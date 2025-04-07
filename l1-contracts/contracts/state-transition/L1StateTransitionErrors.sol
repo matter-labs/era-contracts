@@ -44,6 +44,9 @@ error NotSettlementLayer();
 // 0x32ddf9a2
 error NotHyperchain();
 
+//
+error MessageRootMissing(uint256 chainId, uint256 batchNumber, bytes32 inputRoot);
+
 // 0x2237c426
 error MismatchL2DAValidator();
 

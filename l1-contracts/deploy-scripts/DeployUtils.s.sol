@@ -26,6 +26,8 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    bytes32 interopCenterBytecodeHash;
+    bytes32 assetTrackerBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.
@@ -73,6 +75,10 @@ struct BridgehubDeployedAddresses {
     address ctmDeploymentTrackerProxy;
     address messageRootImplementation;
     address messageRootProxy;
+    address interopCenterImplementation;
+    address interopCenterProxy;
+    address assetTrackerImplementation;
+    address assetTrackerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -379,14 +385,22 @@ abstract contract DeployUtils is Script {
             return abi.encode();
         } else if (compareStrings(contractName, "Bridgehub")) {
             return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
+        } else if (compareStrings(contractName, "InteropCenter")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.ownerAddress);
         } else if (compareStrings(contractName, "MessageRoot")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
+            return
+                abi.encode(
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridgehub.interopCenterProxy,
+                    addresses.bridges.l1AssetRouterProxy
+                );
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return
                 abi.encode(
                     addresses.bridgehub.bridgehubProxy,
+                    addresses.bridgehub.interopCenterProxy,
                     config.eraChainId,
                     addresses.stateTransition.diamondProxy
                 );
@@ -395,6 +409,7 @@ abstract contract DeployUtils is Script {
                 abi.encode(
                     config.tokens.tokenWethAddress,
                     addresses.bridgehub.bridgehubProxy,
+                    addresses.bridgehub.interopCenterProxy,
                     addresses.bridges.l1NullifierProxy,
                     config.eraChainId,
                     addresses.stateTransition.diamondProxy
@@ -459,7 +474,7 @@ abstract contract DeployUtils is Script {
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy);
+            return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
@@ -476,6 +491,15 @@ abstract contract DeployUtils is Script {
             return abi.encode(true);
         } else if (compareStrings(contractName, "DiamondInit")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "AssetTracker")) {
+            return
+                abi.encode(
+                    config.l1ChainId,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.vaults.l1NativeTokenVaultProxy,
+                    addresses.bridgehub.messageRootProxy
+                );
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }

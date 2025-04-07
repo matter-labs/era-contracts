@@ -8,6 +8,7 @@ import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
@@ -21,10 +22,11 @@ import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol"
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SERVICE_TRANSACTION_SENDER} from "../../../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
 import {OnlyEraSupported, BatchNotExecuted, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
 import {NotL1, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../L1StateTransitionErrors.sol";
@@ -32,6 +34,7 @@ import {NotL1, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHype
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {MessageVerification} from "./MessageVerification.sol";
+import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -66,7 +69,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @inheritdoc IMailboxImpl
     function bridgehubRequestL2Transaction(
         BridgehubL2TransactionRequest calldata _request
-    ) external onlyBridgehub returns (bytes32 canonicalTxHash) {
+    ) external onlyBridgehubOrInteropCenter returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
@@ -246,10 +249,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     /// @inheritdoc IMailboxImpl
-    function requestL2TransactionToGatewayMailbox(
+    function requestL2TransactionToGatewayMailboxWithBalanceChange(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
+        uint64 _expirationTimestamp,
+        uint256 _baseTokenAmount,
+        bytes32 _assetId,
+        uint256 _amount
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
@@ -261,7 +267,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
-            _expirationTimestamp: _expirationTimestamp
+            _expirationTimestamp: _expirationTimestamp,
+            _baseTokenAmount: _baseTokenAmount,
+            _assetId: _assetId,
+            _amount: _amount
         });
         canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
@@ -270,7 +279,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override onlyBridgehub {
+    ) external override onlyBridgehubOrInteropCenter {
         _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
         emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
     }
@@ -278,18 +287,21 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _wrapRequest(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
+        uint64 _expirationTimestamp,
+        uint256 _baseTokenAmount,
+        bytes32 _assetId,
+        uint256 _amount
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            IBridgehub.forwardTransactionOnGateway,
-            (_chainId, _canonicalTxHash, _expirationTimestamp)
+            IInteropCenter.forwardTransactionOnGatewayWithBalanceChange,
+            (_chainId, _canonicalTxHash, _expirationTimestamp, _baseTokenAmount, _assetId, _amount)
         );
         return
             BridgehubL2TransactionRequest({
                 /// There is no sender for the wrapping, we use a virtual address.
                 sender: SETTLEMENT_LAYER_RELAY_SENDER,
-                contractL2: L2_BRIDGEHUB_ADDR,
+                contractL2: L2_INTEROP_CENTER_ADDR,
                 mintValue: 0,
                 l2Value: 0,
                 // Very large amount
@@ -325,10 +337,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         if (s.settlementLayer != address(0)) {
             // slither-disable-next-line unused-return
-            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                 _chainId: s.chainId,
                 _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
+                _expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION),
+                _baseTokenAmount: 0,
+                _assetId: bytes32(0),
+                _amount: 0
             });
         }
     }
@@ -399,12 +414,29 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.settlementLayer != address(0)) {
-            // slither-disable-next-line unused-return
-            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailbox({
-                _chainId: s.chainId,
-                _canonicalTxHash: canonicalTxHash,
-                _expirationTimestamp: _params.expirationTimestamp
-            });
+            address assetRouter = IBridgehub(s.bridgehub).assetRouter();
+            if (_params.request.sender != AddressAliasHelper.applyL1ToL2Alias(assetRouter)) {
+                // slither-disable-next-line unused-return
+                IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
+                    _chainId: s.chainId,
+                    _canonicalTxHash: canonicalTxHash,
+                    _expirationTimestamp: _params.expirationTimestamp,
+                    _baseTokenAmount: _params.request.mintValue,
+                    _assetId: bytes32(0),
+                    _amount: 0
+                });
+            } else {
+                IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
+                (bytes32 assetId, uint256 amount) = (assetTracker.getBalanceChange(s.chainId));
+                IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
+                    _chainId: s.chainId,
+                    _canonicalTxHash: canonicalTxHash,
+                    _expirationTimestamp: _params.expirationTimestamp,
+                    _baseTokenAmount: _params.request.mintValue,
+                    _assetId: assetId,
+                    _amount: amount
+                });
+            }
         }
     }
 

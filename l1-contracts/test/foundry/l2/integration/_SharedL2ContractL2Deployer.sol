@@ -10,7 +10,7 @@ import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} fro
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
-import {SystemContractsArgs} from "../../l1/integration/l2-tests-in-l1-context/Utils.sol";
+import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
 import {StateTransitionDeployedAddresses, FacetCut, Action} from "deploy-scripts/Utils.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -29,7 +29,7 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 // import {DeployL1IntegrationScript} from "../../l1/integration/deploy-scripts/DeployL1Integration.s.sol";
 
 import {StateTransitionDeployedAddresses, FacetCut, ADDRESS_ONE} from "deploy-scripts/Utils.sol";
-import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
+import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     using stdToml for string;
@@ -38,7 +38,8 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         L2Utils.initSystemContracts(_args);
     }
 
-    // note this is duplicate code, but the inheritance is already complex
+    /// @notice this is duplicate code, but the inheritance is already complex
+    /// here we have to deploy contracts manually with new Contract(), because that can be handled by the compiler.
     function deployL2Contracts(uint256 _l1ChainId) public virtual override {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(
@@ -71,7 +72,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.diamondInit = address(new DiamondInit());
         // Deploy ChainTypeManager implementation
         addresses.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager(addresses.bridgehub.bridgehubProxy)
+            new ChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)
         );
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager

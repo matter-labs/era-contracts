@@ -3,11 +3,12 @@
 pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOwner} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -61,6 +62,8 @@ contract MessageRoot is IMessageRoot, Initializable {
     // And on chains, we could set it when we seal the batch, but then we need to get the batch number..
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
+    address public assetTracker;
+
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
@@ -74,6 +77,20 @@ contract MessageRoot is IMessageRoot, Initializable {
     modifier onlyChain(uint256 _chainId) {
         if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
             revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+        }
+        _;
+    }
+
+    modifier onlyAssetTracker() {
+        if (msg.sender != assetTracker) {
+            revert OnlyAssetTracker(msg.sender, assetTracker);
+        }
+        _;
+    }
+
+    modifier onlyBridgehubOwner() {
+        if (msg.sender != Ownable(address(BRIDGE_HUB)).owner()) {
+            revert OnlyBridgehubOwner(msg.sender, Ownable(address(BRIDGE_HUB)).owner());
         }
         _;
     }
@@ -92,6 +109,10 @@ contract MessageRoot is IMessageRoot, Initializable {
         _initialize();
     }
 
+    function setAddresses(address _assetTracker) external onlyBridgehubOwner {
+        assetTracker = _assetTracker;
+    }
+
     function addNewChain(uint256 _chainId) external onlyBridgehub {
         if (chainRegistered(_chainId)) {
             revert ChainExists();
@@ -108,7 +129,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
+    ) external onlyAssetTracker {
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
         }

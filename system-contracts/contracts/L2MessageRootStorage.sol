@@ -17,6 +17,14 @@ error MessageRootAlreadyExists();
 contract L2MessageRootStorage is SystemContractBase {
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 msgRoot)) public msgRoots;
 
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] msgRootSides)) public msgRootSides;
+    uint256 public pendingMessageRootIdsLength;
+    struct PendingMessageRootId {
+        uint256 chainId;
+        uint256 batchNumber;
+    }
+    mapping(uint256 index => PendingMessageRootId) public pendingMessageRootIds;
+
     function addMessageRoot(
         uint256 chainId,
         uint256 batchNumber,
@@ -31,5 +39,11 @@ contract L2MessageRootStorage is SystemContractBase {
         msgRoots[chainId][batchNumber] = sides[0];
 
         emit MessageRootAdded(chainId, batchNumber, sides);
+    }
+
+    // kl todo figure out how the executor works with MsgRoot, this on GW.
+    function addThisChainMessageRoot(uint256 batchNumber, bytes32[] memory sides) external {
+        // kl todo add access control, onlyL1Messenger
+        msgRoots[block.chainid][batchNumber] = sides[0];
     }
 }

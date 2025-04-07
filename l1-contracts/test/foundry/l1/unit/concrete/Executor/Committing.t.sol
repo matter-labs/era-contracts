@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
 import {Vm} from "forge-std/Test.sol";
-import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER} from "../Utils/Utils.sol";
+import {Utils, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 import {ExecutorTest, EMPTY_PREPUBLISHED_COMMITMENT, POINT_EVALUATION_PRECOMPILE_RESULT} from "./_Executor_Shared.t.sol";
 
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -426,7 +426,9 @@ contract CommittingTest is ExecutorTest {
             vm.prank(validator);
 
             uint256 allLogsProcessed = uint256(127);
-            vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, allLogsProcessed, allLogsProcessed ^ (1 << i)));
+            vm.expectRevert(
+                abi.encodeWithSelector(MissingSystemLogs.selector, allLogsProcessed, allLogsProcessed ^ (1 << i))
+            );
             (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
                 genesisStoredBatchInfo,
                 wrongNewCommitBatchInfoArray

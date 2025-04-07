@@ -177,4 +177,6 @@ struct ZKChainStorage {
     bytes32 l2EvmEmulatorBytecodeHash;
     /// @dev The dependency message roots
     mapping(uint256 batchNumber => mapping(uint256 index => MessageRoot messageRoot)) dependencyMessageRoots;
+    /// @dev Interop Center, responsible for starting L1->L2 messages
+    address interopCenter;
 }
