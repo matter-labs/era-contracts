@@ -2,6 +2,7 @@ import { ethers } from "hardhat";
 import { enableEvmEmulation } from "./shared/utils";
 import { ContractFactory } from "ethers";
 import { expect } from "chai";
+import { REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from "./shared/constants";
 
 describe("EvmEmulation tests", function () {
   it("Can enable evm emulation", async () => {
@@ -24,5 +25,15 @@ describe("EvmEmulation tests", function () {
     const testValue = await contract.value();
 
     expect(testValue).to.be.eq(101);
+  });
+
+  it("Can deploy EVM contract if EVM emulation is disabled", async () => {
+    const testInterface = new ethers.utils.Interface(testAbi);
+    const factory = new ContractFactory(testInterface, testEvmBytecode);
+
+    await expect(factory.deploy(101)).to.be.revertedWithCustomError(
+      REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+      "EVMEmulationNotSupported"
+    );
   });
 });
