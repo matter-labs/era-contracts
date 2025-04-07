@@ -1079,7 +1079,7 @@ object "EvmEmulator" {
                 switch gt(eSize, 32)
                 case 0 { // if exponent_length <= 32
                     let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
-                    exponent := shr(sub(32, eSize), exponent) // shift to the right if eSize not 32 bytes
+                    exponent := shr(shl(3, sub(32, eSize)), exponent) // shift to the right if eSize not 32 bytes
         
                     // if exponent == 0: iteration_count = 0
                     // else: iteration_count = exponent.bit_length() - 1
@@ -1115,8 +1115,8 @@ object "EvmEmulator" {
             value := mload(index)
         
             if lt(memoryBound, add(index, 32)) {
-                memoryBound := getMax(index, memoryBound)
-                let shift := sub(add(index, 32), memoryBound)
+                memoryBound := getMax(index, memoryBound)  // Note: in bytes
+                let shift := shl(3, sub(add(index, 32), memoryBound)) // Note: in bits
                 value := shl(shift, shr(shift, value))
             }
         }
@@ -4142,7 +4142,7 @@ object "EvmEmulator" {
                     switch gt(eSize, 32)
                     case 0 { // if exponent_length <= 32
                         let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
-                        exponent := shr(sub(32, eSize), exponent) // shift to the right if eSize not 32 bytes
+                        exponent := shr(shl(3, sub(32, eSize)), exponent) // shift to the right if eSize not 32 bytes
             
                         // if exponent == 0: iteration_count = 0
                         // else: iteration_count = exponent.bit_length() - 1
@@ -4178,8 +4178,8 @@ object "EvmEmulator" {
                 value := mload(index)
             
                 if lt(memoryBound, add(index, 32)) {
-                    memoryBound := getMax(index, memoryBound)
-                    let shift := sub(add(index, 32), memoryBound)
+                    memoryBound := getMax(index, memoryBound)  // Note: in bytes
+                    let shift := shl(3, sub(add(index, 32), memoryBound)) // Note: in bits
                     value := shl(shift, shr(shift, value))
                 }
             }
