@@ -1021,7 +1021,7 @@ function modexpGasCost(inputOffset, inputSize) -> gasToCharge {
         switch gt(eSize, 32)
         case 0 { // if exponent_length <= 32
             let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
-            exponent := shr(mul(8, sub(32, eSize)), exponent) // shift to the right if eSize not 32 bytes
+            exponent := shr(shl(3, sub(32, eSize)), exponent) // shift to the right if eSize not 32 bytes
 
             // if exponent == 0: iteration_count = 0
             // else: iteration_count = exponent.bit_length() - 1
@@ -1057,8 +1057,8 @@ function mloadPotentiallyPaddedValue(index, memoryBound) -> value {
     value := mload(index)
 
     if lt(memoryBound, add(index, 32)) {
-        memoryBound := getMax(index, memoryBound)
-        let shift := mul(8, sub(add(index, 32), memoryBound))
+        memoryBound := getMax(index, memoryBound)  // Note: in bytes
+        let shift := shl(3, sub(add(index, 32), memoryBound)) // Note: in bits
         value := shl(shift, shr(shift, value))
     }
 }
