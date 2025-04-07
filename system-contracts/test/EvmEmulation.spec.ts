@@ -27,7 +27,7 @@ describe("EvmEmulation tests", function () {
     expect(testValue).to.be.eq(101);
   });
 
-  it("Can deploy EVM contract if EVM emulation is disabled", async () => {
+  it("Can't deploy EVM contract if EVM emulation is disabled", async () => {
     const testInterface = new ethers.utils.Interface(testAbi);
     const factory = new ContractFactory(testInterface, testEvmBytecode);
 
