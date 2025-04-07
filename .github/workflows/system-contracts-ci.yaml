@@ -117,7 +117,7 @@ jobs:
         uses: dutterbutter/anvil-zksync-action@v1.1.0
         with:
           mode: run
-          releaseTag: 7d87e25
+          releaseTag: ccfff38
           protocolVersion: 28
 
       - name: Install dependencies
