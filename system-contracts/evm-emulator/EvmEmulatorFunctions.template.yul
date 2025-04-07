@@ -1006,6 +1006,7 @@ function modexpGasCost(inputOffset, inputSize) -> gasToCharge {
 
     // The limitated size of parameters also prevents overflows during gas calculations.
     // The current value (32 bytes) violates EVM equivalence. This value comes from circuit limitations.
+    // In the future this constant may be replaced with bigger values, up to MAX_UINT64.
 
     switch inputIsTooBig
     case 1 {
@@ -1029,6 +1030,9 @@ function modexpGasCost(inputOffset, inputSize) -> gasToCharge {
             }
         }
         default { // elif exponent_length > 32
+            // Note: currently this branch is unused (due to MAX_MODEXP_INPUT_FIELD_SIZE restriction). 
+            // It can be used if more efficient modexp circuits are implemented.
+
             // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
 
             // load last 32 bytes of exponent
