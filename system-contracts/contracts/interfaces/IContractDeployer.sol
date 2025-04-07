@@ -112,8 +112,9 @@ interface IContractDeployer {
     /// @notice Can be called by an account to update its account version
     function updateAccountVersion(AccountAbstractionVersion _version) external;
 
-    /// @notice Can be called by an account to update its nonce ordering
-    function updateNonceOrdering(AccountNonceOrdering _nonceOrdering) external;
+    /// @notice Updates the nonce ordering of the account. Since only `KeyedSequential`
+    /// is supported, currently this method always reverts.
+    function updateNonceOrdering(AccountNonceOrdering) external;
 
     /// @notice This method is to be used only during an upgrade to set bytecodes on specific addresses.
     function forceDeployOnAddresses(ForceDeployment[] calldata _deployments) external payable;
