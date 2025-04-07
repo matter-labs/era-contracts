@@ -28,8 +28,6 @@ uint8 constant RELAYED_EXECUTOR_VERSION = 0;
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev Note, that the exact code present below is only present on the L2 in production environment.
-/// For the code on L1 environment, you should look into the following commit: https://github.com/matter-labs/era-contracts/commit/e815d8d86841fa0d8dc6a544941222f48859eeda.
 contract ExecutorFacet is ZKChainBase, IExecutor {
     using UncheckedMath for uint256;
     using PriorityQueue for PriorityQueue.Queue;
