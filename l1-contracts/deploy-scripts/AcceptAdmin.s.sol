@@ -349,6 +349,7 @@ contract AcceptAdmin is Script {
         uint256 l2ChainId;
         uint256 gatewayChainId;
         bytes _gatewayDiamondCutData;
+        address refundRecipient;
         bool _shouldSend;
     }
 
@@ -392,7 +393,8 @@ contract AcceptAdmin is Script {
             gatewayChainInfo.l1AssetRouterProxy,
             gatewayChainInfo.l1AssetRouterProxy,
             0,
-            secondBridgeData
+            secondBridgeData,
+            data.refundRecipient
         );
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
@@ -404,6 +406,7 @@ contract AcceptAdmin is Script {
         uint256 l2ChainId,
         uint256 gatewayChainId,
         bytes calldata _gatewayDiamondCutData,
+        address refundRecipient,
         bool _shouldSend
     ) public {
         _migrateChainToGatewayInner(
@@ -413,6 +416,7 @@ contract AcceptAdmin is Script {
                 l2ChainId: l2ChainId,
                 gatewayChainId: gatewayChainId,
                 _gatewayDiamondCutData: _gatewayDiamondCutData,
+                refundRecipient: refundRecipient,
                 _shouldSend: _shouldSend
             })
         );
@@ -427,6 +431,7 @@ contract AcceptAdmin is Script {
         address l1DAValidator;
         address l2DAValidator;
         address chainDiamondProxyOnGateway;
+        address refundRecipient;
         bool _shouldSend;
     }
 
@@ -443,7 +448,8 @@ contract AcceptAdmin is Script {
             data.chainDiamondProxyOnGateway,
             data.gatewayChainId,
             data.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy
+            l2ChainInfo.l1AssetRouterProxy,
+            data.refundRecipient
         );
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
@@ -457,6 +463,7 @@ contract AcceptAdmin is Script {
         address l1DAValidator,
         address l2DAValidator,
         address chainDiamondProxyOnGateway,
+        address refundRecipient,
         bool _shouldSend
     ) public {
         _setDAValidatorPairWithGatewayInner(
@@ -468,6 +475,7 @@ contract AcceptAdmin is Script {
                 l1DAValidator: l1DAValidator,
                 l2DAValidator: l2DAValidator,
                 chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
+                refundRecipient: refundRecipient,
                 _shouldSend: _shouldSend
             })
         );
@@ -482,6 +490,7 @@ contract AcceptAdmin is Script {
         uint256 gatewayChainId;
         address validatorAddress;
         address gatewayValidatorTimelock;
+        address refundRecipient;
         bool _shouldSend;
     }
 
@@ -498,7 +507,8 @@ contract AcceptAdmin is Script {
             data.gatewayValidatorTimelock,
             data.gatewayChainId,
             data.bridgehub,
-            l2ChainInfo.l1AssetRouterProxy
+            l2ChainInfo.l1AssetRouterProxy,
+            data.refundRecipient
         );
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
@@ -511,6 +521,7 @@ contract AcceptAdmin is Script {
         uint256 gatewayChainId,
         address validatorAddress,
         address gatewayValidatorTimelock,
+        address refundRecipient,
         bool _shouldSend
     ) public {
         _enableValidatorViaGatewayInner(
@@ -521,9 +532,36 @@ contract AcceptAdmin is Script {
                 gatewayChainId: gatewayChainId,
                 validatorAddress: validatorAddress,
                 gatewayValidatorTimelock: gatewayValidatorTimelock,
+                refundRecipient: refundRecipient,
                 _shouldSend: _shouldSend
             })
         );
+    }
+
+    function adminL1L2Tx(
+        address bridgehub,
+        uint256 l1GasPrice,
+        uint256 chainId,
+        address to,
+        uint256 value,
+        bytes data,
+        address refundRecipient,
+        bool _shouldSend
+    ) public {
+        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(bridgehub, chainId);
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+            l1GasPrice,
+            data,
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            to,
+            chainId,
+            bridgehub,
+            l2ChainInfo.l1AssetRouterProxy,
+            refundRecipient
+        );
+
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, _shouldSend);
     }
 
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {

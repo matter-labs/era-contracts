@@ -140,7 +140,8 @@ contract GatewayCTMFromL1 is Script {
                 dstAddress: address(0),
                 chainId: config.chainChainId,
                 bridgehubAddress: config.bridgehub,
-                l1SharedBridgeProxy: config.sharedBridgeProxy
+                l1SharedBridgeProxy: config.sharedBridgeProxy,
+                refundRecipient: msg.sender
             });
         }
 
@@ -152,7 +153,8 @@ contract GatewayCTMFromL1 is Script {
             dstAddress: L2_CREATE2_FACTORY_ADDRESS,
             chainId: config.chainChainId,
             bridgehubAddress: config.bridgehub,
-            l1SharedBridgeProxy: config.sharedBridgeProxy
+            l1SharedBridgeProxy: config.sharedBridgeProxy,
+            refundRecipient: msg.sender
         });
 
         // address whitelistedBytecodesFactory = deployWhitelistedBytecodeFactory();

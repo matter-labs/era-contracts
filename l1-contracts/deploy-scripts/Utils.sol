@@ -93,6 +93,7 @@ struct PrepareL1L2TransactionParams {
     uint256 chainId;
     address bridgehubAddress;
     address l1SharedBridgeProxy;
+    address refundRecipient;
 }
 
 struct SelectorToFacet {
@@ -355,7 +356,8 @@ library Utils {
             dstAddress: L2_DEPLOYER_SYSTEM_CONTRACT_ADDR,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            refundRecipient: msg.sender
         });
         return contractAddress;
     }
@@ -421,7 +423,8 @@ library Utils {
             dstAddress: L2_CREATE2_FACTORY_ADDRESS,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            refundRecipient: msg.sender
         });
         return contractAddress;
     }
@@ -450,8 +453,7 @@ library Utils {
             l2GasLimit: params.l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
             factoryDeps: params.factoryDeps,
-            // FIXME: use correct refund recipient
-            refundRecipient: msg.sender
+            refundRecipient: params.refundRecipient
         });
     }
 
@@ -462,7 +464,8 @@ library Utils {
         address bridgehubAddress,
         address secondBridgeAddress,
         uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata
+        bytes memory secondBridgeCalldata,
+        address refundRecipient
     )
         internal
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
@@ -479,7 +482,7 @@ library Utils {
             l2Value: 0,
             l2GasLimit: l2GasLimit,
             l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            refundRecipient: msg.sender,
+            refundRecipient: refundRecipient,
             secondBridgeAddress: secondBridgeAddress,
             secondBridgeValue: secondBridgeValue,
             secondBridgeCalldata: secondBridgeCalldata
@@ -497,7 +500,8 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address l1SharedBridgeProxy,
+        address refundRecipient
     ) internal {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
         (
@@ -513,7 +517,8 @@ library Utils {
                     dstAddress: dstAddress,
                     chainId: chainId,
                     bridgehubAddress: bridgehubAddress,
-                    l1SharedBridgeProxy: l1SharedBridgeProxy
+                    l1SharedBridgeProxy: l1SharedBridgeProxy,
+                    refundRecipient: refundRecipient
                 })
             );
 
@@ -537,7 +542,8 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address l1SharedBridgeProxy,
+        address refundRecipient
     ) internal returns (Call[] memory calls) {
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
@@ -552,7 +558,8 @@ library Utils {
                     dstAddress: dstAddress,
                     chainId: chainId,
                     bridgehubAddress: bridgehubAddress,
-                    l1SharedBridgeProxy: l1SharedBridgeProxy
+                    l1SharedBridgeProxy: l1SharedBridgeProxy,
+                    refundRecipient: refundRecipient
                 })
             );
 
@@ -584,7 +591,8 @@ library Utils {
         address l1SharedBridgeProxy,
         address secondBridgeAddress,
         uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata
+        bytes memory secondBridgeCalldata,
+        address refundRecipient
     ) internal returns (Call[] memory calls) {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
@@ -596,7 +604,8 @@ library Utils {
                 bridgehubAddress,
                 secondBridgeAddress,
                 secondBridgeValue,
-                secondBridgeCalldata
+                secondBridgeCalldata,
+                refundRecipient
             );
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
@@ -744,7 +753,8 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address l1SharedBridgeProxy,
+        address refundRecipient
     ) internal returns (Call[] memory calls) {
         // 1) Prepare the L2TransactionRequestDirect (same logic as before)
         (
@@ -760,7 +770,8 @@ library Utils {
                     dstAddress: dstAddress,
                     chainId: chainId,
                     bridgehubAddress: bridgehubAddress,
-                    l1SharedBridgeProxy: l1SharedBridgeProxy
+                    l1SharedBridgeProxy: l1SharedBridgeProxy,
+                    refundRecipient: refundRecipient
                 })
             );
 
@@ -797,7 +808,8 @@ library Utils {
         address l1SharedBridgeProxy,
         address secondBridgeAddress,
         uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata
+        bytes memory secondBridgeCalldata,
+        address refundRecipient
     ) internal returns (Call[] memory calls) {
         // 1) Prepare the L2TransactionRequestTwoBridges (same logic as before)
         (
@@ -810,7 +822,8 @@ library Utils {
                 bridgehubAddress,
                 secondBridgeAddress,
                 secondBridgeValue,
-                secondBridgeCalldata
+                secondBridgeCalldata,
+                refundRecipient
             );
 
         // 2) Prepare approval calls if base token != ETH
@@ -848,7 +861,8 @@ library Utils {
         address dstAddress,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address l1SharedBridgeProxy,
+        address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls (no actual execution done here)
         Call[] memory calls = prepareAdminL1L2DirectTransaction(
@@ -859,7 +873,8 @@ library Utils {
             dstAddress,
             chainId,
             bridgehubAddress,
-            l1SharedBridgeProxy
+            l1SharedBridgeProxy,
+            refundRecipient
         );
 
         console.log("Executing transaction");
@@ -890,7 +905,8 @@ library Utils {
         address l1SharedBridgeProxy,
         address secondBridgeAddress,
         uint256 secondBridgeValue,
-        bytes memory secondBridgeCalldata
+        bytes memory secondBridgeCalldata,
+        address refundRecipient
     ) internal returns (bytes32 txHash) {
         // 1) Prepare the calls
         Call[] memory calls = prepareAdminL1L2TwoBridgesTransaction(
@@ -901,7 +917,8 @@ library Utils {
             l1SharedBridgeProxy,
             secondBridgeAddress,
             secondBridgeValue,
-            secondBridgeCalldata
+            secondBridgeCalldata,
+            refundRecipient
         );
 
         console.log("Executing transaction");
@@ -1009,7 +1026,8 @@ library Utils {
             dstAddress: 0x0000000000000000000000000000000000000000,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            refundRecipient: msg.sender
         });
     }
 

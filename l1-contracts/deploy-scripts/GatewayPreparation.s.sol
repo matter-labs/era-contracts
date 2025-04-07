@@ -469,24 +469,25 @@ contract GatewayPreparation is GatewayChainShared {
         adminCalldata = abi.encodeCall(ChainAdmin.multicall, (calls, true));
     }
 
-    /// TODO(EVM-748): make that function support non-ETH based chains
-    function supplyGatewayWallet(address addr, uint256 amount) public {
-        initializeConfig();
+    // /// TODO(EVM-748): make that function support non-ETH based chains
+    // function supplyGatewayWallet(address addr, uint256 amount) public {
+    //     initializeConfig();
 
-        Utils.runL1L2Transaction(
-            hex"",
-            Utils.MAX_PRIORITY_TX_GAS,
-            amount,
-            new bytes[](0),
-            addr,
-            config.gatewayChainId,
-            config.bridgehub,
-            config.l1AssetRouterProxy
-        );
+    //     Utils.runL1L2Transaction(
+    //         hex"",
+    //         Utils.MAX_PRIORITY_TX_GAS,
+    //         amount,
+    //         new bytes[](0),
+    //         addr,
+    //         config.gatewayChainId,
+    //         config.bridgehub,
+    //         config.l1AssetRouterProxy,
+    //         msg.sender
+    //     );
 
-        // We record L2 tx hash only for governance operations
-        saveOutput(bytes32(0));
-    }
+    //     // We record L2 tx hash only for governance operations
+    //     saveOutput(bytes32(0));
+    // }
 
     /// The caller of this function should have private key of the admin of the *gateway*
     function deployGatewayTransactionFilterer(address gatewayProxyAdmin) public {
