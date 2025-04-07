@@ -17,6 +17,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -250,6 +251,25 @@ contract AcceptAdmin is Script {
 
         vm.startBroadcast();
         ecosystemAdmin.multicall(calls, true);
+        vm.stopBroadcast();
+    }
+
+    /// @notice Change pubdata pricing mode. Need to be called by chain admin.
+    /// @param chainAdmin The chain admin
+    /// @param target The zk chain contract.
+    /// @param pricingMode The new pricing mode.
+    function setPubdataPricingMode(ChainAdmin chainAdmin, address target, PubdataPricingMode pricingMode) public {
+        IZKChain zkChainContract = IZKChain(target);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: target,
+            value: 0,
+            data: abi.encodeCall(zkChainContract.setPubdataPricingMode, (pricingMode))
+        });
+
+        vm.startBroadcast();
+        chainAdmin.multicall(calls, true);
         vm.stopBroadcast();
     }
 }
