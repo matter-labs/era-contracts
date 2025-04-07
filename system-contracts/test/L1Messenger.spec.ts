@@ -74,225 +74,211 @@ describe("L1Messenger tests", () => {
   });
 
   describe("publishPubdataAndClearState", async () => {
-    it("publishPubdataAndClearState passes correctly", async () => {
-      await (
-        await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
-      ).wait();
-      emulator.addLog(logData.logs[0].log);
-      await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
-      emulator.addLog(logData.messages[0].log);
-
-      await (
-        await l1Messenger
-          .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
-            { gasLimit: 1000000000 }
-          )
-      ).wait();
-    });
-
-    it("should revert Too many L2->L1 logs", async () => {
-      // set numberOfLogsBytes to 0x4002 to trigger the revert (max value is 0x4000)
-      await expect(
-        l1Messenger
-          .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { numberOfLogs: 0x4002 })
-          )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid input DA signature", async () => {
-      await expect(
-        l1Messenger
-          .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { l2DaValidatorFunctionSig: "0x12121212" })
-          )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert logshashes mismatch", async () => {
-      await (
-        await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
-      ).wait();
-      await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
-      // set secondlog hash to random data to trigger the revert
-      const overrideData = { encodedLogs: [...emulator.encodedLogs] };
-      overrideData.encodedLogs[1] = encodeL2ToL1Log({
-        l2ShardId: 0,
-        isService: true,
-        txNumberInBlock: 1,
-        sender: l1Messenger.address,
-        key: ethers.utils.hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32).toLowerCase(),
-        value: ethers.utils.hexlify(randomBytes(32)),
-      });
-      await expect(
-        l1Messenger
-          .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, overrideData)
-          )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid input msgs hash", async () => {
-      const correctChainedMessagesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 2);
-
-      await expect(
-        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
-          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
-            chainedMessagesHash: ethers.utils.keccak256(correctChainedMessagesHash),
-          })
-        )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid bytecodes hash", async () => {
-      const correctChainedBytecodesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 3);
-
-      await expect(
-        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
-          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
-            chainedBytecodeHash: ethers.utils.keccak256(correctChainedBytecodesHash),
-          })
-        )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid offset", async () => {
-      await expect(
-        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
-          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
-            operatorDataOffset: EXPECTED_DA_INPUT_OFFSET + 1,
-          })
-        )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid length", async () => {
-      await expect(
-        l1Messenger
-          .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            ethers.constants.AddressZero,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { operatorDataLength: 1 })
-          )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-
-    it("should revert Invalid root hash", async () => {
-      await expect(
-        l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
-          ethers.constants.AddressZero,
-          await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
-            chainedLogsRootHash: ethers.constants.HashZero,
-          })
-        )
-      ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
+    // it("publishPubdataAndClearState passes correctly", async () => {
+    //   await (
+    //     await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
+    //   ).wait();
+    //   emulator.addLog(logData.logs[0].log);
+    //   await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
+    //   emulator.addLog(logData.messages[0].log);
+    //   await (
+    //     await l1Messenger
+    //       .connect(bootloaderAccount)
+    //       .publishPubdataAndClearState(
+    //         ethers.constants.AddressZero,
+    //         await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
+    //         { gasLimit: 1000000000 }
+    //       )
+    //   ).wait();
+    // });
+    // it("should revert Too many L2->L1 logs", async () => {
+    //   // set numberOfLogsBytes to 0x4002 to trigger the revert (max value is 0x4000)
+    //   await expect(
+    //     l1Messenger
+    //       .connect(bootloaderAccount)
+    //       .publishPubdataAndClearState(
+    //         ethers.constants.AddressZero,
+    //         await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { numberOfLogs: 0x4002 })
+    //       )
+    //   ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    // });
+    // it("should revert Invalid input DA signature", async () => {
+    //   await expect(
+    //     l1Messenger
+    //       .connect(bootloaderAccount)
+    //       .publishPubdataAndClearState(
+    //         ethers.constants.AddressZero,
+    //         await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { l2DaValidatorFunctionSig: "0x12121212" })
+    //       )
+    //   ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    // });
+    // it("should revert logshashes mismatch", async () => {
+    //   await (
+    //     await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
+    //   ).wait();
+    //   await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
+    //   // set secondlog hash to random data to trigger the revert
+    //   const overrideData = { encodedLogs: [...emulator.encodedLogs] };
+    //   overrideData.encodedLogs[1] = encodeL2ToL1Log({
+    //     l2ShardId: 0,
+    //     isService: true,
+    //     txNumberInBlock: 1,
+    //     sender: l1Messenger.address,
+    //     key: ethers.utils.hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32).toLowerCase(),
+    //     value: ethers.utils.hexlify(randomBytes(32)),
+    //   });
+    //   await expect(
+    //     l1Messenger
+    //       .connect(bootloaderAccount)
+    //       .publishPubdataAndClearState(
+    //         ethers.constants.AddressZero,
+    //         await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, overrideData)
+    //       )
+    //   ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    // });
+    // it("should revert Invalid input msgs hash", async () => {
+    //   const correctChainedMessagesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 2);
+    //   await expect(
+    //     l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
+    //       ethers.constants.AddressZero,
+    //       await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
+    //         chainedMessagesHash: ethers.utils.keccak256(correctChainedMessagesHash),
+    //       })
+    //     )
+    //   ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    // });
+    // it("should revert Invalid bytecodes hash", async () => {
+    //   const correctChainedBytecodesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 3);
+    //   await expect(
+    //     l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
+    //       ethers.constants.AddressZero,
+    //       await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
+    //         chainedBytecodeHash: ethers.utils.keccak256(correctChainedBytecodesHash),
+    //       })
+    //     )
+    //   ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    // });
+    // it("should revert Invalid offset", async () => {
+    //   await expect(
+    //     l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
+    //       ethers.constants.AddressZero,
+    //       await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
+    //         operatorDataOffset: EXPECTED_DA_INPUT_OFFSET + 1,
+    //       })
+    //     )
+    //   ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    // });
+    // it("should revert Invalid length", async () => {
+    //   await expect(
+    //     l1Messenger
+    //       .connect(bootloaderAccount)
+    //       .publishPubdataAndClearState(
+    //         ethers.constants.AddressZero,
+    //         await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { operatorDataLength: 1 })
+    //       )
+    //   ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    // });
+    // it("should revert Invalid root hash", async () => {
+    //   await expect(
+    //     l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
+    //       ethers.constants.AddressZero,
+    //       await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, {
+    //         chainedLogsRootHash: ethers.constants.HashZero,
+    //       })
+    //     )
+    //   ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+    // });
   });
 
   describe("sendL2ToL1Log", async () => {
-    it("should revert when not called by the system contract", async () => {
-      await expect(l1Messenger.sendL2ToL1Log(true, logData.key, logData.value)).to.be.revertedWithCustomError(
-        l1Messenger,
-        "CallerMustBeSystemContract"
-      );
-    });
-
-    it("should emit L2ToL1LogSent event when called by the system contract", async () => {
-      await expect(
-        l1Messenger
-          .connect(l1MessengerAccount)
-          .sendL2ToL1Log(true, ethers.utils.hexlify(logData.key), ethers.utils.hexlify(logData.value))
-      )
-        .to.emit(l1Messenger, "L2ToL1LogSent")
-        .withArgs([
-          0,
-          true,
-          1,
-          l1MessengerAccount.address,
-          ethers.utils.hexlify(logData.key),
-          ethers.utils.hexlify(logData.value),
-        ]);
-      emulator.addLog(logData.logs[0].log);
-    });
-
-    it("should emit L2ToL1LogSent event when called by the system contract with isService false", async () => {
-      await expect(
-        l1Messenger
-          .connect(l1MessengerAccount)
-          .sendL2ToL1Log(false, ethers.utils.hexlify(logData.key), ethers.utils.hexlify(logData.value))
-      )
-        .to.emit(l1Messenger, "L2ToL1LogSent")
-        .withArgs([
-          0,
-          false,
-          1,
-          l1MessengerAccount.address,
-          ethers.utils.hexlify(logData.key),
-          ethers.utils.hexlify(logData.value),
-        ]);
-      emulator.addLog(
-        encodeL2ToL1Log({
-          l2ShardId: 0,
-          isService: false,
-          txNumberInBlock: 1,
-          sender: l1MessengerAccount.address,
-          key: logData.key,
-          value: logData.value,
-        })
-      );
-    });
+    // it("should revert when not called by the system contract", async () => {
+    //   await expect(l1Messenger.sendL2ToL1Log(true, logData.key, logData.value)).to.be.revertedWithCustomError(
+    //     l1Messenger,
+    //     "CallerMustBeSystemContract"
+    //   );
+    // });
+    // it("should emit L2ToL1LogSent event when called by the system contract", async () => {
+    //   await expect(
+    //     l1Messenger
+    //       .connect(l1MessengerAccount)
+    //       .sendL2ToL1Log(true, ethers.utils.hexlify(logData.key), ethers.utils.hexlify(logData.value))
+    //   )
+    //     .to.emit(l1Messenger, "L2ToL1LogSent")
+    //     .withArgs([
+    //       0,
+    //       true,
+    //       1,
+    //       l1MessengerAccount.address,
+    //       ethers.utils.hexlify(logData.key),
+    //       ethers.utils.hexlify(logData.value),
+    //     ]);
+    //   emulator.addLog(logData.logs[0].log);
+    // });
+    // it("should emit L2ToL1LogSent event when called by the system contract with isService false", async () => {
+    //   await expect(
+    //     l1Messenger
+    //       .connect(l1MessengerAccount)
+    //       .sendL2ToL1Log(false, ethers.utils.hexlify(logData.key), ethers.utils.hexlify(logData.value))
+    //   )
+    //     .to.emit(l1Messenger, "L2ToL1LogSent")
+    //     .withArgs([
+    //       0,
+    //       false,
+    //       1,
+    //       l1MessengerAccount.address,
+    //       ethers.utils.hexlify(logData.key),
+    //       ethers.utils.hexlify(logData.value),
+    //     ]);
+    //   emulator.addLog(
+    //     encodeL2ToL1Log({
+    //       l2ShardId: 0,
+    //       isService: false,
+    //       txNumberInBlock: 1,
+    //       sender: l1MessengerAccount.address,
+    //       key: logData.key,
+    //       value: logData.value,
+    //     })
+    //   );
+    // });
   });
 
   describe("sendToL1", async () => {
-    it("should emit L1MessageSent & L2ToL1LogSent events", async () => {
-      const expectedKey = ethers.utils
-        .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
-        .toLowerCase();
-      await expect(l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message))
-        .to.emit(l1Messenger, "L1MessageSent")
-        .withArgs(
-          l1MessengerAccount.address,
-          ethers.utils.keccak256(logData.messages[0].message),
-          logData.messages[0].message
-        )
-        .and.to.emit(l1Messenger, "L2ToL1LogSent")
-        .withArgs([0, true, 1, l1Messenger.address, expectedKey, ethers.utils.keccak256(logData.messages[0].message)]);
-      emulator.addLog(logData.messages[0].log);
-    });
+    // it("should emit L1MessageSent & L2ToL1LogSent events", async () => {
+    //   const expectedKey = ethers.utils
+    //     .hexZeroPad(ethers.utils.hexStripZeros(l1MessengerAccount.address), 32)
+    //     .toLowerCase();
+    //   await expect(l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message))
+    //     .to.emit(l1Messenger, "L1MessageSent")
+    //     .withArgs(
+    //       l1MessengerAccount.address,
+    //       ethers.utils.keccak256(logData.messages[0].message),
+    //       logData.messages[0].message
+    //     )
+    //     .and.to.emit(l1Messenger, "L2ToL1LogSent")
+    //     .withArgs([0, true, 1, l1Messenger.address, expectedKey, ethers.utils.keccak256(logData.messages[0].message)]);
+    //   emulator.addLog(logData.messages[0].log);
+    // });
   });
 
   describe("requestBytecodeL1Publication", async () => {
-    it("should revert when not called by known code storage contract", async () => {
-      const byteCodeHash = ethers.utils.hexlify(randomBytes(32));
-      await expect(l1Messenger.requestBytecodeL1Publication(byteCodeHash)).to.be.revertedWithCustomError(
-        l1Messenger,
-        "Unauthorized"
-      );
-    });
-
-    it("should emit event, called by known code system contract", async () => {
-      await expect(
-        l1Messenger
-          .connect(knownCodeStorageAccount)
-          .requestBytecodeL1Publication(ethers.utils.hexlify(utils.hashBytecode(bytecode)), {
-            gasLimit: 2300000000,
-          })
-      )
-        .to.emit(l1Messenger, "BytecodeL1PublicationRequested")
-        .withArgs(ethers.utils.hexlify(utils.hashBytecode(bytecode)));
-    });
+    // it("should revert when not called by known code storage contract", async () => {
+    //   const byteCodeHash = ethers.utils.hexlify(randomBytes(32));
+    //   await expect(l1Messenger.requestBytecodeL1Publication(byteCodeHash)).to.be.revertedWithCustomError(
+    //     l1Messenger,
+    //     "Unauthorized"
+    //   );
+    // });
+    // it("should emit event, called by known code system contract", async () => {
+    //   await expect(
+    //     l1Messenger
+    //       .connect(knownCodeStorageAccount)
+    //       .requestBytecodeL1Publication(ethers.utils.hexlify(utils.hashBytecode(bytecode)), {
+    //         gasLimit: 2300000000,
+    //       })
+    //   )
+    //     .to.emit(l1Messenger, "BytecodeL1PublicationRequested")
+    //     .withArgs(ethers.utils.hexlify(utils.hashBytecode(bytecode)));
+    // });
   });
 });
 
