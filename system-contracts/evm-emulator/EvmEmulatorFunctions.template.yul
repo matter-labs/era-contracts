@@ -1055,7 +1055,7 @@ function mloadPotentiallyPaddedValue(index, memoryBound) -> value {
     if lt(memoryBound, add(index, 32)) {
         memoryBound := getMax(index, memoryBound)
         let shift := sub(add(index, 32), memoryBound)
-        let value := shl(shift, shr(shift, value))
+        value := shl(shift, shr(shift, value))
     }
 }
 
