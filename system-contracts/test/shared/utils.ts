@@ -13,6 +13,7 @@ import { AccountCodeStorageFactory, ContractDeployerFactory } from "../../typech
 import {
   REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
   REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+  SERVICE_CALL_PSEUDO_CALLER,
   TWO_IN_256,
 } from "./constants";
 
@@ -258,4 +259,12 @@ export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: Sta
   return ethers.utils.hexlify(
     ethers.utils.concat([ethers.utils.solidityPack(["uint16"], [numInitial]), ...initial, ...repeated])
   );
+}
+
+const ERAVM_AND_EVM_ALLOWED_TO_DEPLOY = 1;
+export async function enableEvmEmulation() {
+  const serviceTransactionSender = await ethers.getImpersonatedSigner(SERVICE_CALL_PSEUDO_CALLER);
+  const deployerContract = ContractDeployerFactory.connect(REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, serviceTransactionSender);
+
+  await deployerContract.setAllowedBytecodeTypesToDeploy(ERAVM_AND_EVM_ALLOWED_TO_DEPLOY);
 }
