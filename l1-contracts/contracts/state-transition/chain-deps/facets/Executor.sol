@@ -88,7 +88,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
         }
         if (logOutput.dependencyRootsRollingHash != _newBatch.dependencyRootsRollingHash) {
-            revert DependencyRootsRollingHashMismatch(logOutput.dependencyRootsRollingHash, _newBatch.dependencyRootsRollingHash);
+            revert DependencyRootsRollingHashMismatch(
+                logOutput.dependencyRootsRollingHash,
+                _newBatch.dependencyRootsRollingHash
+            );
         }
 
         // Check the timestamp of the new batch
@@ -306,7 +309,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // console.logBytes(_commitData);
         (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
             .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
-            // console.log("decoding commit data 2");
+        // console.log("decoding commit data 2");
 
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
         // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
@@ -431,7 +434,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_dependencyRootsRollingHash != _storedBatch.dependencyRootsRollingHash) {
             if (_storedBatch.batchNumber == (0)) {
                 return;
-            } 
+            }
             revert DependencyRootsRollingHashMismatch(
                 _storedBatch.dependencyRootsRollingHash,
                 _dependencyRootsRollingHash
@@ -490,14 +493,23 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     uint256(msgRoot.blockNumber)
                 );
             } else {
-                // for testing purposes this is allowed. 
+                // for testing purposes this is allowed.
                 correctRootHash = msgRoot.sides[0];
                 // revert CommitBasedInteropNotSupported();
             }
             if (msgRoot.sides.length != 1 || msgRoot.sides[0] != correctRootHash) {
                 revert InvalidMessageRoot(correctRootHash, msgRoot.sides[0]);
             }
-            dependencyRootsRollingHash = keccak256(abi.encodePacked(dependencyRootsRollingHash, msgRoot.chainId, msgRoot.blockNumber, uint256(96),msgRoot.sides.length, msgRoot.sides));
+            dependencyRootsRollingHash = keccak256(
+                abi.encodePacked(
+                    dependencyRootsRollingHash,
+                    msgRoot.chainId,
+                    msgRoot.blockNumber,
+                    uint256(96),
+                    msgRoot.sides.length,
+                    msgRoot.sides
+                )
+            );
         }
         console.log("dependencyRootsRollingHash");
         console.logBytes32(dependencyRootsRollingHash);
@@ -537,7 +549,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
-
             _executeOneBatch(batchesData[i], priorityOpsData[i], dependencyRoots[i], i);
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }
