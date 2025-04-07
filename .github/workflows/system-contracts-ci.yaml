@@ -117,7 +117,7 @@ jobs:
         uses: dutterbutter/anvil-zksync-action@v1.1.0
         with:
           mode: run
-          releaseTag: 7d87e25
+          releaseTag: ccfff38
           protocolVersion: 28
 
       - name: Install dependencies
@@ -137,9 +137,16 @@ jobs:
             system-contracts/typechain
             system-contracts/contracts-preprocessed
 
+      - name: Display system information
+        run: |
+          echo "CPU info:"
+          lscpu
+          echo "Memory:"
+          free -h
+      
       - name: Run tests
         run: yarn sc test
 
       - name: Print output logs of era_test_node
         if: always()
-        run: cat era_test_node.log
+        run: cat anvil-zksync.log
