@@ -264,7 +264,10 @@ export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: Sta
 const ERAVM_AND_EVM_ALLOWED_TO_DEPLOY = 1;
 export async function enableEvmEmulation() {
   const serviceTransactionSender = await ethers.getImpersonatedSigner(SERVICE_CALL_PSEUDO_CALLER);
-  const deployerContract = ContractDeployerFactory.connect(REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, serviceTransactionSender);
+  const deployerContract = ContractDeployerFactory.connect(
+    REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+    serviceTransactionSender
+  );
 
   await deployerContract.setAllowedBytecodeTypesToDeploy(ERAVM_AND_EVM_ALLOWED_TO_DEPLOY);
 }
