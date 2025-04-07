@@ -11,8 +11,6 @@ pragma solidity ^0.8.20;
  * for the transaction.
  */
 interface INonceHolder {
-    event ValueSetUnderNonce(address indexed accountAddress, uint256 indexed key, uint256 value);
-
     /// @dev Returns the current minimal nonce for account.
     function getMinNonce(address _address) external view returns (uint256);
 
