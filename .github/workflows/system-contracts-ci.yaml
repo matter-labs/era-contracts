@@ -143,7 +143,7 @@ jobs:
           lscpu
           echo "Memory:"
           free -h
-      
+
       - name: Run tests
         run: yarn sc test
 
