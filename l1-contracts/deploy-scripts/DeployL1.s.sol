@@ -151,7 +151,7 @@ contract DeployL1Script is Script, DeployUtils {
         (
             addresses.stateTransition.serverNotifierImplementation,
             addresses.stateTransition.serverNotifierProxy
-        ) = deployTuppWithContract("ServerNotifier");
+        ) = deployServerNotifier();
 
         (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
             "L1Nullifier"
@@ -631,6 +631,13 @@ contract DeployL1Script is Script, DeployUtils {
     function deployTuppWithContract(
         string memory contractName
     ) internal virtual override returns (address implementation, address proxy) {
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(addresses.transparentProxyAdmin);
+    }
+
+    function deployTuppWithContractAndProxyAdmin(
+        string memory contractName,
+        address proxyAdmin
+    ) internal returns (address implementation, address proxy) {
         implementation = deployViaCreate2AndNotify(
             getCreationCode(contractName),
             getCreationCalldata(contractName),
@@ -640,11 +647,23 @@ contract DeployL1Script is Script, DeployUtils {
 
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(implementation, addresses.transparentProxyAdmin, getInitializeCalldata(contractName)),
+            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName)),
             contractName,
             string.concat(contractName, " Proxy")
         );
         return (implementation, proxy);
+    }
+
+    function deployServerNotifier(
+        string memory contractName
+    ) internal returns (address implementation, address proxy) {
+        // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
+        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin);
+
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
+            contractName,
+            ecosystemProxyAdmin
+        );
     }
 
     function saveDiamondSelectors() public {
@@ -829,7 +848,7 @@ contract DeployL1Script is Script, DeployUtils {
                     (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {
-            return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
+            return abi.encodeCall(ServerNotifier.initialize, (addresses.chainAdmin));
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
