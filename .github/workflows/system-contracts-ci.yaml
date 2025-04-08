@@ -4,6 +4,36 @@ on:
   pull_request:
 
 jobs:
+  monitor-system-load:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Start system load monitoring
+        run: |
+          while true; do
+            echo "Timestamp: $(date)"
+            echo "CPU and Memory Usage:"
+            top -b -n1 | head -20
+            sleep 3
+          done > system_load.log &
+          echo $! > monitoring_pid.txt
+
+      - name: Wait for test job to complete
+        run: sleep 360 # Adjust time as needed to match expected test duration
+
+      - name: Stop system load monitoring
+        run: |
+          kill $(cat monitoring_pid.txt)
+          rm monitoring_pid.txt
+
+      - name: Upload system load log
+        uses: actions/upload-artifact@v4
+        with:
+          name: system-load-log
+          path: system_load.log
+
   build:
     runs-on: matterlabs-ci-runner-ultra-performance
 
@@ -68,6 +98,39 @@ jobs:
       - name: Run lint
         run: yarn lint:check
 
+  # FIXME: recover when used multivm is updated
+  # test-bootloader:
+  #   needs: [build, lint]
+  #   runs-on: ubuntu-latest
+
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@v4
+
+  #     - name: Install rust
+  #       uses: actions-rust-lang/setup-rust-toolchain@v1
+  #       with:
+  #         toolchain: nightly-2024-08-01
+
+  # - name: Restore artifacts cache
+  #   uses: actions/cache/restore@v3
+  #   with:
+  #     fail-on-cache-miss: true
+  #     key: artifacts-system-${{ github.sha }}
+  #     path: |
+  #       system-contracts/zkout
+  #       system-contracts/cache-forge
+  #       system-contracts/bootloader/build
+  #       system-contracts/artifacts-zk
+  #       system-contracts/cache-zk
+  #       system-contracts/typechain
+  #       system-contracts/contracts-preprocessed
+
+  #     - name: Run bootloader tests
+  #       run: |
+  #         cd system-contracts/bootloader/test_infra
+  #         cargo run
+
   test-contracts:
     needs: [build, lint]
     runs-on: ubuntu-latest
@@ -106,15 +169,7 @@ jobs:
             system-contracts/typechain
             system-contracts/contracts-preprocessed
 
-      - name: Collect Workflow Telemetry
-        uses: catchpoint/workflow-telemetry-action@v2
-        with:
-          metric_frequency: 5 # Collect metrics every 5 seconds
-          proc_trace_chart_show: true # Display process trace chart
-          proc_trace_table_show: true # Display process trace table
-
       - name: Run tests
-        timeout-minutes: 60 # Set timeout to 60 minutes
         run: yarn sc test
 
       - name: Print output logs of era_test_node
