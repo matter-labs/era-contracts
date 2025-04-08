@@ -99,7 +99,7 @@ describe("L1Messenger tests", () => {
       emulator.addLog(logData.messages[0].log);
       console.log(5);
       await (
-        await l1Messenger
+        await l1Messenger 
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
             ethers.constants.AddressZero,
