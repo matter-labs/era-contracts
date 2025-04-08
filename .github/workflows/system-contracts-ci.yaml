@@ -105,6 +105,9 @@ jobs:
     needs: [build, lint]
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
@@ -121,6 +124,8 @@ jobs:
           mode: run
           releaseTag: ccfff38
           protocolVersion: 28
+          debugMode: "true"
+          log: "debug"
           logFilePath: "anvil-zksync.log"
 
       - name: Install dependencies
