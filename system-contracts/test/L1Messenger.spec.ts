@@ -27,7 +27,7 @@ describe("L1Messenger tests", () => {
   let bootloaderAccount: ethers.Signer;
   let logData: LogData;
   let emulator: L1MessengerPubdataEmulator;
-  let bytecode;
+  let bytecode: any;
 
   before(async () => {
     console.log(1);
