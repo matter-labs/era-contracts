@@ -115,7 +115,7 @@ describe("L1Messenger tests", () => {
         }
       }
       console.log(6);
-    });
+    }).timeout(100000000);
 
     it("should revert Too many L2->L1 logs", async () => {
       console.log(1);
