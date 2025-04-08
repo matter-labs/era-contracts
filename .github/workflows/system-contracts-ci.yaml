@@ -5,7 +5,7 @@ on:
 
 jobs:
   monitor-system-load:
-    runs-on: [ matterlabs-ci-runner-c3d ]
+    runs-on: [matterlabs-ci-runner-c3d]
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
