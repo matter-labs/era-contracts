@@ -121,6 +121,14 @@ jobs:
           mode: run
           releaseTag: ccfff38
           protocolVersion: 28
+          debugMode: "true"
+          showCalls: "all"
+          showStorageLogs: "write"
+          showVmDetails: "all"
+          showGasDetails: "all"
+          resolveHashes: "true"
+          log: "debug"
+          logFilePath: "anvil_zksync.log"
 
       - name: Install dependencies
         run: yarn
@@ -141,7 +149,7 @@ jobs:
 
       - name: Run tests
         run: yarn sc test
-      
+
       - name: Upload logs
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
