@@ -139,7 +139,11 @@ jobs:
             system-contracts/typechain
             system-contracts/contracts-preprocessed
 
+      - name: Collect Workflow Telemetry
+        uses: catchpoint/workflow-telemetry-action@v2
+
       - name: Run tests
+        timeout-minutes: 60 # Set timeout to 60 minutes
         run: yarn sc test
 
       - name: Print output logs of era_test_node
