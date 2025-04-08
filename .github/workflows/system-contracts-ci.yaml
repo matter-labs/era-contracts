@@ -124,8 +124,6 @@ jobs:
           mode: run
           releaseTag: ccfff38
           protocolVersion: 28
-          debugMode: "true"
-          log: "debug"
           logFilePath: "anvil-zksync.log"
 
       - name: Install dependencies
