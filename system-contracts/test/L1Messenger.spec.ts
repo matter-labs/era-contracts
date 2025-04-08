@@ -98,24 +98,17 @@ describe("L1Messenger tests", () => {
       console.log(4);
       emulator.addLog(logData.messages[0].log);
       console.log(5);
-      try {
-        await (
-          await l1Messenger
-            .connect(bootloaderAccount)
-            .publishPubdataAndClearState(
-              ethers.constants.AddressZero,
-              await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
-              { gasLimit: 1000000000 }
-            )
-        ).wait();
-      } catch (error) {
-        console.error("Transaction failed:", error);
-        if (error.reason) {
-          console.error("Revert reason:", error.reason);
-        }
-      }
+      await (
+        await l1Messenger
+          .connect(bootloaderAccount)
+          .publishPubdataAndClearState(
+            ethers.constants.AddressZero,
+            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
+            { gasLimit: 1000000000 }
+          )
+      ).wait();
       console.log(6);
-    }).timeout(100000000);
+    });
 
     it("should revert Too many L2->L1 logs", async () => {
       console.log(1);

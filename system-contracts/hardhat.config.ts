@@ -33,9 +33,6 @@ export default {
       },
     },
   },
-  mocha: {
-    timeout: 100000000,
-  },
   networks: {
     hardhat: {
       zksync: true,
