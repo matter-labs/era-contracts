@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: matterlabs-ci-runner-ultra-performance
 
     steps:
       - name: Checkout the repository
@@ -26,6 +26,9 @@ jobs:
         with:
           node-version: 18.18.0
           cache: yarn
+
+      - name: Install Yarn
+        run: npm install -g yarn
 
       - name: Build artifacts
         working-directory: system-contracts
@@ -136,13 +139,6 @@ jobs:
             system-contracts/cache-zk
             system-contracts/typechain
             system-contracts/contracts-preprocessed
-
-      - name: Display system information
-        run: |
-          echo "CPU info:"
-          lscpu
-          echo "Memory:"
-          free -h
 
       - name: Run tests
         run: yarn sc test
