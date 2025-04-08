@@ -122,11 +122,6 @@ jobs:
           releaseTag: ccfff38
           protocolVersion: 28
           debugMode: "true"
-          showCalls: "all"
-          showStorageLogs: "write"
-          showVmDetails: "all"
-          showGasDetails: "all"
-          resolveHashes: "true"
           log: "debug"
           logFilePath: "anvil-zksync.log"
 
