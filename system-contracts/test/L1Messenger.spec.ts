@@ -30,24 +30,36 @@ describe("L1Messenger tests", () => {
   let bytecode;
 
   before(async () => {
+    console.log(1);
     await prepareEnvironment();
+    console.log(2);
     wallet = getWallets()[0];
+    console.log(3);
     await deployContractOnAddress(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, "L1Messenger");
+    console.log(4);
     l1Messenger = L1MessengerFactory.connect(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, wallet);
+    console.log(5);
     l1MessengerAccount = await ethers.getImpersonatedSigner(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
+    console.log(6);
     knownCodeStorageAccount = await ethers.getImpersonatedSigner(TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS);
+    console.log(7);
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
+    console.log(8);
     // setup
     logData = setupLogData(l1MessengerAccount, l1Messenger);
+    console.log(9);
     bytecode = await getCode(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
+    console.log(10);
     await setResult("SystemContext", "txNumberInBlock", [], {
       failure: false,
       returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [1]),
     });
+    console.log(11);
     await setResult("IMessageRoot", "getAggregatedRoot", [], {
       failure: false,
       returnData: ethers.constants.HashZero,
     });
+    console.log(12);
     emulator = new L1MessengerPubdataEmulator();
   });
 
