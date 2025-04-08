@@ -128,7 +128,7 @@ jobs:
           showGasDetails: "all"
           resolveHashes: "true"
           log: "debug"
-          logFilePath: "anvil_zksync.log"
+          logFilePath: "anvil-zksync.log"
 
       - name: Install dependencies
         run: yarn
