@@ -5,7 +5,7 @@ on:
 
 jobs:
   build:
-    runs-on: matterlabs-ci-runner-ultra-performance
+    runs-on: matterlabs-ci-runner-c3d
 
     steps:
       - name: Checkout the repository
