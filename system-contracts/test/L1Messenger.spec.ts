@@ -87,13 +87,17 @@ describe("L1Messenger tests", () => {
 
   describe("publishPubdataAndClearState", async () => {
     it("publishPubdataAndClearState passes correctly", async () => {
+      console.log(1);
       await (
         await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
       ).wait();
+      console.log(2);
       emulator.addLog(logData.logs[0].log);
+      console.log(3);
       await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
+      console.log(4);
       emulator.addLog(logData.messages[0].log);
-
+      console.log(5);
       await (
         await l1Messenger
           .connect(bootloaderAccount)
@@ -103,9 +107,11 @@ describe("L1Messenger tests", () => {
             { gasLimit: 1000000000 }
           )
       ).wait();
+      console.log(6);
     });
 
     it("should revert Too many L2->L1 logs", async () => {
+      console.log(1);
       // set numberOfLogsBytes to 0x4002 to trigger the revert (max value is 0x4000)
       await expect(
         l1Messenger
@@ -115,6 +121,7 @@ describe("L1Messenger tests", () => {
             await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { numberOfLogs: 0x4002 })
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
+      console.log(2);
     });
 
     it("should revert Invalid input DA signature", async () => {
