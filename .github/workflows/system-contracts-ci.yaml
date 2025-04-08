@@ -4,36 +4,6 @@ on:
   pull_request:
 
 jobs:
-  monitor-system-load:
-    runs-on: [matterlabs-ci-runner-c3d]
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-
-      - name: Start system load monitoring
-        run: |
-          while true; do
-            echo "Timestamp: $(date)"
-            echo "CPU and Memory Usage:"
-            top -b -n1 | head -20
-            sleep 3
-          done > system_load.log &
-          echo $! > monitoring_pid.txt
-
-      - name: Wait for test job to complete
-        run: sleep 360 # Adjust time as needed to match expected test duration
-
-      - name: Stop system load monitoring
-        run: |
-          kill $(cat monitoring_pid.txt)
-          rm monitoring_pid.txt
-
-      - name: Upload system load log
-        uses: actions/upload-artifact@v4
-        with:
-          name: system-load-log
-          path: system_load.log
-
   build:
     runs-on: matterlabs-ci-runner-ultra-performance
 
