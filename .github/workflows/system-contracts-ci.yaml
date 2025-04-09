@@ -89,7 +89,7 @@ jobs:
           path: |
             system-contracts/zkout
             system-contracts/cache-forge
-            system-contracts/bootloader            
+            system-contracts/bootloader/build
             system-contracts/artifacts-zk
             system-contracts/cache-zk
             system-contracts/typechain
@@ -97,7 +97,7 @@ jobs:
 
       - name: Run bootloader tests
         run: |
-          cd system-constracts/bootloader/test_infra
+          cd system-contracts/bootloader/test_infra
           cargo run
 
   test-contracts:
