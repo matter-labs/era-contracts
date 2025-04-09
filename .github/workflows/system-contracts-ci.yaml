@@ -33,8 +33,8 @@ jobs:
         working-directory: system-contracts
         run: |
           yarn install
-          yarn build:foundry
           yarn build
+          yarn build:foundry
 
       - name: Create cache
         uses: actions/cache/save@v3
@@ -81,13 +81,13 @@ jobs:
         with:
           toolchain: nightly-2024-08-01
 
-      - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-5353a10345187933527fbad213d8c4f6500a775c/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+      # - name: Install foundry-zksync
+      #   run: |
+      #     mkdir ./foundry-zksync
+      #     curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-5353a10345187933527fbad213d8c4f6500a775c/foundry_nightly_linux_amd64.tar.gz
+      #     tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+      #     chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+      #     echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Restore artifacts cache
         uses: actions/cache/restore@v3
@@ -103,11 +103,11 @@ jobs:
             system-contracts/typechain
             system-contracts/contracts-preprocessed
 
-      - name: Re-build artifacts with foundry
-        working-directory: system-contracts
-        run: |
-          yarn install
-          yarn build:foundry
+      # - name: Re-build artifacts with foundry
+      #   working-directory: system-contracts
+      #   run: |
+      #     yarn install
+      #     yarn build:foundry
 
       - name: Run bootloader tests
         run: |
