@@ -89,7 +89,7 @@ jobs:
           path: |
             system-contracts/zkout
             system-contracts/cache-forge
-            system-contracts/bootloader/build
+            system-contracts/bootloader            
             system-contracts/artifacts-zk
             system-contracts/cache-zk
             system-contracts/typechain
