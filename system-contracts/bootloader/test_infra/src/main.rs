@@ -16,7 +16,7 @@ use tracing_subscriber::fmt;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use zksync_contracts::{
-    read_sys_contract_bytecode, BaseSystemContracts, ContractLanguage, SystemContractCode,
+    BaseSystemContracts, ContractLanguage, SystemContractCode,
     SystemContractsRepo,
 };
 use zksync_multivm::interface::{ExecutionResult, Halt};
