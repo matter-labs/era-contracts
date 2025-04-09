@@ -36,6 +36,12 @@ jobs:
           yarn build
           yarn build:foundry
 
+      - name: Build artifacts
+        working-directory: l1-contracts
+        run: |
+          yarn install
+          yarn build:foundry
+
       - name: Create cache
         uses: actions/cache/save@v3
         with:
@@ -48,6 +54,7 @@ jobs:
             system-contracts/cache-zk
             system-contracts/typechain
             system-contracts/contracts-preprocessed
+            l1-contracts/zkout
 
   lint:
     runs-on: ubuntu-latest
@@ -102,12 +109,16 @@ jobs:
             system-contracts/cache-zk
             system-contracts/typechain
             system-contracts/contracts-preprocessed
+            l1-contracts/zkout
 
       # - name: Re-build artifacts with foundry
       #   working-directory: system-contracts
       #   run: |
       #     yarn install
       #     yarn build:foundry
+
+      - name: List restored artifacts
+        run: ls -R
 
       - name: Run bootloader tests
         run: |
