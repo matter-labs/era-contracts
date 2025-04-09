@@ -969,6 +969,8 @@ object "Bootloader" {
 
                 canonicalL1TxHash, gasUsedOnPreparation := l1TxPreparation(txDataOffset, gasPerPubdata, basePubdataSpent)
 
+                debugLog("pubdata after L1 prep", getPubdataCounter())
+
                 let refundGas := 0
                 let success := 0
 
@@ -992,6 +994,8 @@ object "Bootloader" {
                     let gasSpentOnExecution := 0
                     let gasForExecution := sub(gasLimitForTx, gasUsedOnPreparation)
 
+                    debugLog("pubdata before getExecute", getPubdataCounter())
+
                     gasSpentOnExecution, success := getExecuteL1TxAndNotifyResult(
                         txDataOffset,
                         gasForExecution,
@@ -1003,19 +1007,24 @@ object "Bootloader" {
                         basePubdataSpent,
                         gasPerPubdata
                     )
+                    debugLog("ergsSpentOnPubdata", ergsSpentOnPubdata)
 
                     // It is assumed that `isNotEnoughGasForPubdata` ensured that the user did not publish too much pubdata.
                     let potentialRefund := saturatingSub(
                         safeAdd(reservedGas, gasForExecution, "safeadd: potentialRefund1"),
                         safeAdd(gasSpentOnExecution, ergsSpentOnPubdata, "safeadd: potentialRefund2")
                     )
+                    debugLog("potentialRefund", potentialRefund)
 
                     // Asking the operator for refund
                     askOperatorForRefund(potentialRefund, ergsSpentOnPubdata, gasPerPubdata)
 
+                    let operatorRefund := getOperatorRefundForTx(transactionIndex)
+                    debugLog("operatorRefund", operatorRefund)
+
                     // In case the operator provided smaller refund than the one calculated
                     // by the bootloader, we return the refund calculated by the bootloader.
-                    refundGas := max(getOperatorRefundForTx(transactionIndex), potentialRefund)
+                    refundGas := max(operatorRefund, potentialRefund)
                 }
 
                 if gt(refundGas, gasLimit) {
@@ -1092,6 +1101,8 @@ object "Bootloader" {
                 checkEnoughGas(gasForExecution)
 
                 let gasBeforeExecution := gas()
+
+                debugLog("pubdata before ZKSYNC_NEAR_CALL", getPubdataCounter())
                 success := ZKSYNC_NEAR_CALL_executeL1Tx(
                     callAbi,
                     txDataOffset,
@@ -2012,6 +2023,8 @@ object "Bootloader" {
                     mintEther(from, value, true)
                 }
 
+
+                debugLog("pubdata before executeL1Tx", getPubdataCounter())
                 success := executeL1Tx(innerTxDataOffset, from)
 
                 debugLog("Executing L1 ret", success)
@@ -2021,10 +2034,12 @@ object "Bootloader" {
                 if iszero(success) {
                     nearCallPanic()
                 }
+                let remainingGas := gas()
+                debugLog("remainingGas", remainingGas)
 
                 if isNotEnoughGasForPubdata(
                     basePubdataSpent,
-                    gas(),
+                    remainingGas,
                     // Note, that for L1->L2 transactions the reserved gas is used to protect the operator from
                     // transactions that might accidentally cause to publish too many pubdata.
                     // Thus, even if there is some accidental `reservedGas` left, it should not be used to publish pubdata.
