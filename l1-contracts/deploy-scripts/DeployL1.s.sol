@@ -275,6 +275,7 @@ contract DeployL1Script is Script, DeployUtils {
 
         if (config.contracts.eigenDAL1Validator == address(0)) {
             if (config.contracts.eigenDARegistry == address(0)) {
+                console.log("Deploying a DummyEigenDARegistry, do not use for production");
                 addresses.daAddresses.eigenDARegistry = deploySimpleContract("DummyEigenDARegistry");
             } else {
                 addresses.daAddresses.eigenDARegistry = config.contracts.eigenDARegistry;

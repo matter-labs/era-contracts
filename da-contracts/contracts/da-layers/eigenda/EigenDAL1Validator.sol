@@ -29,7 +29,7 @@ contract EigenDAL1Validator is IL1DAValidator {
         if (operatorDAInput.length < 32) {
             revert OperatorDAInputTooSmall(operatorDAInput.length, 32);
         }
-        bytes32 stateDiffHash = abi.decode(operatorDAInput[:32], (bytes32));
+        bytes32 stateDiffHash = bytes32(operatorDAInput[:32]);
 
         (bool isVerified, bytes32 eigenDAHash) = eigenDARegistry.isVerified(operatorDAInput[32:]);
 
