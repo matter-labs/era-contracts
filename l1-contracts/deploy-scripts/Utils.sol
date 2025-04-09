@@ -1166,6 +1166,14 @@ library Utils {
         bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
     }
 
+    function readEigenDAL1ValidatorBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/EigenDAL1Validator.sol/EigenDAL1Validator.json");
+    }
+
+    function readDummyEigenDARegistryBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/DummyEigenDARegistry.sol/DummyEigenDARegistry.json");
+    }
+
     // add this to be excluded from coverage report
     function test() internal {}
 }
