@@ -95,6 +95,12 @@ jobs:
             system-contracts/typechain
             system-contracts/contracts-preprocessed
 
+      - name: Re-build artifacts with foundry
+        working-directory: system-contracts
+        run: |
+          yarn install
+          yarn build:foundry
+
       - name: Run bootloader tests
         run: |
           cd system-contracts/bootloader/test_infra
