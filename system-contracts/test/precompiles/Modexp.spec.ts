@@ -5,7 +5,7 @@ import { MODEXP_ADDRESS } from "../shared/constants";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
 describe("Modexp tests", function () {
-  for (const environment in ["EraVM, EVM"]) {
+  for (const environment of ["EraVM"]) {
     describe(`Tests in (${environment})`, function () {
       let modexp: Contract;
 
