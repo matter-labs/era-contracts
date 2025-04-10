@@ -67,7 +67,7 @@
     "generate-bootloader-artifacts": "yarn build:foundry && ts-node scripts/generate-bootloader-artifacts.ts",
     "preprocess:bootloader": "rm -rf ./bootloader/build && yarn ts-node scripts/preprocess-bootloader.ts",
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
-    "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
+    "verify-on-explorer": "yarn ts-node scripts/verify-on-explorer.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
     "test-no-build": "hardhat test --network zkSyncTestNode",
     "test-node": "hardhat node-zksync --tag 0.1.0-alpha.29",
