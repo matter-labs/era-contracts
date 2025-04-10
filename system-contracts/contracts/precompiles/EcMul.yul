@@ -22,8 +22,8 @@ object "EcMul" {
             ///       needed to execute one instance of the corresponding precompile in the circuit.
             function ECMUL_GAS_COST() -> ret {
                 // Currently geometry is set to cycles_per_ecmul_circuit: 15,
-                // so 80'000 / 15 == 5333
-                ret := 5333
+                // so 80'000 / 15 == 5334
+                ret := 5334
             }
 
             // ////////////////////////////////////////////////////////////////
