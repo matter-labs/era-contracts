@@ -53,7 +53,7 @@ In the current system (i.e. before the gateway upgrade), the trusted admin of th
 
 The mapping for L2SharedBridge will be used as a source for the address of `L2SharedBridgeLegacy` contract address during the migration.
 
-To correctly initialize the `L2NativeTokenVault` inside the gateway upgrade, we will need the address of the L2 Wrapped Base Token contract [as well](https://github.com/matter-labs/era-contracts/blob/main/l2-contracts/contracts/bridge/L2WrappedBaseToken.sol) (note that the link is intentionally for the current codebase to show that these are deployed even before the upgrade).
+To correctly initialize the `L2NativeTokenVault` inside the gateway upgrade, we will need the address of the L2 Wrapped Base Token contract [as well](https://github.com/matter-labs/era-contracts/blob/main/l1-contracts/contracts/bridge/L2WrappedBaseToken.sol) (note that the link is intentionally for the current codebase to show that these are deployed even before the upgrade).
 
 The data to execute the upgrade with is gathered on L1, so we need to create a mapping on L1 from `chainId => l2WrappedBaseToken`. This is what the `L2WrappedBaseTokenStore` contract for.
 

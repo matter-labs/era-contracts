@@ -28,14 +28,14 @@ interface IContractDeployer {
     }
 
     /// @notice Defines the nonce ordering used by the account
-    /// - `Sequential` means that it is expected that the nonces are monotonic and increment by 1
-    /// at a time (the same as EOAs).
+    /// - `KeyedSequential` means that it is expected that the nonces are monotonic and increment by 1
+    /// at a time for each key (nonces are split 192:64 bits into nonceKey:nonceValue parts, as proposed by EIP-4337).
     /// - `Arbitrary` means that the nonces for the accounts can be arbitrary. The operator
     /// should serve the transactions from such an account on a first-come-first-serve basis.
     /// @dev This ordering is more of a suggestion to the operator on how the AA expects its transactions
     /// to be processed and is not considered as a system invariant.
     enum AccountNonceOrdering {
-        Sequential,
+        KeyedSequential,
         Arbitrary
     }
 

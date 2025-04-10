@@ -17,8 +17,6 @@ object "EvmEmulator" {
             }
 
             mstore(BYTECODE_LEN_OFFSET(), size)
-            mstore(EMPTY_CODE_OFFSET(), 0)
-            copyActivePtrData(BYTECODE_OFFSET(), 0, size)
         }
 
         function padBytecode(offset, len) -> blobLen {
@@ -144,15 +142,6 @@ object "EvmEmulator" {
             offset := add(MAX_STACK_SLOT_OFFSET(), 32)
         }
         
-        function BYTECODE_OFFSET() -> offset {
-            offset := add(BYTECODE_LEN_OFFSET(), 32)
-        }
-        
-        // reserved empty slot to simplify PUSH N opcodes
-        function EMPTY_CODE_OFFSET() -> offset {
-            offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
-        }
-        
         function MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN() -> max {
             max := 24576 // EIP-170
         }
@@ -162,7 +151,7 @@ object "EvmEmulator" {
         }
         
         function MEM_LEN_OFFSET() -> offset {
-            offset := add(EMPTY_CODE_OFFSET(), 32)
+            offset := add(BYTECODE_LEN_OFFSET(), 32)
         }
         
         function MEM_OFFSET() -> offset {
@@ -190,7 +179,7 @@ object "EvmEmulator" {
         
         function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
         
-        function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
+        function MAX_POINTER_READ_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
         
         function EMPTY_KECCAK() -> value {  // keccak("")
             value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
@@ -202,6 +191,12 @@ object "EvmEmulator" {
         
         function PREVRANDAO_VALUE() -> value {
             value := 2500000000000000 // This value is fixed in EraVM
+        }
+        
+        /// @dev This restriction comes from circuit precompile call limitations
+        /// In future we should use MAX_UINT32 to prevent overflows during gas costs calculation
+        function MAX_MODEXP_INPUT_FIELD_SIZE() -> ret {
+            ret := 32 // 256 bits
         }
         
         ////////////////////////////////////////////////////////////////
@@ -322,17 +317,16 @@ object "EvmEmulator" {
         }
         
         // It is the responsibility of the caller to ensure that ip is correct
-        function readIP(ip, bytecodeEndOffset) -> opcode {
-            if lt(ip, bytecodeEndOffset) {
-                opcode := and(mload(sub(ip, 31)), 0xff)
-            }
-            // STOP else
+        function $llvm_AlwaysInline_llvm$_readIP(ip) -> opcode {
+            opcode := shr(248, activePointerLoad(ip))
         }
         
         // It is the responsibility of the caller to ensure that start and length is correct
         function readBytes(start, length) -> value {
-            value := shr(mul(8, sub(32, length)), mload(start))
-            // will be padded by zeroes if out of bounds (we have reserved EMPTY_CODE_OFFSET() slot)
+            let rawValue := activePointerLoad(start)
+        
+            value := shr(mul(8, sub(32, length)), rawValue)
+            // will be padded by zeroes if out of bounds
         }
         
         function getCodeAddress() -> addr {
@@ -341,6 +335,18 @@ object "EvmEmulator" {
         
         function loadReturndataIntoActivePtr() {
             verbatim_0i_0o("return_data_ptr_to_active")
+        }
+        
+        function swapActivePointer(index0, index1) {
+            verbatim_2i_0o("active_ptr_swap", index0, index1)
+        }
+        
+        function swapActivePointerWithEvmReturndataPointer() {
+            verbatim_2i_0o("active_ptr_swap", 0, 2)
+        }
+        
+        function activePointerLoad(pos) -> res {
+            res := verbatim_1i_1o("active_ptr_data_load", pos)
         }
         
         function loadCalldataIntoActivePtr() {
@@ -368,6 +374,13 @@ object "EvmEmulator" {
             isStatic := iszero(iszero(and(isStatic, 0x04)))
         }
         
+        function loadFromReturnDataPointer(pos) -> res {
+            swapActivePointer(0, 1)
+            loadReturndataIntoActivePtr()
+            res := activePointerLoad(pos)
+            swapActivePointer(0, 1)
+        }
+        
         function fetchFromSystemContract(to, argSize) -> res {
             let success := staticcall(gas(), to, 0, argSize, 0, 0)
         
@@ -376,8 +389,7 @@ object "EvmEmulator" {
                 abortEvmEnvironment()
             }
         
-            returndatacopy(0, 0, 32)
-            res := mload(0) 
+            res := loadFromReturnDataPointer(0)
         }
         
         function isAddrEmpty(addr) -> isEmpty {
@@ -421,10 +433,7 @@ object "EvmEmulator" {
         
         // Basically performs an extcodecopy, while returning the length of the copied bytecode.
         function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-            let rawCodeHash := getRawCodeHash(addr)
-            mstore(0, rawCodeHash)
-            
-            let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+            let success, rawCodeHash := fetchBytecode(addr)
             // it fails if we don't have any code deployed at this address
             if success {
                 // The length of the bytecode is encoded in versioned bytecode hash
@@ -454,6 +463,13 @@ object "EvmEmulator" {
             
                 copiedLen := len
             } 
+        }
+        
+        function fetchBytecode(addr) -> success, rawCodeHash {
+            rawCodeHash := getRawCodeHash(addr)
+            mstore(0, rawCodeHash)
+            
+            success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
         }
         
         function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
@@ -639,8 +655,7 @@ object "EvmEmulator" {
             originalValue := currentValue
             if returndatasize() {
                 isWarm := true
-                returndatacopy(0, 0, 32)
-                originalValue := mload(0)
+                originalValue := loadFromReturnDataPointer(0)
             }
         }
         
@@ -665,8 +680,7 @@ object "EvmEmulator" {
                 callerEVM := true
                 mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
         
-                returndatacopy(0, 0, 32)
-                passGas := mload(0)
+                passGas := loadFromReturnDataPointer(0)
                 
                 isStatic := gt(_returndatasize, 32)
             }
@@ -798,7 +812,7 @@ object "EvmEmulator" {
             switch isHashOfConstructedEvmContract(rawCodeHash)
             case 0 {
                 // Not a constructed EVM contract
-                let precompileCost := getGasForPrecompiles(addr, argsSize)
+                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                 switch precompileCost
                 case 0 {
                     // Not a precompile
@@ -858,7 +872,7 @@ object "EvmEmulator" {
             switch isHashOfConstructedEvmContract(rawCodeHash)
             case 0 {
                 // zkEVM native call
-                let precompileCost := getGasForPrecompiles(addr, argsSize)
+                let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                 switch precompileCost
                 case 0 {
                     // just smart contract
@@ -973,7 +987,7 @@ object "EvmEmulator" {
         // The gas cost mentioned here is purely the cost of the contract, 
         // and does not consider the cost of the call itself nor the instructions 
         // to put the parameters in memory. 
-        function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
+        function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
             switch addr
                 case 0x01 { // ecRecover
                     gasToCharge := 3000
@@ -991,8 +1005,7 @@ object "EvmEmulator" {
                     gasToCharge := add(15, mul(3, dataWordSize))
                 }
                 case 0x05 { // modexp
-                    // We do not support modexp
-                    gasToCharge := 0
+                    gasToCharge := modexpGasCost(argsOffset, argsSize)
                 }
                 // ecAdd ecMul ecPairing EIP below
                 // https://eips.ethereum.org/EIPS/eip-1108
@@ -1025,13 +1038,133 @@ object "EvmEmulator" {
                 }
         }
         
+        //////////// Modexp gas cost calculation ////////////
+        
+        function modexpGasCost(inputOffset, inputSize) -> gasToCharge {
+            // This precompile is a bit tricky since the gas depends on the input data
+            let inputBoundary := add(inputOffset, inputSize)
+        
+            // modexp gas cost implements EIP-2565
+            // https://eips.ethereum.org/EIPS/eip-2565
+        
+            // Expected input layout
+            // [0; 31] (32 bytes)	Bsize	Byte size of B
+            // [32; 63] (32 bytes)	Esize	Byte size of E
+            // [64; 95] (32 bytes)	Msize	Byte size of M
+            // [96; ..] input values
+        
+            let Bsize := mloadPotentiallyPaddedValue(inputOffset, inputBoundary)
+            let Esize := mloadPotentiallyPaddedValue(add(inputOffset, 0x20), inputBoundary)
+            let Msize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
+        
+            let inputIsTooBig := or(
+                gt(Bsize, MAX_MODEXP_INPUT_FIELD_SIZE()), 
+                or(gt(Esize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(Msize, MAX_MODEXP_INPUT_FIELD_SIZE()))
+            )
+        
+            // The limitated size of parameters also prevents overflows during gas calculations.
+            // The current value (32 bytes) violates EVM equivalence. This value comes from circuit limitations.
+        
+            switch inputIsTooBig
+            case 1 {
+                gasToCharge := MAX_UINT64() // Skip calculation, not supported or unpayable
+            }
+            default {
+                // 96 + Bsize, offset of the exponent value
+                let expOffset := add(add(inputOffset, 0x60), Bsize)
+        
+                // Calculate iteration count
+                let iterationCount
+                switch gt(Esize, 32)
+                case 0 { // if exponent_length <= 32
+                    let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
+                    exponent := shr(sub(32, Esize), exponent) // shift to the right if Esize not 32 bytes
+        
+                    // if exponent == 0: iteration_count = 0
+                    // else: iteration_count = exponent.bit_length() - 1
+                    if exponent {
+                        iterationCount := msb(exponent)
+                    }
+                }
+                default { // elif exponent_length > 32
+                    // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
+        
+                    // load last 32 bytes of exponent
+                    let exponentLast32Bytes := mloadPotentiallyPaddedValue(add(expOffset, sub(Esize, 32)), inputBoundary)
+                    iterationCount := add(shl(3, sub(Esize, 32)), msb(exponentLast32Bytes))
+                }
+                if iszero(iterationCount) {
+                    iterationCount := 1
+                }
+        
+                // mult_complexity(Bsize, Msize), EIP-2565
+                let words := shr(3, add(getMax(Bsize, Msize), 7))
+                let multiplicationComplexity := mul(words, words)
+        
+                // return max(200, math.floor(multiplication_complexity * iteration_count / 3))
+                gasToCharge := getMax(200, div(mul(multiplicationComplexity, iterationCount), 3))
+            }
+        }
+        
+        // Read value from bounded memory region. Any out-of-bounds bytes are zeroed out.
+        function mloadPotentiallyPaddedValue(index, memoryBound) -> value {
+            value := mload(index)
+        
+            if lt(memoryBound, add(index, 32)) {
+                memoryBound := getMax(index, memoryBound)
+                let shift := sub(add(index, 32), memoryBound)
+                let value := shl(shift, shr(shift, value))
+            }
+        }
+        
+        // Most significant bit
+        // credit to https://github.com/PaulRBerg/prb-math/blob/280fc5f77e1b21b9c54013aac51966be33f4a410/src/Common.sol#L323
+        function msb(x) -> result {
+            let factor := shl(7, gt(x, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)) // 2^128
+            x := shr(factor, x)
+            result := or(result, factor)
+            factor := shl(6, gt(x, 0xFFFFFFFFFFFFFFFF)) // 2^64
+            x := shr(factor, x)
+            result := or(result, factor)
+            factor := shl(5, gt(x, 0xFFFFFFFF)) // 2^32
+            x := shr(factor, x)
+            result := or(result, factor)
+            factor := shl(4, gt(x, 0xFFFF))  // 2^16
+            x := shr(factor, x)
+            result := or(result, factor)
+            factor := shl(3, gt(x, 0xFF)) // 2^8
+            x := shr(factor, x)
+            result := or(result, factor)
+            factor := shl(2, gt(x, 0xF)) // 2^4
+            x := shr(factor, x)
+            result := or(result, factor)
+            factor := shl(1, gt(x, 0x3)) // 2^2
+            x := shr(factor, x)
+            result := or(result, factor)
+            factor := gt(x, 0x1) // 2^1
+            // No need to shift x any more.
+            result := or(result, factor)
+        }
+        
+        function getMax(a, b) -> result {
+            result := a
+            if gt(b, a) {
+                result := b
+            }
+        }
+        
+        //////////// Returndata pointers operation ////////////
+        
         function _saveReturndataAfterZkEVMCall() {
+            swapActivePointerWithEvmReturndataPointer()
             loadReturndataIntoActivePtr()
+            swapActivePointerWithEvmReturndataPointer()
             mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
         }
         
         function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
             let rtsz := returndatasize()
+            swapActivePointerWithEvmReturndataPointer()
             loadReturndataIntoActivePtr()
         
             // if (rtsz > 31)
@@ -1042,8 +1175,7 @@ object "EvmEmulator" {
                     abortEvmEnvironment()
                 }
                 default {
-                    returndatacopy(0, 0, 32)
-                    _gasLeft := mload(0)
+                    _gasLeft := activePointerLoad(0)
         
                     // We copy as much returndata as possible without going over the 
                     // returndata size.
@@ -1056,11 +1188,14 @@ object "EvmEmulator" {
                     // Skip first 32 bytes of the returnData
                     ptrAddIntoActive(32)
                 }
+            swapActivePointerWithEvmReturndataPointer()
         }
         
         function _eraseReturndataPointer() {
+            swapActivePointerWithEvmReturndataPointer()
             let activePtrSize := getActivePtrDataSize()
             ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
+            swapActivePointerWithEvmReturndataPointer()
             mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
         }
         
@@ -1145,8 +1280,7 @@ object "EvmEmulator" {
             let canBeDeployed := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
         
             if canBeDeployed {
-                returndatacopy(0, 0, 32)
-                addr := and(mload(0), ADDRESS_MASK())
+                addr := and(loadFromReturnDataPointer(0), ADDRESS_MASK())
                 pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
                 // so even if constructor reverts, nonce stays incremented and addr stays warm
         
@@ -1223,6 +1357,7 @@ object "EvmEmulator" {
         }
         
         function _saveConstructorReturnGas() -> gasLeft, addr {
+            swapActivePointerWithEvmReturndataPointer()
             loadReturndataIntoActivePtr()
         
             if lt(returndatasize(), 64) {
@@ -1231,9 +1366,10 @@ object "EvmEmulator" {
             }
         
             // ContractDeployer returns (uint256 gasLeft, address createdContract)
-            returndatacopy(0, 0, 64)
-            gasLeft := mload(0)
-            addr := mload(32)
+            gasLeft := activePointerLoad(0)
+            addr := activePointerLoad(32)
+        
+            swapActivePointerWithEvmReturndataPointer()
         
             _eraseReturndataPointer()
         }
@@ -1340,13 +1476,13 @@ object "EvmEmulator" {
             let sp := sub(STACK_OFFSET(), 32)
             // instruction pointer - index to next instruction. Not called pc because it's an
             // actual yul/evm instruction.
-            let ip := BYTECODE_OFFSET()
+            let ip := 0
             let stackHead
             
-            let bytecodeEndOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
+            let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
             
             for { } true { } {
-                let opcode := readIP(ip, bytecodeEndOffset)
+                let opcode := $llvm_AlwaysInline_llvm$_readIP(ip)
             
                 switch opcode
                 case 0x00 { // OP_STOP
@@ -1711,14 +1847,14 @@ object "EvmEmulator" {
                     dstOffset := add(dstOffset, MEM_OFFSET())
             
                     // EraVM will revert if offset + length overflows uint32
-                    if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
-                        sourceOffset := MAX_CALLDATA_OFFSET()
+                    if gt(sourceOffset, MAX_POINTER_READ_OFFSET()) {
+                        sourceOffset := MAX_POINTER_READ_OFFSET()
                     }
             
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
-                    if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
-                        truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
+                    if gt(add(sourceOffset, len), MAX_POINTER_READ_OFFSET()) { // in theory we could also copy MAX_POINTER_READ_OFFSET slot, but it is unreachable
+                        truncatedLen := sub(MAX_POINTER_READ_OFFSET(), sourceOffset) // truncate
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
@@ -1731,8 +1867,6 @@ object "EvmEmulator" {
                 }
                 case 0x38 { // OP_CODESIZE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
-            
-                    let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
                     sp, stackHead := pushStackItem(sp, bytecodeLen, stackHead)
                     ip := add(ip, 1)
                 }
@@ -1757,21 +1891,19 @@ object "EvmEmulator" {
                         sourceOffset := MAX_UINT64()
                     } 
             
-                    sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
-            
-                    if gt(sourceOffset, bytecodeEndOffset) {
-                        sourceOffset := bytecodeEndOffset
+                    if gt(sourceOffset, bytecodeLen) {
+                        sourceOffset := bytecodeLen
                     }
             
                     // Check bytecode out-of-bounds access
                     let truncatedLen := len
-                    if gt(add(sourceOffset, len), bytecodeEndOffset) {
-                        truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
+                    if gt(add(sourceOffset, len), bytecodeLen) {
+                        truncatedLen := sub(bytecodeLen, sourceOffset) // truncate
                         $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                     }
             
                     if truncatedLen {
-                        $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, truncatedLen)
+                        copyActivePtrData(dstOffset, sourceOffset, truncatedLen)
                     }
                     
                     ip := add(ip, 1)
@@ -1878,7 +2010,9 @@ object "EvmEmulator" {
                         panic()
                     }
             
+                    swapActivePointerWithEvmReturndataPointer()
                     copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
+                    swapActivePointerWithEvmReturndataPointer()
                     ip := add(ip, 1)
                 }
                 case 0x3F { // OP_EXTCODEHASH
@@ -2114,15 +2248,15 @@ object "EvmEmulator" {
                     let counter
                     counter, sp, stackHead := popStackItem(sp, stackHead)
             
-                    // Counter certainly can't be bigger than uint64.
-                    if gt(counter, MAX_UINT64()) {
+                    // Counter certainly can't be bigger than uint32 - 32.
+                    if gt(counter, MAX_POINTER_READ_OFFSET()) {
                         panic()
                     } 
             
-                    ip := add(BYTECODE_OFFSET(), counter)
+                    ip := counter
             
                     // Check next opcode is JUMPDEST
-                    let nextOpcode := readIP(ip, bytecodeEndOffset)
+                    let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                     if iszero(eq(nextOpcode, 0x5B)) {
                         panic()
                     }
@@ -2144,15 +2278,15 @@ object "EvmEmulator" {
                         continue
                     }
             
-                    // Counter certainly can't be bigger than uint64.
-                    if gt(counter, MAX_UINT64()) {
+                    // Counter certainly can't be bigger than uint32 - 32.
+                    if gt(counter, MAX_POINTER_READ_OFFSET()) {
                         panic()
                     } 
             
-                    ip := add(BYTECODE_OFFSET(), counter)
+                    ip := counter
             
                     // Check next opcode is JUMPDEST
-                    let nextOpcode := readIP(ip, bytecodeEndOffset)
+                    let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                     if iszero(eq(nextOpcode, 0x5B)) {
                         panic()
                     }
@@ -2164,7 +2298,7 @@ object "EvmEmulator" {
                 case 0x58 { // OP_PC
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    sp, stackHead := pushStackItem(sp, sub(ip, BYTECODE_OFFSET()), stackHead)
+                    sp, stackHead := pushStackItem(sp, ip, stackHead)
             
                     ip := add(ip, 1)
                 }
@@ -2973,18 +3107,11 @@ object "EvmEmulator" {
             }
 
             function getDeployedBytecode() {
-                let codeLen := fetchDeployedCode(
-                    getCodeAddress(), 
-                    BYTECODE_OFFSET(), // destination offset
-                    0, // source offset
-                    add(MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN(), 1) // so we can check that bytecode isn't too big
-                )
-
-                if gt(codeLen, MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()) {
-                    panic()
-                }
+                let success, rawCodeHash := fetchBytecode(getCodeAddress())
+                let codeLen := and(shr(224, rawCodeHash), 0xffff)
+                
+                loadReturndataIntoActivePtr()
             
-                mstore(EMPTY_CODE_OFFSET(), 0)
                 mstore(BYTECODE_LEN_OFFSET(), codeLen)
             }
 
@@ -3074,15 +3201,6 @@ object "EvmEmulator" {
                 offset := add(MAX_STACK_SLOT_OFFSET(), 32)
             }
             
-            function BYTECODE_OFFSET() -> offset {
-                offset := add(BYTECODE_LEN_OFFSET(), 32)
-            }
-            
-            // reserved empty slot to simplify PUSH N opcodes
-            function EMPTY_CODE_OFFSET() -> offset {
-                offset := add(BYTECODE_OFFSET(), MAX_POSSIBLE_ACTIVE_BYTECODE())
-            }
-            
             function MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN() -> max {
                 max := 24576 // EIP-170
             }
@@ -3092,7 +3210,7 @@ object "EvmEmulator" {
             }
             
             function MEM_LEN_OFFSET() -> offset {
-                offset := add(EMPTY_CODE_OFFSET(), 32)
+                offset := add(BYTECODE_LEN_OFFSET(), 32)
             }
             
             function MEM_OFFSET() -> offset {
@@ -3120,7 +3238,7 @@ object "EvmEmulator" {
             
             function MAX_UINT32() -> ret { ret := 4294967295 } // 2^32 - 1
             
-            function MAX_CALLDATA_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
+            function MAX_POINTER_READ_OFFSET() -> ret { ret := sub(MAX_UINT32(), 32) } // EraVM will panic if offset + length overflows u32
             
             function EMPTY_KECCAK() -> value {  // keccak("")
                 value := 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470
@@ -3132,6 +3250,12 @@ object "EvmEmulator" {
             
             function PREVRANDAO_VALUE() -> value {
                 value := 2500000000000000 // This value is fixed in EraVM
+            }
+            
+            /// @dev This restriction comes from circuit precompile call limitations
+            /// In future we should use MAX_UINT32 to prevent overflows during gas costs calculation
+            function MAX_MODEXP_INPUT_FIELD_SIZE() -> ret {
+                ret := 32 // 256 bits
             }
             
             ////////////////////////////////////////////////////////////////
@@ -3252,17 +3376,16 @@ object "EvmEmulator" {
             }
             
             // It is the responsibility of the caller to ensure that ip is correct
-            function readIP(ip, bytecodeEndOffset) -> opcode {
-                if lt(ip, bytecodeEndOffset) {
-                    opcode := and(mload(sub(ip, 31)), 0xff)
-                }
-                // STOP else
+            function $llvm_AlwaysInline_llvm$_readIP(ip) -> opcode {
+                opcode := shr(248, activePointerLoad(ip))
             }
             
             // It is the responsibility of the caller to ensure that start and length is correct
             function readBytes(start, length) -> value {
-                value := shr(mul(8, sub(32, length)), mload(start))
-                // will be padded by zeroes if out of bounds (we have reserved EMPTY_CODE_OFFSET() slot)
+                let rawValue := activePointerLoad(start)
+            
+                value := shr(mul(8, sub(32, length)), rawValue)
+                // will be padded by zeroes if out of bounds
             }
             
             function getCodeAddress() -> addr {
@@ -3271,6 +3394,18 @@ object "EvmEmulator" {
             
             function loadReturndataIntoActivePtr() {
                 verbatim_0i_0o("return_data_ptr_to_active")
+            }
+            
+            function swapActivePointer(index0, index1) {
+                verbatim_2i_0o("active_ptr_swap", index0, index1)
+            }
+            
+            function swapActivePointerWithEvmReturndataPointer() {
+                verbatim_2i_0o("active_ptr_swap", 0, 2)
+            }
+            
+            function activePointerLoad(pos) -> res {
+                res := verbatim_1i_1o("active_ptr_data_load", pos)
             }
             
             function loadCalldataIntoActivePtr() {
@@ -3298,6 +3433,13 @@ object "EvmEmulator" {
                 isStatic := iszero(iszero(and(isStatic, 0x04)))
             }
             
+            function loadFromReturnDataPointer(pos) -> res {
+                swapActivePointer(0, 1)
+                loadReturndataIntoActivePtr()
+                res := activePointerLoad(pos)
+                swapActivePointer(0, 1)
+            }
+            
             function fetchFromSystemContract(to, argSize) -> res {
                 let success := staticcall(gas(), to, 0, argSize, 0, 0)
             
@@ -3306,8 +3448,7 @@ object "EvmEmulator" {
                     abortEvmEnvironment()
                 }
             
-                returndatacopy(0, 0, 32)
-                res := mload(0) 
+                res := loadFromReturnDataPointer(0)
             }
             
             function isAddrEmpty(addr) -> isEmpty {
@@ -3351,10 +3492,7 @@ object "EvmEmulator" {
             
             // Basically performs an extcodecopy, while returning the length of the copied bytecode.
             function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
-                let rawCodeHash := getRawCodeHash(addr)
-                mstore(0, rawCodeHash)
-                
-                let success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
+                let success, rawCodeHash := fetchBytecode(addr)
                 // it fails if we don't have any code deployed at this address
                 if success {
                     // The length of the bytecode is encoded in versioned bytecode hash
@@ -3384,6 +3522,13 @@ object "EvmEmulator" {
                 
                     copiedLen := len
                 } 
+            }
+            
+            function fetchBytecode(addr) -> success, rawCodeHash {
+                rawCodeHash := getRawCodeHash(addr)
+                mstore(0, rawCodeHash)
+                
+                success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
             }
             
             function build_farcall_abi(isSystemCall, gas, dataStart, dataLength) -> farCallAbi {
@@ -3569,8 +3714,7 @@ object "EvmEmulator" {
                 originalValue := currentValue
                 if returndatasize() {
                     isWarm := true
-                    returndatacopy(0, 0, 32)
-                    originalValue := mload(0)
+                    originalValue := loadFromReturnDataPointer(0)
                 }
             }
             
@@ -3595,8 +3739,7 @@ object "EvmEmulator" {
                     callerEVM := true
                     mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
             
-                    returndatacopy(0, 0, 32)
-                    passGas := mload(0)
+                    passGas := loadFromReturnDataPointer(0)
                     
                     isStatic := gt(_returndatasize, 32)
                 }
@@ -3728,7 +3871,7 @@ object "EvmEmulator" {
                 switch isHashOfConstructedEvmContract(rawCodeHash)
                 case 0 {
                     // Not a constructed EVM contract
-                    let precompileCost := getGasForPrecompiles(addr, argsSize)
+                    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                     switch precompileCost
                     case 0 {
                         // Not a precompile
@@ -3788,7 +3931,7 @@ object "EvmEmulator" {
                 switch isHashOfConstructedEvmContract(rawCodeHash)
                 case 0 {
                     // zkEVM native call
-                    let precompileCost := getGasForPrecompiles(addr, argsSize)
+                    let precompileCost := getGasForPrecompiles(addr, argsOffset, argsSize)
                     switch precompileCost
                     case 0 {
                         // just smart contract
@@ -3903,7 +4046,7 @@ object "EvmEmulator" {
             // The gas cost mentioned here is purely the cost of the contract, 
             // and does not consider the cost of the call itself nor the instructions 
             // to put the parameters in memory. 
-            function getGasForPrecompiles(addr, argsSize) -> gasToCharge {
+            function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
                 switch addr
                     case 0x01 { // ecRecover
                         gasToCharge := 3000
@@ -3921,8 +4064,7 @@ object "EvmEmulator" {
                         gasToCharge := add(15, mul(3, dataWordSize))
                     }
                     case 0x05 { // modexp
-                        // We do not support modexp
-                        gasToCharge := 0
+                        gasToCharge := modexpGasCost(argsOffset, argsSize)
                     }
                     // ecAdd ecMul ecPairing EIP below
                     // https://eips.ethereum.org/EIPS/eip-1108
@@ -3955,13 +4097,133 @@ object "EvmEmulator" {
                     }
             }
             
+            //////////// Modexp gas cost calculation ////////////
+            
+            function modexpGasCost(inputOffset, inputSize) -> gasToCharge {
+                // This precompile is a bit tricky since the gas depends on the input data
+                let inputBoundary := add(inputOffset, inputSize)
+            
+                // modexp gas cost implements EIP-2565
+                // https://eips.ethereum.org/EIPS/eip-2565
+            
+                // Expected input layout
+                // [0; 31] (32 bytes)	Bsize	Byte size of B
+                // [32; 63] (32 bytes)	Esize	Byte size of E
+                // [64; 95] (32 bytes)	Msize	Byte size of M
+                // [96; ..] input values
+            
+                let Bsize := mloadPotentiallyPaddedValue(inputOffset, inputBoundary)
+                let Esize := mloadPotentiallyPaddedValue(add(inputOffset, 0x20), inputBoundary)
+                let Msize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
+            
+                let inputIsTooBig := or(
+                    gt(Bsize, MAX_MODEXP_INPUT_FIELD_SIZE()), 
+                    or(gt(Esize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(Msize, MAX_MODEXP_INPUT_FIELD_SIZE()))
+                )
+            
+                // The limitated size of parameters also prevents overflows during gas calculations.
+                // The current value (32 bytes) violates EVM equivalence. This value comes from circuit limitations.
+            
+                switch inputIsTooBig
+                case 1 {
+                    gasToCharge := MAX_UINT64() // Skip calculation, not supported or unpayable
+                }
+                default {
+                    // 96 + Bsize, offset of the exponent value
+                    let expOffset := add(add(inputOffset, 0x60), Bsize)
+            
+                    // Calculate iteration count
+                    let iterationCount
+                    switch gt(Esize, 32)
+                    case 0 { // if exponent_length <= 32
+                        let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
+                        exponent := shr(sub(32, Esize), exponent) // shift to the right if Esize not 32 bytes
+            
+                        // if exponent == 0: iteration_count = 0
+                        // else: iteration_count = exponent.bit_length() - 1
+                        if exponent {
+                            iterationCount := msb(exponent)
+                        }
+                    }
+                    default { // elif exponent_length > 32
+                        // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
+            
+                        // load last 32 bytes of exponent
+                        let exponentLast32Bytes := mloadPotentiallyPaddedValue(add(expOffset, sub(Esize, 32)), inputBoundary)
+                        iterationCount := add(shl(3, sub(Esize, 32)), msb(exponentLast32Bytes))
+                    }
+                    if iszero(iterationCount) {
+                        iterationCount := 1
+                    }
+            
+                    // mult_complexity(Bsize, Msize), EIP-2565
+                    let words := shr(3, add(getMax(Bsize, Msize), 7))
+                    let multiplicationComplexity := mul(words, words)
+            
+                    // return max(200, math.floor(multiplication_complexity * iteration_count / 3))
+                    gasToCharge := getMax(200, div(mul(multiplicationComplexity, iterationCount), 3))
+                }
+            }
+            
+            // Read value from bounded memory region. Any out-of-bounds bytes are zeroed out.
+            function mloadPotentiallyPaddedValue(index, memoryBound) -> value {
+                value := mload(index)
+            
+                if lt(memoryBound, add(index, 32)) {
+                    memoryBound := getMax(index, memoryBound)
+                    let shift := sub(add(index, 32), memoryBound)
+                    let value := shl(shift, shr(shift, value))
+                }
+            }
+            
+            // Most significant bit
+            // credit to https://github.com/PaulRBerg/prb-math/blob/280fc5f77e1b21b9c54013aac51966be33f4a410/src/Common.sol#L323
+            function msb(x) -> result {
+                let factor := shl(7, gt(x, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)) // 2^128
+                x := shr(factor, x)
+                result := or(result, factor)
+                factor := shl(6, gt(x, 0xFFFFFFFFFFFFFFFF)) // 2^64
+                x := shr(factor, x)
+                result := or(result, factor)
+                factor := shl(5, gt(x, 0xFFFFFFFF)) // 2^32
+                x := shr(factor, x)
+                result := or(result, factor)
+                factor := shl(4, gt(x, 0xFFFF))  // 2^16
+                x := shr(factor, x)
+                result := or(result, factor)
+                factor := shl(3, gt(x, 0xFF)) // 2^8
+                x := shr(factor, x)
+                result := or(result, factor)
+                factor := shl(2, gt(x, 0xF)) // 2^4
+                x := shr(factor, x)
+                result := or(result, factor)
+                factor := shl(1, gt(x, 0x3)) // 2^2
+                x := shr(factor, x)
+                result := or(result, factor)
+                factor := gt(x, 0x1) // 2^1
+                // No need to shift x any more.
+                result := or(result, factor)
+            }
+            
+            function getMax(a, b) -> result {
+                result := a
+                if gt(b, a) {
+                    result := b
+                }
+            }
+            
+            //////////// Returndata pointers operation ////////////
+            
             function _saveReturndataAfterZkEVMCall() {
+                swapActivePointerWithEvmReturndataPointer()
                 loadReturndataIntoActivePtr()
+                swapActivePointerWithEvmReturndataPointer()
                 mstore(LAST_RETURNDATA_SIZE_OFFSET(), returndatasize())
             }
             
             function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
                 let rtsz := returndatasize()
+                swapActivePointerWithEvmReturndataPointer()
                 loadReturndataIntoActivePtr()
             
                 // if (rtsz > 31)
@@ -3972,8 +4234,7 @@ object "EvmEmulator" {
                         abortEvmEnvironment()
                     }
                     default {
-                        returndatacopy(0, 0, 32)
-                        _gasLeft := mload(0)
+                        _gasLeft := activePointerLoad(0)
             
                         // We copy as much returndata as possible without going over the 
                         // returndata size.
@@ -3986,11 +4247,14 @@ object "EvmEmulator" {
                         // Skip first 32 bytes of the returnData
                         ptrAddIntoActive(32)
                     }
+                swapActivePointerWithEvmReturndataPointer()
             }
             
             function _eraseReturndataPointer() {
+                swapActivePointerWithEvmReturndataPointer()
                 let activePtrSize := getActivePtrDataSize()
                 ptrShrinkIntoActive(and(activePtrSize, 0xFFFFFFFF))// uint32(activePtrSize)
+                swapActivePointerWithEvmReturndataPointer()
                 mstore(LAST_RETURNDATA_SIZE_OFFSET(), 0)
             }
             
@@ -4075,8 +4339,7 @@ object "EvmEmulator" {
                 let canBeDeployed := performSystemCallRevertable(DEPLOYER_SYSTEM_CONTRACT(), 68)
             
                 if canBeDeployed {
-                    returndatacopy(0, 0, 32)
-                    addr := and(mload(0), ADDRESS_MASK())
+                    addr := and(loadFromReturnDataPointer(0), ADDRESS_MASK())
                     pop($llvm_AlwaysInline_llvm$_warmAddress(addr)) // will stay warm even if constructor reverts
                     // so even if constructor reverts, nonce stays incremented and addr stays warm
             
@@ -4153,6 +4416,7 @@ object "EvmEmulator" {
             }
             
             function _saveConstructorReturnGas() -> gasLeft, addr {
+                swapActivePointerWithEvmReturndataPointer()
                 loadReturndataIntoActivePtr()
             
                 if lt(returndatasize(), 64) {
@@ -4161,9 +4425,10 @@ object "EvmEmulator" {
                 }
             
                 // ContractDeployer returns (uint256 gasLeft, address createdContract)
-                returndatacopy(0, 0, 64)
-                gasLeft := mload(0)
-                addr := mload(32)
+                gasLeft := activePointerLoad(0)
+                addr := activePointerLoad(32)
+            
+                swapActivePointerWithEvmReturndataPointer()
             
                 _eraseReturndataPointer()
             }
@@ -4258,13 +4523,13 @@ object "EvmEmulator" {
                 let sp := sub(STACK_OFFSET(), 32)
                 // instruction pointer - index to next instruction. Not called pc because it's an
                 // actual yul/evm instruction.
-                let ip := BYTECODE_OFFSET()
+                let ip := 0
                 let stackHead
                 
-                let bytecodeEndOffset := add(BYTECODE_OFFSET(), mload(BYTECODE_LEN_OFFSET()))
+                let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
                 
                 for { } true { } {
-                    let opcode := readIP(ip, bytecodeEndOffset)
+                    let opcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                 
                     switch opcode
                     case 0x00 { // OP_STOP
@@ -4629,14 +4894,14 @@ object "EvmEmulator" {
                         dstOffset := add(dstOffset, MEM_OFFSET())
                 
                         // EraVM will revert if offset + length overflows uint32
-                        if gt(sourceOffset, MAX_CALLDATA_OFFSET()) {
-                            sourceOffset := MAX_CALLDATA_OFFSET()
+                        if gt(sourceOffset, MAX_POINTER_READ_OFFSET()) {
+                            sourceOffset := MAX_POINTER_READ_OFFSET()
                         }
                 
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
-                        if gt(add(sourceOffset, len), MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
-                            truncatedLen := sub(MAX_CALLDATA_OFFSET(), sourceOffset) // truncate
+                        if gt(add(sourceOffset, len), MAX_POINTER_READ_OFFSET()) { // in theory we could also copy MAX_POINTER_READ_OFFSET slot, but it is unreachable
+                            truncatedLen := sub(MAX_POINTER_READ_OFFSET(), sourceOffset) // truncate
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
@@ -4649,8 +4914,6 @@ object "EvmEmulator" {
                     }
                     case 0x38 { // OP_CODESIZE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
-                
-                        let bytecodeLen := mload(BYTECODE_LEN_OFFSET())
                         sp, stackHead := pushStackItem(sp, bytecodeLen, stackHead)
                         ip := add(ip, 1)
                     }
@@ -4675,21 +4938,19 @@ object "EvmEmulator" {
                             sourceOffset := MAX_UINT64()
                         } 
                 
-                        sourceOffset := add(sourceOffset, BYTECODE_OFFSET())
-                
-                        if gt(sourceOffset, bytecodeEndOffset) {
-                            sourceOffset := bytecodeEndOffset
+                        if gt(sourceOffset, bytecodeLen) {
+                            sourceOffset := bytecodeLen
                         }
                 
                         // Check bytecode out-of-bounds access
                         let truncatedLen := len
-                        if gt(add(sourceOffset, len), bytecodeEndOffset) {
-                            truncatedLen := sub(bytecodeEndOffset, sourceOffset) // truncate
+                        if gt(add(sourceOffset, len), bytecodeLen) {
+                            truncatedLen := sub(bytecodeLen, sourceOffset) // truncate
                             $llvm_AlwaysInline_llvm$_memsetToZero(add(dstOffset, truncatedLen), sub(len, truncatedLen)) // pad with zeroes any out-of-bounds
                         }
                 
                         if truncatedLen {
-                            $llvm_AlwaysInline_llvm$_memcpy(dstOffset, sourceOffset, truncatedLen)
+                            copyActivePtrData(dstOffset, sourceOffset, truncatedLen)
                         }
                         
                         ip := add(ip, 1)
@@ -4796,7 +5057,9 @@ object "EvmEmulator" {
                             panic()
                         }
                 
+                        swapActivePointerWithEvmReturndataPointer()
                         copyActivePtrData(add(MEM_OFFSET(), dstOffset), sourceOffset, len)
+                        swapActivePointerWithEvmReturndataPointer()
                         ip := add(ip, 1)
                     }
                     case 0x3F { // OP_EXTCODEHASH
@@ -5032,15 +5295,15 @@ object "EvmEmulator" {
                         let counter
                         counter, sp, stackHead := popStackItem(sp, stackHead)
                 
-                        // Counter certainly can't be bigger than uint64.
-                        if gt(counter, MAX_UINT64()) {
+                        // Counter certainly can't be bigger than uint32 - 32.
+                        if gt(counter, MAX_POINTER_READ_OFFSET()) {
                             panic()
                         } 
                 
-                        ip := add(BYTECODE_OFFSET(), counter)
+                        ip := counter
                 
                         // Check next opcode is JUMPDEST
-                        let nextOpcode := readIP(ip, bytecodeEndOffset)
+                        let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                         if iszero(eq(nextOpcode, 0x5B)) {
                             panic()
                         }
@@ -5062,15 +5325,15 @@ object "EvmEmulator" {
                             continue
                         }
                 
-                        // Counter certainly can't be bigger than uint64.
-                        if gt(counter, MAX_UINT64()) {
+                        // Counter certainly can't be bigger than uint32 - 32.
+                        if gt(counter, MAX_POINTER_READ_OFFSET()) {
                             panic()
                         } 
                 
-                        ip := add(BYTECODE_OFFSET(), counter)
+                        ip := counter
                 
                         // Check next opcode is JUMPDEST
-                        let nextOpcode := readIP(ip, bytecodeEndOffset)
+                        let nextOpcode := $llvm_AlwaysInline_llvm$_readIP(ip)
                         if iszero(eq(nextOpcode, 0x5B)) {
                             panic()
                         }
@@ -5082,7 +5345,7 @@ object "EvmEmulator" {
                     case 0x58 { // OP_PC
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        sp, stackHead := pushStackItem(sp, sub(ip, BYTECODE_OFFSET()), stackHead)
+                        sp, stackHead := pushStackItem(sp, ip, stackHead)
                 
                         ip := add(ip, 1)
                     }
@@ -5862,7 +6125,7 @@ object "EvmEmulator" {
                 
                 function $llvm_AlwaysInline_llvm$_calldataload(calldataOffset) -> res {
                     // EraVM will revert if offset + length overflows uint32
-                    if lt(calldataOffset, MAX_CALLDATA_OFFSET()) { // in theory we could also copy MAX_CALLDATA_OFFSET slot, but it is unreachable
+                    if lt(calldataOffset, MAX_POINTER_READ_OFFSET()) { // in theory we could also copy MAX_POINTER_READ_OFFSET slot, but it is unreachable
                         res := calldataload(calldataOffset)
                     }
                 }
