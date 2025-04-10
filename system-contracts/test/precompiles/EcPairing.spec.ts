@@ -4,8 +4,8 @@ import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation, ge
 import { EC_PAIRING_ADDRESS } from "../shared/constants";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
-describe.only("EcPairing tests", function () {
-  for (const environment of ["EraVM"]) {
+describe("EcPairing tests", function () {
+  for (const environment of ["EraVM", "EVM"]) {
     describe(`Tests in (${environment})`, function () {
       let ecPairing: Contract;
 
