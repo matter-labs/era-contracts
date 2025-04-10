@@ -6,45 +6,23 @@ pragma solidity 0.8.24;
 /// @custom:security-contact security@matterlabs.dev
 /// @title ConsensusRegistry contract interface
 interface IConsensusRegistry {
-    /// @dev Represents a consensus node.
-    /// @param attesterLastUpdateCommit The latest `attestersCommit` where the node's attester attributes were updated.
-    /// @param attesterLatest Attester attributes to read if `node.attesterLastUpdateCommit` < `attestersCommit`.
-    /// @param attesterSnapshot Attester attributes to read if `node.attesterLastUpdateCommit` == `attestersCommit`.
-    /// @param validatorLastUpdateCommit The latest `validatorsCommit` where the node's validator attributes were updated.
-    /// @param validatorLatest Validator attributes to read if `node.validatorLastUpdateCommit` < `validatorsCommit`.
-    /// @param validatorSnapshot Validator attributes to read if `node.validatorLastUpdateCommit` == `validatorsCommit`.
-    /// @param nodeOwnerIdx Index of the node owner within the array of node owners.
-    struct Node {
-        uint32 attesterLastUpdateCommit;
-        uint32 validatorLastUpdateCommit;
-        uint32 nodeOwnerIdx;
-        AttesterAttr attesterLatest;
-        AttesterAttr attesterSnapshot;
-        ValidatorAttr validatorLatest;
-        ValidatorAttr validatorSnapshot;
+    /// @dev Represents a validator in the consensus protocol.
+    /// @param ownerIdx Index of the validator owner within the array of validator owners.
+    /// @param lastSnapshotCommit The `validatorsCommit` value when the last snapshot of this validator was made.
+    /// @param previousSnapshotCommit The `validatorsCommit` value when the previous snapshot of this validator was made.
+    /// @param latest Validator attributes to read if `validatorsCommit` > `validator.lastSnapshotCommit`.
+    /// @param snapshot Validator attributes to read if `validatorsCommit` > `validator.previousSnapshot`.
+    /// @param previousSnapshot Validator attributes to read for older commits.
+    struct Validator {
+        uint32 ownerIdx;
+        uint32 lastSnapshotCommit;
+        uint32 previousSnapshotCommit;
+        ValidatorAttr latest;
+        ValidatorAttr snapshot;
+        ValidatorAttr previousSnapshot;
     }
 
-    /// @dev Represents the attester attributes of a consensus node.
-    /// @param active A flag stating if the attester is active.
-    /// @param removed A flag stating if the attester has been removed (and is pending a deletion).
-    /// @param weight Attester's voting weight.
-    /// @param pubKey Attester's Secp256k1 public key.
-    struct AttesterAttr {
-        bool active;
-        bool removed;
-        uint32 weight;
-        Secp256k1PublicKey pubKey;
-    }
-
-    /// @dev Represents an attester within a committee.
-    /// @param weight Attester's voting weight.
-    /// @param pubKey Attester's Secp256k1 public key.
-    struct CommitteeAttester {
-        uint32 weight;
-        Secp256k1PublicKey pubKey;
-    }
-
-    /// @dev Represents the validator attributes of a consensus node.
+    /// @dev Represents the attributes of a validator.
     /// @param active A flag stating if the validator is active.
     /// @param removed A flag stating if the validator has been removed (and is pending a deletion).
     /// @param weight Validator's voting weight.
@@ -86,76 +64,58 @@ interface IConsensusRegistry {
         bytes16 b;
     }
 
-    /// @dev Represents Secp256k1 public key.
-    /// @param tag Y-coordinate's even/odd indicator of the Secp256k1 public key.
-    /// @param x X-coordinate component of the Secp256k1 public key.
-    struct Secp256k1PublicKey {
-        bytes1 tag;
-        bytes32 x;
-    }
-
-    error UnauthorizedOnlyOwnerOrNodeOwner();
-    error NodeOwnerExists();
-    error NodeOwnerDoesNotExist();
-    error NodeOwnerNotFound();
+    error UnauthorizedOnlyOwnerOrValidatorOwner();
+    error ValidatorOwnerExists();
+    error ValidatorOwnerDoesNotExist();
+    error ValidatorOwnerNotFound();
     error ValidatorPubKeyExists();
-    error AttesterPubKeyExists();
-    error InvalidInputNodeOwnerAddress();
+    error InvalidInputValidatorOwnerAddress();
     error InvalidInputBLS12_381PublicKey();
     error InvalidInputBLS12_381Signature();
-    error InvalidInputSecp256k1PublicKey();
+    error NoPendingCommittee();
+    error PreviousCommitStillPending();
 
-    event NodeAdded(
-        address indexed nodeOwner,
+    event ValidatorAdded(
+        address indexed validatorOwner,
         uint32 validatorWeight,
         BLS12_381PublicKey validatorPubKey,
-        BLS12_381Signature validatorPoP,
-        uint32 attesterWeight,
-        Secp256k1PublicKey attesterPubKey
+        BLS12_381Signature validatorPoP
     );
-    event NodeDeactivated(address indexed nodeOwner);
-    event NodeActivated(address indexed nodeOwner);
-    event NodeRemoved(address indexed nodeOwner);
-    event NodeDeleted(address indexed nodeOwner);
-    event NodeValidatorWeightChanged(address indexed nodeOwner, uint32 newWeight);
-    event NodeAttesterWeightChanged(address indexed nodeOwner, uint32 newWeight);
-    event NodeValidatorKeyChanged(address indexed nodeOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
-    event NodeAttesterKeyChanged(address indexed nodeOwner, Secp256k1PublicKey newPubKey);
-    event ValidatorsCommitted(uint32 commit);
-    event AttestersCommitted(uint32 commit);
+    event ValidatorDeactivated(address indexed validatorOwner);
+    event ValidatorActivated(address indexed validatorOwner);
+    event ValidatorRemoved(address indexed validatorOwner);
+    event ValidatorDeleted(address indexed validatorOwner);
+    event ValidatorWeightChanged(address indexed validatorOwner, uint32 newWeight);
+    event ValidatorKeyChanged(address indexed validatorOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
+    event ValidatorsCommitted(uint32 validatorsCommit, uint256 validatorsCommitBlock);
+    event CommitteeActivationDelayChanged(uint256 newDelay);
 
     function add(
-        address _nodeOwner,
+        address _validatorOwner,
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
-        BLS12_381Signature calldata _validatorPoP,
-        uint32 _attesterWeight,
-        Secp256k1PublicKey calldata _attesterPubKey
+        BLS12_381Signature calldata _validatorPoP
     ) external;
 
-    function deactivate(address _nodeOwner) external;
+    function remove(address _validatorOwner) external;
 
-    function activate(address _nodeOwner) external;
+    function activate(address _validatorOwner) external;
 
-    function remove(address _nodeOwner) external;
+    function deactivate(address _validatorOwner) external;
 
-    function changeValidatorWeight(address _nodeOwner, uint32 _weight) external;
-
-    function changeAttesterWeight(address _nodeOwner, uint32 _weight) external;
+    function changeValidatorWeight(address _validatorOwner, uint32 _weight) external;
 
     function changeValidatorKey(
-        address _nodeOwner,
+        address _validatorOwner,
         BLS12_381PublicKey calldata _pubKey,
         BLS12_381Signature calldata _pop
     ) external;
 
-    function changeAttesterKey(address _nodeOwner, Secp256k1PublicKey calldata _pubKey) external;
-
-    function commitAttesterCommittee() external;
-
     function commitValidatorCommittee() external;
 
-    function getAttesterCommittee() external view returns (CommitteeAttester[] memory);
-
     function getValidatorCommittee() external view returns (CommitteeValidator[] memory);
+
+    function getNextValidatorCommittee() external view returns (CommitteeValidator[] memory);
+
+    function setCommitteeActivationDelay(uint256 _delay) external;
 }
