@@ -2,9 +2,10 @@ import { ethers } from "hardhat";
 import { enableEvmEmulation, getWallets } from "./shared/utils";
 import { ContractFactory } from "ethers";
 import { expect } from "chai";
+import type { Wallet } from "zksync-ethers";
 
 describe("EvmEmulation tests", function () {
-  let wallet: any;
+  let wallet: Wallet;
 
   before(() => {
     wallet = getWallets()[0];

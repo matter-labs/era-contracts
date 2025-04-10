@@ -11,7 +11,7 @@ describe("Modexp tests", function () {
 
       before(async () => {
         if (environment == "EraVM") {
-          modexp = await createPrecompileContractAtAddress(MODEXP_ADDRESS);
+          modexp = createPrecompileContractAtAddress(MODEXP_ADDRESS);
         } else if (environment == "EVM") {
           await enableEvmEmulation();
           const wallet = getWallets()[0];

@@ -11,7 +11,7 @@ describe("EcAdd tests", function () {
 
       before(async () => {
         if (environment == "EraVM") {
-          ecAdd = await createPrecompileContractAtAddress(EC_ADD_ADDRESS);
+          ecAdd = createPrecompileContractAtAddress(EC_ADD_ADDRESS);
         } else {
           const wallet = getWallets()[0];
           await enableEvmEmulation();
