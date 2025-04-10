@@ -162,6 +162,12 @@ fn insert_residue_elements_and_commitments(
 
     let modexp_function = get_modexp_function(l2_mode); 
     let verifier_contract_template = verifier_contract_template.replace("{{modexp_function}}", &modexp_function);
+    
+    let verifier_contract_template = if l2_mode {
+        verifier_contract_template.replace("contract Verifier", "contract L2Verifier")
+    } else {
+        verifier_contract_template
+    };
 
 
     Ok(reg.render_template(

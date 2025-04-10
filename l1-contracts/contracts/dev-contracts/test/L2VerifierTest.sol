@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.24;
 
-import {Verifier} from "../verifier/Verifier.sol";
+import {L2Verifier} from "../../state-transition/L2Verifier.sol";
 
 /// @author Matter Labs
-contract VerifierRecursiveTest is Verifier {
+contract L2VerifierTest is L2Verifier {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
@@ -64,7 +64,7 @@ contract VerifierRecursiveTest is Verifier {
             mstore(VK_LOOKUP_TABLE_TYPE_Y_SLOT, 0x0945076de03a0d240067e5f02b8fc11eaa589df3343542576eb59fdb3ecb57e0)
 
             // flag for using recursive part
-            mstore(VK_RECURSIVE_FLAG_SLOT, 1)
+            mstore(VK_RECURSIVE_FLAG_SLOT, 0)
         }
     }
 }

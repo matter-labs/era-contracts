@@ -58,7 +58,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         require(!GettersFacet(diamondProxy).isPriorityQueueActive(), "Priority queue must not be active");
     }
 
-    function test_forwardToL3OnGateway() public {
+    function test_forwardToL2OnGateway() public {
         // todo fix this test
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);

@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {Verifier} from "./Verifier.sol";
+import {L2Verifier} from "./L2Verifier.sol";
 import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 
 /// @author Matter Labs
@@ -11,9 +11,9 @@ import {IVerifier} from "./chain-interfaces/IVerifier.sol";
 /// @dev This contract is used to skip the zkp verification for the testnet environment.
 /// If the proof is not empty, it will verify it using the main verifier contract,
 /// otherwise, it will skip the verification.
-contract TestnetVerifier is Verifier {
-    constructor(uint256 _l1ChainId) {
-        assert(_l1ChainId != 1);
+contract L2TestnetVerifier is L2Verifier {
+    constructor() {
+        assert(block.chainid != 1);
     }
 
     /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
