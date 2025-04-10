@@ -1,20 +1,23 @@
 import { expect } from "chai";
 import type { Contract } from "zksync-ethers";
-import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation } from "../shared/utils";
+import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation, getWallets } from "../shared/utils";
 import { EC_MUL_ADDRESS } from "../shared/constants";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
 describe("EcMul tests", function () {
-  for (const environment in ["EraVM, EVM"]) {
+  for (const environment of ["EraVM", "EVM"]) {
     describe(`Tests in (${environment})`, function () {
       let ecMul: Contract;
 
       before(async () => {
         if (environment == "EraVM") {
-          ecMul = await createPrecompileContractAtAddress(EC_MUL_ADDRESS);
-        } else {
+          ecMul = createPrecompileContractAtAddress(EC_MUL_ADDRESS);
+        } else if (environment == "EVM") {
+          const wallet = getWallets()[0];
           await enableEvmEmulation();
-          ecMul = await deployEvmPrecompileCaller(EC_MUL_ADDRESS);
+          ecMul = await deployEvmPrecompileCaller(EC_MUL_ADDRESS, wallet);
+        } else {
+          throw new Error("Invalid environment version");
         }
       });
 

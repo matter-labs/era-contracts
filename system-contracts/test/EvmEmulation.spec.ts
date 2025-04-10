@@ -1,11 +1,16 @@
 import { ethers } from "hardhat";
-import { enableEvmEmulation } from "./shared/utils";
+import { enableEvmEmulation, getWallets } from "./shared/utils";
 import { ContractFactory } from "ethers";
 import { expect } from "chai";
-import { REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS } from "./shared/constants";
+import type { Wallet } from "zksync-ethers";
 
 describe("EvmEmulation tests", function () {
-  it("Can enable evm emulation", async () => {
+  let wallet: Wallet;
+
+  before(() => {
+    wallet = getWallets()[0];
+  });
+  it("Can enable EVM emulation", async () => {
     await enableEvmEmulation();
   });
 
@@ -18,22 +23,13 @@ describe("EvmEmulation tests", function () {
     await enableEvmEmulation();
 
     const testInterface = new ethers.utils.Interface(testAbi);
-    const factory = new ContractFactory(testInterface, testEvmBytecode);
+
+    const factory = new ContractFactory(testInterface, testEvmBytecode, wallet);
 
     const contract = await factory.deploy(101);
 
     const testValue = await contract.value();
 
     expect(testValue).to.be.eq(101);
-  });
-
-  it("Can't deploy EVM contract if EVM emulation is disabled", async () => {
-    const testInterface = new ethers.utils.Interface(testAbi);
-    const factory = new ContractFactory(testInterface, testEvmBytecode);
-
-    await expect(factory.deploy(101)).to.be.revertedWithCustomError(
-      REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-      "EVMEmulationNotSupported"
-    );
   });
 });

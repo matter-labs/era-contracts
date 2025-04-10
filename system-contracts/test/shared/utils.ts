@@ -3,7 +3,7 @@ import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/type
 import { BigNumber } from "ethers";
 import type { BytesLike } from "ethers";
 import * as hre from "hardhat";
-import { ethers } from "hardhat";
+import { ethers, network } from "hardhat";
 import type { Contract } from "zksync-ethers";
 import * as zksync from "zksync-ethers";
 import { Provider, utils, Wallet } from "zksync-ethers";
@@ -263,11 +263,24 @@ export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: Sta
 
 const ERAVM_AND_EVM_ALLOWED_TO_DEPLOY = 1;
 export async function enableEvmEmulation() {
-  const serviceTransactionSender = await ethers.getImpersonatedSigner(SERVICE_CALL_PSEUDO_CALLER);
+  await network.provider.request({
+    method: "hardhat_setBalance",
+    params: [SERVICE_CALL_PSEUDO_CALLER, "0xfffffffffffffffff"],
+  });
+
+  await network.provider.request({ method: "hardhat_impersonateAccount", params: [SERVICE_CALL_PSEUDO_CALLER] });
+  const serviceTransactionSender = await ethers.provider.getSigner(SERVICE_CALL_PSEUDO_CALLER);
+
+  //const serviceTransactionSender = await ethers.getImpersonatedSigner(SERVICE_CALL_PSEUDO_CALLER);
   const deployerContract = ContractDeployerFactory.connect(
     REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
     serviceTransactionSender
   );
 
   await deployerContract.setAllowedBytecodeTypesToDeploy(ERAVM_AND_EVM_ALLOWED_TO_DEPLOY);
+
+  await network.provider.request({
+    method: "hardhat_stopImpersonatingAccount",
+    params: [SERVICE_CALL_PSEUDO_CALLER],
+  });
 }
