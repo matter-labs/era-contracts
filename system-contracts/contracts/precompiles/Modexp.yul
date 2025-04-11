@@ -21,7 +21,7 @@ object "Modexp" {
             /// @note The division factor (e.g. 15, 25) is derived from the number of cycles
             ///       needed to execute one instance of the corresponding precompile in the circuit.
             function MODEXP_GAS_COST() -> ret {
-                // Current geometry is cycles_per_modexp_circuit: 25
+                // Current geometry is cycles_per_modexp_circuit: 17
                 // so 80'000 / 17 == 4706
                 ret := 4706
             }
