@@ -22,8 +22,8 @@ contract EigenDAL1Validator is IL1DAValidator {
     function checkDA(
         uint256, // _chainId
         uint256, // _batchNumber,
-        bytes32 l2DAValidatorOutputHash,
-        bytes calldata operatorDAInput,
+        bytes32 l2DAValidatorOutputHash, // keccak(stateDiffHash, eigenDAHash) Calculated on EigenDAL2Validator and passed through L2->L1 Logs
+        bytes calldata operatorDAInput, // stateDiffHash + inclusion_data (inclusion data == abi encoded blobInfo, aka EigenDACert)
         uint256 maxBlobsSupported
     ) external override returns (L1DAValidatorOutput memory output) {
         if (operatorDAInput.length < 32) {
@@ -31,10 +31,12 @@ contract EigenDAL1Validator is IL1DAValidator {
         }
         bytes32 stateDiffHash = bytes32(operatorDAInput[:32]);
 
+        // Check that the proof for the given inclusion data was verified in the EigenDA registry contract
         (bool isVerified, bytes32 eigenDAHash) = eigenDARegistry.isVerified(operatorDAInput[32:]);
 
         if (!isVerified) revert ProofNotVerified();
 
+        // Check that the eigenDAHash from the EigenDARegistry (originally calculted on Risc0 guest) is correct
         if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(stateDiffHash, eigenDAHash)))
             revert InvalidValidatorOutputHash();
 
