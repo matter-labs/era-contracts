@@ -21,9 +21,9 @@ object "EcAdd" {
             /// @note The division factor (e.g. 15, 25) is derived from the number of cycles
             ///       needed to execute one instance of the corresponding precompile in the circuit.
             function ECADD_GAS_COST() -> ret {
-                // Current geometry: cycles_per_ecadd_circuit: 812,
-                // so 80'000 / 812 == 98
-                ret := 98
+                // Current geometry: cycles_per_ecadd_circuit: 752,
+                // so 80'000 / 752 == 107
+                ret := 107
             }
 
             //////////////////////////////////////////////////////////////////
