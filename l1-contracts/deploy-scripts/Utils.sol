@@ -24,6 +24,9 @@ import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -118,6 +121,15 @@ enum Action {
     Add,
     Replace,
     Remove
+}
+
+
+struct ChainInfoFromBridgehub {
+    address diamondProxy;
+    address admin;
+    address ctm;
+    address serverNotifier;
+    address l1AssetRouterProxy;
 }
 
 address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
@@ -431,7 +443,7 @@ library Utils {
 
     function prepareL1L2Transaction(
         PrepareL1L2TransactionParams memory params
-    ) internal returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
+    ) internal view returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
         IBridgehub bridgehub = IBridgehub(params.bridgehubAddress);
 
         requiredValueToDeploy =
@@ -467,7 +479,7 @@ library Utils {
         bytes memory secondBridgeCalldata,
         address refundRecipient
     )
-        internal
+        internal view
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
@@ -544,7 +556,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy,
         address refundRecipient
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
@@ -593,7 +605,7 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata,
         address refundRecipient
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
@@ -727,7 +739,7 @@ library Utils {
         address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
-    ) internal returns (uint256 ethAmountToPass, Call[] memory calls) {
+    ) internal view returns (uint256 ethAmountToPass, Call[] memory calls) {
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
             console.log("Base token not ETH, approving");
@@ -1355,6 +1367,17 @@ library Utils {
         vm.startBroadcast(adminOwner);
         IChainAdmin(_admin).multicall{value: totalValue}(calls, true);
         vm.stopBroadcast();
+    }
+
+    function chainInfoFromBridgehubAndChainId(
+        address _bridgehub,
+        uint256 _chainId
+    ) internal view returns (ChainInfoFromBridgehub memory info) {
+        info.l1AssetRouterProxy = Bridgehub(_bridgehub).assetRouter();
+        info.diamondProxy = Bridgehub(_bridgehub).getZKChain(_chainId);
+        info.admin = IGetters(info.diamondProxy).getAdmin();
+        info.ctm = Bridgehub(_bridgehub).chainTypeManager(_chainId);
+        info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
     }
 
     function readRollupDAValidatorBytecode() internal view returns (bytes memory bytecode) {

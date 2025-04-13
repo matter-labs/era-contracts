@@ -25,7 +25,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
         address chainProxyAdmin,
         address create2FactoryAddress,
         bytes32 create2FactorySalt
-    ) public {
+    ) public returns (address proxy) {
         // Initialize and instantiate Create2Factory before any deployment.
         _initCreate2FactoryParams(create2FactoryAddress, create2FactorySalt);
         instantiateCreate2Factory();
@@ -58,11 +58,6 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
             "TransparentUpgradeableProxy",
             "GatewayTxFiltererProxy"
         );
-
-        // Save the address of the deployed proxy into an output TOML file.
-        string memory toml = vm.serializeAddress("root", "gateway_tx_filterer_proxy", proxy);
-        string memory path = string.concat(vm.projectRoot(), vm.envString("DEPLOY_GATEWAY_TX_FILTERER_OUTPUT") );
-        vm.writeToml(toml, path);
     }
 
     function runWithInputFromFile() public {
@@ -70,12 +65,17 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
         string memory configPath = string.concat(root, vm.envString("DEPLOY_GATEWAY_TX_FILTERER_INPUT"));
         string memory toml = vm.readFile(configPath);
 
-        run(
+        address proxy = run(
             toml.readAddress("$.bridgehub_proxy_addr"),
             toml.readAddress("$.chain_admin"),
             toml.readAddress("$.chain_proxy_admin"),
             toml.readAddress("$.create2_factory_addr"),
             toml.readBytes32("$.create2_factory_salt")
         );
+
+        // Save the address of the deployed proxy into an output TOML file.
+        string memory outputToml = vm.serializeAddress("root", "gateway_tx_filterer_proxy", proxy);
+        string memory outputPath = string.concat(vm.projectRoot(), vm.envString("DEPLOY_GATEWAY_TX_FILTERER_OUTPUT"));
+        vm.writeToml(outputToml, outputPath);
     }
 }

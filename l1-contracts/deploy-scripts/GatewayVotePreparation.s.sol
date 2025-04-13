@@ -52,7 +52,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
 
-import {GatewayCTMFromL1} from "./GatewayCTMFromL1.s.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
@@ -65,9 +64,11 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
+import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
+
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-contract GatewayVotePreparation is DeployL1Script {
+contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     using stdToml for string;
 
     struct GatewayCTMOutput {
@@ -76,7 +77,6 @@ contract GatewayVotePreparation is DeployL1Script {
         bytes diamondCutData;
         address relayedSLDAValidator;
         address validiumDAValidator;
-        address whitelistedBytecodesFactory;
         address rollupDAManager;
     }
 
@@ -215,10 +215,10 @@ contract GatewayVotePreparation is DeployL1Script {
             refundRecipient: msg.sender
         });
 
-        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts, address(0));
+        _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
     }
 
-    function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts, address _whitelistedBytecodesFactory) internal {
+    function _saveExpectedGatewayContractsToOutput(DeployedContracts memory expectedGatewayContracts) internal {
         output = GatewayCTMOutput({
             gatewayStateTransition: StateTransitionDeployedAddresses({
                 chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
@@ -246,7 +246,6 @@ contract GatewayVotePreparation is DeployL1Script {
             relayedSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
             validiumDAValidator: expectedGatewayContracts.daContracts.validiumDAValidator,
             rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
-            whitelistedBytecodesFactory: _whitelistedBytecodesFactory
         });
     }
 
@@ -257,6 +256,13 @@ contract GatewayVotePreparation is DeployL1Script {
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
 
         initializeConfig(configPath);
+        _initializeGatewayGovernanceConfig(GatewayGovernanceConfig({
+            bridgehubProxy: addresses.bridgehub.bridgehubProxy,
+            l1AssetRouterProxy: addresses.bridges.l1AssetRouterProxy,
+            chainTypeManagerProxy: addresses.stateTransition.chainTypeManagerProxy,
+            ctmDeploymentTrackerProxy: addresses.bridgehub.ctmDeploymentTrackerProxy,
+            gatewayChainId: gatewayChainId
+        }));
         instantiateCreate2Factory();
 
         Call[] memory ecosystemAdminCalls;
@@ -367,111 +373,5 @@ contract GatewayVotePreparation is DeployL1Script {
         string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
         string memory path = string.concat(vm.projectRoot(), vm.envString("GATEWAY_VOTE_PREPARATION_OUTPUT"));
         vm.writeToml(toml, path);
-    }
-
-    function _prepareGatewayGovernanceCalls(
-        uint256 _l1GasPrice,
-        address _gatewayCTMAddress,
-        address _refundRecipient
-    ) internal returns (Call[] memory calls) {
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: addresses.bridgehub.bridgehubProxy,
-            value: 0,
-            data: abi.encodeCall(IBridgehub.registerSettlementLayer, (gatewayChainId, true))
-        });
-
-        // Registration of the new chain type manager inside the ZK Gateway chain
-        {
-            bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (_gatewayCTMAddress));
-
-            calls = Utils.mergeCalls(
-                calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    _l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    L2_BRIDGEHUB_ADDRESS,
-                    gatewayChainId,
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    _refundRecipient
-                )
-            );
-        }
-
-        // Registering an asset that corresponds to chains inside L1AssetRouter
-        // as well as inside the CTMDeploymentTracker
-        {
-            calls = Utils.appendCall(
-                calls,
-                Call({
-                    target: addresses.bridges.l1AssetRouterProxy,
-                    data: abi.encodeCall(
-                        L1AssetRouter.setAssetDeploymentTracker,
-                        (bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))), address(addresses.bridgehub.ctmDeploymentTrackerProxy))
-                    ),
-                    value: 0
-                })
-            );
-
-            calls = Utils.appendCall(
-                calls,
-                Call({
-                    target: addresses.bridgehub.ctmDeploymentTrackerProxy,
-                    data: abi.encodeCall(ICTMDeploymentTracker.registerCTMAssetOnL1, (addresses.stateTransition.chainTypeManagerProxy)),
-                    value: 0
-                })
-            );
-        }
-
-        // Confirmed that the L2 Bridgehub should be an asset handler for the assetId for chains.
-        {
-            bytes32 chainAssetId = IBridgehub(addresses.bridgehub.bridgehubProxy).ctmAssetIdFromChainId(gatewayChainId);
-            bytes memory secondBridgeData = abi.encodePacked(
-                SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
-                abi.encode(chainAssetId, L2_BRIDGEHUB_ADDRESS)
-            );
-
-            calls = Utils.mergeCalls(
-                calls,
-                Utils.prepareGovernanceL1L2TwoBridgesTransaction(
-                    _l1GasPrice,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    gatewayChainId,
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    0,
-                    secondBridgeData,
-                    _refundRecipient
-                )
-            );
-        }
-
-        // Setting the address of the GW ChainTypeManager as the correct ChainTypeManager to handle
-        // chains that migrate from L1.
-        {
-            bytes memory secondBridgeData = abi.encodePacked(
-                bytes1(0x01),
-                abi.encode(addresses.stateTransition.chainTypeManagerProxy, _gatewayCTMAddress)
-            );
-
-            calls = Utils.mergeCalls(
-                calls,
-                Utils.prepareGovernanceL1L2TwoBridgesTransaction(
-                    _l1GasPrice,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    gatewayChainId,
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    addresses.bridgehub.ctmDeploymentTrackerProxy,
-                    0,
-                    secondBridgeData,
-                    _refundRecipient
-                )
-            );
-        }
     }
 }   

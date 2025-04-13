@@ -146,8 +146,6 @@ contract DeployL1Script is Script, DeployUtils {
             "MessageRoot"
         );
 
-        // TODO: the below deploys the server notifier whose proxy is owned by the decentralized governance,
-        // while server notifier's proxyadmin should be controlled by the ecosystem admin
         (
             addresses.stateTransition.serverNotifierImplementation,
             addresses.stateTransition.serverNotifierProxy
@@ -396,6 +394,8 @@ contract DeployL1Script is Script, DeployUtils {
         IOwnable(address(ctmDeploymentTracker)).transferOwnership(addresses.governance);
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
+
+        IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
 
         vm.stopBroadcast();
         console.log("Owners updated");

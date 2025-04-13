@@ -13,7 +13,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {Utils} from "./Utils.sol";
+import {Utils, ChainInfoFromBridgehub} from "./Utils.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -267,15 +267,13 @@ contract AcceptAdmin is Script {
         vm.stopBroadcast();
     }
 
-    // TODO: maybe use this output for the rest of the functions.
     struct Output {
         address admin;
         bytes encodedData;
-        uint256 value;
     }
 
     function notifyServerMigrationToGateway(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
-        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: chainInfo.serverNotifier,
@@ -287,7 +285,7 @@ contract AcceptAdmin is Script {
     }
 
     function notifyServerMigrationFromGateway(address _bridgehub, uint256 _chainId, bool _shouldSend) public {
-        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: chainInfo.serverNotifier,
@@ -299,7 +297,7 @@ contract AcceptAdmin is Script {
     }
 
     function grantGatewayWhitelist(address _bridgehub, uint256 _chainId, address _grantee, bool _shouldSend) public {
-        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
         require(transactionFilterer != address(0), "Chain does not have a transaction filterer");
@@ -315,7 +313,7 @@ contract AcceptAdmin is Script {
     }
 
     function revokeGatewayWhitelist(address _bridgehub, uint256 _chainId, address _address, bool _shouldSend) public {
-        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
         require(transactionFilterer != address(0), "Chain does not have a transaction filterer");
@@ -338,7 +336,7 @@ contract AcceptAdmin is Script {
         address _transactionFiltererAddress,
         bool _shouldSend
     ) external {
-        ChainInfo memory chainInfo = chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({
@@ -364,8 +362,8 @@ contract AcceptAdmin is Script {
     function _migrateChainToGatewayInner(MigrateChainToGatewayParams memory data) private {
         Call[] memory calls;
 
-        ChainInfo memory gatewayChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.gatewayChainId);
-        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        ChainInfoFromBridgehub memory gatewayChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.gatewayChainId);
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
 
         bytes memory secondBridgeData;
         {
@@ -374,7 +372,7 @@ contract AcceptAdmin is Script {
             uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
             if (currentSettlementLayer == data.gatewayChainId) {
                 console.log("Chain already using gateway as its settlement layer");
-                saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex"", value: 0}));
+                saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex""}));
                 return;
             }
 
@@ -448,7 +446,7 @@ contract AcceptAdmin is Script {
     // Using struct for input to avoid stack too deep errors
     // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
     function _setDAValidatorPairWithGatewayInner(SetDAValidatorPairWithGatewayParams memory data) private {
-        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
         bytes memory callData = abi.encodeCall(IAdmin.setDAValidatorPair, (data.l1DAValidator, data.l2DAValidator));
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
@@ -492,8 +490,6 @@ contract AcceptAdmin is Script {
         );
     }
 
-    // --- New code for enableValidatorViaGateway ---
-
     struct EnableValidatorViaGatewayParams {
         address bridgehub;
         uint256 l1GasPrice;
@@ -508,7 +504,7 @@ contract AcceptAdmin is Script {
     // Using struct for input to avoid stack too deep errors
     // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
     function _enableValidatorViaGatewayInner(EnableValidatorViaGatewayParams memory data) private {
-        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
         bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidator, (data.l2ChainId, data.validatorAddress));
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
@@ -564,7 +560,7 @@ contract AcceptAdmin is Script {
     // Using struct for input to avoid stack too deep errors.
     // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
     function _adminL1L2TxInner(AdminL1L2TxParams memory params) private {
-        ChainInfo memory l2ChainInfo = chainInfoFromBridgehubAndChainId(params.bridgehub, params.chainId);
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(params.bridgehub, params.chainId);
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             params.l1GasPrice,
             params.data,
@@ -605,39 +601,18 @@ contract AcceptAdmin is Script {
 
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
         bytes memory data = abi.encode(_calls);
-        
 
         if (_shouldSend) {
             Utils.adminExecuteCalls(_admin, address(0), _calls);
         }
 
-        // FIXME: delete totalValue
-        saveOutput(Output({admin: _admin, encodedData: data, value: 0}));
+        saveOutput(Output({admin: _admin, encodedData: data}));
     }
 
     function saveOutput(Output memory output) internal {
         vm.serializeAddress("root", "admin_address", output.admin);
-        vm.serializeUint("root", "value", output.value);
         string memory toml = vm.serializeBytes("root", "encoded_data", output.encodedData);
         string memory path = string.concat(vm.projectRoot(), "/script-out/output-accept-admin.toml");
         vm.writeToml(toml, path);
-    }
-
-    struct ChainInfo {
-        address diamondProxy;
-        address admin;
-        address ctm;
-        address serverNotifier;
-        address l1AssetRouterProxy;
-    }
-
-    function chainInfoFromBridgehubAndChainId(
-        address _bridgehub,
-        uint256 _chainId
-    ) internal view returns (ChainInfo memory info) {
-        info.diamondProxy = Bridgehub(_bridgehub).getZKChain(_chainId);
-        info.admin = IGetters(info.diamondProxy).getAdmin();
-        info.ctm = Bridgehub(_bridgehub).chainTypeManager(_chainId);
-        info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
     }
 }

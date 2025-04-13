@@ -115,9 +115,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     function _setUpGatewayWithFilterer() internal {
-        // FIXME
-        // gatewayScript.governanceRegisterGateway();
-        // gatewayScript.deployAndSetGatewayTransactionFilterer();
+        gatewayScript.governanceRegisterGateway();
+        gatewayScript.deployAndSetGatewayTransactionFilterer();
     }
 
     //
@@ -125,112 +124,110 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         _setUpGatewayWithFilterer();
     }
 
-    // FIXME
-    // //
-    // function test_moveChainToGateway() public {
-    //     _setUpGatewayWithFilterer();
-    //     gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
-    //     require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
-    // }
+    //
+    function test_moveChainToGateway() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
+    }
 
-    // function test_l2Registration() public {
-    //     _setUpGatewayWithFilterer();
-    //     gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
-    //     gatewayScript.governanceSetCTMAssetHandler(bytes32(0));
-    //     gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
-    // }
+    function test_l2Registration() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        gatewayScript.fullGatewayRegistration();
+    }
 
-    // function test_startMessageToL2() public {
-    //     _setUpGatewayWithFilterer();
-    //     gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
-    //     IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
-    //     uint256 expectedValue = 1000000000000000000000;
+    function test_startMessageToL2() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
+        uint256 expectedValue = 1000000000000000000000;
 
-    //     L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
-    //         migratingChainId,
-    //         expectedValue,
-    //         0,
-    //         72000000,
-    //         800,
-    //         "0x"
-    //     );
-    //     addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
-    // }
+        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
+            migratingChainId,
+            expectedValue,
+            0,
+            72000000,
+            800,
+            "0x"
+        );
+        addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+    }
 
-    // function test_recoverFromFailedChainMigration() public {
-    //     _setUpGatewayWithFilterer();
-    //     gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
+    function test_recoverFromFailedChainMigration() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(migratingChainId);
 
-    //     // Setup
-    //     IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
-    //     bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
-    //     bytes memory transferData;
+        // Setup
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
+        bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
+        bytes memory transferData;
 
-    //     {
-    //         IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
-    //         bytes memory chainData = abi.encode(chain.getProtocolVersion());
-    //         bytes memory ctmData = abi.encode(
-    //             address(1),
-    //             msg.sender,
-    //             addresses.chainTypeManager.protocolVersion(),
-    //             ecosystemConfig.contracts.diamondCutData
-    //         );
-    //         BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
-    //             chainId: migratingChainId,
-    //             ctmData: ctmData,
-    //             chainData: chainData
-    //         });
-    //         transferData = abi.encode(data);
-    //     }
+        {
+            IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
+            bytes memory chainData = abi.encode(chain.getProtocolVersion());
+            bytes memory ctmData = abi.encode(
+                address(1),
+                msg.sender,
+                addresses.chainTypeManager.protocolVersion(),
+                ecosystemConfig.contracts.diamondCutData
+            );
+            BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
+                chainId: migratingChainId,
+                ctmData: ctmData,
+                chainData: chainData
+            });
+            transferData = abi.encode(data);
+        }
 
-    //     address chainAdmin = IZKChain(addresses.bridgehub.getZKChain(migratingChainId)).getAdmin();
-    //     IL1AssetRouter assetRouter = IL1AssetRouter(address(addresses.bridgehub.sharedBridge()));
-    //     bytes32 l2TxHash = keccak256("l2TxHash");
-    //     uint256 l2BatchNumber = 5;
-    //     uint256 l2MessageIndex = 0;
-    //     uint16 l2TxNumberInBatch = 0;
-    //     bytes32[] memory merkleProof = new bytes32[](1);
-    //     bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
+        address chainAdmin = IZKChain(addresses.bridgehub.getZKChain(migratingChainId)).getAdmin();
+        IL1AssetRouter assetRouter = IL1AssetRouter(address(addresses.bridgehub.sharedBridge()));
+        bytes32 l2TxHash = keccak256("l2TxHash");
+        uint256 l2BatchNumber = 5;
+        uint256 l2MessageIndex = 0;
+        uint16 l2TxNumberInBatch = 0;
+        bytes32[] memory merkleProof = new bytes32[](1);
+        bytes32 txDataHash = keccak256(bytes.concat(bytes1(0x01), abi.encode(chainAdmin, assetId, transferData)));
 
-    //     // Mock Call for Msg Inclusion
-    //     vm.mockCall(
-    //         address(addresses.bridgehub),
-    //         abi.encodeWithSelector(
-    //             IBridgehub.proveL1ToL2TransactionStatus.selector,
-    //             migratingChainId,
-    //             l2TxHash,
-    //             l2BatchNumber,
-    //             l2MessageIndex,
-    //             l2TxNumberInBatch,
-    //             merkleProof,
-    //             TxStatus.Failure
-    //         ),
-    //         abi.encode(true)
-    //     );
+        // Mock Call for Msg Inclusion
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                migratingChainId,
+                l2TxHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                TxStatus.Failure
+            ),
+            abi.encode(true)
+        );
 
-    //     // Set Deposit Happened
-    //     vm.startBroadcast(address(addresses.bridgehub));
-    //     assetRouter.bridgehubConfirmL2Transaction({
-    //         _chainId: migratingChainId,
-    //         _txDataHash: txDataHash,
-    //         _txHash: l2TxHash
-    //     });
-    //     vm.stopBroadcast();
+        // Set Deposit Happened
+        vm.startBroadcast(address(addresses.bridgehub));
+        assetRouter.bridgehubConfirmL2Transaction({
+            _chainId: migratingChainId,
+            _txDataHash: txDataHash,
+            _txHash: l2TxHash
+        });
+        vm.stopBroadcast();
 
-    //     vm.startBroadcast();
-    //     addresses.l1Nullifier.bridgeRecoverFailedTransfer({
-    //         _chainId: migratingChainId,
-    //         _depositSender: chainAdmin,
-    //         _assetId: assetId,
-    //         _assetData: transferData,
-    //         _l2TxHash: l2TxHash,
-    //         _l2BatchNumber: l2BatchNumber,
-    //         _l2MessageIndex: l2MessageIndex,
-    //         _l2TxNumberInBatch: l2TxNumberInBatch,
-    //         _merkleProof: merkleProof
-    //     });
-    //     vm.stopBroadcast();
-    // }
+        vm.startBroadcast();
+        addresses.l1Nullifier.bridgeRecoverFailedTransfer({
+            _chainId: migratingChainId,
+            _depositSender: chainAdmin,
+            _assetId: assetId,
+            _assetData: transferData,
+            _l2TxHash: l2TxHash,
+            _l2BatchNumber: l2BatchNumber,
+            _l2MessageIndex: l2MessageIndex,
+            _l2TxNumberInBatch: l2TxNumberInBatch,
+            _merkleProof: merkleProof
+        });
+        vm.stopBroadcast();
+    }
 
     // function test_finishMigrateBackChain() public {
     //     _setUpGatewayWithFilterer();
