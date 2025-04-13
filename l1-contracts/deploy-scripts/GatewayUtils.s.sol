@@ -36,7 +36,7 @@ import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
@@ -53,7 +53,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 /// @dev IMPORTANT: this script is not intended to be used in production.
 /// TODO(EVM-925): support secure gateway deployment.
-contract GatewayPreparation {
+contract GatewayUtils is Script {
     /// @dev Calling this function requires private key to the admin of the chain
     function startMigrateChainFromGateway(
         address accessControlRestriction,
@@ -103,6 +103,7 @@ contract GatewayPreparation {
     }
 
     function finishMigrateChainFromGateway(
+        address bridgehubAddr,
         uint256 migratingChainId,
         uint256 gatewayChainId,
         uint256 l2BatchNumber,
@@ -111,43 +112,22 @@ contract GatewayPreparation {
         bytes memory message,
         bytes32[] memory merkleProof
     ) public {
-        revert("This functionality should be integrated into the accept admin function");
-        // initializeConfig();
+        IBridgehub bridgehub = IBridgehub(bridgehubAddr);
 
-        // L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
-        // IBridgehub bridgehub = IBridgehub(config.bridgehub);
-        // bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
-        // vm.broadcast();
-        // l1Nullifier.finalizeDeposit(
-        //     FinalizeL1DepositParams({
-        //         chainId: gatewayChainId,
-        //         l2BatchNumber: l2BatchNumber,
-        //         l2MessageIndex: l2MessageIndex,
-        //         l2Sender: L2_ASSET_ROUTER_ADDR,
-        //         l2TxNumberInBatch: l2TxNumberInBatch,
-        //         message: message,
-        //         merkleProof: merkleProof
-        //     })
-        // );
+        address assetRouter = bridgehub.assetRouter();
+        IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();
+
+        vm.broadcast();
+        l1Nullifier.finalizeDeposit(
+            FinalizeL1DepositParams({
+                chainId: gatewayChainId,
+                l2BatchNumber: l2BatchNumber,
+                l2MessageIndex: l2MessageIndex,
+                l2Sender: L2_ASSET_ROUTER_ADDR,
+                l2TxNumberInBatch: l2TxNumberInBatch,
+                message: message,
+                merkleProof: merkleProof
+            })
+        );
     }
-
-    /// The caller of this function should have private key of the admin of the *gateway*
-    // function deployGatewayTransactionFilterer(address gatewayProxyAdmin) public {
-    //     initializeConfig();
-
-    //     vm.broadcast();
-    //     GatewayTransactionFilterer impl = new GatewayTransactionFilterer(
-    //         IBridgehub(config.bridgehub),
-    //         config.l1AssetRouterProxy
-    //     );
-
-    //     vm.broadcast();
-    //     TransparentUpgradeableProxy proxy = new TransparentUpgradeableProxy(
-    //         address(impl),
-    //         gatewayProxyAdmin,
-    //         abi.encodeCall(GatewayTransactionFilterer.initialize, (config.gatewayChainAdmin))
-    //     );
-
-    //     saveOutput(address(impl), address(proxy));
-    // }
 }

@@ -41,6 +41,8 @@ import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
+import {GatewayUtils} from "deploy-scripts/GatewayUtils.s.sol";
+
 contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
@@ -229,89 +231,92 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         vm.stopBroadcast();
     }
 
-    // function test_finishMigrateBackChain() public {
-    //     _setUpGatewayWithFilterer();
-    //     gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
-    //     migrateBackChain();
-    // }
+    function test_finishMigrateBackChain() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        migrateBackChain();
+    }
 
-    // function migrateBackChain() public {
-    //     IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
-    //     IZKChain migratingChain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
-    //     bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
+    function migrateBackChain() public {
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
+        IZKChain migratingChain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
+        bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
-    //     vm.startBroadcast(Ownable(address(addresses.bridgehub)).owner());
-    //     addresses.bridgehub.registerSettlementLayer(gatewayChainId, true);
-    //     vm.stopBroadcast();
+        vm.startBroadcast(Ownable(address(addresses.bridgehub)).owner());
+        addresses.bridgehub.registerSettlementLayer(gatewayChainId, true);
+        vm.stopBroadcast();
 
-    //     bytes32 baseTokenAssetId = eraConfig.baseTokenAssetId;
+        bytes32 baseTokenAssetId = eraConfig.baseTokenAssetId;
 
-    //     uint256 currentChainId = block.chainid;
-    //     // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
-    //     vm.chainId(migratingChainId);
-    //     vm.mockCall(
-    //         address(addresses.bridgehub),
-    //         abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
-    //         abi.encode(true)
-    //     );
-    //     vm.mockCall(
-    //         address(addresses.bridgehub),
-    //         abi.encodeWithSelector(IBridgehub.ctmAssetIdFromChainId.selector),
-    //         abi.encode(assetId)
-    //     );
-    //     vm.mockCall(
-    //         address(addresses.chainTypeManager),
-    //         abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-    //         abi.encode(addresses.chainTypeManager.protocolVersion())
-    //     );
+        uint256 currentChainId = block.chainid;
+        // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
+        vm.chainId(migratingChainId);
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.ctmAssetIdFromChainId.selector),
+            abi.encode(assetId)
+        );
+        vm.mockCall(
+            address(addresses.chainTypeManager),
+            abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
+            abi.encode(addresses.chainTypeManager.protocolVersion())
+        );
 
-    //     uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
+        uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 
-    //     bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
-    //     bytes memory ctmData = abi.encode(
-    //         baseTokenAssetId,
-    //         msg.sender,
-    //         protocolVersion,
-    //         ecosystemConfig.contracts.diamondCutData
-    //     );
-    //     BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
-    //         chainId: migratingChainId,
-    //         baseTokenAssetId: baseTokenAssetId,
-    //         ctmData: ctmData,
-    //         chainData: chainData
-    //     });
-    //     bytes memory bridgehubMintData = abi.encode(data);
-    //     bytes memory message = abi.encodePacked(
-    //         IAssetRouterBase.finalizeDeposit.selector,
-    //         gatewayChainId,
-    //         assetId,
-    //         bridgehubMintData
-    //     );
-    //     gatewayScript.finishMigrateChainFromGateway(
-    //         migratingChainId,
-    //         gatewayChainId,
-    //         0,
-    //         0,
-    //         0,
-    //         message,
-    //         new bytes32[](0)
-    //     );
+        bytes memory chainData = abi.encode(IAdmin(address(migratingChain)).prepareChainCommitment());
+        bytes memory ctmData = abi.encode(
+            baseTokenAssetId,
+            msg.sender,
+            protocolVersion,
+            ecosystemConfig.contracts.diamondCutData
+        );
+        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
+            chainId: migratingChainId,
+            baseTokenAssetId: baseTokenAssetId,
+            ctmData: ctmData,
+            chainData: chainData
+        });
+        bytes memory bridgehubMintData = abi.encode(data);
+        bytes memory message = abi.encodePacked(
+            IAssetRouterBase.finalizeDeposit.selector,
+            gatewayChainId,
+            assetId,
+            bridgehubMintData
+        );
 
-    //     vm.chainId(currentChainId);
+        GatewayUtils userUtils = new GatewayUtils();
+        userUtils.finishMigrateChainFromGateway(
+            address(addresses.bridgehub),
+            migratingChainId,
+            gatewayChainId,
+            0,
+            0,
+            0,
+            message,
+            new bytes32[](0)
+        );
 
-    //     assertEq(addresses.bridgehub.baseTokenAssetId(migratingChainId), baseTokenAssetId);
-    //     IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
-    //     assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
-    // }
+        vm.chainId(currentChainId);
 
-    // /// to increase coverage, properly tested in L2GatewayTests
-    // function test_forwardToL2OnGateway() public {
-    //     _setUpGatewayWithFilterer();
-    //     vm.chainId(12345);
-    //     vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
-    //     addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
-    //     vm.stopBroadcast();
-    // }
+        assertEq(addresses.bridgehub.baseTokenAssetId(migratingChainId), baseTokenAssetId);
+        IZKChain migratingChainContract = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
+        assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
+    }
+
+    /// to increase coverage, properly tested in L2GatewayTests
+    function test_forwardToL2OnGateway() public {
+        _setUpGatewayWithFilterer();
+        vm.chainId(12345);
+        vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
+        addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
+        vm.stopBroadcast();
+    }
 
     // add this to be excluded from coverage report
     function test() internal override {}

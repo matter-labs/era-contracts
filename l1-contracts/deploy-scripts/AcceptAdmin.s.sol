@@ -26,6 +26,8 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -544,6 +546,76 @@ contract AcceptAdmin is Script {
                 _shouldSend: _shouldSend
             })
         );
+    }
+
+    struct StartMigrateChainFromGatewayParams {
+        address bridgehub;
+        uint256 l1GasPrice;
+        uint256 l2ChainId;
+        uint256 gatewayChainId;
+        bytes l1DiamondCutData;
+        address refundRecipient;
+        bool shouldSend;
+    }
+
+    // Using struct for input to avoid stack too deep errors
+    // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
+    function _startMigrateChainFromGateway(StartMigrateChainFromGatewayParams memory data) internal {
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        
+        // Note, that we do not check whether the chain indeed settles on the ZK Gateway at the moment of calling
+        // this function. This is needed to allow this function to encode the call at all times.
+        // It is the responsibility of the zkstack to warn user in case the chain is not settling on Gateway at the moment.
+
+        bytes memory bridgehubBurnData = abi.encode(
+            BridgehubBurnCTMAssetData({
+                chainId: data.l2ChainId,
+                ctmData: abi.encode(l2ChainInfo.admin, data.l1DiamondCutData),
+                chainData: abi.encode(ChainTypeManager(l2ChainInfo.ctm).getProtocolVersion(data.l2ChainId))
+            })
+        );
+
+        bytes32 ctmAssetId = IBridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
+        bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
+
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+            data.l1GasPrice,
+            l2Calldata,
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            L2_ASSET_ROUTER_ADDR,
+            0,
+            data.gatewayChainId,
+            data.bridgehub,
+            l2ChainInfo.l1AssetRouterProxy,
+            data.refundRecipient
+        );
+
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, data.shouldSend);
+    }
+
+    // The public function preserves the original interface
+    // and simply wraps the input into the struct before calling the inner function.
+    function startMigrateChainFromGateway(
+        address bridgehub,
+        uint256 l1GasPrice,
+        uint256 l2ChainId,
+        uint256 gatewayChainId,
+        bytes memory l1DiamondCutData,
+        address refundRecipient,
+        bool _shouldSend
+    ) public {
+        StartMigrateChainFromGatewayParams memory params = StartMigrateChainFromGatewayParams({
+            bridgehub: bridgehub,
+            l1GasPrice: l1GasPrice,
+            l2ChainId: l2ChainId,
+            gatewayChainId: gatewayChainId,
+            l1DiamondCutData: l1DiamondCutData,
+            refundRecipient: refundRecipient,
+            shouldSend: _shouldSend
+        });
+
+        _startMigrateChainFromGateway(params);
     }
 
     struct AdminL1L2TxParams {
