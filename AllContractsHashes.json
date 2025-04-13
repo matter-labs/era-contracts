@@ -1698,7 +1698,7 @@
   {
     "contractName": "bootloader_test.yul",
     "zkBytecodePath": "/system-contracts/zkout/bootloader_test.yul/contracts-preprocessed/bootloader/bootloader_test.yul.json",
-    "zkBytecodeHash": "0x010003cb761d8531001feff03d99f745e5e0d9f04405181310a8ef4a1d41b8de",
+    "zkBytecodeHash": "0x01000447547804e45feba0701a82ed1e007d73caa58ef7982497541ccc8c608b",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
