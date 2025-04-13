@@ -29,9 +29,6 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         path = string.concat(root, vm.envString("L1_OUTPUT"));
         toml = vm.readFile(path);
 
-        // console.log(toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr"));
-        // console.log(toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr"));
-
         _initializeGatewayGovernanceConfig(GatewayGovernanceConfig({
             bridgehubProxy: toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr"),
             l1AssetRouterProxy: toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr"),
@@ -46,13 +43,6 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
     function governanceRegisterGateway() public {
         Call[] memory calls = _getRegisterSettlementLayerCalls();
         Utils.executeCalls(Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
-
-        // vm.startBroadcast();
-        // for(uint256 i = 0; i < calls.length; i++) {
-        //     (bool success, ) = calls[i].target.call{value: calls[i].value}(calls[i].data);
-        //     require(success, "Call unsuccessfull");
-        // }
-        // vm.stopBroadcast();
     }
 
     function deployAndSetGatewayTransactionFilterer() public {

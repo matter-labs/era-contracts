@@ -52,56 +52,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 /// @dev IMPORTANT: this script is not intended to be used in production.
-/// TODO(EVM-925): support secure gateway deployment.
 contract GatewayUtils is Script {
-    /// @dev Calling this function requires private key to the admin of the chain
-    function startMigrateChainFromGateway(
-        address accessControlRestriction,
-        uint256 chainId,
-        bytes memory l1DiamondCutData
-    ) public {
-        revert("This functionality should be integrated into the accept admin function");
-        // initializeConfig();
-        // address chainAdmin = _getChainAdmin(chainId);
-        // IBridgehub bridgehub = IBridgehub(config.bridgehub);
-
-        // uint256 currentSettlementLayer = bridgehub.settlementLayer(chainId);
-        // if (currentSettlementLayer != config.gatewayChainId) {
-        //     console.log("Chain not using Gateway as settlement layer");
-        //     saveOutput(bytes32(0));
-        //     return;
-        // }
-
-        // bytes memory bridgehubBurnData = abi.encode(
-        //     BridgehubBurnCTMAssetData({
-        //         chainId: chainId,
-        //         ctmData: abi.encode(chainAdmin, l1DiamondCutData),
-        //         chainData: abi.encode(IChainTypeManager(config.chainTypeManagerProxy).getProtocolVersion(chainId))
-        //     })
-        // );
-
-        // bytes32 ctmAssetId = bridgehub.ctmAssetIdFromChainId(chainId);
-        // L2AssetRouter l2AssetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
-
-        // bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
-
-        // bytes32 l2TxHash = Utils.runAdminL1L2DirectTransaction(
-        //     _getL1GasPrice(),
-        //     chainAdmin,
-        //     accessControlRestriction,
-        //     l2Calldata,
-        //     Utils.MAX_PRIORITY_TX_GAS,
-        //     new bytes[](0),
-        //     L2_ASSET_ROUTER_ADDR,
-        //     config.gatewayChainId,
-        //     config.bridgehub,
-        //     config.l1AssetRouterProxy,
-        //     msg.sender
-        // );
-
-        // saveOutput(l2TxHash);
-    }
-
     function finishMigrateChainFromGateway(
         address bridgehubAddr,
         uint256 migratingChainId,
