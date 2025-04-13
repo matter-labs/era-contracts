@@ -134,22 +134,8 @@ contract AcceptAdmin is Script {
     }
 
     function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) public {
-        IGovernance governance = IGovernance(governanceAddr);
-        Ownable2Step ownable = Ownable2Step(governanceAddr);
-
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
-
-        IGovernance.Operation memory operation = IGovernance.Operation({
-            calls: calls,
-            predecessor: bytes32(0),
-            salt: bytes32(0)
-        });
-
-        vm.startBroadcast(ownable.owner());
-        governance.scheduleTransparent(operation, 0);
-        // We assume that the total value is 0
-        governance.execute{value: 0}(operation);
-        vm.stopBroadcast();
+        Utils.executeCalls(governanceAddr, bytes32(0), 0, calls);
     }
 
     function adminExecuteUpgrade(

@@ -16,6 +16,7 @@ import {L2NativeTokenVaultTestAbstract} from "../../l1/integration/l2-tests-in-l
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 import {DeployIntegrationUtils} from "../../l1/integration/deploy-scripts/DeployIntegrationUtils.s.sol";
+import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
 
 contract L2NativeTokenVaultTest is Test, SharedL2ContractL2Deployer, L2NativeTokenVaultTestAbstract {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
@@ -31,7 +32,7 @@ contract L2NativeTokenVaultTest is Test, SharedL2ContractL2Deployer, L2NativeTok
     function deployViaCreate2(
         bytes memory creationCode,
         bytes memory constructorArgs
-    ) internal override(DeployUtils, SharedL2ContractL2Deployer) returns (address) {
+    ) internal override(Create2FactoryUtils, SharedL2ContractL2Deployer) returns (address) {
         return super.deployViaCreate2(creationCode, constructorArgs);
     }
 

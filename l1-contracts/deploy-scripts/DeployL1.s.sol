@@ -573,8 +573,8 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.vaults.l1NativeTokenVaultProxy
         );
 
-        vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
-        vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
+        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
+        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
@@ -631,7 +631,7 @@ contract DeployL1Script is Script, DeployUtils {
     function deployTuppWithContract(
         string memory contractName
     ) internal virtual override returns (address implementation, address proxy) {
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(addresses.transparentProxyAdmin);
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(contractName, addresses.transparentProxyAdmin);
     }
 
     function deployTuppWithContractAndProxyAdmin(
@@ -654,14 +654,12 @@ contract DeployL1Script is Script, DeployUtils {
         return (implementation, proxy);
     }
 
-    function deployServerNotifier(
-        string memory contractName
-    ) internal returns (address implementation, address proxy) {
+    function deployServerNotifier() internal returns (address implementation, address proxy) {
         // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
         address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin);
 
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
-            contractName,
+            "ServerNotifier",
             ecosystemProxyAdmin
         );
     }
@@ -848,7 +846,7 @@ contract DeployL1Script is Script, DeployUtils {
                     (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {
-            return abi.encodeCall(ServerNotifier.initialize, (addresses.chainAdmin));
+            return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

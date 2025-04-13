@@ -681,8 +681,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             upgradeAddresses.upgradeTimer
         );
 
-        vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
-        vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
+        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
+        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
