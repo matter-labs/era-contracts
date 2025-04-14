@@ -121,6 +121,7 @@ object "Bootloader" {
                 ret := {{MAX_TRANSACTIONS_IN_BATCH}}
             }
 
+            /// @dev The maximum number of imported dependency message roots per L1 batch.
             function MAX_MSG_ROOTS_IN_BATCH() -> ret {
                 ret := 100
             }
@@ -304,6 +305,7 @@ object "Bootloader" {
                 ret := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), TX_OPERATOR_L2_BLOCK_INFO_SLOTS())
             }
 
+            /// @dev The size of each of the message roots.
             function MESSAGE_ROOT_SLOT_SIZE() -> ret {
                 // We will have to increase this to add merkle proofs. 
                 ret := 100
@@ -2947,7 +2949,7 @@ object "Bootloader" {
                 }
             }
 
-            // todo split msg roots by block
+            /// @notice Sets the message roots in the L2MessageRootStorage contract.
             function setMessageRoots() {
                 debugLog("Setting message roots", 0)
                 let msgRootSlot := MESSAGE_ROOT_BEGIN_SLOT()
@@ -3006,6 +3008,7 @@ object "Bootloader" {
                 }
             }
 
+            /// @notice Sends the rolling hash of the dependency message roots to the L1.
             function sendMsgRootsRollingHashToL1() {
                 debugLog("Sending message roots to L1", 0)
                 let msgRootSlot := MESSAGE_ROOT_BEGIN_SLOT()
@@ -4038,6 +4041,7 @@ object "Bootloader" {
                 ret := 3
             }
 
+            /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function messageRootRollingHashLogKey() -> ret {
                 ret := 7
             }

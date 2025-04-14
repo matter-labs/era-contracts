@@ -138,7 +138,7 @@ struct BridgehubL2TransactionRequest {
 struct MessageRoot {
     uint256 chainId;
     uint256 blockOrBatchNumber;
-    // We double overloading this. The sides normally contain the root, as well as the sides.
+    // We are double overloading this. The sides of the dynamic incremental merkle tree normally contains the root, as well as the sides of the tree.
     // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
     bytes32[] sides;
 }
