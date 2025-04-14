@@ -35,13 +35,8 @@ describe("EvmPredeploysManager tests", function () {
   describe("deployPredeployedContract", function () {
     it("successfully deploys all predeployed contracts", async () => {
       for (const predeploy of PREDEPLOYS_DATA) {
-        try {
-          await evmPredeploysManager.deployPredeployedContract(predeploy.address, predeploy.input);
-        } catch (e) {
-          console.log(e);
-        }
-        // await expect().to.be.not
-        //   .rejected;
+        await expect(evmPredeploysManager.deployPredeployedContract(predeploy.address, predeploy.input)).to.be.not
+          .rejected;
       }
     });
   });
