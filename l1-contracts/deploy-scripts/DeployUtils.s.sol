@@ -212,7 +212,9 @@ abstract contract DeployUtils is Script {
         }
 
         if (vm.keyExistsToml(toml, "$.contracts.eigenda_cert_and_blob_verifier_addr")) {
-            config.contracts.eigenDACertAndBlobVerifier = toml.readAddress("$.contracts.eigenda_cert_and_blob_verifier_addr");
+            config.contracts.eigenDACertAndBlobVerifier = toml.readAddress(
+                "$.contracts.eigenda_cert_and_blob_verifier_addr"
+            );
         }
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");

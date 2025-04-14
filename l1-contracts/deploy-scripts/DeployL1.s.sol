@@ -592,7 +592,11 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.daAddresses.eigenDAL1DAValidator
         );
 
-        vm.serializeAddress("deployed_addresses", "eigenda_cert_and_blob_verifier_addr", addresses.daAddresses.eigenDACertAndBlobVerifier);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "eigenda_cert_and_blob_verifier_addr",
+            addresses.daAddresses.eigenDACertAndBlobVerifier
+        );
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
