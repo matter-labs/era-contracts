@@ -63,7 +63,7 @@ struct DataAvailabilityDeployedAddresses {
     address noDAValidiumL1DAValidator;
     address availBridge;
     address availL1DAValidator;
-    address eigenDAL1Validator;
+    address eigenDAL1DAValidator;
     address eigenDARegistry;
 }
 
@@ -129,7 +129,7 @@ struct ContractsConfig {
     bytes32 defaultAAHash;
     bytes32 evmEmulatorHash;
     address availL1DAValidator;
-    address eigenDAL1Validator;
+    address eigenDAL1DAValidator;
     address eigenDARegistry;
 }
 
@@ -208,7 +208,7 @@ abstract contract DeployUtils is Script {
         }
 
         if (vm.keyExistsToml(toml, "$.contracts.eigenda_l1_validator")) {
-            config.contracts.eigenDAL1Validator = toml.readAddress("$.contracts.eigenda_l1_validator");
+            config.contracts.eigenDAL1DAValidator = toml.readAddress("$.contracts.eigenda_l1_validator");
         }
 
         if (vm.keyExistsToml(toml, "$.contracts.eigenda_registry_addr")) {
@@ -444,7 +444,7 @@ abstract contract DeployUtils is Script {
             return abi.encode();
         } else if (compareStrings(contractName, "DummyEigenDARegistry")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "EigenDAL1Validator")) {
+        } else if (compareStrings(contractName, "EigenDAL1DAValidator")) {
             return abi.encode(addresses.daAddresses.eigenDARegistry);
         } else if (compareStrings(contractName, "Verifier")) {
             return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);

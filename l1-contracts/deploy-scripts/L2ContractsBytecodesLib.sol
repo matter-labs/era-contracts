@@ -84,8 +84,8 @@ library L2ContractsBytecodesLib {
 
     /// @notice Reads the bytecode of the ValidiumL2DAValidator contract for EigenDA.
     /// @return The bytecode of the ValidiumL2DAValidator contract.
-    function readEigenDAL2ValidatorBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL2("EigenDAL2Validator.sol", "EigenDAL2Validator");
+    function readEigenDAL2DAValidatorBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL2("EigenDAL2DAValidator.sol", "EigenDAL2DAValidator");
     }
 
     /// @notice Reads the bytecode of the ValidiumL2DAValidator contract for NoDA validium.

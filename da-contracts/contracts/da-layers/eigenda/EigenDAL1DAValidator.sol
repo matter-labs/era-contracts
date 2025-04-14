@@ -9,7 +9,7 @@ interface IEigenDABlobProofRegistry {
     function isVerified(bytes calldata inclusion_data) external view returns (bool, bytes32);
 }
 
-contract EigenDAL1Validator is IL1DAValidator {
+contract EigenDAL1DAValidator is IL1DAValidator {
     error InvalidValidatorOutputHash();
     error ProofNotVerified();
 
@@ -22,7 +22,7 @@ contract EigenDAL1Validator is IL1DAValidator {
     function checkDA(
         uint256, // _chainId
         uint256, // _batchNumber,
-        bytes32 l2DAValidatorOutputHash, // keccak(stateDiffHash, eigenDAHash) Calculated on EigenDAL2Validator and passed through L2->L1 Logs
+        bytes32 l2DAValidatorOutputHash, // keccak(stateDiffHash, eigenDAHash) Calculated on EigenDAL2DAValidator and passed through L2->L1 Logs
         bytes calldata operatorDAInput, // stateDiffHash + inclusion_data (inclusion data == abi encoded blobInfo, aka EigenDACert)
         uint256 maxBlobsSupported
     ) external override returns (L1DAValidatorOutput memory output) {

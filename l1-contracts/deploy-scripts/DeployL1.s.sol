@@ -235,11 +235,11 @@ contract DeployL1Script is Script, DeployUtils {
             );
     }
 
-    function getEigenDAL2ValidatorAddress() internal returns (address) {
+    function getEigenDAL2DAValidatorAddress() internal returns (address) {
         return
             Utils.getL2AddressViaCreate2Factory(
                 bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readEigenDAL2ValidatorBytecode()),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readEigenDAL2DAValidatorBytecode()),
                 hex""
             );
     }
@@ -273,16 +273,16 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
 
-        if (config.contracts.eigenDAL1Validator == address(0)) {
+        if (config.contracts.eigenDAL1DAValidator == address(0)) {
             if (config.contracts.eigenDARegistry == address(0)) {
                 console.log("Deploying a DummyEigenDARegistry, do not use for production");
                 addresses.daAddresses.eigenDARegistry = deploySimpleContract("DummyEigenDARegistry");
             } else {
                 addresses.daAddresses.eigenDARegistry = config.contracts.eigenDARegistry;
             }
-            addresses.daAddresses.eigenDAL1Validator = deploySimpleContract("EigenDAL1Validator");
+            addresses.daAddresses.eigenDAL1DAValidator = deploySimpleContract("EigenDAL1DAValidator");
         } else {
-            addresses.daAddresses.eigenDAL1Validator = config.contracts.eigenDAL1Validator;
+            addresses.daAddresses.eigenDAL1DAValidator = config.contracts.eigenDAL1DAValidator;
         }
 
         vm.startBroadcast(msg.sender);
@@ -589,7 +589,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress(
             "deployed_addresses",
             "eigenda_l1_validator_addr",
-            addresses.daAddresses.eigenDAL1Validator
+            addresses.daAddresses.eigenDAL1DAValidator
         );
 
         vm.serializeAddress("deployed_addresses", "eigenda_registry_addr", addresses.daAddresses.eigenDARegistry);
@@ -611,7 +611,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", getRollupL2ValidatorAddress());
         vm.serializeAddress("root", "expected_no_da_validium_l2_validator_addr", getNoDAValidiumL2ValidatorAddress());
         vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getAvailL2ValidatorAddress());
-        vm.serializeAddress("root", "expected_eigenda_l2_validator_addr", getEigenDAL2ValidatorAddress());
+        vm.serializeAddress("root", "expected_eigenda_l2_validator_addr", getEigenDAL2DAValidatorAddress());
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
@@ -779,8 +779,8 @@ contract DeployL1Script is Script, DeployUtils {
             return Utils.readDummyAvailBridgeBytecode();
         } else if (compareStrings(contractName, "DummyEigenDARegistry")) {
             return Utils.readDummyEigenDARegistryBytecode();
-        } else if (compareStrings(contractName, "EigenDAL1Validator")) {
-            return Utils.readEigenDAL1ValidatorBytecode();
+        } else if (compareStrings(contractName, "EigenDAL1DAValidator")) {
+            return Utils.readEigenDAL1DAValidatorBytecode();
         } else if (compareStrings(contractName, "Verifier")) {
             if (config.testnetVerifier) {
                 return type(TestnetVerifier).creationCode;

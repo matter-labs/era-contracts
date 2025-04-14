@@ -1166,8 +1166,8 @@ library Utils {
         bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
     }
 
-    function readEigenDAL1ValidatorBytecode() internal view returns (bytes memory bytecode) {
-        bytecode = readFoundryBytecode("/../da-contracts/out/EigenDAL1Validator.sol/EigenDAL1Validator.json");
+    function readEigenDAL1DAValidatorBytecode() internal view returns (bytes memory bytecode) {
+        bytecode = readFoundryBytecode("/../da-contracts/out/EigenDAL1DAValidator.sol/EigenDAL1DAValidator.json");
     }
 
     function readDummyEigenDARegistryBytecode() internal view returns (bytes memory bytecode) {
