@@ -275,11 +275,9 @@ contract DeployL1Script is Script, DeployUtils {
 
         if (config.contracts.eigenDAL1DAValidator == address(0)) {
             if (config.contracts.eigenDACertAndBlobVerifier == address(0)) {
-                console.log("Deploying a DummyEigenDARegistry, do not use for production");
-                addresses.daAddresses.eigenDACertAndBlobVerifier = deploySimpleContract("DummyEigenDARegistry");
-            } else {
-                addresses.daAddresses.eigenDACertAndBlobVerifier = config.contracts.eigenDACertAndBlobVerifier;
+                console.log("EigenDACertAndBlobVerifier not deployed, do not use for production");
             }
+            addresses.daAddresses.eigenDACertAndBlobVerifier = config.contracts.eigenDACertAndBlobVerifier;
             addresses.daAddresses.eigenDAL1DAValidator = deploySimpleContract("EigenDAL1DAValidator");
         } else {
             addresses.daAddresses.eigenDAL1DAValidator = config.contracts.eigenDAL1DAValidator;
@@ -781,8 +779,6 @@ contract DeployL1Script is Script, DeployUtils {
             return Utils.readAvailL1DAValidatorBytecode();
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return Utils.readDummyAvailBridgeBytecode();
-        } else if (compareStrings(contractName, "DummyEigenDARegistry")) {
-            return Utils.readDummyEigenDARegistryBytecode();
         } else if (compareStrings(contractName, "EigenDAL1DAValidator")) {
             return Utils.readEigenDAL1DAValidatorBytecode();
         } else if (compareStrings(contractName, "Verifier")) {

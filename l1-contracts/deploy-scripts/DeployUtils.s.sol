@@ -444,8 +444,6 @@ abstract contract DeployUtils is Script {
             return abi.encode(addresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "DummyEigenDARegistry")) {
-            return abi.encode();
         } else if (compareStrings(contractName, "EigenDAL1DAValidator")) {
             return abi.encode(addresses.daAddresses.eigenDACertAndBlobVerifier);
         } else if (compareStrings(contractName, "Verifier")) {
