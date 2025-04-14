@@ -98,7 +98,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             daOutput.blobsOpeningCommitments,
             daOutput.blobsLinearHashes
         );
-        _emitMessageRoot(_newBatch.batchNumber, logOutput.l2LogsTreeRoot);
         storedBatchInfo = StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
             batchHash: _newBatch.newStateRoot,
@@ -443,11 +442,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
     }
 
-    function _emitMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
-        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-        messageRootContract.emitMessageRoot(s.chainId, _batchNumber, _messageRoot);
-    }
-
     /// @notice Verifies the dependency message roots that the chain relied on.
     function _verifyDependencyMessageRoots(
         MessageRoot[] memory _dependencyRoots
@@ -465,9 +459,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     uint256(msgRoot.blockOrBatchNumber)
                 );
             } else {
-                // for testing purposes this is allowed.
-                correctRootHash = msgRoot.sides[0];
-                // revert CommitBasedInteropNotSupported();
+                revert CommitBasedInteropNotSupported();
             }
             if (msgRoot.sides.length != 1 || msgRoot.sides[0] != correctRootHash) {
                 revert InvalidMessageRoot(correctRootHash, msgRoot.sides[0]);

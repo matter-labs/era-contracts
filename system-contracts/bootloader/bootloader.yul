@@ -3265,7 +3265,7 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
-                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
 
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -3291,7 +3291,7 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
-                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -3313,7 +3313,7 @@ object "Bootloader" {
                         <!-- @endif -->
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
-                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
 
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
@@ -3333,7 +3333,7 @@ object "Bootloader" {
                         }
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
-                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -3345,7 +3345,7 @@ object "Bootloader" {
                     }
                     case 255 {
                         // Double-check that the operator doesn't try to do an upgrade transaction via L1 -> L2 transaction.
-                        // assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         // L1 transaction, no need to validate as it is validated on L1.
                     }
                     default {

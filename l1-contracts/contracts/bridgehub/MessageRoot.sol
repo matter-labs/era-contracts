@@ -129,17 +129,6 @@ contract MessageRoot is IMessageRoot, Initializable {
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
-    /// @dev emit a new message root when committing a new batch
-    function emitMessageRoot(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = _chainBatchRoot;
-        emit NewMessageRoot(_chainId, _batchNumber, 0, _sides);
-    }
-
     /// @dev Gets the aggregated root of all chains.
     function getAggregatedRoot() external view returns (bytes32) {
         if (chainCount == 0) {
