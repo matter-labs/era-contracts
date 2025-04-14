@@ -64,7 +64,7 @@ struct DataAvailabilityDeployedAddresses {
     address availBridge;
     address availL1DAValidator;
     address eigenDAL1DAValidator;
-    address eigenDARegistry;
+    address eigenDACertAndBlobVerifier;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -130,7 +130,7 @@ struct ContractsConfig {
     bytes32 evmEmulatorHash;
     address availL1DAValidator;
     address eigenDAL1DAValidator;
-    address eigenDARegistry;
+    address eigenDACertAndBlobVerifier;
 }
 
 struct TokensConfig {
@@ -211,8 +211,8 @@ abstract contract DeployUtils is Script {
             config.contracts.eigenDAL1DAValidator = toml.readAddress("$.contracts.eigenda_l1_validator");
         }
 
-        if (vm.keyExistsToml(toml, "$.contracts.eigenda_registry_addr")) {
-            config.contracts.eigenDARegistry = toml.readAddress("$.contracts.eigenda_registry_addr");
+        if (vm.keyExistsToml(toml, "$.contracts.eigenda_cert_and_blob_verifier_addr")) {
+            config.contracts.eigenDACertAndBlobVerifier = toml.readAddress("$.contracts.eigenda_cert_and_blob_verifier_addr");
         }
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
@@ -445,7 +445,7 @@ abstract contract DeployUtils is Script {
         } else if (compareStrings(contractName, "DummyEigenDARegistry")) {
             return abi.encode();
         } else if (compareStrings(contractName, "EigenDAL1DAValidator")) {
-            return abi.encode(addresses.daAddresses.eigenDARegistry);
+            return abi.encode(addresses.daAddresses.eigenDACertAndBlobVerifier);
         } else if (compareStrings(contractName, "Verifier")) {
             return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
         } else if (compareStrings(contractName, "VerifierFflonk")) {

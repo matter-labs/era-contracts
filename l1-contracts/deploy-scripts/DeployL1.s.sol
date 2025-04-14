@@ -274,11 +274,11 @@ contract DeployL1Script is Script, DeployUtils {
         }
 
         if (config.contracts.eigenDAL1DAValidator == address(0)) {
-            if (config.contracts.eigenDARegistry == address(0)) {
+            if (config.contracts.eigenDACertAndBlobVerifier == address(0)) {
                 console.log("Deploying a DummyEigenDARegistry, do not use for production");
-                addresses.daAddresses.eigenDARegistry = deploySimpleContract("DummyEigenDARegistry");
+                addresses.daAddresses.eigenDACertAndBlobVerifier = deploySimpleContract("DummyEigenDARegistry");
             } else {
-                addresses.daAddresses.eigenDARegistry = config.contracts.eigenDARegistry;
+                addresses.daAddresses.eigenDACertAndBlobVerifier = config.contracts.eigenDACertAndBlobVerifier;
             }
             addresses.daAddresses.eigenDAL1DAValidator = deploySimpleContract("EigenDAL1DAValidator");
         } else {
@@ -592,7 +592,7 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.daAddresses.eigenDAL1DAValidator
         );
 
-        vm.serializeAddress("deployed_addresses", "eigenda_registry_addr", addresses.daAddresses.eigenDARegistry);
+        vm.serializeAddress("deployed_addresses", "eigenda_cert_and_blob_verifier_addr", addresses.daAddresses.eigenDACertAndBlobVerifier);
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",

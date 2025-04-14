@@ -13,10 +13,10 @@ contract EigenDAL1DAValidator is IL1DAValidator {
     error InvalidValidatorOutputHash();
     error ProofNotVerified();
 
-    IEigenDABlobProofRegistry public eigenDARegistry;
+    IEigenDABlobProofRegistry public eigenDACertAndBlobVerifier;
 
-    constructor(address eigendaRegistryAddress) {
-        eigenDARegistry = IEigenDABlobProofRegistry(eigendaRegistryAddress);
+    constructor(address eigendaCertAndBlobVerifierAddress) {
+        eigenDACertAndBlobVerifier = IEigenDABlobProofRegistry(eigendaCertAndBlobVerifierAddress);
     }
 
     function checkDA(
@@ -31,12 +31,12 @@ contract EigenDAL1DAValidator is IL1DAValidator {
         }
         bytes32 stateDiffHash = bytes32(operatorDAInput[:32]);
 
-        // Check that the proof for the given inclusion data was verified in the EigenDA registry contract
-        (bool isVerified, bytes32 eigenDAHash) = eigenDARegistry.isVerified(operatorDAInput[32:]);
+        // Check that the proof for the given inclusion data was verified in the EigenDA CertAndBlobVerifier contract
+        (bool isVerified, bytes32 eigenDAHash) = eigenDACertAndBlobVerifier.isVerified(operatorDAInput[32:]);
 
         if (!isVerified) revert ProofNotVerified();
 
-        // Check that the eigenDAHash from the EigenDARegistry (originally calculted on Risc0 guest) is correct
+        // Check that the eigenDAHash from the EigenDACertAndBlobVerifier (originally calculted on Risc0 guest) is correct
         if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(stateDiffHash, eigenDAHash)))
             revert InvalidValidatorOutputHash();
 
