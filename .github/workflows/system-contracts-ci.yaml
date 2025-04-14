@@ -128,7 +128,7 @@ jobs:
           mode: run
           releaseTag: aa7f1aa
           protocolVersion: 28
-          emulate-evm: true
+          emulateEvm: true
 
       - name: Install dependencies
         run: yarn
