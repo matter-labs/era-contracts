@@ -1602,7 +1602,7 @@
   {
     "contractName": "EcAdd",
     "zkBytecodePath": "/system-contracts/zkout/EcAdd.yul/EcAdd.json",
-    "zkBytecodeHash": "0x0100000b6b291927b759e2760b864092584845a582a136986d1cd65a2c9de713",
+    "zkBytecodeHash": "0x0100000b820f8c54defefff268bb401158b07b6dec415de42fb0ae5bd321c51b",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
@@ -1610,7 +1610,7 @@
   {
     "contractName": "EcMul",
     "zkBytecodePath": "/system-contracts/zkout/EcMul.yul/EcMul.json",
-    "zkBytecodeHash": "0x0100000b83ccd6f7b1cf74f8153f239c923c2692f7ede275097199167892d266",
+    "zkBytecodeHash": "0x0100000ba3233410e658281af241070f240abaac0caee3646d8111bee357af1d",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
@@ -1682,7 +1682,7 @@
   {
     "contractName": "Modexp",
     "zkBytecodePath": "/system-contracts/zkout/Modexp.yul/Modexp.json",
-    "zkBytecodeHash": "0x010000256ed3a26e2a1e2116a3a8a2def9d867c5e9c760d278da9b23d28d9739",
+    "zkBytecodeHash": "0x01000025a010894b4f4efe3b991ffca3c9db42625ca22c8f8e8f90087936e17c",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
@@ -1706,7 +1706,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/bootloader_test.yul/Bootloader.json",
-    "zkBytecodeHash": "0x01000431bb01039722313731865ebc1db05279d85a08ef6ac51701812e0c0b6e",
+    "zkBytecodeHash": "0x0100040fa519d96bb7cdc15ad15b09e618f9a1bb48dfe9b29893bb7ee8873f81",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
