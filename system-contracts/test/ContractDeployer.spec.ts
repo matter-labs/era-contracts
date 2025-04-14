@@ -566,7 +566,7 @@ describe("ContractDeployer tests", function () {
     });
   });
 
-  describe.only("createEVM", function () {
+  describe("createEVM", function () {
     let expectedAddress;
 
     before(async () => {
