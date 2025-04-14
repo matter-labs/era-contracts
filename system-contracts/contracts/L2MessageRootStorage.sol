@@ -15,7 +15,7 @@ error MessageRootAlreadyExists();
  * @dev
  */
 contract L2MessageRootStorage is SystemContractBase {
-    mapping(uint256 chainId => mapping(uint256 blockNumber => bytes32 msgRoot)) public msgRoots;
+    mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => bytes32 msgRoot)) public msgRoots;
 
     function addMessageRoot(
         uint256 chainId,

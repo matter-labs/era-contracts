@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {console2 as console} from "forge-std/Script.sol";
-
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
@@ -18,7 +16,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidLogKey, InvalidLogValue, InvalidMessageRoot} from "../../../common/L1ContractErrors.sol";
-import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
+import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero, CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -28,9 +26,6 @@ import {MessageRoot} from "../../../common/Messaging.sol";
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
 uint8 constant RELAYED_EXECUTOR_VERSION = 0;
-
-error CommitBasedInteropNotSupported();
-error DependencyRootsRollingHashMismatch(bytes32 _expected, bytes32 _actual);
 
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
@@ -65,7 +60,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Check that batch contains all meta information for L2 logs.
         // Get the chained hash of priority transaction hashes.
-        // console.log("processing logs");
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
         L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
@@ -305,12 +299,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (!IChainTypeManager(s.chainTypeManager).protocolVersionIsActive(s.protocolVersion)) {
             revert InvalidProtocolVersion();
         }
-        // console.log("decoding commit data");
-        // console.logBytes(_commitData);
         (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
             .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
-        // console.log("decoding commit data 2");
-
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
         // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
         // and so the range checked in the `decodeAndCheckCommitData` is enough.
@@ -478,19 +468,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 length = _dependencyRoots.length;
         for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
             MessageRoot memory msgRoot = _dependencyRoots[i];
-            console.log("msgRoot.sides 0");
-            console.log(msgRoot.chainId);
-            console.log(msgRoot.blockNumber);
-            console.log(msgRoot.sides.length);
-            console.logBytes32(msgRoot.sides[0]);
             bytes32 correctRootHash;
             if (msgRoot.chainId == block.chainid) {
                 IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-                correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.blockNumber));
+                correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.blockOrBatchNumber));
             } else if (msgRoot.chainId == L1_CHAIN_ID) {
                 correctRootHash = L2_MESSAGE_ROOT_STORAGE.msgRoots(
                     uint256(msgRoot.chainId),
-                    uint256(msgRoot.blockNumber)
+                    uint256(msgRoot.blockOrBatchNumber)
                 );
             } else {
                 // for testing purposes this is allowed.
@@ -504,15 +489,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 abi.encodePacked(
                     dependencyRootsRollingHash,
                     msgRoot.chainId,
-                    msgRoot.blockNumber,
+                    msgRoot.blockOrBatchNumber,
                     uint256(96),
                     msgRoot.sides.length,
                     msgRoot.sides
                 )
             );
         }
-        console.log("dependencyRootsRollingHash");
-        console.logBytes32(dependencyRootsRollingHash);
     }
 
     /// @notice Appends the batch message root to the global message.
