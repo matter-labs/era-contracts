@@ -150,9 +150,6 @@ jobs:
       - name: Run tests
         run: yarn sc test
 
-      - name: List all files with "log" in their name
-        run: find . -type f -iname "*log*"
-
       - name: Print output logs of anvil-zksync
         if: always()
-        run: cat anvil-zksync.log
+        run: cat anvil_zksync.log
