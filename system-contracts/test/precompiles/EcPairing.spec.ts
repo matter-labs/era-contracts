@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import type { Contract } from "zksync-ethers";
-import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation } from "../shared/utils";
+import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation, getWallets } from "../shared/utils";
 import { EC_PAIRING_ADDRESS } from "../shared/constants";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
@@ -11,10 +11,13 @@ describe("EcPairing tests", function () {
 
       before(async () => {
         if (environment == "EraVM") {
-          ecPairing = await createPrecompileContractAtAddress(EC_PAIRING_ADDRESS);
-        } else {
+          ecPairing = createPrecompileContractAtAddress(EC_PAIRING_ADDRESS);
+        } else if (environment == "EVM") {
+          const wallet = getWallets()[0];
           await enableEvmEmulation();
-          ecPairing = await deployEvmPrecompileCaller(EC_PAIRING_ADDRESS);
+          ecPairing = await deployEvmPrecompileCaller(EC_PAIRING_ADDRESS, wallet);
+        } else {
+          throw new Error("Invalid environment");
         }
       });
 

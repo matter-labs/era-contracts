@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import type { Contract } from "zksync-ethers";
-import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation } from "../shared/utils";
+import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation, getWallets } from "../shared/utils";
 import { EC_ADD_ADDRESS } from "../shared/constants";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
@@ -11,10 +11,11 @@ describe("EcAdd tests", function () {
 
       before(async () => {
         if (environment == "EraVM") {
-          ecAdd = await createPrecompileContractAtAddress(EC_ADD_ADDRESS);
+          ecAdd = createPrecompileContractAtAddress(EC_ADD_ADDRESS);
         } else {
+          const wallet = getWallets()[0];
           await enableEvmEmulation();
-          ecAdd = await deployEvmPrecompileCaller(EC_ADD_ADDRESS);
+          ecAdd = await deployEvmPrecompileCaller(EC_ADD_ADDRESS, wallet);
         }
       });
 

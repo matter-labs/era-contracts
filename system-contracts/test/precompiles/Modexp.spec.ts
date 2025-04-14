@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import type { Contract } from "zksync-ethers";
-import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation } from "../shared/utils";
+import { callFallback, createPrecompileContractAtAddress, enableEvmEmulation, getWallets } from "../shared/utils";
 import { MODEXP_ADDRESS } from "../shared/constants";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
@@ -11,21 +11,38 @@ describe("Modexp tests", function () {
 
       before(async () => {
         if (environment == "EraVM") {
-          modexp = await createPrecompileContractAtAddress(MODEXP_ADDRESS);
-        } else {
+          modexp = createPrecompileContractAtAddress(MODEXP_ADDRESS);
+        } else if (environment == "EVM") {
           await enableEvmEmulation();
-          modexp = await deployEvmPrecompileCaller(MODEXP_ADDRESS);
+          const wallet = getWallets()[0];
+          modexp = await deployEvmPrecompileCaller(MODEXP_ADDRESS, wallet);
+        } else {
+          throw new Error("Invalid environment");
         }
       });
 
-      describe("Tests", function () {
-        // FIXME: add tests
-        it("Empty input", async () => {
-          const returnData = await callFallback(modexp, "0x");
+      describe("Ethereum Tests", function () {
+        const testCases = [
+          ["0 bytes: (0, 0) mod 0", "0x" + "00".repeat(96), "0x"],
+          ["0 bytes: (0, 0) mod 1", "0x" + "00".repeat(64) + "01".padStart(64, "0") + "01", "0x00"],
+          ["0 bytes: (0, 0) mod 2", "0x" + "00".repeat(64) + "01".padStart(64, "0") + "02", "0x00"],
+          ["0 bytes: (0, 0) mod 4", "0x" + "00".repeat(64) + "01".padStart(64, "0") + "04", "0x00"],
+          ["0 bytes: (0, 0) mod 8", "0x" + "00".repeat(64) + "01".padStart(64, "0") + "08", "0x00"],
+          ["0 bytes: (0, 0) mod 16", "0x" + "00".repeat(64) + "01".padStart(64, "0") + "10", "0x00"],
+          ["0 bytes: (0, 0) mod 32", "0x" + "00".repeat(64) + "01".padStart(64, "0") + "20", "0x00"],
+          ["0 bytes: (0, 0) mod 64", "0x" + "00".repeat(64) + "01".padStart(64, "0") + "40", "0x00"],
+          ["0 bytes: (0, 0) mod 100", "0x" + "00".repeat(64) + "01".padStart(64, "0") + "64", "0x00"],
+          ["0 bytes: (0, 0) mod 128", "0x" + "00".repeat(64) + "01".padStart(64, "0") + "80", "0x00"],
+        ];
 
-          // TODO: check if this is valid
-          expect(returnData).to.be.equal("0x0000000000000000000000000000000000000000000000000000000000000000");
-        });
+        for (const [label, input, expected] of testCases) {
+          it(label, async () => {
+            const returnData = await callFallback(modexp, input);
+            expect(returnData).to.equal(expected);
+          });
+        }
+
+        // Additional test cases will be appended here
       });
     });
   }
