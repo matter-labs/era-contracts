@@ -19,17 +19,17 @@ contract L2MessageRootStorage is SystemContractBase {
 
     function addMessageRoot(
         uint256 chainId,
-        uint256 blockNumber,
-        bytes32[] memory sides
+        uint256 blockOrBatchNumber,
+        bytes32[] calldata sides
     ) external onlyCallFromBootloader {
         if (sides.length != 1) {
             revert SidesLengthNotOne();
         }
-        if (msgRoots[chainId][blockNumber] != bytes32(0)) {
+        if (msgRoots[chainId][blockOrBatchNumber] != bytes32(0)) {
             revert MessageRootAlreadyExists();
         }
-        msgRoots[chainId][blockNumber] = sides[0];
+        msgRoots[chainId][blockOrBatchNumber] = sides[0];
 
-        emit MessageRootAdded(chainId, blockNumber, sides);
+        emit MessageRootAdded(chainId, blockOrBatchNumber, sides);
     }
 }
