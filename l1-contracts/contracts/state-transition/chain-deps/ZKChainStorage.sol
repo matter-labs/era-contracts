@@ -175,6 +175,4 @@ struct ZKChainStorage {
     /// @notice Bytecode hash of evm emulator.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
-    /// @dev The dependency message roots
-    mapping(uint256 batchNumber => mapping(uint256 index => MessageRoot messageRoot)) dependencyMessageRoots;
 }

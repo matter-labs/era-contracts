@@ -169,18 +169,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    struct ViaIR {
-        address logSender2;
-        address logSender3;
-        address logSender4;
-        uint256 logKey2;
-        bytes32 logValue2;
-        uint256 logKey3;
-        bytes32 logValue3;
-        uint256 logKey4;
-        bytes32 logValue4;
-    }
-
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
     /// @dev The logs processed here should line up such that only one log for each key from the
     ///      SystemLogKey enum in Constants.sol is processed per new batch.
@@ -188,7 +176,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     function _processL2Logs(
         CommitBatchInfo memory _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) internal returns (LogProcessingOutput memory logOutput) {
+    ) internal view returns (LogProcessingOutput memory logOutput) {
         // Copy L2 to L1 logs into memory.
         bytes memory emittedL2Logs = _newBatch.systemLogs;
 
@@ -202,8 +190,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (logsLength % L2_TO_L1_LOG_SERIALIZE_SIZE != 0) {
             revert InvalidSystemLogsLength();
         }
-
-        uint256 savedMsgRootIndex = 0;
 
         for (uint256 i = 0; i < logsLength; i = i.uncheckedAdd(L2_TO_L1_LOG_SERIALIZE_SIZE)) {
             // Extract the values to be compared to/used such as the log sender, key, and value
@@ -462,6 +448,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         messageRootContract.emitMessageRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
+    /// @notice Verifies the dependency message roots that the chain relied on.
     function _verifyDependencyMessageRoots(
         MessageRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
