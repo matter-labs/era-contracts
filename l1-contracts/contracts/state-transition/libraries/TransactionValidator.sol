@@ -103,34 +103,35 @@ library TransactionValidator {
         uint256 _numberOfFactoryDependencies,
         uint256 _l2GasPricePerPubdata
     ) internal pure returns (uint256) {
-        uint256 costForComputation;
-        {
-            // Adding the intrinsic cost for the transaction, i.e. auxiliary prices which cannot be easily accounted for
-            costForComputation = L1_TX_INTRINSIC_L2_GAS;
-
-            // Taking into account the hashing costs that depend on the length of the transaction
-            // Note that L1_TX_DELTA_544_ENCODING_BYTES is the delta in the price for every 544 bytes of
-            // the transaction's encoding. It is taken as LCM between 136 and 32 (the length for each keccak256 round
-            // and the size of each new encoding word).
-            costForComputation += Math.ceilDiv(_encodingLength * L1_TX_DELTA_544_ENCODING_BYTES, 544);
-
-            // Taking into the account the additional costs of providing new factory dependencies
-            costForComputation += _numberOfFactoryDependencies * L1_TX_DELTA_FACTORY_DEPS_L2_GAS;
-
-            // There is a minimal amount of computational L2 gas that the transaction should cover
-            costForComputation = Math.max(costForComputation, L1_TX_MIN_L2_GAS_BASE);
-        }
-
-        uint256 costForPubdata = 0;
-        {
-            // Adding the intrinsic cost for the transaction, i.e. auxiliary prices which cannot be easily accounted for
-            costForPubdata = L1_TX_INTRINSIC_PUBDATA * _l2GasPricePerPubdata;
-
-            // Taking into the account the additional costs of providing new factory dependencies
-            costForPubdata += _numberOfFactoryDependencies * L1_TX_DELTA_FACTORY_DEPS_PUBDATA * _l2GasPricePerPubdata;
-        }
-
-        return costForComputation + costForPubdata;
+        return 0; // TODO: zk os
+//        uint256 costForComputation;
+//        {
+//            // Adding the intrinsic cost for the transaction, i.e. auxiliary prices which cannot be easily accounted for
+//            costForComputation = L1_TX_INTRINSIC_L2_GAS;
+//
+//            // Taking into account the hashing costs that depend on the length of the transaction
+//            // Note that L1_TX_DELTA_544_ENCODING_BYTES is the delta in the price for every 544 bytes of
+//            // the transaction's encoding. It is taken as LCM between 136 and 32 (the length for each keccak256 round
+//            // and the size of each new encoding word).
+//            costForComputation += Math.ceilDiv(_encodingLength * L1_TX_DELTA_544_ENCODING_BYTES, 544);
+//
+//            // Taking into the account the additional costs of providing new factory dependencies
+//            costForComputation += _numberOfFactoryDependencies * L1_TX_DELTA_FACTORY_DEPS_L2_GAS;
+//
+//            // There is a minimal amount of computational L2 gas that the transaction should cover
+//            costForComputation = Math.max(costForComputation, L1_TX_MIN_L2_GAS_BASE);
+//        }
+//
+//        uint256 costForPubdata = 0;
+//        {
+//            // Adding the intrinsic cost for the transaction, i.e. auxiliary prices which cannot be easily accounted for
+//            costForPubdata = L1_TX_INTRINSIC_PUBDATA * _l2GasPricePerPubdata;
+//
+//            // Taking into the account the additional costs of providing new factory dependencies
+//            costForPubdata += _numberOfFactoryDependencies * L1_TX_DELTA_FACTORY_DEPS_PUBDATA * _l2GasPricePerPubdata;
+//        }
+//
+//        return costForComputation + costForPubdata;
     }
 
     /// @notice Based on the full L2 gas limit (that includes the batch overhead) and other
