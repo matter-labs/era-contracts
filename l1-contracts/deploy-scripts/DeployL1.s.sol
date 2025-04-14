@@ -715,7 +715,8 @@ contract DeployL1Script is Script, DeployUtils {
             return type(ChainRegistrar).creationCode;
         } else if (compareStrings(contractName, "Bridgehub")) {
             // Bridgehub is a special case because its bytecode was generated using a low optimizer runs setting.
-            return Utils.readFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
+            // return Utils.readFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
+            return type(Bridgehub).creationCode;
         } else if (compareStrings(contractName, "MessageRoot")) {
             return type(MessageRoot).creationCode;
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {

@@ -595,6 +595,7 @@ object "Bootloader" {
             ) {
                 // We set the L2 block info for this particular transaction
                 setL2Block(transactionIndex)
+                setMessageRoots()
 
                 let innerTxDataOffset := add(txDataOffset, 32)
 
@@ -2946,6 +2947,7 @@ object "Bootloader" {
                 }
             }
 
+            // todo split msg roots by block
             function setMessageRoots() {
                 debugLog("Setting message roots", 0)
                 let msgRootSlot := MESSAGE_ROOT_BEGIN_SLOT()
@@ -2953,7 +2955,6 @@ object "Bootloader" {
                 debugLog("Setting message roots 1", msgRootSlot)
                 for {let i := 0} true {i := add(i, 1)} {
                     debugLog("Setting message roots 2", i)
-                    debugLog("slot", add(msgRootSlot, mul(i, msgRootSlotSize)))
                     let messageRootStartSlot := mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32)
                     let chainId  := mload(messageRootStartSlot) 
                     let blockNumber := mload(add(messageRootStartSlot, 32))
@@ -2964,18 +2965,21 @@ object "Bootloader" {
                     debugLog("Setting message roots 5", sidesLength)
 
                     if iszero(sidesLength) {
+                        debugLog("Finish", 0)
                         break
                     }
+                    debugLog("Setting message roots 5.1", 0)
 
-                    mstore(0, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
-                    mstore(4, chainId)
-                    mstore(36, blockNumber)
-                    mstore(68, 96)
-                    mstore(100, sidesLength)
+                    let msgRootOffset := 64
+                    mstore(msgRootOffset, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
+                    mstore(add(msgRootOffset, 4), chainId)
+                    mstore(add(msgRootOffset, 36), blockNumber)
+                    mstore(add(msgRootOffset, 68), 96)
+                    mstore(add(msgRootOffset, 100), sidesLength)
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
                         debugLog("Setting message roots 6", j)
                         debugLog("Setting message roots 7", mload(add(messageRootStartSlot, mul(add(3, j), 32))))
-                        mstore(add(132, mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                        mstore(add(add(msgRootOffset, 132), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
                     }
                     // todo add merkle proof
 
@@ -2985,7 +2989,7 @@ object "Bootloader" {
                         gas(),
                         L2_MESSAGE_ROOT_STORAGE(),
                         0,
-                        0,
+                        msgRootOffset,
                         add(132, mul(sidesLength, 32)),
                         0,
                         0
@@ -2998,33 +3002,56 @@ object "Bootloader" {
                     }
                     debugLog("Tried to set messageRoot: ", 2)
 
+
+                }
+            }
+
+            function sendMsgRootsRollingHashToL1() {
+                debugLog("Sending message roots to L1", 0)
+                let msgRootSlot := MESSAGE_ROOT_BEGIN_SLOT()
+                let msgRootSlotSize := MESSAGE_ROOT_SLOT_SIZE() 
+                let rollingHashOfProcessedRoots := 0
+                for {let i := 0} true {i := add(i, 1)} {
+                    let messageRootStartSlot := mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32)
+                    let chainId  := mload(messageRootStartSlot) 
+                    let blockNumber := mload(add(messageRootStartSlot, 32))
+                    let sidesLength := mload(add(messageRootStartSlot, 64))
+
+                    debugLog("Sending message roots to L1 3", chainId)
+                    debugLog("Sending message roots to L1 4", blockNumber)
+                    debugLog("Sending message roots to L1 5", sidesLength)
+
+                    if iszero(sidesLength) {
+                        // There are no more logs, sending hash to L1.
+                        debugLog("Rolling hash to L1", rollingHashOfProcessedRoots)
+                        debugLog("Finish", 0)
+
+                        sendToL1Native(true, messageRootRollingHashLogKey(), rollingHashOfProcessedRoots)
+                        break
+                    }
+
+                    let msgRootOffset := 64
+                    mstore(msgRootOffset, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
+                    mstore(add(msgRootOffset, 4), chainId)
+                    mstore(add(msgRootOffset, 36), blockNumber)
+                    mstore(add(msgRootOffset, 68), 96)
+                    mstore(add(msgRootOffset, 100), sidesLength)
+                    for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
+                        debugLog("Sending message roots to L1 6", j)
+                        debugLog("Sending message roots to L1 7", mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                        mstore(add(add(msgRootOffset, 132), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                    }
+
                     // for single messageRoots that are not really sides, we send them to L1 here.
                     if lt(sidesLength, 2) {
-                        sendToL1Native(true, messageRootLogKey(i), chainId)
-                        sendToL1Native(true, add(messageRootLogKey(i), 1), blockNumber)
-                        sendToL1Native(true, add(messageRootLogKey(i), 2), sidesLength)
-                        sendToL1Native(true, add(messageRootLogKey(i), 3), mload(add(messageRootStartSlot, 96)))
+                        // Calculate keccak256 of all data
+                        mstore(36, rollingHashOfProcessedRoots)
+                        debugLog("keccak rolling ", mload(36))
+
+                        rollingHashOfProcessedRoots := keccak256(36, add(32, add(128, mul(sidesLength, 32))))
+                        debugLog("keccak rolling out", rollingHashOfProcessedRoots)
                     }
                 }
-
-
-                debugLog("Tried to clear pending messageRootIds: ", 0)
-
-                let success := call(
-                    gas(),
-                    L2_MESSAGE_ROOT_STORAGE(),
-                    0,
-                    0,
-                    4,
-                    0,
-                    0
-                )
-                debugLog("Tried to clear pending messageRootIds: ", 1)
-                if iszero(success) {
-                    debugLog("Failed to clear pending messageRootIds: ", 1)
-                    // revertWithReason(FAILED_TO_SET_L2_BLOCK(), 1)
-                }
-                debugLog("Tried to clear pending messageRootIds: ", 2)
             }
 
             /// @notice Appends the transaction hash to the current L2 block.
@@ -4011,16 +4038,16 @@ object "Bootloader" {
                 ret := 3
             }
 
-            /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
-            function protocolUpgradeTxHashKey() -> ret {
+            function messageRootRollingHashLogKey() -> ret {
                 ret := 7
             }
 
-
-            function messageRootLogKey(id) -> ret {
-                let logPerMessageRoot := 3
-                ret := add(8, mul(id, logPerMessageRoot))
+            /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
+            function protocolUpgradeTxHashKey() -> ret {
+                ret := 8
             }
+
+
 
             ////////////////////////////////////////////////////////////////////////////
             //                      Main Transaction Processing
@@ -4228,6 +4255,7 @@ object "Bootloader" {
             // Sending system logs (to be processed on L1)
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
+            sendMsgRootsRollingHashToL1()
 
             l1MessengerPublishingCall()
             }

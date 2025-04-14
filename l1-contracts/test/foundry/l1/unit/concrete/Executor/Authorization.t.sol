@@ -19,6 +19,7 @@ contract AuthorizationTest is ExecutorTest {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: Utils.randomBytes32("priorityOperationsHash"),
+            dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: Utils.randomBytes32("l2LogsTreeRoot"),
             timestamp: 0,
             commitment: Utils.randomBytes32("commitment")
@@ -31,6 +32,7 @@ contract AuthorizationTest is ExecutorTest {
             newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
             priorityOperationsHash: Utils.randomBytes32("priorityOperationsHash"),
+            dependencyRootsRollingHash: bytes32(0),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: bytes(""),

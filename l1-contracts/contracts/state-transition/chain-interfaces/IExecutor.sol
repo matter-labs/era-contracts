@@ -13,6 +13,7 @@ struct LogProcessingOutput {
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
     bytes32 l2DAValidatorOutputHash;
+    bytes32 dependencyRootsRollingHash;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
@@ -52,6 +53,7 @@ interface IExecutor is IZKChainBase {
         uint64 indexRepeatedStorageChanges;
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash; // kl todo we might have to include a new and old version of this struct for migration
         bytes32 l2LogsTreeRoot;
         uint256 timestamp;
         bytes32 commitment;
@@ -82,6 +84,7 @@ interface IExecutor is IZKChainBase {
         bytes32 newStateRoot;
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash; // kl todo we might have to include a new and old version of this struct for migration
         bytes32 bootloaderHeapInitialContentsHash;
         bytes32 eventsQueueStateHash;
         bytes systemLogs;

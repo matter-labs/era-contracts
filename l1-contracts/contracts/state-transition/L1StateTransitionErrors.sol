@@ -17,6 +17,12 @@ error NotChainAdmin(address prevMsgSender, address admin);
 // 0xc59d372c
 error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protocolVersion);
 
+//
+error CommitBasedInteropNotSupported();
+
+//
+error DependencyRootsRollingHashMismatch(bytes32 _expected, bytes32 _actual);
+
 // 0xedae13f3
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
 

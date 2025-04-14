@@ -101,6 +101,7 @@ contract ExecutorProofTest is Test {
             numberOfLayer1Txs: 10,
             // ignored
             priorityOperationsHash: 0x167f4ca80269c9520ad951eeeda28dd3deb0715e9e2917461e81a60120a14183,
+            dependencyRootsRollingHash: bytes32(0),
             bootloaderHeapInitialContentsHash: 0x540442e48142fa061a81822184f7790e7b69dea92153d38ef623802c6f0411c0,
             eventsQueueStateHash: 0xda42ab7994d4695a25f4ea8a9a485a592b7a31c20d5dae6363828de86d8826ea,
             systemLogs: Utils.encodePacked(mockSystemLogs),
