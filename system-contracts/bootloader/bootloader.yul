@@ -311,7 +311,6 @@ object "Bootloader" {
             }
 
             function MESSAGE_ROOT_SLOTS() -> ret {
-                // Is it a problem if we have
                 ret := mul(add(MAX_MSG_ROOTS_IN_BATCH(), 1), MESSAGE_ROOT_SLOT_SIZE())
             }
 
@@ -516,17 +515,17 @@ object "Bootloader" {
             function BOOTLOADER_UTILITIES() -> ret {
                 ret := 0x000000000000000000000000000000000000800c
             }
-
-            function L2_MESSAGE_ROOT_STORAGE() -> ret {
-                ret := 0x0000000000000000000000000000000000010008
-            }
-
+            
             function BYTECODE_COMPRESSOR_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000800e
             }
 
             function MAX_SYSTEM_CONTRACT_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000ffff
+            }
+
+            function L2_MESSAGE_ROOT_STORAGE() -> ret {
+                ret := 0x0000000000000000000000000000000000010008
             }
 
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
