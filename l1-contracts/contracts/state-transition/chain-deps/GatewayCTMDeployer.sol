@@ -264,7 +264,6 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
-    /// FIXME: we should either change the admin/proxy admin here or delete this thing from being deployed.
     function _deployServerNotifier(bytes32 _salt, DeployedContracts memory _deployedContracts) internal {
         address serverNotifierImplementation = address(new ServerNotifier{salt: _salt}(true));
         _deployedContracts.stateTransition.serverNotifierImplementation = serverNotifierImplementation;
