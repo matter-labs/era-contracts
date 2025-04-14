@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
@@ -100,7 +101,9 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
             return _checkCTMAssetId(decodedAssetId);
         }
 
-        if (contractL2 > MIN_ALLOWED_ADDRESS) {
+        // We always allow calls to the L2AssetRouter contract. We expect that it will not
+        // cause deploying of any unwhitelisted code, but it is needed to facilitate withdrawals of chains.
+        if (contractL2 > MIN_ALLOWED_ADDRESS || contractL2 == L2_ASSET_ROUTER_ADDR) {
             return true;
         }
 

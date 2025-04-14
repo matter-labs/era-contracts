@@ -48,7 +48,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
 
         // Deploy the TransparentUpgradeableProxy via Create2 with notify.
         // The proxy uses the provided chainProxyAdmin as its admin.
-        address proxy = deployViaCreate2AndNotify(
+        proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(
                 implementation,    // the logic/implementation contract

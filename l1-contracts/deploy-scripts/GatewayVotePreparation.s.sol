@@ -245,7 +245,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             diamondCutData: expectedGatewayContracts.diamondCutData,
             relayedSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
             validiumDAValidator: expectedGatewayContracts.daContracts.validiumDAValidator,
-            rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
+            rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager
         });
     }
 

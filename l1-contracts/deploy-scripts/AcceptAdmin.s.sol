@@ -562,11 +562,16 @@ contract AcceptAdmin is Script {
     // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
     function _startMigrateChainFromGateway(StartMigrateChainFromGatewayParams memory data) internal {
         ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
-        
-        // Note, that we do not check whether the chain indeed settles on the ZK Gateway at the moment of calling
-        // this function. This is needed to allow this function to encode the call at all times.
-        // It is the responsibility of the zkstack to warn user in case the chain is not settling on Gateway at the moment.
 
+        {
+            uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
+            if (currentSettlementLayer != data.gatewayChainId) {
+                console.log("Chain does not settle on Gateway");
+                saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex""}));
+                return;
+            }    
+        }
+        
         bytes memory bridgehubBurnData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: data.l2ChainId,
