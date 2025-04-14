@@ -30,4 +30,6 @@ interface IProtocolUpgradeHandler {
     function guardians() external view returns (address);
 
     function securityCouncil() external view returns (address);
+
+    function executeEmergencyUpgrade(UpgradeProposal calldata _proposal) external payable;
 }

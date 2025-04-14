@@ -20,9 +20,9 @@ import {InvalidCall} from "./SystemContractErrors.sol";
 contract MsgValueSimulator is SystemContractBase {
     /// @notice Extract value, isSystemCall and to from the extraAbi params.
     /// @dev The contract accepts value, the callee and whether the call should be a system one via its ABI params.
-    /// @dev The first ABI param contains the value in the [0..127] bits. The 128th contains
-    /// the flag whether or not the call should be a system one.
-    /// The second ABI params contains the callee.
+    /// @dev The first input extra ABI param contains the value. The second one contains
+    /// the address to call, while the third one contains whether the `systemCall` flag should
+    /// be used (this can be helpful when e.g. calling `ContractDeployer`).
     function _getAbiParams() internal view returns (uint256 value, bool isSystemCall, address to) {
         value = SystemContractHelper.getExtraAbiData(0);
         uint256 addressAsUint = SystemContractHelper.getExtraAbiData(1);

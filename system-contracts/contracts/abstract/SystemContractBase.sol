@@ -3,8 +3,8 @@
 pragma solidity ^0.8.20;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER} from "../Constants.sol";
-import {SystemCallFlagRequired, Unauthorized, CallerMustBeSystemContract, CallerMustBeBootloader, CallerMustBeForceDeployer} from "../SystemContractErrors.sol";
+import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
+import {SystemCallFlagRequired, Unauthorized, CallerMustBeSystemContract, CallerMustBeBootloader, CallerMustBeEvmContract} from "../SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -53,10 +53,10 @@ abstract contract SystemContractBase {
     }
 
     /// @notice Modifier that makes sure that the method
-    /// can only be called from the L1 force deployer.
-    modifier onlyCallFromForceDeployer() {
-        if (msg.sender != FORCE_DEPLOYER) {
-            revert CallerMustBeForceDeployer();
+    /// can only be called from the EVM emulator using system call (unaccessible from EVM environment)
+    modifier onlySystemCallFromEvmEmulator() {
+        if (!SystemContractHelper.isSystemCallFromEvmEmulator()) {
+            revert CallerMustBeEvmContract();
         }
         _;
     }

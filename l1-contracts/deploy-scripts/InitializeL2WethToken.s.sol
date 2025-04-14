@@ -44,7 +44,7 @@ contract InitializeL2WethTokenScript is Script {
 
         // Parse some config from output of l1 deployment
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-out/output-deploy-l1.toml");
+        string memory path = string.concat(root, vm.envString("L1_OUTPUT"));
         string memory toml = vm.readFile(path);
 
         config.create2FactoryAddr = toml.readAddress("$.create2_factory_addr");
