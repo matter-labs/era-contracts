@@ -30,36 +30,24 @@ describe("L1Messenger tests", () => {
   let bytecode;
 
   before(async () => {
-    console.log(1);
     await prepareEnvironment();
-    console.log(2);
     wallet = getWallets()[0];
-    console.log(3);
     await deployContractOnAddress(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, "L1Messenger");
-    console.log(4);
     l1Messenger = L1MessengerFactory.connect(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, wallet);
-    console.log(5);
     l1MessengerAccount = await ethers.getImpersonatedSigner(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
-    console.log(6);
     knownCodeStorageAccount = await ethers.getImpersonatedSigner(TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS);
-    console.log(7);
     bootloaderAccount = await ethers.getImpersonatedSigner(TEST_BOOTLOADER_FORMAL_ADDRESS);
-    console.log(8);
     // setup
     logData = setupLogData(l1MessengerAccount, l1Messenger);
-    console.log(9);
     bytecode = await getCode(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS);
-    console.log(10);
     await setResult("SystemContext", "txNumberInBlock", [], {
       failure: false,
       returnData: ethers.utils.defaultAbiCoder.encode(["uint16"], [1]),
     });
-    console.log(11);
     await setResult("IMessageRoot", "getAggregatedRoot", [], {
       failure: false,
       returnData: ethers.constants.HashZero,
     });
-    console.log(12);
     emulator = new L1MessengerPubdataEmulator();
   });
 
@@ -87,17 +75,12 @@ describe("L1Messenger tests", () => {
 
   describe("publishPubdataAndClearState", async () => {
     it("publishPubdataAndClearState passes correctly", async () => {
-      console.log(1);
       await (
         await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
       ).wait();
-      console.log(2);
       emulator.addLog(logData.logs[0].log);
-      console.log(3);
       await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
-      console.log(4);
       emulator.addLog(logData.messages[0].log);
-      console.log(5);
       await (
         await l1Messenger
           .connect(bootloaderAccount)
@@ -107,11 +90,9 @@ describe("L1Messenger tests", () => {
             { gasLimit: 1000000000 }
           )
       ).wait();
-      console.log(6);
     });
 
     it("should revert Too many L2->L1 logs", async () => {
-      console.log(1);
       // set numberOfLogsBytes to 0x4002 to trigger the revert (max value is 0x4000)
       await expect(
         l1Messenger
@@ -121,7 +102,6 @@ describe("L1Messenger tests", () => {
             await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger, { numberOfLogs: 0x4002 })
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-      console.log(2);
     });
 
     it("should revert Invalid input DA signature", async () => {
