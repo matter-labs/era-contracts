@@ -8,6 +8,7 @@ remappings = [
     "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
+solc_version = "0.8.24"
 
 [profile.default.zksync]
 zksolc = "1.5.7"
