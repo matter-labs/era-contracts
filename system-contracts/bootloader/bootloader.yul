@@ -301,8 +301,15 @@ object "Bootloader" {
                 ret := mul(add(MAX_TRANSACTIONS_IN_BATCH(), 1), TX_OPERATOR_L2_BLOCK_INFO_SLOT_SIZE())
             }
 
-            function MESSAGE_ROOT_BEGIN_SLOT() -> ret {
+            /// @dev We store the next messageRoot number to be processed. 
+            /// For each txs we check if the messageRoot belongs to a block that we should process, if yes we store it and continue to the next.
+            /// If no, we stop.
+            function NEXT_MESSAGE_ROOT_NUMBER_SLOT() -> ret {
                 ret := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), TX_OPERATOR_L2_BLOCK_INFO_SLOTS())
+            }
+
+            function MESSAGE_ROOT_BEGIN_SLOT() -> ret {
+                ret := add(NEXT_MESSAGE_ROOT_NUMBER_SLOT(), 1)
             }
 
             /// @dev The size of each of the message roots.
@@ -517,7 +524,7 @@ object "Bootloader" {
             function BOOTLOADER_UTILITIES() -> ret {
                 ret := 0x000000000000000000000000000000000000800c
             }
-            
+
             function BYTECODE_COMPRESSOR_ADDR() -> ret {
                 ret := 0x000000000000000000000000000000000000800e
             }
@@ -597,7 +604,7 @@ object "Bootloader" {
             ) {
                 // We set the L2 block info for this particular transaction
                 setL2Block(transactionIndex)
-                setMessageRoots()
+                setMessageRoots(transactionIndex)
 
                 let innerTxDataOffset := add(txDataOffset, 32)
 
@@ -1899,8 +1906,7 @@ object "Bootloader" {
                 ) {
                     // If not enough gas for pubdata was provided, we revert all the state diffs / messages
                     // that caused the pubdata to be published
-                    // debugLog("Reverting due to pubdata", 0)
-                    // nearCallPanic()
+                    nearCallPanic()
                 }
             }
 
@@ -2950,26 +2956,53 @@ object "Bootloader" {
             }
 
             /// @notice Sets the message roots in the L2MessageRootStorage contract.
-            function setMessageRoots() {
+            /// We store the latest processed messageRoot number in the NEXT_MESSAGE_ROOT_NUMBER_SLOT()
+            /// For each txs, we check if the next messageRoot belongs to a block that we should process, if yes we store it and continue to the next.
+            /// If no, we stop.
+            /// @param txId The index of the transaction in the batch for which to get the L2 block information.
+            function setMessageRoots(txId) {
                 debugLog("Setting message roots", 0)
                 let msgRootSlot := MESSAGE_ROOT_BEGIN_SLOT()
                 let msgRootSlotSize := MESSAGE_ROOT_SLOT_SIZE() 
+                let txL2BlockPosition := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_BYTE(), mul(TX_OPERATOR_L2_BLOCK_INFO_SIZE_BYTES(), txId))
+
+                let currentL2BlockNumber := mload(txL2BlockPosition)
+
+                let nextMsgRootNumber := mload(NEXT_MESSAGE_ROOT_NUMBER_SLOT())
+                let messageRootStartSlot := mul(add(msgRootSlot, mul(nextMsgRootNumber, msgRootSlotSize)), 32)
+                let nextMessageRootBlockNumber  := mload(messageRootStartSlot) 
+
+                if lt(currentL2BlockNumber, nextMessageRootBlockNumber) {
+                    debugLog("Processed all message roots for this block", 0)
+                    return(0, 0)
+                }
+
                 debugLog("Setting message roots 1", msgRootSlot)
-                for {let i := 0} true {i := add(i, 1)} {
+                for {let i := nextMsgRootNumber} true {i := add(i, 1)} {
                     debugLog("Setting message roots 2", i)
-                    let messageRootStartSlot := mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32)
+                    let currentBlockNumberSlot := mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32)
+                    let messageRootStartSlot := add(32, currentBlockNumberSlot)
+                    let currentBlockNumber := mload(currentBlockNumberSlot)
                     let chainId  := mload(messageRootStartSlot) 
                     let blockNumber := mload(add(messageRootStartSlot, 32))
                     let sidesLength := mload(add(messageRootStartSlot, 64))
+
 
                     debugLog("Setting message roots 3", chainId)
                     debugLog("Setting message roots 4", blockNumber)
                     debugLog("Setting message roots 5", sidesLength)
 
+                    if lt(currentL2BlockNumber, currentBlockNumber) {
+                        debugLog("Processed all message roots for this block", 0)
+                        break
+                    }
+
                     if iszero(sidesLength) {
                         debugLog("Finish", 0)
                         break
                     }
+                    mstore(NEXT_MESSAGE_ROOT_NUMBER_SLOT(), i)
+
                     debugLog("Setting message roots 5.1", 0)
 
                     let msgRootOffset := 64
@@ -3015,7 +3048,7 @@ object "Bootloader" {
                 let msgRootSlotSize := MESSAGE_ROOT_SLOT_SIZE() 
                 let rollingHashOfProcessedRoots := 0
                 for {let i := 0} true {i := add(i, 1)} {
-                    let messageRootStartSlot := mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32)
+                    let messageRootStartSlot := add(32, mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32))
                     let chainId  := mload(messageRootStartSlot) 
                     let blockNumber := mload(add(messageRootStartSlot, 32))
                     let sidesLength := mload(add(messageRootStartSlot, 64))
@@ -4152,7 +4185,7 @@ object "Bootloader" {
             mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), EMPTY_STRING_KECCAK())
             mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), 0)
 
-            setMessageRoots()
+            setMessageRoots(0)
 
             // Iterating through transaction descriptions
             let transactionIndex := 0
