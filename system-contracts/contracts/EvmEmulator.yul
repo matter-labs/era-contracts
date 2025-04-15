@@ -2732,6 +2732,17 @@ object "EvmEmulator" {
                 case 0xFE { // OP_INVALID
                     $llvm_NoInline_llvm$_invalid()
                 }
+                case 0xFF { // OP_SELFDESTRUCT
+                    evmGasLeft := chargeGas(evmGasLeft, 5000)
+            
+                    let beneficiary := accessStackHead(sp, stackHead)
+                    // TODO: forced transfer
+            
+                    returnLen := 0
+                    returnOffset := 0
+            
+                    break
+                }
                 // We explicitly add unused opcodes to optimize the jump table by compiler.
                 case 0x0C { // Unused opcode
                     $llvm_NoInline_llvm$_invalid()
@@ -3061,9 +3072,6 @@ object "EvmEmulator" {
                     $llvm_NoInline_llvm$_invalid()
                 }
                 case 0xFC { // Unused opcode
-                    $llvm_NoInline_llvm$_invalid()
-                }
-                case 0xFF { // Unused opcode
                     $llvm_NoInline_llvm$_invalid()
                 }
                 default {
@@ -5783,6 +5791,17 @@ object "EvmEmulator" {
                     case 0xFE { // OP_INVALID
                         $llvm_NoInline_llvm$_invalid()
                     }
+                    case 0xFF { // OP_SELFDESTRUCT
+                        evmGasLeft := chargeGas(evmGasLeft, 5000)
+                
+                        let beneficiary := accessStackHead(sp, stackHead)
+                        // TODO: forced transfer
+                
+                        returnLen := 0
+                        returnOffset := 0
+                
+                        break
+                    }
                     // We explicitly add unused opcodes to optimize the jump table by compiler.
                     case 0x0C { // Unused opcode
                         $llvm_NoInline_llvm$_invalid()
@@ -6112,9 +6131,6 @@ object "EvmEmulator" {
                         $llvm_NoInline_llvm$_invalid()
                     }
                     case 0xFC { // Unused opcode
-                        $llvm_NoInline_llvm$_invalid()
-                    }
-                    case 0xFF { // Unused opcode
                         $llvm_NoInline_llvm$_invalid()
                     }
                     default {

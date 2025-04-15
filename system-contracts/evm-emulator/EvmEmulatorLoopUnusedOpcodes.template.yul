@@ -328,6 +328,3 @@ case 0xFB { // Unused opcode
 case 0xFC { // Unused opcode
     $llvm_NoInline_llvm$_invalid()
 }
-case 0xFF { // Unused opcode
-    $llvm_NoInline_llvm$_invalid()
-}
