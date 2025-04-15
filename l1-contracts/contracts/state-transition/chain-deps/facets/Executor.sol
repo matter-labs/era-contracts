@@ -91,6 +91,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
             revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
         }
+        // Check that the dependency roots rolling hash is as expected
         if (logOutput.dependencyRootsRollingHash != _newBatch.dependencyRootsRollingHash) {
             revert DependencyRootsRollingHashMismatch(
                 logOutput.dependencyRootsRollingHash,

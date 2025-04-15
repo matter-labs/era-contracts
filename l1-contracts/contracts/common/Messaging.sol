@@ -135,6 +135,11 @@ struct BridgehubL2TransactionRequest {
     address refundRecipient;
 }
 
+/// @dev The structure that contains the parameters for the message root
+/// @param chainId The chain id of the dependency chain
+/// @param blockOrBatchNumber The block number or the batch number where the message root was created
+/// @param sides The sides of the dynamic incremental merkle tree emitted in the L2ToL1Messenger for precommit based interop
+/// For proof and commit based interop, the sides contain a single root.
 struct MessageRoot {
     uint256 chainId;
     uint256 blockOrBatchNumber;

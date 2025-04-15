@@ -35,7 +35,6 @@ contract MessageRoot is IMessageRoot, Initializable {
 
     event Preimage(bytes32 one, bytes32 two);
 
-    // event NewMessageRoot(uint256 indexed chainId, uint256 indexed blockNumber, bytes32 indexed root);
     event NewMessageRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
