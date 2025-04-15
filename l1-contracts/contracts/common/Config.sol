@@ -36,10 +36,13 @@ uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 /// NOTE: The constant is set to zero for the Alpha release period
 uint256 constant PRIORITY_EXPIRATION = 0 days;
 
-/// @dev Timestamp - seconds since unix epoch.
+// @dev The chainId of Ethereum Mainnet
+uint256 constant MAINNET_CHAIN_ID = 1;
+
+/// @dev Timestamp - seconds since unix epoch. This value will be used on the mainnet.
 uint256 constant MAINNET_COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
 
-/// @dev Timestamp - seconds since unix epoch.
+/// @dev Timestamp - seconds since unix epoch. This value will be used on testnets.
 uint256 constant TESTNET_COMMIT_TIMESTAMP_NOT_OLDER = 30 days;
 
 /// @dev Maximum available error between real commit batch timestamp and analog used in the verifier (in seconds)
