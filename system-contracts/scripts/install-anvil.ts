@@ -1,15 +1,46 @@
 import { execSync } from "child_process";
 import { existsSync, mkdirSync, chmodSync } from "fs";
 import { join } from "path";
+import os from "os";
 
 const VERSION = "v0.5.3-v28";
-const COMMIT_HASH = "aa7f1aa"; // Added commit hash
+const COMMIT_HASH = "aa7f1aa";
 const BIN_DIR = join(__dirname, "../bin");
 const BINARY_PATH = join(BIN_DIR, "anvil-zksync");
-const DOWNLOAD_URL = `https://github.com/matter-labs/anvil-zksync/releases/download/${COMMIT_HASH}/anvil-zksync-${VERSION}-aarch64-apple-darwin.tar.gz`;
+
+function getPlatformInfo() {
+  const platform = os.platform();
+  const arch = os.arch();
+
+  let osType: string;
+  let archType: string;
+
+  // Map OS
+  if (platform === "darwin") {
+    osType = "apple-darwin";
+  } else if (platform === "linux") {
+    osType = "unknown-linux-gnu";
+  } else {
+    throw new Error(`Unsupported platform: ${platform}`);
+  }
+
+  // Map architecture
+  if (arch === "arm64") {
+    archType = "aarch64";
+  } else if (arch === "x64") {
+    archType = "x86_64";
+  } else {
+    throw new Error(`Unsupported architecture: ${arch}`);
+  }
+
+  return { archType, osType };
+}
 
 function install() {
   try {
+    const { archType, osType } = getPlatformInfo();
+    const DOWNLOAD_URL = `https://github.com/matter-labs/anvil-zksync/releases/download/${COMMIT_HASH}/anvil-zksync-${VERSION}-${archType}-${osType}.tar.gz`;
+
     // Create bin directory if needed
     if (!existsSync(BIN_DIR)) {
       mkdirSync(BIN_DIR, { recursive: true });
