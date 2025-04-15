@@ -22,6 +22,7 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
 import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
+import {MessageRoot} from "contracts/common/Messaging.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -63,7 +64,7 @@ library Utils {
     }
 
     function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](7);
+        bytes[] memory logs = new bytes[](8);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -105,6 +106,12 @@ library Utils {
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
             bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
+        );
+        logs[7] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.MESSAGE_ROOT_ROLLING_HASH_KEY),
+            bytes32(uint256(uint160(0)))
         );
 
         return logs;
@@ -230,10 +237,11 @@ library Utils {
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
+        MessageRoot[][] memory dependencyRoots = new MessageRoot[][](_batchesData.length);
         return (
             _batchesData[0].batchNumber,
             _batchesData[_batchesData.length - 1].batchNumber,
-            bytes.concat(bytes1(0x00), abi.encode(_batchesData, _priorityOpsData))
+            bytes.concat(bytes1(0x00), abi.encode(_batchesData, _priorityOpsData, dependencyRoots))
         );
     }
 

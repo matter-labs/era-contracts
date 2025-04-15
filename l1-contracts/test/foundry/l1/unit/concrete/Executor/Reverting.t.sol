@@ -50,14 +50,14 @@ contract RevertingTest is ExecutorTest {
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
             batchNumber: 1,
-            batchHash: entries[1].topics[2],
+            batchHash: entries[0].topics[2],
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: 0,
             timestamp: currentTimestamp,
-            commitment: entries[1].topics[3]
+            commitment: entries[0].topics[3]
         });
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);

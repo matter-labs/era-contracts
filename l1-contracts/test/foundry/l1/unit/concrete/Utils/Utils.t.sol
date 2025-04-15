@@ -45,7 +45,7 @@ contract UtilsTest is Test {
     function test_CreateSystemLogs() public {
         bytes[] memory logs = Utils.createSystemLogs(bytes32(0));
 
-        assertEq(logs.length, 7, "logs length should be correct");
+        assertEq(logs.length, 8, "logs length should be correct");
 
         assertEq(
             logs[0],

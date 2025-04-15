@@ -36,7 +36,7 @@ contract TestExecutorFacet is ExecutorFacet {
     function processL2Logs(
         CommitBatchInfo calldata _newBatch,
         bytes32 _expectedSystemContractUpgradeTxHash
-    ) external returns (LogProcessingOutput memory logOutput) {
+    ) external view returns (LogProcessingOutput memory logOutput) {
         return _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
     }
 
@@ -122,7 +122,7 @@ contract ExecutorProofTest is Test {
         );
         assertEq(
             nextCommitment,
-            0x6bf01db427f6af33a29a9505dfca9e1dd07b4e39ce7aee9be805c8f7115480f6,
+            0x3ff8bc7791ca3108714b41035ac969df60771753ae6d5b3557eb8b654505eea7,
             "nextCommitment computation failed"
         );
 

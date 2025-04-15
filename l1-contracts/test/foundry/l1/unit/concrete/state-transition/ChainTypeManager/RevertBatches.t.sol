@@ -199,7 +199,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 2);
+        assertEq(entries.length, 1);
         assertEq(entries[1].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
         assertEq(entries[1].topics[1], bytes32(uint256(1))); // batchNumber
         assertEq(entries[1].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
