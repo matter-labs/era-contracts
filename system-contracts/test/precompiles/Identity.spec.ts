@@ -1,6 +1,6 @@
 import { expect } from "chai";
 import type { Contract } from "zksync-ethers";
-import { callFallback, deployContractYul, enableEvmEmulation } from "../shared/utils";
+import { callFallback, deployContractYul, enableEvmEmulation, getWallets } from "../shared/utils";
 import { deployEvmPrecompileCaller } from "./shared/utils";
 
 describe("Identity tests", function () {
@@ -19,7 +19,8 @@ describe("Identity tests", function () {
 
     it("Returns data in EVM context", async () => {
       enableEvmEmulation();
-      const precompileCaller = await deployEvmPrecompileCaller(identity.address);
+      const wallet = getWallets()[0];
+      const precompileCaller = await deployEvmPrecompileCaller(identity.address, wallet);
 
       const data = "0xff00ff00ff00ff00ff";
       const returnData = await callFallback(precompileCaller, data);
