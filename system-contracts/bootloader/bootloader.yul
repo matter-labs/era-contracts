@@ -2984,6 +2984,7 @@ object "Bootloader" {
                     let messageRootStartSlot := add(32, currentBlockNumberSlot)
                     let currentBlockNumber := mload(currentBlockNumberSlot)
                     let chainId  := mload(messageRootStartSlot) 
+                    /// Note it might be a block or batchNumber
                     let blockNumber := mload(add(messageRootStartSlot, 32))
                     let sidesLength := mload(add(messageRootStartSlot, 64))
 
