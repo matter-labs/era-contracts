@@ -3028,6 +3028,7 @@ object "Bootloader" {
 
                     if iszero(success) {
                         debugLog("Failed to set messageRoot: ", 1)
+                        // kl todo this is still failing, as we set the same messageRoot multiple times
                         // revertWithReason(FAILED_TO_SET_MESSAGE_ROOT(), 1)
                     }
                     debugLog("MsgRoot set successfully", 2)
