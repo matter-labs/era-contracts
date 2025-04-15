@@ -308,6 +308,7 @@ object "Bootloader" {
                 ret := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), TX_OPERATOR_L2_BLOCK_INFO_SLOTS())
             }
 
+            /// @dev The slot starting from which the message roots are stored.
             function MESSAGE_ROOT_BEGIN_SLOT() -> ret {
                 ret := add(NEXT_MESSAGE_ROOT_NUMBER_SLOT(), 1)
             }
@@ -319,6 +320,9 @@ object "Bootloader" {
 
             }
 
+            /// @dev The number of slots dedicated for the message roots.
+            /// For each message root we store the containing blockNumber, the chainId, the dependency blockNumber, and the sides.
+            /// The sides are the sides of the L2->L1 logs incremental merkle tree, used for precommit based interop, for proof based and commit based it is a single root.
             function MESSAGE_ROOT_SLOTS() -> ret {
                 ret := mul(add(MAX_MSG_ROOTS_IN_BATCH(), 1), MESSAGE_ROOT_SLOT_SIZE())
             }
