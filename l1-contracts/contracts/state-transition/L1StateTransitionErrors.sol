@@ -59,15 +59,6 @@ error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLengt
 // 0xfbd630b8
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
 
-// 0x55008233
-error PriorityOpsDataLeftPathLengthIsNotZero();
-
-// 0x8be936a9
-error PriorityOpsDataRightPathLengthIsNotZero();
-
-// 0x99d44739
-error PriorityOpsDataItemHashesLengthIsNotZero();
-
 // 0x885ae069
 error OperatorDAInputTooSmall(uint256 operatorDAInputLength, uint256 minAllowedLength);
 
