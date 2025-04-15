@@ -6,7 +6,7 @@ import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 // import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
-import {MessageRoot} from "../../common/Messaging.sol";
+
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
 /// @param Transparent Fully transparent upgrade is initiated, upgrade data is publicly known

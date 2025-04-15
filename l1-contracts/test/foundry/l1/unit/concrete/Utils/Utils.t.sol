@@ -3,8 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {Utils, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER, L2_DA_VALIDATOR_ADDRESS} from "./Utils.sol";
-import {SystemLogKey} from "contracts/common/Config.sol";
+import {Utils, SystemLogKey, L2_TO_L1_MESSENGER, L2_SYSTEM_CONTEXT_ADDRESS, L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER, L2_DA_VALIDATOR_ADDRESS} from "./Utils.sol";
 
 // solhint-enable max-line-length
 

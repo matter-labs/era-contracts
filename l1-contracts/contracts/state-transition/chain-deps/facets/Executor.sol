@@ -5,8 +5,8 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, SystemLogKey, MAX_MSG_ROOTS_IN_BATCH, MAX_LOG_KEY} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT, SystemLogKey, MAX_LOG_KEY} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
@@ -15,12 +15,11 @@ import {L2_MESSAGE_ROOT_STORAGE} from "../../../common/l2-helpers/L2ContractAddr
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidLogKey, InvalidLogValue, InvalidMessageRoot} from "../../../common/L1ContractErrors.sol";
-import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero, CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch} from "../../L1StateTransitionErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidMessageRoot} from "../../../common/L1ContractErrors.sol";
+import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {MessageRoot} from "../../../common/Messaging.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
@@ -98,6 +97,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             daOutput.blobsOpeningCommitments,
             daOutput.blobsLinearHashes
         );
+
         storedBatchInfo = StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
             batchHash: _newBatch.newStateRoot,
@@ -465,6 +465,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 revert InvalidMessageRoot(correctRootHash, msgRoot.sides[0]);
             }
             dependencyRootsRollingHash = keccak256(
+                // solhint-disable-next-line func-named-parameters
                 abi.encodePacked(
                     dependencyRootsRollingHash,
                     msgRoot.chainId,
