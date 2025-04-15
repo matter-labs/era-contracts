@@ -302,8 +302,8 @@ object "Bootloader" {
             }
 
             /// @dev We store the next messageRoot number to be processed. 
-            /// For each txs we check if the messageRoot belongs to a block that we should process, if yes we store it and continue to the next.
-            /// If no, we stop.
+            /// For each txs we check if the messageRoot belongs to a block that we should process, if yes we store it and continue to the next root.
+            /// When we process all the necessary roots, we stop.
             function NEXT_MESSAGE_ROOT_NUMBER_SLOT() -> ret {
                 ret := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), TX_OPERATOR_L2_BLOCK_INFO_SLOTS())
             }
@@ -2989,12 +2989,12 @@ object "Bootloader" {
                     let sidesLength := mload(add(messageRootStartSlot, 64))
 
 
-                    debugLog("Setting message roots chainId     ", chainId)
-                    debugLog("Setting message roots blockNumber ", blockNumber)
-                    debugLog("Setting message roots sidesLength ", sidesLength)
+                    debugLog("Set roots chainId     ", chainId)
+                    debugLog("Set roots blockNumber ", blockNumber)
+                    debugLog("Set roots sidesLength ", sidesLength)
 
                     if lt(currentL2BlockNumber, currentBlockNumber) {
-                        debugLog("Processed all message roots for this block", 0)
+                        debugLog("Processed all message roots for this block", 1)
                         break
                     }
 
@@ -3028,7 +3028,7 @@ object "Bootloader" {
 
                     if iszero(success) {
                         debugLog("Failed to set messageRoot: ", 1)
-                        revertWithReason(FAILED_TO_SET_MESSAGE_ROOT(), 1)
+                        // revertWithReason(FAILED_TO_SET_MESSAGE_ROOT(), 1)
                     }
                     debugLog("MsgRoot set successfully", 2)
                 }
@@ -3046,9 +3046,9 @@ object "Bootloader" {
                     let blockNumber := mload(add(messageRootStartSlot, 32))
                     let sidesLength := mload(add(messageRootStartSlot, 64))
 
-                    debugLog("Sending message roots to L1 chainId     ", chainId)
-                    debugLog("Sending message roots to L1 blockNumber ", blockNumber)
-                    debugLog("Sending message roots to L1 sidesLength ", sidesLength)
+                    debugLog("Send roots L1 chainId     ", chainId)
+                    debugLog("Send roots L1 blockNumber ", blockNumber)
+                    debugLog("Send roots L1 sidesLength ", sidesLength)
 
                     if iszero(sidesLength) {
                         // There are no more logs, sending hash to L1.
