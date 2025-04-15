@@ -57,8 +57,8 @@ library MessageHashing {
         // - first byte: metadata version (0x01).
         // - second byte: length of the log leaf proof (the proof that the log belongs to a batch).
         // - third byte: length of the batch leaf proof (the proof that the batch belongs to another settlement layer, if any).
-        // - the rest of the bytes are zeroes.
         // - fourth byte: whether the current proof is the last in the links of recursive proofs for settlement layers.
+        // - the rest of the bytes are zeroes.
         //
         // In the future the old version will be disabled, and only the new version will be supported.
         // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 28 bytes are zeroes.
