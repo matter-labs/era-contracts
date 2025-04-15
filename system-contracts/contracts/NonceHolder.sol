@@ -137,7 +137,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
         uint256 oldRawNonce = rawNonces[addressAsKey];
 
         (, uint256 oldMinNonce) = _splitRawNonce(oldRawNonce);
-        if (oldMinNonce != nonceValue) {
+        if (oldMinNonce != _expectedNonce) {
             revert ValueMismatch(nonceValue, oldMinNonce);
         }
 
@@ -168,9 +168,8 @@ contract NonceHolder is INonceHolder, SystemContractBase {
             revert ValueMismatch(nonceValue, oldNonceValue);
         }
 
-        unchecked {
-            keyedNonces[addressAsKey][nonceKey] = oldNonceValue + 1;
-        }
+        // no unchecked block here to prevent overflow
+        keyedNonces[addressAsKey][nonceKey] = oldNonceValue + 1;
     }
 
     /// @notice Returns the deployment nonce for the accounts used for CREATE opcode.
@@ -205,7 +204,7 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     function isNonceUsed(address _address, uint256 _nonce) public view returns (bool) {
         uint256 addressAsKey = uint256(uint160(_address));
         (uint192 nonceKey, uint64 nonceValue) = _splitKeyedNonce(_nonce);
-        bool belowMinimum = (nonceKey == 0 && nonceValue < getMinNonce(_address)) ||
+        bool belowMinimum = (nonceKey == 0 && _nonce < getMinNonce(_address)) ||
             (nonceKey != 0 && nonceValue < keyedNonces[addressAsKey][nonceKey]);
         // We keep the `nonceValues` check here, until it is confirmed that this mapping has never been used by anyone.
         return belowMinimum || __DEPRECATED_nonceValues[addressAsKey][_nonce] > 0;
