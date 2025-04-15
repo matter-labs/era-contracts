@@ -2988,9 +2988,9 @@ object "Bootloader" {
                     let sidesLength := mload(add(messageRootStartSlot, 64))
 
 
-                    debugLog("Setting message roots 3", chainId)
-                    debugLog("Setting message roots 4", blockNumber)
-                    debugLog("Setting message roots 5", sidesLength)
+                    debugLog("Setting message roots chainId     ", chainId)
+                    debugLog("Setting message roots blockNumber ", blockNumber)
+                    debugLog("Setting message roots sidesLength ", sidesLength)
 
                     if lt(currentL2BlockNumber, currentBlockNumber) {
                         debugLog("Processed all message roots for this block", 0)
@@ -2998,12 +2998,12 @@ object "Bootloader" {
                     }
 
                     if iszero(sidesLength) {
-                        debugLog("Finish", 0)
+                        debugLog("Empty sides, finishing", 0)
                         break
                     }
-                    mstore(NEXT_MESSAGE_ROOT_NUMBER_SLOT(), i)
+                    mstore(NEXT_MESSAGE_ROOT_NUMBER_SLOT(), add(i, 1))
 
-                    debugLog("Setting message roots 5.1", 0)
+                    debugLog("Next message root updated", add(i, 1))
 
                     let msgRootOffset := 64
                     mstore(msgRootOffset, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
@@ -3012,13 +3012,8 @@ object "Bootloader" {
                     mstore(add(msgRootOffset, 68), 96)
                     mstore(add(msgRootOffset, 100), sidesLength)
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        debugLog("Setting message roots 6", j)
-                        debugLog("Setting message roots 7", mload(add(messageRootStartSlot, mul(add(3, j), 32))))
                         mstore(add(add(msgRootOffset, 132), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
                     }
-                    // todo add merkle proof
-
-                    debugLog("Tried to set messageRoot: ", 0)
 
                     let success := call(
                         gas(),
@@ -3029,15 +3024,12 @@ object "Bootloader" {
                         0,
                         0
                     )
-                    debugLog("Tried to set messageRoot: ", 1)
 
                     if iszero(success) {
                         debugLog("Failed to set messageRoot: ", 1)
-                        // revertWithReason(FAILED_TO_SET_L2_BLOCK(), 1)
+                        revertWithReason(FAILED_TO_SET_MESSAGE_ROOT(), 1)
                     }
-                    debugLog("Tried to set messageRoot: ", 2)
-
-
+                    debugLog("MsgRoot set successfully", 2)
                 }
             }
 
@@ -3053,15 +3045,13 @@ object "Bootloader" {
                     let blockNumber := mload(add(messageRootStartSlot, 32))
                     let sidesLength := mload(add(messageRootStartSlot, 64))
 
-                    debugLog("Sending message roots to L1 3", chainId)
-                    debugLog("Sending message roots to L1 4", blockNumber)
-                    debugLog("Sending message roots to L1 5", sidesLength)
+                    debugLog("Sending message roots to L1 chainId     ", chainId)
+                    debugLog("Sending message roots to L1 blockNumber ", blockNumber)
+                    debugLog("Sending message roots to L1 sidesLength ", sidesLength)
 
                     if iszero(sidesLength) {
                         // There are no more logs, sending hash to L1.
-                        debugLog("Rolling hash to L1", rollingHashOfProcessedRoots)
-                        debugLog("Finish", 0)
-
+                        debugLog("MsgRoot hash to L1", rollingHashOfProcessedRoots)
                         sendToL1Native(true, messageRootRollingHashLogKey(), rollingHashOfProcessedRoots)
                         break
                     }
@@ -3073,8 +3063,6 @@ object "Bootloader" {
                     mstore(add(msgRootOffset, 68), 96)
                     mstore(add(msgRootOffset, 100), sidesLength)
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        debugLog("Sending message roots to L1 6", j)
-                        debugLog("Sending message roots to L1 7", mload(add(messageRootStartSlot, mul(add(3, j), 32))))
                         mstore(add(add(msgRootOffset, 132), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
                     }
 
@@ -3082,10 +3070,11 @@ object "Bootloader" {
                     if lt(sidesLength, 2) {
                         // Calculate keccak256 of all data
                         mstore(36, rollingHashOfProcessedRoots)
-                        debugLog("keccak rolling ", mload(36))
-
                         rollingHashOfProcessedRoots := keccak256(36, add(32, add(128, mul(sidesLength, 32))))
-                        debugLog("keccak rolling out", rollingHashOfProcessedRoots)
+                    } {
+                        if gt(sidesLength, 1) {
+                            revertWithReason(FAILED_PRECOMMIT_BASED_INTEROP_NOT_SUPPORTED(), 1)
+                        }
                     }
                 }
             }
@@ -3901,6 +3890,14 @@ object "Bootloader" {
 
             function FAILED_TO_CALL_SYSTEM_CONTEXT_ERR_CODE() -> ret {
                 ret := 29
+            }
+
+            function FAILED_TO_SET_MESSAGE_ROOT() -> ret {
+                ret := 30
+            }
+
+            function FAILED_PRECOMMIT_BASED_INTEROP_NOT_SUPPORTED() -> ret {
+                ret := 31
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes
