@@ -162,7 +162,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         );
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
-        
+
         bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
         address create2FactoryAddr;
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {

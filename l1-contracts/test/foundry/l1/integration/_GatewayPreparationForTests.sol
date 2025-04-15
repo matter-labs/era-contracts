@@ -3,7 +3,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 // import {GatewayPreparation} from "deploy-scripts/GatewayPreparation.s.sol";
 
-import { GatewayGovernanceUtils } from "deploy-scripts/GatewayGovernanceUtils.s.sol";
+import {GatewayGovernanceUtils} from "deploy-scripts/GatewayGovernanceUtils.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 import {DeployGatewayTransactionFilterer} from "deploy-scripts/DeployGatewayTransactionFilterer.s.sol";
@@ -12,7 +12,6 @@ import {Utils, ChainInfoFromBridgehub} from "deploy-scripts/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {AcceptAdmin} from "deploy-scripts/AcceptAdmin.s.sol";
 import {Call} from "contracts/governance/Common.sol";
-
 
 contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
     using stdToml for string;
@@ -29,15 +28,19 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         path = string.concat(root, vm.envString("L1_OUTPUT"));
         toml = vm.readFile(path);
 
-        _initializeGatewayGovernanceConfig(GatewayGovernanceConfig({
-            bridgehubProxy: toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr"),
-            l1AssetRouterProxy: toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr"),
-            chainTypeManagerProxy: toml.readAddress(
-              "$.deployed_addresses.state_transition.state_transition_proxy_addr"
-            ),
-            ctmDeploymentTrackerProxy: toml.readAddress("$.deployed_addresses.bridgehub.ctm_deployment_tracker_proxy_addr"),
-            gatewayChainId: gatewayChainId
-        }));
+        _initializeGatewayGovernanceConfig(
+            GatewayGovernanceConfig({
+                bridgehubProxy: toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr"),
+                l1AssetRouterProxy: toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr"),
+                chainTypeManagerProxy: toml.readAddress(
+                    "$.deployed_addresses.state_transition.state_transition_proxy_addr"
+                ),
+                ctmDeploymentTrackerProxy: toml.readAddress(
+                    "$.deployed_addresses.bridgehub.ctm_deployment_tracker_proxy_addr"
+                ),
+                gatewayChainId: gatewayChainId
+            })
+        );
     }
 
     function governanceRegisterGateway() public {
@@ -69,7 +72,12 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         );
 
         AcceptAdmin adminScript = new AcceptAdmin();
-        adminScript.setTransactionFilterer(_gatewayGovernanceConfig.bridgehubProxy, _gatewayGovernanceConfig.gatewayChainId, transactionFiltererProxy, true);
+        adminScript.setTransactionFilterer(
+            _gatewayGovernanceConfig.bridgehubProxy,
+            _gatewayGovernanceConfig.gatewayChainId,
+            transactionFiltererProxy,
+            true
+        );
     }
 
     function migrateChainToGateway(uint256 migratingChainId) public {

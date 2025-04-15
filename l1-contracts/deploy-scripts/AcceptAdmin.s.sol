@@ -364,8 +364,14 @@ contract AcceptAdmin is Script {
     function _migrateChainToGatewayInner(MigrateChainToGatewayParams memory data) private {
         Call[] memory calls;
 
-        ChainInfoFromBridgehub memory gatewayChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.gatewayChainId);
-        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        ChainInfoFromBridgehub memory gatewayChainInfo = Utils.chainInfoFromBridgehubAndChainId(
+            data.bridgehub,
+            data.gatewayChainId
+        );
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(
+            data.bridgehub,
+            data.l2ChainId
+        );
 
         bytes memory secondBridgeData;
         {
@@ -432,7 +438,6 @@ contract AcceptAdmin is Script {
         );
     }
 
-
     struct SetDAValidatorPairWithGatewayParams {
         address bridgehub;
         uint256 l1GasPrice;
@@ -448,7 +453,10 @@ contract AcceptAdmin is Script {
     // Using struct for input to avoid stack too deep errors
     // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
     function _setDAValidatorPairWithGatewayInner(SetDAValidatorPairWithGatewayParams memory data) private {
-        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(
+            data.bridgehub,
+            data.l2ChainId
+        );
         bytes memory callData = abi.encodeCall(IAdmin.setDAValidatorPair, (data.l1DAValidator, data.l2DAValidator));
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
@@ -506,7 +514,10 @@ contract AcceptAdmin is Script {
     // Using struct for input to avoid stack too deep errors
     // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
     function _enableValidatorViaGatewayInner(EnableValidatorViaGatewayParams memory data) private {
-        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(
+            data.bridgehub,
+            data.l2ChainId
+        );
         bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidator, (data.l2ChainId, data.validatorAddress));
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
@@ -561,7 +572,10 @@ contract AcceptAdmin is Script {
     // Using struct for input to avoid stack too deep errors
     // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
     function _startMigrateChainFromGateway(StartMigrateChainFromGatewayParams memory data) internal {
-        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.l2ChainId);
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(
+            data.bridgehub,
+            data.l2ChainId
+        );
 
         {
             uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
@@ -569,9 +583,9 @@ contract AcceptAdmin is Script {
                 console.log("Chain does not settle on Gateway");
                 saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex""}));
                 return;
-            }    
+            }
         }
-        
+
         bytes memory bridgehubBurnData = abi.encode(
             BridgehubBurnCTMAssetData({
                 chainId: data.l2ChainId,
@@ -637,7 +651,10 @@ contract AcceptAdmin is Script {
     // Using struct for input to avoid stack too deep errors.
     // The outer function does not expect it as input rightaway for easier encoding in zkstack Rust.
     function _adminL1L2TxInner(AdminL1L2TxParams memory params) private {
-        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(params.bridgehub, params.chainId);
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(
+            params.bridgehub,
+            params.chainId
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             params.l1GasPrice,
             params.data,
@@ -664,16 +681,18 @@ contract AcceptAdmin is Script {
         address refundRecipient,
         bool _shouldSend
     ) public {
-        _adminL1L2TxInner(AdminL1L2TxParams({
-            bridgehub: bridgehub,
-            l1GasPrice: l1GasPrice,
-            chainId: chainId,
-            to: to,
-            value: value,
-            data: data,
-            refundRecipient: refundRecipient,
-            _shouldSend: _shouldSend
-        }));
+        _adminL1L2TxInner(
+            AdminL1L2TxParams({
+                bridgehub: bridgehub,
+                l1GasPrice: l1GasPrice,
+                chainId: chainId,
+                to: to,
+                value: value,
+                data: data,
+                refundRecipient: refundRecipient,
+                _shouldSend: _shouldSend
+            })
+        );
     }
 
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {

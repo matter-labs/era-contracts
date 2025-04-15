@@ -51,7 +51,6 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
-
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
@@ -65,7 +64,6 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
-
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
@@ -102,7 +100,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
         refundRecipient = toml.readAddress("$.refund_recipient");
 
-        // The "new" and "old" rollup L2 DA validators are those that were set in v27 and v26 respectively 
+        // The "new" and "old" rollup L2 DA validators are those that were set in v27 and v26 respectively
         rollupL2DAValidator = toml.readAddress("$.rollup_l2_da_validator");
         oldRollupL2DAValidator = toml.readAddress("$.old_rollup_l2_da_validator");
 
@@ -146,7 +144,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             forceDeploymentsData: forceDeploymentsData,
             protocolVersion: config.contracts.latestProtocolVersion
         });
-
     }
 
     function setAddressesBasedOnBridgehub() internal {
@@ -256,13 +253,15 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
 
         initializeConfig(configPath);
-        _initializeGatewayGovernanceConfig(GatewayGovernanceConfig({
-            bridgehubProxy: addresses.bridgehub.bridgehubProxy,
-            l1AssetRouterProxy: addresses.bridges.l1AssetRouterProxy,
-            chainTypeManagerProxy: addresses.stateTransition.chainTypeManagerProxy,
-            ctmDeploymentTrackerProxy: addresses.bridgehub.ctmDeploymentTrackerProxy,
-            gatewayChainId: gatewayChainId
-        }));
+        _initializeGatewayGovernanceConfig(
+            GatewayGovernanceConfig({
+                bridgehubProxy: addresses.bridgehub.bridgehubProxy,
+                l1AssetRouterProxy: addresses.bridges.l1AssetRouterProxy,
+                chainTypeManagerProxy: addresses.stateTransition.chainTypeManagerProxy,
+                ctmDeploymentTrackerProxy: addresses.bridgehub.ctmDeploymentTrackerProxy,
+                gatewayChainId: gatewayChainId
+            })
+        );
         instantiateCreate2Factory();
 
         Call[] memory ecosystemAdminCalls;
@@ -270,7 +269,9 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             (, serverNotifier) = deployServerNotifier();
 
             vm.startBroadcast();
-            ServerNotifier(serverNotifier).setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
+            ServerNotifier(serverNotifier).setChainTypeManager(
+                IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
+            );
             ServerNotifier(serverNotifier).transferOwnership(addresses.chainAdmin);
             vm.stopBroadcast();
 
@@ -285,35 +286,42 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 value: 0,
                 data: abi.encodeCall(Ownable2Step.acceptOwnership, ())
             });
-        } 
+        }
 
         // Firstly, we deploy Gateway CTM
         deployGatewayCTM();
 
-        Call[] memory governanceCalls = _prepareGatewayGovernanceCalls(EXPECTED_MAX_L1_GAS_PRICE, output.gatewayStateTransition.chainTypeManagerProxy, refundRecipient);
+        Call[] memory governanceCalls = _prepareGatewayGovernanceCalls(
+            EXPECTED_MAX_L1_GAS_PRICE,
+            output.gatewayStateTransition.chainTypeManagerProxy,
+            refundRecipient
+        );
 
         // We need to also whitelist the old L2 rollup address
         if (oldRollupL2DAValidator != address(0)) {
-            governanceCalls = Utils.mergeCalls(governanceCalls, Utils.prepareGovernanceL1L2DirectTransaction(
-                EXPECTED_MAX_L1_GAS_PRICE, 
-                abi.encodeCall(RollupDAManager.updateDAPair, (output.relayedSLDAValidator, oldRollupL2DAValidator, true)), 
-                Utils.MAX_PRIORITY_TX_GAS, 
-                new bytes[](0), 
-                output.rollupDAManager, 
-                gatewayChainId, 
-                addresses.bridgehub.bridgehubProxy, 
-                addresses.bridges.l1AssetRouterProxy,
-                refundRecipient
-            ));
+            governanceCalls = Utils.mergeCalls(
+                governanceCalls,
+                Utils.prepareGovernanceL1L2DirectTransaction(
+                    EXPECTED_MAX_L1_GAS_PRICE,
+                    abi.encodeCall(
+                        RollupDAManager.updateDAPair,
+                        (output.relayedSLDAValidator, oldRollupL2DAValidator, true)
+                    ),
+                    Utils.MAX_PRIORITY_TX_GAS,
+                    new bytes[](0),
+                    output.rollupDAManager,
+                    gatewayChainId,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    refundRecipient
+                )
+            );
         }
 
         saveOutput(governanceCalls, ecosystemAdminCalls);
     }
 
-    function saveOutput(
-        Call[] memory governanceCallsToExecute, 
-        Call[] memory ecosystemAdminCallsToExecute
-    ) internal {
+    function saveOutput(Call[] memory governanceCallsToExecute, Call[] memory ecosystemAdminCallsToExecute) internal {
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_proxy_addr",
@@ -367,11 +375,10 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         vm.serializeAddress("root", "relayed_sl_da_validator", output.relayedSLDAValidator);
         vm.serializeAddress("root", "validium_da_validator", output.validiumDAValidator);
         vm.serializeBytes("root", "governance_calls_to_execute", abi.encode(governanceCallsToExecute));
-        vm.serializeBytes("root" , "ecosystem_admin_calls_to_execute", abi.encode(ecosystemAdminCallsToExecute));
-
+        vm.serializeBytes("root", "ecosystem_admin_calls_to_execute", abi.encode(ecosystemAdminCallsToExecute));
 
         string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
         string memory path = string.concat(vm.projectRoot(), vm.envString("GATEWAY_VOTE_PREPARATION_OUTPUT"));
         vm.writeToml(toml, path);
     }
-}   
+}

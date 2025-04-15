@@ -36,10 +36,7 @@ abstract contract Create2FactoryUtils is Script {
     /// @param _factoryAddress The preconfigured factory address (if any).
     /// @param _factorySalt The salt used for deterministic deployment.
     function _initCreate2FactoryParams(address _factoryAddress, bytes32 _factorySalt) internal {
-        create2FactoryParams = Create2FactoryParams({
-            factoryAddress: _factoryAddress,
-            factorySalt: _factorySalt
-        });
+        create2FactoryParams = Create2FactoryParams({factoryAddress: _factoryAddress, factorySalt: _factorySalt});
     }
 
     /// @notice Instantiates the Create2Factory.
@@ -66,26 +63,35 @@ abstract contract Create2FactoryUtils is Script {
             console.log("Create2Factory deployed at:", deployedAddress);
         }
 
-        create2FactoryState = Create2FactoryState({ create2FactoryAddress: deployedAddress });
+        create2FactoryState = Create2FactoryState({create2FactoryAddress: deployedAddress});
     }
 
     /// @notice Deploys a contract via Create2 using the provided complete bytecode.
     /// @param bytecode The full bytecode (creation code concatenated with constructor arguments).
     /// @return The deployed contract address.
     function deployViaCreate2(bytes memory bytecode) internal virtual returns (address) {
-        return Utils.deployViaCreate2(bytecode, create2FactoryParams.factorySalt, create2FactoryState.create2FactoryAddress);
+        return
+            Utils.deployViaCreate2(
+                bytecode,
+                create2FactoryParams.factorySalt,
+                create2FactoryState.create2FactoryAddress
+            );
     }
 
     /// @notice Deploys a contract via Create2 by concatenating the creation code and constructor arguments.
     /// @param creationCode The creation code of the contract.
     /// @param constructorArgs The constructor arguments.
     /// @return The deployed contract address.
-    function deployViaCreate2(bytes memory creationCode, bytes memory constructorArgs) internal virtual returns (address) {
-        return Utils.deployViaCreate2(
-            abi.encodePacked(creationCode, constructorArgs),
-            create2FactoryParams.factorySalt,
-            create2FactoryState.create2FactoryAddress
-        );
+    function deployViaCreate2(
+        bytes memory creationCode,
+        bytes memory constructorArgs
+    ) internal virtual returns (address) {
+        return
+            Utils.deployViaCreate2(
+                abi.encodePacked(creationCode, constructorArgs),
+                create2FactoryParams.factorySalt,
+                create2FactoryState.create2FactoryAddress
+            );
     }
 
     /// @notice Deploys a contract via Create2 and notifies via console logs.

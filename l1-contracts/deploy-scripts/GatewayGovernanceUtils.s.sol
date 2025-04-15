@@ -51,7 +51,6 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
-
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
@@ -63,7 +62,6 @@ import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interf
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-
 
 abstract contract GatewayGovernanceUtils is Script {
     struct GatewayGovernanceConfig {
@@ -149,8 +147,9 @@ abstract contract GatewayGovernanceUtils is Script {
 
         // Confirmed that the L2 Bridgehub should be an asset handler for the assetId for chains.
         {
-            bytes32 chainAssetId = IBridgehub(_gatewayGovernanceConfig.bridgehubProxy)
-                .ctmAssetIdFromChainId(_gatewayGovernanceConfig.gatewayChainId);
+            bytes32 chainAssetId = IBridgehub(_gatewayGovernanceConfig.bridgehubProxy).ctmAssetIdFromChainId(
+                _gatewayGovernanceConfig.gatewayChainId
+            );
 
             bytes memory secondBridgeData = abi.encodePacked(
                 SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,

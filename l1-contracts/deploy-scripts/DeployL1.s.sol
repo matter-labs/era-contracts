@@ -658,10 +658,7 @@ contract DeployL1Script is Script, DeployUtils {
         // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
         address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin);
 
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
-            "ServerNotifier",
-            ecosystemProxyAdmin
-        );
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
     }
 
     function saveDiamondSelectors() public {

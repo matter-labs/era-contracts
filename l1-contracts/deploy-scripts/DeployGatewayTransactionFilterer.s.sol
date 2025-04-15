@@ -51,9 +51,9 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(
-                implementation,    // the logic/implementation contract
-                chainProxyAdmin,   // the admin for the proxy (already deployed)
-                initData           // initialization calldata to set chainAdmin as owner
+                implementation, // the logic/implementation contract
+                chainProxyAdmin, // the admin for the proxy (already deployed)
+                initData // initialization calldata to set chainAdmin as owner
             ),
             "TransparentUpgradeableProxy",
             "GatewayTxFiltererProxy"

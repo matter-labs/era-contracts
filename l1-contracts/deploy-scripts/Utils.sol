@@ -123,7 +123,6 @@ enum Action {
     Remove
 }
 
-
 struct ChainInfoFromBridgehub {
     address diamondProxy;
     address admin;
@@ -443,7 +442,11 @@ library Utils {
 
     function prepareL1L2Transaction(
         PrepareL1L2TransactionParams memory params
-    ) internal view returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy) {
+    )
+        internal
+        view
+        returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy)
+    {
         IBridgehub bridgehub = IBridgehub(params.bridgehubAddress);
 
         requiredValueToDeploy =
@@ -479,7 +482,8 @@ library Utils {
         bytes memory secondBridgeCalldata,
         address refundRecipient
     )
-        internal view
+        internal
+        view
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
