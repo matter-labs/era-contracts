@@ -610,7 +610,16 @@ library Utils {
     function generatePriorityOps(uint256 len) internal pure returns (PriorityOpsBatchInfo[] memory _ops) {
         _ops = new PriorityOpsBatchInfo[](len);
         bytes32[] memory empty;
-        PriorityOpsBatchInfo memory info = PriorityOpsBatchInfo({leftPath: empty, rightPath: empty, itemHashes: empty});
+        bytes32[] memory hashes = new bytes32[](2);
+        hashes[0] = keccak256("hash1");
+        hashes[1] = keccak256("hash2");
+        bytes32[] memory leftPath = new bytes32[](2);
+        leftPath[0] = keccak256("left1");
+        leftPath[1] = keccak256("left2");
+        bytes32[] memory rightPath = new bytes32[](2);
+        rightPath[0] = keccak256("right1");
+        rightPath[1] = keccak256("right2");
+        PriorityOpsBatchInfo memory info = PriorityOpsBatchInfo({leftPath: leftPath, rightPath: rightPath, itemHashes: hashes});
 
         for (uint256 i = 0; i < len; ++i) {
             _ops[i] = info;

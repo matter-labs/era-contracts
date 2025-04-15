@@ -119,6 +119,7 @@ contract ExecutingTest is ExecutorTest {
             commitBatchInfoArray
         );
         executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        executor.setPriorityTreeHistoricalRoot(0x682709a1fd539b1a69dfd64ade8d17231d5498c372fb8a6325ec545137f8a35a);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -331,7 +332,7 @@ contract ExecutingTest is ExecutorTest {
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
         correctNewStoredBatchInfo.batchHash = entries[0].topics[2];
-        correctNewStoredBatchInfo.numberOfLayer1Txs = 1;
+        correctNewStoredBatchInfo.numberOfLayer1Txs = 2;
         correctNewStoredBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
         correctNewStoredBatchInfo.commitment = entries[0].topics[3];
 
@@ -437,9 +438,9 @@ contract ExecutingTest is ExecutorTest {
         assertEq(totalBlocksExecuted, 1);
 
         bool isPriorityQueueActive = getters.isPriorityQueueActive();
-        assertFalse(isPriorityQueueActive);
+        assert(isPriorityQueueActive);
 
         uint256 processed = getters.getFirstUnprocessedPriorityTx();
-        assertEq(processed, 2);
+        assertEq(processed, 0);
     }
 }

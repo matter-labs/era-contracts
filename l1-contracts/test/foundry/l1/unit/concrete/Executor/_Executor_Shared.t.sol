@@ -78,13 +78,14 @@ contract ExecutorTest is Test {
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = executor.commitBatchesSharedBridge.selector;
         selectors[i++] = executor.proveBatchesSharedBridge.selector;
         selectors[i++] = executor.executeBatchesSharedBridge.selector;
         selectors[i++] = executor.revertBatchesSharedBridge.selector;
         selectors[i++] = executor.setPriorityTreeStartIndex.selector;
+        selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
         selectors[i++] = executor.appendPriorityOp.selector;
         return selectors;
     }

@@ -128,7 +128,7 @@ contract ExecutorProofTest is Test {
 
         bytes32 prevCommitment = 0x8199d18dbc01ea80a635f515d6a12312daa1aa32b5404944477dcd41fd7b2bdf;
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
-        assertEq(result, 0xb93b40845ee564c7458db1e46299f558a6bb7bab01e142ca5f19b6f4, "getBatchProofPublicInput");
+        assertEq(result, 0xBCBE30EE87E734F02CD5CCEADBBA8A9AF92A6E6514A03F5C10A2EF57, "getBatchProofPublicInput");
     }
 
     // add this to be excluded from coverage report

@@ -56,8 +56,8 @@ contract MessageRoot is IMessageRoot, Initializable {
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice The mapping from block number to the global message root.
-    // kl todo this approach does not work, each block might have multiple txs that bump the historical root.
-    // And on chains, we could set it when we seal the batch, but then we need to get the batch number..
+    /// @dev Each block might have multiple txs that change the historical root.
+    /// This is ok, since the chains can use the latest one in the block.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
     /// @notice only the bridgehub can call
