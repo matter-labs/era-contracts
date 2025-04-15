@@ -460,7 +460,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {
-            return abi.encode(true);
+            return abi.encode();
         } else if (compareStrings(contractName, "DiamondInit")) {
             return abi.encode();
         } else {

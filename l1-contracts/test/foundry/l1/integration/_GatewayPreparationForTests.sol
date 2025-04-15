@@ -78,6 +78,19 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
             transactionFiltererProxy,
             true
         );
+
+        adminScript.grantGatewayWhitelist(
+            _gatewayGovernanceConfig.bridgehubProxy, 
+            _gatewayGovernanceConfig.gatewayChainId, 
+            _gatewayGovernanceConfig.ctmDeploymentTrackerProxy, 
+            true
+        );
+        adminScript.grantGatewayWhitelist(
+            _gatewayGovernanceConfig.bridgehubProxy, 
+            _gatewayGovernanceConfig.gatewayChainId, 
+            Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), 
+            true
+        );
     }
 
     function migrateChainToGateway(uint256 migratingChainId) public {

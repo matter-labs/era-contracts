@@ -21,10 +21,8 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
         _;
     }
 
-    constructor(bool disableInitializers) {
-        if (disableInitializers) {
-            _disableInitializers();
-        }
+    constructor() {
+        _disableInitializers();
     }
 
     function initialize(address _initialOwner) public reentrancyGuardInitializer {
