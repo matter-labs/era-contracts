@@ -11,17 +11,17 @@ import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice This contract enables chain admins to emit migration events for the server.
-/// @dev The `owner` of this contract is expected to be the admin of the chain type manager.
+/// @dev The `owner` of this contract is expected to be the admin of the chainTypeManager contract.
 contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
     /// @notice The chainTypeManager, which is used to retrieve chain administrator addresses.
     IChainTypeManager public chainTypeManager;
 
     /// @notice Emitted to notify the server before a chain migrates to the ZK gateway.
-    /// @param chainId The identifier for the chain initiating migration to a gateway.
+    /// @param chainId The identifier for the chain initiating migration to the ZK gateway.
     event MigrateToGateway(uint256 indexed chainId);
 
     /// @notice Emitted to notify the server before a chain migrates from the ZK gateway.
-    /// @param chainId The identifier for the chain initiating migration from a gateway.
+    /// @param chainId The identifier for the chain initiating migration to the ZK gateway.
     event MigrateFromGateway(uint256 indexed chainId);
 
     /// @notice Modifier to ensure the caller is the administrator of the specified chain.
