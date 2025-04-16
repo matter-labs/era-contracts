@@ -29,6 +29,16 @@ const L2_CONTRACTS: { [key: string]: ContractDescription } = {
     codeName: "MessageRoot",
     path: "contracts/bridgehub/MessageRoot.sol",
   },
+  BridgeHub: {
+    address: "0x0000000000000000000000000000000000010002",
+    codeName: "Bridgehub",
+    path: "contracts/bridgehub/Bridgehub.sol",
+  },
+  BridgedStandardERC20: {
+    address: "0x05b00ef3489E21E57b3e93a72bc9F59c57bB199b",
+    codeName: "BridgedStandardERC20",
+    path: "contracts/bridge/BridgedStandardERC20.sol",
+  },
   L2WrappedBaseToken: {
     address: "0x0000000000000000000000000000000000010007",
     codeName: "L2WrappedBaseToken",
