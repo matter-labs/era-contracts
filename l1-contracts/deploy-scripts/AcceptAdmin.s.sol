@@ -143,7 +143,7 @@ contract AcceptAdmin is Script {
 
     function adminEncodeMulticall(bytes memory callsToExecute) external {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
-        
+
         bytes memory result = abi.encodeCall(ChainAdmin.multicall, (calls, true));
         console.logBytes(result);
     }

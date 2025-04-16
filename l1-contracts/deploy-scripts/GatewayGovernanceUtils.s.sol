@@ -151,7 +151,11 @@ abstract contract GatewayGovernanceUtils is Script {
         // Confirmed that the L2 Bridgehub should be an asset handler for the assetId for chains.
         {
             // The CTM assetId has not yet been registered on production chains and so we need to calculate it manually.
-            bytes32 chainAssetId = DataEncoding.encodeAssetId(block.chainid, bytes32(uint256(uint160(_gatewayGovernanceConfig.chainTypeManagerProxy))), _gatewayGovernanceConfig.ctmDeploymentTrackerProxy);
+            bytes32 chainAssetId = DataEncoding.encodeAssetId(
+                block.chainid,
+                bytes32(uint256(uint160(_gatewayGovernanceConfig.chainTypeManagerProxy))),
+                _gatewayGovernanceConfig.ctmDeploymentTrackerProxy
+            );
 
             bytes memory secondBridgeData = abi.encodePacked(
                 SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
