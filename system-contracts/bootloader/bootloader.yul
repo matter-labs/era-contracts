@@ -4093,7 +4093,6 @@ object "Bootloader" {
             //                      Main Transaction Processing
             ////////////////////////////////////////////////////////////////////////////
 
-            function main() {
             /// @notice the address that will be the beneficiary of all the fees
             let OPERATOR_ADDRESS := mload(0)
 
@@ -4298,8 +4297,6 @@ object "Bootloader" {
             sendMsgRootsRollingHashToL1()
 
             l1MessengerPublishingCall()
-            }
-            main()
         }
     }
 }
