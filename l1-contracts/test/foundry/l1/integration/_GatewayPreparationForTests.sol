@@ -80,15 +80,15 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         );
 
         adminScript.grantGatewayWhitelist(
-            _gatewayGovernanceConfig.bridgehubProxy, 
-            _gatewayGovernanceConfig.gatewayChainId, 
-            _gatewayGovernanceConfig.ctmDeploymentTrackerProxy, 
+            _gatewayGovernanceConfig.bridgehubProxy,
+            _gatewayGovernanceConfig.gatewayChainId,
+            _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
             true
         );
         adminScript.grantGatewayWhitelist(
-            _gatewayGovernanceConfig.bridgehubProxy, 
-            _gatewayGovernanceConfig.gatewayChainId, 
-            Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), 
+            _gatewayGovernanceConfig.bridgehubProxy,
+            _gatewayGovernanceConfig.gatewayChainId,
+            Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(),
             true
         );
     }
