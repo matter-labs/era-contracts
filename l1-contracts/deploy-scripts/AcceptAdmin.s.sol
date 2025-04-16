@@ -141,6 +141,13 @@ contract AcceptAdmin is Script {
         Utils.executeCalls(governanceAddr, bytes32(0), 0, calls);
     }
 
+    function adminEncodeMulticall(bytes memory callsToExecute) external {
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+        
+        bytes memory result = abi.encodeCall(ChainAdmin.multicall, (calls, true));
+        console.logBytes(result);
+    }
+
     function adminExecuteUpgrade(
         bytes memory diamondCut,
         address adminAddr,
