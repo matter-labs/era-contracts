@@ -90,6 +90,9 @@ abstract contract GatewayGovernanceUtils is Script {
     function _prepareGatewayGovernanceCalls(
         uint256 _l1GasPrice,
         address _gatewayCTMAddress,
+        address _gatewayRollupDAManager,
+        address _gatewayValidatorTimelock,
+        address _gatewayServerNotifier,
         address _refundRecipient
     ) internal view returns (Call[] memory calls) {
         calls = _getRegisterSettlementLayerCalls();
@@ -190,6 +193,54 @@ abstract contract GatewayGovernanceUtils is Script {
                     _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
                     0,
                     secondBridgeData,
+                    _refundRecipient
+                )
+            );
+        }
+
+        // Accept ownership calls
+        {
+            bytes memory data = abi.encodeCall(Ownable2Step.acceptOwnership, ());
+
+            calls = Utils.mergeCalls(
+                calls,
+                Utils.prepareGovernanceL1L2DirectTransaction(
+                    _l1GasPrice,
+                    data,
+                    Utils.MAX_PRIORITY_TX_GAS,
+                    new bytes[](0),
+                    _gatewayRollupDAManager,
+                    _gatewayGovernanceConfig.gatewayChainId,
+                    _gatewayGovernanceConfig.bridgehubProxy,
+                    _gatewayGovernanceConfig.l1AssetRouterProxy,
+                    _refundRecipient
+                )
+            );
+            calls = Utils.mergeCalls(
+                calls,
+                Utils.prepareGovernanceL1L2DirectTransaction(
+                    _l1GasPrice,
+                    data,
+                    Utils.MAX_PRIORITY_TX_GAS,
+                    new bytes[](0),
+                    _gatewayValidatorTimelock,
+                    _gatewayGovernanceConfig.gatewayChainId,
+                    _gatewayGovernanceConfig.bridgehubProxy,
+                    _gatewayGovernanceConfig.l1AssetRouterProxy,
+                    _refundRecipient
+                )
+            );
+            calls = Utils.mergeCalls(
+                calls,
+                Utils.prepareGovernanceL1L2DirectTransaction(
+                    _l1GasPrice,
+                    data,
+                    Utils.MAX_PRIORITY_TX_GAS,
+                    new bytes[](0),
+                    _gatewayServerNotifier,
+                    _gatewayGovernanceConfig.gatewayChainId,
+                    _gatewayGovernanceConfig.bridgehubProxy,
+                    _gatewayGovernanceConfig.l1AssetRouterProxy,
                     _refundRecipient
                 )
             );

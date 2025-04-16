@@ -294,6 +294,9 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         Call[] memory governanceCalls = _prepareGatewayGovernanceCalls(
             EXPECTED_MAX_L1_GAS_PRICE,
             output.gatewayStateTransition.chainTypeManagerProxy,
+            output.rollupDAManager,
+            output.gatewayStateTransition.validatorTimelock,
+            output.gatewayStateTransition.serverNotifierProxy,
             refundRecipient
         );
 
