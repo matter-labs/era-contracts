@@ -114,7 +114,7 @@ contract L2VerifierFflonk is IVerifierV2 {
     uint256 internal constant PROOF_EVALUATIONS_LENGTH = 15;
     uint256 internal constant TOTAL_LAGRANGE_BASIS_INVERSES_LENGTH = 18;
 
-        /// @inheritdoc IVerifierV2
+    /// @inheritdoc IVerifierV2
     function verificationKeyHash() external pure returns (bytes32) {
         return
             keccak256(
