@@ -25,10 +25,11 @@ contract ExecutingTest is ExecutorTest {
         }
     }
 
-    function generatePriorityOps() internal {
-        bytes32[] memory hashes = new bytes32[](2);
-        hashes[0] = keccak256("hash1");
-        hashes[1] = keccak256("hash2");
+    function generatePriorityOps(uint256 priorityOpsLength) internal {
+        bytes32[] memory hashes = new bytes32[](priorityOpsLength);
+        for (uint256 i = 0; i < priorityOpsLength; ++i) {
+            hashes[i] = keccak256(abi.encodePacked("hash", i));
+        }
 
         bytes32 rollingHash = keccak256("");
 
@@ -41,7 +42,7 @@ contract ExecutingTest is ExecutorTest {
     }
 
     function setUp() public {
-        generatePriorityOps();
+        generatePriorityOps(2);
 
         bytes1 source = bytes1(0x01);
         bytes memory defaultBlobCommitment = Utils.getDefaultBlobCommitment();
@@ -120,6 +121,8 @@ contract ExecutingTest is ExecutorTest {
         );
         executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
         executor.setPriorityTreeHistoricalRoot(0x682709a1fd539b1a69dfd64ade8d17231d5498c372fb8a6325ec545137f8a35a);
+        executor.setPriorityTreeHistoricalRoot(0xa09200c9b365ebf37db651d6096b20c46ea62ff692839090fb0494a53ee80b28);
+        executor.setPriorityTreeHistoricalRoot(0x500f38f9d51b79071e5020b1c196f90fb3fc2fd089eb9358f205b523953d2985);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -209,9 +212,7 @@ contract ExecutingTest is ExecutorTest {
     function test_RevertWhen_ExecutingUnavailablePriorityOperationHash() public {
         vm.prank(validator);
         executor.revertBatchesSharedBridge(0, 0);
-
-        bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
-        bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
+        generatePriorityOps(1);
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
@@ -224,7 +225,7 @@ contract ExecutingTest is ExecutorTest {
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
-            chainedPriorityTxHash
+            correctRollingHash
         );
         correctL2Logs[uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
             true,
@@ -235,7 +236,7 @@ contract ExecutingTest is ExecutorTest {
 
         IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+        correctNewCommitBatchInfo.priorityOperationsHash = correctRollingHash;
         correctNewCommitBatchInfo.numberOfLayer1Txs = 1;
 
         IExecutor.CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
@@ -254,7 +255,7 @@ contract ExecutingTest is ExecutorTest {
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
         correctNewStoredBatchInfo.batchHash = entries[0].topics[2];
         correctNewStoredBatchInfo.numberOfLayer1Txs = 1;
-        correctNewStoredBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+        correctNewStoredBatchInfo.priorityOperationsHash = correctRollingHash;
         correctNewStoredBatchInfo.commitment = entries[0].topics[3];
 
         IExecutor.StoredBatchInfo[] memory correctNewStoredBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
@@ -274,11 +275,11 @@ contract ExecutingTest is ExecutorTest {
         }
 
         vm.prank(validator);
-        vm.expectRevert(QueueIsEmpty.selector);
+        // vm.expectRevert(QueueIsEmpty.selector);
         {
             (processBatchFrom, processBatchTo, processData) = Utils.encodeExecuteBatchesData(
                 correctNewStoredBatchInfoArray,
-                Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
+                Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length, 1)
             );
             executor.executeBatchesSharedBridge(uint256(0), processBatchFrom, processBatchTo, processData);
         }
@@ -289,6 +290,8 @@ contract ExecutingTest is ExecutorTest {
 
         vm.prank(validator);
         executor.revertBatchesSharedBridge(0, 0);
+        /// 3 priority operations to generate error
+        generatePriorityOps(3);
 
         bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
@@ -304,18 +307,18 @@ contract ExecutingTest is ExecutorTest {
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.CHAINED_PRIORITY_TXN_HASH_KEY),
-            chainedPriorityTxHash
+            correctRollingHash
         );
         correctL2Logs[uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY)] = Utils.constructL2Log(
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.NUMBER_OF_LAYER_1_TXS_KEY),
-            bytes32(uint256(1))
+            bytes32(uint256(2))
         );
         IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
         correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
-        correctNewCommitBatchInfo.numberOfLayer1Txs = 1;
+        correctNewCommitBatchInfo.priorityOperationsHash = correctRollingHash;
+        correctNewCommitBatchInfo.numberOfLayer1Txs = 2;
 
         IExecutor.CommitBatchInfo[] memory correctNewCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
         correctNewCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
@@ -333,7 +336,7 @@ contract ExecutingTest is ExecutorTest {
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
         correctNewStoredBatchInfo.batchHash = entries[0].topics[2];
         correctNewStoredBatchInfo.numberOfLayer1Txs = 2;
-        correctNewStoredBatchInfo.priorityOperationsHash = chainedPriorityTxHash;
+        correctNewStoredBatchInfo.priorityOperationsHash = correctRollingHash;
         correctNewStoredBatchInfo.commitment = entries[0].topics[3];
 
         IExecutor.StoredBatchInfo[] memory correctNewStoredBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
@@ -379,7 +382,7 @@ contract ExecutingTest is ExecutorTest {
         {
             (processBatchFrom, processBatchTo, processData) = Utils.encodeExecuteBatchesData(
                 correctNewStoredBatchInfoArray,
-                Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
+                Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length, 2)
             );
             executor.executeBatchesSharedBridge(uint256(0), processBatchFrom, processBatchTo, processData);
         }

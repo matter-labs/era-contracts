@@ -116,8 +116,8 @@ error InvalidNextLeafIndex(uint256 treeNextLeafIndex, uint256 commitmentNextLeaf
 // 0xf9ba09d6
 error NotAllBatchesExecuted();
 
-// 0x9b53b101
-error NotHistoricalRoot();
+// 0xa7050bf6
+error NotHistoricalRoot(bytes32);
 
 // 0xc02d3ee3
 error ContractNotDeployed();
