@@ -71,7 +71,7 @@
     "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
     "test-no-build": "hardhat test --network zkSyncTestNode",
-    "test-node": "hardhat node-zksync --tag 0.1.0-alpha.29",
+    "test-node": "hardhat node-zksync --tag 0.4.0",
     "test:bootloader": "cd bootloader/test_infra && cargo run"
   }
 }
