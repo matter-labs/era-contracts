@@ -486,7 +486,10 @@ contract AcceptAdmin is Script {
             data.bridgehub,
             data.l2ChainId
         );
-        bytes memory callData = abi.encodeCall(IAdmin.setDAValidatorPair, (address(0x719A5aE8dF7468C7E1C22278eD3fD472e9904604), address(0xfa96A3Da88f201433911bEFf3Ecc434CB1222731)));
+        bytes memory callData = abi.encodeCall(
+            IAdmin.setDAValidatorPair,
+            (address(0x719A5aE8dF7468C7E1C22278eD3fD472e9904604), address(0xfa96A3Da88f201433911bEFf3Ecc434CB1222731))
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             callData,
@@ -529,7 +532,7 @@ contract AcceptAdmin is Script {
         );
     }
 
-    function setDAValidatorPairWithGateway(
+    function updateDAValidatorPairWithGateway(
         address bridgehub,
         uint256 l1GasPrice,
         uint256 l2ChainId,
