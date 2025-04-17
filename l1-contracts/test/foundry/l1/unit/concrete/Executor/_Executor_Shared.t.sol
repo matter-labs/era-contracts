@@ -39,7 +39,6 @@ contract ExecutorTest is Test {
     address internal owner;
     address internal validator;
     address internal randomSigner;
-    address internal blobVersionedHashRetriever;
     address internal l1DAValidator;
     AdminFacet internal admin;
     TestExecutor internal executor;
@@ -148,7 +147,6 @@ contract ExecutorTest is Test {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
-        blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
         messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
         dummyBridgehub.setMessageRoot(address(messageRoot));
@@ -213,8 +211,7 @@ contract ExecutorTest is Test {
             l2DefaultAccountBytecodeHash: dummyHash,
             l2EvmEmulatorBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 1000000,
-            feeParams: defaultFeeParams(),
-            blobVersionedHashRetriever: blobVersionedHashRetriever
+            feeParams: defaultFeeParams()
         });
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
