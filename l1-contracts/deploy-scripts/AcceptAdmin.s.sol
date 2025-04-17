@@ -481,6 +481,28 @@ contract AcceptAdmin is Script {
         saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
     }
 
+    function _updateDAValidatorPairWithGatewayInner(SetDAValidatorPairWithGatewayParams memory data) private {
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(
+            data.bridgehub,
+            data.l2ChainId
+        );
+        bytes memory callData = abi.encodeCall(IAdmin.setDAValidatorPair, (address(0x719A5aE8dF7468C7E1C22278eD3fD472e9904604), address(0xfa96A3Da88f201433911bEFf3Ecc434CB1222731)));
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+            data.l1GasPrice,
+            callData,
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            address(0x064ac968ccad1948fcee025fd59c20b153c88072),
+            0,
+            data.gatewayChainId,
+            data.bridgehub,
+            l2ChainInfo.l1AssetRouterProxy,
+            data.refundRecipient
+        );
+
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
+    }
+
     function setDAValidatorPairWithGateway(
         address bridgehub,
         uint256 l1GasPrice,
@@ -493,6 +515,32 @@ contract AcceptAdmin is Script {
         bool _shouldSend
     ) public {
         _setDAValidatorPairWithGatewayInner(
+            SetDAValidatorPairWithGatewayParams({
+                bridgehub: bridgehub,
+                l1GasPrice: l1GasPrice,
+                l2ChainId: l2ChainId,
+                gatewayChainId: gatewayChainId,
+                l1DAValidator: l1DAValidator,
+                l2DAValidator: l2DAValidator,
+                chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
+                refundRecipient: refundRecipient,
+                _shouldSend: _shouldSend
+            })
+        );
+    }
+
+    function setDAValidatorPairWithGateway(
+        address bridgehub,
+        uint256 l1GasPrice,
+        uint256 l2ChainId,
+        uint256 gatewayChainId,
+        address l1DAValidator,
+        address l2DAValidator,
+        address chainDiamondProxyOnGateway,
+        address refundRecipient,
+        bool _shouldSend
+    ) public {
+        _updateDAValidatorPairWithGatewayInner(
             SetDAValidatorPairWithGatewayParams({
                 bridgehub: bridgehub,
                 l1GasPrice: l1GasPrice,
