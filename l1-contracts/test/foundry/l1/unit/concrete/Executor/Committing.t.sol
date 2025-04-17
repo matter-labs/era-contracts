@@ -785,8 +785,6 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_BlobDoesNotExist() public {
-        vm.mockCall(blobVersionedHashRetriever, abi.encode(uint256(0)), abi.encode(bytes32(0)));
-
         bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
             true,

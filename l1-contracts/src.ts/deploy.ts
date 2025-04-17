@@ -162,7 +162,6 @@ export class Deployer {
       L2_DEFAULT_ACCOUNT_BYTECODE_HASH,
       L2_EVM_EMULATOR_BYTECODE_HASH,
       this.addresses.StateTransition.Verifier,
-      this.addresses.BlobVersionedHashRetriever,
       +priorityTxMaxGasLimit,
       this.addresses.StateTransition.DiamondInit,
       false
@@ -1798,39 +1797,6 @@ export class Deployer {
     this.addresses.RollupL1DAValidator = rollupDAValidatorAddress;
     this.addresses.ValidiumL1DAValidator = validiumDAValidatorAddress;
     this.addresses.RelayedSLDAValidator = relayedSLDAValidator;
-  }
-
-  public async updateBlobVersionedHashRetrieverZkMode() {
-    if (!this.isZkMode()) {
-      throw new Error("`updateBlobVersionedHashRetrieverZk` should be only called when deploying on zkSync network");
-    }
-
-    console.log("BlobVersionedHashRetriever is not needed within zkSync network and won't be deployed");
-
-    // 0 is not allowed, we need to some random non-zero value. Let it be 0x1000000000000000000000000000000000000001
-    console.log("CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=0x1000000000000000000000000000000000000001");
-    this.addresses.BlobVersionedHashRetriever = "0x1000000000000000000000000000000000000001";
-  }
-
-  public async deployBlobVersionedHashRetriever(
-    create2Salt: string,
-    ethTxOptions: ethers.providers.TransactionRequest
-  ) {
-    // solc contracts/zksync/utils/blobVersionedHashRetriever.yul --strict-assembly --bin
-    const bytecode = "0x600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-
-    const contractAddress = await this.deployBytecodeViaCreate2(
-      "BlobVersionedHashRetriever",
-      bytecode,
-      create2Salt,
-      ethTxOptions
-    );
-
-    if (this.verbose) {
-      console.log(`CONTRACTS_BLOB_VERSIONED_HASH_RETRIEVER_ADDR=${contractAddress}`);
-    }
-
-    this.addresses.BlobVersionedHashRetriever = contractAddress;
   }
 
   public transparentUpgradableProxyContract(address, signerOrProvider: Signer | providers.Provider) {
