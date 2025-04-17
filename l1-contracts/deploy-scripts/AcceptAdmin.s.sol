@@ -28,6 +28,7 @@ import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridge
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -487,8 +488,8 @@ contract AcceptAdmin is Script {
             data.l2ChainId
         );
         bytes memory callData = abi.encodeCall(
-            IAdmin.setDAValidatorPair,
-            (address(0x719A5aE8dF7468C7E1C22278eD3fD472e9904604), address(0xfa96A3Da88f201433911bEFf3Ecc434CB1222731))
+            RollupDAManager.updateDAPair,
+            (address(0x719A5aE8dF7468C7E1C22278eD3fD472e9904604), address(0xfa96A3Da88f201433911bEFf3Ecc434CB1222731), true)
         );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
