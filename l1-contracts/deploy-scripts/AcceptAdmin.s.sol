@@ -495,7 +495,7 @@ contract AcceptAdmin is Script {
             callData,
             Utils.MAX_PRIORITY_TX_GAS,
             new bytes[](0),
-            address(0x064ac968ccad1948fcee025fd59c20b153c88072),
+            address(0x064ac968CCad1948fceE025fD59c20b153c88072),
             0,
             data.gatewayChainId,
             data.bridgehub,
