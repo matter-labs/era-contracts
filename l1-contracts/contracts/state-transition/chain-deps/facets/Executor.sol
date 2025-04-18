@@ -464,11 +464,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             bytes32 correctRootHash;
             if (msgRoot.chainId == block.chainid) {
                 IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-                correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.blockOrBatchNumber));
+                correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.blockNumber));
             } else if (msgRoot.chainId == L1_CHAIN_ID) {
                 correctRootHash = L2_MESSAGE_ROOT_STORAGE.msgRoots(
                     uint256(msgRoot.chainId),
-                    uint256(msgRoot.blockOrBatchNumber)
+                    uint256(msgRoot.blockNumber)
                 );
             } else {
                 revert CommitBasedInteropNotSupported();
@@ -481,7 +481,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 abi.encodePacked(
                     dependencyRootsRollingHash,
                     msgRoot.chainId,
-                    msgRoot.blockOrBatchNumber,
+                    msgRoot.blockNumber,
                     uint256(96),
                     msgRoot.sides.length,
                     msgRoot.sides
