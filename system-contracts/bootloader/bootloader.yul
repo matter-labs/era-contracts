@@ -2973,6 +2973,7 @@ object "Bootloader" {
                 let txL2BlockPosition := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_BYTE(), mul(TX_OPERATOR_L2_BLOCK_INFO_SIZE_BYTES(), txId))
 
                 let currentL2BlockNumber := mload(txL2BlockPosition)
+                debugLog("currentL2BlockNumber", currentL2BlockNumber)
 
                 let nextMsgRootNumber := mload(NEXT_MESSAGE_ROOT_NUMBER_SLOT())
                 let messageRootStartSlot := mul(add(msgRootSlot, mul(nextMsgRootNumber, msgRootSlotSize)), 32)
@@ -3035,7 +3036,7 @@ object "Bootloader" {
                     if iszero(success) {
                         debugLog("Failed to set messageRoot: ", 1)
                         // kl todo this is still failing, as we set the same messageRoot multiple times
-                        // revertWithReason(FAILED_TO_SET_MESSAGE_ROOT(), 1)
+                        revertWithReason(FAILED_TO_SET_MESSAGE_ROOT(), 1)
                     }
                     debugLog("MsgRoot set successfully", 2)
                 }
