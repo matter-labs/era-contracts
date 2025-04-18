@@ -52,7 +52,7 @@ contract L2AdminFactory {
         // an attack where malicious deployer could select malicious `seed1` and `seed2` where
         // this factory with `seed1` produces the same address as some other random factory with `seed2`,
         // allowing to deploy a malicious contract.
-        admin = address(new ChainAdmin(restrictions));
+        admin = address(new ChainAdmin(restrictions, address(0)));
 
         emit AdminDeployed(address(admin));
     }

@@ -62,7 +62,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         restriction = new AccessControlRestriction(0, owner);
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
-        chainAdmin = new ChainAdmin(restrictions);
+        chainAdmin = new ChainAdmin(restrictions, address(0));
     }
 
     function _deployPermRestriction(

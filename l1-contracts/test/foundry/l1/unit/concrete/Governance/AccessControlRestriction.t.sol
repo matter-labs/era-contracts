@@ -38,7 +38,7 @@ contract AccessRestrictionTest is Test {
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
 
-        chainAdmin = new ChainAdmin(restrictions);
+        chainAdmin = new ChainAdmin(restrictions, address(0));
     }
 
     function test_adminAsAddressZero() public {

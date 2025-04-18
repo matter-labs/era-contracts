@@ -32,6 +32,9 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice The set of active restrictions.
     EnumerableSet.AddressSet internal activeRestrictions;
 
+    /// @notice ChainTypeManager of the ZKSync Chain that ChainAdmin is governing
+    IChainTypeManager internal immutable CHAIN_TYPE_MANAGER;
+
     /// @notice Ensures that only the `ChainAdmin` contract itself can call the function.
     /// @dev All functions that require access-control should use `onlySelf` modifier, while the access control logic
     /// should be implemented in the restriction contracts.
@@ -42,7 +45,8 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
         _;
     }
 
-    constructor(address[] memory _initialRestrictions) reentrancyGuardInitializer {
+    constructor(address[] memory _initialRestrictions, address _chainTypeManager) reentrancyGuardInitializer {
+        CHAIN_TYPE_MANAGER = IChainTypeManager(_chainTypeManager);
         unchecked {
             for (uint256 i = 0; i < _initialRestrictions.length; ++i) {
                 _addRestriction(_initialRestrictions[i]);
@@ -76,13 +80,8 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice Set the expected upgrade timestamp for a specific protocol version.
     /// @param _protocolVersion The ZKsync chain protocol version.
     /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
-    /// @param _chainTypeManager ChainTypeManager address used to check if the protocol version is active. Included for the convenience of the Chain Admin.
-    function setUpgradeTimestamp(
-        uint256 _protocolVersion,
-        uint256 _upgradeTimestamp,
-        address _chainTypeManager
-    ) external onlySelf {
-        if (!IChainTypeManager(_chainTypeManager).protocolVersionIsActive(_protocolVersion)) {
+    function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external onlySelf {
+        if (!CHAIN_TYPE_MANAGER.protocolVersionIsActive(_protocolVersion)) {
             revert InvalidProtocolVersion();
         }
         protocolVersionToUpgradeTimestamp[_protocolVersion] = _upgradeTimestamp;

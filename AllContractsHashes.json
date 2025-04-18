@@ -817,19 +817,19 @@
   },
   {
     "contractName": "l1-contracts/ChainAdmin",
-    "zkBytecodeHash": "0x010001b17e319b8d66255ba940c6f1833fc1b05e8862bebe7a254e706949e8fd",
+    "zkBytecodeHash": "0x010001b9ccc249676938bda5a83faac206ed088ab002963fc432afb86b2a309a",
     "zkBytecodePath": "/l1-contracts/zkout/ChainAdmin.sol/ChainAdmin.json",
-    "evmBytecodeHash": "0x587c46f6e13429245ec3bc09a08a1888098ba322664c76ceb6004120a1c5168f",
+    "evmBytecodeHash": "0x1c03116d0e4cfab34d6a82d57ac88fc4257d7894f11184bd02983b29f4fea682",
     "evmBytecodePath": "/l1-contracts/out/ChainAdmin.sol/ChainAdmin.json",
-    "evmDeployedBytecodeHash": "0x8db736432f243d5b45667a154a5ecf910f31eac2ca750eebf5a3d5a4010ee898"
+    "evmDeployedBytecodeHash": "0x2c3296affc6bace532be452dd3f232eded2c842a3290475fe0fdcad1c4eed5ab"
   },
   {
     "contractName": "l1-contracts/ChainAdminOwnable",
-    "zkBytecodeHash": "0x01000121e0e6d11fc545102b7688402bf52ca259015d1e88306c46b30a7293a9",
+    "zkBytecodeHash": "0x010001416bb23b8d8e0f84ba8c7dbce06b28d109c427ebc88e662addfd883001",
     "zkBytecodePath": "/l1-contracts/zkout/ChainAdminOwnable.sol/ChainAdminOwnable.json",
-    "evmBytecodeHash": "0xae3b9658c8fcce9c685e2944ddf563cb35aba7f89cfba79a64491c8afe1799b9",
+    "evmBytecodeHash": "0xcadc14df931dffe8c3b01a94624db1f1417bf427ba15c15d5104cfdfe99e6ca4",
     "evmBytecodePath": "/l1-contracts/out/ChainAdminOwnable.sol/ChainAdminOwnable.json",
-    "evmDeployedBytecodeHash": "0x6a35f1ce6633f5bf7aeb53a8ebe55c7c788fc6aee235f90e58aa49300abf2b7f"
+    "evmDeployedBytecodeHash": "0xa35703475819b2d27ac88faa8ad1160b77f5d85723d8935c951afb0a54e7bf93"
   },
   {
     "contractName": "l1-contracts/ChainRegistrar",
@@ -1089,11 +1089,11 @@
   },
   {
     "contractName": "l1-contracts/L2AdminFactory",
-    "zkBytecodeHash": "0x010000bb0cd7b22e93abc3ac6e7a3b87b960aa0e0afe7e3e40522ae61f4ef17d",
+    "zkBytecodeHash": "0x010000bb6524581cd266161a159b3029aea86aeb61c1a6c3e437a8494b4c558e",
     "zkBytecodePath": "/l1-contracts/zkout/L2AdminFactory.sol/L2AdminFactory.json",
-    "evmBytecodeHash": "0xa0a7ce5f88b000cfa6ad6aae5284bc84c572cca59e320913d6cf0ee4f5d78d8e",
+    "evmBytecodeHash": "0x92324b201c3e39af5b9b325ba44ec5f36829a519d22f7342fc3ebe4f18c03e99",
     "evmBytecodePath": "/l1-contracts/out/L2AdminFactory.sol/L2AdminFactory.json",
-    "evmDeployedBytecodeHash": "0x6fb20ba4e21f62880ab60d6d4d5cca5a7b78cab4d3669b5400dad1d2380749d1"
+    "evmDeployedBytecodeHash": "0x2c19ce519ae88fc2ce0f5c7f0fac3f5e3a269c76de0b7383ea35e542d28a4d7b"
   },
   {
     "contractName": "l1-contracts/L2AssetRouter",

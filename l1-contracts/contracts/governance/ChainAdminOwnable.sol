@@ -5,7 +5,8 @@ pragma solidity 0.8.28;
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IChainAdminOwnable} from "./IChainAdminOwnable.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
-import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {InvalidProtocolVersion, NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -23,7 +24,11 @@ contract ChainAdminOwnable is IChainAdminOwnable, Ownable2Step {
     /// and used by the automated service in a way similar to the sequencer workflow.
     address public tokenMultiplierSetter;
 
-    constructor(address _initialOwner, address _initialTokenMultiplierSetter) {
+    /// @notice ChainTypeManager of the ZKSync Chain that ChainAdmin is governing
+    IChainTypeManager internal immutable CHAIN_TYPE_MANAGER;
+
+    constructor(address _initialOwner, address _initialTokenMultiplierSetter, address _chainTypeManager) {
+        CHAIN_TYPE_MANAGER = IChainTypeManager(_chainTypeManager);
         if (_initialOwner == address(0)) {
             revert ZeroAddress();
         }
@@ -44,6 +49,9 @@ contract ChainAdminOwnable is IChainAdminOwnable, Ownable2Step {
     /// @param _protocolVersion The ZKsync chain protocol version.
     /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
     function setUpgradeTimestamp(uint256 _protocolVersion, uint256 _upgradeTimestamp) external onlyOwner {
+        if (!CHAIN_TYPE_MANAGER.protocolVersionIsActive(_protocolVersion)) {
+            revert InvalidProtocolVersion();
+        }
         protocolVersionToUpgradeTimestamp[_protocolVersion] = _upgradeTimestamp;
         emit UpdateUpgradeTimestamp(_protocolVersion, _upgradeTimestamp);
     }

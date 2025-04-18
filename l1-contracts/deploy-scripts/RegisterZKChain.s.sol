@@ -349,7 +349,10 @@ contract RegisterZKChainScript is Script {
 
     function deployChainAdminOwnable() internal returns (address chainAdmin, address accessControlRestriction) {
         chainAdmin = Utils.deployViaCreate2(
-            abi.encodePacked(type(ChainAdminOwnable).creationCode, abi.encode(config.ownerAddress, address(0))),
+            abi.encodePacked(
+                type(ChainAdminOwnable).creationCode,
+                abi.encode(config.ownerAddress, address(0), address(0))
+            ),
             config.create2Salt,
             config.create2FactoryAddress
         );
@@ -377,7 +380,7 @@ contract RegisterZKChainScript is Script {
 
         input = abi.encode(restrictions);
         chainAdmin = Utils.deployViaCreate2(
-            abi.encodePacked(type(ChainAdmin).creationCode, input),
+            abi.encodePacked(type(ChainAdmin).creationCode, abi.encode(input, address(0))),
             config.create2Salt,
             config.create2FactoryAddress
         );

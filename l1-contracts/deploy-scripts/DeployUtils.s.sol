@@ -445,13 +445,13 @@ abstract contract DeployUtils is Script {
                     config.contracts.governanceMinDelay
                 );
         } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-            return abi.encode(config.ownerAddress, address(0));
+            return abi.encode(config.ownerAddress, address(0), address(0));
         } else if (compareStrings(contractName, "AccessControlRestriction")) {
             return abi.encode(uint256(0), config.ownerAddress);
         } else if (compareStrings(contractName, "ChainAdmin")) {
             address[] memory restrictions = new address[](1);
             restrictions[0] = addresses.accessControlRestrictionAddress;
-            return abi.encode(restrictions);
+            return abi.encode(restrictions, address(0));
         } else if (compareStrings(contractName, "ChainTypeManager")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {

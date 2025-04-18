@@ -10,7 +10,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
-import {NotARestriction, NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
+import {InvalidProtocolVersion, NotARestriction, NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/DummyChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -35,11 +35,12 @@ contract ChainAdminTest is Test {
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
 
-        chainAdmin = new ChainAdmin(restrictions);
+        dummyChainTypeManager = new DummyChainTypeManager();
+
+        chainAdmin = new ChainAdmin(restrictions, address(dummyChainTypeManager));
 
         gettersFacet = new GettersFacet();
         dummyRestriction = new DummyRestriction(true);
-        dummyChainTypeManager = new DummyChainTypeManager();
     }
 
     function test_getRestrictions() public {
@@ -130,7 +131,21 @@ contract ChainAdminTest is Test {
         emit IChainAdmin.UpdateUpgradeTimestamp(protocolVersion, timestamp);
 
         vm.prank(address(chainAdmin));
-        chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp, address(dummyChainTypeManager));
+        chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp);
+    }
+
+    function test_setUpgradeTimestampWithInvalidProtocolVersion(
+        uint256 semverMinorVersionMultiplier,
+        uint256 timestamp
+    ) public {
+        (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
+        uint256 protocolVersion = packSemver(major, minor, patch + 1, semverMinorVersionMultiplier);
+
+        dummyChainTypeManager.setProtocolVersionDeadline(protocolVersion, block.timestamp + 42);
+
+        vm.prank(address(chainAdmin));
+        vm.expectRevert(InvalidProtocolVersion.selector);
+        chainAdmin.setUpgradeTimestamp(protocolVersion + 10, timestamp);
     }
 
     function test_multicallRevertNoCalls() public {
