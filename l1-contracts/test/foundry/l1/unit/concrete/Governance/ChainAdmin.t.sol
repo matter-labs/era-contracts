@@ -12,12 +12,15 @@ import {Call} from "contracts/governance/Common.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
 import {NotARestriction, NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
+import {DummyChainTypeManager} from "contracts/dev-contracts/DummyChainTypeManager.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract ChainAdminTest is Test {
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     GettersFacet internal gettersFacet;
     DummyRestriction internal dummyRestriction;
+    DummyChainTypeManager internal dummyChainTypeManager;
 
     address internal owner;
     uint32 internal major;
@@ -36,6 +39,7 @@ contract ChainAdminTest is Test {
 
         gettersFacet = new GettersFacet();
         dummyRestriction = new DummyRestriction(true);
+        dummyChainTypeManager = new DummyChainTypeManager();
     }
 
     function test_getRestrictions() public {
@@ -120,11 +124,13 @@ contract ChainAdminTest is Test {
         (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
         uint256 protocolVersion = packSemver(major, minor, patch + 1, semverMinorVersionMultiplier);
 
+        dummyChainTypeManager.setProtocolVersionDeadline(protocolVersion, block.timestamp + 42);
+
         vm.expectEmit(true, false, false, true);
         emit IChainAdmin.UpdateUpgradeTimestamp(protocolVersion, timestamp);
 
         vm.prank(address(chainAdmin));
-        chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp, gettersFacet.getChainTypeManager());
+        chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp, address(dummyChainTypeManager));
     }
 
     function test_multicallRevertNoCalls() public {
