@@ -80,7 +80,7 @@ abstract contract MessageVerification is IMessageVerification {
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
         // equal to the length of other nodes preimages (which are `2 * 32`)
 
-        // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
+        // We can use `index` as a mask, since the `LocalLogsRoot` is on the left part of the tree.
 
         return
             _proveL2LeafInclusion({
