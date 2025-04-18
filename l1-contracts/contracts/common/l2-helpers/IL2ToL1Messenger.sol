@@ -43,7 +43,7 @@ uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
  * - This system contract accepts an arbitrary length message and sends a fixed length message with
  * parameters `senderAddress == this`, `isService == true`, `key == msg.sender`, `value == keccak256(message)`.
  * - The contract on L1 accepts all sent messages and if the message came from this system contract
- * it requires that the preimage of `value` be provided.
+ * it requires the preimage of `value` to be provided.
  */
 interface IL2ToL1Messenger {
     // Possibly in the future we will be able to track the messages sent to L1 with
@@ -61,6 +61,6 @@ interface IL2ToL1Messenger {
 
     function sendL2ToL1Log(bool _isService, bytes32 _key, bytes32 _value) external returns (uint256 logIdInMerkleTree);
 
-    // This function is expected to be called only by the KnownCodesStorage system contract
+    /// @notice This function is expected to be called only by the KnownCodesStorage system contract
     function requestBytecodeL1Publication(bytes32 _bytecodeHash) external;
 }

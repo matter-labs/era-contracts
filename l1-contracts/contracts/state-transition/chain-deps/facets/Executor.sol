@@ -463,9 +463,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             MessageRoot memory msgRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
             if (msgRoot.chainId == block.chainid) {
+                // For the same chain we import from the MessageRoot contract
                 IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
                 correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.blockOrBatchNumber));
             } else if (msgRoot.chainId == L1_CHAIN_ID) {
+                // this case can only happen on GW.
+                // L1 chain root is stored in the storage contract.
+
                 correctRootHash = L2_MESSAGE_ROOT_STORAGE.msgRoots(
                     uint256(msgRoot.chainId),
                     uint256(msgRoot.blockOrBatchNumber)

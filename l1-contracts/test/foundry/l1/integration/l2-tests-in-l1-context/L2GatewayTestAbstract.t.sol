@@ -127,6 +127,5 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         );
 
         (bool success, ) = recipient.call(data);
-        // assertTrue(success);
     }
 }
