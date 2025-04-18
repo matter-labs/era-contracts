@@ -76,15 +76,10 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice Set the expected upgrade timestamp for a specific protocol version.
     /// @param _protocolVersion The ZKsync chain protocol version.
     /// @param _upgradeTimestamp The timestamp at which the chain node should expect the upgrade to happen.
-    /// @param _chainTypeManager ChainTypeManager address used to check if the protocol version is active. Included for the convenience of the Chain Admin.
     function setUpgradeTimestamp(
         uint256 _protocolVersion,
-        uint256 _upgradeTimestamp,
-        address _chainTypeManager
+        uint256 _upgradeTimestamp
     ) external onlySelf {
-        if (!IChainTypeManager(_chainTypeManager).protocolVersionIsActive(_protocolVersion)) {
-            revert InvalidProtocolVersion();
-        }
         protocolVersionToUpgradeTimestamp[_protocolVersion] = _upgradeTimestamp;
         emit UpdateUpgradeTimestamp(_protocolVersion, _upgradeTimestamp);
     }

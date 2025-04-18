@@ -130,7 +130,7 @@ contract ChainAdminTest is Test {
         emit IChainAdmin.UpdateUpgradeTimestamp(protocolVersion, timestamp);
 
         vm.prank(address(chainAdmin));
-        chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp, address(dummyChainTypeManager));
+        chainAdmin.setUpgradeTimestamp(protocolVersion, timestamp);
     }
 
     function test_multicallRevertNoCalls() public {
