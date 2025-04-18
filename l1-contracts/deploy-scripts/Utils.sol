@@ -223,8 +223,8 @@ library Utils {
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
         return
             readZKFoundryBytecodeSystemContracts(
-                "proved_batch.yul/contracts-preprocessed/bootloader",
-                "proved_batch.yul"
+                "proved_batch.yul",
+                "Bootloader"
             );
     }
 
@@ -232,7 +232,7 @@ library Utils {
      * @dev Returns the bytecode hash of the EVM emulator.
      */
     function getEvmEmulatorBytecodeHash() internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts("EvmEmulator.yul/contracts-preprocessed", "EvmEmulator.yul");
+        return readZKFoundryBytecodeSystemContracts("EvmEmulator.yul", "EvmEmulator");
     }
 
     /**
@@ -260,9 +260,9 @@ library Utils {
         string memory path = string.concat(
             "/../system-contracts/zkout/",
             filename,
-            ".yul/contracts-preprocessed/",
+            ".yul/",
             filename,
-            ".yul.json"
+            ".json"
         );
 
         return readFoundryBytecode(path);
@@ -275,9 +275,9 @@ library Utils {
         string memory path = string.concat(
             "/../system-contracts/zkout/",
             filename,
-            ".yul/contracts-preprocessed/precompiles/",
+            ".yul/",
             filename,
-            ".yul.json"
+            ".json"
         );
 
         return readFoundryBytecode(path);
