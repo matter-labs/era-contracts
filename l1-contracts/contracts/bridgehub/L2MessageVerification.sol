@@ -25,10 +25,11 @@ contract L2MessageVerification is MessageVerification {
             _proof: _proof
         });
         if (proofVerificationResult.finalProofNode) {
-            bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE.msgRoots(_chainId, _batchOrBlockNumber); // SL MessageRoot at block number _batchOrBlockNumber
+            // For proof based interop this is the SL MessageRoot at block number _batchOrBlockNumber
+            bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE.msgRoots(_chainId, _batchOrBlockNumber); 
             return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
         }
-        // kl todo think this through. Does it work for the global MessageRoot, and for GW based chains, and both?
+
         return
             this.proveL2LeafInclusionShared({
                 _chainId: proofVerificationResult.settlementLayerChainId,
