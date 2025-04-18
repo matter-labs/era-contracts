@@ -490,9 +490,7 @@ contract GatewayCTMFromL1 is Script {
             l2DefaultAccountBytecodeHash: config.defaultAAHash,
             l2EvmEmulatorBytecodeHash: config.evmEmulatorHash,
             priorityTxMaxGasLimit: config.priorityTxMaxGasLimit,
-            feeParams: feeParams,
-            // We can not provide zero value there. At the same time, there is no such contract on gateway
-            blobVersionedHashRetriever: ADDRESS_ONE
+            feeParams: feeParams
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

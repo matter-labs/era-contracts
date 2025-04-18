@@ -178,7 +178,6 @@ contract DeployL1Script is Script, DeployUtils {
 
         initializeGeneratedData();
 
-        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever");
         deployStateTransitionDiamondFacets();
         (
             addresses.stateTransition.chainTypeManagerImplementation,
@@ -516,11 +515,6 @@ contract DeployL1Script is Script, DeployUtils {
 
         vm.serializeAddress(
             "deployed_addresses",
-            "blob_versioned_hash_retriever_addr",
-            addresses.blobVersionedHashRetriever
-        );
-        vm.serializeAddress(
-            "deployed_addresses",
             "server_notifier_proxy_addr",
             addresses.stateTransition.serverNotifierProxy
         );
@@ -737,8 +731,6 @@ contract DeployL1Script is Script, DeployUtils {
             return type(BridgedStandardERC20).creationCode;
         } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
             return type(UpgradeableBeacon).creationCode;
-        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
-            return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return type(RollupDAManager).creationCode;
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {

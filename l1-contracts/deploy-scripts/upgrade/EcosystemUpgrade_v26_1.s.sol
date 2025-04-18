@@ -148,7 +148,6 @@ contract EcosystemUpgrade_v26_1 is Script {
         address upgradeTimer;
         address bytecodesSupplier;
         address l2WrappedBaseTokenStore;
-        address blobVersionedHashRetriever;
     }
 
     struct ExpectedL2Addresses {

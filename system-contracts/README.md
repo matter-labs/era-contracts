@@ -43,10 +43,22 @@ Update the system contracts hashes: `yarn sc calculate-hashes:fix`
 
 ### Run tests
 
-The tests of the system contracts utilize the ZKsync test node. In order to run the tests, execute the following commands in the root of the repository:
+The tests of the system contracts utilize the Anvil-ZKsync. In order to run the tests, execute the following commands in the root of the repository:
+
+```
+yarn install-anvil
+```
+
+If you want to run test-node with built-in contracts, run:
 
 ```
 yarn test-node
+```
+
+If you want to run test-node with local contracts for development, run:
+
+```
+yarn test-node-local-contracts
 ```
 
 It will run the test node, and you can see its logs in the output.

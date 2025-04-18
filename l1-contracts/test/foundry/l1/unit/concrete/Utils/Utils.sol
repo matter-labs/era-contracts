@@ -420,8 +420,7 @@ library Utils {
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 500000,
-                feeParams: makeFeeParams(),
-                blobVersionedHashRetriever: address(0x23746765237749923040872834)
+                feeParams: makeFeeParams()
             });
     }
 
@@ -436,8 +435,7 @@ library Utils {
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 80000000,
-                feeParams: makeFeeParams(),
-                blobVersionedHashRetriever: address(0x23746765237749923040872834)
+                feeParams: makeFeeParams()
             });
     }
 
