@@ -55,7 +55,7 @@ contract L2LegacyBridgeFixUpgrade {
         migrateSharedBridgeLegacyOwner(l2LegacySharedBridge, _aliasedGovernance);
         migrateBeaconProxyOwner(l2LegacySharedBridge, _aliasedGovernance);
         
-        fixBridgedETHBugFix(_bridgedEthAssetId, _aliasedGovernance);
+        fixBridgedETHBug(_bridgedEthAssetId, _aliasedGovernance);
     }
 
     function migrateSharedBridgeLegacyOwner(
@@ -121,7 +121,7 @@ contract L2LegacyBridgeFixUpgrade {
         );
     }
 
-    function fixBridgedETHBugFix(
+    function fixBridgedETHBug(
         bytes32 _bridgedEthAssetId,
         address _aliasedGovernance
     ) internal {
@@ -140,6 +140,11 @@ contract L2LegacyBridgeFixUpgrade {
         // Unfortunately it is not exposed anywhere in public API.
         // It is stored in first byte of the 0-th slot.
         uint8 version = uint8(uint256(SystemContractHelper.forcedSload(bridgedETHAddress, bytes32(0))) & 0xff);
+        if (version == type(uint8).max) {
+            // On no chain we have `version` equal to 255, but in case it does happen, we would prefer to not halt the chain
+            // because due to failing upgrade, so we just silently return without fixing the issue instead of reverting.
+            return;  
+        }
 
         // Since all fields will be supported, no field needs to be ignored now.
         IBridgedStandardERC20.ERC20Getters memory getters = IBridgedStandardERC20.ERC20Getters({
