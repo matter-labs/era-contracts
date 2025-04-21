@@ -791,12 +791,13 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         // 0. Pause migration to/from Gateway
         // 1. Perform upgrade
         // 2. Unpause migration to/from Gateway
+        console.log("0");
         stage0Calls = prepareStage0GovernanceCalls();
         vm.serializeBytes("governance_calls", "governance_stage0_calls", abi.encode(stage0Calls));
-
+        console.log("1");
         stage1Calls = prepareStage1GovernanceCalls();
         vm.serializeBytes("governance_calls", "governance_stage1_calls", abi.encode(stage1Calls));
-
+        console.log("2");
         stage2Calls = prepareStage2GovernanceCalls();
 
         string memory governanceCallsSerialized = vm.serializeBytes(
@@ -811,8 +812,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](2);
+        console.log("0.1");
         allCalls[0] = preparePauseGatewayMigrationsCall();
+        console.log("0.2");
         allCalls[1] = prepareGatewaySpecificStage0GovernanceCalls();
+        console.log("0.3");
         calls = mergeCallsArray(allCalls);
     }
 
@@ -831,8 +835,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](3);
         allCalls[0] = prepareUnpauseGatewayMigrationsCall();
+        console.log("2.1");
         allCalls[1] = prepareGatewaySpecificStage2GovernanceCalls();
-        allCalls[2] = prepareGovernanceUpgradeTimerCheckCall();
+        console.log("2.2");
+        // allCalls[2] = prepareGovernanceUpgradeTimerCheckCall();
+        console.log("2.2");
         calls = mergeCallsArray(allCalls);
     }
 
@@ -895,10 +902,13 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         uint256 l1GasPrice = newConfig.l1GasPrice;
 
         uint256 tokensRequired;
+        console.log("0.2.0");
         (allCalls[1], tokensRequired) = preparePauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
+        console.log("0.2.1");
 
         // Approve required amount of base token
         allCalls[0] = prepareApproveGatewayBaseTokenCall(addresses.bridges.l1AssetRouterProxy, tokensRequired);
+        console.log("0.2.2");
 
         calls = mergeCallsArray(allCalls);
     }
@@ -916,15 +926,19 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         uint256 tokensForCall;
         (allCalls[1], tokensForCall) = provideSetNewVersionUpgradeCallForGateway(l2GasLimit, l1GasPrice);
         tokensRequired += tokensForCall;
+        console.log("2.1.0");
 
         (allCalls[2], tokensForCall) = prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
         tokensRequired += tokensForCall;
+        console.log("2.1.1");
 
         (allCalls[3], tokensForCall) = prepareUnpauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
         tokensRequired += tokensForCall;
+        console.log("2.1.2");
 
         // Approve required amount of base token
         allCalls[0] = prepareApproveGatewayBaseTokenCall(addresses.bridges.l1AssetRouterProxy, tokensRequired);
+        console.log("2.1.3");
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1003,7 +1017,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             ChainTypeManager.setChainCreationParams,
             (getChainCreationParams(gatewayConfig.gatewayStateTransition))
         );
-
+        calls = new Call[](1);
         (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
             l2Calldata,
             l2GasLimit,
@@ -1051,8 +1065,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         address token = IBridgehub(addresses.bridgehub.bridgehubProxy).baseToken(gatewayConfig.chainId);
         require(token != address(0), "Base token for Gateway is zero");
-
+        calls = new Call[](1);
+        console.log("0.2.1.0");
         calls[0] = Call({target: token, data: abi.encodeCall(IERC20.approve, (spender, amount)), value: 0});
+        console.log("0.2.1.1");
     }
 
     /// @notice Double checking that the deadline has passed.
