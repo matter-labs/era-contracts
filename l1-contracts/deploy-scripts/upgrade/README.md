@@ -59,11 +59,13 @@ forge script --sig <data-generated-by-zkstack> FinalizeUpgrade.s.sol:FinalizeUpg
 ```
 
 (same as testing without broadcast)
-```sh 
+
+```sh
 UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v27-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url localhost:8545 --gas-limit 20000000000 --broadcast --slow --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 ```
 
-Generate yaml file from toml: 
+Generate yaml file from toml:
+
 ```sh
 UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json YAML_OUTPUT_FILE=script-out/v27-stage-output.yaml yarn upgrade-yaml-output-generator
 ```
