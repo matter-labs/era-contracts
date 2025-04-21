@@ -1,6 +1,5 @@
 
 
-
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.8.28;
@@ -84,6 +83,11 @@ contract L2LegacyBridgeFixUpgrade {
         }
 
         address currentOwner = ProxyAdmin(proxyAdmin).owner();
+        if (currentOwner == _aliasedGovernance) {
+            return;
+        }
+
+        // Note, that `ProxyAdmin` is not Ownable2Step, so a single transfer of ownership is enough.
         SystemContractHelper.mimicCallWithPropagatedRevert(
             proxyAdmin,
             currentOwner,
@@ -96,6 +100,10 @@ contract L2LegacyBridgeFixUpgrade {
         address _aliasedGovernance
     ) internal {
         address currentOwner = Ownable2Step(_addr).owner();
+        if (currentOwner == _aliasedGovernance) {
+            return;
+        }
+
         SystemContractHelper.mimicCallWithPropagatedRevert(
             _addr,
             currentOwner,
@@ -114,6 +122,11 @@ contract L2LegacyBridgeFixUpgrade {
     ) internal {
         UpgradeableBeacon l2TokenBeacon = IL2SharedBridgeLegacy(_l2LegacySharedBridge).l2TokenBeacon();
         address currentOwner = l2TokenBeacon.owner();
+        if (currentOwner == _aliasedGovernance) {
+            return;
+        }
+
+        // Note, that `BeaconProxy` is not Ownable2Step, so a single transfer of ownership is enough.
         SystemContractHelper.mimicCallWithPropagatedRevert(
             address(l2TokenBeacon),
             currentOwner,
