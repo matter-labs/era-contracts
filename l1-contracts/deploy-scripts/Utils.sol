@@ -580,7 +580,7 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata,
         address refundRecipient
-    ) internal view returns (Call[] memory calls) {
+    ) internal returns (Call[] memory calls) {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
@@ -893,7 +893,8 @@ library Utils {
         bytes[] memory factoryDeps,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address l1SharedBridgeProxy,
+        address refundRecipient
     ) internal {
         runL1L2Transaction({
             l2Calldata: "",
@@ -903,7 +904,8 @@ library Utils {
             dstAddress: 0x0000000000000000000000000000000000000000,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            refundRecipient: refundRecipient
         });
     }
 
@@ -1207,6 +1209,23 @@ library Utils {
         vm.stopBroadcast();
     }
 
+    function adminExecuteCalls(address _admin, address _accessControlRestriction, Call[] memory calls) internal {
+        // If `_accessControlRestriction` is not provided, we assume that `_admin` is IOwnable
+        address adminOwner = _accessControlRestriction == address(0)
+            ? IOwnable(_admin).owner()
+            : IAccessControlDefaultAdminRules(_accessControlRestriction).defaultAdmin();
+
+        // Calculate total ETH required
+        uint256 totalValue;
+        for (uint256 i = 0; i < calls.length; i++) {
+            totalValue += calls[i].value;
+        }
+
+        vm.startBroadcast(adminOwner);
+        IChainAdmin(_admin).multicall{value: totalValue}(calls, true);
+        vm.stopBroadcast();
+    }
+
     function readRollupDAValidatorBytecode() internal view returns (bytes memory bytecode) {
         bytecode = readFoundryBytecode("/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json");
     }
@@ -1217,6 +1236,24 @@ library Utils {
 
     function readDummyAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
         bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
+    }
+
+    function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
+        result = new Call[](a.length + b.length);
+        for (uint256 i = 0; i < a.length; i++) {
+            result[i] = a[i];
+        }
+        for (uint256 i = 0; i < b.length; i++) {
+            result[a.length + i] = b[i];
+        }
+    }
+
+    function appendCall(Call[] memory a, Call memory b) public pure returns (Call[] memory result) {
+        result = new Call[](a.length + 1);
+        for (uint256 i = 0; i < a.length; i++) {
+            result[i] = a[i];
+        }
+        result[a.length] = b;
     }
 
     // add this to be excluded from coverage report

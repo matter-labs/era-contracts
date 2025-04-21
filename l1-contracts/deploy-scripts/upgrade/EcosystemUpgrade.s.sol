@@ -130,6 +130,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
         bytes fixedForceDeploymentsData;
+        bytes fixedForceDeploymentsDataGW;
         bytes diamondCutData;
         bytes upgradeCutData;
     }
@@ -139,6 +140,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         bool initialized;
         bool expectedL2AddressesInitialized;
         bool fixedForceDeploymentsDataGenerated;
+        bool fixedForceDeploymentsDataGeneratedGW;
         bool diamondCutPrepared;
         bool upgradeCutPrepared;
         bool factoryDepsPublished;
@@ -475,11 +477,19 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
-        FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
+        FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData(config.eraChainId);
+        FixedForceDeploymentsData memory forceDeploymentsDataGW = prepareFixedForceDeploymentsData(
+            gatewayConfig.chainId
+        );
 
         newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
         generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
+
+        // Generate same data as above but for GW chain
+        newlyGeneratedData.fixedForceDeploymentsDataGW = abi.encode(forceDeploymentsDataGW);
+        generatedData.forceDeploymentsDataGW = abi.encode(forceDeploymentsDataGW);
+        upgradeConfig.fixedForceDeploymentsDataGeneratedGW = true;
     }
 
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
@@ -508,12 +518,14 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
-    function prepareFixedForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
+    function prepareFixedForceDeploymentsData(
+        uint256 chainId
+    ) public view virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
-            eraChainId: config.eraChainId,
+            eraChainId: chainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
                 L2ContractsBytecodesLib.readBeaconProxyBytecode()
@@ -671,6 +683,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "contracts_newConfig",
             "force_deployments_data",
             newlyGeneratedData.fixedForceDeploymentsData
+        );
+
+        vm.serializeBytes(
+            "contracts_newConfig",
+            "force_deployments_data_gateway",
+            newlyGeneratedData.fixedForceDeploymentsDataGW
         );
 
         vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());

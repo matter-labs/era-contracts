@@ -136,6 +136,7 @@ struct TokensConfig {
 // solhint-disable-next-line gas-struct-packing
 struct GeneratedData {
     bytes forceDeploymentsData;
+    bytes forceDeploymentsDataGW;
 }
 
 abstract contract DeployUtils is Script {
