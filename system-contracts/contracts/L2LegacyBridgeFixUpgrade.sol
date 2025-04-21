@@ -17,12 +17,12 @@ bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8
 /// @author Matter Labs
 /// @title L2LegacyBridgeFixUpgrade
 /// @notice Performs governance‑related fixes and the Bridged‑ETH metadata patch on chains
-///         that have the legacy L2 Shared Bridge.
+/// that have the legacy L2 Shared Bridge.
 contract L2LegacyBridgeFixUpgrade {
     /// @notice Executes the one‑time migration/patch.
-    /// @dev    Intended to be delegate‑called by the `ComplexUpgrader` contract.
+    /// @dev Intended to be delegate‑called by the `ComplexUpgrader` contract.
     /// @param _aliasedGovernance The already‑aliased L1 governance address that
-    ///        must become the owner/admin of every affected contract.
+    /// must become the owner/admin of every affected contract.
     /// @param _bridgedEthAssetId The asset ID of the bridged ETH inside NativeTokenVault.
     function upgrade(
         address _aliasedGovernance,
@@ -51,8 +51,8 @@ contract L2LegacyBridgeFixUpgrade {
     }
 
     /// @notice Makes `_aliasedGovernance` the owner of the legacy shared bridge’s
-    ///         TransparentUpgradeableProxy, deploying a fresh `ProxyAdmin` when
-    ///         the current admin is not a contract.
+    /// TransparentUpgradeableProxy, deploying a fresh `ProxyAdmin` when
+    /// the current admin is not a contract.
     /// @param _l2LegacySharedBridge Address of the legacy shared bridge proxy.
     /// @param _aliasedGovernance    New owner / admin address.
     function migrateSharedBridgeLegacyOwner(
@@ -99,7 +99,7 @@ contract L2LegacyBridgeFixUpgrade {
     }
 
     /// @notice Transfers a two‑step ownable contract to `_aliasedGovernance`
-    ///         and completes the `acceptOwnership` step.
+    /// and completes the `acceptOwnership` step.
     /// @param _addr               Target contract address.
     /// @param _aliasedGovernance  New owner to set and immediately accept.
     function ensureOwnable2StepOwner(
@@ -124,7 +124,7 @@ contract L2LegacyBridgeFixUpgrade {
     }
 
     /// @notice Transfers ownership of the `UpgradeableBeacon` that backs
-    ///         bridged ERC‑20 tokens to governance.
+    /// bridged ERC‑20 tokens to governance.
     /// @param _l2LegacySharedBridge Address of the legacy shared bridge proxy.
     /// @param _aliasedGovernance    New owner of the beacon.
     function migrateBeaconProxyOwner(
@@ -148,10 +148,10 @@ contract L2LegacyBridgeFixUpgrade {
     }
 
     /// @notice Re‑initializes bridged ETH so that its `name`, `symbol`, and
-    ///         `decimals` getters work correctly.
+    /// `decimals` getters work correctly.
     /// @param _bridgedEthAssetId  Asset ID of bridged ETH.
     /// @param _aliasedGovernance  Governance address allowed to call
-    ///        `reinitializeToken`.
+    /// `reinitializeToken`.
     function fixBridgedETHBug(
         bytes32 _bridgedEthAssetId,
         address _aliasedGovernance
