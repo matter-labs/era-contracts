@@ -313,6 +313,30 @@ object "Bootloader" {
                 ret := add(NEXT_MESSAGE_ROOT_NUMBER_SLOT(), 1)
             }
 
+            function getMessageRootSlot(i) -> ret {
+                ret := mul(add(MESSAGE_ROOT_BEGIN_SLOT(), mul(i, MESSAGE_ROOT_SLOT_SIZE())), 32)
+            }
+
+            function MESSAGE_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET() -> ret {
+                ret := 0
+            }
+
+            function MESSAGE_ROOT_CHAIN_ID_OFFSET() -> ret {
+                ret := 32
+            }
+
+            function MESSAGE_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET() -> ret {
+                ret := 64
+            }
+
+            function MESSAGE_ROOT_SIDE_LENGTH_OFFSET() -> ret {
+                ret := 96
+            }
+
+            function MESSAGE_ROOT_SIDES_OFFSET_START() -> ret {
+                ret := 128
+            }
+
             /// @dev The size of each of the message roots.
             function MESSAGE_ROOT_SLOT_SIZE() -> ret {
                 // We will have to increase this to add merkle proofs. 
@@ -2969,16 +2993,14 @@ object "Bootloader" {
             /// @param txId The index of the transaction in the batch for which to get the L2 block information.
             function setMessageRoots(txId) {
                 debugLog("Setting message roots", 0)
-                let msgRootSlot := MESSAGE_ROOT_BEGIN_SLOT()
-                let msgRootSlotSize := MESSAGE_ROOT_SLOT_SIZE() 
                 let txL2BlockPosition := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_BYTE(), mul(TX_OPERATOR_L2_BLOCK_INFO_SIZE_BYTES(), txId))
-
                 let currentL2BlockNumber := mload(txL2BlockPosition)
-                debugLog("currentL2BlockNumber", currentL2BlockNumber)
+
                 debugLog("current txId", txId)
+                debugLog("currentL2BlockNumber", currentL2BlockNumber)
 
                 let nextMsgRootNumber := mload(NEXT_MESSAGE_ROOT_NUMBER_SLOT())
-                let messageRootStartSlot := mul(add(msgRootSlot, mul(nextMsgRootNumber, msgRootSlotSize)), 32)
+                let messageRootStartSlot := getMessageRootSlot(nextMsgRootNumber)
                 let nextMessageRootBlockNumber  := mload(messageRootStartSlot) 
 
                 if lt(currentL2BlockNumber, nextMessageRootBlockNumber) {
@@ -2986,16 +3008,15 @@ object "Bootloader" {
                     leave
                 }
 
-                debugLog("Setting message roots 1", msgRootSlot)
+                debugLog("Setting message roots 1", nextMsgRootNumber)
                 for {let i := nextMsgRootNumber} true {i := add(i, 1)} {
                     debugLog("Setting message roots 2", i)
-                    let currentBlockNumberSlot := mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32)
-                    let messageRootStartSlot := add(32, currentBlockNumberSlot)
-                    let currentBlockNumber := mload(currentBlockNumberSlot)
-                    let chainId  := mload(messageRootStartSlot) 
-                    /// Note it might be a block or batchNumber
-                    let blockNumber := mload(add(messageRootStartSlot, 32))
-                    let sidesLength := mload(add(messageRootStartSlot, 64))
+                    let messageRootStartSlot := getMessageRootSlot(i)
+                    let currentBlockNumber := mload(add(messageRootStartSlot, MESSAGE_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET()))
+                    let chainId  := mload(add(messageRootStartSlot, MESSAGE_ROOT_CHAIN_ID_OFFSET())) 
+                    /// Note it might be a block or batchNumber. For proof based it is a block number.
+                    let blockNumber := mload(add(messageRootStartSlot, MESSAGE_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
+                    let sidesLength := mload(add(messageRootStartSlot, MESSAGE_ROOT_SIDE_LENGTH_OFFSET()))
 
 
                     debugLog("Set roots chainId     ", chainId)
@@ -3018,10 +3039,13 @@ object "Bootloader" {
                     mstore(0, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}})
                     mstore(4, chainId)
                     mstore(36, blockNumber)
+                    /// needed for abi-encoding, specifies the array start slot
                     mstore(68, 96)
                     mstore(100, sidesLength)
+                    let sidesOffset := add(messageRootStartSlot, MESSAGE_ROOT_SIDES_OFFSET_START())
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        mstore(add(132, mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                        mstore(add(132, mul(j, 32)), mload(sidesOffset))
+                        sidesOffset := add(sidesOffset, 32)
                     }
 
                     let success := call(
@@ -3049,10 +3073,11 @@ object "Bootloader" {
                 let msgRootSlotSize := MESSAGE_ROOT_SLOT_SIZE() 
                 let rollingHashOfProcessedRoots := 0
                 for {let i := 0} true {i := add(i, 1)} {
-                    let messageRootStartSlot := add(32, mul(add(msgRootSlot, mul(i, msgRootSlotSize)), 32))
-                    let chainId  := mload(messageRootStartSlot) 
-                    let blockNumber := mload(add(messageRootStartSlot, 32))
-                    let sidesLength := mload(add(messageRootStartSlot, 64))
+                    let messageRootStartSlot := getMessageRootSlot(i)
+                    let chainId  := mload(add(messageRootStartSlot, MESSAGE_ROOT_CHAIN_ID_OFFSET())) 
+                    /// Note it might be a block or batchNumber. For proof based it is a block number.
+                    let blockNumber := mload(add(messageRootStartSlot, MESSAGE_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
+                    let sidesLength := mload(add(messageRootStartSlot, MESSAGE_ROOT_SIDE_LENGTH_OFFSET()))
 
                     debugLog("Send roots L1 chainId     ", chainId)
                     debugLog("Send roots L1 blockNumber ", blockNumber)
@@ -3068,18 +3093,25 @@ object "Bootloader" {
                     let msgRootOffset := 64 
                     mstore(add(msgRootOffset, 4), chainId)
                     mstore(add(msgRootOffset, 36), blockNumber)
+                    let sidesOffset := add(messageRootStartSlot, MESSAGE_ROOT_SIDES_OFFSET_START())
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        mstore(add(add(msgRootOffset, 68), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                        mstore(add(add(msgRootOffset, 68), mul(j, 32)), mload(sidesOffset))
+                        debugLog("Sending side", sidesOffset)
+                        debugLog("Sending side", add(add(messageRootStartSlot, 32), mul(add(3, j), 32)))
+                        sidesOffset := add(sidesOffset, 32)
                     }
 
                     // for single messageRoots that are not really sides, we send them to L1 here.
-                    if lt(sidesLength, 2) {
+                    switch sidesLength 
+                    case 1 {
                         // Calculate keccak256 of all data
                         mstore(36, rollingHashOfProcessedRoots) 
                         rollingHashOfProcessedRoots := keccak256(36, add(32, add(64, mul(sidesLength, 32))))
-                    } {
+                    } 
+                    default {
                         revertWithReason(FAILED_PRECOMMIT_BASED_INTEROP_NOT_SUPPORTED(), 1)
                     }
+                    
                 }
             }
 
