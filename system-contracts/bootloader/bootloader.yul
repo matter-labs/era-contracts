@@ -2982,7 +2982,7 @@ object "Bootloader" {
 
                 if lt(currentL2BlockNumber, nextMessageRootBlockNumber) {
                     debugLog("Processed all message roots for this block", 0)
-                    return(0, 0)
+                    leave
                 }
 
                 debugLog("Setting message roots 1", msgRootSlot)
@@ -3063,8 +3063,8 @@ object "Bootloader" {
                         sendToL1Native(true, messageRootRollingHashLogKey(), rollingHashOfProcessedRoots)
                         break
                     }
-
-                    let msgRootOffset := 64
+                    /// We have an offset so we can preload the rolling hash into it later for hashing.
+                    let msgRootOffset := 64 
                     mstore(add(msgRootOffset, 4), chainId)
                     mstore(add(msgRootOffset, 36), blockNumber)
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
@@ -3074,12 +3074,10 @@ object "Bootloader" {
                     // for single messageRoots that are not really sides, we send them to L1 here.
                     if lt(sidesLength, 2) {
                         // Calculate keccak256 of all data
-                        mstore(36, rollingHashOfProcessedRoots)
+                        mstore(36, rollingHashOfProcessedRoots) 
                         rollingHashOfProcessedRoots := keccak256(36, add(32, add(64, mul(sidesLength, 32))))
                     } {
-                        if gt(sidesLength, 1) {
-                            revertWithReason(FAILED_PRECOMMIT_BASED_INTEROP_NOT_SUPPORTED(), 1)
-                        }
+                        revertWithReason(FAILED_PRECOMMIT_BASED_INTEROP_NOT_SUPPORTED(), 1)
                     }
                 }
             }
