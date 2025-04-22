@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
-import {ZeroAddress, Unauthorized} from "../common/L1ContractErrors.sol";
+import {InvalidProtocolVersion, ZeroAddress, Unauthorized} from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 
@@ -87,6 +87,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
         uint256 _protocolVersion,
         uint256 _upgradeTimestamp
     ) external onlyChainAdmin(_chainId) {
+        require(chainTypeManager.protocolVersionIsActive(_protocolVersion), InvalidProtocolVersion());
         protocolVersionToUpgradeTimestamp[_chainId][_protocolVersion] = _upgradeTimestamp;
         emit UpgradeTimestampUpdated(_chainId, _protocolVersion, _upgradeTimestamp);
     }
