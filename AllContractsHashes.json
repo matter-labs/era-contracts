@@ -1089,11 +1089,11 @@
   },
   {
     "contractName": "l1-contracts/L2AdminFactory",
-    "zkBytecodeHash": "0x010000bb6524581cd266161a159b3029aea86aeb61c1a6c3e437a8494b4c558e",
+    "zkBytecodeHash": "0x010000bd943309cf740be302c30bdeba59f51d75a5843c2623c8b9ef6ec7c059",
     "zkBytecodePath": "/l1-contracts/zkout/L2AdminFactory.sol/L2AdminFactory.json",
-    "evmBytecodeHash": "0x92324b201c3e39af5b9b325ba44ec5f36829a519d22f7342fc3ebe4f18c03e99",
+    "evmBytecodeHash": "0xd522601fa40aa5baec0cba1dd2b2630f3f7c8a3f72fcf0b2dbadef1be2025c30",
     "evmBytecodePath": "/l1-contracts/out/L2AdminFactory.sol/L2AdminFactory.json",
-    "evmDeployedBytecodeHash": "0x2c19ce519ae88fc2ce0f5c7f0fac3f5e3a269c76de0b7383ea35e542d28a4d7b"
+    "evmDeployedBytecodeHash": "0x1be10c00c95b76391d44d83a26f45957e2e650a3afccfe1a35b3c52c97c7eccc"
   },
   {
     "contractName": "l1-contracts/L2AssetRouter",

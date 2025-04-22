@@ -20,6 +20,10 @@ contract DummyChainTypeManager is ChainTypeManager {
         zkChain = _zkChain;
     }
 
+    function setProtocolVersionDeadlineNoAccessControl(uint256 _protocolVersion, uint256 _timestamp) external {
+        _setProtocolVersionDeadline(_protocolVersion, _timestamp);
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

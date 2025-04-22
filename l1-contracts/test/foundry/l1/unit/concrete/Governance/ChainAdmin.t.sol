@@ -125,7 +125,7 @@ contract ChainAdminTest is Test {
         (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
         uint256 protocolVersion = packSemver(major, minor, patch + 1, semverMinorVersionMultiplier);
 
-        dummyChainTypeManager.setProtocolVersionDeadline(protocolVersion, block.timestamp + 42);
+        dummyChainTypeManager.setProtocolVersionDeadlineNoAccessControl(protocolVersion, block.timestamp + 42);
 
         vm.expectEmit(true, false, false, true);
         emit IChainAdmin.UpdateUpgradeTimestamp(protocolVersion, timestamp);
@@ -141,7 +141,7 @@ contract ChainAdminTest is Test {
         (major, minor, patch) = gettersFacet.getSemverProtocolVersion();
         uint256 protocolVersion = packSemver(major, minor, patch + 1, semverMinorVersionMultiplier);
 
-        dummyChainTypeManager.setProtocolVersionDeadline(protocolVersion, block.timestamp + 42);
+        dummyChainTypeManager.setProtocolVersionDeadlineNoAccessControl(protocolVersion, block.timestamp + 42);
 
         vm.prank(address(chainAdmin));
         vm.expectRevert(InvalidProtocolVersion.selector);
