@@ -10,8 +10,8 @@ import {IBridgehub} from "./IBridgehub.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
-    event InteropBundleSent(bytes32 interopBundleHash, InteropBundle interopBundle);
-    event InteropTriggerSent(bytes32 interopTriggerHash, InteropTrigger _interopTrigger);
+    event InteropBundleSent(bytes32 l2l1TxHash, bytes32 interopBundleHash, InteropBundle interopBundle);
+    event InteropTriggerSent(bytes32 l2l11TxHash, InteropTrigger _interopTrigger);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
