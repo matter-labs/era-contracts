@@ -350,8 +350,8 @@ abstract contract DeployUtils is Script {
 
     function deploySimpleContract(string memory contractName) internal returns (address contractAddress) {
         contractAddress = deployViaCreate2AndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
             contractName
         );
     }
@@ -361,8 +361,8 @@ abstract contract DeployUtils is Script {
         address owner
     ) internal returns (address contractAddress) {
         contractAddress = deployWithOwnerAndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
             owner,
             contractName,
             string.concat(contractName, " Implementation")
@@ -373,9 +373,9 @@ abstract contract DeployUtils is Script {
         string memory contractName
     ) internal virtual returns (address implementation, address proxy);
 
-    function getCreationCode(string memory contractName) internal view virtual returns (bytes memory);
+    function getCreationCode(string memory contractName, bool isZKBytecode) internal view virtual returns (bytes memory);
 
-    function getCreationCalldata(string memory contractName) internal view virtual returns (bytes memory) {
+    function getCreationCalldata(string memory contractName,  bool isZKBytecode) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Bridgehub")) {

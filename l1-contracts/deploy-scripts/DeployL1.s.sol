@@ -630,8 +630,8 @@ contract DeployL1Script is Script, DeployUtils {
         string memory contractName
     ) internal virtual override returns (address implementation, address proxy) {
         implementation = deployViaCreate2AndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
             contractName,
             string.concat(contractName, " Implementation")
         );
@@ -710,89 +710,162 @@ contract DeployL1Script is Script, DeployUtils {
 
     ////////////////////////////// GetContract data  /////////////////////////////////
 
-    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ChainRegistrar")) {
-            return type(ChainRegistrar).creationCode;
-        } else if (compareStrings(contractName, "Bridgehub")) {
-            // Bridgehub is a special case because its bytecode was generated using a low optimizer runs setting.
-            return Utils.readFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
-        } else if (compareStrings(contractName, "MessageRoot")) {
-            return type(MessageRoot).creationCode;
-        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-            return type(CTMDeploymentTracker).creationCode;
-        } else if (compareStrings(contractName, "L1Nullifier")) {
-            if (config.supportL2LegacySharedBridgeTest) {
-                return type(L1NullifierDev).creationCode;
+    function getCreationCode(string memory contractName, bool isZKBytecode) internal view virtual override returns (bytes memory) {
+        if (!isZKBytecode) {
+            if (compareStrings(contractName, "ChainRegistrar")) {
+                return type(ChainRegistrar).creationCode;
+            } else if (compareStrings(contractName, "Bridgehub")) {
+                // Bridgehub is a special case because its bytecode was generated using a low optimizer runs setting.
+                return Utils.readFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
+            } else if (compareStrings(contractName, "MessageRoot")) {
+                return type(MessageRoot).creationCode;
+            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+                return type(CTMDeploymentTracker).creationCode;
+            } else if (compareStrings(contractName, "L1Nullifier")) {
+                if (config.supportL2LegacySharedBridgeTest) {
+                    return type(L1NullifierDev).creationCode;
+                } else {
+                    return type(L1Nullifier).creationCode;
+                }
+            } else if (compareStrings(contractName, "L1AssetRouter")) {
+                return type(L1AssetRouter).creationCode;
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return type(L1ERC20Bridge).creationCode;
+            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+                return type(L1NativeTokenVault).creationCode;
+            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+                return type(BridgedStandardERC20).creationCode;
+            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+                return type(UpgradeableBeacon).creationCode;
+            } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+                return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+            } else if (compareStrings(contractName, "RollupDAManager")) {
+                return type(RollupDAManager).creationCode;
+            } else if (compareStrings(contractName, "RollupL1DAValidator")) {
+                return Utils.readRollupDAValidatorBytecode();
+            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+                return type(ValidiumL1DAValidator).creationCode;
+            } else if (compareStrings(contractName, "AvailL1DAValidator")) {
+                return Utils.readAvailL1DAValidatorBytecode();
+            } else if (compareStrings(contractName, "DummyAvailBridge")) {
+                return Utils.readDummyAvailBridgeBytecode();
+            } else if (compareStrings(contractName, "Verifier")) {
+                if (config.testnetVerifier) {
+                    return type(TestnetVerifier).creationCode;
+                } else {
+                    return type(DualVerifier).creationCode;
+                }
+            } else if (compareStrings(contractName, "VerifierFflonk")) {
+                return type(L1VerifierFflonk).creationCode;
+            } else if (compareStrings(contractName, "VerifierPlonk")) {
+                return type(L1VerifierPlonk).creationCode;
+            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+                return type(DefaultUpgrade).creationCode;
+            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+                return type(L1GenesisUpgrade).creationCode;
+            } else if (compareStrings(contractName, "ValidatorTimelock")) {
+                return type(ValidatorTimelock).creationCode;
+            } else if (compareStrings(contractName, "Governance")) {
+                return type(Governance).creationCode;
+            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+                return type(ChainAdminOwnable).creationCode;
+            } else if (compareStrings(contractName, "AccessControlRestriction")) {
+                // TODO(EVM-924): this function is unused
+                return type(AccessControlRestriction).creationCode;
+            } else if (compareStrings(contractName, "ChainAdmin")) {
+                return type(ChainAdmin).creationCode;
+            } else if (compareStrings(contractName, "ChainTypeManager")) {
+                return type(ChainTypeManager).creationCode;
+            } else if (compareStrings(contractName, "BytecodesSupplier")) {
+                return type(BytecodesSupplier).creationCode;
+            } else if (compareStrings(contractName, "ProxyAdmin")) {
+                return type(ProxyAdmin).creationCode;
+            } else if (compareStrings(contractName, "ExecutorFacet")) {
+                return type(ExecutorFacet).creationCode;
+            } else if (compareStrings(contractName, "AdminFacet")) {
+                return type(AdminFacet).creationCode;
+            } else if (compareStrings(contractName, "MailboxFacet")) {
+                return type(MailboxFacet).creationCode;
+            } else if (compareStrings(contractName, "GettersFacet")) {
+                return type(GettersFacet).creationCode;
+            } else if (compareStrings(contractName, "DiamondInit")) {
+                return type(DiamondInit).creationCode;
+            } else if (compareStrings(contractName, "ServerNotifier")) {
+                return type(ServerNotifier).creationCode;
             } else {
-                return type(L1Nullifier).creationCode;
+                revert(string.concat("Contract ", contractName, " creation code not set"));
             }
-        } else if (compareStrings(contractName, "L1AssetRouter")) {
-            return type(L1AssetRouter).creationCode;
-        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-            return type(L1ERC20Bridge).creationCode;
-        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-            return type(L1NativeTokenVault).creationCode;
-        } else if (compareStrings(contractName, "BridgedStandardERC20")) {
-            return type(BridgedStandardERC20).creationCode;
-        } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
-            return type(UpgradeableBeacon).creationCode;
-        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
-            return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-        } else if (compareStrings(contractName, "RollupDAManager")) {
-            return type(RollupDAManager).creationCode;
-        } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return Utils.readRollupDAValidatorBytecode();
-        } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
-            return type(ValidiumL1DAValidator).creationCode;
-        } else if (compareStrings(contractName, "AvailL1DAValidator")) {
-            return Utils.readAvailL1DAValidatorBytecode();
-        } else if (compareStrings(contractName, "DummyAvailBridge")) {
-            return Utils.readDummyAvailBridgeBytecode();
-        } else if (compareStrings(contractName, "Verifier")) {
-            if (config.testnetVerifier) {
-                return type(TestnetVerifier).creationCode;
-            } else {
-                return type(DualVerifier).creationCode;
-            }
-        } else if (compareStrings(contractName, "VerifierFflonk")) {
-            return type(L1VerifierFflonk).creationCode;
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
-            return type(L1VerifierPlonk).creationCode;
-        } else if (compareStrings(contractName, "DefaultUpgrade")) {
-            return type(DefaultUpgrade).creationCode;
-        } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
-            return type(L1GenesisUpgrade).creationCode;
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return type(ValidatorTimelock).creationCode;
-        } else if (compareStrings(contractName, "Governance")) {
-            return type(Governance).creationCode;
-        } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-            return type(ChainAdminOwnable).creationCode;
-        } else if (compareStrings(contractName, "AccessControlRestriction")) {
-            // TODO(EVM-924): this function is unused
-            return type(AccessControlRestriction).creationCode;
-        } else if (compareStrings(contractName, "ChainAdmin")) {
-            return type(ChainAdmin).creationCode;
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return type(ChainTypeManager).creationCode;
-        } else if (compareStrings(contractName, "BytecodesSupplier")) {
-            return type(BytecodesSupplier).creationCode;
-        } else if (compareStrings(contractName, "ProxyAdmin")) {
-            return type(ProxyAdmin).creationCode;
-        } else if (compareStrings(contractName, "ExecutorFacet")) {
-            return type(ExecutorFacet).creationCode;
-        } else if (compareStrings(contractName, "AdminFacet")) {
-            return type(AdminFacet).creationCode;
-        } else if (compareStrings(contractName, "MailboxFacet")) {
-            return type(MailboxFacet).creationCode;
-        } else if (compareStrings(contractName, "GettersFacet")) {
-            return type(GettersFacet).creationCode;
-        } else if (compareStrings(contractName, "DiamondInit")) {
-            return type(DiamondInit).creationCode;
-        } else if (compareStrings(contractName, "ServerNotifier")) {
-            return type(ServerNotifier).creationCode;
         } else {
-            revert(string.concat("Contract ", contractName, " creation code not set"));
+            if (compareStrings(contractName, "ChainRegistrar")) {
+                return Utils.readZKFoundryBytecodeL1("ChainRegistrar.sol", "ChainRegistrar");
+            } else if (compareStrings(contractName, "Bridgehub")) {
+                return Utils.readZKFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
+            } else if (compareStrings(contractName, "MessageRoot")) {
+                return Utils.readZKFoundryBytecodeL1("MessageRoot.sol", "MessageRoot");
+            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+                return Utils.readZKFoundryBytecodeL1("CTMDeploymentTracker.sol", "CTMDeploymentTracker");
+            } else if (compareStrings(contractName, "L2AssetRouter")) {
+                return Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return Utils.readZKFoundryBytecodeL1("L1ERC20Bridge.sol", "L1ERC20Bridge");
+            } else if (compareStrings(contractName, "L2NativeTokenVault")) {
+                return Utils.readZKFoundryBytecodeL1("L2NativeTokenVault.sol", "L2NativeTokenVault");
+            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+                return Utils.readZKFoundryBytecodeL1("BridgedStandardERC20.sol", "BridgedStandardERC20");
+            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+                return Utils.readZKFoundryBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
+            } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+                return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+            } else if (compareStrings(contractName, "RollupDAManager")) {
+                return Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
+            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+                return Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
+            } else if (compareStrings(contractName, "Verifier")) {
+                if (config.testnetVerifier) {
+                    return Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
+                } else {
+                    return Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
+                }
+            } else if (compareStrings(contractName, "VerifierFflonk")) {
+                return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
+            } else if (compareStrings(contractName, "VerifierPlonk")) {
+                return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
+            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+                return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
+            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+                return Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+            } else if (compareStrings(contractName, "ValidatorTimelock")) {
+                return Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
+            } else if (compareStrings(contractName, "Governance")) {
+                return Utils.readZKFoundryBytecodeL1("Governance.sol", "Governance");
+            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+                return Utils.readZKFoundryBytecodeL1("ChainAdminOwnable.sol", "ChainAdminOwnable");
+            } else if (compareStrings(contractName, "AccessControlRestriction")) {
+                // TODO(EVM-924): this function is unused
+                return Utils.readZKFoundryBytecodeL1("AccessControlRestriction.sol", "AccessControlRestriction");
+            } else if (compareStrings(contractName, "ChainAdmin")) {
+                return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
+            } else if (compareStrings(contractName, "ChainTypeManager")) {
+                return Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
+            } else if (compareStrings(contractName, "BytecodesSupplier")) {
+                return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
+            } else if (compareStrings(contractName, "ProxyAdmin")) {
+                return Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
+            } else if (compareStrings(contractName, "ExecutorFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
+            } else if (compareStrings(contractName, "AdminFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
+            } else if (compareStrings(contractName, "MailboxFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
+            } else if (compareStrings(contractName, "GettersFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
+            } else if (compareStrings(contractName, "DiamondInit")) {
+                return Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
+            } else if (compareStrings(contractName, "ServerNotifier")) {
+                return Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
+            } else {
+                revert(string.concat("Contract ", contractName, " creation code not set"));
+            }
         }
     }
 
