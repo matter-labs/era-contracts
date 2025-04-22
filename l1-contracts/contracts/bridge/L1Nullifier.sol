@@ -18,7 +18,7 @@ import {IAssetRouterBase} from "./asset-router/IAssetRouterBase.sol";
 import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
-import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol"; 
+import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {L2Message, TxStatus} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
