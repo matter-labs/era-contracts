@@ -964,7 +964,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
         );
 
-        // TODO: approve base token
         calls = new Call[](1);
         (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
             l2Calldata,
@@ -980,7 +979,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls, uint256 requiredTokens) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.pauseMigration, ());
 
-        // TODO: approve base token
         calls = new Call[](1);
         (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
             l2Calldata,
@@ -996,7 +994,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls, uint256 requiredTokens) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.unpauseMigration, ());
 
-        // TODO: approve base token
         calls = new Call[](1);
         (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
             l2Calldata,
