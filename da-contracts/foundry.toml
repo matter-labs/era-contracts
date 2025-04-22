@@ -14,7 +14,8 @@ fs_permissions = [
     { access = "read", path = "../l2-contracts/artifacts-zk/" },
     { access = "read", path = "./script-config" },
     { access = "read-write", path = "./script-out" },
-    { access = "read", path = "./out" }
+    { access = "read", path = "./out" },
+    { access = "read", path = "./celestia_test_cases.json" }
 ]
 cache_path = 'cache-forge'
 test = 'test/foundry'
