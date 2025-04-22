@@ -322,7 +322,8 @@ object "Bootloader" {
 
             /// @dev The number of slots dedicated for the message roots.
             /// For each message root we store the containing blockNumber, the chainId, the dependency blockNumber, and the sides.
-            /// The sides are the sides of the L2->L1 logs incremental merkle tree, used for precommit based interop, for proof based and commit based it is a single root.
+            /// The sides are the sides of the L2->L1 logs incremental merkle tree, used for precommit based interop, for proof based and commit based it is a single root. 
+            /// Only proof based interop is supported at the moment.
             function MESSAGE_ROOT_SLOTS() -> ret {
                 ret := mul(add(MAX_MSG_ROOTS_IN_BATCH(), 1), MESSAGE_ROOT_SLOT_SIZE())
             }

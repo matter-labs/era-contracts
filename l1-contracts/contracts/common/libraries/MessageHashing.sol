@@ -102,7 +102,7 @@ library MessageHashing {
     /// @param _leaf The leaf.
     /// @param _proof The proof.
     /// @return result The proof verification result.
-    function hashProof(
+    function hashProof( 
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
