@@ -95,7 +95,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _proof
     ) external view returns (bool) {
         return
-            _proveL2LogInclusion({_chainId: s.chainId, _batchNumber: _batchNumber, _index: _index, _log: _log, _proof: _proof});
+            _proveL2LogInclusion({
+                _chainId: s.chainId,
+                _batchNumber: _batchNumber,
+                _index: _index,
+                _log: _log,
+                _proof: _proof
+            });
     }
 
     /// @inheritdoc IMailboxImpl

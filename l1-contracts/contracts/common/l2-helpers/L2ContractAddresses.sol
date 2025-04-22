@@ -31,7 +31,7 @@ address constant L2_DEPLOYER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFF
 address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07);
 
 /// @dev The address of the L2ToL1Messenger system contract
-address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08) ;
+address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08);
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
 IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
