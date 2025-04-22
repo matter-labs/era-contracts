@@ -9,6 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {L2_NATIVE_TOKEN_VAULT, L2_ASSET_ROUTER, L2_BRIDGE_HUB} from "./Constants.sol";
 import {IBridgedStandardERC20} from "./interfaces/IBridgedStandardERC20.sol";
+import {LegacyBridgeNotProxy} from "./SystemContractErrors.sol";
 
 /// @dev Storage slot with the admin of the contract used for EIP‑1967 proxies (e.g., TUP, BeaconProxy, etc.).
 bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
@@ -67,9 +68,10 @@ contract L2LegacyBridgeFixUpgrade {
             )))
         );
 
-        // Unexpected state: the proxy must have an admin set.
-        // FIXME: use custom errors.
-        require(proxyAdmin != address(0), "Expected TUP");
+        if (proxyAdmin == address(0)) {
+            // Unexpected state: the proxy must have an admin set.
+            revert LegacyBridgeNotProxy();
+        }
 
         // If the admin is an EOA (code length == 0), deploy a new `ProxyAdmin`
         // owned by governance and make it the proxy admin.

@@ -201,6 +201,8 @@ error InvalidNewL2BlockNumber(uint256 l2BlockNumber);
 // 0xe0a0dd23
 error InvalidNonceKey(uint192 nonceKey);
 
+error LegacyBridgeNotProxy();
+
 enum CodeHashReason {
     NotContractOnConstructor,
     NotConstructedContract
