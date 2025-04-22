@@ -846,8 +846,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](3);
-        allCalls[0] = prepareUnpauseGatewayMigrationsCall();
-        allCalls[1] = prepareGatewaySpecificStage2GovernanceCalls();
+        allCalls[0] = prepareGatewaySpecificStage2GovernanceCalls();
+        allCalls[1] = prepareUnpauseGatewayMigrationsCall();
         allCalls[2] = prepareGovernanceUpgradeTimerCheckCall();
         calls = mergeCallsArray(allCalls);
     }
