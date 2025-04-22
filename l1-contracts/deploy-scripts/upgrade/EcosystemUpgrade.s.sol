@@ -903,19 +903,13 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function prepareGatewaySpecificStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        Call[][] memory allCalls = new Call[][](2);
-
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 l2GasLimit = newConfig.l2GasLimit;
         uint256 l1GasPrice = newConfig.l1GasPrice;
 
         uint256 tokensRequired;
-        (allCalls[1], tokensRequired) = preparePauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
 
-        // Approve required amount of base token
-        allCalls[0] = prepareApproveGatewayBaseTokenCall(addresses.bridges.l1AssetRouterProxy, tokensRequired);
-
-        calls = mergeCallsArray(allCalls);
+        calls = preparePauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
     }
 
     function prepareGatewaySpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
@@ -929,17 +923,17 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         uint256 tokensRequired;
         uint256 tokensForCall;
-        (allCalls[1], tokensForCall) = provideSetNewVersionUpgradeCallForGateway(l2GasLimit, l1GasPrice);
+        (allCalls[0], tokensForCall) = provideSetNewVersionUpgradeCallForGateway(l2GasLimit, l1GasPrice);
         tokensRequired += tokensForCall;
 
-        (allCalls[2], tokensForCall) = prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
+        (allCalls[1], tokensForCall) = prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
         tokensRequired += tokensForCall;
 
-        (allCalls[3], tokensForCall) = prepareUnpauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
+        (allCalls[2], tokensForCall) = prepareUnpauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
         tokensRequired += tokensForCall;
 
         // Approve required amount of base token
-        allCalls[0] = prepareApproveGatewayBaseTokenCall(addresses.bridges.l1AssetRouterProxy, tokensRequired);
+        // allCalls[0] = prepareApproveGatewayBaseTokenCall(addresses.bridges.l1AssetRouterProxy, tokensRequired);
 
         calls = mergeCallsArray(allCalls);
     }
@@ -963,8 +957,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
         );
 
-        calls = new Call[](1);
-        (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
+        // TODO: approve base token
+        calls = _prepareL1ToGatewayCall(
             l2Calldata,
             l2GasLimit,
             l1GasPrice,
@@ -975,11 +969,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function preparePauseMigrationCallForGateway(
         uint256 l2GasLimit,
         uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls, uint256 requiredTokens) {
+    ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.pauseMigration, ());
 
-        calls = new Call[](1);
-        (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
+        calls = _prepareL1ToGatewayCall(
             l2Calldata,
             l2GasLimit,
             l1GasPrice,
@@ -993,8 +986,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls, uint256 requiredTokens) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.unpauseMigration, ());
 
-        calls = new Call[](1);
-        (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
+        // TODO: approve base token
+        calls = _prepareL1ToGatewayCall(
             l2Calldata,
             l2GasLimit,
             l1GasPrice,
@@ -1015,8 +1008,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             ChainTypeManager.setChainCreationParams,
             (getChainCreationParams(gatewayConfig.gatewayStateTransition))
         );
-        calls = new Call[](1);
-        (calls[0], requiredTokens) = _prepareL1ToGatewayCall(
+        
+        calls = _prepareL1ToGatewayCall(
             l2Calldata,
             l2GasLimit,
             l1GasPrice,
@@ -1029,33 +1022,15 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         uint256 l2GasLimit,
         uint256 l1GasPrice,
         address dstAddress
-    ) internal view returns (Call memory call, uint256 requiredTokens) {
+    ) internal view returns (Call[] memory calls) {
         require(gatewayConfig.chainId != 0, "Chain id of gateway is zero in newConfig");
 
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
         require(addresses.bridges.l1AssetRouterProxy != address(0), "l1AssetRouterProxyAddress is zero in newConfig");
 
-        L2TransactionRequestDirect memory l2TransactionRequestDirect;
-        (l2TransactionRequestDirect, requiredTokens) = Utils.prepareL1L2Transaction(
-            PrepareL1L2TransactionParams({
-                l1GasPrice: l1GasPrice,
-                l2Calldata: l2Calldata,
-                l2GasLimit: l2GasLimit,
-                l2Value: 0,
-                factoryDeps: new bytes[](0),
-                dstAddress: dstAddress,
-                chainId: gatewayConfig.chainId,
-                bridgehubAddress: addresses.bridgehub.bridgehubProxy,
-                l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-                refundRecipient: msg.sender
-            })
-        );
-
-        call = Call({
-            target: addresses.bridgehub.bridgehubProxy,
-            data: abi.encodeCall(IBridgehub.requestL2TransactionDirect, (l2TransactionRequestDirect)),
-            value: 0
-        });
+        calls = Utils.prepareGovernanceL1L2DirectTransaction(
+            l1GasPrice, l2Calldata, l2GasLimit, new bytes[](0), 
+            dstAddress, gatewayConfig.chainId, addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy, msg.sender);
     }
 
     function prepareApproveGatewayBaseTokenCall(
