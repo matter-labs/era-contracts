@@ -51,7 +51,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-/// @dev IMPORTANT: this script is not intended to be used in production.
 contract GatewayUtils is Script {
     function finishMigrateChainFromGateway(
         address bridgehubAddr,
