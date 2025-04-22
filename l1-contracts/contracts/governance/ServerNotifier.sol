@@ -87,7 +87,9 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
         uint256 _protocolVersion,
         uint256 _upgradeTimestamp
     ) external onlyChainAdmin(_chainId) {
-        require(chainTypeManager.protocolVersionIsActive(_protocolVersion), InvalidProtocolVersion());
+        if (!chainTypeManager.protocolVersionIsActive(_protocolVersion)) {
+            revert InvalidProtocolVersion();
+        }
         protocolVersionToUpgradeTimestamp[_chainId][_protocolVersion] = _upgradeTimestamp;
         emit UpgradeTimestampUpdated(_chainId, _protocolVersion, _upgradeTimestamp);
     }
