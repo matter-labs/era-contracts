@@ -10,7 +10,7 @@ import {PermanentRestriction} from "contracts/governance/PermanentRestriction.so
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
 import {NotARestriction} from "contracts/common/L1ContractErrors.sol";
-import { DummyChainTypeManager } from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
+import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 
 contract L2AdminFactoryTest is Test {
     address validRestriction1;

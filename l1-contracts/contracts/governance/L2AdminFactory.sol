@@ -33,7 +33,10 @@ contract L2AdminFactory {
     /// @param _chainTypeManager Address of the chain type manager of the ZKSync Chain that ChainAdmin will be governing.
     /// @return admin The address of the deployed admin contract.
     // solhint-disable-next-line gas-calldata-parameters
-    function deployAdmin(address[] memory _additionalRestrictions, address _chainTypeManager) external returns (address admin) {
+    function deployAdmin(
+        address[] memory _additionalRestrictions,
+        address _chainTypeManager
+    ) external returns (address admin) {
         // Even though the chain admin will likely perform similar checks,
         // we keep those here just in case, since it is not expensive, while allowing to fail fast.
         _validateRestrictions(_additionalRestrictions);

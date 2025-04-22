@@ -12,7 +12,7 @@ import {IAccessControlRestriction} from "contracts/governance/IAccessControlRest
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
 import {ZeroAddress, NoCallsProvided, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
-import { DummyChainTypeManager } from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
+import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 
 contract AccessRestrictionTest is Test {
     AccessControlRestriction internal restriction;
