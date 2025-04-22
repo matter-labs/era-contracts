@@ -235,7 +235,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return false;
         }
 
-        if (BRIDGE_HUB.getZKChain(chainId) != _chain) {
+        if (BRIDGE_HUB.getZKChain(chainId) != _chain)  {
             // It is not a ZKChain, so we can return `false` here.
             return false;
         }
