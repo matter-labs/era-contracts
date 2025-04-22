@@ -145,6 +145,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         bool upgradeCutPrepared;
         bool factoryDepsPublished;
         bool ecosystemContractsDeployed;
+        bool ecosystemContractsDeployedGW;
         string outputPath;
     }
 
@@ -172,6 +173,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContracts();
         console.log("Ecosystem contracts are deployed!");
+        deployNewEcosystemContractsGW();
+        console.log("Ecosystem contracts are deployed for GW!");
         publishBytecodes();
         console.log("Bytecodes published!");
         generateUpgradeData();
@@ -199,6 +202,38 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
 
         upgradeConfig.ecosystemContractsDeployed = true;
+    }
+
+    /// @notice Deploy everything that should be deployed for GW
+    function deployNewEcosystemContractsGW() public virtual {
+        require(upgradeConfig.initialized, "Not initialized");
+
+        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
+        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
+        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
+
+        gatewayConfig.gatewayStateTransition.executorFacet = deploySimpleContract("ExecutorFacet");
+        gatewayConfig.gatewayStateTransition.adminFacet = deploySimpleContract("AdminFacet");
+        gatewayConfig.gatewayStateTransition.mailboxFacet = deploySimpleContract("MailboxFacet");
+        gatewayConfig.gatewayStateTransition.gettersFacet = deploySimpleContract("GettersFacet");
+        gatewayConfig.gatewayStateTransition.diamondInit = deploySimpleContract("DiamondInit");
+
+        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
+
+        upgradeConfig.ecosystemContractsDeployedGW = true;
+    }
+
+     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
+        contractAddress = deployThroughL1Deterministic(
+            getCreationCode(contractName),
+            getCreationCalldata(contractName),
+            0,
+            newConfig.l2GasLimit,
+            new bytes[](0),
+            gatewayConfig.chainId,
+            addresses.bridgehub.bridgehubProxy,
+            addresses.bridges.l1AssetRouterProxy
+        );
     }
 
     /// @notice Generate data required for the upgrade
