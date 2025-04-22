@@ -10,6 +10,7 @@ import {PermanentRestriction} from "contracts/governance/PermanentRestriction.so
 import {IPermanentRestriction} from "contracts/governance/IPermanentRestriction.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
 import {NotARestriction} from "contracts/common/L1ContractErrors.sol";
+import { DummyChainTypeManager } from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 
 contract L2AdminFactoryTest is Test {
     address validRestriction1;
@@ -17,11 +18,15 @@ contract L2AdminFactoryTest is Test {
 
     address invalidRestriction;
 
+    DummyChainTypeManager chainTypeManager;
+
     function setUp() public {
         validRestriction1 = address(new DummyRestriction(true));
         validRestriction2 = address(new DummyRestriction(true));
 
         invalidRestriction = address(new DummyRestriction(false));
+
+        chainTypeManager = new DummyChainTypeManager();
     }
 
     function test_invalidInitialRestriction() public {
@@ -42,7 +47,7 @@ contract L2AdminFactoryTest is Test {
         additionalRestrictions[0] = invalidRestriction;
 
         vm.expectRevert(abi.encodeWithSelector(NotARestriction.selector, address(invalidRestriction)));
-        factory.deployAdmin(additionalRestrictions);
+        factory.deployAdmin(additionalRestrictions, address(chainTypeManager));
     }
 
     function testL2AdminFactory() public {
@@ -58,7 +63,7 @@ contract L2AdminFactoryTest is Test {
         allRestrictions[0] = requiredRestrictions[0];
         allRestrictions[1] = additionalRestrictions[0];
 
-        address admin = factory.deployAdmin(additionalRestrictions);
+        address admin = factory.deployAdmin(additionalRestrictions, address(chainTypeManager));
 
         // Now, we need to check whether it would be able to accept such an admin
         PermanentRestriction restriction = new PermanentRestriction(IBridgehub(address(0)), address(factory));

@@ -12,9 +12,11 @@ import {IAccessControlRestriction} from "contracts/governance/IAccessControlRest
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
 import {ZeroAddress, NoCallsProvided, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
+import { DummyChainTypeManager } from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 
 contract AccessRestrictionTest is Test {
     AccessControlRestriction internal restriction;
+    DummyChainTypeManager chainTypeManager;
     ChainAdmin internal chainAdmin;
     address owner;
     address randomCaller;
@@ -38,7 +40,9 @@ contract AccessRestrictionTest is Test {
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
 
-        chainAdmin = new ChainAdmin(restrictions, address(0));
+        chainTypeManager = new DummyChainTypeManager();
+
+        chainAdmin = new ChainAdmin(restrictions, address(chainTypeManager));
     }
 
     function test_adminAsAddressZero() public {

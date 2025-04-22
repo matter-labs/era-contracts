@@ -12,7 +12,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
 import {InvalidProtocolVersion, NotARestriction, NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
-import {DummyChainTypeManager} from "contracts/dev-contracts/DummyChainTypeManager.sol";
+import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 contract ChainAdminTest is Test {
