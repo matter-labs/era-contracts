@@ -9,7 +9,7 @@ import {L2_MESSAGE_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.
 /// @title The interface of the ZKsync L2MessageVerification contract that can be used to prove L2 message inclusion on the L2.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract L2MessageVerification is MessageVerification { 
+contract L2MessageVerification is MessageVerification {
     function _proveL2LeafInclusion(
         uint256 _chainId,
         uint256 _batchOrBlockNumber,
@@ -27,7 +27,7 @@ contract L2MessageVerification is MessageVerification {
         if (proofVerificationResult.finalProofNode) {
             // For proof based interop this is the SL MessageRoot at block number _batchOrBlockNumber
             bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE.msgRoots(_chainId, _batchOrBlockNumber);
-            return correctBatchRoot == proofVerificationResult.batchSettlementRoot; 
+            return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
         }
 
         return
