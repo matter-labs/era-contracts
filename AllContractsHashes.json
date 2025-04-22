@@ -985,11 +985,11 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x010003bf3cdc412828f67cb6cfa032e398c07429d9a524db0e1ec44de75a7301",
+    "zkBytecodeHash": "0x010003bf255eae2e8df6954978f1e55c54bda432b461550b4e4cf1b2a8565b00",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmBytecodeHash": "0xba92824b7788fbe5a715844d87737bd5e299313ce330c0f3cf2fd2021278929f",
+    "evmBytecodeHash": "0x0685c0e165718599bce64ef514b3af1e45850ef76f6f6ca245c4c91fe8cc14d4",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmDeployedBytecodeHash": "0x4650c36ad1fc30cfd760836d3397db8de4e172bf165eae295ea6d57790746f10"
+    "evmDeployedBytecodeHash": "0x92a9b667010fcf8515a52e778e3ac07531271a393c4a1ef2eb162d4ba36b8dc1"
   },
   {
     "contractName": "l1-contracts/GatewayTransactionFilterer",
@@ -1321,11 +1321,11 @@
   },
   {
     "contractName": "l1-contracts/ServerNotifier",
-    "zkBytecodeHash": "0x010000b964c383988287a72c8aec2b62336450392de49c28a3d41bf6e1a98ba8",
+    "zkBytecodeHash": "0x010000e7a21386bb420dd2291364b60d98d61615546c04ccd752c931c6aba38e",
     "zkBytecodePath": "/l1-contracts/zkout/ServerNotifier.sol/ServerNotifier.json",
-    "evmBytecodeHash": "0x02b4766fb8eeae314178ef9600f126ed6cd4116a8bbcd72b83d5852cc5a66c1d",
+    "evmBytecodeHash": "0x83875c0bd5dd77ad0c47d4bb270ed8ffe6002cf1215d99b3ebb7fd0e0383a261",
     "evmBytecodePath": "/l1-contracts/out/ServerNotifier.sol/ServerNotifier.json",
-    "evmDeployedBytecodeHash": "0x81aed7981c4bac998d37e0f47a59317dba5a3a501c83b21ea6f6eaab3cdaac45"
+    "evmDeployedBytecodeHash": "0xe161ec1e28549d02a11c0791f929b14df208e3a899a8c21f3bdb007f98ddf873"
   },
   {
     "contractName": "l1-contracts/SignedMath",
