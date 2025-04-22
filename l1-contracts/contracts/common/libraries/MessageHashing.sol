@@ -48,6 +48,9 @@ library MessageHashing {
         bool finalProofNode;
     }
 
+    /// @notice Parses the proof metadata.
+    /// @param _proof The proof.
+    /// @return result The proof metadata.
     function parseProofMetadata(bytes32[] calldata _proof) internal pure returns (ProofMetadata memory result) {
         bytes32 proofMetadata = _proof[0];
 
@@ -92,6 +95,13 @@ library MessageHashing {
         }
     }
 
+    /// @notice Hashes the proof.
+    /// @param _chainId The chain id.
+    /// @param _batchNumber The batch number.
+    /// @param _leafProofMask The leaf proof mask.
+    /// @param _leaf The leaf.
+    /// @param _proof The proof.
+    /// @return result The proof verification result.
     function hashProof(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -161,6 +171,11 @@ library MessageHashing {
         });
     }
 
+    /// @notice Extracts slice from the proof.
+    /// @param _proof The proof.
+    /// @param _left The left index.
+    /// @param _right The right index.
+    /// @return slice The slice.
     function extractSlice(
         bytes32[] calldata _proof,
         uint256 _left,

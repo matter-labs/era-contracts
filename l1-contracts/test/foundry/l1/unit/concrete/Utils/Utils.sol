@@ -21,7 +21,7 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
 import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
-import {MessageRoot} from "contracts/common/Messaging.sol";
+import {InteropRoot} from "contracts/common/Messaging.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -193,7 +193,6 @@ library Utils {
                 newStateRoot: randomBytes32("newStateRoot"),
                 numberOfLayer1Txs: 0,
                 priorityOperationsHash: keccak256(""),
-                dependencyRootsRollingHash: bytes32(0),
                 bootloaderHeapInitialContentsHash: randomBytes32("bootloaderHeapInitialContentsHash"),
                 eventsQueueStateHash: randomBytes32("eventsQueueStateHash"),
                 systemLogs: abi.encode(randomBytes32("systemLogs")),
@@ -236,7 +235,7 @@ library Utils {
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
-        MessageRoot[][] memory dependencyRoots = new MessageRoot[][](_batchesData.length);
+        InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
         return (
             _batchesData[0].batchNumber,
             _batchesData[_batchesData.length - 1].batchNumber,

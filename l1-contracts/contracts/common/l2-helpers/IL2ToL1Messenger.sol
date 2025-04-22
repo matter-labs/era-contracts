@@ -50,15 +50,16 @@ interface IL2ToL1Messenger {
     // some hooks in the VM. For now, it is much easier to track them with L2 events.
     event L1MessageSent(address indexed _sender, bytes32 indexed _hash, bytes _message);
 
-    event L2ToL1LogSent(L2ToL1Log _l2log);
-
-    event BytecodeL1PublicationRequested(bytes32 _bytecodeHash);
-
     /// @notice Sends an arbitrary length message to L1.
     /// @param _message The variable length message to be sent to L1.
     /// @return Returns the keccak256 hashed value of the message.
     function sendToL1(bytes memory _message) external returns (bytes32);
 
+    /// @notice Sends L2ToL1Log.
+    /// @param _isService The `isService` flag.
+    /// @param _key The `key` part of the L2Log.
+    /// @param _value The `value` part of the L2Log.
+    /// @dev Can be called only by a system contract.
     function sendL2ToL1Log(bool _isService, bytes32 _key, bytes32 _value) external returns (uint256 logIdInMerkleTree);
 
     /// @notice This function is expected to be called only by the KnownCodesStorage system contract

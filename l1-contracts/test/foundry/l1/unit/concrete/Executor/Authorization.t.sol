@@ -32,7 +32,6 @@ contract AuthorizationTest is ExecutorTest {
             newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
             priorityOperationsHash: Utils.randomBytes32("priorityOperationsHash"),
-            dependencyRootsRollingHash: bytes32(0),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: bytes(""),

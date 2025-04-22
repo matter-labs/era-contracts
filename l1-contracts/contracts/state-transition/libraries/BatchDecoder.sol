@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
 import {IncorrectBatchBounds, EmptyData, UnsupportedCommitBatchEncoding, UnsupportedProofBatchEncoding, UnsupportedExecuteBatchEncoding} from "../../common/L1ContractErrors.sol";
-import {MessageRoot} from "../../common/Messaging.sol";
+import {InteropRoot} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -164,7 +164,7 @@ library BatchDecoder {
         returns (
             IExecutor.StoredBatchInfo[] memory executeData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
-            MessageRoot[][] memory dependencyRoots
+            InteropRoot[][] memory dependencyRoots
         )
     {
         if (_executeData.length == 0) {
@@ -175,7 +175,7 @@ library BatchDecoder {
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
             (executeData, priorityOpsData, dependencyRoots) = abi.decode(
                 _executeData[1:],
-                (IExecutor.StoredBatchInfo[], PriorityOpsBatchInfo[], MessageRoot[][])
+                (IExecutor.StoredBatchInfo[], PriorityOpsBatchInfo[], InteropRoot[][])
             );
         } else {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
@@ -200,7 +200,7 @@ library BatchDecoder {
         returns (
             IExecutor.StoredBatchInfo[] memory executeData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
-            MessageRoot[][] memory dependencyRoots
+            InteropRoot[][] memory dependencyRoots
         )
     {
         (executeData, priorityOpsData, dependencyRoots) = _decodeExecuteData(_executeData);

@@ -12,14 +12,15 @@ error MessageRootAlreadyExists();
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
  * @notice MessageRootStorage contract responsible for storing the message roots of other chains on the L2.
- * @dev
- */
+ */ 
 contract L2MessageRootStorage is SystemContractBase {
+    /// @notice Mapping of chain ID to block or batch number to message root.
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => bytes32 msgRoot)) public msgRoots;
 
     /// @dev Adds a message root to the L2MessageRootStorage contract.
     /// @param chainId The chain ID of the chain that the message root is for.
-    /// @param blockOrBatchNumber The block or batch number of the message root.
+    /// @param blockOrBatchNumber The block or batch number of the message root. 
+    /// For proof based interop it is block number. For commit based interop it is batch number.
     /// @param sides The message root sides.
     function addMessageRoot(
         uint256 chainId,
@@ -27,7 +28,8 @@ contract L2MessageRootStorage is SystemContractBase {
         bytes32[] calldata sides
     ) external onlyCallFromBootloader {
         if (sides.length != 1) {
-            revert SidesLengthNotOne();
+            /// This will only be supported for precommit based interop.
+            revert SidesLengthNotOne(); 
         }
         if (msgRoots[chainId][blockOrBatchNumber] != bytes32(0)) {
             revert MessageRootAlreadyExists();

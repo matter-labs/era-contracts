@@ -2974,6 +2974,7 @@ object "Bootloader" {
 
                 let currentL2BlockNumber := mload(txL2BlockPosition)
                 debugLog("currentL2BlockNumber", currentL2BlockNumber)
+                debugLog("current txId", txId)
 
                 let nextMsgRootNumber := mload(NEXT_MESSAGE_ROOT_NUMBER_SLOT())
                 let messageRootStartSlot := mul(add(msgRootSlot, mul(nextMsgRootNumber, msgRootSlotSize)), 32)
@@ -3013,21 +3014,20 @@ object "Bootloader" {
 
                     debugLog("Next message root updated", add(i, 1))
 
-                    let msgRootOffset := 64
-                    mstore(msgRootOffset, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
-                    mstore(add(msgRootOffset, 4), chainId)
-                    mstore(add(msgRootOffset, 36), blockNumber)
-                    mstore(add(msgRootOffset, 68), 96)
-                    mstore(add(msgRootOffset, 100), sidesLength)
+                    mstore(0, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}})
+                    mstore(4, chainId)
+                    mstore(36, blockNumber)
+                    mstore(68, 96)
+                    mstore(100, sidesLength)
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        mstore(add(add(msgRootOffset, 132), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                        mstore(add(132, mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
                     }
 
                     let success := call(
                         gas(),
                         L2_MESSAGE_ROOT_STORAGE(),
                         0,
-                        msgRootOffset,
+                        0,
                         add(132, mul(sidesLength, 32)),
                         0,
                         0
@@ -3035,7 +3035,6 @@ object "Bootloader" {
 
                     if iszero(success) {
                         debugLog("Failed to set messageRoot: ", 1)
-                        // kl todo this is still failing, as we set the same messageRoot multiple times
                         revertWithReason(FAILED_TO_SET_MESSAGE_ROOT(), 1)
                     }
                     debugLog("MsgRoot set successfully", 2)
@@ -3066,20 +3065,17 @@ object "Bootloader" {
                     }
 
                     let msgRootOffset := 64
-                    mstore(msgRootOffset, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}}) // todo
                     mstore(add(msgRootOffset, 4), chainId)
                     mstore(add(msgRootOffset, 36), blockNumber)
-                    mstore(add(msgRootOffset, 68), 96)
-                    mstore(add(msgRootOffset, 100), sidesLength)
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        mstore(add(add(msgRootOffset, 132), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
+                        mstore(add(add(msgRootOffset, 68), mul(j, 32)), mload(add(messageRootStartSlot, mul(add(3, j), 32))))
                     }
 
                     // for single messageRoots that are not really sides, we send them to L1 here.
                     if lt(sidesLength, 2) {
                         // Calculate keccak256 of all data
                         mstore(36, rollingHashOfProcessedRoots)
-                        rollingHashOfProcessedRoots := keccak256(36, add(32, add(128, mul(sidesLength, 32))))
+                        rollingHashOfProcessedRoots := keccak256(36, add(32, add(64, mul(sidesLength, 32))))
                     } {
                         if gt(sidesLength, 1) {
                             revertWithReason(FAILED_PRECOMMIT_BASED_INTEROP_NOT_SUPPORTED(), 1)

@@ -102,7 +102,6 @@ interface IExecutor is IZKChainBase {
         bytes32 newStateRoot;
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
-        bytes32 dependencyRootsRollingHash; // kl todo we might have to include a new and old version of this struct for migration
         bytes32 bootloaderHeapInitialContentsHash;
         bytes32 eventsQueueStateHash;
         bytes systemLogs;

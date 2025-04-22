@@ -20,7 +20,7 @@ import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1T
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {MessageRoot} from "../../../common/Messaging.sol";
+import {InteropRoot} from "../../../common/Messaging.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -90,13 +90,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Check that the number of processed priority operations is as expected
         if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
             revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
-        }
-        // Check that the dependency roots rolling hash is as expected
-        if (logOutput.dependencyRootsRollingHash != _newBatch.dependencyRootsRollingHash) {
-            revert DependencyRootsRollingHashMismatch(
-                logOutput.dependencyRootsRollingHash,
-                _newBatch.dependencyRootsRollingHash
-            );
         }
 
         // Check the timestamp of the new batch
@@ -436,14 +429,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     function _executeOneBatch(
         StoredBatchInfo memory _storedBatch,
         PriorityOpsBatchInfo memory _priorityOpsData,
-        MessageRoot[] memory _dependencyRoots,
+        InteropRoot[] memory _dependencyRoots,
         uint256 _executedBatchIdx
     ) internal {
         if (_priorityOpsData.itemHashes.length != _storedBatch.numberOfLayer1Txs) {
             revert MismatchNumberOfLayer1Txs(_priorityOpsData.itemHashes.length, _storedBatch.numberOfLayer1Txs);
         }
         bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
-        bytes32 dependencyRootsRollingHash = _verifyDependencyMessageRoots(_dependencyRoots);
+        bytes32 dependencyRootsRollingHash = _verifyDependencyInteropRoots(_dependencyRoots);
         _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash, dependencyRootsRollingHash);
         s.priorityTree.processBatch(_priorityOpsData);
 
@@ -455,16 +448,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @notice Verifies the dependency message roots that the chain relied on.
-    function _verifyDependencyMessageRoots(
-        MessageRoot[] memory _dependencyRoots
+    function _verifyDependencyInteropRoots(
+        InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
         uint256 length = _dependencyRoots.length;
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+
         for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
-            MessageRoot memory msgRoot = _dependencyRoots[i];
+            InteropRoot memory msgRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
             if (msgRoot.chainId == block.chainid) {
-                // For the same chain we import from the MessageRoot contract
-                IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+                // For the same chain we verify using the MessageRoot contract
                 correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.blockOrBatchNumber));
             } else if (msgRoot.chainId == L1_CHAIN_ID) {
                 // this case can only happen on GW.
@@ -486,8 +480,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     dependencyRootsRollingHash,
                     msgRoot.chainId,
                     msgRoot.blockOrBatchNumber,
-                    uint256(96),
-                    msgRoot.sides.length,
                     msgRoot.sides
                 )
             );
@@ -520,7 +512,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         (
             StoredBatchInfo[] memory batchesData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
-            MessageRoot[][] memory dependencyRoots
+            InteropRoot[][] memory dependencyRoots
         ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {

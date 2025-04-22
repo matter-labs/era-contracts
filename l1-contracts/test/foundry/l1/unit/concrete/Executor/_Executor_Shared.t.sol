@@ -287,7 +287,6 @@ contract ExecutorTest is Test {
             newStateRoot: Utils.randomBytes32("newStateRoot"),
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
-            dependencyRootsRollingHash: bytes32(0),
             bootloaderHeapInitialContentsHash: Utils.randomBytes32("bootloaderHeapInitialContentsHash"),
             eventsQueueStateHash: Utils.randomBytes32("eventsQueueStateHash"),
             systemLogs: l2Logs,
