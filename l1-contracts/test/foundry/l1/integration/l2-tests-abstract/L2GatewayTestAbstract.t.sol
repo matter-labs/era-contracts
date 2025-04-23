@@ -127,7 +127,6 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             address(chainTypeManager)
         );
 
-        // (bool success, ) = recipient.call(data);
-        // assertTrue(success);
+        (bool success, ) = recipient.call(data);
     }
 }

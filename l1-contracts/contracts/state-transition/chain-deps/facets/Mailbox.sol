@@ -82,7 +82,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) public view returns (bool) {
         return
             _proveL2LogInclusion({
-                _chainId: 0,
+                _chainId: s.chainId,
                 _batchNumber: _batchNumber,
                 _index: _index,
                 _log: _l2MessageToLog(_message),
@@ -98,7 +98,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _proof
     ) external view returns (bool) {
         return
-            _proveL2LogInclusion({_chainId: 0, _batchNumber: _batchNumber, _index: _index, _log: _log, _proof: _proof});
+            _proveL2LogInclusion({
+                _chainId: s.chainId,
+                _batchNumber: _batchNumber,
+                _index: _index,
+                _log: _log,
+                _proof: _proof
+            });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -130,7 +136,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         });
         return
             _proveL2LogInclusion({
-                _chainId: 0,
+                _chainId: s.chainId,
                 _batchNumber: _l2BatchNumber,
                 _index: _l2MessageIndex,
                 _log: l2Log,
@@ -147,7 +153,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) external view returns (bool) {
         return
             _proveL2LeafInclusion({
-                _chainId: uint256(0),
+                _chainId: s.chainId,
                 _batchNumber: _batchNumber,
                 _leafProofMask: _leafProofMask,
                 _leaf: _leaf,
@@ -156,7 +162,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     function _proveL2LeafInclusion(
-        // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
@@ -164,7 +169,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
         ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof({
-            _chainId: s.chainId,
+            _chainId: _chainId,
             _batchNumber: _batchNumber,
             _leafProofMask: _leafProofMask,
             _leaf: _leaf,

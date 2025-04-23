@@ -6,6 +6,8 @@ import {Transaction} from "../libraries/TransactionHelper.sol";
 
 bytes4 constant ACCOUNT_VALIDATION_SUCCESS_MAGIC = IAccount.validateTransaction.selector;
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IAccount {
     /// @notice Called by the bootloader to validate that an account agrees to process the transaction
     /// (and potentially pay for it).

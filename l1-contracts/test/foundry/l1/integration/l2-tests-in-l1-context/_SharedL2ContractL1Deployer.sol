@@ -71,7 +71,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
         addresses.bridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
         addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
         addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
-        addresses.blobVersionedHashRetriever = address(0x1);
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         if (!_skip) {

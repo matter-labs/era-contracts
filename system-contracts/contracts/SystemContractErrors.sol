@@ -76,8 +76,8 @@ error MerklePathEmpty();
 error MerklePathOutOfBounds();
 // 0xe90aded4
 error NonceAlreadyUsed(address account, uint256 nonce);
-// 0x45ac24a6
-error NonceIncreaseError(uint256 max, uint256 proposed);
+// 0xbac091ee
+error NonceIncreaseError(uint256 min, uint256 max, uint256 proposed);
 // 0x1f2f8478
 error NonceNotUsed(address account, uint256 nonce);
 // 0x760a1568

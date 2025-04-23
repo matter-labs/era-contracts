@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IExecutor} from "../chain-interfaces/IExecutor.sol";
 import {PriorityOpsBatchInfo} from "./PriorityTree.sol";
 import {IncorrectBatchBounds, EmptyData, UnsupportedCommitBatchEncoding, UnsupportedProofBatchEncoding, UnsupportedExecuteBatchEncoding} from "../../common/L1ContractErrors.sol";
-import {L2Log} from "../../common/Messaging.sol";
+import {InteropRoot, L2Log} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -14,7 +14,7 @@ import {L2Log} from "../../common/Messaging.sol";
 ///      It reverts with custom errors when the data is invalid or unsupported encoding is used.
 library BatchDecoder {
     /// @notice The currently supported encoding version.
-    uint8 internal constant SUPPORTED_ENCODING_VERSION = 0; // kl todo bump?
+    uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.
     /// @param _commitData The calldata byte array containing the data for committing batches.
@@ -164,6 +164,7 @@ library BatchDecoder {
         returns (
             IExecutor.StoredBatchInfo[] memory executeData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
+            InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
             bytes32[] memory messageRoots
@@ -175,9 +176,9 @@ library BatchDecoder {
 
         uint8 encodingVersion = uint8(_executeData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (executeData, priorityOpsData, logs, messages, messageRoots) = abi.decode(
+            (executeData, priorityOpsData,dependencyRoots, logs, messages, messageRoots) = abi.decode(
                 _executeData[1:],
-                (IExecutor.StoredBatchInfo[], PriorityOpsBatchInfo[], L2Log[][], bytes[][], bytes32[])
+                (IExecutor.StoredBatchInfo[], PriorityOpsBatchInfo[],InteropRoot[][], L2Log[][], bytes[][], bytes32[])
             );
         } else {
             revert UnsupportedExecuteBatchEncoding(encodingVersion);
@@ -202,12 +203,13 @@ library BatchDecoder {
         returns (
             IExecutor.StoredBatchInfo[] memory executeData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
+            InteropRoot[][] memory dependencyRoots,
             L2Log[][] memory logs,
             bytes[][] memory messages,
             bytes32[] memory messageRoots
         )
     {
-        (executeData, priorityOpsData, logs, messages, messageRoots) = _decodeExecuteData(_executeData);
+        (executeData, priorityOpsData, dependencyRoots,logs, messages, messageRoots) = _decodeExecuteData(_executeData);
 
         if (executeData.length == 0) {
             revert EmptyData();

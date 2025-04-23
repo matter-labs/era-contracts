@@ -10,6 +10,7 @@ import {HashedLogIsDefault} from "../../../common/L1ContractErrors.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @dev This contract is abstract and is inherited by the Mailbox and L2MessageVerification contracts.
+/// @dev All calls go through via the _proveL2LeafInclusion function, which is different on L1 and L2.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 abstract contract MessageVerification is IMessageVerification {
@@ -79,7 +80,7 @@ abstract contract MessageVerification is IMessageVerification {
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
         // equal to the length of other nodes preimages (which are `2 * 32`)
 
-        // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
+        // We can use `index` as a mask, since the `LocalLogsRoot` is on the left part of the tree.
 
         return
             _proveL2LeafInclusion({
