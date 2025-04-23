@@ -55,7 +55,6 @@ export const EC_PAIRING_ADDRESS = "0x0000000000000000000000000000000000000008";
 
 export const SERVICE_CALL_PSEUDO_CALLER = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
-
 export const BRIDGEHUB_L2_CANONICAL_TRANSACTION_ABI =
   "tuple(uint256 txType, uint256 from, uint256 to, uint256 gasLimit, uint256 gasPerPubdataByteLimit, uint256 maxFeePerGas, uint256 maxPriorityFeePerGas, uint256 paymaster, uint256 nonce, uint256 value, uint256[4] reserved, bytes data, bytes signature, uint256[] factoryDeps, bytes paymasterInput, bytes reservedDynamic)";
 export const BRIDGEHUB_L2_TRANSACTION_REQUEST_ABI =
