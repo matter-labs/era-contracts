@@ -372,9 +372,15 @@ abstract contract DeployUtils is Script {
         string memory contractName
     ) internal virtual returns (address implementation, address proxy);
 
-    function getCreationCode(string memory contractName, bool isZKBytecode) internal view virtual returns (bytes memory);
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual returns (bytes memory);
 
-    function getCreationCalldata(string memory contractName,  bool isZKBytecode) internal view virtual returns (bytes memory) {
+    function getCreationCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Bridgehub")) {

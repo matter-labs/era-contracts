@@ -711,7 +711,10 @@ contract DeployL1Script is Script, DeployUtils {
 
     ////////////////////////////// GetContract data  /////////////////////////////////
 
-    function getCreationCode(string memory contractName, bool isZKBytecode) internal view virtual override returns (bytes memory) {
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "ChainRegistrar")) {
                 return type(ChainRegistrar).creationCode;

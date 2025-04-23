@@ -98,7 +98,10 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     // add this to be excluded from coverage report
     function test() internal virtual override {}
 
-    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override returns (bytes memory) {
         revert("Not implemented");
     }
 

@@ -23,6 +23,10 @@ import {IEmergencyUpgrageBoard} from "./interfaces/IEmergencyUpgrageBoard.sol";
 import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
+import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -118,6 +122,14 @@ enum Action {
     Add,
     Replace,
     Remove
+}
+
+struct ChainInfoFromBridgehub {
+    address diamondProxy;
+    address admin;
+    address ctm;
+    address serverNotifier;
+    address l1AssetRouterProxy;
 }
 
 address constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
@@ -1210,6 +1222,27 @@ library Utils {
         vm.stopBroadcast();
     }
 
+    function executeCalls(address _governor, bytes32 _salt, uint256 _delay, Call[] memory calls) internal {
+        IGovernance.Operation memory operation = IGovernance.Operation({
+            calls: calls,
+            predecessor: bytes32(0),
+            salt: _salt
+        });
+
+        // Calculate total ETH required
+        uint256 totalValue;
+        for (uint256 i = 0; i < calls.length; i++) {
+            totalValue += calls[i].value;
+        }
+
+        vm.startBroadcast(IOwnable(_governor).owner());
+        IGovernance(_governor).scheduleTransparent(operation, _delay);
+        if (_delay == 0) {
+            IGovernance(_governor).execute{value: totalValue}(operation);
+        }
+        vm.stopBroadcast();
+    }
+
     function adminExecuteCalls(address _admin, address _accessControlRestriction, Call[] memory calls) internal {
         // If `_accessControlRestriction` is not provided, we assume that `_admin` is IOwnable
         address adminOwner = _accessControlRestriction == address(0)
@@ -1225,6 +1258,17 @@ library Utils {
         vm.startBroadcast(adminOwner);
         IChainAdmin(_admin).multicall{value: totalValue}(calls, true);
         vm.stopBroadcast();
+    }
+
+    function chainInfoFromBridgehubAndChainId(
+        address _bridgehub,
+        uint256 _chainId
+    ) internal view returns (ChainInfoFromBridgehub memory info) {
+        info.l1AssetRouterProxy = Bridgehub(_bridgehub).assetRouter();
+        info.diamondProxy = Bridgehub(_bridgehub).getZKChain(_chainId);
+        info.admin = IGetters(info.diamondProxy).getAdmin();
+        info.ctm = Bridgehub(_bridgehub).chainTypeManager(_chainId);
+        info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
     }
 
     function readRollupDAValidatorBytecode() internal view returns (bytes memory bytecode) {
