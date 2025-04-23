@@ -132,7 +132,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
         bytes fixedForceDeploymentsData;
-        bytes fixedForceDeploymentsDataGW;
         bytes diamondCutData;
         bytes upgradeCutData;
     }
@@ -142,7 +141,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         bool initialized;
         bool expectedL2AddressesInitialized;
         bool fixedForceDeploymentsDataGenerated;
-        bool fixedForceDeploymentsDataGeneratedGW;
         bool diamondCutPrepared;
         bool upgradeCutPrepared;
         bool factoryDepsPublished;
@@ -175,8 +173,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContracts();
         console.log("Ecosystem contracts are deployed!");
-        deployNewEcosystemContractsGW();
-        console.log("Ecosystem contracts are deployed for GW!");
         publishBytecodes();
         console.log("Bytecodes published!");
         generateUpgradeData();
@@ -207,26 +203,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
-    /// @notice Deploy everything that should be deployed for GW
-    function deployNewEcosystemContractsGW() public virtual {
-        require(upgradeConfig.initialized, "Not initialized");
-        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
-        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
-
-        gatewayConfig.gatewayStateTransition.executorFacet = deployGWContract("ExecutorFacet");
-        gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract("AdminFacet");
-        gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
-        gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract("GettersFacet");
-        gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract("DiamondInit");
-
-        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
-
-        upgradeConfig.ecosystemContractsDeployedGW = true;
-    }
-
-     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
-        contractAddress = Utils.deployThroughL1Deterministic(
+     function deployGWContract(string memory contractName) internal returns (Call[] memory calls, address contractAddress) {
+        (calls, contractAddress) = Utils.prepareThroughL1Deterministic(
             getCreationCode(contractName, true),
             getCreationCalldata(contractName, true),
             0,
@@ -248,8 +226,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         console.log("Generated fixed force deployments data");
         getDiamondCutData(addresses.stateTransition); //{isOnGateway: false});
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        // Diamond cut GW goes here
-        // gatewayConfig.facetCutsData = getDiamondCutData(gatewayConfig.gatewayStateTransition); Do we need it??
+        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition, false); //{isOnGateway: false});
         console.log("UpgradeCutGenerated");
@@ -362,12 +339,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         IL2ContractDeployer.ForceDeployment[]
             memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
         // add additional force deployments here
-        // if  (isGateway)
-        //     additionalForceDeployments[0] = newlyGeneratedData.fixedForceDeploymentsDataGW; // Why the format for force deployments is different
-        // else {
-        //     additionalForceDeployments[0] = newlyGeneratedData.fixedForceDeploymentsData;
-        // }
-
+ 
         // TODO: do we update *all* fixed force deployments?
 
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
@@ -475,6 +447,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
         );
 
+        gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
+            "$.gateway.gateway_state_transition.rollup_da_manager"
+        );
+
         gatewayConfig.baseToken = toml.readAddress("$.gateway.base_token");
 
         gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
@@ -522,18 +498,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     function generateFixedForceDeploymentsData() internal virtual {
         FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData(config.eraChainId);
-        FixedForceDeploymentsData memory forceDeploymentsDataGW = prepareFixedForceDeploymentsData(
-            gatewayConfig.chainId
-        );
 
         newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
         generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
-
-        // Generate same data as above but for GW chain
-        newlyGeneratedData.fixedForceDeploymentsDataGW = abi.encode(forceDeploymentsDataGW);
-        generatedData.forceDeploymentsDataGW = abi.encode(forceDeploymentsDataGW);
-        upgradeConfig.fixedForceDeploymentsDataGeneratedGW = true;
     }
 
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
@@ -737,17 +705,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             getExpectedL2Address("NoDAL2DAValidator")
         );
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
+        vm.serializeBytes("contracts_newConfig", "gateway_diamond_cut_data", gatewayConfig.facetCutsData);
 
         vm.serializeBytes(
             "contracts_newConfig",
             "force_deployments_data",
             newlyGeneratedData.fixedForceDeploymentsData
-        );
-
-        vm.serializeBytes(
-            "contracts_newConfig",
-            "force_deployments_data_gateway",
-            newlyGeneratedData.fixedForceDeploymentsDataGW
         );
 
         vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
@@ -817,6 +780,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
+        vm.serializeUint("root", "gateway_chain_id", gatewayConfig.chainId);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_newConfig", contractsConfig);
@@ -894,11 +858,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](6);
-        allCalls[0] = prepareCheckMigrationsPausedCalls();
-        allCalls[1] = prepareUpgradeProxiesCalls();
-        allCalls[2] = prepareNewChainCreationParamsCall();
-        allCalls[3] = provideSetNewVersionUpgradeCall();
-        allCalls[4] = prepareDAValidatorCall();
+        allCalls[0] = prepareUpgradeProxiesCalls();
+        allCalls[1] = prepareNewChainCreationParamsCall();
+        allCalls[2] = provideSetNewVersionUpgradeCall();
+        allCalls[3] = prepareDAValidatorCall();
+        allCalls[4] = deployNewEcosystemContractsGW();
         allCalls[5] = prepareGatewaySpecificStage1GovernanceCalls();
 
         calls = mergeCallsArray(allCalls);
@@ -971,6 +935,29 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         uint256 tokensRequired;
 
         calls = preparePauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
+    }
+
+    /// @notice Deploy everything that should be deployed for GW
+    function deployNewEcosystemContractsGW() public virtual returns (Call[] memory calls) {
+        require(upgradeConfig.initialized, "Not initialized");
+
+        Call[][] memory allCalls = new Call[][](9);
+
+        (allCalls[0], gatewayConfig.gatewayStateTransition.verifier) = deployGWContract("Verifier");
+        (allCalls[1], gatewayConfig.gatewayStateTransition.verifierFflonk) = deployGWContract("VerifierFflonk");
+        (allCalls[2], gatewayConfig.gatewayStateTransition.verifierPlonk) = deployGWContract("VerifierPlonk");
+
+        (allCalls[3], gatewayConfig.gatewayStateTransition.executorFacet) = deployGWContract("ExecutorFacet");
+        (allCalls[4], gatewayConfig.gatewayStateTransition.adminFacet) = deployGWContract("AdminFacet");
+        (allCalls[5], gatewayConfig.gatewayStateTransition.mailboxFacet) = deployGWContract("MailboxFacet");
+        (allCalls[6], gatewayConfig.gatewayStateTransition.gettersFacet) = deployGWContract("GettersFacet");
+        (allCalls[7], gatewayConfig.gatewayStateTransition.diamondInit) = deployGWContract("DiamondInit");
+
+        (allCalls[8], gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation) = deployGWContract("ChainTypeManager");
+
+        upgradeConfig.ecosystemContractsDeployedGW = true;
+
+        calls = mergeCallsArray(allCalls);
     }
 
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
@@ -1334,8 +1321,13 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             } else {
                 return abi.encode(gatewayConfig.gatewayStateTransition.verifierFflonk, gatewayConfig.gatewayStateTransition.verifierPlonk);
             }
-        // } else if (compareStrings(contractName, "AdminFacet")) { Check!!
-        //     return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
+        } else if (compareStrings(contractName, "AdminFacet")) {
+            if (!isZKBytecode) {
+                return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
+            } else {
+                return abi.encode(config.l1ChainId, gatewayConfig.gatewayStateTransition.rollupDAManager);
+            }
+            
         // } else if (compareStrings(contractName, "MailboxFacet")) {
         //     return abi.encode(config.eraChainId, config.l1ChainId);
         // } else if (compareStrings(contractName, "ValidatorTimelock")) {
