@@ -32,6 +32,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -94,7 +95,7 @@ contract GatewayCTMDeployerTest is Test {
             salt: keccak256("test-salt"),
             eraChainId: 1001,
             l1ChainId: 1,
-            rollupL2DAValidatorAddress: address(0x456),
+            rollupL2DACommitmentScheme: L2DACommitmentScheme.KECCAK,
             testnetVerifier: true,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),

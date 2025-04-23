@@ -28,6 +28,7 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ChainTypeManager} from "../ChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -45,8 +46,8 @@ struct GatewayCTMDeployerConfig {
     uint256 eraChainId;
     /// @notice Chain ID of the L1 chain.
     uint256 l1ChainId;
-    /// @notice Address of the Rollup L2 Data Availability Validator.
-    address rollupL2DAValidatorAddress;
+    /// @notice TODO
+    L2DACommitmentScheme rollupL2DACommitmentScheme;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
     /// @notice Array of function selectors for the Admin facet.
@@ -179,7 +180,7 @@ contract GatewayCTMDeployer {
             _salt: salt,
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
-            _rollupL2DAValidatorAddress: _config.rollupL2DAValidatorAddress,
+            _rollupl2DACommitmentScheme: _config.rollupL2DACommitmentScheme,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
             _deployedContracts: contracts
         });
@@ -207,7 +208,7 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _eraChainId Era Chain ID.
     /// @param _l1ChainId L1 Chain ID.
-    /// @param _rollupL2DAValidatorAddress The expected L2 DA Validator to be
+    /// @param _rollupl2DACommitmentScheme The expected L2 DA scheme to be
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
@@ -216,7 +217,7 @@ contract GatewayCTMDeployer {
         bytes32 _salt,
         uint256 _eraChainId,
         uint256 _l1ChainId,
-        address _rollupL2DAValidatorAddress,
+        L2DACommitmentScheme _rollupl2DACommitmentScheme,
         address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal {
@@ -228,7 +229,7 @@ contract GatewayCTMDeployer {
 
         RollupDAManager rollupDAManager = _deployRollupDAContracts(
             _salt,
-            _rollupL2DAValidatorAddress,
+            _rollupl2DACommitmentScheme,
             _aliasedGovernanceAddress,
             _deployedContracts
         );
@@ -298,14 +299,14 @@ contract GatewayCTMDeployer {
 
     /// @notice Deploys DA-related contracts.
     /// @param _salt Salt used for CREATE2 deployments.
-    /// @param _rollupL2DAValidatorAddress The expected L2 DA Validator to be
+    /// @param _rollupl2DACommitmentScheme The expected L2 DA commitment scheme to be
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployRollupDAContracts(
         bytes32 _salt,
-        address _rollupL2DAValidatorAddress,
+        L2DACommitmentScheme _rollupl2DACommitmentScheme,
         address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal returns (RollupDAManager rollupDAManager) {
@@ -314,7 +315,7 @@ contract GatewayCTMDeployer {
         ValidiumL1DAValidator validiumDAValidator = new ValidiumL1DAValidator{salt: _salt}();
 
         RelayedSLDAValidator relayedSLDAValidator = new RelayedSLDAValidator{salt: _salt}();
-        rollupDAManager.updateDAPair(address(relayedSLDAValidator), _rollupL2DAValidatorAddress, true);
+        rollupDAManager.updateDAPair(address(relayedSLDAValidator), _rollupl2DACommitmentScheme, true);
 
         // Note, that the governance still has to accept it.
         // It will happen in a separate voting after the deployment is done.
