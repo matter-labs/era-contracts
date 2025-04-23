@@ -66,6 +66,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+import {CheckMigrationsPauseState} from "contracts/upgrades/CheckMigrationsPauseState.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -96,6 +97,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         address upgradeTimer;
         address bytecodesSupplier;
         address l2WrappedBaseTokenStore;
+        address checkMigrationsPauseState;
     }
 
     struct ExpectedL2Addresses {
@@ -188,6 +190,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         instantiateCreate2Factory();
 
         deployVerifiers();
+        deployCheckMigrationsPauseState();
         // add custom upgrade deployment here instead of DefaultUpgrade if needed.
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
@@ -890,19 +893,23 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](5);
-        allCalls[0] = prepareUpgradeProxiesCalls();
-        allCalls[1] = prepareNewChainCreationParamsCall();
-        allCalls[2] = provideSetNewVersionUpgradeCall();
-        allCalls[3] = prepareDAValidatorCall();
-        allCalls[4] = prepareGatewaySpecificStage1GovernanceCalls();
+        Call[][] memory allCalls = new Call[][](6);
+        allCalls[0] = prepareCheckMigrationsPausedCalls();
+        allCalls[1] = prepareUpgradeProxiesCalls();
+        allCalls[2] = prepareNewChainCreationParamsCall();
+        allCalls[3] = provideSetNewVersionUpgradeCall();
+        allCalls[4] = prepareDAValidatorCall();
+        allCalls[5] = prepareGatewaySpecificStage1GovernanceCalls();
 
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        calls = prepareUnpauseGatewayMigrationsCall();
+        Call[][] memory allCalls = new Call[](3);
+        allCalls[0] = prepareUnpauseGatewayMigrationsCall();
+        allCalls[1] = prepareGatewaySpecificStage2GovernanceCalls();
+        allCalls[2] = prepareCheckMigrationsUnpausedCalls();
     }
 
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {
@@ -969,7 +976,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](2);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 l2GasLimit = newConfig.l2GasLimit;
@@ -980,12 +987,24 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         allCalls[1] = prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
 
-        allCalls[2] = prepareUnpauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
-
-        allCalls[3] = prepareCTMImplementationUpgrade(l2GasLimit, l1GasPrice);
+        allCalls[2] = prepareCTMImplementationUpgrade(l2GasLimit, l1GasPrice);
 
         // Approve required amount of base token
         // allCalls[0] = prepareApproveGatewayBaseTokenCall(addresses.bridges.l1AssetRouterProxy, tokensRequired);
+
+        calls = mergeCallsArray(allCalls);
+    }
+    
+    function prepareGatewaySpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
+        if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
+
+        Call[][] memory allCalls = new Call[][](1);
+
+        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
+        uint256 l2GasLimit = newConfig.l2GasLimit;
+        uint256 l1GasPrice = newConfig.l1GasPrice;
+
+        allCalls[0] = prepareUnpauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1147,6 +1166,32 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         });
     }
 
+    /// @notice Checks to make sure that migrations are paused
+    function prepareCheckMigrationsPausedCalls() public virtual returns (Call[] memory calls) {
+        require(upgradeAddresses.checkMigrationsPauseState != address(0), "checkMigrationsPauseState is zero");
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: upgradeAddresses.checkMigrationsPauseState,
+            // Double checking migrations are paused
+            data: abi.encodeCall(CheckMigrationsPauseState.requireMigrationsPaused, ()),
+            value: 0
+        });
+    }
+
+    /// @notice Checks to make sure that migrations are paused
+    function prepareCheckMigrationsUnpausedCalls() public virtual returns (Call[] memory calls) {
+        require(upgradeAddresses.checkMigrationsPauseState != address(0), "checkMigrationsPauseState is zero");
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: upgradeAddresses.checkMigrationsPauseState,
+            // Double checking migrations are unpaused
+            data: abi.encodeCall(CheckMigrationsPauseState.requireMigrationsUnpaused, ()),
+            value: 0
+        });
+    }
+
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](5);
@@ -1296,9 +1341,15 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         // } else if (compareStrings(contractName, "ValidatorTimelock")) {
         //     uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         //     return abi.encode(config.deployerAddress, executionDelay);
+        } else if (compareStrings(contractName, "CheckMigrationsPauseState")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else {
             return super.getCreationCalldata(contractName, isZKBytecode);
         }
+    }
+
+    function deployCheckMigrationsPauseState() internal {
+        upgradeAddresses.checkMigrationsPauseState = deploySimpleContract("CheckMigrationsPauseState");
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////
