@@ -396,7 +396,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // Set the settlement to 0 - as this is the current settlement chain.
         s.settlementLayer = address(0);
 
-        _setDAValidatorPair(address(0), L2DACommitmentScheme.NONE);
+        _setDAValidatorPair(address(0), L2DACommitmentScheme.EMPTY);
 
         emit MigrationComplete();
     }

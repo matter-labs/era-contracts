@@ -314,7 +314,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         }
 
         bytes32 l2DAValidatorOutputhash = bytes32(0);
-        if (_l2DACommitmentScheme != L2DACommitmentScheme.NONE) {
+        if (_l2DACommitmentScheme != L2DACommitmentScheme.EMPTY) {
             // TODO validation address logic
             address _l2DAValidatorAddress = address(0); // TODO
             bytes memory returnData = EfficientCall.call({

@@ -196,6 +196,6 @@ address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFfff
 
 // TODO
 enum L2DACommitmentScheme {
-    NONE,
+    EMPTY,
     KECCAK
 }

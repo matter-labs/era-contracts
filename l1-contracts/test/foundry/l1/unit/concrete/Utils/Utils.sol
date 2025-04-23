@@ -116,7 +116,7 @@ library Utils {
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
-            bytes32(uint256(L2DACommitmentScheme.NONE))
+            bytes32(uint256(L2DACommitmentScheme.EMPTY))
         );
 
         return systemLogs;
