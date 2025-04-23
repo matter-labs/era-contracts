@@ -120,7 +120,7 @@ contract ExecutingTest is ExecutorTest {
             commitBatchInfoArray
         );
         executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
-        /// These constansts were the hashes that are needed for the test to run. PriorityTree hashing validity is checked separately.
+        /// These constants were the hashes that are needed for the test to run. PriorityTree hashing validity is checked separately.
         executor.setPriorityTreeHistoricalRoot(0x682709a1fd539b1a69dfd64ade8d17231d5498c372fb8a6325ec545137f8a35a);
         executor.setPriorityTreeHistoricalRoot(0xa09200c9b365ebf37db651d6096b20c46ea62ff692839090fb0494a53ee80b28);
         executor.setPriorityTreeHistoricalRoot(0x500f38f9d51b79071e5020b1c196f90fb3fc2fd089eb9358f205b523953d2985);
