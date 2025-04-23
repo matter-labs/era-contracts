@@ -18,6 +18,7 @@ contract ServerNotifierTest is Test {
 
     event MigrateToGateway(uint256 indexed chainId);
     event MigrateFromGateway(uint256 indexed chainId);
+    event UpgradeTimestampUpdated(uint256 indexed chainId, uint256 indexed protocolVersion, uint256 upgradeTimestamp);
 
     function setUp() public {
         chainId = 1;
@@ -28,7 +29,7 @@ contract ServerNotifierTest is Test {
 
         chainTypeManager.setChainAdmin(chainId, chainAdmin);
 
-        serverNotifier = new ServerNotifier(false);
+        serverNotifier = new ServerNotifier();
         serverNotifier.initialize(owner);
 
         vm.startPrank(owner);
@@ -42,7 +43,11 @@ contract ServerNotifierTest is Test {
         chainTypeManager.setProtocolVersionDeadline(protocolVersion, deadline);
 
         vm.startPrank(chainAdmin);
+        vm.expectEmit(true, true, true, true);
+        emit UpgradeTimestampUpdated(chainId, protocolVersion, deadline);
         serverNotifier.setUpgradeTimestamp(chainId, protocolVersion, deadline);
+        uint256 stored = serverNotifier.protocolVersionToUpgradeTimestamp(chainId, protocolVersion);
+        assertEq(stored, deadline);
     }
 
     function test_setUpgradeTimestampInvalidProtocolVersionReverts() public {

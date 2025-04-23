@@ -260,7 +260,7 @@ contract GatewayCTMDeployer {
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployServerNotifier(bytes32 _salt, DeployedContracts memory _deployedContracts) internal {
-        address serverNotifierImplementation = address(new ServerNotifier{salt: _salt}(true));
+        address serverNotifierImplementation = address(new ServerNotifier{salt: _salt}());
         _deployedContracts.stateTransition.serverNotifierImplementation = serverNotifierImplementation;
         _deployedContracts.stateTransition.serverNotifierProxy = address(
             new TransparentUpgradeableProxy{salt: _salt}(
