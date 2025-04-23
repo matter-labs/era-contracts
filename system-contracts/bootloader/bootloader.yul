@@ -3036,36 +3036,43 @@ object "Bootloader" {
 
                     debugLog("Next message root updated", add(i, 1))
 
-                    mstore(0, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}})
-                    mstore(4, chainId)
-                    mstore(36, blockNumber)
-                    /// needed for abi-encoding, specifies the array start slot
-                    mstore(68, 96)
-                    mstore(100, sidesLength)
-                    let sidesLoadingOffset := 132
-                    let sidesOffset := add(messageRootStartSlot, MESSAGE_ROOT_SIDES_OFFSET_START())
-                    for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        mstore(sidesLoadingOffset, mload(sidesOffset))
-                        sidesOffset := add(sidesOffset, 32)
-                        sidesLoadingOffset := add(sidesLoadingOffset, 32)
-                    }
+                    callL2MessageRootStorage(chainId, blockNumber, sidesLength, messageRootStartSlot)
 
-                    let success := call(
-                        gas(),
-                        L2_MESSAGE_ROOT_STORAGE(),
-                        0,
-                        0,
-                        add(132, mul(sidesLength, 32)),
-                        0,
-                        0
-                    )
 
-                    if iszero(success) {
-                        debugLog("Failed to set messageRoot: ", 1)
-                        revertWithReason(FAILED_TO_SET_MESSAGE_ROOT(), 1)
-                    }
-                    debugLog("MsgRoot set successfully", 2)
                 }
+            }
+
+            function callL2MessageRootStorage(chainId, blockNumber, sidesLength, messageRootStartSlot) {
+                mstore(0, {{RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR}})
+                mstore(4, chainId)
+                mstore(36, blockNumber)
+                /// needed for abi-encoding, specifies the array start slot
+                mstore(68, 96)
+                mstore(100, sidesLength)
+                let sidesLoadingOffset := 132
+                let sidesOffset := add(messageRootStartSlot, MESSAGE_ROOT_SIDES_OFFSET_START())
+                for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
+                    mstore(sidesLoadingOffset, mload(sidesOffset))
+                    sidesOffset := add(sidesOffset, 32)
+                    sidesLoadingOffset := add(sidesLoadingOffset, 32)
+                }
+
+                let success := call(
+                    gas(),
+                    L2_MESSAGE_ROOT_STORAGE(),
+                    0,
+                    0,
+                    add(132, mul(sidesLength, 32)),
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("Failed to set messageRoot: ", 1)
+                    revertWithReason(FAILED_TO_SET_MESSAGE_ROOT(), 1)
+                }
+                debugLog("MsgRoot set successfully", 2)
+                
             }
 
             /// @notice Sends the rolling hash of the dependency message roots to the L1.
