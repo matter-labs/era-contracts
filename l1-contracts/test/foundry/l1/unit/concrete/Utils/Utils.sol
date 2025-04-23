@@ -216,7 +216,10 @@ library Utils {
         return (
             _newBatchesData[0].batchNumber,
             _newBatchesData[_newBatchesData.length - 1].batchNumber,
-            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), abi.encode(_lastCommittedBatchData, _newBatchesData))
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+                abi.encode(_lastCommittedBatchData, _newBatchesData)
+            )
         );
     }
 
@@ -228,7 +231,10 @@ library Utils {
         return (
             _committedBatches[0].batchNumber,
             _committedBatches[_committedBatches.length - 1].batchNumber,
-            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), abi.encode(_prevBatch, _committedBatches, _proof))
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+                abi.encode(_prevBatch, _committedBatches, _proof)
+            )
         );
     }
 
@@ -240,7 +246,10 @@ library Utils {
         return (
             _batchesData[0].batchNumber,
             _batchesData[_batchesData.length - 1].batchNumber,
-            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), abi.encode(_batchesData, _priorityOpsData, dependencyRoots))
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+                abi.encode(_batchesData, _priorityOpsData, dependencyRoots)
+            )
         );
     }
 
