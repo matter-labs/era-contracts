@@ -3042,10 +3042,12 @@ object "Bootloader" {
                     /// needed for abi-encoding, specifies the array start slot
                     mstore(68, 96)
                     mstore(100, sidesLength)
+                    let sidesLoadingOffset := 132
                     let sidesOffset := add(messageRootStartSlot, MESSAGE_ROOT_SIDES_OFFSET_START())
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        mstore(add(132, mul(j, 32)), mload(sidesOffset))
+                        mstore(sidesLoadingOffset, mload(sidesOffset))
                         sidesOffset := add(sidesOffset, 32)
+                        sidesLoadingOffset := add(sidesLoadingOffset, 32)
                     }
 
                     let success := call(
@@ -3093,12 +3095,12 @@ object "Bootloader" {
                     let msgRootOffset := 64 
                     mstore(add(msgRootOffset, 4), chainId)
                     mstore(add(msgRootOffset, 36), blockNumber)
+                    let sidesLoadingOffset := add(msgRootOffset, 68)
                     let sidesOffset := add(messageRootStartSlot, MESSAGE_ROOT_SIDES_OFFSET_START())
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        mstore(add(add(msgRootOffset, 68), mul(j, 32)), mload(sidesOffset))
-                        debugLog("Sending side", sidesOffset)
-                        debugLog("Sending side", add(add(messageRootStartSlot, 32), mul(add(3, j), 32)))
+                        mstore(sidesLoadingOffset, mload(sidesOffset))
                         sidesOffset := add(sidesOffset, 32)
+                        sidesLoadingOffset := add(sidesLoadingOffset, 32)
                     }
 
                     // for single messageRoots that are not really sides, we send them to L1 here.
