@@ -13,7 +13,7 @@ error InteropRootAlreadyExists();
  * @custom:security-contact security@matterlabs.dev
  * @notice InteropRootStorage contract responsible for storing the message roots of other chains on the L2.
  */
-contract L2MessageRootStorage is SystemContractBase {
+contract L2InteropRootStorage is SystemContractBase {
     /// @notice Mapping of chain ID to block or batch number to message root.
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => bytes32 msgRoot)) public msgRoots;
 

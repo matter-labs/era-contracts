@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
-import {IL2MessageRootStorage} from "../interfaces/IL2MessageRootStorage.sol";
+import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 
 /// @dev the offset for the system contracts
@@ -70,7 +70,7 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
 
 /// @dev The address of the L2 message root storage system contract
-IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
+IL2InteropRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2InteropRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
 
 /// @dev The address of the L2 message verification system contract
 IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));

@@ -13,6 +13,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -215,7 +216,7 @@ library Utils {
         return (
             _newBatchesData[0].batchNumber,
             _newBatchesData[_newBatchesData.length - 1].batchNumber,
-            bytes.concat(bytes1(0x00), abi.encode(_lastCommittedBatchData, _newBatchesData))
+            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), abi.encode(_lastCommittedBatchData, _newBatchesData))
         );
     }
 
@@ -227,7 +228,7 @@ library Utils {
         return (
             _committedBatches[0].batchNumber,
             _committedBatches[_committedBatches.length - 1].batchNumber,
-            bytes.concat(bytes1(0x00), abi.encode(_prevBatch, _committedBatches, _proof))
+            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), abi.encode(_prevBatch, _committedBatches, _proof))
         );
     }
 
@@ -239,7 +240,7 @@ library Utils {
         return (
             _batchesData[0].batchNumber,
             _batchesData[_batchesData.length - 1].batchNumber,
-            bytes.concat(bytes1(0x00), abi.encode(_batchesData, _priorityOpsData, dependencyRoots))
+            bytes.concat(bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION), abi.encode(_batchesData, _priorityOpsData, dependencyRoots))
         );
     }
 
