@@ -21,7 +21,7 @@ import {ValidiumL1DAValidator} from "contracts/state-transition/data-availabilit
 
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
-import {L2VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
+import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
