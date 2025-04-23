@@ -848,6 +848,14 @@
     "evmDeployedBytecodeHash": "0x005a0744078882ff448fbe73f13bacbc68af88402d43012e5b86876ea603db18"
   },
   {
+    "contractName": "l1-contracts/CheckMigrationsPauseState",
+    "zkBytecodeHash": "0x01000057de28d1b4723bd61fc6e81dfb34bf146eb94f40c99a0ba783b1df878b",
+    "zkBytecodePath": "/l1-contracts/zkout/CheckMigrationsPauseState.sol/CheckMigrationsPauseState.json",
+    "evmBytecodeHash": "0x22f9ff63685919f892997785d125c624871ec6928c1950b0955c566f8c769ff7",
+    "evmBytecodePath": "/l1-contracts/out/CheckMigrationsPauseState.sol/CheckMigrationsPauseState.json",
+    "evmDeployedBytecodeHash": "0x63d090afc2b82cdd2391def1abb1c8d06a7985269d75071321fd8ae3a6d01ee5"
+  },
+  {
     "contractName": "l1-contracts/CountersUpgradeable",
     "zkBytecodeHash": "0x010000076df32a9bc96f42e9f3855c4229b8786a032635908de44c9ceb7bbe91",
     "zkBytecodePath": "/l1-contracts/zkout/CountersUpgradeable.sol/CountersUpgradeable.json",
@@ -985,11 +993,11 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x010003c110ebc4cf5572ae2c52982fb14feecbd72fd421a0b3c208a9c5baa51d",
+    "zkBytecodeHash": "0x010003c151bdf3fd630d6223a4ab32c7714b3a0bd11b154f814a8e2c1171527e",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmBytecodeHash": "0x4228e6a4c6ceb51e8fc7de43555e94ad965e2d81b9a5304eaee00ad20e339033",
+    "evmBytecodeHash": "0x12132c06c62892699b6c5a9cce82923a359fecd645f17e42d3bc9397537b5586",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmDeployedBytecodeHash": "0x7a605035a883cbecefe739ff05ee9a4eb4e0c4766ac4ce061096e12281309490"
+    "evmDeployedBytecodeHash": "0x7f2b12cf68c1058cf5bf6d38b9b9d41a15eacc300b540bbff4cd2c3592c49f94"
   },
   {
     "contractName": "l1-contracts/GatewayTransactionFilterer",
