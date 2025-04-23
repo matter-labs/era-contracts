@@ -66,7 +66,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-import {CheckMigrationsPauseState} from "contracts/upgrades/CheckMigrationsPauseState.sol";
+import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
@@ -97,7 +97,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         address upgradeTimer;
         address bytecodesSupplier;
         address l2WrappedBaseTokenStore;
-        address checkMigrationsPauseState;
+        address upgradeStageValidator;
     }
 
     struct ExpectedL2Addresses {
@@ -188,7 +188,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         instantiateCreate2Factory();
 
         deployVerifiers();
-        deployCheckMigrationsPauseState();
+        deployUpgradeStageValidator();
         // add custom upgrade deployment here instead of DefaultUpgrade if needed.
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
@@ -801,6 +801,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
         vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", upgradeAddresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
+        vm.serializeAddress("deployed_addresses", "check_migration_pause_state", upgradeAddresses.upgradeStageValidator);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
 
         string memory deployedAddresses = vm.serializeAddress(
@@ -901,10 +902,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
-        allCalls[0] = prepareUnpauseGatewayMigrationsCall();
-        allCalls[1] = prepareGatewaySpecificStage2GovernanceCalls();
-        allCalls[2] = prepareCheckMigrationsUnpausedCalls();
+        Call[][] memory allCalls = new Call[][](4);
+        allCalls[0] = prepareCheckUpgradeHasHappenedCalls();
+        allCalls[1] = prepareUnpauseGatewayMigrationsCall();
+        allCalls[2] = prepareGatewaySpecificStage2GovernanceCalls();
+        allCalls[3] = prepareCheckMigrationsUnpausedCalls();
     }
 
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {
@@ -1183,26 +1185,39 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Checks to make sure that migrations are paused
     function prepareCheckMigrationsPausedCalls() public virtual returns (Call[] memory calls) {
-        require(upgradeAddresses.checkMigrationsPauseState != address(0), "checkMigrationsPauseState is zero");
+        require(upgradeAddresses.upgradeStageValidator != address(0), "upgradeStageValidator is zero");
         calls = new Call[](1);
 
         calls[0] = Call({
-            target: upgradeAddresses.checkMigrationsPauseState,
+            target: upgradeAddresses.upgradeStageValidator,
             // Double checking migrations are paused
-            data: abi.encodeCall(CheckMigrationsPauseState.requireMigrationsPaused, ()),
+            data: abi.encodeCall(UpgradeStageValidator.checkMigrationsPaused, ()),
             value: 0
         });
     }
 
     /// @notice Checks to make sure that migrations are paused
     function prepareCheckMigrationsUnpausedCalls() public virtual returns (Call[] memory calls) {
-        require(upgradeAddresses.checkMigrationsPauseState != address(0), "checkMigrationsPauseState is zero");
+        require(upgradeAddresses.upgradeStageValidator != address(0), "upgradeStageValidator is zero");
         calls = new Call[](1);
 
         calls[0] = Call({
-            target: upgradeAddresses.checkMigrationsPauseState,
+            target: upgradeAddresses.upgradeStageValidator,
             // Double checking migrations are unpaused
-            data: abi.encodeCall(CheckMigrationsPauseState.requireMigrationsUnpaused, ()),
+            data: abi.encodeCall(UpgradeStageValidator.checkMigrationsUnpaused, ()),
+            value: 0
+        });
+    }
+
+    /// @notice Checks to make sure that the upgrade has happened.
+    function prepareCheckUpgradeHasHappenedCalls() public virtual returns (Call[] memory calls) {
+        require(upgradeAddresses.upgradeStageValidator != address(0), "upgradeStageValidator is zero");
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: upgradeAddresses.upgradeStageValidator,
+            // Double checking migrations are unpaused
+            data: abi.encodeCall(UpgradeStageValidator.checkChainUpgraded, ()),
             value: 0
         });
     }
@@ -1365,21 +1380,21 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             } else {
                 return abi.encode(config.l1ChainId, gatewayConfig.gatewayStateTransition.rollupDAManager);
             }
-
-            // } else if (compareStrings(contractName, "MailboxFacet")) {
-            //     return abi.encode(config.eraChainId, config.l1ChainId);
-            // } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            //     uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-            //     return abi.encode(config.deployerAddress, executionDelay);
-        } else if (compareStrings(contractName, "CheckMigrationsPauseState")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy);
+            
+        // } else if (compareStrings(contractName, "MailboxFacet")) {
+        //     return abi.encode(config.eraChainId, config.l1ChainId);
+        // } else if (compareStrings(contractName, "ValidatorTimelock")) {
+        //     uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
+        //     return abi.encode(config.deployerAddress, executionDelay);
+        } else if (compareStrings(contractName, "UpgradeStageValidator")) {
+            return abi.encode(addresses.stateTransition.chainTypeManagerProxy, config.contracts.latestProtocolVersion);
         } else {
             return super.getCreationCalldata(contractName, isZKBytecode);
         }
     }
 
-    function deployCheckMigrationsPauseState() internal {
-        upgradeAddresses.checkMigrationsPauseState = deploySimpleContract("CheckMigrationsPauseState");
+    function deployUpgradeStageValidator() internal {
+        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator");
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////

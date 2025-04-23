@@ -83,7 +83,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {CheckMigrationsPauseState} from "contracts/upgrades/CheckMigrationsPauseState.sol";
+import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -796,8 +796,8 @@ contract DeployL1Script is Script, DeployUtils {
                 return type(DiamondInit).creationCode;
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return type(ServerNotifier).creationCode;
-            } else if (compareStrings(contractName, "CheckMigrationsPauseState")) {
-                return type(CheckMigrationsPauseState).creationCode;
+            } else if (compareStrings(contractName, "UpgradeStageValidator")) {
+                return type(UpgradeStageValidator).creationCode;
             } else {
                 revert(string.concat("Contract ", contractName, " creation code not set"));
             }
