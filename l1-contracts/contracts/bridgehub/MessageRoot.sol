@@ -35,7 +35,7 @@ contract MessageRoot is IMessageRoot, Initializable {
 
     event Preimage(bytes32 one, bytes32 two);
 
-    event NewMessageRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
+    event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
@@ -124,7 +124,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         bytes32 sharedTreeRoot = sharedTree.root();
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = sharedTreeRoot;
-        emit NewMessageRoot(block.chainid, block.number, 0, _sides);
+        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
@@ -153,7 +153,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         bytes32 newRoot = sharedTree.root();
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = newRoot;
-        emit NewMessageRoot(block.chainid, block.number, 0, _sides);
+        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
         historicalRoot[block.number] = newRoot;
     }
 

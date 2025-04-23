@@ -105,7 +105,7 @@ const params = {
     "appendTransactionToCurrentL2Block"
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
-  RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR: getPaddedSelector("L2MessageRootStorage", "addMessageRoot"),
+  RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2MessageRootStorage", "addMessageRoot"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
