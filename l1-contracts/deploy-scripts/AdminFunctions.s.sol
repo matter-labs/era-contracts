@@ -31,7 +31,7 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
-contract AcceptAdmin is Script {
+contract AdminFunctions is Script {
     using stdToml for string;
 
     struct Config {
@@ -43,7 +43,7 @@ contract AcceptAdmin is Script {
 
     function initConfig() public {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/script-config/config-accept-admin.toml");
+        string memory path = string.concat(root, "/script-config/config-admin-functionsons.toml");
         string memory toml = vm.readFile(path);
         config.admin = toml.readAddress("$.target_addr");
         config.governor = toml.readAddress("$.governor");
@@ -715,7 +715,7 @@ contract AcceptAdmin is Script {
     function saveOutput(Output memory output) internal {
         vm.serializeAddress("root", "admin_address", output.admin);
         string memory toml = vm.serializeBytes("root", "encoded_data", output.encodedData);
-        string memory path = string.concat(vm.projectRoot(), "/script-out/output-accept-admin.toml");
+        string memory path = string.concat(vm.projectRoot(), "/script-out/output-admin-functionsons.toml");
         vm.writeToml(toml, path);
     }
 }

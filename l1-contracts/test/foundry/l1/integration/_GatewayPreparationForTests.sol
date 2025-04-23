@@ -1,8 +1,6 @@
 import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-// import {GatewayPreparation} from "deploy-scripts/GatewayPreparation.s.sol";
-
 import {GatewayGovernanceUtils} from "deploy-scripts/GatewayGovernanceUtils.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
@@ -10,7 +8,7 @@ import {DeployGatewayTransactionFilterer} from "deploy-scripts/DeployGatewayTran
 
 import {Utils, ChainInfoFromBridgehub} from "deploy-scripts/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {AcceptAdmin} from "deploy-scripts/AcceptAdmin.s.sol";
+import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.solsol";
 import {Call} from "contracts/governance/Common.sol";
 
 contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
@@ -71,7 +69,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
             bytes32(0)
         );
 
-        AcceptAdmin adminScript = new AcceptAdmin();
+        AdminFunctions adminScript = new AdminFunctions();
         adminScript.setTransactionFilterer(
             _gatewayGovernanceConfig.bridgehubProxy,
             _gatewayGovernanceConfig.gatewayChainId,
@@ -94,7 +92,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
     }
 
     function migrateChainToGateway(uint256 migratingChainId) public {
-        AcceptAdmin adminScript = new AcceptAdmin();
+        AdminFunctions adminScript = new AdminFunctions();
         adminScript.migrateChainToGateway(
             _gatewayGovernanceConfig.bridgehubProxy,
             _getL1GasPrice(),
