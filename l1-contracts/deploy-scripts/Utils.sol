@@ -413,39 +413,6 @@ library Utils {
         return contractAddress;
     }
 
-    /**
-     * @dev Deploy l2 contracts through l1, while using built-in L2 Create2Factory contract.
-     */
-    function prepareThroughL1Deterministic(
-        bytes memory bytecode,
-        bytes memory constructorargs,
-        bytes32 create2salt,
-        uint256 l2GasLimit,
-        bytes[] memory factoryDeps,
-        uint256 chainId,
-        address bridgehubAddress,
-        address l1SharedBridgeProxy
-    ) internal returns (Call[] memory calls, address) {
-        (bytes32 bytecodeHash, bytes memory deployData) = getDeploymentCalldata(create2salt, bytecode, constructorargs);
-
-        address contractAddress = getL2AddressViaCreate2Factory(create2salt, bytecodeHash, constructorargs);
-
-        bytes[] memory _factoryDeps = appendArray(factoryDeps, bytecode);
-
-        calls = prepareGovernanceL1L2DirectTransaction({
-            l1GasPrice: bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
-            l2Calldata: deployData,
-            l2GasLimit: l2GasLimit,
-            factoryDeps: _factoryDeps,
-            dstAddress: L2_CREATE2_FACTORY_ADDRESS,
-            chainId: chainId,
-            bridgehubAddress: bridgehubAddress,
-            l1SharedBridgeProxy: l1SharedBridgeProxy,
-            refundRecipient: msg.sender
-        });
-        return (calls, contractAddress);
-    }
-
     function prepareL1L2Transaction(
         PrepareL1L2TransactionParams memory params
     )

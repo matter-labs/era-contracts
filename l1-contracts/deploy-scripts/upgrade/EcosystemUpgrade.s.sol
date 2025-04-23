@@ -173,6 +173,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContracts();
         console.log("Ecosystem contracts are deployed!");
+        deployNewEcosystemContractsGW();
+        console.log("Ecosystem contracts for GW are deployed!");
         publishBytecodes();
         console.log("Bytecodes published!");
         generateUpgradeData();
@@ -203,8 +205,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
-     function deployGWContract(string memory contractName) internal returns (Call[] memory calls, address contractAddress) {
-        (calls, contractAddress) = Utils.prepareThroughL1Deterministic(
+     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
+        contractAddress = Utils.deployThroughL1Deterministic(
             getCreationCode(contractName, true),
             getCreationCalldata(contractName, true),
             0,
@@ -857,20 +859,18 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](6);
+        Call[][] memory allCalls = new Call[][](5);
         allCalls[0] = prepareUpgradeProxiesCalls();
         allCalls[1] = prepareNewChainCreationParamsCall();
         allCalls[2] = provideSetNewVersionUpgradeCall();
         allCalls[3] = prepareDAValidatorCall();
-        allCalls[4] = deployNewEcosystemContractsGW();
-        allCalls[5] = prepareGatewaySpecificStage1GovernanceCalls();
-
+        allCalls[4] = prepareGatewaySpecificStage1GovernanceCalls();
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[](3);
+        Call[][] memory allCalls = new Call[][](3);
         allCalls[0] = prepareUnpauseGatewayMigrationsCall();
         allCalls[1] = prepareGatewaySpecificStage2GovernanceCalls();
         allCalls[2] = prepareCheckMigrationsUnpausedCalls();
@@ -938,32 +938,28 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     /// @notice Deploy everything that should be deployed for GW
-    function deployNewEcosystemContractsGW() public virtual returns (Call[] memory calls) {
+    function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
-        Call[][] memory allCalls = new Call[][](9);
+        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
+        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
+        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
 
-        (allCalls[0], gatewayConfig.gatewayStateTransition.verifier) = deployGWContract("Verifier");
-        (allCalls[1], gatewayConfig.gatewayStateTransition.verifierFflonk) = deployGWContract("VerifierFflonk");
-        (allCalls[2], gatewayConfig.gatewayStateTransition.verifierPlonk) = deployGWContract("VerifierPlonk");
+        gatewayConfig.gatewayStateTransition.executorFacet = deployGWContract("ExecutorFacet");
+        gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract("AdminFacet");
+        gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
+        gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract("GettersFacet");
+        gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract("DiamondInit");
 
-        (allCalls[3], gatewayConfig.gatewayStateTransition.executorFacet) = deployGWContract("ExecutorFacet");
-        (allCalls[4], gatewayConfig.gatewayStateTransition.adminFacet) = deployGWContract("AdminFacet");
-        (allCalls[5], gatewayConfig.gatewayStateTransition.mailboxFacet) = deployGWContract("MailboxFacet");
-        (allCalls[6], gatewayConfig.gatewayStateTransition.gettersFacet) = deployGWContract("GettersFacet");
-        (allCalls[7], gatewayConfig.gatewayStateTransition.diamondInit) = deployGWContract("DiamondInit");
-
-        (allCalls[8], gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation) = deployGWContract("ChainTypeManager");
+        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
 
         upgradeConfig.ecosystemContractsDeployedGW = true;
-
-        calls = mergeCallsArray(allCalls);
     }
 
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        Call[][] memory allCalls = new Call[][](2);
+        Call[][] memory allCalls = new Call[][](3);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 l2GasLimit = newConfig.l2GasLimit;
