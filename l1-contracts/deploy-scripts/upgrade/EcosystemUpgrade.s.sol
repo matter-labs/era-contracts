@@ -1381,12 +1381,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             } else {
                 return abi.encode(config.l1ChainId, gatewayConfig.gatewayStateTransition.rollupDAManager);
             }
-            
-        // } else if (compareStrings(contractName, "MailboxFacet")) {
-        //     return abi.encode(config.eraChainId, config.l1ChainId);
-        // } else if (compareStrings(contractName, "ValidatorTimelock")) {
-        //     uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-        //     return abi.encode(config.deployerAddress, executionDelay);
+
+            // } else if (compareStrings(contractName, "MailboxFacet")) {
+            //     return abi.encode(config.eraChainId, config.l1ChainId);
+            // } else if (compareStrings(contractName, "ValidatorTimelock")) {
+            //     uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
+            //     return abi.encode(config.deployerAddress, executionDelay);
         } else if (compareStrings(contractName, "UpgradeStageValidator")) {
             return abi.encode(addresses.stateTransition.chainTypeManagerProxy, config.contracts.latestProtocolVersion);
         } else {
