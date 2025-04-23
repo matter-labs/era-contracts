@@ -12,3 +12,6 @@
 [submodule "lib/forge-std"]
 	path = lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "lib/@matterlabs/zksync-contracts"]
+	path = lib/@matterlabs/zksync-contracts
+	url = https://github.com/matter-labs/v2-testnet-contracts

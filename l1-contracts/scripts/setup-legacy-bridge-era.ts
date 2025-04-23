@@ -94,6 +94,7 @@ async function main() {
       );
 
       const l2SharedBridgeAddress = getAddressFromEnv("CONTRACTS_L2_SHARED_BRIDGE_ADDR");
+      const L2NativeTokenVaultAddress = getAddressFromEnv("CONTRACTS_L2_NATIVE_TOKEN_VAULT_PROXY_ADDR");
       const l2TokenBytecodeHash = hashL2Bytecode(beaconProxy.bytecode);
       const l2Provider = new Provider(process.env.API_WEB3_JSON_RPC_HTTP_URL);
       // For the server to start up.
@@ -104,12 +105,12 @@ async function main() {
       // Wait a bit more after the server is ready to ensure that all of its components are ready.
       await sleep(2);
 
-      const l2SharedBridge = new ethers.Contract(
-        l2SharedBridgeAddress,
+      const L2NativeTokenVault = new ethers.Contract(
+        L2NativeTokenVaultAddress,
         ["function l2TokenBeacon() view returns (address)"],
         l2Provider
       );
-      const l2TokenBeacon = await l2SharedBridge.l2TokenBeacon();
+      const l2TokenBeacon = await L2NativeTokenVault.l2TokenBeacon();
 
       console.log("Retrieved storage values for TestERC20Bridge:");
       console.log("l2SharedBridgeAddress:", l2SharedBridgeAddress);
@@ -117,7 +118,8 @@ async function main() {
       console.log("l2TokenBytecodeHash:", ethers.utils.hexlify(l2TokenBytecodeHash));
 
       // set storage values
-      const tx = await dummyBridge.setValues(l2SharedBridgeAddress, l2TokenBeacon, l2TokenBytecodeHash);
+      // FIXME(EVM-716): we provide the `L2NativeTokenVaultAddress` as the "shared bridge value" as it is only used for calculating of L2 token addresses.
+      const tx = await dummyBridge.setValues(L2NativeTokenVaultAddress, l2TokenBeacon, l2TokenBytecodeHash);
       await tx.wait();
 
       console.log("Set storage values for TestERC20Bridge");

@@ -1,6 +1,7 @@
 era_chain_id = 9
 owner_address = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8"
 testnet_verifier = true
+support_l2_legacy_shared_bridge_test = false
 
 [contracts]
 governance_security_council_address = "0x0000000000000000000000000000000000000000"
@@ -25,6 +26,7 @@ diamond_init_priority_tx_max_pubdata = 99000
 diamond_init_minimal_l2_gas_price = 250000000
 bootloader_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 default_aa_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+force_deployments_data = "0x"
 
 [tokens]
 token_weth_address = "0x0000000000000000000000000000000000000000"

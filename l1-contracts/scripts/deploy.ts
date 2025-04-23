@@ -5,10 +5,11 @@ import { Command } from "commander";
 import { Wallet, ethers } from "ethers";
 import { Deployer } from "../src.ts/deploy";
 import { formatUnits, parseUnits } from "ethers/lib/utils";
-import { web3Provider, GAS_MULTIPLIER } from "./utils";
+import { web3Provider, GAS_MULTIPLIER, web3Url } from "./utils";
 import { deployedAddressesFromEnv } from "../src.ts/deploy-utils";
 import { initialBridgehubDeployment } from "../src.ts/deploy-process";
 import { ethTestConfig } from "../src.ts/utils";
+import { Wallet as ZkWallet, Provider as ZkProvider } from "zksync-ethers";
 
 const provider = web3Provider();
 
@@ -27,12 +28,25 @@ async function main() {
     .option("--diamond-upgrade-init <version>")
     .option("--only-verifier")
     .action(async (cmd) => {
-      const deployWallet = cmd.privateKey
-        ? new Wallet(cmd.privateKey, provider)
-        : Wallet.fromMnemonic(
-            process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
-            "m/44'/60'/0'/0/1"
-          ).connect(provider);
+      let deployWallet: ethers.Wallet | ZkWallet;
+
+      if (process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true") {
+        const provider = new ZkProvider(web3Url());
+        deployWallet = cmd.privateKey
+          ? new ZkWallet(cmd.privateKey, provider)
+          : ZkWallet.fromMnemonic(
+              process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+              "m/44'/60'/0'/0/1"
+            ).connect(provider);
+      } else {
+        deployWallet = cmd.privateKey
+          ? new Wallet(cmd.privateKey, provider)
+          : Wallet.fromMnemonic(
+              process.env.MNEMONIC ? process.env.MNEMONIC : ethTestConfig.mnemonic,
+              "m/44'/60'/0'/0/1"
+            ).connect(provider);
+      }
+
       console.log(`Using deployer wallet: ${deployWallet.address}`);
 
       const ownerAddress = cmd.ownerAddress ? cmd.ownerAddress : deployWallet.address;
@@ -54,6 +68,10 @@ async function main() {
         ownerAddress,
         verbose: true,
       });
+
+      if (deployer.isZkMode()) {
+        console.log("Deploying on a zkSync network!");
+      }
 
       await initialBridgehubDeployment(deployer, [], gasPrice, cmd.onlyVerifier, create2Salt, nonce);
     });

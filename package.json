@@ -6,6 +6,7 @@
     "packages": [
       "l1-contracts",
       "l2-contracts",
+      "da-contracts",
       "system-contracts",
       "gas-bound-caller"
     ],
@@ -28,6 +29,8 @@
     "solhint": "4.5.4"
   },
   "scripts": {
+    "calculate-hashes:check": "ts-node scripts/calculate-hashes.ts --check-only",
+    "calculate-hashes:fix": "ts-node scripts/calculate-hashes.ts",
     "lint:check": "yarn lint:md && yarn lint:sol && yarn lint:ts && yarn prettier:check",
     "lint:fix": "yarn lint:md --fix && yarn lint:sol --fix && yarn lint:ts --fix && yarn prettier:fix",
     "lint:md": "markdownlint \"**/*.md\"",
@@ -38,6 +41,7 @@
     "l1": "yarn workspace l1-contracts",
     "l2": "yarn workspace l2-contracts",
     "sc": "yarn workspace system-contracts",
+    "da": "yarn workspace da-contracts",
     "gas-bound-caller": "yarn workspace gas-bound-caller"
   }
 }
