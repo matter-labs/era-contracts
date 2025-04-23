@@ -801,7 +801,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
         vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", upgradeAddresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
-        vm.serializeAddress("deployed_addresses", "check_migration_pause_state", upgradeAddresses.upgradeStageValidator);
+        vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
 
         string memory deployedAddresses = vm.serializeAddress(
@@ -891,12 +891,13 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](5);
-        allCalls[0] = prepareUpgradeProxiesCalls();
-        allCalls[1] = prepareNewChainCreationParamsCall();
-        allCalls[2] = provideSetNewVersionUpgradeCall();
-        allCalls[3] = prepareDAValidatorCall();
-        allCalls[4] = prepareGatewaySpecificStage1GovernanceCalls();
+        Call[][] memory allCalls = new Call[][](6);
+        allCalls[0] = prepareCheckMigrationsPausedCalls();
+        allCalls[1] = prepareUpgradeProxiesCalls();
+        allCalls[2] = prepareNewChainCreationParamsCall();
+        allCalls[3] = provideSetNewVersionUpgradeCall();
+        allCalls[4] = prepareDAValidatorCall();
+        allCalls[5] = prepareGatewaySpecificStage1GovernanceCalls();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -1059,7 +1060,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.pauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, addresses.bridgehub.bridgehubProxy);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDRESS);
     }
 
     function prepareUnpauseMigrationCallForGateway(
@@ -1069,7 +1070,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.unpauseMigration, ());
 
         // TODO: approve base token
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, addresses.bridgehub.bridgehubProxy);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDRESS);
     }
 
     function prepareNewChainCreationParamsCallForGateway(
