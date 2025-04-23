@@ -908,6 +908,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         allCalls[1] = prepareUnpauseGatewayMigrationsCall();
         allCalls[2] = prepareGatewaySpecificStage2GovernanceCalls();
         allCalls[3] = prepareCheckMigrationsUnpausedCalls();
+        calls = mergeCallsArray(allCalls);
     }
 
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {
