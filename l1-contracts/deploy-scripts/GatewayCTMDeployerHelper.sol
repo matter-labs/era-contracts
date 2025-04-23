@@ -97,7 +97,7 @@ library GatewayCTMDeployerHelper {
         address serverNotifierImplementation = _deployInternal(
             "ServerNotifier",
             "ServerNotifier.sol",
-            abi.encode(true),
+            abi.encode(),
             innerConfig
         );
 
@@ -247,9 +247,6 @@ library GatewayCTMDeployerHelper {
             abi.encode(L2_BRIDGEHUB_ADDR),
             innerConfig
         );
-
-        address proxyAdmin = _deployInternal("ProxyAdmin", "ProxyAdmin.sol", hex"", innerConfig);
-        _deployedContracts.stateTransition.chainTypeManagerProxyAdmin = proxyAdmin;
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
