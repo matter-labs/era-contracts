@@ -8,7 +8,7 @@ import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT, L2DACommitmentScheme} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
@@ -186,7 +186,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
 
     /// @notice Verifies that the {_operatorInput} reflects what occurred within the L1Batch and that
     ///         the compressed statediffs are equivalent to the full state diffs.
-    /// @param _l2DAValidator the address of the l2 da validator
+    /// @param _l2DACommitmentScheme TODO
     /// @param _operatorInput The total pubdata and uncompressed state diffs of transactions that were
     ///        processed in the current L1 Batch. Pubdata consists of L2 to L1 Logs, messages, deployed bytecode, and state diffs.
     /// @dev Function that should be called exactly once per L1 Batch by the bootloader.
@@ -196,7 +196,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
     /// @dev Performs calculation of L2ToL1Logs merkle tree root, "sends" such root and keccak256(totalL2ToL1Pubdata)
     /// to L1 using low-level (VM) L2Log.
     function publishPubdataAndClearState(
-        address _l2DAValidator,
+        L2DACommitmentScheme _l2DACommitmentScheme,
         bytes calldata _operatorInput
     ) external onlyCallFromBootloader {
         uint256 calldataPtr = 0;
@@ -314,10 +314,12 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         }
 
         bytes32 l2DAValidatorOutputhash = bytes32(0);
-        if (_l2DAValidator != address(0)) {
+        if (_l2DACommitmentScheme != L2DACommitmentScheme.NONE) {
+            // TODO validation address logic
+            address _l2DAValidatorAddress = address(0); // TODO
             bytes memory returnData = EfficientCall.call({
                 _gas: gasleft(),
-                _address: _l2DAValidator,
+                _address: _l2DAValidatorAddress,
                 _value: 0,
                 _data: _operatorInput,
                 _isSystem: false
@@ -330,8 +332,8 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), fullRootHash);
         SystemContractHelper.toL1(
             true,
-            bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)),
-            bytes32(uint256(uint160(_l2DAValidator)))
+            bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)), // TODO: compatibility issues? Different key?
+            bytes32(uint256(_l2DACommitmentScheme)) // TODO: compatibility issues?
         );
         SystemContractHelper.toL1(
             true,

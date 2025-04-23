@@ -239,8 +239,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
                     revert InvalidLogSender(logSender, logKey);
                 }
-                if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
-                    revert MismatchL2DAValidator();
+                if (uint256(s.l2DACommitmentScheme) != uint256(logValue)) {
+                    revert MismatchL2DAValidator(uint256(logValue), uint256(s.l2DACommitmentScheme));
                 }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {

@@ -170,3 +170,9 @@ struct ZKChainCommitment {
 
 /// @dev Used as the `msg.sender` for system service transactions.
 address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF));
+
+// TODO move to a better place
+enum L2DACommitmentScheme {
+    NONE,
+    KECCAK
+}
