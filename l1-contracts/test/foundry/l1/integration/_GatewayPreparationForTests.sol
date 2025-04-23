@@ -8,7 +8,7 @@ import {DeployGatewayTransactionFilterer} from "deploy-scripts/DeployGatewayTran
 
 import {Utils, ChainInfoFromBridgehub} from "deploy-scripts/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.solsol";
+import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
