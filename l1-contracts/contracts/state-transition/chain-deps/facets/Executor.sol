@@ -479,7 +479,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     uint256(msgRoot.blockOrBatchNumber)
                 );
             } else {
-                revert CommitBasedInteropNotSupported();
+                // @notice: here we will verify against the Diamond proxy contract of the sender directly.
+                // This means the receiving chain has to trust the sender chain's CTM. 
+                // For now we will not allow permissionless CTMs to be added, so the ecosystem is secure.
+                // revert CommitBasedInteropNotSupported();
+                correctRootHash = IGetters(IBridgehub(s.bridgehub).getZKChain(msgRoot.chainId)).l2LogsRootHash(msgRoot.blockOrBatchNumber);
             }
             if (msgRoot.sides.length != 1 || msgRoot.sides[0] != correctRootHash) {
                 revert InvalidMessageRoot(correctRootHash, msgRoot.sides[0]);
