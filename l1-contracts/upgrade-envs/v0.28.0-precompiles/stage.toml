@@ -9,7 +9,7 @@ owner_address = "0x0000000000000000000000000000000000000001"
 # This should always be false for non-loadtest environments.
 support_l2_legacy_shared_bridge_test = false
 
-old_protocol_version = 0x1a00000000
+old_protocol_version = 0x1b00000000
 
 #l2_gas_limit = 72000000
 #l1_gas_price = 20000000000
@@ -25,7 +25,7 @@ create2_factory_salt = "0x100000000000000000000000000000000000000000000000000000
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 validator_timelock_execution_delay = 0
 genesis_root = "0x85fa0abaa93032259defb7bc3d060f1fcce909600a71841e9a578db386723966"
-genesis_rollup_leaf_index = 76
+genesis_rollup_leaf_index = 78
 genesis_batch_commitment = "0xc66918c8860c607e73892cb3e686bfba6185f7a49f8c7ec21fb1cce3c4f353cd"
 recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
 recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"

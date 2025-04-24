@@ -611,6 +611,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "chain_type_manager_implementation_addr",
             gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation
         );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "chain_type_manager_proxy",
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+        );
         vm.serializeAddress("gateway_state_transition", "verifier_addr", gatewayConfig.gatewayStateTransition.verifier);
         vm.serializeAddress(
             "gateway_state_transition",
@@ -642,16 +647,22 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "genesis_upgrade_addr",
             gatewayConfig.gatewayStateTransition.genesisUpgrade
         );
+        vm.serializeAddress("gateway_state_transition", "verifier_addr", gatewayConfig.gatewayStateTransition.verifier);
         vm.serializeAddress(
             "gateway_state_transition",
             "verifier_fflonk_addr",
             gatewayConfig.gatewayStateTransition.verifierFflonk
         );
-        vm.serializeAddress(
+        string memory gateway_state_transition = vm.serializeAddress(
             "gateway_state_transition",
             "verifier_plonk_addr",
             gatewayConfig.gatewayStateTransition.verifierPlonk
         );
+
+        vm.serializeBytes("gateway", "diamond_cut_data", gatewayConfig.facetCutsData);
+        string memory gateway = vm.serializeString("gateway", "gateway_state_transition", gateway_state_transition);
+
+        vm.serializeUint("root", "gateway_chain_id", gatewayConfig.chainId);
 
         vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
@@ -738,7 +749,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             getExpectedL2Address("NoDAL2DAValidator")
         );
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
-        vm.serializeBytes("contracts_newConfig", "gateway_diamond_cut_data", gatewayConfig.facetCutsData);
 
         vm.serializeBytes(
             "contracts_newConfig",
@@ -814,10 +824,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
-        vm.serializeUint("root", "gateway_chain_id", gatewayConfig.chainId);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_newConfig", contractsConfig);
+        vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
         vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
