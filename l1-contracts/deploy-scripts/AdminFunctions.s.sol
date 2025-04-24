@@ -308,7 +308,7 @@ contract AdminFunctions is Script {
     function grantGatewayWhitelist(
         address _bridgehub,
         uint256 _chainId,
-        address[] calldata _grantes,
+        address[] calldata _grantees,
         bool _shouldSend
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
@@ -316,12 +316,12 @@ contract AdminFunctions is Script {
         address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
         require(transactionFilterer != address(0), "Chain does not have a transaction filterer");
 
-        Call[] memory calls = new Call[](_grantes.length);
-        for (uint256 i = 0; i < _grantes.length; i++) {
+        Call[] memory calls = new Call[](_grantees.length);
+        for (uint256 i = 0; i < _grantees.length; i++) {
             calls[i] = Call({
                 target: transactionFilterer,
                 value: 0,
-                data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantes[i]))
+                data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantees[i]))
             });
         }
 
@@ -722,7 +722,7 @@ contract AdminFunctions is Script {
     function saveOutput(Output memory output) internal {
         vm.serializeAddress("root", "admin_address", output.admin);
         string memory toml = vm.serializeBytes("root", "encoded_data", output.encodedData);
-        string memory path = string.concat(vm.projectRoot(), "/script-out/output-admin-functionsons.toml");
+        string memory path = string.concat(vm.projectRoot(), "/script-out/output-admin-functions.toml");
         vm.writeToml(toml, path);
     }
 }
