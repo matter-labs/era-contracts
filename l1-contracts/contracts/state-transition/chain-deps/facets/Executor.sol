@@ -457,7 +457,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         messageRootContract.emitMessageRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
-
     /// @notice Verifies the dependency message roots that the chain relied on.
     function _verifyDependencyInteropRoots(
         InteropRoot[] memory _dependencyRoots

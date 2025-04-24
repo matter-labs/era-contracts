@@ -68,7 +68,7 @@ error OnlyAssetTracker(address, address);
 //
 error DirectCallNonEmptyValue(address nextContract);
 
-// 
+//
 error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
 
 // 0x73fe6c1b
