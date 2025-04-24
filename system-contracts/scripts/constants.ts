@@ -166,6 +166,11 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     codeName: "PubdataChunkPublisher",
     lang: Language.Solidity,
   },
+  entryPoint: {
+    address: "0x0000000000000000000000000000000000008016",
+    codeName: "EntryPoint",
+    lang: Language.Solidity,
+  },
   create2Factory: {
     // This is explicitly a non-system-contract address.
     // We do not use the same address as create2 factories on EVM, since
