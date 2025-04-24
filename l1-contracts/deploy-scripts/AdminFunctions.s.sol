@@ -305,18 +305,25 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
-    function grantGatewayWhitelist(address _bridgehub, uint256 _chainId, address _grantee, bool _shouldSend) public {
+    function grantGatewayWhitelist(
+        address _bridgehub,
+        uint256 _chainId,
+        address[] calldata _grantes,
+        bool _shouldSend
+    ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
         address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
         require(transactionFilterer != address(0), "Chain does not have a transaction filterer");
 
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: transactionFilterer,
-            value: 0,
-            data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantee))
-        });
+        Call[] memory calls = new Call[](_grantes.length);
+        for (uint256 i = 0; i < _grantes.length; i++) {
+            calls[i] = Call({
+                target: transactionFilterer,
+                value: 0,
+                data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantes[i]))
+            });
+        }
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }

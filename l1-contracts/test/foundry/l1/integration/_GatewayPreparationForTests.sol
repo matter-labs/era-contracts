@@ -77,16 +77,14 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
             true
         );
 
+        address[] memory addressesToGrantWhitelist = new address[](2);
+        addressesToGrantWhitelist[0] = _gatewayGovernanceConfig.ctmDeploymentTrackerProxy;
+        addressesToGrantWhitelist[1] = Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner();
+
         adminScript.grantGatewayWhitelist(
             _gatewayGovernanceConfig.bridgehubProxy,
             _gatewayGovernanceConfig.gatewayChainId,
-            _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
-            true
-        );
-        adminScript.grantGatewayWhitelist(
-            _gatewayGovernanceConfig.bridgehubProxy,
-            _gatewayGovernanceConfig.gatewayChainId,
-            Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(),
+            addressesToGrantWhitelist,
             true
         );
     }
