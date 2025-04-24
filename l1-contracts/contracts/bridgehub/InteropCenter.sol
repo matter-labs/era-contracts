@@ -218,8 +218,11 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             // when sending the trigger
             return interopBundleHash;
         } else {
-            emit InteropBundleSent(interopBundleHash, interopBundle);
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes));
+            // TODO use canonicalTxHash for linking it to the trigger, instead of interopBundleHash
+            bytes32 canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+                bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
+            );
+            emit InteropBundleSent(canonicalTxHash, interopBundleHash, interopBundle);
         }
     }
 
@@ -282,9 +285,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _sender,
         address _refundRecipient
     ) internal returns (bytes32 canonicalTxHash) {
-        emit InteropTriggerSent(_interopTrigger);
-        return
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger)));
+        canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger))
+        );
+        emit InteropTriggerSent(canonicalTxHash, _interopTrigger);
     }
 
     /*//////////////////////////////////////////////////////////////

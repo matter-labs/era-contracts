@@ -10,10 +10,11 @@ import {IBridgehub} from "./IBridgehub.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
-    event InteropBundleSent(bytes32 interopBundleHash, InteropBundle interopBundle);
-    event InteropTriggerSent(InteropTrigger _interopTrigger);
+    event InteropBundleSent(bytes32 l2l1TxHash, bytes32 interopBundleHash, InteropBundle interopBundle);
+    event InteropTriggerSent(bytes32 l2l11TxHash, InteropTrigger _interopTrigger);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
+
     function assetTracker() external view returns (IAssetTracker);
 
     function setAddresses(address assetRouter, address assetTracker) external;
@@ -77,7 +78,9 @@ interface IInteropCenter {
     ) external;
 
     function startBundle(uint256 _destinationChainId) external returns (bytes32 bundleId);
+
     function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external;
+
     function finishAndSendBundle(
         bytes32 _bundleId,
         address _executionAddress
