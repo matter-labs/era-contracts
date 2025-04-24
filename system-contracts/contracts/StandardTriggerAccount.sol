@@ -61,18 +61,25 @@ contract StandardTriggerAccount is IAccount {
         _;
     }
 
+    ///
+    /// FOUNDRY SUPPORT START
+    ///
     function executeTransaction(
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash
         Transaction calldata _transaction
-    ) external payable virtual override ignoreNonBootloader ignoreInDelegateCall {
+    ) external payable virtual override ignoreNonBootloader ignoreInDelegateCall returns (bytes memory) {
         address to = address(uint160(_transaction.to));
         if (to == (address((L2_INTEROP_HANDLER)))) {
             (bytes memory executionBundle, bytes memory executionProof) = abi.decode(_transaction.data, (bytes, bytes));
             MessageInclusionProof memory executionInclusionProof = abi.decode(executionProof, (MessageInclusionProof));
             L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof, false);
-            return;
+            return bytes("");
         }
+        return bytes("");
+        ///
+        /// FOUNDRY SUPPORT END
+        ///
 
         // super._execute(_transaction);
     }
