@@ -71,7 +71,9 @@
     "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
     "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
     "test-no-build": "hardhat test --network zkSyncTestNode",
-    "test-node": "hardhat node-zksync --tag 0.1.0-alpha.29",
-    "test:bootloader": "cd bootloader/test_infra && cargo run"
+    "test-node": "./bin/anvil-zksync --protocol-version=28 --emulate-evm",
+    "test-node-local-contracts": "yarn build:foundry && ./bin/anvil-zksync --protocol-version=28 --dev-system-contracts=local --system-contracts-path='.'",
+    "test:bootloader": "cd bootloader/test_infra && cargo run",
+    "install-anvil": "ts-node ./scripts/install-anvil.ts"
   }
 }

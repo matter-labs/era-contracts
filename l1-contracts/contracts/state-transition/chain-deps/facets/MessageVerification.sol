@@ -8,6 +8,11 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "../../../common/Config.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {HashedLogIsDefault} from "../../../common/L1ContractErrors.sol";
 
+/// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
+/// @dev This contract is abstract and is inherited by the Mailbox and L2MessageVerification contracts.
+/// @dev All calls go through via the _proveL2LeafInclusion function, which is different on L1 and L2.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 abstract contract MessageVerification is IMessageVerification {
     /// @inheritdoc IMessageVerification
     function proveL2MessageInclusionShared(
@@ -17,7 +22,14 @@ abstract contract MessageVerification is IMessageVerification {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) public view returns (bool) {
-        return _proveL2LogInclusion(_chainId, _batchNumber, _index, _L2MessageToLog(_message), _proof);
+        return
+            _proveL2LogInclusion({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _index: _index,
+                _log: _l2MessageToLog(_message),
+                _proof: _proof
+            });
     }
 
     /// @inheritdoc IMessageVerification
@@ -28,7 +40,14 @@ abstract contract MessageVerification is IMessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        return _proveL2LeafInclusion(_chainId, _batchNumber, _leafProofMask, _leaf, _proof);
+        return
+            _proveL2LeafInclusion({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof
+            });
     }
 
     function _proveL2LeafInclusion(
@@ -61,13 +80,20 @@ abstract contract MessageVerification is IMessageVerification {
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
         // equal to the length of other nodes preimages (which are `2 * 32`)
 
-        // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
+        // We can use `index` as a mask, since the `LocalLogsRoot` is on the left part of the tree.
 
-        return _proveL2LeafInclusion(_chainId, _batchNumber, _index, hashedLog, _proof);
+        return
+            _proveL2LeafInclusion({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _leafProofMask: _index,
+                _leaf: hashedLog,
+                _proof: _proof
+            });
     }
 
-    /// @dev Convert arbitrary-length message to the raw l2 log
-    function _L2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
+    /// @dev Convert arbitrary-length message to the raw L2 log
+    function _l2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
         return
             L2Log({
                 l2ShardId: 0,
@@ -87,6 +113,13 @@ abstract contract MessageVerification is IMessageVerification {
         L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view returns (bool) {
-        return _proveL2LogInclusion(_chainId, _batchNumber, _index, _log, _proof);
+        return
+            _proveL2LogInclusion({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _index: _index,
+                _log: _log,
+                _proof: _proof
+            });
     }
 }

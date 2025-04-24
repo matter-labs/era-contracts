@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 
 import {L2Log, L2Message} from "../../common/Messaging.sol";
 
-/// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
+/// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMessageVerification {
@@ -38,10 +38,16 @@ interface IMessageVerification {
         bytes32[] calldata _proof
     ) external view returns (bool);
 
-    /// Proves that a certain leaf was included as part of the log merkle tree.
+    /// @notice Proves that a certain leaf was included as part of the log merkle tree.
+    /// @param _chainId The chain id of the L2
+    /// @param _batchOrBlockNumber Either the executed L2 batch number in which the log appeared, or the SL block number when the MessageRoot was updated with this log
+    /// @param _batchRootMask The mask of the batch root
+    /// @param _leaf The leaf to prove inclusion of
+    /// @param _proof Merkle proof for inclusion of the L2 log
+    /// @return Whether the proof is correct and L2 log is included in batch
     function proveL2LeafInclusionShared(
         uint256 _chainId,
-        uint256 _batchNumber,
+        uint256 _batchOrBlockNumber,
         uint256 _batchRootMask,
         bytes32 _leaf,
         bytes32[] calldata _proof

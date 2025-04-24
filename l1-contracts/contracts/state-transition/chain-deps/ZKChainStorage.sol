@@ -6,7 +6,7 @@ import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 // import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
-import {MessageRoot} from "../../common/Messaging.sol";
+
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
 /// @param Transparent Fully transparent upgrade is initiated, upgrade data is publicly known
@@ -138,8 +138,7 @@ struct ZKChainStorage {
     /// charged at that level.
     FeeParams feeParams;
     /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
-    /// @dev Used only for testing.
-    address blobVersionedHashRetriever;
+    address __DEPRECATED_blobVersionedHashRetriever;
     /// @dev The chainId of the chain
     uint256 chainId;
     /// @dev The address of the bridgehub
@@ -175,6 +174,4 @@ struct ZKChainStorage {
     /// @notice Bytecode hash of evm emulator.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
-    /// @dev The dependency message roots
-    mapping(uint256 batchNumber => mapping(uint256 index => MessageRoot messageRoot)) dependencyMessageRoots;
 }

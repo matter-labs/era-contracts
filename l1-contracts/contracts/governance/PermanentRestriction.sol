@@ -231,18 +231,16 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         (uint256 chainId, bool chainIdQuerySuccess) = _getChainIdUnffallibleCall(_chain);
 
         if (!chainIdQuerySuccess) {
-            // It is not a hyperchain, so we can return `false` here.
+            // It is not a ZKChain, so we can return `false` here.
             return false;
         }
 
-        // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
-        // is compatible with the legacy ones.
         if (BRIDGE_HUB.getZKChain(chainId) != _chain) {
-            // It is not a hyperchain, so we can return `false` here.
+            // It is not a ZKChain, so we can return `false` here.
             return false;
         }
 
-        // Now, the chain is known to be a hyperchain, so it must implement the corresponding interface
+        // Now, the chain is known to be a ZKChain, so it must implement the corresponding interface
         address admin = IZKChain(_chain).getAdmin();
 
         return admin == msg.sender;

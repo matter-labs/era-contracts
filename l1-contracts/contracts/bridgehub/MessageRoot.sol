@@ -35,8 +35,7 @@ contract MessageRoot is IMessageRoot, Initializable {
 
     event Preimage(bytes32 one, bytes32 two);
 
-    // event NewMessageRoot(uint256 indexed chainId, uint256 indexed blockNumber, bytes32 indexed root);
-    event NewMessageRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
+    event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
@@ -57,8 +56,8 @@ contract MessageRoot is IMessageRoot, Initializable {
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice The mapping from block number to the global message root.
-    // kl todo this approach does not work, each block might have multiple txs that bump the historical root.
-    // And on chains, we could set it when we seal the batch, but then we need to get the batch number..
+    /// @dev Each block might have multiple txs that change the historical root.
+    /// This is ok, since the chains can use the latest one in the block.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
     /// @notice only the bridgehub can call
@@ -125,19 +124,8 @@ contract MessageRoot is IMessageRoot, Initializable {
         bytes32 sharedTreeRoot = sharedTree.root();
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = sharedTreeRoot;
-        emit NewMessageRoot(block.chainid, block.number, 0, _sides);
+        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
         historicalRoot[block.number] = sharedTreeRoot;
-    }
-
-    /// @dev emit a new message root when committing a new batch
-    function emitMessageRoot(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = _chainBatchRoot;
-        emit NewMessageRoot(_chainId, _batchNumber, 0, _sides);
     }
 
     /// @dev Gets the aggregated root of all chains.
@@ -165,7 +153,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         bytes32 newRoot = sharedTree.root();
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = newRoot;
-        emit NewMessageRoot(block.chainid, block.number, 0, _sides);
+        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
         historicalRoot[block.number] = newRoot;
     }
 

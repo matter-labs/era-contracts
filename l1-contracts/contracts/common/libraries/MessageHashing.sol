@@ -48,6 +48,9 @@ library MessageHashing {
         bool finalProofNode;
     }
 
+    /// @notice Parses the proof metadata.
+    /// @param _proof The proof.
+    /// @return result The proof metadata.
     function parseProofMetadata(bytes32[] calldata _proof) internal pure returns (ProofMetadata memory result) {
         bytes32 proofMetadata = _proof[0];
 
@@ -57,8 +60,8 @@ library MessageHashing {
         // - first byte: metadata version (0x01).
         // - second byte: length of the log leaf proof (the proof that the log belongs to a batch).
         // - third byte: length of the batch leaf proof (the proof that the batch belongs to another settlement layer, if any).
-        // - the rest of the bytes are zeroes.
         // - fourth byte: whether the current proof is the last in the links of recursive proofs for settlement layers.
+        // - the rest of the bytes are zeroes.
         //
         // In the future the old version will be disabled, and only the new version will be supported.
         // For now, we need to support both for backwards compatibility. We distinguish between those based on whether the last 28 bytes are zeroes.
@@ -92,6 +95,13 @@ library MessageHashing {
         }
     }
 
+    /// @notice Hashes the proof.
+    /// @param _chainId The chain id.
+    /// @param _batchNumber The batch number.
+    /// @param _leafProofMask The leaf proof mask.
+    /// @param _leaf The leaf.
+    /// @param _proof The proof.
+    /// @return result The proof verification result.
     function hashProof(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -116,7 +126,7 @@ library MessageHashing {
             result.batchSettlementRoot = batchSettlementRoot;
             result.finalProofNode = proofMetadata.finalProofNode;
 
-            if (proofMetadata.batchLeafProofLen == 0) {
+            if (proofMetadata.finalProofNode) {
                 return result;
             }
             // Now, we'll have to check that the Gateway included the message.
@@ -161,6 +171,11 @@ library MessageHashing {
         });
     }
 
+    /// @notice Extracts slice from the proof.
+    /// @param _proof The proof.
+    /// @param _left The left index.
+    /// @param _right The right index.
+    /// @return slice The slice.
     function extractSlice(
         bytes32[] calldata _proof,
         uint256 _left,

@@ -36,8 +36,14 @@ uint256 constant MAX_ALLOWED_MINOR_VERSION_DELTA = 100;
 /// NOTE: The constant is set to zero for the Alpha release period
 uint256 constant PRIORITY_EXPIRATION = 0 days;
 
-/// @dev Timestamp - seconds since unix epoch.
-uint256 constant COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
+// @dev The chainId of Ethereum Mainnet
+uint256 constant MAINNET_CHAIN_ID = 1;
+
+/// @dev Timestamp - seconds since unix epoch. This value will be used on the mainnet.
+uint256 constant MAINNET_COMMIT_TIMESTAMP_NOT_OLDER = 3 days;
+
+/// @dev Timestamp - seconds since unix epoch. This value will be used on testnets.
+uint256 constant TESTNET_COMMIT_TIMESTAMP_NOT_OLDER = 30 days;
 
 /// @dev Maximum available error between real commit batch timestamp and analog used in the verifier (in seconds)
 /// @dev Must be used cause miner's `block.timestamp` value can differ on some small value (as we know - 12 seconds)
@@ -164,27 +170,3 @@ struct ZKChainCommitment {
 
 /// @dev Used as the `msg.sender` for system service transactions.
 address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF));
-
-uint256 constant MAX_MSG_ROOTS_IN_BATCH = 100;
-uint256 constant LOGS_PER_MSG_ROOT = 3;
-
-/// @dev Enum used by L2 System Contracts to differentiate logs.
-enum SystemLogKey {
-    L2_TO_L1_LOGS_TREE_ROOT_KEY,
-    PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY,
-    CHAINED_PRIORITY_TXN_HASH_KEY,
-    NUMBER_OF_LAYER_1_TXS_KEY,
-    // Note, that it is important that `PREV_BATCH_HASH_KEY` has position
-    // `4` since it is the same as it was in the previous protocol version and
-    // it is the only one that is emitted before the system contracts are upgraded.
-    PREV_BATCH_HASH_KEY,
-    L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
-    EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
-}
-
-uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max) + MAX_MSG_ROOTS_IN_BATCH * LOGS_PER_MSG_ROOT;
-
-uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
-
-uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1;

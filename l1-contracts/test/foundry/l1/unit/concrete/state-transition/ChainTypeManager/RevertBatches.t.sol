@@ -8,13 +8,12 @@ import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 import {Utils, L2_SYSTEM_CONTEXT_ADDRESS, L2_DA_VALIDATOR_ADDRESS} from "../../Utils/Utils.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
-import {COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, POINT_EVALUATION_PRECOMPILE_ADDR, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
+import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, POINT_EVALUATION_PRECOMPILE_ADDR, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, PRIORITY_TX_MAX_GAS_LIMIT} from "contracts/common/Config.sol";
 import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol"; //, COMPLEX_UPGRADER_ADDR, GENESIS_UPGRADE_ADDR
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {SystemLogKey} from "contracts/common/Config.sol";
+import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -66,10 +65,11 @@ contract revertBatchesTest is ChainTypeManagerTest {
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: bytes32(uint256(0x01))
         });
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
+        vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
         newCommitBatchInfo = IExecutor.CommitBatchInfo({
             batchNumber: 1,
@@ -144,7 +144,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             blobsLinearHashes
         );
 
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
+        vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
         bytes32 expectedSystemContractUpgradeTxHash = gettersFacet.getL2SystemContractsUpgradeTxHash();
         bytes[] memory correctL2Logs = Utils.createSystemLogsWithUpgradeTransactionForCTM(
@@ -212,6 +212,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]
         });

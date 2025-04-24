@@ -6,9 +6,8 @@ import {Utils, L2_SYSTEM_CONTEXT_ADDRESS} from "../Utils/Utils.sol";
 
 import {ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT, EMPTY_PREPUBLISHED_COMMITMENT} from "./_Executor_Shared.t.sol";
 
-import {COMMIT_TIMESTAMP_NOT_OLDER, POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {SystemLogKey} from "contracts/common/Config.sol";
+import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
+import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {VerifiedBatchesExceedsCommittedBatches, BatchHashMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract ProvingTest is ExecutorTest {
@@ -19,7 +18,7 @@ contract ProvingTest is ExecutorTest {
     function setUp() public {
         setUpCommitBatch();
 
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
+        vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
@@ -56,6 +55,7 @@ contract ProvingTest is ExecutorTest {
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
             l2LogsTreeRoot: 0,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]
         });

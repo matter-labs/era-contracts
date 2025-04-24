@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IZKChainBase} from "./IZKChainBase.sol";
 import {L2CanonicalTransaction, L2Log, L2Message, TxStatus, BridgehubL2TransactionRequest} from "../../common/Messaging.sol";
 
-/// @title The interface of the ZKsync Mailbox contract that provides interfaces for L1 <-> L2 interaction.
+/// @title The interface of the ZKsync MailboxImpl contract that provides interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IMailboxImpl is IZKChainBase {
@@ -135,7 +135,6 @@ interface IMailboxImpl is IZKChainBase {
     ) external view returns (uint256);
 
     /// @dev Proves that a certain leaf was included as part of the log merkle tree.
-    /// Proves that a certain leaf was included as part of the log merkle tree.
     /// @dev Warning: this function does not enforce any additional checks on the structure
     /// of the leaf. This means that it can accept intermediate nodes of the Merkle tree as a `_leaf` as
     /// well as the default "empty" leaves. It is the responsibility of the caller to ensure that the
@@ -146,26 +145,6 @@ interface IMailboxImpl is IZKChainBase {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) external view returns (bool);
-
-    /// @notice transfer Eth to shared bridge as part of migration process
-    // function transferEthToSharedBridge() external;
-
-    // function relayTxSL(
-    //     address _to,
-    //     L2CanonicalTransaction memory _transaction,
-    //     bytes[] memory _factoryDeps,
-    //     bytes32 _canonicalTxHash,
-    //     uint64 _expirationTimestamp
-    // ) external;
-
-    // function freeAcceptTx(
-    //     L2CanonicalTransaction memory _transaction,
-    //     bytes[] memory _factoryDeps,
-    //     bytes32 _canonicalTxHash,
-    //     uint64 _expirationTimestamp
-    // ) external;
-
-    // function acceptFreeRequestFromBridgehub(BridgehubL2TransactionRequest calldata _request) external;
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue
     /// @param txId Serial number of the priority operation

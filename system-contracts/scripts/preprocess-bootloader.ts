@@ -90,6 +90,8 @@ const params = {
   GET_TX_HASHES_SELECTOR: getSelector("BootloaderUtilities", "getTransactionHashes"),
   CREATE_SELECTOR: getSelector("ContractDeployer", "create"),
   CREATE2_SELECTOR: getSelector("ContractDeployer", "create2"),
+  CREATE_EVM_SELECTOR: getSelector("ContractDeployer", "createEVM"),
+  CREATE2_EVM_SELECTOR: getSelector("ContractDeployer", "create2EVM"),
   CREATE_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "createAccount"),
   CREATE2_ACCOUNT_SELECTOR: getSelector("ContractDeployer", "create2Account"),
   PADDED_TRANSFER_FROM_TO_SELECTOR: getPaddedSelector("L2BaseToken", "transferFromTo"),
@@ -103,7 +105,7 @@ const params = {
     "appendTransactionToCurrentL2Block"
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
-  RIGHT_PADDED_SET_L2_MESSAGE_ROOT_SELECTOR: getPaddedSelector("L2MessageRootStorage", "addMessageRoot"),
+  RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2InteropRootStorage", "addInteropRoot"),
   COMPRESSED_BYTECODES_SLOTS: 196608,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
