@@ -4,7 +4,7 @@ import * as hardhat from "hardhat";
 import type { BytesLike } from "ethers/lib/utils";
 import { Interface } from "ethers/lib/utils";
 
-import type { Bridgehub, GettersFacet, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, GettersFacet, InteropCenter, MockExecutorFacet } from "../../typechain";
 import {
   BridgehubFactory,
   TestnetERC20TokenFactory,
@@ -12,12 +12,13 @@ import {
   GettersFacetFactory,
   MockExecutorFacetFactory,
   L1NullifierFactory,
+  InteropCenterFactory,
 } from "../../typechain";
 import type { IL1ERC20Bridge } from "../../typechain/IL1ERC20Bridge";
 import { IL1ERC20BridgeFactory } from "../../typechain/IL1ERC20BridgeFactory";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/constants";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 import { getTokens } from "../../src.ts/deploy-token";
 import type { Deployer } from "../../src.ts/deploy";
@@ -26,7 +27,7 @@ import { initialEraTestnetDeploymentProcess } from "../../src.ts/deploy-test-pro
 import {
   depositERC20,
   L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-  L2_TO_L1_MESSENGER,
+  L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
   getCallRevertReason,
   requestExecuteDirect,
   DUMMY_MERKLE_PROOF_START,
@@ -47,6 +48,7 @@ describe("Legacy Era tests", function () {
   // let sharedBridgeProxy: L1AssetRouter;
   let erc20TestToken: ethers.Contract;
   let bridgehub: Bridgehub;
+  let interopCenter: InteropCenter;
   let chainId = "9"; // Hardhat config ERA_CHAIN_ID
   const functionSignature = "0x11a2ccc1";
   let l2ToL1message: BytesLike;
@@ -87,6 +89,7 @@ describe("Legacy Era tests", function () {
     chainId = deployer.chainId.toString();
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    interopCenter = InteropCenterFactory.connect(deployer.addresses.Bridgehub.InteropCenterProxy, deployWallet);
 
     l1ERC20BridgeAddress = deployer.addresses.Bridges.ERC20BridgeProxy;
 
@@ -105,6 +108,7 @@ describe("Legacy Era tests", function () {
     const sharedBridge = await sharedBridgeFactory.deploy(
       l1WethToken,
       deployer.addresses.Bridgehub.BridgehubProxy,
+      deployer.addresses.Bridgehub.InteropCenterProxy,
       deployer.addresses.Bridges.L1NullifierProxy,
       deployer.chainId,
       deployer.addresses.StateTransition.DiamondProxy
@@ -260,7 +264,7 @@ describe("Legacy Era tests", function () {
     const key = ethers.utils.hexZeroPad(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
     const HASHED_LOG = ethers.utils.solidityKeccak256(
       ["uint8", "bool", "uint16", "address", "bytes32", "bytes32"],
-      [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, MESSAGE_HASH]
+      [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, key, MESSAGE_HASH]
     );
 
     const MERKLE_PROOF = [

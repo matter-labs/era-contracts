@@ -63,7 +63,7 @@ contract L1AssetRouterActorHandler is Test {
         ghost_totalDeposits += amount;
     }
 
-    // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol#L203-L217
+    // borrowed from https://github.com/matter-labs/era-contracts/blob/16dedf6d77695ce00f81fce35a3066381b97fca1/l1-contracts/test/foundry/l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol#L203-L217
     /// @notice Encodes the token data.
     /// @param name The name of the token.
     /// @param symbol The symbol of the token.

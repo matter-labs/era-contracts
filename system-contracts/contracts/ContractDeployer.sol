@@ -82,6 +82,15 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         emit AccountVersionUpdated(msg.sender, _version);
     }
 
+    /// @notice Update the used version of the account.
+    /// @param _version The new version of the AA protocol to use.
+    /// @dev Note that it allows changes from account to non-account and vice versa.
+    function updateInteropAccountVersion(AccountAbstractionVersion _version) external onlyStandardTriggerAccount {
+        accountInfo[msg.sender].supportedAAVersion = _version;
+
+        emit AccountVersionUpdated(msg.sender, _version);
+    }
+
     /// @notice Updates the nonce ordering of the account. Since only `KeyedSequential`
     /// is supported, currently this method always reverts.
     function updateNonceOrdering(AccountNonceOrdering) external onlySystemCall {
@@ -259,8 +268,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         bytes32 _salt,
         bytes32 _bytecodeHash,
         bytes calldata _input,
-        AccountAbstractionVersion _aaVersion
-    ) public payable override onlySystemCall returns (address) {
+        AccountAbstractionVersion _aaVersion /*onlySystemCall kl todo allow interopHandler to call this */
+    ) public payable override returns (address) {
         NONCE_HOLDER_SYSTEM_CONTRACT.incrementDeploymentNonce(msg.sender);
         address newAddress = getNewAddressCreate2(msg.sender, _bytecodeHash, _salt, _input);
 

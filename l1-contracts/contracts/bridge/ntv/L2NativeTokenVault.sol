@@ -22,6 +22,7 @@ import {L2ContractHelper, IContractDeployer} from "../../common/l2-helpers/L2Con
 
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {IAssetTracker} from "../asset-tracker/IAssetTracker.sol";
 
 import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
@@ -272,7 +273,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         uint256 _amount,
         bool _isNative
     ) internal override {
-        // on L2s we don't track the balance
+        // on L2s we don't track the balance.
+        // Note GW->L2 txs are not allowed. Even for GW, there
     }
 
     function _handleChainBalanceDecrease(
@@ -281,7 +283,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         uint256 _amount,
         bool _isNative
     ) internal override {
-        // on L2s we don't track the balance
+        // on L2s we don't track the balance.
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {

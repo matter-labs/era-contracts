@@ -131,7 +131,7 @@ jobs:
         run: yarn calculate-hashes:check
 
   test-foundry:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -176,7 +176,7 @@ jobs:
         run: FOUNDRY_PROFILE=default yarn test:foundry
 
   test-foundry-zksync:
-    needs: [build, lint]
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:

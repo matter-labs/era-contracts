@@ -11,6 +11,7 @@ import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
@@ -56,6 +57,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {InteropCenter} from "contracts/bridgehub/InteropCenter.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -71,6 +73,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
@@ -92,11 +95,11 @@ contract DeployL1Script is Script, DeployUtils {
     function run() public virtual {
         console.log("Deploying L1 contracts");
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
+        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", false);
     }
 
-    function runForTest() public {
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+    function runForTest(bool skipL1Deployments) public {
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), skipL1Deployments);
 
         // In the production environment, there will be a separate script dedicated to accepting the adminship
         // but for testing purposes we'll have to do it here.
@@ -113,14 +116,16 @@ contract DeployL1Script is Script, DeployUtils {
         return config;
     }
 
-    function runInner(string memory inputPath, string memory outputPath) internal {
+    function runInner(string memory inputPath, string memory outputPath, bool skipL1Deployments) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
         initializeConfig(inputPath);
 
-        instantiateCreate2Factory();
+        if (!skipL1Deployments) {
+            instantiateCreate2Factory();
+        }
         deployIfNeededMulticall3();
 
         addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier");
@@ -142,6 +147,10 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
             "Bridgehub"
         );
+        (
+            addresses.bridgehub.interopCenterImplementation,
+            addresses.bridgehub.interopCenterProxy
+        ) = deployTuppWithContract("InteropCenter");
         (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
             "MessageRoot"
         );
@@ -168,6 +177,10 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
             "L1ERC20Bridge"
         );
+        (
+            addresses.bridgehub.assetTrackerImplementation,
+            addresses.bridgehub.assetTrackerProxy
+        ) = deployTuppWithContract("AssetTracker");
         updateSharedBridge();
         // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
         (
@@ -337,13 +350,18 @@ contract DeployL1Script is Script, DeployUtils {
 
     function setBridgehubParams() internal {
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        IMessageRoot messageRoot = IMessageRoot(addresses.bridgehub.messageRootProxy);
+        IInteropCenter interopCenter = IInteropCenter(addresses.bridgehub.interopCenterProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         bridgehub.setAddresses(
             addresses.bridges.l1AssetRouterProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-            IMessageRoot(addresses.bridgehub.messageRootProxy)
+            IMessageRoot(addresses.bridgehub.messageRootProxy),
+            addresses.bridgehub.interopCenterProxy
         );
+        interopCenter.setAddresses(addresses.bridges.l1AssetRouterProxy, addresses.bridgehub.assetTrackerProxy);
+        messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
         vm.stopBroadcast();
         console.log("SharedBridge registered");
     }
@@ -353,6 +371,11 @@ contract DeployL1Script is Script, DeployUtils {
         vm.broadcast(msg.sender);
         sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(addresses.bridges.erc20BridgeProxy));
         console.log("SharedBridge updated with ERC20Bridge address");
+
+        vm.broadcast(msg.sender);
+        L1NativeTokenVault ntv = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
+        ntv.setAssetTracker(addresses.bridgehub.assetTrackerProxy);
+        console.log("L1NativeTokenVault updated with AssetTracker address");
     }
 
     function setL1NativeTokenVaultParams() internal {
@@ -610,6 +633,12 @@ contract DeployL1Script is Script, DeployUtils {
                 L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
             ),
             messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            interopCenterBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readInteropCenterBytecode()
+            ),
+            assetTrackerBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.readAssetTrackerBytecode()
+            ),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -784,6 +813,10 @@ contract DeployL1Script is Script, DeployUtils {
             return type(DiamondInit).creationCode;
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return type(ServerNotifier).creationCode;
+        } else if (compareStrings(contractName, "AssetTracker")) {
+            return type(AssetTracker).creationCode;
+        } else if (compareStrings(contractName, "InteropCenter")) {
+            return type(InteropCenter).creationCode;
         } else {
             revert(string.concat("Contract ", contractName, " creation code not set"));
         }
@@ -792,6 +825,8 @@ contract DeployL1Script is Script, DeployUtils {
     function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "Bridgehub")) {
             return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "InteropCenter")) {
+            return abi.encodeCall(InteropCenter.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "MessageRoot")) {
             return abi.encodeCall(MessageRoot.initialize, ());
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -822,6 +857,8 @@ contract DeployL1Script is Script, DeployUtils {
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
+        } else if (compareStrings(contractName, "AssetTracker")) {
+            return abi.encodeCall(AssetTracker.initialize, ());
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

@@ -32,7 +32,7 @@ fs_permissions = [
 ]
 ignored_error_codes = ["missing-receive-ether", "code-size"]
 ignored_warnings_from = ["test", "contracts/dev-contracts"]
-suppressed_warnings = ["txorigin"]
+suppressed_warnings = ["txorigin", "sendtransfer"]
 remappings = [
     "forge-std/=lib/forge-std/src/",
     "murky/=lib/murky/src/",
@@ -43,7 +43,7 @@ remappings = [
 ]
 optimizer = true
 optimizer_runs = 200
-[profile.default.zksync] 
+[profile.default.zksync]
 enable_eravm_extensions = true
 zksolc = "1.5.11"
 optimization = "0"

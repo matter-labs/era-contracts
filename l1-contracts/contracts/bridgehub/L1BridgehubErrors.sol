@@ -59,6 +59,18 @@ error NotL1(uint256 l1ChainId, uint256 blockChainId);
 // 0x527b87c7
 error OnlyBridgehub(address msgSender, address bridgehub);
 
+//
+error OnlyInteropCenter(address msgSender, address interopCenter);
+
+//
+error OnlyAssetTracker(address, address);
+
+//
+error DirectCallNonEmptyValue(address nextContract);
+
+//
+error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
+
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
 

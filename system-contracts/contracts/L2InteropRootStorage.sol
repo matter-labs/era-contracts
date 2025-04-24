@@ -17,6 +17,14 @@ contract L2InteropRootStorage is SystemContractBase {
     /// @notice Mapping of chain ID to block or batch number to message root.
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => bytes32 msgRoot)) public msgRoots;
 
+    // mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] msgRootSides)) public msgRootSides;
+    // uint256 public pendingMessageRootIdsLength;
+    // struct PendingMessageRootId {
+    //     uint256 chainId;
+    //     uint256 batchNumber;
+    // }
+    // mapping(uint256 index => PendingMessageRootId) public pendingMessageRootIds;
+
     /// @dev Adds a message root to the L2InteropRootStorage contract.
     /// @param chainId The chain ID of the chain that the message root is for.
     /// @param blockOrBatchNumber The block or batch number of the message root.
@@ -38,4 +46,10 @@ contract L2InteropRootStorage is SystemContractBase {
 
         emit InteropRootAdded(chainId, blockOrBatchNumber, sides);
     }
+
+    // // kl todo figure out how the executor works with MsgRoot, this on GW.
+    // function addThisChainMessageRoot(uint256 batchNumber, bytes32[] memory sides) external {
+    //     // kl todo add access control, onlyL1Messenger
+    //     msgRoots[block.chainid][batchNumber] = sides[0];
+    // }
 }
