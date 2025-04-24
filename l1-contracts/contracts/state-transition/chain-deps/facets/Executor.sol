@@ -452,10 +452,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         _verifyDependencyInteropRoots(_dependencyRoots);
     }
 
-    function _emitMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
+    /// @notice Verifies the dependency message roots that the chain relied on.
+    function _verifyDependencyInteropRoots(
+        InteropRoot[] memory _dependencyRoots
+    ) internal view returns (bytes32 dependencyRootsRollingHash) {
+        uint256 length = _dependencyRoots.length;
         IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-        messageRootContract.emitMessageRoot(s.chainId, _batchNumber, _messageRoot);
-    }
 
     /// @notice Verifies the dependency message roots that the chain relied on.
     function _verifyDependencyInteropRoots(
