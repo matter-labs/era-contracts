@@ -2999,11 +2999,15 @@ object "Bootloader" {
                 debugLog("current txId", txId)
                 debugLog("currentL2BlockNumber", currentL2BlockNumber)
 
+                setInteropRootUntilBlock(currentL2BlockNumber)
+            }
+
+            function setInteropRootUntilBlock(setUntilBlockNumber) {
                 let nextInteropRootNumber := mload(NEXT_INTEROP_ROOT_NUMBER_SLOT())
                 let interopRootStartSlot := getInteropRootSlot(nextInteropRootNumber)
                 let nextInteropRootBlockNumber  := mload(interopRootStartSlot) 
 
-                if lt(currentL2BlockNumber, nextInteropRootBlockNumber) {
+                if lt(setUntilBlockNumber, nextInteropRootBlockNumber) {
                     debugLog("Processed all interop roots for this block", 0)
                     leave
                 }
@@ -3023,7 +3027,7 @@ object "Bootloader" {
                     debugLog("Set roots blockNumber ", blockNumber)
                     debugLog("Set roots sidesLength ", sidesLength)
 
-                    if lt(currentL2BlockNumber, currentBlockNumber) {
+                    if lt(setUntilBlockNumber, currentBlockNumber) {
                         debugLog("Processed all interop roots for this block", 1)
                         break
                     }
@@ -3037,8 +3041,6 @@ object "Bootloader" {
                     debugLog("Next interop root updated", add(i, 1))
 
                     callL2InteropRootStorage(chainId, blockNumber, sidesLength, interopRootStartSlot)
-
-
                 }
             }
 
@@ -4331,6 +4333,8 @@ object "Bootloader" {
             // Sending system logs (to be processed on L1)
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
+            /// setting all remaining interop roots, even the ones in the fictive block.
+            setInteropRootUntilBlock(9999999999999999)
             sendInteropRootRollingHashToL1()
 
             l1MessengerPublishingCall()
