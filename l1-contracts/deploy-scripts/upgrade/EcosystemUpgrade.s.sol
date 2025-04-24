@@ -127,6 +127,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         bytes additionalForceDeployments;
         uint256 chainId;
         address baseToken;
+        bytes upgradeCutData;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -231,12 +232,14 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition); //{isOnGateway: false});
+        generateUpgradeCutData(gatewayConfig.gatewayStateTransition); //{isOnGateway: false});
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
     }
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
+        gatewayConfig.gatewayStateTransition.isOnGateway = true;
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
@@ -370,6 +373,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         if (!stateTransition.isOnGateway) {
             newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
             upgradeConfig.upgradeCutPrepared = true;
+        } else {
+            gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         }
     }
 
@@ -644,6 +649,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
         vm.serializeAddress(
             "gateway_state_transition",
+            "default_upgrade_addr",
+            gatewayConfig.gatewayStateTransition.defaultUpgrade
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
             "genesis_upgrade_addr",
             gatewayConfig.gatewayStateTransition.genesisUpgrade
         );
@@ -660,6 +670,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
 
         vm.serializeBytes("gateway", "diamond_cut_data", gatewayConfig.facetCutsData);
+        vm.serializeBytes("gateway", "upgrade_cut_data", gatewayConfig.upgradeCutData);
         string memory gateway = vm.serializeString("gateway", "gateway_state_transition", gateway_state_transition);
 
         vm.serializeUint("root", "gateway_chain_id", gatewayConfig.chainId);
@@ -1050,6 +1061,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         uint256 deadline = getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCut = generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
+        console.logBytes(abi.encode(upgradeCut));
+        gatewayConfig.upgradeCutData = abi.encode(upgradeCut);
 
         bytes memory l2Calldata = abi.encodeCall(
             ChainTypeManager.setNewVersionUpgrade,
