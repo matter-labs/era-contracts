@@ -367,7 +367,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
                     _commitment.priorityTree.sides[_commitment.priorityTree.sides.length - 1]
                 )
             ) {
-                revert NotHistoricalRoot();
+                revert NotHistoricalRoot(_commitment.priorityTree.sides[_commitment.priorityTree.sides.length - 1]);
             }
             if (!_contractAlreadyDeployed) {
                 revert ContractNotDeployed();

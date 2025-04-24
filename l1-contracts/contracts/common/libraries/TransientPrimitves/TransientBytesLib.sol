@@ -50,11 +50,7 @@ library TransientBytesLib {
                 let offset := add(data.offset, sub(0x20, LENGTH_BYTES))
                 // Ensure each loop can do cheap comparison to see if it's at the end.
                 let endOffset := sub(add(data.offset, len), 1)
-                for {
-
-                } 1 {
-
-                } {
+                for {} 1 {} {
                     tstore(slot, calldataload(offset))
                     offset := add(offset, 0x20)
                     if gt(offset, endOffset) {
@@ -90,11 +86,7 @@ library TransientBytesLib {
                 let offset := add(dataStart, sub(0x20, LENGTH_BYTES))
                 // Ensure each loop can do cheap comparison to see if it's at the end.
                 let endOffset := sub(add(dataStart, len), 1)
-                for {
-
-                } 1 {
-
-                } {
+                for {} 1 {} {
                     tstore(slot, mload(offset))
                     offset := add(offset, 0x20)
                     if gt(offset, endOffset) {
@@ -126,11 +118,7 @@ library TransientBytesLib {
                 // Store remainder.
                 let offset := add(dataStart, sub(0x20, LENGTH_BYTES))
                 let endOffset := add(dataStart, len)
-                for {
-
-                } 1 {
-
-                } {
+                for {} 1 {} {
                     mstore(offset, tload(slot))
                     offset := add(offset, 0x20)
                     if gt(offset, endOffset) {

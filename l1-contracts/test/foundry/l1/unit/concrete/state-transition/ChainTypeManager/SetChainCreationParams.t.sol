@@ -48,6 +48,7 @@ contract SetChainCreationParamsTest is ChainTypeManagerTest {
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: genesisBatchCommitment
         });

@@ -873,12 +873,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     //////////////////////////////////////////////////////////////*/
 
     /// @notice return the ZK chain contract for a chainId
-    // function getHyperchain(uint256 _chainId) public view returns (address) {
-    //     return getZKChain(_chainId);
-    // }
+    function getHyperchain(uint256 _chainId) public view returns (address) {
+        return getZKChain(_chainId);
+    }
 
-    // /// @notice return the asset router
-    // function sharedBridge() public view returns (address) {
-    //     return assetRouter;
-    // }
+    /// @notice return the asset router
+    function sharedBridge() public view returns (address) {
+        return assetRouter;
+    }
 }

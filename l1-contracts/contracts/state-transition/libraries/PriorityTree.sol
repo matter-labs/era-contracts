@@ -82,7 +82,7 @@ library PriorityTree {
                 _priorityOpsData.itemHashes
             );
             if (!_tree.historicalRoots[expectedRoot]) {
-                revert NotHistoricalRoot();
+                revert NotHistoricalRoot(expectedRoot);
             }
             _tree.unprocessedIndex += _priorityOpsData.itemHashes.length;
         }

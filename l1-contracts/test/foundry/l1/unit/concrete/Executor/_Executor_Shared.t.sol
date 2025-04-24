@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_VALIDATOR_ADDRESS} from "../Utils/Utils.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -39,7 +39,6 @@ contract ExecutorTest is Test {
     address internal owner;
     address internal validator;
     address internal randomSigner;
-    address internal blobVersionedHashRetriever;
     address internal l1DAValidator;
     AdminFacet internal admin;
     TestExecutor internal executor;
@@ -79,13 +78,14 @@ contract ExecutorTest is Test {
     }
 
     function getExecutorSelectors() private view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](6);
+        bytes4[] memory selectors = new bytes4[](7);
         uint256 i = 0;
         selectors[i++] = executor.commitBatchesSharedBridge.selector;
         selectors[i++] = executor.proveBatchesSharedBridge.selector;
         selectors[i++] = executor.executeBatchesSharedBridge.selector;
         selectors[i++] = executor.revertBatchesSharedBridge.selector;
         selectors[i++] = executor.setPriorityTreeStartIndex.selector;
+        selectors[i++] = executor.setPriorityTreeHistoricalRoot.selector;
         selectors[i++] = executor.appendPriorityOp.selector;
         return selectors;
     }
@@ -153,7 +153,6 @@ contract ExecutorTest is Test {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
-        blobVersionedHashRetriever = makeAddr("blobVersionedHashRetriever");
         dummyBridgehub = new DummyBridgehub();
         address interopCenter = makeAddr("interopCenter");
         messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
@@ -193,6 +192,7 @@ contract ExecutorTest is Test {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            dependencyRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
             commitment: bytes32("")
@@ -220,8 +220,7 @@ contract ExecutorTest is Test {
             l2DefaultAccountBytecodeHash: dummyHash,
             l2EvmEmulatorBytecodeHash: dummyHash,
             priorityTxMaxGasLimit: 1000000,
-            feeParams: defaultFeeParams(),
-            blobVersionedHashRetriever: blobVersionedHashRetriever
+            feeParams: defaultFeeParams()
         });
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
@@ -280,7 +279,7 @@ contract ExecutorTest is Test {
 
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
+        vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1 + 1);
         currentTimestamp = block.timestamp;
 
         bytes memory l2Logs = Utils.encodePacked(Utils.createSystemLogs(bytes32(0)));
