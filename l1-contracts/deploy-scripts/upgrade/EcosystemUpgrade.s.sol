@@ -249,10 +249,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
-        address eraDiamondProxy = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).getHyperchain(
-            config.eraChainId
+        address diamondProxy = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).getHyperchain(
+            config.gatewayChainId
         );
-        IZKChain.Facet[] memory facets = IZKChain(eraDiamondProxy).facets();
+        IZKChain.Facet[] memory facets = IZKChain(diamondProxy).facets();
 
         // Freezability does not matter when deleting, so we just put false everywhere
         facetCuts = new Diamond.FacetCut[](facets.length);
@@ -329,7 +329,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         Diamond.FacetCut[] memory facetCuts;
         facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
-        facetCuts = mergeFacets(getFacetCutsForDeletion(), facetCuts);
+        facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
         VerifierParams memory verifierParams = getVerifierParams();
 
