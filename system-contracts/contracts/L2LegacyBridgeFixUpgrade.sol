@@ -25,10 +25,7 @@ contract L2LegacyBridgeFixUpgrade {
     /// @param _aliasedGovernance The already‑aliased L1 governance address that
     /// must become the owner/admin of every affected contract.
     /// @param _bridgedEthAssetId The asset ID of the bridged ETH inside NativeTokenVault.
-    function upgrade(
-        address _aliasedGovernance,
-        bytes32 _bridgedEthAssetId
-    ) external {
+    function upgrade(address _aliasedGovernance, bytes32 _bridgedEthAssetId) external {
         // 1. Ensure every pre‑deployed system contract has the correct governor.
         // On public networks this is already true, but it is not the case on some
         // staging chains.
@@ -56,16 +53,10 @@ contract L2LegacyBridgeFixUpgrade {
     /// the current admin is not a contract.
     /// @param _l2LegacySharedBridge Address of the legacy shared bridge proxy.
     /// @param _aliasedGovernance    New owner / admin address.
-    function migrateSharedBridgeLegacyOwner(
-        address _l2LegacySharedBridge,
-        address _aliasedGovernance
-    ) internal {
+    function migrateSharedBridgeLegacyOwner(address _l2LegacySharedBridge, address _aliasedGovernance) internal {
         // Read the current proxy admin directly from storage.
         address proxyAdmin = address(
-            uint160(uint256(SystemContractHelper.forcedSload(
-                _l2LegacySharedBridge,
-                PROXY_ADMIN_SLOT
-            )))
+            uint160(uint256(SystemContractHelper.forcedSload(_l2LegacySharedBridge, PROXY_ADMIN_SLOT)))
         );
 
         if (proxyAdmin == address(0)) {
@@ -104,10 +95,7 @@ contract L2LegacyBridgeFixUpgrade {
     /// and completes the `acceptOwnership` step.
     /// @param _addr               Target contract address.
     /// @param _aliasedGovernance  New owner to set and immediately accept.
-    function ensureOwnable2StepOwner(
-        address _addr,
-        address _aliasedGovernance
-    ) internal {
+    function ensureOwnable2StepOwner(address _addr, address _aliasedGovernance) internal {
         address currentOwner = Ownable2Step(_addr).owner();
         if (currentOwner == _aliasedGovernance) {
             return;
@@ -129,12 +117,8 @@ contract L2LegacyBridgeFixUpgrade {
     /// bridged ERC‑20 tokens to governance.
     /// @param _l2LegacySharedBridge Address of the legacy shared bridge proxy.
     /// @param _aliasedGovernance    New owner of the beacon.
-    function migrateBeaconProxyOwner(
-        address _l2LegacySharedBridge,
-        address _aliasedGovernance
-    ) internal {
-        UpgradeableBeacon l2TokenBeacon =
-            IL2SharedBridgeLegacy(_l2LegacySharedBridge).l2TokenBeacon();
+    function migrateBeaconProxyOwner(address _l2LegacySharedBridge, address _aliasedGovernance) internal {
+        UpgradeableBeacon l2TokenBeacon = IL2SharedBridgeLegacy(_l2LegacySharedBridge).l2TokenBeacon();
 
         address currentOwner = l2TokenBeacon.owner();
         if (currentOwner == _aliasedGovernance) {
@@ -154,12 +138,8 @@ contract L2LegacyBridgeFixUpgrade {
     /// @param _bridgedEthAssetId  Asset ID of bridged ETH.
     /// @param _aliasedGovernance  Governance address allowed to call
     /// `reinitializeToken`.
-    function fixBridgedETHBug(
-        bytes32 _bridgedEthAssetId,
-        address _aliasedGovernance
-    ) internal {
-        address bridgedETHAddress =
-            L2_NATIVE_TOKEN_VAULT.tokenAddress(_bridgedEthAssetId);
+    function fixBridgedETHBug(bytes32 _bridgedEthAssetId, address _aliasedGovernance) internal {
+        address bridgedETHAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_bridgedEthAssetId);
 
         if (bridgedETHAddress == address(0)) {
             // Bridged ETH not deployed – nothing to fix.
@@ -167,8 +147,8 @@ contract L2LegacyBridgeFixUpgrade {
         }
 
         // The fixed issue is reproduced by calling `name`/`symbol` method on bridged ETH token.
-        // We could try calling these methods to determine whether the issue is present, but 
-        // the most straightworward way is just to reinitialize the token regardless. 
+        // We could try calling these methods to determine whether the issue is present, but
+        // the most straightworward way is just to reinitialize the token regardless.
         // This will ensure that the issue will be definitely fixed and keep the logic easy to follow.
 
         // The `reinitializeToken` function requires us to provide the new version of the token.
@@ -178,24 +158,20 @@ contract L2LegacyBridgeFixUpgrade {
         if (version == type(uint8).max) {
             // On no chain we have `version` equal to 255, but in case it does happen, we would prefer to not halt the chain
             // because due to failing upgrade, so we just silently return without fixing the issue instead of reverting.
-            return;  
+            return;
         }
 
         // Since all fields will be supported, no field needs to be ignored now.
-        IBridgedStandardERC20.ERC20Getters memory getters =
-            IBridgedStandardERC20.ERC20Getters({
-                ignoreName: false,
-                ignoreSymbol: false,
-                ignoreDecimals: false
-            });
+        IBridgedStandardERC20.ERC20Getters memory getters = IBridgedStandardERC20.ERC20Getters({
+            ignoreName: false,
+            ignoreSymbol: false,
+            ignoreDecimals: false
+        });
 
         SystemContractHelper.mimicCallWithPropagatedRevert(
             bridgedETHAddress,
             _aliasedGovernance,
-            abi.encodeCall(
-                IBridgedStandardERC20.reinitializeToken,
-                (getters, "Ether", "ETH", version + 1)
-            )
+            abi.encodeCall(IBridgedStandardERC20.reinitializeToken, (getters, "Ether", "ETH", version + 1))
         );
     }
 }

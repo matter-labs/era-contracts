@@ -32,5 +32,3 @@ interface IBridgedStandardERC20 {
         uint8 _version
     ) external;
 }
- 
-
