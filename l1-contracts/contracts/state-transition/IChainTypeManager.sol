@@ -125,8 +125,6 @@ interface IChainTypeManager {
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
 
-    function getRollupDAManager(uint256 _chainId) external view returns (address);
-
     function createNewChain(
         uint256 _chainId,
         bytes32 _baseTokenAssetId,
