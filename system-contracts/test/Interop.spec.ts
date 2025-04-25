@@ -65,7 +65,7 @@ describe("Interop tests", function () {
 
     await deployContractOnAddress(REAL_L2_MESSAGE_VERIFICATION_ADDRESS, "DummyL2MessageVerification", false);
 
-    await deployContractOnAddress(REAL_L2_MESSAGE_ROOT_STORAGE_ADDRESS, "L2MessageRootStorage", false);
+    await deployContractOnAddress(REAL_L2_MESSAGE_ROOT_STORAGE_ADDRESS, "L2InteropRootStorage", false);
 
     await deployContractOnAddress(TEST_BASE_TOKEN_SYSTEM_CONTRACT_ADDRESS, "L2BaseToken");
     // console.log("kl todo 6");
