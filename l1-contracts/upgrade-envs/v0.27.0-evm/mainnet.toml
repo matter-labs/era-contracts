@@ -2,23 +2,22 @@ era_chain_id = 324
 testnet_verifier = false
 governance_upgrade_timer_initial_delay = 1058400
 
-# FIXME
-# original owner that was used to create bridgehub
-# 0x343ee72ddd8ccd80cd43d6adbc6c463a2de433a7 ?? 
-owner_address = "0x0000000000000000000000000000000000000001"
+# Not used in this upgrade
+# TODO: should be clarified and refined in next upgrades
+owner_address = "0x0000000000000000000000000000000000000000"
 # This should always be false for non-loadtest environments.
 support_l2_legacy_shared_bridge_test = false
 
 old_protocol_version = 0x1a00000000
 
-
 [contracts]
-# FIXME
+# Not used in this upgrade
 governance_min_delay = 0
+
 max_number_of_chains = 100
 create2_factory_salt = "0xde6b9c610417de5c775c1601c947f482e4f4e30c0f7b848c6d2b0554d76f607e"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
-validator_timelock_execution_delay = 0
+validator_timelock_execution_delay = 0 # Not used in this upgrade
 genesis_root = "0xb192c5937e91363c0b880faf0568b0621a3b16010cb2df42b588972516c1d4fe"
 genesis_rollup_leaf_index = 76
 genesis_batch_commitment = "0xe23f2436b09ef15ba64ec3f30dc26833dda86d6dd6bef7ba6f8274e434801d05"
@@ -37,14 +36,16 @@ default_aa_hash = "0x0100050bf9baf9d08e5d3c037f8d8b486076de7e6dceb3f3fc0989ea2c9
 evm_emulator_hash = "0x01000bbb8116fe7bdf690c19740ea350375426cec23f4f1f69a12fdc58adc9ba"
 bridgehub_proxy_address = "0x303a465B659cBB0ab36eE643eA362c509EEb5213"
 transparent_proxy_admin = "0xC2a36181fB524a6bEfE639aFEd37A67e77d62cf1"
+rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
+
 governance_security_council_address = "0xBDFfCC71FE84020238F2990a6D2954e87355De0D"
 latest_protocol_version = 0x1b00000000
 l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
+
 # fixme - previous protocol not released yet
 protocol_upgrade_handler_proxy_address = "0x0000000000000000000000000000000000000000"
 # fixme - previous protocol not released yet
 protocol_upgrade_handler_impl_address = "0x0000000000000000000000000000000000000000"
-rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 
 [tokens]
 token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"

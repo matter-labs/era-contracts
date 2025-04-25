@@ -468,6 +468,7 @@ library Utils {
         address refundRecipient
     )
         internal
+        view
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
@@ -873,30 +874,48 @@ library Utils {
             ethAmountToPass = amountToApprove;
         }
     }
-    function extractPriorityOpFromLogs(
+
+    function extractAllPriorityOpFromLogs(
         address expectedDiamondProxyAddress,
         Vm.Log[] memory logs
-    ) internal pure returns (bytes32 txHash) {
+    ) internal pure returns (bytes32[] memory result) {
         // TODO(EVM-749): cleanup the constant and automate its derivation
         bytes32 topic0 = bytes32(uint256(0x4531cd5795773d7101c17bdeb9f5ab7f47d7056017506f937083be5d6e77a382));
 
+        uint256 count = 0;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].emitter == expectedDiamondProxyAddress && logs[i].topics[0] == topic0) {
-                if (txHash != bytes32(0)) {
-                    revert("Multiple priority ops");
-                }
+                count += 1;
+            }
+        }
 
+        result = new bytes32[](count);
+        uint256 index = 0;
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].emitter == expectedDiamondProxyAddress && logs[i].topics[0] == topic0) {
                 bytes memory data = logs[i].data;
+                bytes32 txHash;
                 assembly {
                     // Skip length + tx id
                     txHash := mload(add(data, 0x40))
                 }
+                result[index++] = txHash;
             }
         }
+    }
 
-        if (txHash == bytes32(0)) {
-            revert("No priority op found");
+    function extractPriorityOpFromLogs(
+        address expectedDiamondProxyAddress,
+        Vm.Log[] memory logs
+    ) internal pure returns (bytes32 txHash) {
+        bytes32[] memory allLogs = extractAllPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        if (allLogs.length != 1) {
+            revert("Incorrect number of priority logs");
         }
+
+        txHash = allLogs[0];
     }
 
     /**
@@ -993,18 +1012,32 @@ library Utils {
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: _target, value: _value, data: _data});
 
+        executeCalls(_governor, _salt, _delay, calls);
+    }
+
+    function executeCalls(address _governor, bytes32 _salt, uint256 _delay, Call[] memory calls) internal {
         IGovernance.Operation memory operation = IGovernance.Operation({
             calls: calls,
             predecessor: bytes32(0),
             salt: _salt
         });
 
-        vm.startBroadcast(ownable.owner());
-        governance.scheduleTransparent(operation, _delay);
+        // Calculate total ETH required
+        uint256 totalValue;
+        for (uint256 i = 0; i < calls.length; i++) {
+            totalValue += calls[i].value;
+        }
+
+        vm.startBroadcast(IOwnable(_governor).owner());
+        IGovernance(_governor).scheduleTransparent(operation, _delay);
         if (_delay == 0) {
-            governance.execute{value: _value}(operation);
+            IGovernance(_governor).execute{value: totalValue}(operation);
         }
         vm.stopBroadcast();
+    }
+
+    function encodeChainAdminMulticall(Call[] memory _calls, bool _requireSuccess) internal returns (bytes memory) {
+        return abi.encodeCall(IChainAdmin.multicall, (_calls, _requireSuccess));
     }
 
     function getGuardiansEmergencySignatures(
@@ -1209,16 +1242,26 @@ library Utils {
         bytes memory _data,
         uint256 _value
     ) internal {
-        // If `_accessControlRestriction` is not provided, we expect that this ChainAdmin is IOwnable
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: _target, value: _value, data: _data});
+
+        adminExecuteCalls(_admin, _accessControlRestriction, calls);
+    }
+
+    function adminExecuteCalls(address _admin, address _accessControlRestriction, Call[] memory calls) internal {
+        // If `_accessControlRestriction` is not provided, we assume that `_admin` is IOwnable
         address adminOwner = _accessControlRestriction == address(0)
             ? IOwnable(_admin).owner()
             : IAccessControlDefaultAdminRules(_accessControlRestriction).defaultAdmin();
 
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({target: _target, value: _value, data: _data});
+        // Calculate total ETH required
+        uint256 totalValue;
+        for (uint256 i = 0; i < calls.length; i++) {
+            totalValue += calls[i].value;
+        }
 
         vm.startBroadcast(adminOwner);
-        IChainAdmin(_admin).multicall{value: _value}(calls, true);
+        IChainAdmin(_admin).multicall{value: totalValue}(calls, true);
         vm.stopBroadcast();
     }
 
