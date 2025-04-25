@@ -64,6 +64,8 @@ contract UpgradeIntegrationTest is Test {
             ecosystemUpgrade.generateUpgradeCutData(ecosystemUpgrade.getAddresses().stateTransition)
         );
 
+        // TODO add create chain call
+
         // TODO: here we should include tests that depoists work for upgraded chains
         // including era specific deposit/withdraw functions
         // We also may need to test that normal flow of block commit / verify / execute works (but it is hard)
