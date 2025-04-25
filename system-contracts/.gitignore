@@ -1,6 +1,8 @@
 # Compiler files
 cache/
+cache-tests/
 out/
+out-tests/
 zkout/
 
 # Ignores development broadcast logs

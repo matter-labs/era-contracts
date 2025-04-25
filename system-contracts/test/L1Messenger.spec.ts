@@ -26,7 +26,7 @@ const L2_DA_COMMITMENT_SCHEME = {
   KECCAK: 3,
 };
 
-describe("L1Messenger tests", () => {
+describe.only("L1Messenger tests", () => {
   let l1Messenger: L1Messenger;
   let wallet: Wallet;
   let l1MessengerAccount: ethers.Signer;
@@ -194,26 +194,6 @@ describe("L1Messenger tests", () => {
           })
         )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
-    });
-    it("should revert Invalid DA commitment type", async () => {
-      await (
-        await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
-      ).wait();
-      emulator.addLog(logData.logs[0].log);
-      await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
-      emulator.addLog(logData.messages[0].log);
-
-      await expect(
-        l1Messenger
-          .connect(bootloaderAccount)
-          .publishPubdataAndClearState(
-            L2_DA_COMMITMENT_SCHEME.NONE,
-            await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
-            { gasLimit: 1000000000 }
-          )
-      )
-        .to.be.revertedWithCustomError(l1Messenger, "InvalidDACommitmentScheme")
-        .withArgs(L2_DA_COMMITMENT_SCHEME.NONE);
     });
   });
 

@@ -82,51 +82,57 @@ library L2DAValidator {
         uint256 calldataPtr = 0;
 
         /// Check logs
-        uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4 + numberOfL2ToL1Logs * L2_TO_L1_LOG_SERIALIZE_SIZE;
+        {
+            uint32 numberOfL2ToL1Logs = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+            calldataPtr += 4 + numberOfL2ToL1Logs * L2_TO_L1_LOG_SERIALIZE_SIZE;
+        }
 
         /// Check messages
-        uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-        bytes32 reconstructedChainedMessagesHash;
-        for (uint256 i = 0; i < numberOfMessages; ++i) {
-            uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+        {
+            uint32 numberOfMessages = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
             calldataPtr += 4;
-            bytes32 hashedMessage = EfficientCall.keccak(
-                _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentMessageLength]
-            );
-            calldataPtr += currentMessageLength;
-            reconstructedChainedMessagesHash = keccak256(abi.encode(reconstructedChainedMessagesHash, hashedMessage));
-        }
-        if (reconstructedChainedMessagesHash != _chainedMessagesHash) {
-            revert ReconstructionMismatch(PubdataField.MsgHash, _chainedMessagesHash, reconstructedChainedMessagesHash);
+            bytes32 reconstructedChainedMessagesHash;
+            for (uint256 i = 0; i < numberOfMessages; ++i) {
+                uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+                calldataPtr += 4;
+                bytes32 hashedMessage = EfficientCall.keccak(
+                    _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentMessageLength]
+                );
+                calldataPtr += currentMessageLength;
+                reconstructedChainedMessagesHash = keccak256(abi.encode(reconstructedChainedMessagesHash, hashedMessage));
+            }
+            if (reconstructedChainedMessagesHash != _chainedMessagesHash) {
+                revert ReconstructionMismatch(PubdataField.MsgHash, _chainedMessagesHash, reconstructedChainedMessagesHash);
+            }
         }
 
         /// Check bytecodes
-        uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
-        calldataPtr += 4;
-        bytes32 reconstructedChainedL1BytecodesRevealDataHash;
-        for (uint256 i = 0; i < numberOfBytecodes; ++i) {
-            uint32 currentBytecodeLength = uint32(
-                bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])
-            );
+        {
+            uint32 numberOfBytecodes = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
             calldataPtr += 4;
-            reconstructedChainedL1BytecodesRevealDataHash = keccak256(
-                abi.encode(
-                    reconstructedChainedL1BytecodesRevealDataHash,
-                    Utils.hashL2Bytecode(
-                        _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
+            bytes32 reconstructedChainedL1BytecodesRevealDataHash;
+            for (uint256 i = 0; i < numberOfBytecodes; ++i) {
+                uint32 currentBytecodeLength = uint32(
+                    bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])
+                );
+                calldataPtr += 4;
+                reconstructedChainedL1BytecodesRevealDataHash = keccak256(
+                    abi.encode(
+                        reconstructedChainedL1BytecodesRevealDataHash,
+                        Utils.hashL2Bytecode(
+                            _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentBytecodeLength]
+                        )
                     )
-                )
-            );
-            calldataPtr += currentBytecodeLength;
-        }
-        if (reconstructedChainedL1BytecodesRevealDataHash != _chainedBytecodesHash) {
-            revert ReconstructionMismatch(
-                PubdataField.Bytecode,
-                _chainedBytecodesHash,
-                reconstructedChainedL1BytecodesRevealDataHash
-            );
+                );
+                calldataPtr += currentBytecodeLength;
+            }
+            if (reconstructedChainedL1BytecodesRevealDataHash != _chainedBytecodesHash) {
+                revert ReconstructionMismatch(
+                    PubdataField.Bytecode,
+                    _chainedBytecodesHash,
+                    reconstructedChainedL1BytecodesRevealDataHash
+                );
+            }
         }
 
         /// Check State Diffs

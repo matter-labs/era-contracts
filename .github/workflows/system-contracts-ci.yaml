@@ -153,3 +153,24 @@ jobs:
       - name: Print output logs of anvil-zksync
         if: always()
         run: cat anvil_zksync.log
+
+  test-contracts-foundry:
+    needs: [build, lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Run tests using foundry
+        run: yarn test-foundry
+      
