@@ -305,21 +305,24 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
-    struct UpgradeZKChainOnGateway {
+    struct UpgradeZKChainOnGatewayParams {
         uint256 l1GasPrice;
         uint256 oldProtocolVersion;
         bytes upgradeCutData;
         address chainDiamondProxyOnGateway;
         uint256 gatewayChainId;
+        uint256 chainId;
         address bridgehub;
         address l1AssetRouterProxy;
         address refundRecipient;
+        bool shouldSend;
     }
 
-    function prepareUpgradeZKChainOnGateway(UpgradeZKChainOnGateway memory data) public returns (Call[] memory calls) {
+    function _prepareUpgradeZKChainOnGatewayInner(UpgradeZKChainOnGatewayParams memory data) private {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.chainId);
         Diamond.DiamondCutData memory upgradeCutData = abi.decode(data.upgradeCutData, (Diamond.DiamondCutData));
 
-        calls = Utils.prepareAdminL1L2DirectTransaction(
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             abi.encodeCall(IAdmin.upgradeChainFromVersion, (data.oldProtocolVersion, upgradeCutData)),
             Utils.MAX_PRIORITY_TX_GAS,
@@ -330,6 +333,36 @@ contract AdminFunctions is Script {
             data.bridgehub,
             data.l1AssetRouterProxy,
             data.refundRecipient
+        );
+
+        saveAndSendAdminTx(chainInfo.admin, calls, data.shouldSend);
+    }
+
+    function prepareUpgradeZKChainOnGateway(
+        uint256 l1GasPrice,
+        uint256 oldProtocolVersion,
+        bytes memory upgradeCutData,
+        address chainDiamondProxyOnGateway,
+        uint256 gatewayChainId,
+        uint256 chainId,
+        address bridgehub,
+        address l1AssetRouterProxy,
+        address refundRecipient,
+        bool shouldSend
+    ) public {
+        _prepareUpgradeZKChainOnGatewayInner(
+            UpgradeZKChainOnGatewayParams({
+                l1GasPrice: l1GasPrice,
+                oldProtocolVersion: oldProtocolVersion,
+                upgradeCutData: upgradeCutData,
+                chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
+                gatewayChainId: gatewayChainId,
+                chainId: chainId,
+                bridgehub: bridgehub,
+                l1AssetRouterProxy: l1AssetRouterProxy,
+                refundRecipient: refundRecipient,
+                shouldSend: shouldSend
+            })
         );
     }
 
