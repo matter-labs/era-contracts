@@ -1265,44 +1265,6 @@ library Utils {
         vm.stopBroadcast();
     }
 
-    function executeCalls(address _governor, bytes32 _salt, uint256 _delay, Call[] memory calls) internal {
-        IGovernance.Operation memory operation = IGovernance.Operation({
-            calls: calls,
-            predecessor: bytes32(0),
-            salt: _salt
-        });
-
-        // Calculate total ETH required
-        uint256 totalValue;
-        for (uint256 i = 0; i < calls.length; i++) {
-            totalValue += calls[i].value;
-        }
-
-        vm.startBroadcast(IOwnable(_governor).owner());
-        IGovernance(_governor).scheduleTransparent(operation, _delay);
-        if (_delay == 0) {
-            IGovernance(_governor).execute{value: totalValue}(operation);
-        }
-        vm.stopBroadcast();
-    }
-
-    function adminExecuteCalls(address _admin, address _accessControlRestriction, Call[] memory calls) internal {
-        // If `_accessControlRestriction` is not provided, we assume that `_admin` is IOwnable
-        address adminOwner = _accessControlRestriction == address(0)
-            ? IOwnable(_admin).owner()
-            : IAccessControlDefaultAdminRules(_accessControlRestriction).defaultAdmin();
-
-        // Calculate total ETH required
-        uint256 totalValue;
-        for (uint256 i = 0; i < calls.length; i++) {
-            totalValue += calls[i].value;
-        }
-
-        vm.startBroadcast(adminOwner);
-        IChainAdmin(_admin).multicall{value: totalValue}(calls, true);
-        vm.stopBroadcast();
-    }
-
     function chainInfoFromBridgehubAndChainId(
         address _bridgehub,
         uint256 _chainId
