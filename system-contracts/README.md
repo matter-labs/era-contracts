@@ -127,6 +127,17 @@ Typically, one test case corresponds to one main function call, possibly with ad
 Therefore, considering all the information above, we can say that it's almost unit tests over external functions.
 Many examples can be found in [test](test).
 
+#### Special tests
+
+Special tests are not part of the main test suite and are rather run manually against an anvil-zksync fork of the chain to be upgraded. Currently there is only one special test that can be run by doing:
+
+```
+./bin/anvil-zksync fork --fork-url [chain-rpc-url] --fork-block-number [block-number] &> era_test_node.log.anvil &
+yarn test-legacy-bridge-fix
+```
+
+and specifying the correct chain-rpc-url and block-number for the fork to test the upgrade against.
+
 ## Update Process
 
 System contracts handle core functionalities and play a critical role in maintaining the integrity of our protocol. To

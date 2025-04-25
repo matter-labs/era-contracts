@@ -10,5 +10,5 @@ pragma solidity ^0.8.20;
  * @notice The interface for the L2NativeTokenVault contract
  */
 interface IL2NativeTokenVault {
-    function tokenAddress(bytes32 _assetId) external returns (address);
+    function tokenAddress(bytes32 _assetId) external view returns (address);
 }

@@ -63,4 +63,7 @@ export default {
   paths: {
     sources: "./contracts-preprocessed",
   },
+  mocha: {
+    exclude: ["./test/special-tests/**/*.manual.spec.ts"],
+  },
 };
