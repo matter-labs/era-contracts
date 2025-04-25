@@ -45,6 +45,14 @@ library Utils {
         return uint24(_x);
     }
 
+    function safeCastToU8(uint256 _x) internal pure returns (uint8) {
+        if (_x > type(uint8).max) {
+            revert Overflow();
+        }
+
+        return uint8(_x);
+    }
+
     /// @return If this bytecode hash for EVM contract or not
     function isCodeHashEVM(bytes32 _bytecodeHash) internal pure returns (bool) {
         return (uint8(_bytecodeHash[0]) == EVM_BYTECODE_FLAG);

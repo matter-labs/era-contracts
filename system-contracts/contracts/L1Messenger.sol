@@ -7,6 +7,7 @@ import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
+import {L2DAValidator} from "./libraries/L2DAValidator.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT, L2DACommitmentScheme} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
@@ -313,20 +314,12 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputChainedLogsRootHash);
         }
 
-        bytes32 l2DAValidatorOutputhash = bytes32(0);
-        if (_l2DACommitmentScheme != L2DACommitmentScheme.EMPTY) {
-            // TODO validation address logic
-            address _l2DAValidatorAddress = address(0); // TODO
-            bytes memory returnData = EfficientCall.call({
-                _gas: gasleft(),
-                _address: _l2DAValidatorAddress,
-                _value: 0,
-                _data: _operatorInput,
-                _isSystem: false
-            });
-
-            l2DAValidatorOutputhash = abi.decode(returnData, (bytes32));
-        }
+        bytes32 l2DAValidatorOutputhash = L2DAValidator.validatePubdata(
+            _l2DACommitmentScheme,
+            inputChainedMsgsHash,
+            inputChainedBytecodesHash,
+            _operatorInput[4 + 32 * 4:] // operator data
+        );
 
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), fullRootHash);

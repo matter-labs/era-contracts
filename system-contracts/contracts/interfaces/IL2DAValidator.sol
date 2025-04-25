@@ -5,6 +5,7 @@ pragma solidity ^0.8.20;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL2DAValidator {
+    // TODO Used only for signature (sort of magic value)
     function validatePubdata(
         // The rolling hash of the user L2->L1 logs.
         bytes32 _chainedLogsHash,

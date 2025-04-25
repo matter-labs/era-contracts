@@ -54,6 +54,8 @@ error InsufficientFunds(uint256 required, uint256 actual);
 error InvalidCall();
 // 0x8cbd7f8b
 error InvalidCodeHash(CodeHashReason);
+// 0xc74537a1
+error InvalidDACommitmentScheme(uint256);
 // 0xb4fa3fb3
 error InvalidInput();
 // 0x60b85677
@@ -223,7 +225,9 @@ enum PubdataField {
     InputMsgsHash,
     InputBytecodeHash,
     Offset,
-    Length
+    Length,
+    StateDiffCompressionVersion,
+    ExtraData
 }
 
 enum BytecodeError {

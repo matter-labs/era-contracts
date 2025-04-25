@@ -106,6 +106,8 @@ address constant EVM_GAS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x13);
 address constant EVM_PREDEPLOYS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x14);
 IEvmHashesStorage constant EVM_HASHES_STORAGE = IEvmHashesStorage(address(SYSTEM_CONTRACTS_OFFSET + 0x15));
 
+address constant L2_DA_VALIDATOR = address(SYSTEM_CONTRACTS_OFFSET + 0x16);
+
 ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
 address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
 IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
@@ -136,6 +138,11 @@ bytes1 constant CREATE2_EVM_PREFIX = 0xff;
 
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
+
+uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
+
+/// @dev The current version of state diff compression being used.
+uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
 
 enum SystemLogKey {
     L2_TO_L1_LOGS_TREE_ROOT_KEY,
@@ -196,6 +203,8 @@ address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFfff
 
 // TODO
 enum L2DACommitmentScheme {
+    NONE, // Invalid commitment scheme
     EMPTY,
+    ROLLUP,
     KECCAK
 }

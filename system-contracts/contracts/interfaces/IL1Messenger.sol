@@ -22,6 +22,7 @@ struct L2ToL1Log {
 
 /// @dev Bytes in raw L2 to L1 log
 /// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBlock, address sender, bytes32 key, bytes32 value)
+// TODO remove? Is it used somewhere?
 uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 
 /// @dev The value of default leaf hash for L2 to L1 logs Merkle tree
@@ -30,6 +31,7 @@ uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
 
 /// @dev The current version of state diff compression being used.
+// TODO remove? Is it used somewhere?
 uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
 
 /**
