@@ -305,6 +305,34 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
+    struct UpgradeZKChainOnGateway {
+        uint256 l1GasPrice;
+        uint256 oldProtocolVersion;
+        bytes upgradeCutData;
+        address chainDiamondProxyOnGateway;
+        uint256 gatewayChainId;
+        address bridgehub;
+        address l1AssetRouterProxy;
+        address refundRecipient;
+    }
+
+    function prepareUpgradeZKChainOnGateway(UpgradeZKChainOnGateway memory data) public returns (Call[] memory calls) {
+        Diamond.DiamondCutData memory upgradeCutData = abi.decode(data.upgradeCutData, (Diamond.DiamondCutData));
+
+        calls = Utils.prepareAdminL1L2DirectTransaction(
+            data.l1GasPrice,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (data.oldProtocolVersion, upgradeCutData)),
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            data.chainDiamondProxyOnGateway,
+            0,
+            data.gatewayChainId,
+            data.bridgehub,
+            data.l1AssetRouterProxy,
+            data.refundRecipient
+        );
+    }
+
     function grantGatewayWhitelist(
         address _bridgehub,
         uint256 _chainId,
