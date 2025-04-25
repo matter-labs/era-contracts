@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.24;
 
-import {IEntryPoint} from "../interfaces/IEntryPoint.sol";
+import {IEntryPoint, PackedUserOperation} from "../interfaces/IEntryPoint.sol";
 import {IBootloaderUtilities} from "../interfaces/IBootloaderUtilities.sol";
 import {IAccount} from "../interfaces/IAccount.sol";
 import {IAccountCodeStorage} from "../interfaces/IAccountCodeStorage.sol";
@@ -29,14 +29,36 @@ import {SystemContractsCaller, CalldataForwardingMode} from "../libraries/System
 contract EntryPointV01 is IEntryPoint, SystemContractBase {
     using TransactionHelper for *;
 
-    // TODO: `Transaction` should be replaced with EIP4337 `UserOperation`
-    function handleUserOps(Transaction[] calldata _transactions) external {
-        for (uint i = 0; i < _transactions.length; i++) {
-            _handleTransaction(_transactions[i]);
+    function handleUserOps(PackedUserOperation[] calldata _ops) external {
+        for (uint i = 0; i < _ops.length; i++) {
+            PackedUserOperation memory op = _ops[i];
+            Transaction memory tx = abi.decode(op.callData, (Transaction));
+
+            // Alignment checks.
+            // These are important in case data will be indexed: we want to make sure that
+            // "wrapped" fields are aligned with the original ones.
+            require(op.sender == address(uint160(tx.from)), "Sender mismatch");
+            require(op.nonce == tx.nonce, "Nonce mismatch");
+            require(op.initCode.length == 0, "Init code not supported");
+            require(uint256(op.accountGasLimits) >> 128 == 0, "Verification gas limit must be 0");
+            require(uint256(op.accountGasLimits) == tx.gasLimit, "Call gas limit mismatch");
+            require(uint256(op.gasFees) >> 128 == tx.maxPriorityFeePerGas, "Max priority fee per gas mismatch");
+            require(uint256(uint128(uint256(op.gasFees))) == tx.maxFeePerGas, "Max fee per gas mismatch");
+
+            require(op.preVerificationGas == 0, "Pre-verification gas limit must be 0");
+            if (op.paymasterAndData.length > 0) {
+                // Decode address and params
+                (address paymaster, bytes memory paymasterInput) = abi.decode(op.paymasterAndData, (address, bytes)); // TODO: is that correct?
+                require(paymaster == address(uint160(tx.paymaster)), "Paymaster mismatch");
+                require(keccak256(paymasterInput) == keccak256(tx.paymasterInput), "Paymaster input mismatch");
+            }
+            require(keccak256(op.signature) == keccak256(tx.signature), "Signature mismatch");
+
+            _handleTransaction(tx);
         }
     }
 
-    function _handleTransaction(Transaction calldata tx) private {
+    function _handleTransaction(Transaction memory tx) private {
         bytes32 txHash = bytes32(0); // TODO: Should we calculate it for user?
         bytes32 suggestedTxHash = bytes32(0); // TODO: Should we calculate it for user?
 
