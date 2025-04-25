@@ -318,7 +318,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             _l2DACommitmentScheme,
             inputChainedMsgsHash,
             inputChainedBytecodesHash,
-            _operatorInput[4 + 32 * 4:] // operator data
+            _operatorInput[4 + 32 * 4 + 64:] // TODO operator data
         );
 
         /// Native (VM) L2 to L1 log

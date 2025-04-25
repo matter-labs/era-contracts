@@ -20,8 +20,8 @@ const L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 const L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = "0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba";
 
 const L2_DA_COMMITMENT_SCHEME = {
-  EMPTY: 0,
-  NONE: 1,
+  NONE: 0,
+  EMPTY: 1,
   ROLLUP: 2,
   KECCAK: 3,
 };
@@ -202,15 +202,18 @@ describe("L1Messenger tests", () => {
       emulator.addLog(logData.logs[0].log);
       await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
       emulator.addLog(logData.messages[0].log);
+
       await expect(
-        await l1Messenger
+        l1Messenger
           .connect(bootloaderAccount)
           .publishPubdataAndClearState(
             L2_DA_COMMITMENT_SCHEME.NONE,
             await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
             { gasLimit: 1000000000 }
           )
-      ).to.be.revertedWithCustomError(l1Messenger, "InvalidDACommitmentScheme");
+      )
+        .to.be.revertedWithCustomError(l1Messenger, "InvalidDACommitmentScheme")
+        .withArgs(L2_DA_COMMITMENT_SCHEME.NONE);
     });
   });
 
