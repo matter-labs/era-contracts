@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER, L2DACommitmentScheme, STATE_DIFF_ENTRY_SIZE, L2_TO_L1_LOG_SERIALIZE_SIZE, STATE_DIFF_COMPRESSION_VERSION_NUMBER} from "../Constants.sol";
 import {EfficientCall} from "../libraries/EfficientCall.sol";
-import {BytecodeError, MalformedBytecode, ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "../SystemContractErrors.sol";
+import {ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "../SystemContractErrors.sol";
 import {Utils} from "./Utils.sol";
 
 /// TODO

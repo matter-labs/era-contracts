@@ -37,6 +37,7 @@ import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} 
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
+// solhint-disable-next-line gas-struct-packing
 struct GatewayCTMDeployerConfig {
     /// @notice Address of the aliased governance contract.
     address aliasedGovernanceAddress;
