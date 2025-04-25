@@ -93,16 +93,24 @@ library L2DAValidator {
             calldataPtr += 4;
             bytes32 reconstructedChainedMessagesHash;
             for (uint256 i = 0; i < numberOfMessages; ++i) {
-                uint32 currentMessageLength = uint32(bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4]));
+                uint32 currentMessageLength = uint32(
+                    bytes4(_totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + 4])
+                );
                 calldataPtr += 4;
                 bytes32 hashedMessage = EfficientCall.keccak(
                     _totalL2ToL1PubdataAndStateDiffs[calldataPtr:calldataPtr + currentMessageLength]
                 );
                 calldataPtr += currentMessageLength;
-                reconstructedChainedMessagesHash = keccak256(abi.encode(reconstructedChainedMessagesHash, hashedMessage));
+                reconstructedChainedMessagesHash = keccak256(
+                    abi.encode(reconstructedChainedMessagesHash, hashedMessage)
+                );
             }
             if (reconstructedChainedMessagesHash != _chainedMessagesHash) {
-                revert ReconstructionMismatch(PubdataField.MsgHash, _chainedMessagesHash, reconstructedChainedMessagesHash);
+                revert ReconstructionMismatch(
+                    PubdataField.MsgHash,
+                    _chainedMessagesHash,
+                    reconstructedChainedMessagesHash
+                );
             }
         }
 
