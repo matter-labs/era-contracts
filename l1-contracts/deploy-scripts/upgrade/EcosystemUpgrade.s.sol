@@ -239,7 +239,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        gatewayConfig.gatewayStateTransition.isOnGateway = true;
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
@@ -456,6 +455,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
             "$.gateway.gateway_state_transition.rollup_da_manager"
         );
+
+        gatewayConfig.gatewayStateTransition.isOnGateway = true;
 
         gatewayConfig.baseToken = toml.readAddress("$.gateway.base_token");
 
