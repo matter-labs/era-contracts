@@ -146,6 +146,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit NewTransactionFilterer(oldTransactionFilterer, _transactionFilterer);
     }
 
+    /// @inheritdoc IAdmin
+    function getRollupDAManager() external view returns (address) {
+        return address(ROLLUP_DA_MANAGER);
+    }
+
     /// @notice Sets the DA validator pair with the given addresses.
     /// @dev It does not check for these addresses to be non-zero, since when migrating to a new settlement
     /// layer, we set them to zero.

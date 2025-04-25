@@ -125,6 +125,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return IZKChain(getZKChain(_chainId)).getAdmin();
     }
 
+    /// @notice Returns address of the RollupDAManager of the ZK Chain.
+    function getRollupDAManager(uint256 _chainId) external view returns (address) {
+        return IZKChain(getZKChain(_chainId)).getRollupDAManager();
+    }
+
     /// @dev initialize
     /// @dev Note, that while the contract does not use `nonReentrant` modifier, we still keep the `reentrancyGuardInitializer`
     /// here for two reasons:
@@ -185,7 +190,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             genesisBatchHash: _chainCreationParams.genesisBatchHash,
             genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
+            newInitialCut: _chainCreationParams.diamondCut,
             newInitialCutHash: newInitialCutHash,
+            forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
             forceDeploymentHash: forceDeploymentHash
         });
     }

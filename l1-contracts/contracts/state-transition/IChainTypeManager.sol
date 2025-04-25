@@ -71,7 +71,9 @@ interface IChainTypeManager {
         bytes32 genesisBatchHash,
         uint64 genesisIndexRepeatedStorageChanges,
         bytes32 genesisBatchCommitment,
+        Diamond.DiamondCutData newInitialCut,
         bytes32 newInitialCutHash,
+        bytes forceDeploymentsData,
         bytes32 forceDeploymentHash
     );
 
@@ -122,6 +124,8 @@ interface IChainTypeManager {
     function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
 
     function getChainAdmin(uint256 _chainId) external view returns (address);
+
+    function getRollupDAManager(uint256 _chainId) external view returns (address);
 
     function createNewChain(
         uint256 _chainId,
