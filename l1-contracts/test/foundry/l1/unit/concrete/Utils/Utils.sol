@@ -110,13 +110,13 @@ library Utils {
         return logs;
     }
 
-    function createSystemLogsWithEmptyDAValidator() public returns (bytes[] memory) {
+    function createSystemLogsWithNoneDAValidator() public returns (bytes[] memory) {
         bytes[] memory systemLogs = createSystemLogs(bytes32(0));
         systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
-            bytes32(uint256(L2DACommitmentScheme.EMPTY))
+            bytes32(uint256(L2DACommitmentScheme.NONE))
         );
 
         return systemLogs;
