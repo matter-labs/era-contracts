@@ -232,7 +232,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition); //{isOnGateway: false});
-        generateUpgradeCutData(gatewayConfig.gatewayStateTransition); //{isOnGateway: false});
+        generateUpgradeCutData(gatewayConfig.gatewayStateTransition); //{isOnGateway: true});
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
     }
@@ -1061,7 +1061,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         uint256 deadline = getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCut = generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
-        console.logBytes(abi.encode(upgradeCut));
         gatewayConfig.upgradeCutData = abi.encode(upgradeCut);
 
         bytes memory l2Calldata = abi.encodeCall(
