@@ -97,7 +97,7 @@ library GatewayCTMDeployerHelper {
         address serverNotifierImplementation = _deployInternal(
             "ServerNotifier",
             "ServerNotifier.sol",
-            abi.encode(true),
+            abi.encode(),
             innerConfig
         );
 

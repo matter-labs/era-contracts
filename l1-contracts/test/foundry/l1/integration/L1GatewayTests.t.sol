@@ -41,6 +41,8 @@ import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
+import {GatewayUtils} from "deploy-scripts/GatewayUtils.s.sol";
+
 contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
@@ -127,20 +129,19 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
+        gatewayScript.migrateChainToGateway(migratingChainId);
         require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
-        gatewayScript.governanceSetCTMAssetHandler(bytes32(0));
-        gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        gatewayScript.fullGatewayRegistration();
     }
 
-    function test_startMessageToL3() public {
+    function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
+        gatewayScript.migrateChainToGateway(migratingChainId);
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
@@ -157,7 +158,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
+        gatewayScript.migrateChainToGateway(migratingChainId);
 
         // Setup
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
@@ -232,7 +233,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
+        gatewayScript.migrateChainToGateway(migratingChainId);
         migrateBackChain();
     }
 
@@ -288,7 +289,10 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             assetId,
             bridgehubMintData
         );
-        gatewayScript.finishMigrateChainFromGateway(
+
+        GatewayUtils userUtils = new GatewayUtils();
+        userUtils.finishMigrateChainFromGateway(
+            address(addresses.bridgehub),
             migratingChainId,
             gatewayChainId,
             0,
@@ -306,7 +310,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     }
 
     /// to increase coverage, properly tested in L2GatewayTests
-    function test_forwardToL3OnGateway() public {
+    function test_forwardToL2OnGateway() public {
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
