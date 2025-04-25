@@ -79,7 +79,7 @@ function processFile(filePath: string, fix: boolean, collectedErrors: Map<string
       const previousLine = newLines[newLines.length - 1];
       const selectorComment = `// ${selector}`;
 
-      if (!previousLine || previousLine.trim() !== selectorComment) {
+      if (!previousLine || (previousLine.trim() !== selectorComment && !previousLine.trim().startsWith("// skip-errors-lint"))) {
         if (fix) {
           // We allow fixing incorrect signature
           if (previousLine.startsWith("//")) {
