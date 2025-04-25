@@ -1,6 +1,6 @@
 # Compiler files
 cache/
-cache-tests/
+cache-forge-tests/
 out/
 out-tests/
 zkout/
