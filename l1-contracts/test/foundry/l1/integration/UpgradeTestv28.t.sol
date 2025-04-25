@@ -65,6 +65,14 @@ contract UpgradeIntegrationTest is Test {
         );
 
         // TODO add create chain call
+        address admin = ecosystemUpgrade.getBridgehubAdmin();
+        vm.startPrank(admin);
+        Call memory createNewChainCall = ecosystemUpgrade.prepareCreateNewChainCall(555)[0];
+        (bool success, bytes memory data) = payable(createNewChainCall.target).call{value: createNewChainCall.value}(
+            createNewChainCall.data
+        );
+        require(success, "Create new chain call failed");
+        vm.stopPrank();
 
         // TODO: here we should include tests that depoists work for upgraded chains
         // including era specific deposit/withdraw functions

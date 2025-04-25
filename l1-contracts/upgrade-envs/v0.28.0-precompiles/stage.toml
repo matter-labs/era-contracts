@@ -14,7 +14,7 @@ old_protocol_version = 0x1b00000000
 #l2_gas_limit = 72000000
 #l1_gas_price = 20000000000
 l2_gas_limit = 2000000
-l1_gas_price = 100
+l1_gas_price = 50000000000
 
 [contracts]
 # FIXME

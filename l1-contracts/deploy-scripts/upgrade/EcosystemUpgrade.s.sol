@@ -463,6 +463,33 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
     }
 
+    function getBridgehubAdmin() public virtual returns (address admin) {
+        admin = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+    }
+
+    function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
+        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+
+        bytes32 newChainAssetId = Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(gatewayConfig.chainId);
+        result = new Call[](1);
+        result[0] = Call({
+            target: addresses.bridgehub.bridgehubProxy,
+            value: 0,
+            data: abi.encodeCall(
+                IBridgehub.createNewChain,
+                (
+                    chainId,
+                    addresses.stateTransition.chainTypeManagerProxy,
+                    newChainAssetId,
+                    5,
+                    msg.sender,
+                    abi.encode(newlyGeneratedData.diamondCutData, newlyGeneratedData.fixedForceDeploymentsData),
+                    new bytes[](0)
+                )
+            )
+        });
+    }
+
     function setAddressesBasedOnBridgehub() internal virtual {
         config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
         address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
