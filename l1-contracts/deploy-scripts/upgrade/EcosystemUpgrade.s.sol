@@ -231,7 +231,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         console.log("Generated fixed force deployments data");
         getDiamondCutData(addresses.stateTransition); //{isOnGateway: false});
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
+        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition)); //{isOnGateway: true});
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition); //{isOnGateway: false});
         generateUpgradeCutData(gatewayConfig.gatewayStateTransition); //{isOnGateway: true});
@@ -1057,9 +1057,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         allCalls[1] = prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
 
         allCalls[2] = prepareCTMImplementationUpgrade(l2GasLimit, l1GasPrice);
-
-        // Approve required amount of base token
-        // allCalls[0] = prepareApproveGatewayBaseTokenCall(addresses.bridges.l1AssetRouterProxy, tokensRequired);
 
         calls = mergeCallsArray(allCalls);
     }

@@ -328,10 +328,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
                 l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
                 priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
                 feeParams: feeParams,
-                // blobVersionedHashRetriever: stateTransition.isOnGateway
-                //     ? ADDRESS_ONE
-                //     : addresses.blobVersionedHashRetriever
-                blobVersionedHashRetriever: ADDRESS_ONE
+                blobVersionedHashRetriever: stateTransition.isOnGateway
+                    ? ADDRESS_ONE
+                    : addresses.blobVersionedHashRetriever
             });
     }
 
