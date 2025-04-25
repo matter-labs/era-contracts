@@ -81,7 +81,7 @@ contract GatewayCTMDeployerTest is Test {
         new DualVerifier(L2VerifierFflonk(address(0)), L2VerifierPlonk(address(0)));
 
         new ValidatorTimelock(address(0), 0);
-        new ServerNotifier(false);
+        new ServerNotifier();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
         try new TransparentUpgradeableProxy(address(0), address(0), hex"") {} catch {}

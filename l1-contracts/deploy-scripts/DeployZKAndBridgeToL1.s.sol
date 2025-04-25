@@ -152,7 +152,8 @@ contract DeployZKScript is Script {
             addr,
             config.chainId,
             config.bridgehub,
-            config.l1SharedBridge
+            config.l1SharedBridge,
+            msg.sender
         );
     }
 
