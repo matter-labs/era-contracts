@@ -133,7 +133,7 @@ Special tests are not part of the main test suite and are rather run manually ag
 
 ```
 ./bin/anvil-zksync fork --fork-url [chain-rpc-url] &> era_test_node.log.anvil &
-BRIDGED_ETH_ASSET_ID=[bridged-eth-asset-id] yarn test-legacy-bridge-fix
+BRIDGED_ETH_ASSET_ID=[bridged-eth-asset-id] ALIASED_GOVERNANCE_ADDRESS=[governance-address] yarn test-legacy-bridge-fix
 ```
 
 and specifying the chain-rpc-url for the fork to test the upgrade against, and the bridged-eth-asset-id and governance-address if defined.
