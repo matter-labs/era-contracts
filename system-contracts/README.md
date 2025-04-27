@@ -129,14 +129,14 @@ Many examples can be found in [test](test).
 
 #### Special tests
 
-Special tests are not part of the main test suite and are rather run manually against an anvil-zksync fork of the chain to be upgraded. Currently there is only one special test that can be run by doing:
+Special tests are not part of the main test suite and are rather run manually against an anvil-zksync fork of the chain to be upgraded. Currently there is only one special test for the [L2LegacyBridgeFixUpgrade](contracts/L2LegacyBridgeFixUpgrade.sol) that can be run by doing:
 
 ```
-./bin/anvil-zksync fork --fork-url [chain-rpc-url] --fork-block-number [block-number] &> era_test_node.log.anvil &
-yarn test-legacy-bridge-fix
+./bin/anvil-zksync fork --fork-url [chain-rpc-url] &> era_test_node.log.anvil &
+BRIDGED_ETH_ASSET_ID=[bridged-eth-asset-id] yarn test-legacy-bridge-fix
 ```
 
-and specifying the correct chain-rpc-url and block-number for the fork to test the upgrade against.
+and specifying the chain-rpc-url for the fork to test the upgrade against, and the bridged-eth-asset-id and governance-address if defined.
 
 ## Update Process
 
