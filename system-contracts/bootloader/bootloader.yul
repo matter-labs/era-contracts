@@ -3033,14 +3033,15 @@ object "Bootloader" {
                     debugLog("Set roots blockNumber ", blockNumber)
                     debugLog("Set roots sidesLength ", sidesLength)
 
-                    if lt(setUntilBlockNumber, currentBlockNumber) {
+                    if or(lt(setUntilBlockNumber, currentBlockNumber), eq(blockNumber, MAXIMUM_L2_BLOCK_NUMBER())) {
                         debugLog("Processed all interop roots for this block", 1)
                         break
                     }
 
                     if iszero(sidesLength) {
                         debugLog("Empty sides, finishing", 0)
-                        break
+                                    break
+                        revertWithReason(NON_DUMMY_INTEROP_ROOT(), 1)
                     }
                     mstore(NEXT_INTEROP_ROOT_NUMBER_SLOT(), add(i, 1))
 
@@ -3061,6 +3062,7 @@ object "Bootloader" {
                 let sidesOffset := add(interopRootStartSlot, INTEROP_ROOT_SIDES_OFFSET_START())
                 for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
                     mstore(sidesLoadingOffset, mload(sidesOffset))
+                    debugLog("Setting interopRoot: ", mload(sidesOffset))
                     sidesOffset := add(sidesOffset, 32)
                     sidesLoadingOffset := add(sidesLoadingOffset, 32)
                 }
@@ -3091,6 +3093,7 @@ object "Bootloader" {
                 let rollingHashOfProcessedRoots := 0
                 for {let i := 0} true {i := add(i, 1)} {
                     let interopRootStartSlot := getInteropRootSlot(i)
+                    let currentBlockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET()))
                     let chainId  := mload(add(interopRootStartSlot, INTEROP_ROOT_CHAIN_ID_OFFSET())) 
                     /// Note it might be a block or batchNumber. For proof based it is a block number.
                     let blockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
@@ -3100,11 +3103,19 @@ object "Bootloader" {
                     debugLog("Send roots L1 blockNumber ", blockNumber)
                     debugLog("Send roots L1 sidesLength ", sidesLength)
 
-                    if iszero(sidesLength) {
-                        // There are no more logs, sending hash to L1.
+
+                    if eq(blockNumber, MAXIMUM_L2_BLOCK_NUMBER()) {
                         debugLog("InteropRoot hash to L1", rollingHashOfProcessedRoots)
                         sendToL1Native(true, interopRootRollingHashLogKey(), rollingHashOfProcessedRoots)
                         break
+                    }
+
+                    if iszero(sidesLength) {
+                        debugLog("Empty sides, finishing", 0)
+                                debugLog("InteropRoot hash to L1", rollingHashOfProcessedRoots)
+                                sendToL1Native(true, interopRootRollingHashLogKey(), rollingHashOfProcessedRoots)
+                                break
+                        revertWithReason(NON_DUMMY_INTEROP_ROOT(), 2)
                     }
                     /// We have an offset so we can preload the rolling hash into it later for hashing.
                     let msgRootOffset := 64 
@@ -3123,6 +3134,7 @@ object "Bootloader" {
                     case 1 {
                         // Calculate keccak256 of all data
                         mstore(36, rollingHashOfProcessedRoots) 
+                        debugLog("Hashing ", mload(add(interopRootStartSlot, INTEROP_ROOT_SIDES_OFFSET_START())))
                         rollingHashOfProcessedRoots := keccak256(36, add(32, add(64, mul(sidesLength, 32))))
                     } 
                     default {
