@@ -211,9 +211,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
+        bytes memory creationCalldata = getCreationCalldata(contractName, true);
         contractAddress = Utils.deployThroughL1Deterministic(
             getCreationCode(contractName, true),
-            getCreationCalldata(contractName, true),
+            creationCalldata,
             0,
             newConfig.l2GasLimit,
             new bytes[](0),
@@ -221,6 +222,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             addresses.bridgehub.bridgehubProxy,
             addresses.bridges.l1AssetRouterProxy
         );
+        notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName);
     }
 
     /// @notice Generate data required for the upgrade
@@ -416,41 +418,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
 
-        newConfig.l2GasLimit = toml.readUint("$.l2_gas_limit");
-        newConfig.l1GasPrice = toml.readUint("$.l1_gas_price");
+        newConfig.l2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
+        newConfig.l1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
 
         addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
-
-        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_implementation_addr"
-        );
-        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
-            "$.gateway.gateway_state_transition.verifier_addr"
-        );
-        gatewayConfig.gatewayStateTransition.adminFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.admin_facet_addr"
-        );
-        gatewayConfig.gatewayStateTransition.mailboxFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.mailbox_facet_addr"
-        );
-        gatewayConfig.gatewayStateTransition.executorFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.executor_facet_addr"
-        );
-        gatewayConfig.gatewayStateTransition.gettersFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.getters_facet_addr"
-        );
-        gatewayConfig.gatewayStateTransition.diamondInit = toml.readAddress(
-            "$.gateway.gateway_state_transition.diamond_init_addr"
-        );
-        gatewayConfig.gatewayStateTransition.genesisUpgrade = toml.readAddress(
-            "$.gateway.gateway_state_transition.genesis_upgrade_addr"
-        );
-        gatewayConfig.gatewayStateTransition.defaultUpgrade = toml.readAddress(
-            "$.gateway.gateway_state_transition.default_upgrade_addr"
-        );
-        gatewayConfig.gatewayStateTransition.validatorTimelock = toml.readAddress(
-            "$.gateway.gateway_state_transition.validator_timelock_addr"
-        );
 
         gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
@@ -461,8 +432,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
 
         gatewayConfig.gatewayStateTransition.isOnGateway = true;
-
-        gatewayConfig.baseToken = toml.readAddress("$.gateway.base_token");
 
         gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
     }
@@ -945,8 +914,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](7);
-        allCalls[0] = prepareCheckMigrationsPausedCalls();
-        allCalls[1] = prepareGovernanceUpgradeTimerCheckCall();
+        allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
+        allCalls[1] = prepareCheckMigrationsPausedCalls();
         allCalls[2] = prepareUpgradeProxiesCalls();
         allCalls[3] = prepareNewChainCreationParamsCall();
         allCalls[4] = provideSetNewVersionUpgradeCall();
@@ -1021,8 +990,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         uint256 l2GasLimit = newConfig.l2GasLimit;
         uint256 l1GasPrice = newConfig.l1GasPrice;
 
-        uint256 tokensRequired;
-
         calls = preparePauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
     }
 
@@ -1030,15 +997,17 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
-        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
         gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
         gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
+        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
 
         gatewayConfig.gatewayStateTransition.executorFacet = deployGWContract("ExecutorFacet");
         gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract("AdminFacet");
         gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
         gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract("GettersFacet");
         gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract("DiamondInit");
+        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployGWContract("DefaultUpgrade");
+        gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
         gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
 
@@ -1054,11 +1023,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         uint256 l2GasLimit = newConfig.l2GasLimit;
         uint256 l1GasPrice = newConfig.l1GasPrice;
 
-        uint256 tokensRequired;
         allCalls[0] = provideSetNewVersionUpgradeCallForGateway(l2GasLimit, l1GasPrice);
-
         allCalls[1] = prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
-
         allCalls[2] = prepareCTMImplementationUpgrade(l2GasLimit, l1GasPrice);
 
         calls = mergeCallsArray(allCalls);
@@ -1098,7 +1064,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             (upgradeCut, previousProtocolVersion, deadline, newProtocolVersion)
         );
 
-        // TODO: approve base token
         calls = _prepareL1ToGatewayCall(
             l2Calldata,
             l2GasLimit,
@@ -1122,7 +1087,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.unpauseMigration, ());
 
-        // TODO: approve base token
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDRESS);
     }
 
@@ -1434,12 +1398,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             } else {
                 return abi.encode(config.l1ChainId, gatewayConfig.gatewayStateTransition.rollupDAManager);
             }
-
-            // } else if (compareStrings(contractName, "MailboxFacet")) {
-            //     return abi.encode(config.eraChainId, config.l1ChainId);
-            // } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            //     uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-            //     return abi.encode(config.deployerAddress, executionDelay);
         } else if (compareStrings(contractName, "UpgradeStageValidator")) {
             return abi.encode(addresses.stateTransition.chainTypeManagerProxy, config.contracts.latestProtocolVersion);
         } else {

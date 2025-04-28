@@ -13,8 +13,8 @@ old_protocol_version = 0x1b00000000
 
 #l2_gas_limit = 72000000
 #l1_gas_price = 20000000000
-l2_gas_limit = 2000000
-l1_gas_price = 50000000000
+priority_txs_l2_gas_limit = 2000000
+max_expected_l1_gas_price = 50000000000
 
 [contracts]
 # FIXME
@@ -54,20 +54,8 @@ protocol_upgrade_handler_impl_address = "0x0000000000000000000000000000000000000
 token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
 
 [gateway]
-
-base_token = "0x049AB2b044A0ad97D8Fde44a45E63D10B31F7a86"
 chain_id = 123
 
 [gateway.gateway_state_transition]
-chain_type_manager_implementation_addr = "0x20DCcB8AC500c1df48AE09ca41d3cfAF4d84dF28"
 chain_type_manager_proxy_addr = "0x7f5401a0a0340f6a68fe3162e7bb3a57e262d18e"
-verifier_addr = "0xC2B2Adec31752DbBC7000b7A611c3eDac5518a2D"
-admin_facet_addr = "0x1A1c48880b7C33DBb9D7184086C90DA788B55C3c"
-mailbox_facet_addr = "0x121385DCE88da3855Dd86fCc8C431D54E23400A3"
-executor_facet_addr = "0xADa3b6059c50b7e366197387Fae223c456374237"
-getters_facet_addr = "0x2433e433f51434A9176De9e38EBBe2A1e08A4007"
-diamond_init_addr = "0x480e3FcfEDeD9D688532d459F70Ff24fE033C435"
-genesis_upgrade_addr = "0x10f0d9bbF331B8a64E59d80F5E112EB6DDe3ced6"
-default_upgrade_addr = "0xfED91a1CE7e334EbeE5b39722a5f859801CaAf50"
-validator_timelock_addr = "0xa81839237509449334c27a8c5607397962102747"
 rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
