@@ -649,7 +649,7 @@ One of the most expensive resource for a rollup is data availability, so in orde
 The contract provides two methods:
 
 - `publishCompressedBytecode` that verifies the correctness of the bytecode compression and publishes it in form of a message to the DA layer.
-- `verifyCompressedStateDiffs` that can verify the correctness of our standard state diff compression. This method is used by  [L1Messenger](../../system-contracts/contracts/L1Messenger.sol) system contract.
+- `verifyCompressedStateDiffs` that can verify the correctness of our standard state diff compression. This method is used by [L1Messenger](../../system-contracts/contracts/L1Messenger.sol) system contract.
 
 You can read more about how custom DA is handled [here](../settlement_contracts/data_availability/custom_da.md).
 
