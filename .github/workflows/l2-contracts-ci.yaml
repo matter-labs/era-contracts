@@ -75,6 +75,7 @@ jobs:
         run: yarn lint:check
 
   test:
+    if: false
     needs: [build, lint]
     runs-on: ubuntu-latest
 

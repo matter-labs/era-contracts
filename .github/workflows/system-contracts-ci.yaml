@@ -161,6 +161,8 @@ jobs:
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Use Node.js
         uses: actions/setup-node@v3
@@ -180,4 +182,4 @@ jobs:
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
       - name: Run tests using foundry
-        run: yarn sc test-foundry
+        run: yarn sc test:foundry

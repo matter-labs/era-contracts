@@ -16,16 +16,13 @@ enable_eravm_extensions = true
 suppressed_errors = ["sendtransfer"]
 
 [profile.test]
-src = 'test-foundry'
+src = 'test/foundry'
+test = 'test/foundry'
 out = "out-tests"
 libs = ["lib"]
 cache_path = "cache-forge-tests"
 evm_version = "cancun"
 solc_version = "0.8.28"
-remappings = [
-    "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
-    "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
-]
 
 [profile.test.zksync]
 zksolc = "1.5.11"
