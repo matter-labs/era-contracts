@@ -200,45 +200,14 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter");
         addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault");
 
+        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
+
         deployStateTransitionDiamondFacets();
         deployBlobVersionedHashRetriever();
-        deployGovernanceUpgradeTimer();
 
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
 
         upgradeConfig.ecosystemContractsDeployed = true;
-    }
-
-    function deployGovernanceUpgradeTimer() internal {
-        uint256 INITIAL_DELAY = newConfig.governanceUpgradeTimerInitialDelay;
-
-        uint256 MAX_ADDITIONAL_DELAY = 2 weeks;
-
-        // It may make sense to have a separate admin there, but
-        // using the same as bridgehub is just as fine.
-        address bridgehubAdmin = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
-
-        bytes memory bytecode = abi.encodePacked(
-            type(GovernanceUpgradeTimer).creationCode,
-            abi.encode(
-                INITIAL_DELAY,
-                MAX_ADDITIONAL_DELAY,
-                addresses.protocolUpgradeHandlerProxy,
-                newConfig.ecosystemAdminAddress
-            )
-        );
-
-        upgradeAddresses.upgradeTimer = deployViaCreate2(bytecode);
-        notifyAboutDeployment(
-            upgradeAddresses.upgradeTimer,
-            "GovernanceUpgradeTimer",
-            abi.encode(
-                INITIAL_DELAY,
-                MAX_ADDITIONAL_DELAY,
-                addresses.protocolUpgradeHandlerProxy,
-                newConfig.ecosystemAdminAddress
-            )
-        );
     }
 
     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
