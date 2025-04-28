@@ -182,7 +182,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DACommitmentScheme)) {
-            // TODO
             // The correct data availability pair should be set beforehand.
             revert InvalidDAForPermanentRollup();
         }

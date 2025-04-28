@@ -47,7 +47,7 @@ struct GatewayCTMDeployerConfig {
     uint256 eraChainId;
     /// @notice Chain ID of the L1 chain.
     uint256 l1ChainId;
-    /// @notice TODO
+    /// @notice The scheme of DA commitment. Different L1 validators may use different schemes.
     L2DACommitmentScheme rollupL2DACommitmentScheme;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;

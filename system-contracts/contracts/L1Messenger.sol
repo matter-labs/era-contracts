@@ -187,14 +187,14 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
 
     /// @notice Verifies that the {_operatorInput} reflects what occurred within the L1Batch and that
     ///         the compressed statediffs are equivalent to the full state diffs.
-    /// @param _l2DACommitmentScheme TODO
+    /// @param _l2DACommitmentScheme The scheme of DA commitment. Different L1 validators may use different schemes.
     /// @param _operatorInput The total pubdata and uncompressed state diffs of transactions that were
-    ///        processed in the current L1 Batch. Pubdata consists of L2 to L1 Logs, messages, deployed bytecode, and state diffs.
+    ///        processed in the current L1 Batch. Pubdata consists of L2 to L1 Logs, messages, deployed bytecodes, and state diffs.
     /// @dev Function that should be called exactly once per L1 Batch by the bootloader.
     /// @dev Checks that totalL2ToL1Pubdata is strictly packed data that should to be published to L1.
     /// @dev The data passed in also contains the encoded state diffs to be checked again, however this is aux data that is not
     ///      part of the committed pubdata.
-    /// @dev Performs calculation of L2ToL1Logs merkle tree root, "sends" such root and keccak256(totalL2ToL1Pubdata)
+    /// @dev Performs calculation of L2ToL1Logs merkle tree root, "sends" such root and L2 DA commitment
     /// to L1 using low-level (VM) L2Log.
     function publishPubdataAndClearState(
         L2DACommitmentScheme _l2DACommitmentScheme,
@@ -260,7 +260,8 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         // Shift calldata ptr past the pubdata offset and len
         calldataPtr += 64;
 
-        /// Check logs
+        /// Check logs. Full logs root hash is published even for Validiums without DA.
+        // TODO: makes sense to move to L2DAValidator as part of pubdata validation, but idk if we want to inflate audit scope
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_operatorInput[calldataPtr:calldataPtr + 4]));
         if (numberOfL2ToL1Logs > L2_TO_L1_LOGS_MERKLE_TREE_LEAVES) {
             revert ReconstructionMismatch(
@@ -314,19 +315,21 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputChainedLogsRootHash);
         }
 
-        bytes32 l2DAValidatorOutputhash = L2DAValidator.validatePubdata(
+        // Validate pubdata and make commitment. Logs are not checked since we already checked them above.
+        // Does nothing if commitment scheme is EMPTY_NO_DA.
+        bytes32 l2DAValidatorOutputhash = L2DAValidator.makeDACommitment(
             _l2DACommitmentScheme,
             inputChainedMsgsHash,
             inputChainedBytecodesHash,
-            _operatorInput[4 + 32 * 4 + 64:] // TODO operator data
+            _operatorInput[4 + 32 * 4 + 64:] // Operator data offset (as bytes slice)
         );
 
         /// Native (VM) L2 to L1 log
         SystemContractHelper.toL1(true, bytes32(uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)), fullRootHash);
         SystemContractHelper.toL1(
             true,
-            bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)), // TODO: compatibility issues? Different key?
-            bytes32(uint256(_l2DACommitmentScheme)) // TODO: compatibility issues?
+            bytes32(uint256(SystemLogKey.USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY)),
+            bytes32(uint256(_l2DACommitmentScheme))
         );
         SystemContractHelper.toL1(
             true,

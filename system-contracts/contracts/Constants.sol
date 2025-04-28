@@ -139,6 +139,8 @@ bytes1 constant CREATE2_EVM_PREFIX = 0xff;
 /// @dev Each state diff consists of 156 bytes of actual data and 116 bytes of unused padding, needed for circuit efficiency.
 uint256 constant STATE_DIFF_ENTRY_SIZE = 272;
 
+/// @dev Bytes in raw L2 to L1 log
+/// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBlock, address sender, bytes32 key, bytes32 value)
 uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
 
 /// @dev The current version of state diff compression being used.
@@ -154,7 +156,7 @@ enum SystemLogKey {
     // it is the only one that is emitted before the system contracts are upgraded.
     PREV_BATCH_HASH_KEY,
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
-    USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+    USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
