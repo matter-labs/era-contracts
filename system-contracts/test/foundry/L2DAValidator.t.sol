@@ -70,7 +70,7 @@ contract L2DAValidatorTest is Test {
             composer.correctRollingMessagesHash(),
             composer.currentRollingMessagesHash()
         );
-        finalizeAndCall(L2DACommitmentScheme.ROLLUP, revertMessage);
+        finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, revertMessage);
     }
 
     function test_incorrectChainBytecodeHash() public {
@@ -82,7 +82,7 @@ contract L2DAValidatorTest is Test {
             composer.correctRollingBytecodesHash(),
             composer.currentRollingBytecodesHash()
         );
-        finalizeAndCall(L2DACommitmentScheme.ROLLUP, revertMessage);
+        finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, revertMessage);
     }
 
     function test_incorrectStateDiffVersion() public {
@@ -94,7 +94,7 @@ contract L2DAValidatorTest is Test {
             bytes32(uint256(1)),
             bytes32(uint256(2))
         );
-        finalizeAndCall(L2DACommitmentScheme.ROLLUP, revertMessage);
+        finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, revertMessage);
     }
 
     function test_nonZeroLeftOver() public {
@@ -106,7 +106,7 @@ contract L2DAValidatorTest is Test {
             bytes32(0),
             bytes32(uint256(32))
         );
-        finalizeAndCall(L2DACommitmentScheme.ROLLUP, revertMessage);
+        finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, revertMessage);
     }
 
     function test_fullCorrectCompression() public {
@@ -144,7 +144,7 @@ contract L2DAValidatorTest is Test {
         );
         vm.mockCall(address(PUBDATA_CHUNK_PUBLISHER), chunkPubdataToBlobsData, abi.encode(blobHashes));
 
-        bytes32 operatorDAHash = finalizeAndCall(L2DACommitmentScheme.ROLLUP, new bytes(0));
+        bytes32 operatorDAHash = finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, new bytes(0));
 
         bytes32 expectedOperatorDAHash = keccak256(
             abi.encodePacked(stateDiffsHash, keccak256(totalPubdata), uint8(blobHashes.length), blobHashes)
@@ -178,7 +178,7 @@ contract L2DAValidatorTest is Test {
         );
         vm.mockCall(address(COMPRESSOR_CONTRACT), verifyCompressedStateDiffsData, abi.encodePacked(stateDiffsHash));
 
-        bytes32 operatorDAHash = finalizeAndCall(L2DACommitmentScheme.KECCAK, new bytes(0));
+        bytes32 operatorDAHash = finalizeAndCall(L2DACommitmentScheme.PUBDATA_KECCAK256, new bytes(0));
 
         bytes memory totalPubdata = composer.getTotalPubdata();
         bytes32 expectedOperatorDAHash = keccak256(abi.encodePacked(stateDiffsHash, keccak256(totalPubdata)));
@@ -187,7 +187,7 @@ contract L2DAValidatorTest is Test {
     }
 
     function test_callValidiumDAValidator() public {
-        bytes32 operatorDAHash = finalizeAndCall(L2DACommitmentScheme.EMPTY, new bytes(0));
+        bytes32 operatorDAHash = finalizeAndCall(L2DACommitmentScheme.EMPTY_NO_DA, new bytes(0));
 
         assertEq(operatorDAHash, bytes32(0));
     }

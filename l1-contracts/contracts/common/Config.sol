@@ -174,7 +174,7 @@ address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFf
 // TODO move to a better place
 enum L2DACommitmentScheme {
     NONE, // Invalid commitment scheme
-    EMPTY,
-    ROLLUP,
-    KECCAK
+    EMPTY_NO_DA,
+    PUBDATA_KECCAK256,
+    BLOBS_AND_PUBDATA_KECCAK256
 }

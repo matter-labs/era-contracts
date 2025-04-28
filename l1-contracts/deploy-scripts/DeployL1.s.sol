@@ -209,7 +209,7 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
-        return L2DACommitmentScheme.ROLLUP;
+        return L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
     }
 
     function deployVerifiers() internal {

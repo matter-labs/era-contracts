@@ -16,7 +16,7 @@ library L2DAValidator {
         bytes32 _chainedBytecodesHash,
         bytes calldata _operatorData
     ) internal returns (bytes32 outputHash) {
-        if (_l2DACommitmentScheme == L2DACommitmentScheme.EMPTY) {
+        if (_l2DACommitmentScheme == L2DACommitmentScheme.EMPTY_NO_DA) {
             // Since we do not need to publish anything to L1, we can just return 0.
             // Note, that Rollup validator sends the hash of uncompressed state diffs, since the
             // correctness of the publish pubdata depends on it. However Validium doesn't sent anything,
@@ -31,7 +31,7 @@ library L2DAValidator {
         );
 
         // TODO comments
-        if (_l2DACommitmentScheme == L2DACommitmentScheme.ROLLUP) {
+        if (_l2DACommitmentScheme == L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256) {
             /// Rollup DA commitment scheme. It will publish data that would allow to use either calldata or blobs.
 
             /// Check for calldata strict format
@@ -55,7 +55,7 @@ library L2DAValidator {
                     blobLinearHashes
                 )
             );
-        } else if (_l2DACommitmentScheme == L2DACommitmentScheme.KECCAK) {
+        } else if (_l2DACommitmentScheme == L2DACommitmentScheme.PUBDATA_KECCAK256) {
             // It will create a commitment to the pubdata that can later be verified during settlement.
 
             bytes32 fullPubdataHash = EfficientCall.keccak(_totalPubdata);
