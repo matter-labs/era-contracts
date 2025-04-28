@@ -19,7 +19,13 @@ describe("L2LegacyBridgeFixUpgrade tests", function () {
   const aliasedGovernanceAddress =
     process.env.ALIASED_GOVERNANCE_ADDRESS ||
     ethers.utils.getAddress(ethers.utils.hexlify(ethers.utils.randomBytes(20)));
-  const bridgedEthAssetId = process.env.BRIDGED_ETH_ASSET_ID || ethers.constants.HashZero;
+  const l1ChainId = process.env.L1_CHAIN_ID || 1;
+  const bridgedEthAssetId = ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(
+      ["uint256", "address", "bytes32"],
+      [l1ChainId, REAL_L2_NATIVE_TOKEN_VAULT_ADDRESS, ethers.utils.hexZeroPad(ethers.utils.hexlify(1), 32)]
+    )
+  );
 
   before(async () => {
     // Getting the old Bridged ETH version, if applicable
