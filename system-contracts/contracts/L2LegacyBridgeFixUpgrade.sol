@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import "hardhat/console.sol";
+
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
@@ -46,6 +48,13 @@ contract L2LegacyBridgeFixUpgrade {
 
         // 4. Patch the bridged ETH token metadata bug.
         fixBridgedETHBug(_bridgedEthAssetId, _aliasedGovernance);
+
+        address bridgedETHAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_bridgedEthAssetId);
+        bytes memory data = abi.encodeWithSelector(bytes4(keccak256("name()")));
+        (bool success, bytes memory returnData) = bridgedETHAddress.call(data);
+        require(success, "Call to name() failed");
+        string memory tokenName = abi.decode(returnData, (string));
+        console.log("tokenName: ", tokenName);
     }
 
     /// @notice Makes `_aliasedGovernance` the owner of the legacy shared bridge’s
