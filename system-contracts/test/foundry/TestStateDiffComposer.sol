@@ -1,4 +1,7 @@
 // SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.28;
+
 import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/interfaces/IL1Messenger.sol";
 import {Utils} from "contracts/libraries/Utils.sol";
 
@@ -77,7 +80,7 @@ contract TestStateDiffComposer {
         uncomressedStateDiffsPart = abi.encodePacked(_numberOfStateDiffs, _stateDiffs);
     }
 
-    function getTotalPubdata() public returns (bytes memory _totalPubdata) {
+    function getTotalPubdata() public view returns (bytes memory _totalPubdata) {
         _totalPubdata = abi.encodePacked(
             uint32(logsNumber),
             logs,
@@ -89,7 +92,7 @@ contract TestStateDiffComposer {
         );
     }
 
-    function generateTotalStateDiffsAndPubdata() public returns (bytes memory _totalL2ToL1PubdataAndStateDiffs) {
+    function generateTotalStateDiffsAndPubdata() public view returns (bytes memory _totalL2ToL1PubdataAndStateDiffs) {
         _totalL2ToL1PubdataAndStateDiffs = abi.encodePacked(getTotalPubdata(), uncomressedStateDiffsPart);
     }
 }
