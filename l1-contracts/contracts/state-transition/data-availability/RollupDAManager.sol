@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {ZeroAddress, InvalidL2DACommitmentScheme} from "../../common/L1ContractErrors.sol";
 import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @title The RollupManager contract
@@ -11,7 +11,7 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @notice Responsible for determining which DA pairs are allowed to be used
 /// for permanent rollups.
 contract RollupDAManager is Ownable2Step {
-    /// @dev Mapping to track the status (enabled/disabled) of each DAPair. TODO
+    /// @dev Deprecated field.
     mapping(address l1DAValidator => mapping(address l2DAValidator => bool)) public _DEPRECATED_allowedDAPairs;
     /// @dev Mapping to track the status (enabled/disabled) of each DAPair.
     mapping(address l1DAValidator => mapping(L2DACommitmentScheme => bool)) public allowedDAConfigurations;
@@ -22,11 +22,16 @@ contract RollupDAManager is Ownable2Step {
     /// @param status Boolean representing the state of the DAPair.
     event DAPairUpdated(address indexed l1DAValidator, L2DACommitmentScheme indexed l2DACommitmentScheme, bool status);
 
-    /// @dev Modifier to ensure address in DAPair is not zero address.
+    /// @dev Modifier to ensure address in DAPair is not zero address and l2DACommitmentScheme is correct scheme.
     /// @param l1DAValidator Address of the L1 data availability validator.
-    modifier validAddress(address l1DAValidator) {
+    /// @param l2DACommitmentScheme TODO
+    modifier validDAConfiguration(address l1DAValidator, L2DACommitmentScheme l2DACommitmentScheme) {
         if (l1DAValidator == address(0)) {
             revert ZeroAddress();
+        }
+
+        if (l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
+            revert InvalidL2DACommitmentScheme(uint8(l2DACommitmentScheme));
         }
         _;
     }
@@ -42,12 +47,13 @@ contract RollupDAManager is Ownable2Step {
     /// Requirements:
     ///
     /// - The `l1DAValidator` must be valid address (non-zero).
+    /// - The `l2DACommitmentScheme` must be valid scheme (not NONE).
     /// - Only the owner of the contract can call this function.
     function updateDAPair(
         address _l1DAValidator,
         L2DACommitmentScheme _l2DACommitmentScheme,
         bool _status
-    ) external onlyOwner validAddress(_l1DAValidator) {
+    ) external onlyOwner validDAConfiguration(_l1DAValidator, _l2DACommitmentScheme) {
         allowedDAConfigurations[_l1DAValidator][_l2DACommitmentScheme] = _status;
 
         emit DAPairUpdated(_l1DAValidator, _l2DACommitmentScheme, _status);
