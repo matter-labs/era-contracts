@@ -8,11 +8,9 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// @title The RollupManager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Responsible for determining which DA pairs are allowed to be used
+/// @notice Responsible for determining which DA configurations (DAPairs) are allowed to be used
 /// for permanent rollups.
 contract RollupDAManager is Ownable2Step {
-    /// @dev Deprecated field.
-    mapping(address l1DAValidator => mapping(address l2DAValidator => bool)) public _DEPRECATED_allowedDAPairs;
     /// @dev Mapping to track the status (enabled/disabled) of each DAPair.
     mapping(address l1DAValidator => mapping(L2DACommitmentScheme => bool)) public allowedDAConfigurations;
 

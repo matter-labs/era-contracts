@@ -248,7 +248,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
         return s.settlementLayer;
     }
 
-    // TODO
+    /// @inheritdoc IGetters
     function getDAValidatorPair() external view returns (address, L2DACommitmentScheme) {
         return (s.l1DAValidator, s.l2DACommitmentScheme);
     }
