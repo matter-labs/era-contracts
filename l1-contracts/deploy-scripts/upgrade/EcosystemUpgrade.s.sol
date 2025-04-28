@@ -146,7 +146,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         bool upgradeCutPrepared;
         bool factoryDepsPublished;
         bool ecosystemContractsDeployed;
-        bool ecosystemContractsDeployedGW;
         string outputPath;
     }
 
@@ -201,6 +200,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault");
 
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
+        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot");
 
         deployStateTransitionDiamondFacets();
         deployBlobVersionedHashRetriever();
@@ -233,12 +233,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         // Important, this must come after the initializeExpectedL2Addresses
         generateFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
-        getDiamondCutData(addresses.stateTransition); //{isOnGateway: false});
+        getDiamondCutData(addresses.stateTransition);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition)); //{isOnGateway: true});
+        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
-        generateUpgradeCutData(addresses.stateTransition); //{isOnGateway: false});
-        generateUpgradeCutData(gatewayConfig.gatewayStateTransition); //{isOnGateway: true});
+        generateUpgradeCutData(addresses.stateTransition);
+        generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
     }
@@ -504,7 +504,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
-        FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData(config.eraChainId);
+        FixedForceDeploymentsData memory forceDeploymentsData = prepareFixedForceDeploymentsData();
 
         newlyGeneratedData.fixedForceDeploymentsData = abi.encode(forceDeploymentsData);
         generatedData.forceDeploymentsData = abi.encode(forceDeploymentsData);
@@ -537,14 +537,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
     }
 
-    function prepareFixedForceDeploymentsData(
-        uint256 chainId
-    ) public view virtual returns (FixedForceDeploymentsData memory data) {
+    function prepareFixedForceDeploymentsData() public view virtual returns (FixedForceDeploymentsData memory data) {
         require(config.ownerAddress != address(0), "owner not set");
 
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
-            eraChainId: chainId,
+            eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
                 L2ContractsBytecodesLib.readBeaconProxyBytecode()
@@ -816,11 +814,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "validium_l1_da_validator_addr",
             addresses.daAddresses.noDAValidiumL1DAValidator
         );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "l2_wrapped_base_token_store_addr",
-            upgradeAddresses.l2WrappedBaseTokenStore
-        );
         vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", upgradeAddresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
@@ -1010,8 +1003,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
         gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
-
-        upgradeConfig.ecosystemContractsDeployedGW = true;
     }
 
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
@@ -1242,7 +1233,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](5);
+        calls = new Call[](6);
 
         calls[0] = _buildCallProxyUpgrade(
             addresses.stateTransition.chainTypeManagerProxy,
@@ -1268,6 +1259,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         calls[4] = _buildCallProxyUpgrade(
             addresses.vaults.l1NativeTokenVaultProxy,
             addresses.vaults.l1NativeTokenVaultImplementation
+        );
+
+        calls[5] = _buildCallProxyUpgrade(
+            addresses.bridgehub.messageRootProxy,
+            addresses.bridgehub.messageRootImplementation
         );
     }
 

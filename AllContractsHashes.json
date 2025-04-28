@@ -1433,11 +1433,11 @@
   },
   {
     "contractName": "l1-contracts/UpgradeStageValidator",
-    "zkBytecodeHash": "0x010000a38a1e61594128a7e0a6ab1ec4ab1f4bb10ce0b160978f6ab425942944",
+    "zkBytecodeHash": "0x010000a30efe09435380c5a68fe2c6cbc156d650f5013c7b16053166688eeb6e",
     "zkBytecodePath": "/l1-contracts/zkout/UpgradeStageValidator.sol/UpgradeStageValidator.json",
-    "evmBytecodeHash": "0x7e6154508e9ac7e1b2826591954a4af409b71a736c0f3b07ffef805a9f5ed8e2",
+    "evmBytecodeHash": "0xa8375e9f291c06cd59018a7526dc2a8819ffac0385fc4c7415b7d3d4278527cf",
     "evmBytecodePath": "/l1-contracts/out/UpgradeStageValidator.sol/UpgradeStageValidator.json",
-    "evmDeployedBytecodeHash": "0x928db008a5f8fe425fe6b01a23f5ecc6a6f6ea8f11a868b63fd427d144f3734a"
+    "evmDeployedBytecodeHash": "0x75c4f22d8918d2d7037152d5416e007b8dbbc0dd9f7569c5861dfc00b6af3f18"
   },
   {
     "contractName": "l1-contracts/UpgradeableBeacon",
