@@ -340,9 +340,15 @@ object "Bootloader" {
             /// @dev The size of each of the interop roots.
             function INTEROP_ROOT_SLOT_SIZE() -> ret {
                 // We will have to increase this to add merkle proofs. 
-                ret := 100
+                ret := 6
 
             }
+
+            /// @dev The maximum L2 block number. used for dummy interop roots.
+            function MAXIMUM_L2_BLOCK_NUMBER() -> ret {
+                ret := 4294967295
+            }
+
 
             /// @dev The number of slots dedicated for the interop roots.
             /// For each interop root we store the containing blockNumber, the chainId, the dependency blockNumber, and the sides.
@@ -3947,6 +3953,10 @@ object "Bootloader" {
                 ret := 31
             }
 
+            function NON_DUMMY_INTEROP_ROOT() -> ret {
+                ret := 32
+            }
+
             /// @dev Accepts a 1-word literal and returns its length in bytes
             /// @param str A string literal
             function getStrLen(str) -> len {
@@ -4332,7 +4342,7 @@ object "Bootloader" {
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
             /// setting all remaining interop roots, even the ones in the fictive block.
-            setInteropRootUntilBlock(9999999999999999)
+            setInteropRootUntilBlock(MAXIMUM_L2_BLOCK_NUMBER())
             sendInteropRootRollingHashToL1()
 
             l1MessengerPublishingCall()

@@ -77,6 +77,19 @@ interface IExecutor is IZKChainBase {
         bytes32 commitment;
     }
 
+    /// @notice Legacy StoredBatchInfo struct
+    /// @dev dependencyRootsRollingHash is not included in the struct
+    struct LegacyStoredBatchInfo {
+        uint64 batchNumber;
+        bytes32 batchHash;
+        uint64 indexRepeatedStorageChanges;
+        uint256 numberOfLayer1Txs;
+        bytes32 priorityOperationsHash;
+        bytes32 l2LogsTreeRoot;
+        uint256 timestamp;
+        bytes32 commitment;
+    }
+
     /// @notice Data needed to commit new batch
     /// @param batchNumber Number of the committed batch
     /// @param timestamp Unix timestamp denoting the start of the batch execution

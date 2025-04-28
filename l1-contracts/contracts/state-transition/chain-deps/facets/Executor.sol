@@ -299,11 +299,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
         // Check that we commit batches after last committed batch
         if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
-            // incorrect previous batch data
-            revert BatchHashMismatch(
-                s.storedBatchHashes[s.totalBatchesCommitted],
-                _hashStoredBatchInfo(lastCommittedBatchData)
-            );
+            if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashLegacyStoredBatchInfo(lastCommittedBatchData)) {
+                // incorrect previous batch data
+                revert BatchHashMismatch(
+                    s.storedBatchHashes[s.totalBatchesCommitted],
+                    _hashStoredBatchInfo(lastCommittedBatchData)
+                );
+            }
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
@@ -554,7 +556,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Check that the batch passed by the validator is indeed the first unverified batch
         if (_hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
+            if (_hashLegacyStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
             revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
+            }
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
@@ -726,6 +730,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Returns the keccak hash of the ABI-encoded StoredBatchInfo
     function _hashStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
         return keccak256(abi.encode(_storedBatchInfo));
+    }
+
+    /// @notice Returns the keccak hash of the ABI-encoded Legacy StoredBatchInfo
+    function _hashLegacyStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
+        LegacyStoredBatchInfo memory legacyStoredBatchInfo = LegacyStoredBatchInfo({
+            batchNumber: _storedBatchInfo.batchNumber,
+            batchHash: _storedBatchInfo.batchHash,
+            indexRepeatedStorageChanges: _storedBatchInfo.indexRepeatedStorageChanges,
+            numberOfLayer1Txs: _storedBatchInfo.numberOfLayer1Txs,
+            priorityOperationsHash: _storedBatchInfo.priorityOperationsHash,
+            l2LogsTreeRoot: _storedBatchInfo.l2LogsTreeRoot,
+            timestamp: _storedBatchInfo.timestamp,
+            commitment: _storedBatchInfo.commitment
+        });
+        return keccak256(abi.encode(legacyStoredBatchInfo));
     }
 
     /// @notice Returns true if the bit at index {_index} is 1
