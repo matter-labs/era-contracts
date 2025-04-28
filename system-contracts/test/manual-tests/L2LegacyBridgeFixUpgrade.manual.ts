@@ -38,6 +38,8 @@ describe("L2LegacyBridgeFixUpgrade tests", function () {
 
       const l2LegacyBridgeFixUpgradeFactory = await ethers.getContractFactory("L2LegacyBridgeFixUpgrade");
       await publishBytecode(l2LegacyBridgeFixUpgradeFactory.bytecode);
+      const proxyAdminFactory = await ethers.getContractFactory("ProxyAdmin");
+      await publishBytecode(proxyAdminFactory.bytecode);
       // Creating a dummy deterministic address for deployment
       const dummyDeployAddress = create2Address(
         complexUpgrader.address,
