@@ -202,10 +202,43 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         deployStateTransitionDiamondFacets();
         deployBlobVersionedHashRetriever();
+        deployGovernanceUpgradeTimer();
 
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
 
         upgradeConfig.ecosystemContractsDeployed = true;
+    }
+
+    function deployGovernanceUpgradeTimer() internal {
+        uint256 INITIAL_DELAY = newConfig.governanceUpgradeTimerInitialDelay;
+
+        uint256 MAX_ADDITIONAL_DELAY = 2 weeks;
+
+        // It may make sense to have a separate admin there, but
+        // using the same as bridgehub is just as fine.
+        address bridgehubAdmin = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+
+        bytes memory bytecode = abi.encodePacked(
+            type(GovernanceUpgradeTimer).creationCode,
+            abi.encode(
+                INITIAL_DELAY,
+                MAX_ADDITIONAL_DELAY,
+                addresses.protocolUpgradeHandlerProxy,
+                newConfig.ecosystemAdminAddress
+            )
+        );
+
+        upgradeAddresses.upgradeTimer = deployViaCreate2(bytecode);
+        notifyAboutDeployment(
+            upgradeAddresses.upgradeTimer,
+            "GovernanceUpgradeTimer",
+            abi.encode(
+                INITIAL_DELAY,
+                MAX_ADDITIONAL_DELAY,
+                addresses.protocolUpgradeHandlerProxy,
+                newConfig.ecosystemAdminAddress
+            )
+        );
     }
 
     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
@@ -942,13 +975,14 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](6);
+        Call[][] memory allCalls = new Call[][](7);
         allCalls[0] = prepareCheckMigrationsPausedCalls();
-        allCalls[1] = prepareUpgradeProxiesCalls();
-        allCalls[2] = prepareNewChainCreationParamsCall();
-        allCalls[3] = provideSetNewVersionUpgradeCall();
-        allCalls[4] = prepareDAValidatorCall();
-        allCalls[5] = prepareGatewaySpecificStage1GovernanceCalls();
+        allCalls[1] = prepareGovernanceUpgradeTimerCheckCall();
+        allCalls[2] = prepareUpgradeProxiesCalls();
+        allCalls[3] = prepareNewChainCreationParamsCall();
+        allCalls[4] = provideSetNewVersionUpgradeCall();
+        allCalls[5] = prepareDAValidatorCall();
+        allCalls[6] = prepareGatewaySpecificStage1GovernanceCalls();
         calls = mergeCallsArray(allCalls);
     }
 

@@ -64,7 +64,7 @@ contract UpgradeIntegrationTest is Test {
             ecosystemUpgrade.generateUpgradeCutData(ecosystemUpgrade.getAddresses().stateTransition)
         );
 
-        // TODO add create chain call
+        console.log("Creating new chain");
         address admin = ecosystemUpgrade.getBridgehubAdmin();
         vm.startPrank(admin);
         Call memory createNewChainCall = ecosystemUpgrade.prepareCreateNewChainCall(555)[0];
