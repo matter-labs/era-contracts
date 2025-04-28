@@ -32,7 +32,7 @@ contract L2InteropRootStorage is SystemContractBase {
             revert SidesLengthNotOne();
         }
         if (msgRoots[chainId][blockOrBatchNumber] != bytes32(0)) {
-            // revert InteropRootAlreadyExists();
+            revert InteropRootAlreadyExists();
         }
         msgRoots[chainId][blockOrBatchNumber] = sides[0];
 
