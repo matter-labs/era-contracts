@@ -17,6 +17,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -182,7 +183,7 @@ contract AcceptAdmin is Script {
         ChainAdmin chainAdmin,
         address target,
         address l1DaValidator,
-        address l2DaValidator
+        L2DACommitmentScheme l2DaCommitmentScheme
     ) public {
         IZKChain adminContract = IZKChain(target);
 
@@ -190,7 +191,7 @@ contract AcceptAdmin is Script {
         calls[0] = Call({
             target: target,
             value: 0,
-            data: abi.encodeCall(adminContract.setDAValidatorPair, (l1DaValidator, l2DaValidator))
+            data: abi.encodeCall(adminContract.setDAValidatorPair, (l1DaValidator, l2DaCommitmentScheme))
         });
 
         vm.startBroadcast();

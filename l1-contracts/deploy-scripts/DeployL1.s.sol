@@ -208,35 +208,8 @@ contract DeployL1Script is Script, DeployUtils {
         }
     }
 
-    function getRollupL2ValidatorAddress() internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
-                hex""
-            );
-    }
-
     function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
         return L2DACommitmentScheme.ROLLUP;
-    }
-
-    function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode()),
-                hex""
-            );
-    }
-
-    function getAvailL2ValidatorAddress() internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode()),
-                hex""
-            );
     }
 
     function deployVerifiers() internal {
@@ -578,10 +551,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", getRollupL2ValidatorAddress());
         vm.serializeUint("root", "expected_rollup_l2_da_commitment_scheme", uint256(getRollupL2DACommitmentScheme()));
-        vm.serializeAddress("root", "expected_no_da_validium_l2_validator_addr", getNoDAValidiumL2ValidatorAddress());
-        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getAvailL2ValidatorAddress());
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
