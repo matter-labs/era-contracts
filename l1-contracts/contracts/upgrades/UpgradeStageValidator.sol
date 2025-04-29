@@ -49,7 +49,7 @@ contract UpgradeStageValidator {
     }
 
     /// @notice Check if the upgrade data was sent to the CTM.
-    function checkChainUpgraded() external {
+    function checkProtocolUpgradePresence() external {
         uint256 protocolVersion = CHAIN_TYPE_MANAGER.protocolVersion();
 
         if (protocolVersion != NEW_PROTOCOL_VERSION) {

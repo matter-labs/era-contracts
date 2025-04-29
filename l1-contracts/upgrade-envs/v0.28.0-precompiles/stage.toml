@@ -1,23 +1,17 @@
 era_chain_id = 270
 testnet_verifier = true
-governance_upgrade_timer_initial_delay = 86400
+governance_upgrade_timer_initial_delay = 1200
+owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 
-# FIXME
-# original owner that was used to create bridgehub
-# 0x343ee72ddd8ccd80cd43d6adbc6c463a2de433a7 ?? 
-owner_address = "0x0000000000000000000000000000000000000001"
 # This should always be false for non-loadtest environments.
 support_l2_legacy_shared_bridge_test = false
 
 old_protocol_version = 0x1b00000000
 
-#l2_gas_limit = 72000000
-#l1_gas_price = 20000000000
 priority_txs_l2_gas_limit = 2000000
 max_expected_l1_gas_price = 50000000000
 
 [contracts]
-# FIXME
 governance_min_delay = 0
 
 max_number_of_chains = 100
@@ -41,14 +35,12 @@ bootloader_hash = "0x0100085f9382a7928dd83bfc529121827b5f29f18b9aa10d18aa68e1be7
 default_aa_hash = "0x010005f72e443c94460f4583fb38ef5d0c5cd9897021c41df840f91465c0392e"
 evm_emulator_hash = "0x01000d83e0329d9144ad041430fafcbc2b388e5434db8cb8a96e80157738a1da"
 bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
-transparent_proxy_admin = "0xcb7f8e556ef02771ea32f54e767d6f9742ed31c2"
 rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
 
 governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
 latest_protocol_version = 0x1c00000000
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
-protocol_upgrade_handler_impl_address = "0x0000000000000000000000000000000000000000"
 
 [tokens]
 token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"

@@ -89,6 +89,13 @@ import {DeployL1Script} from "../DeployL1.s.sol";
 contract EcosystemUpgrade is Script, DeployL1Script {
     using stdToml for string;
 
+    /**
+     * @dev Storage slot with the admin of the contract.
+     * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
+     * validated in the constructor.
+     */
+    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         ExpectedL2Addresses expectedL2Addresses;
@@ -410,8 +417,20 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         setAddressesBasedOnBridgehub();
 
-        addresses.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
+        addresses.transparentProxyAdmin = address(
+            uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
+        );
         addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
+
+        require(
+            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() ==
+                addresses.protocolUpgradeHandlerProxy,
+            "Incorrect ProtocolUpgradeHandlerProxy"
+        );
+        require(
+            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
+            "Incorrect owner"
+        );
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
@@ -440,6 +459,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         admin = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
     }
 
+    /// @notice This function is meant to only be used in tests
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
@@ -842,6 +862,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
         vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
+        vm.serializeUint(
+            "root",
+            "governance_upgrade_timer_initial_delay",
+            newConfig.governanceUpgradeTimerInitialDelay
+        );
 
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
@@ -904,9 +929,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](2);
+        Call[][] memory allCalls = new Call[][](3);
         allCalls[0] = preparePauseGatewayMigrationsCall();
         allCalls[1] = prepareGatewaySpecificStage0GovernanceCalls();
+        allCalls[2] = prepareGovernanceUpgradeTimerStartCall();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -1169,6 +1195,18 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         calls[0] = Call({target: token, data: abi.encodeCall(IERC20.approve, (spender, amount)), value: 0});
     }
 
+    /// @notice Start the upgrade timer.
+    function prepareGovernanceUpgradeTimerStartCall() public virtual returns (Call[] memory calls) {
+        require(upgradeAddresses.upgradeTimer != address(0), "upgradeTimer is zero");
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: upgradeAddresses.upgradeTimer,
+            data: abi.encodeCall(GovernanceUpgradeTimer.startTimer, ()),
+            value: 0
+        });
+    }
+
     /// @notice Double checking that the deadline has passed.
     function prepareGovernanceUpgradeTimerCheckCall() public virtual returns (Call[] memory calls) {
         require(upgradeAddresses.upgradeTimer != address(0), "upgradeTimer is zero");
@@ -1232,8 +1270,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         calls[0] = Call({
             target: upgradeAddresses.upgradeStageValidator,
-            // Double checking migrations are unpaused
-            data: abi.encodeCall(UpgradeStageValidator.checkChainUpgraded, ()),
+            // Double checking the presence of the upgrade
+            data: abi.encodeCall(UpgradeStageValidator.checkProtocolUpgradePresence, ()),
             value: 0
         });
     }
@@ -1353,8 +1391,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
                 return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return Utils.readZKFoundryBytecodeL1("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer");
-            } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-                return L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return L2ContractsBytecodesLib.readStandardERC20Bytecode();
             } else if (compareStrings(contractName, "RollupL2DAValidator")) {

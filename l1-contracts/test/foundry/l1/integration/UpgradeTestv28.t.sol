@@ -15,7 +15,7 @@ import {Test} from "forge-std/Test.sol";
 string constant ECOSYSTEM_INPUT = "/upgrade-envs/v0.28.0-precompiles/stage.toml";
 string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage.toml";
 string constant CHAIN_INPUT = "/upgrade-envs/v0.28.0-precompiles/stage-gateway.toml";
-string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-era.toml";
+string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-gateway.toml";
 
 contract UpgradeIntegrationTest is Test {
     EcosystemUpgrade ecosystemUpgrade;

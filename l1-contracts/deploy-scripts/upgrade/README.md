@@ -42,7 +42,7 @@ UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_
 
 This part will not be verified by governance as it can be done by anyone. To save up funds, we will use `MulticallWithGas` contract.
 
-### Deploying the multicall with gas contract (probably for v26 only)
+### Deploying the multicall with gas contract (for v26 only)
 
 Firstly, you should deploy the `MulticallWithGas` contract.
 
@@ -80,7 +80,7 @@ cargo run -- --ecosystem-yaml $ZKSYNC_HOME/contracts/l1-contracts/script-out/v27
 
 This part will not be verified by governance as it can be done by anyone. To save up funds, we will use `MulticallWithGas` contract.
 
-### Deploying the multicall with gas contract (probably for v26 only)
+### Deploying the multicall with gas contract (for v26 only)
 
 Firstly, you should deploy the `MulticallWithGas` contract.
 
