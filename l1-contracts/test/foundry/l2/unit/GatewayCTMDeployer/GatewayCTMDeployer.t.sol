@@ -95,7 +95,6 @@ contract GatewayCTMDeployerTest is Test {
             salt: keccak256("test-salt"),
             eraChainId: 1001,
             l1ChainId: 1,
-            rollupL2DACommitmentScheme: L2DACommitmentScheme.PUBDATA_KECCAK256,
             testnetVerifier: true,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),

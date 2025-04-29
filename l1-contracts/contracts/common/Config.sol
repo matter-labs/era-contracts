@@ -182,3 +182,6 @@ enum L2DACommitmentScheme {
     PUBDATA_KECCAK256,
     BLOBS_AND_PUBDATA_KECCAK256
 }
+
+/// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
+L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
