@@ -7,7 +7,7 @@ import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IRollupDAManager {
-    function allowedDAConfigurations(
+    function isAllowedDAConfiguration(
         address l1DAValidator,
         L2DACommitmentScheme l2DAValidator
     ) external view returns (bool);

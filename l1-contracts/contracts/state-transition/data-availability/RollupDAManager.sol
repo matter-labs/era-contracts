@@ -12,7 +12,7 @@ import {L2DACommitmentScheme} from "../../common/Config.sol";
 /// for permanent rollups.
 contract RollupDAManager is Ownable2Step {
     /// @dev Mapping to track the status (enabled/disabled) of each DAPair.
-    mapping(address l1DAValidator => mapping(L2DACommitmentScheme => bool)) public allowedDAConfigurations;
+    mapping(address l1DAValidator => mapping(L2DACommitmentScheme => bool)) public isAllowedDAConfiguration;
 
     /// @dev Emitted when a DAPair is added or updated.
     /// @param l1DAValidator Address of the L1 data availability validator.
@@ -34,7 +34,7 @@ contract RollupDAManager is Ownable2Step {
         _;
     }
 
-    /// @dev Adds or updates a DAPair in the `allowedDAConfigurations` mapping. Only callable by the contract owner.
+    /// @dev Adds or updates a DAPair in the `isAllowedDAConfiguration` mapping. Only callable by the contract owner.
     ///
     /// Emits a {DAPairUpdated} event.
     ///
@@ -52,7 +52,7 @@ contract RollupDAManager is Ownable2Step {
         L2DACommitmentScheme _l2DACommitmentScheme,
         bool _status
     ) external onlyOwner validDAConfiguration(_l1DAValidator, _l2DACommitmentScheme) {
-        allowedDAConfigurations[_l1DAValidator][_l2DACommitmentScheme] = _status;
+        isAllowedDAConfiguration[_l1DAValidator][_l2DACommitmentScheme] = _status;
 
         emit DAPairUpdated(_l1DAValidator, _l2DACommitmentScheme, _status);
     }
@@ -66,6 +66,6 @@ contract RollupDAManager is Ownable2Step {
         address _l1DAValidator,
         L2DACommitmentScheme _l2DACommitmentScheme
     ) external view returns (bool) {
-        return allowedDAConfigurations[_l1DAValidator][_l2DACommitmentScheme];
+        return isAllowedDAConfiguration[_l1DAValidator][_l2DACommitmentScheme];
     }
 }
