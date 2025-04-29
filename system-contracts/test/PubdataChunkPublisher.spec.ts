@@ -24,7 +24,7 @@ describe("PubdataChunkPublisher tests", () => {
     const hexChunkLen = blobSizeInBytes * 2; // two symbols per byte
 
     for (let i = 0; i < strippedHex.length; i += hexChunkLen) {
-      chunks.push(strippedHex.slice(i, i + hexChunkLen));
+      chunks.push(strippedHex.slice(i, i + hexChunkLen).padEnd(hexChunkLen, "0"));
     }
 
     return chunks.map((x) => ethers.utils.keccak256("0x" + x));
@@ -61,8 +61,14 @@ describe("PubdataChunkPublisher tests", () => {
       expect(result).to.be.deep.eq(chunkData(pubdata));
     });
 
-    it("Publish 2 Blobs", async () => {
+    it("Publish max Blobs", async () => {
       const pubdata = genRandHex(blobSizeInBytes * maxNumberBlobs);
+      let result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      expect(result).to.be.deep.eq(chunkData(pubdata));
+    });
+
+    it.only("Publish 1 padded blob", async () => {
+      const pubdata = genRandHex(blobSizeInBytes / 2);
       let result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
       expect(result).to.be.deep.eq(chunkData(pubdata));
     });
