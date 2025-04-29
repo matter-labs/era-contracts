@@ -13,10 +13,22 @@ describe("PubdataChunkPublisher tests", () => {
 
   let pubdataChunkPublisher: PubdataChunkPublisher;
 
-  const genRandHex = (size) => ethers.utils.hexlify(ethers.utils.randomBytes(size));
-
+  const genRandHex = (size: number) => ethers.utils.hexlify(ethers.utils.randomBytes(size));
   const blobSizeInBytes = 126_976;
   const maxNumberBlobs = 6;
+
+  const chunkData = (data: string) => {
+    const strippedHex = data.slice(2);
+    const chunks: string[] = [];
+
+    const hexChunkLen = blobSizeInBytes * 2; // two symbols per byte
+
+    for (let i = 0; i < strippedHex.length; i += hexChunkLen) {
+      chunks.push(strippedHex.slice(i, i + hexChunkLen));
+    }
+
+    return chunks.map((x) => ethers.utils.keccak256("0x" + x));
+  };
 
   before(async () => {
     await prepareEnvironment();
@@ -35,7 +47,7 @@ describe("PubdataChunkPublisher tests", () => {
     });
   });
 
-  describe("chunkPubdataToBlobs", () => {
+  describe.only("chunkPubdataToBlobs", () => {
     it("Too Much Pubdata", async () => {
       const pubdata = genRandHex(blobSizeInBytes * maxNumberBlobs + 1);
       await expect(
@@ -45,12 +57,14 @@ describe("PubdataChunkPublisher tests", () => {
 
     it("Publish 1 Blob", async () => {
       const pubdata = genRandHex(blobSizeInBytes);
-      await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      let result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      expect(result).to.be.deep.eq(chunkData(pubdata));
     });
 
     it("Publish 2 Blobs", async () => {
       const pubdata = genRandHex(blobSizeInBytes * maxNumberBlobs);
-      await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      let result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      expect(result).to.be.deep.eq(chunkData(pubdata));
     });
   });
 });

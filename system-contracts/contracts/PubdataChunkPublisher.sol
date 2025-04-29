@@ -26,12 +26,8 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher {
         blobLinearHashes = new bytes32[](blobCount);
 
         uint256 ptr;
-        assembly {
-            ptr := _pubdata.offset
-        }
-
         for (uint256 i = 0; i < blobCount; ++i) {
-            blobLinearHashes[i] = EfficientCall.keccak(_pubdata[ptr: ptr + BLOB_SIZE_BYTES]);
+            blobLinearHashes[i] = EfficientCall.keccak(_pubdata[ptr:ptr + BLOB_SIZE_BYTES]);
             ptr = ptr + BLOB_SIZE_BYTES;
         }
     }
