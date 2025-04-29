@@ -67,6 +67,10 @@ contract RollupDAManagerTest is Test {
         vm.expectRevert(abi.encodeWithSignature("InvalidL2DACommitmentScheme(uint8)", uint8(L2DACommitmentScheme.NONE)));
         rollupDAManager.updateDAPair(l1DAValidator1, L2DACommitmentScheme.NONE, true);
 
+        // Both inputs are invalid
+        vm.expectRevert(ZeroAddress.selector);
+        rollupDAManager.updateDAPair(zeroAddress, L2DACommitmentScheme.NONE, true);
+
         vm.stopPrank();
     }
 
