@@ -11,7 +11,6 @@ import {L2DAValidatorTester} from "contracts/test-contracts/L2DAValidatorTester.
 import {STATE_DIFF_ENTRY_SIZE, COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER, L2DACommitmentScheme} from "contracts/Constants.sol";
 import {ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "contracts/SystemContractErrors.sol";
 
-import {console2 as console} from "forge-std/Script.sol";
 
 contract L2DAValidatorTest is Test {
     L2DAValidatorTester internal l2DAValidator;
@@ -84,6 +83,7 @@ contract L2DAValidatorTest is Test {
     }
 
     function test_incorrectStateDiffVersion() public {
+        // solhint-disable-next-line func-named-parameters
         composer.setDummyStateDiffs(2, 0, 64, new bytes(0), 0, new bytes(0));
 
         bytes memory revertMessage = abi.encodeWithSelector(
@@ -96,6 +96,7 @@ contract L2DAValidatorTest is Test {
     }
 
     function test_nonZeroLeftOver() public {
+        // solhint-disable-next-line func-named-parameters
         composer.setDummyStateDiffs(1, 0, 64, new bytes(0), 0, new bytes(32));
 
         bytes memory revertMessage = abi.encodeWithSelector(
@@ -116,6 +117,7 @@ contract L2DAValidatorTest is Test {
         bytes memory compressedStateDiffs = new bytes(12);
         bytes memory uncompressedStateDiffs = new bytes(STATE_DIFF_ENTRY_SIZE * numberOfStateDiffs);
 
+        // solhint-disable-next-line func-named-parameters
         composer.setDummyStateDiffs(
             1,
             uint24(compressedStateDiffs.length),
@@ -160,6 +162,7 @@ contract L2DAValidatorTest is Test {
         bytes memory compressedStateDiffs = new bytes(12);
         bytes memory uncompressedStateDiffs = new bytes(STATE_DIFF_ENTRY_SIZE * numberOfStateDiffs);
 
+        // solhint-disable-next-line func-named-parameters
         composer.setDummyStateDiffs(
             1,
             uint24(compressedStateDiffs.length),
