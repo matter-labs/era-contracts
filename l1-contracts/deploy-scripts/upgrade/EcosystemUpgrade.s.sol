@@ -116,8 +116,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         uint256 governanceUpgradeTimerInitialDelay;
         uint256 oldProtocolVersion;
         address oldValidatorTimelock;
-        uint256 l2GasLimit;
-        uint256 l1GasPrice;
+        uint256 priorityTxsL2GasLimit;
+        uint256 maxExpectedL1GasPrice;
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -216,7 +216,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             getCreationCode(contractName, true),
             creationCalldata,
             0,
-            newConfig.l2GasLimit,
+            newConfig.priorityTxsL2GasLimit,
             new bytes[](0),
             gatewayConfig.chainId,
             addresses.bridgehub.bridgehubProxy,
@@ -418,8 +418,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
 
         newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
 
-        newConfig.l2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
-        newConfig.l1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
+        newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
+        newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
 
         addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
 
@@ -620,7 +620,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "chain_type_manager_proxy",
             gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
         );
-        vm.serializeAddress("gateway_state_transition", "verifier_addr", gatewayConfig.gatewayStateTransition.verifier);
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "rollup_da_manager",
+            gatewayConfig.gatewayStateTransition.rollupDAManager
+        );
         vm.serializeAddress(
             "gateway_state_transition",
             "admin_facet_addr",
@@ -673,6 +677,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         string memory gateway = vm.serializeString("gateway", "gateway_state_transition", gateway_state_transition);
 
         vm.serializeUint("root", "gateway_chain_id", gatewayConfig.chainId);
+        vm.serializeUint("root", "priority_txs_l2_gas_limit", newConfig.priorityTxsL2GasLimit);
+        vm.serializeUint("root", "max_expected_l1_gas_price", newConfig.maxExpectedL1GasPrice);
 
         vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
@@ -980,10 +986,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 l2GasLimit = newConfig.l2GasLimit;
-        uint256 l1GasPrice = newConfig.l1GasPrice;
+        uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
+        uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
 
-        calls = preparePauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
+        calls = preparePauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
     }
 
     /// @notice Deploy everything that should be deployed for GW
@@ -1011,12 +1017,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         Call[][] memory allCalls = new Call[][](3);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 l2GasLimit = newConfig.l2GasLimit;
-        uint256 l1GasPrice = newConfig.l1GasPrice;
+        uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
+        uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
 
-        allCalls[0] = provideSetNewVersionUpgradeCallForGateway(l2GasLimit, l1GasPrice);
-        allCalls[1] = prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
-        allCalls[2] = prepareCTMImplementationUpgrade(l2GasLimit, l1GasPrice);
+        allCalls[0] = provideSetNewVersionUpgradeCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[1] = prepareNewChainCreationParamsCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[2] = prepareCTMImplementationUpgrade(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1027,10 +1033,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         Call[][] memory allCalls = new Call[][](1);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 l2GasLimit = newConfig.l2GasLimit;
-        uint256 l1GasPrice = newConfig.l1GasPrice;
+        uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
+        uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
 
-        allCalls[0] = prepareUnpauseMigrationCallForGateway(l2GasLimit, l1GasPrice);
+        allCalls[0] = prepareUnpauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = mergeCallsArray(allCalls);
     }
