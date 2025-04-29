@@ -694,6 +694,37 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
+            /// @notice Returns whether the account is EOA (even if it's EIP-7702 delegated).
+            /// @param addr The address of the account to check.
+            function isEOA(addr) -> ret {
+                mstore(0, {{RIGHT_PADDED_IS_ACCOUNT_EOA_SELECTOR}})
+                mstore(4, addr)
+                let success := staticcall(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    36,
+                    0,
+                    32
+                )
+
+                // In case the call to the account code storage fails,
+                // it most likely means that the caller did not provide enough gas for
+                // the call.
+                // In case the caller is certain that the amount of gas provided is enough, i.e.
+                // (`assertSuccess` = true), then we should panic.
+                if iszero(success) {
+                    // Most likely not enough gas provided, revert the current frame.
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
+
+            function processDelegations(txDataOffset) -> ret {
+                // TODO: call AccountCodeStorage
+            }
+
             /// @dev Calculates the canonical hash of the L1->L2 transaction that will be
             /// sent to L1 as a message to the L1 contract that a certain operation has been processed.
             function getCanonicalL1TxHash(txDataOffset) -> ret {
@@ -2152,16 +2183,6 @@ object "Bootloader" {
                 }
             }
 
-            /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
-            /// @param addr The address to check
-            function isEOA(addr) -> ret {
-                ret := 0
-
-                if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
-                    ret := iszero(getRawCodeHash(addr, false))
-                }
-            }
-
             /// @dev Calls the `payForTransaction` method of an account
             function accountPayForTx(account, txDataOffset) -> success {
                 success := callAccountMethod({{PAY_FOR_TX_SELECTOR}}, account, txDataOffset)
@@ -3105,11 +3126,6 @@ object "Bootloader" {
             /// @dev This function validates only L2 transactions, since the integrity of the L1->L2
             /// transactions is enforced by the L1 smart contracts.
             function validateTypedTxStructure(innerTxDataOffset) {
-                /// Some common checks for all transactions.
-                let reservedDynamicLength := getReservedDynamicBytesLength(innerTxDataOffset)
-                if gt(reservedDynamicLength, 0) {
-                    assertionError("non-empty reservedDynamic")
-                }
                 let txType := getTxType(innerTxDataOffset)
                 switch txType
                     case 0 {
@@ -3139,6 +3155,7 @@ object "Bootloader" {
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
                         assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
+                        assertEq(getReservedDynamicBytesLength(innerTxDataOffset), 0, "reservedDynamic non zero")
                     }
                     case 1 {
                         let maxFeePerGas := getMaxFeePerGas(innerTxDataOffset)
@@ -3165,6 +3182,7 @@ object "Bootloader" {
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
                         assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
+                        assertEq(getReservedDynamicBytesLength(innerTxDataOffset), 0, "reservedDynamic non zero")
                     }
                     case 2 {
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
@@ -3188,6 +3206,35 @@ object "Bootloader" {
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
                         assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
+                        assertEq(getReservedDynamicBytesLength(innerTxDataOffset), 0, "reservedDynamic non zero")
+                    }
+                    case 4 {
+                        assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
+                        assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
+
+                        <!-- @if BOOTLOADER_TYPE!='playground_batch' -->
+
+                        let from := getFrom(innerTxDataOffset)
+                        let iseoa := isEOA(from)
+                        assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+
+                        <!-- @endif -->
+
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
+
+                        assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
+                        // reserved1 used as marker that tx doesn't have field "to"
+                        // however, for EIP7702, transactions without "to" are not allowed.
+                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
+                        assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
+                        assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
+                        assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
+                        assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
+
+                        // For EIP7702, we use `reservedDynamic` to pass encoded authorization list data.
+                        assertEq(gt(getReservedDynamicBytesLength(innerTxDataOffset), 0), 1, "reservedDynamic is zero for EIP7702")
                     }
                     case 113 {
                         let paymaster := getPaymaster(innerTxDataOffset)
@@ -3205,6 +3252,7 @@ object "Bootloader" {
                         // reserved1 used as marker that tx doesn't have field "to"
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
+                        assertEq(getReservedDynamicBytesLength(innerTxDataOffset), 0, "reservedDynamic non zero")
                     }
                     case 254 {
                         // Upgrade transaction, no need to validate as it is validated on L1.

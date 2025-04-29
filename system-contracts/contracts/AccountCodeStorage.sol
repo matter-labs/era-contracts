@@ -3,9 +3,24 @@
 pragma solidity 0.8.24;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
+import {SystemContractBase} from "./abstract/SystemContractBase.sol";
+import {Transaction} from "./libraries/TransactionHelper.sol";
+import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS, EVM_HASHES_STORAGE} from "./Constants.sol";
 import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
+
+/// @notice EIP-7702 authorization list item
+/// @dev Authorization list items are passed from the transaction
+/// through the bootloader.
+struct AuthorizationListItem {
+    uint256 chainId;
+    uint256 nonce;
+    address addr;
+    uint256 yParity;
+    uint256 r;
+    uint256 s;
+}
 
 /**
  * @author Matter Labs
@@ -20,8 +35,14 @@ import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErr
  * were published on L1 as calldata. This contract trusts the ContractDeployer and the KnownCodesStorage
  * system contracts to enforce the invariants mentioned above.
  */
-contract AccountCodeStorage is IAccountCodeStorage {
+contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
     bytes32 private constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
+
+    /// @notice Information about EIP-7702 delegated EOAs.
+    /// @dev Delegated EOAs have code hash set to the code hash of the delegation address contract.
+    /// So, in order to check whether an account is an EOA, checking for the code hash is not enough.
+    /// We need to also check whether the account is a delegated EOA.
+    mapping(address => bool) private delegatedEOAs;
 
     modifier onlyDeployer() {
         if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {
@@ -153,4 +174,73 @@ contract AccountCodeStorage is IAccountCodeStorage {
         bytes32 bytecodeHash = getRawCodeHash(_addr);
         return Utils.isCodeHashEVM(bytecodeHash);
     }
+
+    /// @notice Method for detecting whether an address is an EOA
+    /// @dev Checks whether the account either has no code hash set or is a delegated EOA.
+    function isAccountEOA(address _addr) external view override returns (bool) {
+        return delegatedEOAs[_addr] || getRawCodeHash(_addr) == 0x00;
+    }
+
+    function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
+        for (uint256 i = 0; i < authorizationList.length; i++) {
+            // Per EIP7702 rules, if any check for the tuple item fails,
+            // we must move on to the next item in the list.
+            AuthorizationListItem calldata item = authorizationList[i];
+
+            // Verify the chain ID is 0 or the ID of the current chain.
+            if (item.chainId != 0 || item.chainId != block.chainid) {
+                continue;
+            }
+
+            // Verify the nonce is less than 2**64 - 1.
+            if (item.nonce >= 0xFFFFFFFFFFFFFFFF) {
+                continue;
+            }
+
+            // Calculate EIP7702 magic:
+            // msg = keccak(MAGIC || rlp([chain_id, address, nonce]))
+            bytes memory chainIdEncoded = RLPEncoder.encodeUint256(item.chainId);
+            bytes memory addressEncoded = RLPEncoder.encodeAddress(item.addr);
+            bytes memory nonceEncoded = RLPEncoder.encodeUint256(item.nonce);
+            bytes memory listLenEncoded = RLPEncoder.encodeListLen(
+                uint64(chainIdEncoded.length + addressEncoded.length + nonceEncoded.length)
+            );
+            bytes32 message = keccak256(
+                bytes.concat(bytes1(0x05), listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
+            );
+
+            // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+            // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
+            // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
+            // signatures from current libraries generate a unique signature with an s-value in the lower half order.
+            //
+            // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
+            // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
+            // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
+            // these malleable signatures as well.
+            if (uint256(item.s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+                continue;
+            }
+
+            address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
+            emit Log("Authority");
+            emit LogAddr(authority);
+
+            // ZKsync has native account abstraction, so we only allow delegation for EOAs.
+            if (!this.isAccountEOA(authority)) {
+                continue;
+            }
+
+            if (item.nonce != NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(item.addr)) {
+                emit Log("Nonce mismatch");
+                continue;
+            }
+            delegatedEOAs[item.addr] = true;
+            // TODO: set code hash
+            // TODO: increment nonce
+        }
+    }
 }
+
+event Log(string);
+event LogAddr(address);

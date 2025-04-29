@@ -16,4 +16,6 @@ interface IAccountCodeStorage {
     function getCodeSize(uint256 _input) external view returns (uint256 codeSize);
 
     function isAccountEVM(address _addr) external view returns (bool);
+
+    function isAccountEOA(address _addr) external view returns (bool);
 }
