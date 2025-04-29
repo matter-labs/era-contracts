@@ -152,6 +152,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
     }
 
     /// @notice Sets the DA validator pair with the given values.
+    /// @param _l1DAValidator The address of the L1 DA validator.
+    /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment.
     /// @dev It does not check for these values to be non-zero, since when migrating to a new settlement
     /// layer, we set them to zero.
     function _setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) internal {
@@ -395,7 +397,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // Set the settlement to 0 - as this is the current settlement chain.
         s.settlementLayer = address(0);
 
-        _setDAValidatorPair(address(0), L2DACommitmentScheme.EMPTY_NO_DA);
+        _setDAValidatorPair(address(0), L2DACommitmentScheme.NONE);
 
         emit MigrationComplete();
     }

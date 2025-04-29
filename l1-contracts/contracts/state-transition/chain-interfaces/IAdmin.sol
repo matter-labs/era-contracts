@@ -83,7 +83,7 @@ interface IAdmin is IZKChainBase {
     /// usually these should work in pair and L1 validator typically expects a specific input from the L2 Validator.
     /// That's why we change those together to prevent admins of chains from shooting themselves in the foot.
     /// @param _l1DAValidator The address of the L1 DA validator
-    /// @param _l2DACommitmentScheme The scheme of the L2 DA validator commitment
+    /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment
     function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external;
 
     /// @notice Makes the chain as permanent rollup.
@@ -141,7 +141,7 @@ interface IAdmin is IZKChainBase {
     /// @notice The EVM emulator has been enabled
     event EnableEvmEmulator();
 
-    /// @notice New pair of DA validators set
+    /// @notice New L2 DA commitment scheme set
     event NewL2DACommitmentScheme(
         L2DACommitmentScheme indexed oldL2DACommitmentScheme,
         L2DACommitmentScheme indexed newL2DACommitmentScheme

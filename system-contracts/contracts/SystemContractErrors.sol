@@ -80,7 +80,8 @@ error NonEmptyMsgValue();
 error NotAllowedToDeployInKernelSpace();
 // 0x35278d12
 error Overflow();
-// skip-errors-lint 0x7f7b0cf7 Note: enum should be encoded as uint8 to calculate selector!
+// Note: enum should be encoded as uint8 to calculate selector!
+// skip-errors-lint 0x7f7b0cf7
 error ReconstructionMismatch(PubdataField, bytes32 expected, bytes32 actual);
 // 0x3adb5f1d
 error ShaInvalidReturnData();

@@ -20,7 +20,7 @@ contract RollupDAManager is Ownable2Step {
     /// @param status Boolean representing the state of the DAPair.
     event DAPairUpdated(address indexed l1DAValidator, L2DACommitmentScheme indexed l2DACommitmentScheme, bool status);
 
-    /// @dev Modifier to ensure address in DAPair is not zero address and l2DACommitmentScheme is correct scheme.
+    /// @dev Modifier to ensure address in DAPair is not zero address and l2DACommitmentScheme is not NONE.
     /// @param l1DAValidator Address of the L1 data availability validator.
     /// @param l2DACommitmentScheme The scheme of DA commitment. Different L1 validators may use different schemes.
     modifier validDAConfiguration(address l1DAValidator, L2DACommitmentScheme l2DACommitmentScheme) {
