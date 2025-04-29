@@ -110,7 +110,8 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     }
 
     function deployTuppWithContract(
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal virtual override returns (address implementation, address proxy) {
         revert("Not implemented tupp");
     }

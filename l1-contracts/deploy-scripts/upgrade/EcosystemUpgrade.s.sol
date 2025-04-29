@@ -197,22 +197,22 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         deployVerifiers();
         deployUpgradeStageValidator();
         // add custom upgrade deployment here instead of DefaultUpgrade if needed.
-        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
-        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
+        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
+        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
-        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub");
+        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
 
-        addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier");
-        addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter");
-        addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault");
+        addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
+        addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
+        addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault", false);
 
-        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer");
-        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot");
+        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
+        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
 
         deployStateTransitionDiamondFacets();
         deployBlobVersionedHashRetriever();
 
-        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager");
+        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
 
         upgradeConfig.ecosystemContractsDeployed = true;
     }
@@ -229,7 +229,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             addresses.bridgehub.bridgehubProxy,
             addresses.bridges.l1AssetRouterProxy
         );
-        notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName);
+        notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
     }
 
     /// @notice Generate data required for the upgrade
@@ -952,7 +952,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](4);
-        allCalls[0] = prepareCheckUpgradeHasHappenedCalls();
+        allCalls[0] = prepareCheckUpgradeIsPresent();
         allCalls[1] = prepareUnpauseGatewayMigrationsCall();
         allCalls[2] = prepareGatewaySpecificStage2GovernanceCalls();
         allCalls[3] = prepareCheckMigrationsUnpausedCalls();
@@ -1264,7 +1264,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     /// @notice Checks to make sure that the upgrade has happened.
-    function prepareCheckUpgradeHasHappenedCalls() public virtual returns (Call[] memory calls) {
+    function prepareCheckUpgradeIsPresent() public virtual returns (Call[] memory calls) {
         require(upgradeAddresses.upgradeStageValidator != address(0), "upgradeStageValidator is zero");
         calls = new Call[](1);
 
@@ -1369,8 +1369,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
                 return type(TransitionaryOwner).creationCode;
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return type(GovernanceUpgradeTimer).creationCode;
-            } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-                return L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return L2ContractsBytecodesLib.readStandardERC20Bytecode();
             } else if (compareStrings(contractName, "RollupL2DAValidator")) {
@@ -1391,6 +1389,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
                 return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return Utils.readZKFoundryBytecodeL1("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer");
+            } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
+                return L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return L2ContractsBytecodesLib.readStandardERC20Bytecode();
             } else if (compareStrings(contractName, "RollupL2DAValidator")) {
@@ -1457,7 +1457,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     }
 
     function deployUpgradeStageValidator() internal {
-        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator");
+        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////

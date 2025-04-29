@@ -124,27 +124,29 @@ contract DeployL1Script is Script, DeployUtils {
         instantiateCreate2Factory();
         deployIfNeededMulticall3();
 
-        addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier");
+        addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
 
         deployVerifiers();
 
-        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
-        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
+        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
+        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
         deployDAValidators();
-        (addresses.stateTransition.validatorTimelock) = deploySimpleContract("ValidatorTimelock");
+        (addresses.stateTransition.validatorTimelock) = deploySimpleContract("ValidatorTimelock", false);
 
-        (addresses.governance) = deploySimpleContract("Governance");
-        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable");
+        (addresses.governance) = deploySimpleContract("Governance", false);
+        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
 
-        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance);
+        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
-            "Bridgehub"
+            "Bridgehub",
+            false
         );
         (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
-            "MessageRoot"
+            "MessageRoot",
+            false
         );
 
         (
@@ -153,38 +155,45 @@ contract DeployL1Script is Script, DeployUtils {
         ) = deployServerNotifier();
 
         (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
-            "L1Nullifier"
+            "L1Nullifier",
+            false
         );
         (addresses.bridges.l1AssetRouterImplementation, addresses.bridges.l1AssetRouterProxy) = deployTuppWithContract(
-            "L1AssetRouter"
+            "L1AssetRouter",
+            false
         );
-        (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20");
-        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner("BridgedTokenBeacon", config.ownerAddress);
+        (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20", false);
+        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
+            "BridgedTokenBeacon",
+            config.ownerAddress,
+            false
+        );
         (
             addresses.vaults.l1NativeTokenVaultImplementation,
             addresses.vaults.l1NativeTokenVaultProxy
-        ) = deployTuppWithContract("L1NativeTokenVault");
+        ) = deployTuppWithContract("L1NativeTokenVault", false);
         setL1NativeTokenVaultParams();
 
         (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
-            "L1ERC20Bridge"
+            "L1ERC20Bridge",
+            false
         );
         updateSharedBridge();
         // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
         (
             addresses.bridgehub.ctmDeploymentTrackerImplementation,
             addresses.bridgehub.ctmDeploymentTrackerProxy
-        ) = deployTuppWithContract("CTMDeploymentTracker");
+        ) = deployTuppWithContract("CTMDeploymentTracker", false);
         setBridgehubParams();
 
         initializeGeneratedData();
 
-        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever");
+        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever", false);
         deployStateTransitionDiamondFacets();
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager");
+        ) = deployTuppWithContract("ChainTypeManager", false);
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
         setChainTypeManagerInServerNotifier();
@@ -237,9 +246,9 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployVerifiers() internal {
-        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
-        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk");
-        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier");
+        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
+        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
+        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -250,17 +259,17 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployDAValidators() internal {
-        addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender);
+        addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
         updateRollupDAManager();
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
-        addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator");
+        addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
 
-        addresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator");
+        addresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
 
         if (config.contracts.availL1DAValidator == address(0)) {
-            addresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge");
-            addresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator");
+            addresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge", false);
+            addresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator", false);
         } else {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
@@ -630,36 +639,44 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployTuppWithContract(
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal virtual override returns (address implementation, address proxy) {
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(contractName, addresses.transparentProxyAdmin);
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
+            contractName,
+            addresses.transparentProxyAdmin,
+            isZKBytecode
+        );
     }
 
     function deployTuppWithContractAndProxyAdmin(
         string memory contractName,
-        address proxyAdmin
+        address proxyAdmin,
+        bool isZKBytecode
     ) internal returns (address implementation, address proxy) {
         implementation = deployViaCreate2AndNotify(
             getCreationCode(contractName, false),
             getCreationCalldata(contractName, false),
             contractName,
-            string.concat(contractName, " Implementation")
+            string.concat(contractName, " Implementation"),
+            isZKBytecode
         );
 
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName)),
             contractName,
-            string.concat(contractName, " Proxy")
+            string.concat(contractName, " Proxy"),
+            isZKBytecode
         );
         return (implementation, proxy);
     }
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
         // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin);
+        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin, false);
 
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
     }
 
     function saveDiamondSelectors() public {
