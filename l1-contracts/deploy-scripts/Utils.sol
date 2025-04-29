@@ -82,6 +82,7 @@ struct StateTransitionDeployedAddresses {
     address bytecodesSupplier;
     address serverNotifierProxy;
     address serverNotifierImplementation;
+    address rollupDAManager;
     bool isOnGateway;
 }
 
@@ -234,18 +235,14 @@ library Utils {
      * @dev Returns the bytecode hash of the batch bootloader.
      */
     function getBatchBootloaderBytecodeHash() internal view returns (bytes memory) {
-        return
-            readZKFoundryBytecodeSystemContracts(
-                "proved_batch.yul/contracts-preprocessed/bootloader",
-                "proved_batch.yul"
-            );
+        return readZKFoundryBytecodeSystemContracts("proved_batch.yul", "Bootloader");
     }
 
     /**
      * @dev Returns the bytecode hash of the EVM emulator.
      */
     function getEvmEmulatorBytecodeHash() internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts("EvmEmulator.yul/contracts-preprocessed", "EvmEmulator.yul");
+        return readZKFoundryBytecodeSystemContracts("EvmEmulator.yul", "EvmEmulator");
     }
 
     /**
@@ -270,13 +267,7 @@ library Utils {
      * @dev Returns the bytecode of a given system contract in yul.
      */
     function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat(
-            "/../system-contracts/zkout/",
-            filename,
-            ".yul/contracts-preprocessed/",
-            filename,
-            ".yul.json"
-        );
+        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
 
         return readFoundryBytecode(path);
     }
@@ -285,13 +276,7 @@ library Utils {
      * @dev Returns the bytecode of a given precompile system contract.
      */
     function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat(
-            "/../system-contracts/zkout/",
-            filename,
-            ".yul/contracts-preprocessed/precompiles/",
-            filename,
-            ".yul.json"
-        );
+        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
 
         return readFoundryBytecode(path);
     }
@@ -609,7 +594,7 @@ library Utils {
         uint256 secondBridgeValue,
         bytes memory secondBridgeCalldata,
         address refundRecipient
-    ) internal view returns (Call[] memory calls) {
+    ) internal returns (Call[] memory calls) {
         (
             L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest,
             uint256 requiredValueToDeploy
@@ -940,7 +925,8 @@ library Utils {
         bytes[] memory factoryDeps,
         uint256 chainId,
         address bridgehubAddress,
-        address l1SharedBridgeProxy
+        address l1SharedBridgeProxy,
+        address refundRecipient
     ) internal {
         runL1L2Transaction({
             l2Calldata: "",
@@ -951,7 +937,7 @@ library Utils {
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
             l1SharedBridgeProxy: l1SharedBridgeProxy,
-            refundRecipient: msg.sender
+            refundRecipient: refundRecipient
         });
     }
 

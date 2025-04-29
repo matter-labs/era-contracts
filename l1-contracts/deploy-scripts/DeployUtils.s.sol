@@ -92,6 +92,7 @@ struct Config {
     uint256 l1ChainId;
     address deployerAddress;
     uint256 eraChainId;
+    uint256 gatewayChainId;
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
@@ -153,6 +154,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.eraChainId = toml.readUint("$.era_chain_id");
+        config.gatewayChainId = toml.readUint("$.gateway.chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
@@ -207,15 +209,15 @@ abstract contract DeployUtils is Create2FactoryUtils {
     }
 
     function deployStateTransitionDiamondFacets() internal {
-        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet");
-        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet");
-        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet");
-        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet");
-        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit");
+        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet", false);
+        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
+        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
+        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet", false);
+        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
     function deployBlobVersionedHashRetriever() internal {
-        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever");
+        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever", false);
     }
 
     function getFacetCuts(
@@ -334,34 +336,47 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function deploySimpleContract(string memory contractName) internal returns (address contractAddress) {
+    function deploySimpleContract(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal returns (address contractAddress) {
         contractAddress = deployViaCreate2AndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
-            contractName
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
+            contractName,
+            isZKBytecode
         );
     }
 
     function deployWithCreate2AndOwner(
         string memory contractName,
-        address owner
+        address owner,
+        bool isZKBytecode
     ) internal returns (address contractAddress) {
         contractAddress = deployWithOwnerAndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
             owner,
             contractName,
-            string.concat(contractName, " Implementation")
+            string.concat(contractName, " Implementation"),
+            isZKBytecode
         );
     }
 
     function deployTuppWithContract(
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal virtual returns (address implementation, address proxy);
 
-    function getCreationCode(string memory contractName) internal view virtual returns (bytes memory);
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual returns (bytes memory);
 
-    function getCreationCalldata(string memory contractName) internal view virtual returns (bytes memory) {
+    function getCreationCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Bridgehub")) {
