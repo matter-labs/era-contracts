@@ -140,7 +140,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
-        return super.getCreationCode(contractName, true);
+        return super.getCreationCode(contractName, false);
     }
 
     function getInitializeCalldata(
