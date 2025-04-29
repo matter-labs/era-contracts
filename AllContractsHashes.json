@@ -873,11 +873,11 @@
   },
   {
     "contractName": "l1-contracts/DefaultUpgrade",
-    "zkBytecodeHash": "0x010002c1b3042819252c95f9ab5f46e517fe289252fe8b50e56723eba61d4177",
+    "zkBytecodeHash": "0x010002c78f44229569124cd4f8fd0285a6795b0c33b05f381a949488bcb64003",
     "zkBytecodePath": "/l1-contracts/zkout/DefaultUpgrade.sol/DefaultUpgrade.json",
-    "evmBytecodeHash": "0xff710fc102e0fba52026517db3463f8900a76e217cdb263d9c4eafe2718158ad",
+    "evmBytecodeHash": "0x324e4c5eadce51161b86cac68145112b4d5d4d1d08ac380b81752f2761d5a244",
     "evmBytecodePath": "/l1-contracts/out/DefaultUpgrade.sol/DefaultUpgrade.json",
-    "evmDeployedBytecodeHash": "0x65a5916935cc49d65810e2e4d584dc4e8d26164972a5a0eb42cb870c48d7ffda"
+    "evmDeployedBytecodeHash": "0xa21ee18a561100fd760f7c3a0974149bc86638da3358f5eaadecac706729a218"
   },
   {
     "contractName": "l1-contracts/Diamond",
@@ -985,11 +985,11 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x010003c1f257a9d147af1489ddab363acf6d9036da861ab427ff0b850357b424",
+    "zkBytecodeHash": "0x010003c16917108b4c68b889f841af139429fd2f226a89a33d1f68667fd11653",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmBytecodeHash": "0x6034eaac52d2172aecef22a0c1ebc55b06634ff629190b171c89d7dd9ca35118",
+    "evmBytecodeHash": "0x7e25f86cb3b2538b7a34158bc855a15293a334545d41cc8dd9e633a1d6941a92",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmDeployedBytecodeHash": "0x75d4d0e24ed3609125c5652f920d191f29da5e383829672d7c351307bae21dfe"
+    "evmDeployedBytecodeHash": "0x1d44717c44de5bcb6e84380922619c9169c3983b3182c21f3f67da8d80bff05f"
   },
   {
     "contractName": "l1-contracts/GatewayTransactionFilterer",
@@ -1001,11 +1001,11 @@
   },
   {
     "contractName": "l1-contracts/GatewayUpgrade",
-    "zkBytecodeHash": "0x0100057d557e2106afce1091922539b224629ea74561705eb4cdfc5e6dceb0dd",
+    "zkBytecodeHash": "0x010005817a46e8cfa63c9938a0eb135443b152714d42a345786ca97dbc0cc1d7",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayUpgrade.sol/GatewayUpgrade.json",
-    "evmBytecodeHash": "0x35f4e0b31357cd37d216acb6a5b0c0b5dbcabcae2893ebe4e50ad9f760b0a373",
+    "evmBytecodeHash": "0x33e937a9e0251664775649d0136e6fd2c24b98783b8cb689f3a991abfbbe2d9b",
     "evmBytecodePath": "/l1-contracts/out/GatewayUpgrade.sol/GatewayUpgrade.json",
-    "evmDeployedBytecodeHash": "0x5ecfc2a8085929fce231c1a878ce58e5f1cac77b37a0f812146e01a790f278cc"
+    "evmDeployedBytecodeHash": "0x2e958e2fbc662cb62a6ea2c7668d538057087b051273bd10c3a94b2c29bbf8e8"
   },
   {
     "contractName": "l1-contracts/GettersFacet",
@@ -1049,11 +1049,11 @@
   },
   {
     "contractName": "l1-contracts/L1GenesisUpgrade",
-    "zkBytecodeHash": "0x010006c730a40df01dcbd82c1cd60082b97f65d57425eaad9c9b79b8278044b8",
+    "zkBytecodeHash": "0x010006c5c012346761c4bf8378a1a31ea0d04db69a37f369781fabcd612d9329",
     "zkBytecodePath": "/l1-contracts/zkout/L1GenesisUpgrade.sol/L1GenesisUpgrade.json",
-    "evmBytecodeHash": "0x50f0bc005dc9069984e00d1b908bd43a1502c13877c87c39ea76909e4d597595",
+    "evmBytecodeHash": "0x9d4ad5ce116afcb9e7378d64bcd71087b113e34d82df42fb1a52bdb9b077a6ed",
     "evmBytecodePath": "/l1-contracts/out/L1GenesisUpgrade.sol/L1GenesisUpgrade.json",
-    "evmDeployedBytecodeHash": "0x071205d074506ef8f14ea32bcc39534ed9bd2fc3fa4eb30a9586a4235a0169e6"
+    "evmDeployedBytecodeHash": "0x72230a977e3b0380374a4db9bc7973129d4fab56cbc1042596aac42476966aaf"
   },
   {
     "contractName": "l1-contracts/L1NativeTokenVault",
@@ -1433,11 +1433,11 @@
   },
   {
     "contractName": "l1-contracts/UpgradeStageValidator",
-    "zkBytecodeHash": "0x010000a30efe09435380c5a68fe2c6cbc156d650f5013c7b16053166688eeb6e",
+    "zkBytecodeHash": "0x010000a3e8b9be8fcea224da8557ac4f61717f0b68e01f4b1ad1f7844ac57e8f",
     "zkBytecodePath": "/l1-contracts/zkout/UpgradeStageValidator.sol/UpgradeStageValidator.json",
-    "evmBytecodeHash": "0xa8375e9f291c06cd59018a7526dc2a8819ffac0385fc4c7415b7d3d4278527cf",
+    "evmBytecodeHash": "0x0ddd2d6d39b37506a20617e093464c3c4ac3b9cabde47defe9e0e987cc4cc33c",
     "evmBytecodePath": "/l1-contracts/out/UpgradeStageValidator.sol/UpgradeStageValidator.json",
-    "evmDeployedBytecodeHash": "0x75c4f22d8918d2d7037152d5416e007b8dbbc0dd9f7569c5861dfc00b6af3f18"
+    "evmDeployedBytecodeHash": "0x06e43ee2956a2a8425fe9512a7440bba4fd5b2341ffd2b632f6f254f4c082743"
   },
   {
     "contractName": "l1-contracts/UpgradeableBeacon",
