@@ -47,7 +47,7 @@ describe("PubdataChunkPublisher tests", () => {
     });
   });
 
-  describe.only("chunkPubdataToBlobs", () => {
+  describe("chunkPubdataToBlobs", () => {
     it("Too Much Pubdata", async () => {
       const pubdata = genRandHex(blobSizeInBytes * maxNumberBlobs + 1);
       await expect(
@@ -57,19 +57,25 @@ describe("PubdataChunkPublisher tests", () => {
 
     it("Publish 1 Blob", async () => {
       const pubdata = genRandHex(blobSizeInBytes);
-      let result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      const result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
       expect(result).to.be.deep.eq(chunkData(pubdata));
     });
 
     it("Publish max Blobs", async () => {
       const pubdata = genRandHex(blobSizeInBytes * maxNumberBlobs);
-      let result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      const result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
       expect(result).to.be.deep.eq(chunkData(pubdata));
     });
 
-    it.only("Publish 1 padded blob", async () => {
+    it("Publish 1 padded blob", async () => {
       const pubdata = genRandHex(blobSizeInBytes / 2);
-      let result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      const result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
+      expect(result).to.be.deep.eq(chunkData(pubdata));
+    });
+
+    it("Publish 1 full and 1 padded blob", async () => {
+      const pubdata = genRandHex(blobSizeInBytes + blobSizeInBytes / 2);
+      const result = await pubdataChunkPublisher.connect(l1MessengerAccount).chunkPubdataToBlobs(pubdata);
       expect(result).to.be.deep.eq(chunkData(pubdata));
     });
   });
