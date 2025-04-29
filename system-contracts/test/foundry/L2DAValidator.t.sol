@@ -11,7 +11,6 @@ import {L2DAValidatorTester} from "contracts/test-contracts/L2DAValidatorTester.
 import {STATE_DIFF_ENTRY_SIZE, COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER, L2DACommitmentScheme} from "contracts/Constants.sol";
 import {ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "contracts/SystemContractErrors.sol";
 
-
 contract L2DAValidatorTest is Test {
     L2DAValidatorTester internal l2DAValidator;
     TestStateDiffComposer internal composer;
@@ -23,6 +22,7 @@ contract L2DAValidatorTest is Test {
         bytes memory emptyArray = new bytes(0);
 
         // Setting dummy state diffs, so it works fine.
+        // solhint-disable-next-line func-named-parameters
         composer.setDummyStateDiffs(1, 0, 64, emptyArray, 0, emptyArray);
 
         bytes memory verifyCompressedStateDiffsData = abi.encodeCall(

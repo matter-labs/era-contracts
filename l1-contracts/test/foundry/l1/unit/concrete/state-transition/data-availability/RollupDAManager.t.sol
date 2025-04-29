@@ -8,7 +8,7 @@ import {Test} from "forge-std/Test.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
-import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {ZeroAddress, InvalidL2DACommitmentScheme} from "contracts/common/L1ContractErrors.sol";
 
 contract RollupDAManagerTest is Test {
     // Instance of the contract under test
@@ -56,12 +56,16 @@ contract RollupDAManagerTest is Test {
         vm.stopPrank();
     }
 
-    function testUpdateDAPairRevertsOnZeroAddress() public {
+    function testUpdateDAPairRevertsOnInvalidInput() public {
         vm.startPrank(owner);
 
         // L1DAValidator zero
         vm.expectRevert(ZeroAddress.selector);
         rollupDAManager.updateDAPair(zeroAddress, L2DACommitmentScheme.EMPTY_NO_DA, true);
+
+        // L2DACommitmentScheme NONE
+        vm.expectRevert(abi.encodeWithSignature("InvalidL2DACommitmentScheme(uint8)", uint8(L2DACommitmentScheme.NONE)));
+        rollupDAManager.updateDAPair(l1DAValidator1, L2DACommitmentScheme.NONE, true);
 
         vm.stopPrank();
     }

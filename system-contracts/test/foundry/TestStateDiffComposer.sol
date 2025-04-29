@@ -81,6 +81,7 @@ contract TestStateDiffComposer {
     }
 
     function getTotalPubdata() public view returns (bytes memory _totalPubdata) {
+        // solhint-disable-next-line func-named-parameters
         _totalPubdata = abi.encodePacked(
             uint32(logsNumber),
             logs,
