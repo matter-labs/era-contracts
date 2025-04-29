@@ -1014,7 +1014,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        Call[][] memory allCalls = new Call[][](3);
+        Call[][] memory allCalls = new Call[][](4);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
@@ -1023,6 +1023,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         allCalls[0] = provideSetNewVersionUpgradeCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[1] = prepareNewChainCreationParamsCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[2] = prepareCTMImplementationUpgrade(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[3] = prepareDAValidatorCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1301,6 +1302,18 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             ),
             value: 0
         });
+    }
+
+    function prepareDAValidatorCallGW(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        bytes memory l2Calldata = abi.encodeCall(
+            RollupDAManager.updateDAPair,
+            (gatewayConfig.gatewayStateTransition.rollupDAManager, getExpectedL2Address("RollupL2DAValidator"), true)
+        );
+
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDRESS);
     }
 
     function getCreationCode(
