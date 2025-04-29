@@ -14,4 +14,6 @@ interface IAccountCodeStorage {
     function getCodeHash(uint256 _input) external view returns (bytes32 codeHash);
 
     function getCodeSize(uint256 _input) external view returns (uint256 codeSize);
+
+    function isAccountEVM(address _addr) external view returns (bool);
 }

@@ -13,7 +13,7 @@ era_test_node.log*
 node_modules/
 out/
 target/
-tools/data/Verifier.sol
+tools/data/*.sol
 typechain/
 yarn-debug.log*
 yarn-error.log*

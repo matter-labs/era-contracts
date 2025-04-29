@@ -17,6 +17,7 @@ import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
 /// @param verifierParams Verifier config parameters that describes the circuit to be verified
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
 /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
+/// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
 /// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
 /// @param feeParams Fee parameters to be used for L1->L2 transactions
 /// @param blobVersionedHashRetriever Address of contract used to pull the blob versioned hash for a transaction.
@@ -34,6 +35,7 @@ struct InitializeData {
     VerifierParams verifierParams;
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
+    bytes32 l2EvmEmulatorBytecodeHash;
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
     address blobVersionedHashRetriever;
@@ -43,6 +45,7 @@ struct InitializeData {
 /// @param verifierParams Verifier config parameters that describes the circuit to be verified
 /// @param l2BootloaderBytecodeHash The hash of bootloader L2 bytecode
 /// @param l2DefaultAccountBytecodeHash The hash of default account L2 bytecode
+/// @param l2EvmEmulatorBytecodeHash The hash of EVM emulator L2 bytecode
 /// @param priorityTxMaxGasLimit maximum number of the L2 gas that a user can request for L1 -> L2 transactions
 /// @param feeParams Fee parameters to be used for L1->L2 transactions
 /// @param blobVersionedHashRetriever Address of contract used to pull the blob versioned hash for a transaction.
@@ -51,6 +54,7 @@ struct InitializeDataNewChain {
     VerifierParams verifierParams;
     bytes32 l2BootloaderBytecodeHash;
     bytes32 l2DefaultAccountBytecodeHash;
+    bytes32 l2EvmEmulatorBytecodeHash;
     uint256 priorityTxMaxGasLimit;
     FeeParams feeParams;
     address blobVersionedHashRetriever;

@@ -20,6 +20,9 @@ interface IChainAdmin {
     /// @notice Emitted when a restriction is removed.
     event RestrictionRemoved(address indexed restriction);
 
+    /// @notice The EVM emulator has been enabled
+    event EnableEvmEmulator();
+
     /// @notice Returns the list of active restrictions.
     function getRestrictions() external view returns (address[] memory);
 

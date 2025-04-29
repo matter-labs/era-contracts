@@ -71,7 +71,7 @@ library PriorityTree {
     /// It does not check that e.g. there are no zero items inside the provided `itemHashes`, so in theory proofs
     /// that include non-existing priority operations could be created. This function relies on the fact
     /// that the `itemHashes` of `_priorityOpsData` are hashes of valid priority transactions.
-    /// This fact is ensures by the fact the rolling hash of those is sent to the Executor by the bootloader
+    /// This fact is ensured by the fact the rolling hash of those is sent to the Executor by the bootloader
     /// and so assuming that zero knowledge proofs are correct, so is the structure of the `itemHashes`.
     function processBatch(Tree storage _tree, PriorityOpsBatchInfo memory _priorityOpsData) internal {
         if (_priorityOpsData.itemHashes.length > 0) {

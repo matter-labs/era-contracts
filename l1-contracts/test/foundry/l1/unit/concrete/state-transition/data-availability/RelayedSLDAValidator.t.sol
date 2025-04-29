@@ -20,9 +20,9 @@ contract RelayedSLDAValidatorTest is Test {
 
     function setUp() public {
         daValidator = new RelayedSLDAValidator();
-        vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, abi.encode(address(daValidator)));
+        vm.etch(address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR), abi.encode(address(daValidator)));
         vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
             abi.encodeWithSelector(IL1Messenger.sendToL1.selector),
             abi.encode(bytes32(0))
         );

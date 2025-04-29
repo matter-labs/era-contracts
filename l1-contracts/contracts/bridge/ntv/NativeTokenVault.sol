@@ -111,9 +111,12 @@ abstract contract NativeTokenVault is
     }
 
     /// @inheritdoc INativeTokenVault
-    function ensureTokenIsRegistered(address _nativeToken) public {
-        if (assetId[_nativeToken] == bytes32(0)) {
-            _registerToken(_nativeToken);
+    function ensureTokenIsRegistered(address _nativeToken) public returns (bytes32 tokenAssetId) {
+        bytes32 currentAssetId = assetId[_nativeToken];
+        if (currentAssetId == bytes32(0)) {
+            tokenAssetId = _registerToken(_nativeToken);
+        } else {
+            tokenAssetId = currentAssetId;
         }
     }
 
@@ -122,7 +125,7 @@ abstract contract NativeTokenVault is
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetHandler
-    /// @notice Used when the chain receives a transfer from L1 Shared Bridge and correspondingly mints the asset.
+    /// @notice Used when the chain receives a transfer from another chain's Asset Router and correspondingly mints the asset.
     /// @param _chainId The chainId that the message is from.
     /// @param _assetId The assetId of the asset being bridged.
     /// @param _data The abi.encoded transfer data.
@@ -482,7 +485,7 @@ abstract contract NativeTokenVault is
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
         if (_assetId != expectedAssetId) {
             // Make sure that a NativeTokenVault sent the message
-            revert AssetIdMismatch(_assetId, expectedAssetId);
+            revert AssetIdMismatch(expectedAssetId, _assetId);
         }
     }
 

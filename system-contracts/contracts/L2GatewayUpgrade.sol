@@ -5,7 +5,7 @@ pragma solidity 0.8.24;
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 
-import {L2GatewayUpgradeHelper} from "./L2GatewayUpgradeHelper.sol";
+import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
@@ -35,7 +35,7 @@ contract L2GatewayUpgrade {
         bytes memory _fixedForceDeploymentsData,
         bytes memory _additionalForceDeploymentsData
     ) {
-        L2GatewayUpgradeHelper.performForceDeployedContractsInit(
+        L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             _ctmDeployer,
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData

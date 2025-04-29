@@ -763,7 +763,16 @@
     proper-lockfile "^4.1.2"
     semver "^7.5.1"
 
-"@matterlabs/hardhat-zksync-solc@=1.1.4", "@matterlabs/hardhat-zksync-solc@^1.0.5", "@matterlabs/hardhat-zksync-solc@^1.1.4":
+"@matterlabs/hardhat-zksync-solc@^0.3.15":
+  version "0.3.17"
+  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-solc/-/hardhat-zksync-solc-0.3.17.tgz#72f199544dc89b268d7bfc06d022a311042752fd"
+  integrity sha512-aZgQ0yfXW5xPkfuEH1d44ncWV4T2LzKZd0VVPo4PL5cUrYs2/II1FaEDp5zsf3FxOR1xT3mBsjuSrtJkk4AL8Q==
+  dependencies:
+    "@nomiclabs/hardhat-docker" "^2.0.0"
+    chalk "4.1.2"
+    dockerode "^3.3.4"
+
+"@matterlabs/hardhat-zksync-solc@^1.0.5", "@matterlabs/hardhat-zksync-solc@^1.1.4":
   version "1.1.4"
   resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-solc/-/hardhat-zksync-solc-1.1.4.tgz#04a2fad6fb6b6944c64ad969080ee65b9af3f617"
   integrity sha512-4/usbogh9neewR2/v8Dn2OzqVblZMUuT/iH2MyPZgPRZYQlL4SlZtMvokU9UQjZT6iSoaKCbbdWESHDHSzfUjA==
@@ -779,15 +788,6 @@
     sinon "^17.0.1"
     sinon-chai "^3.7.0"
     undici "^5.14.0"
-
-"@matterlabs/hardhat-zksync-solc@^0.3.15":
-  version "0.3.17"
-  resolved "https://registry.yarnpkg.com/@matterlabs/hardhat-zksync-solc/-/hardhat-zksync-solc-0.3.17.tgz#72f199544dc89b268d7bfc06d022a311042752fd"
-  integrity sha512-aZgQ0yfXW5xPkfuEH1d44ncWV4T2LzKZd0VVPo4PL5cUrYs2/II1FaEDp5zsf3FxOR1xT3mBsjuSrtJkk4AL8Q==
-  dependencies:
-    "@nomiclabs/hardhat-docker" "^2.0.0"
-    chalk "4.1.2"
-    dockerode "^3.3.4"
 
 "@matterlabs/hardhat-zksync-solc@^1.2.5":
   version "1.2.5"
@@ -1251,13 +1251,11 @@
   integrity sha512-+Wz0hwmJGSI17B+BhU/qFRZ1l6/xMW82QGXE/Gi+WTmwgJrQefuBs1lIf7hzQ1hLk6hpkvb/zwcNkpVKRYTQYg==
 
 "@openzeppelin/contracts-upgradeable-v4@npm:@openzeppelin/contracts-upgradeable@4.9.5", "@openzeppelin/contracts-upgradeable@4.9.5":
-  name "@openzeppelin/contracts-upgradeable-v4"
   version "4.9.5"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts-upgradeable/-/contracts-upgradeable-4.9.5.tgz#572b5da102fc9be1d73f34968e0ca56765969812"
   integrity sha512-f7L1//4sLlflAN7fVzJLoRedrf5Na3Oal5PZfIq55NFcVZ90EpV1q5xOvL4lFvg3MNICSDr2hH0JUBxwlxcoPg==
 
 "@openzeppelin/contracts-v4@npm:@openzeppelin/contracts@4.9.5", "@openzeppelin/contracts@4.9.5":
-  name "@openzeppelin/contracts-v4"
   version "4.9.5"
   resolved "https://registry.yarnpkg.com/@openzeppelin/contracts/-/contracts-4.9.5.tgz#1eed23d4844c861a1835b5d33507c1017fa98de8"
   integrity sha512-ZK+W5mVhRppff9BE6YdR8CC52C8zAvsVAiWhEtQ5+oNxFE6h1WdeWo+FJSF8KKvtxxVYZ7MTP/5KoVpAU3aSWg==
@@ -1464,9 +1462,9 @@
     "@sinonjs/commons" "^3.0.0"
 
 "@sinonjs/fake-timers@^13.0.1":
-  version "13.0.5"
-  resolved "https://registry.yarnpkg.com/@sinonjs/fake-timers/-/fake-timers-13.0.5.tgz#36b9dbc21ad5546486ea9173d6bea063eb1717d5"
-  integrity sha512-36/hTbH2uaWuGVERyC6da9YwGWnzUZXuPro/F2LfsdOsLnCojz/iSH8MxUt/FD2S5XBSVPhmArFUXcpCQ2Hkiw==
+  version "13.0.2"
+  resolved "https://registry.yarnpkg.com/@sinonjs/fake-timers/-/fake-timers-13.0.2.tgz#3ffe88abb062067a580fdfba706ad00435a0f2a6"
+  integrity sha512-4Bb+oqXZTSTZ1q27Izly9lv8B9dlV61CROxPiVtywwzv5SnytJqhvYe6FclHYuXml4cd1VHPo1zd5PmTeJozvA==
   dependencies:
     "@sinonjs/commons" "^3.0.1"
 
@@ -7788,9 +7786,9 @@ undici@^5.14.0:
     "@fastify/busboy" "^2.0.0"
 
 undici@^6.18.2:
-  version "6.20.1"
-  resolved "https://registry.yarnpkg.com/undici/-/undici-6.20.1.tgz#fbb87b1e2b69d963ff2d5410a40ffb4c9e81b621"
-  integrity sha512-AjQF1QsmqfJys+LXfGTNum+qw4S88CojRInG/6t31W/1fk6G59s92bnAvGz5Cmur+kQv2SURXEvvudLmbrE8QA==
+  version "6.19.8"
+  resolved "https://registry.yarnpkg.com/undici/-/undici-6.19.8.tgz#002d7c8a28f8cc3a44ff33c3d4be4d85e15d40e1"
+  integrity sha512-U8uCCl2x9TK3WANvmBavymRzxbfFYG+tAu+fgx3zxQy3qdagQqBLwJVrdyO1TBfUXvfKveMKJZhpvUYoOjM+4g==
 
 universalify@^0.1.0:
   version "0.1.2"

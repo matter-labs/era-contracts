@@ -134,7 +134,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         if (isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex]) {
             revert WithdrawalAlreadyFinalized();
         }
-        // We don't need to set finalizeWithdrawal here, as we set it in the shared bridge
+        // We don't need to set finalizeWithdrawal here, as we set it in the L1 Nullifier
 
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
             chainId: ERA_CHAIN_ID,
@@ -221,7 +221,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
                             ERA LEGACY FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev Transfers tokens from the depositor address to the native token vault address.
+    /// @dev Transfers tokens from the depositor address to this contract and force approves those
+    /// to the asset router address.
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _approveFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));

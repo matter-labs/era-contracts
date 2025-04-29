@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {BytecodeError, MalformedBytecode, LengthIsNotDivisibleBy32} from "../L1ContractErrors.sol";
 
 import {UncheckedMath} from "./UncheckedMath.sol";
-import {L2_MESSENGER} from "../L2ContractAddresses.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../L2ContractAddresses.sol";
 
 /**
  * @author Matter Labs
@@ -50,13 +50,14 @@ library L2ContractHelper {
     bytes32 private constant CREATE2_PREFIX = keccak256("zksyncCreate2");
 
     /// @dev Prefix used during derivation of account addresses using CREATE
+    /// @dev keccak256("zksyncCreate")
     bytes32 private constant CREATE_PREFIX = 0x63bae3a9951d38e8a3fbb7b70909afc1200610fc5bc55ade242f815974674f23;
 
     /// @notice Sends L2 -> L1 arbitrary-long message through the system contract messenger.
     /// @param _message Data to be sent to L1.
     /// @return keccak256 hash of the sent message.
     function sendMessageToL1(bytes memory _message) internal returns (bytes32) {
-        return L2_MESSENGER.sendToL1(_message);
+        return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(_message);
     }
 
     /// @notice Validate the bytecode format and calculate its hash.
@@ -184,7 +185,7 @@ library L2ContractHelper {
         for (uint256 i = 0; i < factoryDepsLen; i = i.uncheckedInc()) {
             bytes32 hashedBytecode = hashL2Bytecode(_factoryDeps[i]);
 
-            // Store the resulting hash sequentially in bytes.
+            // Store the resulting hash sequentially in words.
             assembly {
                 mstore(add(hashedFactoryDeps, mul(add(i, 1), 32)), hashedBytecode)
             }

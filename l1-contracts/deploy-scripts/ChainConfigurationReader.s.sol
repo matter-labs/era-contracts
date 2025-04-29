@@ -4,7 +4,7 @@ pragma solidity ^0.8.21;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {IZkSyncHyperchain} from "contracts/state-transition/chain-interfaces/IZkSyncHyperchain.sol";
-import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZkSyncHyperchainStorage.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {StateTransitionManager} from "contracts/state-transition/StateTransitionManager.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";

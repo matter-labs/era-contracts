@@ -44,6 +44,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     address public coinbase = BOOTLOADER_FORMAL_ADDRESS;
 
     /// @notice Formal `block.difficulty` parameter.
+    /// @dev (!) EVM emulator doesn't expect this value to change
     uint256 public difficulty = 2.5e15;
 
     /// @notice The `block.basefee`.

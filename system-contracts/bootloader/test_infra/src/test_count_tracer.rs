@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
-use multivm::interface::dyn_tracers::vm_1_5_0::DynTracer;
-use multivm::vm_latest::{HistoryMode, SimpleMemory, VmTracer};
-use multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateData};
 use once_cell::sync::OnceCell;
-use zksync_state::{StoragePtr, WriteStorage};
+use zksync_multivm::tracers::dynamic::vm_1_5_0::DynTracer;
+use zksync_multivm::vm_latest::{HistoryMode, SimpleMemory, VmTracer};
+use zksync_multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateData};
+use zksync_state::interface::{StoragePtr, WriteStorage};
 
 use crate::hook::TestVmHook;
 

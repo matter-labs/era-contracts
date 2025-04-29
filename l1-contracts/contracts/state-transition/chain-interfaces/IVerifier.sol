@@ -20,5 +20,5 @@ interface IVerifier {
 
     /// @notice Calculates a keccak256 hash of the runtime loaded verification keys.
     /// @return vkHash The keccak256 hash of the loaded verification keys.
-    function verificationKeyHash() external pure returns (bytes32);
+    function verificationKeyHash() external view returns (bytes32);
 }

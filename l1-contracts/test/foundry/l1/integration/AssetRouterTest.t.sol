@@ -36,7 +36,7 @@ import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/Bridg
 import {IBridgedStandardToken} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -81,7 +81,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function depositToL1(address _tokenAddress) public {
         vm.mockCall(
-            address(bridgehub),
+            address(addresses.bridgehub),
             abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
@@ -94,7 +94,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             _amount: 100,
             _erc20Metadata: BridgeHelper.getERC20Getters(_tokenAddress, chainId)
         });
-        l1Nullifier.finalizeDeposit(
+        addresses.l1Nullifier.finalizeDeposit(
             FinalizeL1DepositParams({
                 chainId: chainId,
                 l2BatchNumber: 1,
@@ -110,7 +110,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 merkleProof: new bytes32[](0)
             })
         );
-        tokenL1Address = l1NativeTokenVault.tokenAddress(l2TokenAssetId);
+        tokenL1Address = addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId);
     }
 
     function test_DepositToL1_Success() public {
@@ -119,7 +119,9 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function test_BridgeTokenFunctions() public {
         depositToL1(ETH_TOKEN_ADDRESS);
-        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
+        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(
+            addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId)
+        );
         assertEq(bridgedToken.name(), "Ether");
         assertEq(bridgedToken.symbol(), "ETH");
         assertEq(bridgedToken.decimals(), 18);
@@ -127,8 +129,10 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function test_reinitBridgedToken_Success() public {
         depositToL1(ETH_TOKEN_ADDRESS);
-        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
-        address owner = l1NativeTokenVault.owner();
+        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(
+            addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId)
+        );
+        address owner = addresses.l1NativeTokenVault.owner();
         vm.broadcast(owner);
         bridgedToken.reinitializeToken(
             BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}),
@@ -140,7 +144,9 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function test_reinitBridgedToken_WrongVersion() public {
         depositToL1(ETH_TOKEN_ADDRESS);
-        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
+        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(
+            addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId)
+        );
         vm.expectRevert(NonSequentialVersion.selector);
         bridgedToken.reinitializeToken(
             BridgedStandardERC20.ERC20Getters({ignoreName: false, ignoreSymbol: false, ignoreDecimals: false}),
@@ -153,7 +159,9 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     /// @dev We should not test this on the L1, but to get coverage we do.
     function test_BridgeTokenBurn() public {
         depositToL1(ETH_TOKEN_ADDRESS);
-        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(l1NativeTokenVault.tokenAddress(l2TokenAssetId));
+        BridgedStandardERC20 bridgedToken = BridgedStandardERC20(
+            addresses.l1NativeTokenVault.tokenAddress(l2TokenAssetId)
+        );
         // setting nativeTokenVault to zero address.
         vm.store(address(bridgedToken), bytes32(uint256(207)), bytes32(0));
         vm.mockCall(
@@ -171,8 +179,8 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
         );
-        IERC20(tokenL1Address).approve(address(l1NativeTokenVault), 100);
-        bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
+        IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
+        addresses.bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
@@ -180,7 +188,7 @@ contract AssetRouterTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 l2GasLimit: 1000000,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 refundRecipient: address(0),
-                secondBridgeAddress: address(sharedBridge),
+                secondBridgeAddress: address(addresses.sharedBridge),
                 secondBridgeValue: 0,
                 secondBridgeCalldata: secondBridgeCalldata
             })
