@@ -393,7 +393,7 @@
   },
   {
     "contractName": "l2-contracts/ConsensusRegistry",
-    "zkBytecodeHash": "0x010003b5263cde96c7f35ff01cbcec3e07b6b9ccc41db330011bd7f26a636c80",
+    "zkBytecodeHash": "0x01000515e29e2d5ae048cb22f4e2863b8e34c068805cefb523ea9c9616cdb6dd",
     "zkBytecodePath": "/l2-contracts/zkout/ConsensusRegistry.sol/ConsensusRegistry.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
