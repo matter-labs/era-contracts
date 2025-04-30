@@ -28,7 +28,7 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ChainTypeManager} from "../ChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
-import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
+import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
