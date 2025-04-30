@@ -446,13 +446,22 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
         );
 
+        gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
+            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
+        );
+
         gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
             "$.gateway.gateway_state_transition.rollup_da_manager"
+        );
+
+        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
+            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
         );
 
         gatewayConfig.gatewayStateTransition.isOnGateway = true;
 
         gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
+        config.gatewayChainId = gatewayConfig.chainId;
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
@@ -642,8 +651,18 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
         vm.serializeAddress(
             "gateway_state_transition",
+            "chain_type_manager_proxy_admin",
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
             "rollup_da_manager",
             gatewayConfig.gatewayStateTransition.rollupDAManager
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "rollup_l2_da_validator",
+            gatewayConfig.gatewayStateTransition.rollupSLDAValidator
         );
         vm.serializeAddress(
             "gateway_state_transition",
@@ -1157,7 +1176,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             l2Calldata,
             l2GasLimit,
             l1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
         );
     }
 
@@ -1348,10 +1367,19 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (gatewayConfig.gatewayStateTransition.rollupDAManager, getExpectedL2Address("RollupL2DAValidator"), true)
+            (
+                gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
+                getExpectedL2Address("RollupL2DAValidator"),
+                true
+            )
         );
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDRESS);
+        calls = _prepareL1ToGatewayCall(
+            l2Calldata,
+            l2GasLimit,
+            l1GasPrice,
+            gatewayConfig.gatewayStateTransition.rollupDAManager
+        );
     }
 
     function getCreationCode(

@@ -15,7 +15,7 @@ max_expected_l1_gas_price = 50000000000
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x1000000000000000000000000000000000000000000000000000000000000001"
+create2_factory_salt = "0x83de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb7"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 validator_timelock_execution_delay = 0
 genesis_root = "0x85fa0abaa93032259defb7bc3d060f1fcce909600a71841e9a578db386723966"
@@ -51,3 +51,5 @@ chain_id = 123
 [gateway.gateway_state_transition]
 chain_type_manager_proxy_addr = "0x7f5401a0a0340f6a68fe3162e7bb3a57e262d18e"
 rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
+chain_type_manager_proxy_admin = "0x0f7bef9694575a0e149dad6808d69f678746608b"
+rollup_sl_da_validator = "0x719A5aE8dF7468C7E1C22278eD3fD472e9904604"
