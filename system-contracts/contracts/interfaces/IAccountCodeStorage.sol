@@ -17,5 +17,5 @@ interface IAccountCodeStorage {
 
     function isAccountEVM(address _addr) external view returns (bool);
 
-    function isAccountEOA(address _addr) external view returns (bool);
+    function isAccountDelegated(address _addr) external view returns (bool);
 }

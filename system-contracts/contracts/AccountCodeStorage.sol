@@ -32,10 +32,8 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
     bytes32 private constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     /// @notice Information about EIP-7702 delegated EOAs.
-    /// @dev Delegated EOAs have code hash set to the code hash of the delegation address contract.
-    /// So, in order to check whether an account is an EOA, checking for the code hash is not enough.
-    /// We need to also check whether the account is a delegated EOA.
-    mapping(address => bool) private delegatedEOAs;
+    /// @dev Delegated EOAs.
+    mapping(address => address) private delegatedEOAs;
 
     modifier onlyDeployer() {
         if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {
@@ -168,10 +166,8 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
         return Utils.isCodeHashEVM(bytecodeHash);
     }
 
-    /// @notice Method for detecting whether an address is an EOA
-    /// @dev Checks whether the account either has no code hash set or is a delegated EOA.
-    function isAccountEOA(address _addr) external view override returns (bool) {
-        return delegatedEOAs[_addr] || getRawCodeHash(_addr) == 0x00;
+    function isAccountDelegated(address _addr) external view override returns (bool) {
+        return delegatedEOAs[_addr] != address(0);
     }
 
     function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
@@ -218,7 +214,7 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
             address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
 
             // ZKsync has native account abstraction, so we only allow delegation for EOAs.
-            if (!this.isAccountEOA(authority)) {
+            if (this.getRawCodeHash(authority) != 0x00) {
                 continue;
             }
 
@@ -237,17 +233,29 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
                 delete delegatedEOAs[authority];
                 emit AccountDelegationRemoved(authority);
             } else {
-                // Otherwise, load code hash of the delegation address and store it in the account.
-                bytes32 codeHash = getRawCodeHash(item.addr);
+                // Otherwise, store the delegation.
                 // TODO: Do we need any security checks here, e.g. non-default code hash or non-system contract?
-                _storeCodeHash(authority, codeHash);
-                delegatedEOAs[item.addr] = true;
+                delegatedEOAs[authority] = item.addr;
                 emit AccountDelegated(authority, item.addr);
             }
         }
     }
 
-    
+    // TODO: Function made to match signature of account methods for simplicity.
+    function delegateTx(
+        bytes32,
+        bytes32,
+        Transaction calldata _tx
+    ) external onlyCallFromBootloader returns (bool success) {
+        // Check if the transaction is delegated
+        address from = address(uint160(_tx.from));
+        address delegationAddress = delegatedEOAs[from];
+        if (delegationAddress == address(0)) {
+            return false;
+        }
+        return this._performRawMimicCall(uint32(gasleft()), from, delegationAddress, _tx.data, false);
+    }
+
     // Needed to convert `memory` to `calldata`
     // TODO: (partial) duplication with EntryPointV01; probably need to be moved somewhere.
     function _performRawMimicCall(
@@ -257,15 +265,6 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
         bytes calldata _data,
         bool isSystem
     ) external onlyCallFrom(address(this)) returns (bool success) {
-        return
-            EfficientCall.rawMimicCall(
-                _gas,
-                _to,
-                _data,
-                _whoToMimic,
-                false,
-                isSystem
-            );
+        return EfficientCall.rawMimicCall(_gas, _to, _data, _whoToMimic, false, isSystem);
     }
 }
-

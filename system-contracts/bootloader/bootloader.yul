@@ -694,10 +694,10 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
-            /// @notice Returns whether the account is EOA (even if it's EIP-7702 delegated).
+            /// @notice Returns whether the account is a EIP-7702 delegated EOA .
             /// @param addr The address of the account to check.
-            function isEOA(addr) -> ret {
-                mstore(0, {{RIGHT_PADDED_IS_ACCOUNT_EOA_SELECTOR}})
+            function isAccountDelegated(addr) -> ret {
+                mstore(0, {{RIGHT_PADDED_IS_ACCOUNT_DELEGATED_SELECTOR}})
                 mstore(4, addr)
                 let success := staticcall(
                     gas(),
@@ -2229,6 +2229,16 @@ object "Bootloader" {
                 }
             }
 
+            /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
+            /// @param addr The address to check
+            function isEOA(addr) -> ret {
+                ret := 0
+
+                if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
+                    ret := iszero(getRawCodeHash(addr, false))
+                }
+            }
+
             /// @dev Calls the `payForTransaction` method of an account
             function accountPayForTx(account, txDataOffset) -> success {
                 success := callAccountMethod({{PAY_FOR_TX_SELECTOR}}, account, txDataOffset)
@@ -2613,7 +2623,17 @@ object "Bootloader" {
             /// @dev Function responsible for the execution of the L2 transaction
             /// @dev Returns `true` or `false` depending on whether or not the tx has reverted.
             function executeL2Tx(txDataOffset, from) -> ret {
-                ret := callAccountMethod({{EXECUTE_TX_SELECTOR}}, from, txDataOffset)
+                let isDelegated := isAccountDelegated(from)
+
+                switch isDelegated
+                    case 0 {
+                        // Account not delegated: invoke the `execute` method
+                        ret := callAccountMethod({{EXECUTE_TX_SELECTOR}}, from, txDataOffset)
+                    }
+                    default {
+                        // Account is delegated: invoke through AccountCodeStorage
+                        ret := callAccountMethod({{DELEGATE_TX_SELECTOR}}, ACCOUNT_CODE_STORAGE_ADDR(), txDataOffset)
+                    }                
 
                 if iszero(ret) {
                     debugReturndata()
