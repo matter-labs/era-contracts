@@ -182,65 +182,70 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
     }
 
     function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
-        for (uint256 i = 0; i < authorizationList.length; i++) {
-            // Per EIP7702 rules, if any check for the tuple item fails,
-            // we must move on to the next item in the list.
-            AuthorizationListItem calldata item = authorizationList[i];
+        emit Log("processDelegations");
+        emit Log("Number of delegations");
+        emit LogNumber(authorizationList.length);
 
-            // Verify the chain ID is 0 or the ID of the current chain.
-            if (item.chainId != 0 || item.chainId != block.chainid) {
-                continue;
-            }
+        // for (uint256 i = 0; i < authorizationList.length; i++) {
+        //     // Per EIP7702 rules, if any check for the tuple item fails,
+        //     // we must move on to the next item in the list.
+        //     AuthorizationListItem calldata item = authorizationList[i];
 
-            // Verify the nonce is less than 2**64 - 1.
-            if (item.nonce >= 0xFFFFFFFFFFFFFFFF) {
-                continue;
-            }
+        //     // Verify the chain ID is 0 or the ID of the current chain.
+        //     if (item.chainId != 0 || item.chainId != block.chainid) {
+        //         continue;
+        //     }
 
-            // Calculate EIP7702 magic:
-            // msg = keccak(MAGIC || rlp([chain_id, address, nonce]))
-            bytes memory chainIdEncoded = RLPEncoder.encodeUint256(item.chainId);
-            bytes memory addressEncoded = RLPEncoder.encodeAddress(item.addr);
-            bytes memory nonceEncoded = RLPEncoder.encodeUint256(item.nonce);
-            bytes memory listLenEncoded = RLPEncoder.encodeListLen(
-                uint64(chainIdEncoded.length + addressEncoded.length + nonceEncoded.length)
-            );
-            bytes32 message = keccak256(
-                bytes.concat(bytes1(0x05), listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
-            );
+        //     // Verify the nonce is less than 2**64 - 1.
+        //     if (item.nonce >= 0xFFFFFFFFFFFFFFFF) {
+        //         continue;
+        //     }
 
-            // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
-            // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
-            // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
-            // signatures from current libraries generate a unique signature with an s-value in the lower half order.
-            //
-            // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
-            // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
-            // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
-            // these malleable signatures as well.
-            if (uint256(item.s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
-                continue;
-            }
+        //     // Calculate EIP7702 magic:
+        //     // msg = keccak(MAGIC || rlp([chain_id, address, nonce]))
+        //     bytes memory chainIdEncoded = RLPEncoder.encodeUint256(item.chainId);
+        //     bytes memory addressEncoded = RLPEncoder.encodeAddress(item.addr);
+        //     bytes memory nonceEncoded = RLPEncoder.encodeUint256(item.nonce);
+        //     bytes memory listLenEncoded = RLPEncoder.encodeListLen(
+        //         uint64(chainIdEncoded.length + addressEncoded.length + nonceEncoded.length)
+        //     );
+        //     bytes32 message = keccak256(
+        //         bytes.concat(bytes1(0x05), listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
+        //     );
 
-            address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
-            emit Log("Authority");
-            emit LogAddr(authority);
+        //     // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+        //     // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
+        //     // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
+        //     // signatures from current libraries generate a unique signature with an s-value in the lower half order.
+        //     //
+        //     // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
+        //     // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
+        //     // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
+        //     // these malleable signatures as well.
+        //     if (uint256(item.s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+        //         continue;
+        //     }
 
-            // ZKsync has native account abstraction, so we only allow delegation for EOAs.
-            if (!this.isAccountEOA(authority)) {
-                continue;
-            }
+        //     address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
+        //     emit Log("Authority");
+        //     emit LogAddr(authority);
 
-            if (item.nonce != NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(item.addr)) {
-                emit Log("Nonce mismatch");
-                continue;
-            }
-            delegatedEOAs[item.addr] = true;
-            // TODO: set code hash
-            // TODO: increment nonce
-        }
+        //     // ZKsync has native account abstraction, so we only allow delegation for EOAs.
+        //     if (!this.isAccountEOA(authority)) {
+        //         continue;
+        //     }
+
+        //     if (item.nonce != NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(item.addr)) {
+        //         emit Log("Nonce mismatch");
+        //         continue;
+        //     }
+        //     delegatedEOAs[item.addr] = true;
+        //     // TODO: set code hash
+        //     // TODO: increment nonce
+        // }
     }
 }
 
 event Log(string);
 event LogAddr(address);
+event LogNumber(uint256);

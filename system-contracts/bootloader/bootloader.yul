@@ -721,8 +721,50 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
-            function processDelegations(txDataOffset) -> ret {
-                // TODO: call AccountCodeStorage
+            /// @notice invokes the `processDelegations` method of the `AccountCodeStorage` contract.
+            /// @dev this method expects `reservedDynamic` to contain ABI-encoded `AuthorizationList`
+            /// @dev this method internally overwrites transaction data and restores it after the call.
+            /// This is done to avoid copying the data to a new memory location.
+            function processDelegations(innerTxDataOffset) {
+                // 1. Read delegation length
+                let ptr := getReservedDynamicPtr(innerTxDataOffset)
+                let length := mload(ptr)
+
+                // Delegations are only processed if transaction is EIP7702 and
+                // authorization list is provided
+                let isEIP7702 := eq(getTxType(innerTxDataOffset), 4)
+                let isDelegationProvided := gt(length, 0)
+                // let shouldProcess := and(isEIP7702, isDelegationProvided)
+
+                if and(isEIP7702, isDelegationProvided) {
+                    // 2. Overwrite the delegation length word with right-padded selector
+                    // This will work because `reservedDynamic` is `bytes`, so the first word
+                    // is the length; but for us the contents are already ABI-encoded data.
+                    mstore(ptr, {{RIGHT_PADDED_PROCESS_DELEGATIONS_SELECTOR}})
+
+                    // 3. Call the method
+                    let calldataOffset := add(ptr, 28)
+                    let calldataLength := add(length, 4)
+                    let success := call(
+                        gas(),
+                        ACCOUNT_CODE_STORAGE_ADDR(),
+                        0,
+                        calldataOffset,
+                        calldataLength,
+                        0,
+                        0
+                    )
+
+                    // 4. Restore the length in memory
+                    mstore(length, {{RIGHT_PADDED_PROCESS_DELEGATIONS_SELECTOR}})
+
+                    // 5. Process the result
+                    // If the transaction failed, either there was not enough gas or compression is malformed.
+                    if iszero(success) {
+                        debugLog("processing delegations failed", 0)
+                        nearCallPanic()
+                    }
+                }
             }
 
             /// @dev Calculates the canonical hash of the L1->L2 transaction that will be
@@ -1495,6 +1537,8 @@ object "Bootloader" {
                 default {
                     setTxOrigin(BOOTLOADER_FORMAL_ADDR())
                 }
+
+                processDelegations(innerTxDataOffset)
 
                 success := executeL2Tx(txDataOffset, from)
 
