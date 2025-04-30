@@ -1367,10 +1367,19 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (gatewayConfig.gatewayStateTransition.rollupL2DAValidator, getExpectedL2Address("RollupL2DAValidator"), true)
+            (
+                gatewayConfig.gatewayStateTransition.rollupL2DAValidator,
+                getExpectedL2Address("RollupL2DAValidator"),
+                true
+            )
         );
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, gatewayConfig.gatewayStateTransition.rollupDAManager);
+        calls = _prepareL1ToGatewayCall(
+            l2Calldata,
+            l2GasLimit,
+            l1GasPrice,
+            gatewayConfig.gatewayStateTransition.rollupDAManager
+        );
     }
 
     function getCreationCode(
