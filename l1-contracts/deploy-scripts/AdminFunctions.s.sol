@@ -359,7 +359,7 @@ contract AdminFunctions is Script {
             value: 0,
             data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
         });
-    
+
         vm.startBroadcast();
         chainAdmin.multicall(calls, true);
         vm.stopBroadcast();
