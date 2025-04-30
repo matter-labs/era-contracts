@@ -233,6 +233,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
                 serverNotifierProxy: expectedGatewayContracts.stateTransition.serverNotifierProxy,
                 serverNotifierImplementation: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
+                rollupDAManager: expectedGatewayContracts.daContracts.rollupDAManager,
                 rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
                 // No need for default upgrade on gateway
                 defaultUpgrade: address(0),
