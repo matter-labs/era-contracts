@@ -84,7 +84,7 @@ struct StateTransitionDeployedAddresses {
     address serverNotifierProxy;
     address serverNotifierImplementation;
     address rollupDAManager;
-    address rollupL2DAValidator;
+    address rollupSLDAValidator;
     bool isOnGateway;
 }
 
