@@ -10,13 +10,13 @@ import {Utils} from "./Utils.sol";
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice This library is used to validate pubdata and create DA commitments. These commitments then used to validate DA on settlement layer.
+ * @notice This library is used to validate pubdata and create L2 DA commitments. These commitments then used to validate DA on settlement layer.
  */
 library L2DAValidator {
     /// @notice Validates that the operator provided the correct pubdata (and aux data) and creates pubdata commitment for DA.
     /// @dev Logs are not validated. It is the caller's responsibility to check that they are valid.
     /// Note, that validity of uncompressed state diffs is not checked.
-    /// @param _l2DACommitmentScheme The scheme of DA commitment. Different L1 validators may use different schemes.
+    /// @param _l2DACommitmentScheme The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     /// @param _chainedMessagesHash The chained hash of messages.
     /// @param _chainedBytecodesHash The chained hash of bytecodes.
     /// @param _operatorData The data provided by opretator. Should include logs, messages, bytecodes, compressed and uncompressed state diffs.

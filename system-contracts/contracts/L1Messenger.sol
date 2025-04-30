@@ -187,7 +187,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
 
     /// @notice Verifies that the {_operatorInput} reflects what occurred within the L1Batch and that
     ///         the compressed statediffs are equivalent to the full state diffs.
-    /// @param _l2DACommitmentScheme The scheme of DA commitment. Different L1 validators may use different schemes.
+    /// @param _l2DACommitmentScheme The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     /// @param _operatorInput The total pubdata and uncompressed state diffs of transactions that were
     ///        processed in the current L1 Batch. Pubdata consists of L2 to L1 Logs, messages, deployed bytecodes, and state diffs.
     /// @dev Function that should be called exactly once per L1 Batch by the bootloader.

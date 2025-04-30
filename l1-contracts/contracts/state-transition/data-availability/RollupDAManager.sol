@@ -16,13 +16,13 @@ contract RollupDAManager is Ownable2Step {
 
     /// @dev Emitted when a DAPair is added or updated.
     /// @param l1DAValidator Address of the L1 data availability validator.
-    /// @param l2DACommitmentScheme The scheme of DA commitment. Different L1 validators may use different schemes.
+    /// @param l2DACommitmentScheme The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     /// @param status Boolean representing the state of the DAPair.
     event DAPairUpdated(address indexed l1DAValidator, L2DACommitmentScheme indexed l2DACommitmentScheme, bool status);
 
     /// @dev Modifier to ensure address in DAPair is not zero address and l2DACommitmentScheme is not NONE.
     /// @param l1DAValidator Address of the L1 data availability validator.
-    /// @param l2DACommitmentScheme The scheme of DA commitment. Different L1 validators may use different schemes.
+    /// @param l2DACommitmentScheme The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     modifier validDAConfiguration(address l1DAValidator, L2DACommitmentScheme l2DACommitmentScheme) {
         if (l1DAValidator == address(0)) {
             revert ZeroAddress();
@@ -39,7 +39,7 @@ contract RollupDAManager is Ownable2Step {
     /// Emits a {DAPairUpdated} event.
     ///
     /// @param _l1DAValidator Address of the L1 data availability validator.
-    /// @param _l2DACommitmentScheme The scheme of DA commitment. Different L1 validators may use different schemes.
+    /// @param _l2DACommitmentScheme The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     /// @param _status Boolean representing whether the DAPair is active or not.
     ///
     /// Requirements:
@@ -60,7 +60,7 @@ contract RollupDAManager is Ownable2Step {
     /// @notice Returns whether the DA pair is allowed.
     ///
     /// @param _l1DAValidator Address of the L1 data availability validator.
-    /// @param _l2DACommitmentScheme The scheme of DA commitment. Different L1 validators may use different schemes.
+    /// @param _l2DACommitmentScheme The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     /// @return bool indicating if the DA pair is allowed.
     function isPairAllowed(
         address _l1DAValidator,

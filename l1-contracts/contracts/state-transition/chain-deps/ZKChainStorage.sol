@@ -175,6 +175,6 @@ struct ZKChainStorage {
     /// @notice Bytecode hash of evm emulator.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
-    /// @dev The scheme of DA commitment. Different L1 validators may use different schemes.
+    /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     L2DACommitmentScheme l2DACommitmentScheme;
 }
