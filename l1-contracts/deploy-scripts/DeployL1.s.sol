@@ -149,7 +149,7 @@ contract DeployL1Script is Script, DeployUtils {
         (
             addresses.stateTransition.serverNotifierImplementation,
             addresses.stateTransition.serverNotifierProxy
-        ) = deployTuppWithContract("ServerNotifier");
+        ) = deployServerNotifier();
 
         (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
             "L1Nullifier"
@@ -415,6 +415,8 @@ contract DeployL1Script is Script, DeployUtils {
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
+        IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
+
         vm.stopBroadcast();
         console.log("Owners updated");
     }
@@ -602,8 +604,8 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.vaults.l1NativeTokenVaultProxy
         );
 
-        vm.serializeAddress("root", "create2_factory_addr", addresses.create2Factory);
-        vm.serializeBytes32("root", "create2_factory_salt", config.contracts.create2FactorySalt);
+        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
+        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
@@ -661,6 +663,13 @@ contract DeployL1Script is Script, DeployUtils {
     function deployTuppWithContract(
         string memory contractName
     ) internal virtual override returns (address implementation, address proxy) {
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(contractName, addresses.transparentProxyAdmin);
+    }
+
+    function deployTuppWithContractAndProxyAdmin(
+        string memory contractName,
+        address proxyAdmin
+    ) internal returns (address implementation, address proxy) {
         implementation = deployViaCreate2AndNotify(
             getCreationCode(contractName),
             getCreationCalldata(contractName),
@@ -670,11 +679,18 @@ contract DeployL1Script is Script, DeployUtils {
 
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(implementation, addresses.transparentProxyAdmin, getInitializeCalldata(contractName)),
+            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName)),
             contractName,
             string.concat(contractName, " Proxy")
         );
         return (implementation, proxy);
+    }
+
+    function deployServerNotifier() internal returns (address implementation, address proxy) {
+        // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
+        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin);
+
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
     }
 
     function saveDiamondSelectors() public {
