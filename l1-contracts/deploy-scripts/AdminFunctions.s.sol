@@ -360,10 +360,9 @@ contract AdminFunctions is Script {
             data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
         });
 
-        vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
-        vm.stopBroadcast();
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
     }
+
     struct MigrateChainToGatewayParams {
         address bridgehub;
         uint256 l1GasPrice;
