@@ -34,7 +34,7 @@ contract PubdataChunkPublisher is IPubdataChunkPublisher {
                 // Copy to memory to pad with zeroes
                 bytes memory blob = new bytes(BLOB_SIZE_BYTES);
                 assembly {
-                    calldatacopy(add(0x20, blob), add(_pubdata.offset, ptr), BLOB_SIZE_BYTES)
+                    calldatacopy(add(0x20, blob), add(_pubdata.offset, ptr), sub(_pubdata.length, ptr))
                 }
                 blobLinearHashes[i] = keccak256(blob);
             }
