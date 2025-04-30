@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The interface for the L2AssetRouter contract
+ * @notice The interface for the BridgedStandardERC20 contract
  */
 interface IBridgedStandardERC20 {
     /// @dev Describes whether there is a specific getter in the token.
