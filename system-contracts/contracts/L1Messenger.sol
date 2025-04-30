@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import {IL1Messenger, L2ToL1Log, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "./interfaces/IL1Messenger.sol";
+import {IL1Messenger, L2ToL1Log} from "./interfaces/IL1Messenger.sol";
 
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {L2DAValidator} from "./libraries/L2DAValidator.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT, L2DACommitmentScheme} from "./Constants.sol";
+import {SystemLogKey, SYSTEM_CONTEXT_CONTRACT, KNOWN_CODE_STORAGE_CONTRACT, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, COMPUTATIONAL_PRICE_FOR_PUBDATA, L2_MESSAGE_ROOT, L2DACommitmentScheme, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "./Constants.sol";
 import {ReconstructionMismatch, PubdataField} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 

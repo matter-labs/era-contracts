@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.28;
 
-import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/interfaces/IL1Messenger.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/Constants.sol";
 import {Utils} from "contracts/libraries/Utils.sol";
 
 /// @notice The contract that is used in testing to compose the pubdata needed for the
