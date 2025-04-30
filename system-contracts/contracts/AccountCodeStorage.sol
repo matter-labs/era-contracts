@@ -4,23 +4,11 @@ pragma solidity 0.8.24;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {Transaction} from "./libraries/TransactionHelper.sol";
+import {Transaction, AuthorizationListItem} from "./libraries/TransactionHelper.sol";
 import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS, EVM_HASHES_STORAGE} from "./Constants.sol";
 import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
-
-/// @notice EIP-7702 authorization list item
-/// @dev Authorization list items are passed from the transaction
-/// through the bootloader.
-struct AuthorizationListItem {
-    uint256 chainId;
-    uint256 nonce;
-    address addr;
-    uint256 yParity;
-    uint256 r;
-    uint256 s;
-}
 
 /**
  * @author Matter Labs

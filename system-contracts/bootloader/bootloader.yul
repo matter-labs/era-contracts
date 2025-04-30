@@ -726,6 +726,7 @@ object "Bootloader" {
             /// @dev this method internally overwrites transaction data and restores it after the call.
             /// This is done to avoid copying the data to a new memory location.
             function processDelegations(innerTxDataOffset) {
+                debugLog("processDelegations", 0)
                 // 1. Read delegation length
                 let ptr := getReservedDynamicPtr(innerTxDataOffset)
                 let length := mload(ptr)
@@ -734,13 +735,14 @@ object "Bootloader" {
                 // authorization list is provided
                 let isEIP7702 := eq(getTxType(innerTxDataOffset), 4)
                 let isDelegationProvided := gt(length, 0)
-                // let shouldProcess := and(isEIP7702, isDelegationProvided)
+                let shouldProcess := and(isEIP7702, isDelegationProvided)
+                debugLog("shouldProcessDelegations", shouldProcess)
 
-                if and(isEIP7702, isDelegationProvided) {
+                if shouldProcess {
                     // 2. Overwrite the delegation length word with right-padded selector
                     // This will work because `reservedDynamic` is `bytes`, so the first word
                     // is the length; but for us the contents are already ABI-encoded data.
-                    mstore(ptr, {{RIGHT_PADDED_PROCESS_DELEGATIONS_SELECTOR}})
+                    mstore(ptr, {{PROCESS_DELEGATIONS_SELECTOR}})
 
                     // 3. Call the method
                     let calldataOffset := add(ptr, 28)
@@ -756,7 +758,7 @@ object "Bootloader" {
                     )
 
                     // 4. Restore the length in memory
-                    mstore(length, {{RIGHT_PADDED_PROCESS_DELEGATIONS_SELECTOR}})
+                    mstore(ptr, length)
 
                     // 5. Process the result
                     // If the transaction failed, either there was not enough gas or compression is malformed.
@@ -3171,6 +3173,7 @@ object "Bootloader" {
             /// transactions is enforced by the L1 smart contracts.
             function validateTypedTxStructure(innerTxDataOffset) {
                 let txType := getTxType(innerTxDataOffset)
+                debugLog("txType", txType)
                 switch txType
                     case 0 {
                         let maxFeePerGas := getMaxFeePerGas(innerTxDataOffset)
