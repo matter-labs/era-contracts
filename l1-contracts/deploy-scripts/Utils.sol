@@ -1305,7 +1305,7 @@ library Utils {
     function readEigenDAL1DAValidatorBytecode() internal view returns (bytes memory bytecode) {
         bytecode = readFoundryBytecode("/../da-contracts/out/EigenDAL1DAValidator.sol/EigenDAL1DAValidator.json");
     }
-    
+
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
         result = new Call[](a.length + b.length);
         for (uint256 i = 0; i < a.length; i++) {
