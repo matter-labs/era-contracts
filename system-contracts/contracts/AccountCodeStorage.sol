@@ -4,11 +4,16 @@ pragma solidity 0.8.24;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
+import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
+import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Transaction, AuthorizationListItem} from "./libraries/TransactionHelper.sol";
 import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS, EVM_HASHES_STORAGE} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS, EVM_HASHES_STORAGE, INonceHolder} from "./Constants.sol";
 import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
+
+event AccountDelegated(address indexed authority, address indexed delegationAddress);
+event AccountDelegationRemoved(address indexed authority);
 
 /**
  * @author Matter Labs
@@ -170,70 +175,97 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
     }
 
     function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
-        emit Log("processDelegations");
-        emit Log("Number of delegations");
-        emit LogNumber(authorizationList.length);
+        for (uint256 i = 0; i < authorizationList.length; i++) {
+            // Per EIP7702 rules, if any check for the tuple item fails,
+            // we must move on to the next item in the list.
+            AuthorizationListItem calldata item = authorizationList[i];
 
-        // for (uint256 i = 0; i < authorizationList.length; i++) {
-        //     // Per EIP7702 rules, if any check for the tuple item fails,
-        //     // we must move on to the next item in the list.
-        //     AuthorizationListItem calldata item = authorizationList[i];
+            // Verify the chain ID is 0 or the ID of the current chain.
+            if (item.chainId != 0 && item.chainId != block.chainid) {
+                continue;
+            }
 
-        //     // Verify the chain ID is 0 or the ID of the current chain.
-        //     if (item.chainId != 0 || item.chainId != block.chainid) {
-        //         continue;
-        //     }
+            // Verify the nonce is less than 2**64 - 1.
+            if (item.nonce >= 0xFFFFFFFFFFFFFFFF) {
+                continue;
+            }
 
-        //     // Verify the nonce is less than 2**64 - 1.
-        //     if (item.nonce >= 0xFFFFFFFFFFFFFFFF) {
-        //         continue;
-        //     }
+            // Calculate EIP7702 magic:
+            // msg = keccak(MAGIC || rlp([chain_id, address, nonce]))
+            bytes memory chainIdEncoded = RLPEncoder.encodeUint256(item.chainId);
+            bytes memory addressEncoded = RLPEncoder.encodeAddress(item.addr);
+            bytes memory nonceEncoded = RLPEncoder.encodeUint256(item.nonce);
+            bytes memory listLenEncoded = RLPEncoder.encodeListLen(
+                uint64(chainIdEncoded.length + addressEncoded.length + nonceEncoded.length)
+            );
+            bytes32 message = keccak256(
+                bytes.concat(bytes1(0x05), listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
+            );
 
-        //     // Calculate EIP7702 magic:
-        //     // msg = keccak(MAGIC || rlp([chain_id, address, nonce]))
-        //     bytes memory chainIdEncoded = RLPEncoder.encodeUint256(item.chainId);
-        //     bytes memory addressEncoded = RLPEncoder.encodeAddress(item.addr);
-        //     bytes memory nonceEncoded = RLPEncoder.encodeUint256(item.nonce);
-        //     bytes memory listLenEncoded = RLPEncoder.encodeListLen(
-        //         uint64(chainIdEncoded.length + addressEncoded.length + nonceEncoded.length)
-        //     );
-        //     bytes32 message = keccak256(
-        //         bytes.concat(bytes1(0x05), listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
-        //     );
+            // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+            // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
+            // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
+            // signatures from current libraries generate a unique signature with an s-value in the lower half order.
+            //
+            // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
+            // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
+            // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
+            // these malleable signatures as well.
+            if (uint256(item.s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+                continue;
+            }
 
-        //     // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
-        //     // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
-        //     // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
-        //     // signatures from current libraries generate a unique signature with an s-value in the lower half order.
-        //     //
-        //     // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
-        //     // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
-        //     // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
-        //     // these malleable signatures as well.
-        //     if (uint256(item.s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
-        //         continue;
-        //     }
+            address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
 
-        //     address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
-        //     emit Log("Authority");
-        //     emit LogAddr(authority);
+            // ZKsync has native account abstraction, so we only allow delegation for EOAs.
+            if (!this.isAccountEOA(authority)) {
+                continue;
+            }
 
-        //     // ZKsync has native account abstraction, so we only allow delegation for EOAs.
-        //     if (!this.isAccountEOA(authority)) {
-        //         continue;
-        //     }
+            bool nonceIncremented = this._performRawMimicCall(
+                uint32(gasleft()),
+                authority,
+                address(NONCE_HOLDER_SYSTEM_CONTRACT),
+                abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (item.nonce)),
+                true
+            );
+            if (!nonceIncremented) {
+                continue;
+            }
+            if (item.addr == address(0)) {
+                // If the delegation address is 0, we need to remove the delegation.
+                delete delegatedEOAs[authority];
+                emit AccountDelegationRemoved(authority);
+            } else {
+                // Otherwise, load code hash of the delegation address and store it in the account.
+                bytes32 codeHash = getRawCodeHash(item.addr);
+                // TODO: Do we need any security checks here, e.g. non-default code hash or non-system contract?
+                _storeCodeHash(authority, codeHash);
+                delegatedEOAs[item.addr] = true;
+                emit AccountDelegated(authority, item.addr);
+            }
+        }
+    }
 
-        //     if (item.nonce != NONCE_HOLDER_SYSTEM_CONTRACT.getRawNonce(item.addr)) {
-        //         emit Log("Nonce mismatch");
-        //         continue;
-        //     }
-        //     delegatedEOAs[item.addr] = true;
-        //     // TODO: set code hash
-        //     // TODO: increment nonce
-        // }
+    
+    // Needed to convert `memory` to `calldata`
+    // TODO: (partial) duplication with EntryPointV01; probably need to be moved somewhere.
+    function _performRawMimicCall(
+        uint32 _gas,
+        address _whoToMimic,
+        address _to,
+        bytes calldata _data,
+        bool isSystem
+    ) external onlyCallFrom(address(this)) returns (bool success) {
+        return
+            EfficientCall.rawMimicCall(
+                _gas,
+                _to,
+                _data,
+                _whoToMimic,
+                false,
+                isSystem
+            );
     }
 }
 
-event Log(string);
-event LogAddr(address);
-event LogNumber(uint256);
