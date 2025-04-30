@@ -16,9 +16,9 @@ import type { Context } from "mocha";
 describe("L2LegacyBridgeFixUpgrade tests", function () {
   let oldBridgedEthVersion: number;
 
-  const aliasedGovernanceAddress =
-    process.env.ALIASED_GOVERNANCE_ADDRESS ||
-    ethers.utils.getAddress(ethers.utils.hexlify(ethers.utils.randomBytes(20)));
+  const aliasedGovernanceAddress = ethers.utils.getAddress(
+    process.env.ALIASED_GOVERNANCE_ADDRESS || ethers.utils.hexlify(ethers.utils.randomBytes(20))
+  );
   const l1ChainId = process.env.L1_CHAIN_ID || 1;
   const bridgedEthAssetId = ethers.utils.keccak256(
     ethers.utils.defaultAbiCoder.encode(
@@ -28,6 +28,26 @@ describe("L2LegacyBridgeFixUpgrade tests", function () {
   );
 
   before(async () => {
+    // Checking the old system contract owners
+    const bridgehub = await ethers.getContractAt("Ownable2Step", REAL_BRIDGEHUB_ADDRESS);
+    const oldBridgehubOwner = await bridgehub.owner();
+    console.log("Old bridgehub owner:", oldBridgehubOwner);
+    if (oldBridgehubOwner === aliasedGovernanceAddress) {
+      console.log("Bridgehub is already owned by the aliased governance address");
+    }
+    const assetRouter = await ethers.getContractAt("Ownable2Step", REAL_L2_ASSET_ROUTER_ADDRESS);
+    const oldAssetRouterOwner = await assetRouter.owner();
+    console.log("Old asset router owner:", oldAssetRouterOwner);
+    if (oldAssetRouterOwner === aliasedGovernanceAddress) {
+      console.log("Asset router is already owned by the aliased governance address");
+    }
+    const l2NativeTokenVaultOwnable = await ethers.getContractAt("Ownable2Step", REAL_L2_NATIVE_TOKEN_VAULT_ADDRESS);
+    const oldL2NativeTokenVaultOwner = await l2NativeTokenVaultOwnable.owner();
+    console.log("Old L2 native token vault owner:", oldL2NativeTokenVaultOwner);
+    if (oldL2NativeTokenVaultOwner === aliasedGovernanceAddress) {
+      console.log("L2 native token vault is already owned by the aliased governance address");
+    }
+
     // Getting the old Bridged ETH version, if applicable
     const l2NativeTokenVault = await ethers.getContractAt("IL2NativeTokenVault", REAL_L2_NATIVE_TOKEN_VAULT_ADDRESS);
     const bridgedEthAddress = await l2NativeTokenVault.tokenAddress(bridgedEthAssetId);
@@ -90,6 +110,7 @@ describe("L2LegacyBridgeFixUpgrade tests", function () {
       const l2LegacySharedBridge = await assetRouter.L2_LEGACY_SHARED_BRIDGE();
       if (l2LegacySharedBridge === ethers.constants.AddressZero) {
         doesL2LegacySharedBridgeExist = false;
+        console.log("Legacy shared bridge does not exist, skipping ownership migration test");
         this.skip();
       }
 
@@ -108,11 +129,19 @@ describe("L2LegacyBridgeFixUpgrade tests", function () {
     });
 
     it("The bridged ETH token metadata bug gets patched, if applicable", async function (this: Context) {
-      // Reinitialized bridged ETH only if it was deployed
+      // Test is skipped if legacy shared bridge does not exist
+      if (!doesL2LegacySharedBridgeExist) {
+        console.log("Legacy shared bridge does not exist, skipping bridged ETH metadata test");
+        this.skip();
+      }
+      // Reinitialized bridged ETH only if it exists
       const l2NativeTokenVault = await ethers.getContractAt("IL2NativeTokenVault", REAL_L2_NATIVE_TOKEN_VAULT_ADDRESS);
       const bridgedEthAddress = await l2NativeTokenVault.tokenAddress(bridgedEthAssetId);
-      // Test is skipped if legacy shared bridge does not exist or bridged ETH is not deployed/unspecified
-      if (!doesL2LegacySharedBridgeExist || bridgedEthAddress === ethers.constants.AddressZero) this.skip();
+      // Test is skipped if bridged ETH is not defined
+      if (bridgedEthAddress === ethers.constants.AddressZero) {
+        console.log("Bridged ETH is not defined, skipping bridged ETH metadata test");
+        this.skip();
+      }
 
       // Version is increased by 1
       const storageValue = await ethers.provider.getStorageAt(bridgedEthAddress, ethers.constants.Zero);
