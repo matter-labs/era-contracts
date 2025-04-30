@@ -8,5 +8,5 @@ pragma solidity ^0.8.20;
  * @notice The interface for the L2AssetRouter contract
  */
 interface IL2AssetRouter {
-    function L2_LEGACY_SHARED_BRIDGE() external returns (address);
+    function L2_LEGACY_SHARED_BRIDGE() external view returns (address);
 }

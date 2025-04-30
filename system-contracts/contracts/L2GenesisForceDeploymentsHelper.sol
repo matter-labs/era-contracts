@@ -191,7 +191,13 @@ library L2GenesisForceDeploymentsHelper {
     ) internal pure returns (bytes memory initData) {
         initData = abi.encodeCall(
             IL2WrappedBaseToken.initializeV3,
-            (_wrappedBaseTokenName, _wrappedBaseTokenSymbol, address(L2_ASSET_ROUTER), _baseTokenL1Address, _baseTokenAssetId)
+            (
+                _wrappedBaseTokenName,
+                _wrappedBaseTokenSymbol,
+                address(L2_ASSET_ROUTER),
+                _baseTokenL1Address,
+                _baseTokenAssetId
+            )
         );
     }
 
