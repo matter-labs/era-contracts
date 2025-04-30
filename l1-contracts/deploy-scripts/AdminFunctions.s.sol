@@ -360,7 +360,7 @@ contract AdminFunctions is Script {
             data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
         });
 
-        saveAndSendAdminTx(l2ChainInfo.admin, calls, data._shouldSend);
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
     struct MigrateChainToGatewayParams {
