@@ -75,12 +75,14 @@ library L2UtilsBase {
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
         {
-            address interopHandler = address(new InteropHandler());
-            vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
             address l2messageVerification = address(new L2MessageVerification());
             vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
             address l2MessageRootStorage = address(new DummyL2MessageRootStorage());
             vm.etch(address(L2_MESSAGE_ROOT_STORAGE), l2MessageRootStorage.code);
+        }
+        {
+            address interopHandler = address(new InteropHandler());
+            vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());
             vm.etch(L2_STANDARD_TRIGGER_ACCOUNT_ADDR, l2StandardTriggerAccount.code);
             address l2InteropAccount = address(new DummyL2InteropAccount());
