@@ -154,6 +154,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
         config.eraChainId = toml.readUint("$.era_chain_id");
+        config.gatewayChainId = toml.readUint("$.gateway.chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
