@@ -219,6 +219,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         output = GatewayCTMOutput({
             gatewayStateTransition: StateTransitionDeployedAddresses({
                 chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
+                chainTypeManagerProxyAdmin: expectedGatewayContracts.stateTransition.chainTypeManagerProxyAdmin,
                 chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                 verifier: expectedGatewayContracts.stateTransition.verifier,
                 verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
@@ -232,6 +233,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
                 serverNotifierProxy: expectedGatewayContracts.stateTransition.serverNotifierProxy,
                 serverNotifierImplementation: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
+                rollupSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
                 // No need for default upgrade on gateway
                 defaultUpgrade: address(0),
                 diamondProxy: address(0),
