@@ -651,7 +651,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         );
         vm.serializeAddress(
             "gateway_state_transition",
-            "chain_type_manager_proxy",
+            "chain_type_manager_proxy_admin",
             gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
         );
         vm.serializeAddress(
