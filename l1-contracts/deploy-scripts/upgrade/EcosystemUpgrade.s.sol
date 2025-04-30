@@ -454,8 +454,8 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             "$.gateway.gateway_state_transition.rollup_da_manager"
         );
 
-        gatewayConfig.gatewayStateTransition.rollupL2DAValidator = toml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_l2_da_validator"
+        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
+            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
         );
 
         gatewayConfig.gatewayStateTransition.isOnGateway = true;
@@ -662,7 +662,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress(
             "gateway_state_transition",
             "rollup_l2_da_validator",
-            gatewayConfig.gatewayStateTransition.rollupL2DAValidator
+            gatewayConfig.gatewayStateTransition.rollupSLDAValidator
         );
         vm.serializeAddress(
             "gateway_state_transition",
@@ -1368,7 +1368,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
             (
-                gatewayConfig.gatewayStateTransition.rollupL2DAValidator,
+                gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
                 getExpectedL2Address("RollupL2DAValidator"),
                 true
             )
