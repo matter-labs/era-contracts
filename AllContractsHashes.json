@@ -217,7 +217,7 @@
   },
   {
     "contractName": "system-contracts/L2LegacyBridgeFixUpgrade",
-    "zkBytecodeHash": "0x010003539dfae0d8d8143587177f65c3511ddde1967e3189f4e7d3c6b6e05b03",
+    "zkBytecodeHash": "0x01000353d330276c468c81573b08c1755f030d5c39ffe6204ff7165ea2f5ee0a",
     "zkBytecodePath": "/system-contracts/zkout/L2LegacyBridgeFixUpgrade.sol/L2LegacyBridgeFixUpgrade.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
