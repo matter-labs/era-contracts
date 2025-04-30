@@ -409,7 +409,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             if (_expectedPrevL2BlockHash != pendingL2BlockHash) {
                 revert IncorrectL2BlockHash(_expectedPrevL2BlockHash, pendingL2BlockHash);
             }
-            if (_l2BlockTimestamp <= currentL2BlockTimestamp) {
+            if (_l2BlockTimestamp < currentL2BlockTimestamp) {
                 revert NonMonotonicL2BlockTimestamp(_l2BlockTimestamp, currentL2BlockTimestamp);
             }
 
