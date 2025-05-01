@@ -6,6 +6,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {IChainAdminOwnable} from "./IChainAdminOwnable.sol";
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 import {NoCallsProvided, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {PubdataPricingMode} from "../state-transition/chain-deps/ZKChainStorage.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -79,6 +80,10 @@ contract ChainAdminOwnable is IChainAdminOwnable, Ownable2Step {
             revert Unauthorized(msg.sender);
         }
         _chainContract.setTokenMultiplier(_nominator, _denominator);
+    }
+
+    function setPubdataPricingMode(IAdmin _chainContract, PubdataPricingMode _mode) external onlyOwner {
+        _chainContract.setPubdataPricingMode(_mode);
     }
 
     /// @dev Contract might receive/hold ETH as part of the maintenance process.
