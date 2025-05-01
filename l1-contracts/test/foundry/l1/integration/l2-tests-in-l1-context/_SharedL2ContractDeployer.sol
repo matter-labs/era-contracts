@@ -111,7 +111,8 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
-                l1CtmDeployer: l1CTMDeployer
+                l1CtmDeployer: l1CTMDeployer,
+                weth: address(weth)
             })
         );
         deployL2Contracts(L1_CHAIN_ID);
@@ -211,7 +212,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         address _aliasedOwner,
         address _l1SharedBridge,
         bytes32 _l2TokenProxyBytecodeHash
-    ) internal returns (address) {
+    ) internal virtual returns (address) {
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
 
         L2SharedBridgeLegacy bridge = new L2SharedBridgeLegacy();
