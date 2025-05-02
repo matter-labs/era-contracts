@@ -302,14 +302,22 @@ object "Bootloader" {
             }
 
             /// @dev The last processed block number.
-            function LAST_PROCESSED_BLOCK_NUMBER() -> ret {
+            function LAST_PROCESSED_BLOCK_NUMBER_SLOT() -> ret {
                 ret := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), TX_OPERATOR_L2_BLOCK_INFO_SLOTS())
+            }
+
+            function LAST_PROCESSED_BLOCK_NUMBER_BYTE() -> ret {
+                ret := mul(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 32)
             }
 
             /// @dev The slot starting from which the interop roots are stored.
             /// The value tells us where we are in the processed number of interop roots array.
             function CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT() -> ret {
-                ret := add(LAST_PROCESSED_BLOCK_NUMBER(), 1)
+                ret := add(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 1)
+            }
+
+            function CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE() -> ret {
+                ret := mul(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT(), 32)
             }
             
             /// @dev We store the next interopRoot number to be processed. 
@@ -319,30 +327,45 @@ object "Bootloader" {
                 ret := add(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT(), 1)
             }
 
+            function CURRENT_INTEROP_ROOT_BYTE() -> ret {
+                ret := mul(CURRENT_INTEROP_ROOT_SLOT(), 32)
+            }
+
             /// @dev The slot starting from which the interop roots are stored.
             function INTEROP_BLOCKS_BEGIN_SLOT() -> ret {
                 ret := add(CURRENT_INTEROP_ROOT_SLOT(), 1)
+            }
+
+            function INTEROP_BLOCKS_BEGIN_BYTE() -> ret {
+                ret := mul(INTEROP_BLOCKS_BEGIN_SLOT(), 32)
             }
 
             /// @dev The slot starting from which the interop roots are stored.
             function INTEROP_ROOT_BEGIN_SLOT() -> ret {
                 ret := add(INTEROP_BLOCKS_BEGIN_SLOT(), 100)
             }
+
+            function INTEROP_ROOT_BEGIN_BYTE() -> ret {
+                ret := mul(INTEROP_ROOT_BEGIN_SLOT(), 32)
+            }
             
             function getNumberOfInteropRootInBlock(i) -> ret {
-                ret :=  mload(add(INTEROP_BLOCKS_BEGIN_SLOT(), i))
+                debugLog("slot", add(INTEROP_BLOCKS_BEGIN_SLOT(), i))
+                ret :=  mload(mul(add(INTEROP_BLOCKS_BEGIN_SLOT(), i), 32))
             }
 
             function getNumberOfInteropRootInCurrentBlock() -> ret {
-                ret := getNumberOfInteropRootInBlock(mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT()))
+                debugLog("current num roots in b s", CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT())
+                debugLog("value", mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()))
+                ret := getNumberOfInteropRootInBlock(mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()))
             }
 
-            function getInteropRootSlot(i) -> ret {
+            function getInteropRootByte(i) -> ret {
                 ret := mul(add(INTEROP_ROOT_BEGIN_SLOT(), mul(i, INTEROP_ROOT_SLOT_SIZE())), 32)
             }
 
-            function getNextInteropRootSlot() -> ret {
-                ret := getInteropRootSlot(mload(CURRENT_INTEROP_ROOT_SLOT()))
+            function getNextInteropRootByte() -> ret {
+                ret := getInteropRootByte(mload(CURRENT_INTEROP_ROOT_BYTE()))
             }
 
 
@@ -3022,7 +3045,7 @@ object "Bootloader" {
             }
 
             /// @notice Sets the interop roots in the L2InteropRootStorage contract.
-            /// We store the latest processed interopRoot number in the CURRENT_INTEROP_ROOT_SLOT()
+            /// We store the latest processed interopRoot number in the CURRENT_INTEROP_ROOT_BYTE()
             /// For each txs, we check if the next interopRoot belongs to a block that we should process, if yes we store it and continue to the next.
             /// If no, we stop.
             /// @param txId The index of the transaction in the batch for which to get the L2 block information.
@@ -3034,7 +3057,7 @@ object "Bootloader" {
                 debugLog("current txId", txId)
                 debugLog("currentL2BlockNumber", currentL2BlockNumber)
 
-                let lastProcessedBlockNumber := mload(LAST_PROCESSED_BLOCK_NUMBER())
+                let lastProcessedBlockNumber := mload(LAST_PROCESSED_BLOCK_NUMBER_BYTE())
                 debugLog("lastProcessedBlockNumber", lastProcessedBlockNumber)
 
                 if lt(currentL2BlockNumber, add(lastProcessedBlockNumber, 1)) {
@@ -3048,27 +3071,15 @@ object "Bootloader" {
             }
 
             function setInteropRootForBlock(setForBlockNumber) {
-                let nextInteropRootNumber := mload(CURRENT_INTEROP_ROOT_SLOT())
-                let interopRootStartSlot := getNextInteropRootSlot()
+                let nextInteropRootNumber := mload(CURRENT_INTEROP_ROOT_BYTE())
+                let interopRootStartSlot := getNextInteropRootByte()
                 let numberOfRoots := getNumberOfInteropRootInCurrentBlock()
-                debugLog("numberOfRoots slot", CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT())
-                debugLog("numberOfRoots slot value", mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT()))
-                debugLog("next interop slot", add(INTEROP_BLOCKS_BEGIN_SLOT(), mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT())))
-                debugLog("next interop slot value", mload(add(INTEROP_BLOCKS_BEGIN_SLOT(), mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT()))))
-                debugLog("value at 70150", mload(70150))
-                debugLog("value at 70151", mload(70151))
-                debugLog("value at 70152", mload(70152))
-                debugLog("value at 70153", mload(70153))
-                debugLog("value at 70154", mload(70154))
-                debugLog("value at 70155", mload(70155))
-                debugLog("value at 70156", mload(70156))
                 
                 debugLog("numberOfRoots", numberOfRoots)
-                debugLog("numberOfRoots 2", getNumberOfInteropRootInBlock(mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT())))
-                debugLog("numberOfRoots 3", getNumberOfInteropRootInBlock(mload(add(INTEROP_BLOCKS_BEGIN_SLOT(), CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT()))))
+
                 if eq(numberOfRoots, 0) {
                     debugLog("No interop roots for this block", 0)
-                    let interopRootStartSlot := getInteropRootSlot(0)
+                    let interopRootStartSlot := getInteropRootByte(0)
                     let blockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
                     debugLog("first blockNumber", blockNumber)
                     leave
@@ -3083,7 +3094,7 @@ object "Bootloader" {
                 debugLog("Setting interop roots 1", nextInteropRootNumber)
                 for {let i := nextInteropRootNumber} lt(i, sub(numberOfRoots, 1)) {i := add(i, 1)} {
                     debugLog("Setting interop roots 2", i)
-                    let interopRootStartSlot := getInteropRootSlot(i)
+                    let interopRootStartSlot := getInteropRootByte(i)
                     let currentBlockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET()))
                     let chainId  := mload(add(interopRootStartSlot, INTEROP_ROOT_CHAIN_ID_OFFSET())) 
                     /// Note it might be a block or batchNumber. For proof based it is a block number.
@@ -3104,19 +3115,19 @@ object "Bootloader" {
                         debugLog("Empty sides, finishing", 0)
                         break
                     }
-                    mstore(CURRENT_INTEROP_ROOT_SLOT(), add(i, 1))
+                    mstore(CURRENT_INTEROP_ROOT_BYTE(), add(i, 1))
 
-                    debugLog("Next interop root updated", add(i, 1))
+                    debugLog("Current interop root updated", add(i, 1))
 
                     callL2InteropRootStorage(chainId, blockNumber, sidesLength, interopRootStartSlot)
                 }
 
 
-                mstore(LAST_PROCESSED_BLOCK_NUMBER(), setForBlockNumber)
-                debugLog("currentNumberOfRoots", mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT()))
-                debugLog("currentNumberOfRoots 2", add(mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT()), 1))
-                mstore(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT(), add(mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT()), 1))
-                debugLog("currentNumberOfRoots 3", mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT()))
+                mstore(LAST_PROCESSED_BLOCK_NUMBER_BYTE(), setForBlockNumber)
+                debugLog("currentNumberOfRoots", mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()))
+                debugLog("currentNumberOfRoots 2", add(mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()), 1))
+                mstore(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE(), add(mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()), 1))
+                debugLog("currentNumberOfRoots 3", mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()))
             }
 
             function callL2InteropRootStorage(chainId, blockNumber, sidesLength, interopRootStartSlot) {
@@ -3159,7 +3170,7 @@ object "Bootloader" {
                 let msgRootSlotSize := INTEROP_ROOT_SLOT_SIZE() 
                 let rollingHashOfProcessedRoots := 0
                 for {let i := 0} true {i := add(i, 1)} {
-                    let interopRootStartSlot := getInteropRootSlot(i)
+                    let interopRootStartSlot := getInteropRootByte(i)
                     let chainId  := mload(add(interopRootStartSlot, INTEROP_ROOT_CHAIN_ID_OFFSET())) 
                     /// Note it might be a block or batchNumber. For proof based it is a block number.
                     let blockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
@@ -3182,6 +3193,7 @@ object "Bootloader" {
                     let sidesLoadingOffset := add(msgRootOffset, 68)
                     let sidesOffset := add(interopRootStartSlot, INTEROP_ROOT_SIDES_OFFSET_START())
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
+                        debugLog("Hashing", mload(sidesOffset))
                         mstore(sidesLoadingOffset, mload(sidesOffset))
                         sidesOffset := add(sidesOffset, 32)
                         sidesLoadingOffset := add(sidesLoadingOffset, 32)
