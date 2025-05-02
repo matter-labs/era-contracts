@@ -22,7 +22,7 @@ use zksync_contracts::{
 use zksync_multivm::interface::{ExecutionResult, Halt};
 use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
 use zksync_types::{block::L2BlockHasher, Address, L1BatchNumber, L2BlockNumber, U256, u256_to_h256, };
-use zksync_types::{L2ChainId, Transaction};
+use zksync_types::{L2ChainId, Transaction, InteropRoot};
 use zksync_types::bytecode::BytecodeHash;
 
 mod hook;
@@ -85,7 +85,7 @@ fn execute_internal_bootloader_test() {
             timestamp: 15,
             prev_block_hash: L2BlockHasher::legacy_hash(L2BlockNumber(0)),
             max_virtual_blocks_to_create: 1,
-            interop_roots: vec![],
+            interop_roots: vec![InteropRoot::new(299, 1, vec![U256::from(0)])],
         },
     };
 
@@ -221,7 +221,7 @@ fn execute_internal_bootloader_test() {
 fn main() {
     tracing_subscriber::registry()
         .with(fmt::Layer::default())
-        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(tracing_subscriber::EnvFilter::new("trace"))
         .init();
 
     execute_internal_bootloader_test();

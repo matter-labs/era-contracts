@@ -197,3 +197,7 @@ function TEST_saturatingSub() {
     testing_assertEq(saturatingSub(4, 2), 2, "Invalid subtraction")
     testing_assertEq(saturatingSub(2, 4), 0, "Invalid subtraction")
 }
+
+function TEST_main() {
+    // main()
+}

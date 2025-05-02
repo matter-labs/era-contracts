@@ -7,8 +7,9 @@ use zksync_multivm::tracers::dynamic::vm_1_5_2::DynTracer;
 
 use zksync_multivm::interface::tracer::{TracerExecutionStatus, TracerExecutionStopReason};
 use zksync_multivm::vm_latest::{
-    BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState,
+    BootloaderState, HistoryMode, SimpleMemory, VmTracer, ZkSyncVmState, MultiVmSubversion,
 };
+use zksync_multivm::vm_latest::types::VmHook;
 use zksync_multivm::zk_evm_latest::tracing::{BeforeExecutionData, VmLocalStateData};
 
 use zksync_state::interface::{StoragePtr, WriteStorage};
@@ -49,6 +50,7 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
         _storage: StoragePtr<S>,
     ) {
         let hook = TestVmHook::from_opcode_memory(&state, &data, memory);
+        let normal_hook = VmHook::from_opcode_memory(&state, &data, MultiVmSubversion::EcPrecompiles);
 
         if let TestVmHook::TestLog(msg, data_str) = &hook {
             println!("{} {} {}", "Test log".bold(), msg, data_str);
@@ -66,6 +68,9 @@ impl<S, H: HistoryMode> DynTracer<S, SimpleMemory<H>> for BootloaderTestTracer {
             self.test_name
                 .set(test_name.clone())
                 .expect("Test already started");
+        }
+        if let Some(normal_hook) = normal_hook {
+            println!("Hook: {:?}", normal_hook);
         }
     }
 }

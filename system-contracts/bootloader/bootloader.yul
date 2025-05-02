@@ -719,6 +719,7 @@ object "Bootloader" {
                         // Since this is upgrade transactions, we are okay that the gasUsed by the transaction will
                         // not cover this additional hash computation
                         let canonicalL1TxHash := getCanonicalL1TxHash(txDataOffset)
+                        debugLog("canonicalL1TxHash upgrade", canonicalL1TxHash)
                         sendToL1Native(true, protocolUpgradeTxHashKey(), canonicalL1TxHash)
 
                         processL1Tx(txDataOffset, resultPtr, transactionIndex, userProvidedPubdataPrice, false)
@@ -733,7 +734,7 @@ object "Bootloader" {
                             revertWithReason(UNACCEPTABLE_GAS_PRICE_ERR_CODE(), 0)
                         }
 
-                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' || BOOTLOADER_TYPE=='unit_tests' -->
                         processL2Tx(txDataOffset, resultPtr, transactionIndex, gasPerPubdata)
                         <!-- @endif -->
 
@@ -1068,7 +1069,7 @@ object "Bootloader" {
                 let canonicalL1TxHash := 0
 
                 canonicalL1TxHash, gasUsedOnPreparation := l1TxPreparation(txDataOffset, gasPerPubdata, basePubdataSpent)
-
+                debugLog("canonicalL1TxHash", canonicalL1TxHash)
                 let refundGas := 0
                 let success := 0
 
@@ -3420,7 +3421,7 @@ object "Bootloader" {
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
-                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' || BOOTLOADER_TYPE=='unit_tests' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
 
@@ -3446,7 +3447,7 @@ object "Bootloader" {
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
-                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' || BOOTLOADER_TYPE=='unit_tests' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
@@ -3468,7 +3469,7 @@ object "Bootloader" {
 
                         <!-- @endif -->
 
-                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' || BOOTLOADER_TYPE=='unit_tests' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
 
@@ -3488,7 +3489,7 @@ object "Bootloader" {
                             assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
                         }
 
-                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' || BOOTLOADER_TYPE=='unit_tests' -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
@@ -4223,6 +4224,10 @@ object "Bootloader" {
             //                      Main Transaction Processing
             ////////////////////////////////////////////////////////////////////////////
 
+            <!-- @if BOOTLOADER_TYPE=='unit_tests' -->
+            main() {
+            <!-- @endif -->
+
             /// @notice the address that will be the beneficiary of all the fees
             let OPERATOR_ADDRESS := mload(0)
 
@@ -4260,7 +4265,7 @@ object "Bootloader" {
 
 
 
-                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                <!-- @if BOOTLOADER_TYPE=='proved_batch' || BOOTLOADER_TYPE=='unit_tests' -->
 
                 let baseFee := 0
 
@@ -4360,7 +4365,7 @@ object "Bootloader" {
 
                 validateTypedTxStructure(add(txDataOffset, 32))
 
-                <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                <!-- @if BOOTLOADER_TYPE=='proved_batch' || BOOTLOADER_TYPE=='unit_tests' -->
                 {
                     debugLog("ethCall", 0)
                     processTx(txDataOffset, resultPtr, transactionIndex, 0, GAS_PRICE_PER_PUBDATA)
@@ -4427,6 +4432,10 @@ object "Bootloader" {
             sendInteropRootRollingHashToL1()
 
             l1MessengerPublishingCall()
+            <!-- @if BOOTLOADER_TYPE=='unit_tests' -->
+            }
+            main()
+            <!-- @endif -->
         }
     }
 }

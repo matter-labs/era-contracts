@@ -6,13 +6,19 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "8a3725ac18fbb83d4d191d73a144418f6f02474f" }
+# zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "8a3725ac18fbb83d4d191d73a144418f6f02474f" }
+# zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "8a3725ac18fbb83d4d191d73a144418f6f02474f" }
+# zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "8a3725ac18fbb83d4d191d73a144418f6f02474f" }
+# zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "8a3725ac18fbb83d4d191d73a144418f6f02474f" }
+# zksync_vlog = { git = "https://github.com/matter-labs/zksync-era.git", rev = "8a3725ac18fbb83d4d191d73a144418f6f02474f" }
 
-zksync_multivm = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3bb75049d8a94239769f32f3b4a799f20bdb0967" }
-zksync_types = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3bb75049d8a94239769f32f3b4a799f20bdb0967" }
-zksync_contracts = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3bb75049d8a94239769f32f3b4a799f20bdb0967" }
-zksync_utils = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3bb75049d8a94239769f32f3b4a799f20bdb0967" }
-zksync_state = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3bb75049d8a94239769f32f3b4a799f20bdb0967" }
-zksync_vlog = { git = "https://github.com/matter-labs/zksync-era.git", rev = "3bb75049d8a94239769f32f3b4a799f20bdb0967" }
+zksync_multivm = { path = "../../../../core/lib/multivm" }
+zksync_types = { path = "../../../../core/lib/types" }
+zksync_contracts = { path = "../../../../core/lib/contracts" }
+zksync_utils = { path = "../../../../core/lib/utils" }
+zksync_state = { path = "../../../../core/lib/state" }
+zksync_vlog = { path = "../../../../core/lib/vlog" }
 
 colored = "2.0"
 hex = "0.4"

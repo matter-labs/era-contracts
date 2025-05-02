@@ -16,7 +16,7 @@ const SYSTEM_PARAMS = require("../../SystemConfig.json");
 const OUTPUT_DIR_1 = "contracts-preprocessed/bootloader";
 const OUTPUT_DIR_2 = "bootloader/build";
 
-const PREPROCCESING_MODES = ["proved_batch", "playground_batch"];
+const PREPROCCESING_MODES = ["proved_batch", "playground_batch", "unit_tests"];
 
 function getSelector(contractName: string, method: string): string {
   let contractInterface;
@@ -206,6 +206,8 @@ async function main() {
   const playgroundBatchBootloader = preprocess.preprocess(bootloader, { BOOTLOADER_TYPE: "playground_batch" });
   console.log("Preprocessing gas test bootloader");
   const gasTestBootloader = preprocess.preprocess(gasTestBootloaderTemplate, { BOOTLOADER_TYPE: "proved_batch" });
+  console.log("Preprocessing unit tests bootloader");
+  const unitTestsBootloader = preprocess.preprocess(bootloader, { BOOTLOADER_TYPE: "unit_tests" });
   console.log("Preprocessing fee estimation bootloader");
   const feeEstimationBootloader = preprocess.preprocess(feeEstimationBootloaderTemplate, {
     BOOTLOADER_TYPE: "playground_batch",
@@ -226,7 +228,7 @@ async function main() {
     ...params,
     CODE_START_PLACEHOLDER: "\n" + bootloaderTestUtils + "\n" + bootloaderTests + "\n" + testFramework,
   });
-  const provedBootloaderWithTests = preprocess.preprocess(bootloaderWithTests, { BOOTLOADER_TYPE: "proved_batch" });
+  const provedBootloaderWithTests = preprocess.preprocess(bootloaderWithTests, { BOOTLOADER_TYPE: "unit_tests" });
 
   if (!existsSync(OUTPUT_DIR_1)) {
     mkdirSync(OUTPUT_DIR_1);
