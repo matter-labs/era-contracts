@@ -19,7 +19,7 @@ contract SecurityCouncilEmergencyStageUpgrade is Script {
         // Insert the private key of the stage governance
         Vm.Wallet memory wallet = vm.createWallet(uint256(vm.envBytes32("PRIVATE_KEY")));
 
-        IProtocolUpgradeHandler.Call[] memory _calls = new IProtocolUpgradeHandler.Call[](0);
+        IProtocolUpgradeHandler.Call[] memory _calls = IProtocolUpgradeHandler.Call[](0);
 
         Utils.executeEmergencyProtocolUpgrade(protocolUpgradeHandler, wallet, _calls, bytes32(0));
     }
