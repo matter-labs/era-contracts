@@ -3,7 +3,7 @@ import { Provider as ZkSyncProvider } from "zksync-ethers";
 import { ethers } from "ethers";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const TESTNET_PROTOCOL_UPGRADE_HANDLER_ABI = require("./abi/TestnetProtocolUpgradeHandler.json");
+const TESTNET_PROTOCOL_UPGRADE_HANDLER_ABI = require("./abi/TestnetProtocolUpgradeHandler.json").abi;
 
 const program = new Command();
 
