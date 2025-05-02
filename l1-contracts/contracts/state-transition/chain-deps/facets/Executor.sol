@@ -557,7 +557,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Check that the batch passed by the validator is indeed the first unverified batch
         if (_hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
             if (_hashLegacyStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-            revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
+                revert BatchHashMismatch(
+                    s.storedBatchHashes[currentTotalBatchesVerified],
+                    _hashStoredBatchInfo(prevBatch)
+                );
             }
         }
 
