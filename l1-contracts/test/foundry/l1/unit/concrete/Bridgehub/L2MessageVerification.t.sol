@@ -107,7 +107,7 @@ contract MessageRootTest is Test {
         proof[24] = bytes32(0x00000000000000000000000000000000000000000000000000000000000001fa);
         proof[25] = bytes32(0x0101000100000000000000000000000000000000000000000000000000000000);
         proof[26] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
-        
+
         vm.mockCall(
             address(L2_MESSAGE_ROOT_STORAGE),
             abi.encodeWithSelector(L2_MESSAGE_ROOT_STORAGE.msgRoots.selector),
@@ -121,6 +121,5 @@ contract MessageRootTest is Test {
             proof
         );
         assertEq(isIncluded, true);
-
     }
 }
