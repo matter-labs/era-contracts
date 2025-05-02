@@ -142,11 +142,12 @@ contract AdminFunctions is Script {
     // This function should be called by the owner to update token multiplier setter role
     function chainSetPubdataPricingMode(
         address chainAdmin,
+        address admin,
         PubdataPricingMode mode
     ) public {
         IChainAdminOwnable admin = IChainAdminOwnable(chainAdmin);
         vm.startBroadcast();
-        admin.setPubdataPricingMode(mode);
+        admin.setPubdataPricingMode(admin, mode);
         vm.stopBroadcast();
     }
 
