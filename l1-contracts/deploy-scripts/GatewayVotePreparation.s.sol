@@ -377,6 +377,8 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         vm.serializeAddress("root", "multicall3_addr", output.multicall3);
         vm.serializeAddress("root", "relayed_sl_da_validator", output.relayedSLDAValidator);
         vm.serializeAddress("root", "validium_da_validator", output.validiumDAValidator);
+        vm.serializeAddress("root", "rollup_da_manager", output.rollupDAManager);
+
         vm.serializeBytes("root", "governance_calls_to_execute", abi.encode(governanceCallsToExecute));
         vm.serializeBytes("root", "ecosystem_admin_calls_to_execute", abi.encode(ecosystemAdminCallsToExecute));
 
