@@ -829,7 +829,7 @@
     "zkBytecodePath": "/l1-contracts/zkout/ChainAdminOwnable.sol/ChainAdminOwnable.json",
     "evmBytecodeHash": "0x51fa43e05faab1f7939c3ad5b7ce6ee34ca1f734dcb174807198ab11c83aced3",
     "evmBytecodePath": "/l1-contracts/out/ChainAdminOwnable.sol/ChainAdminOwnable.json",
-    "evmDeployedBytecodeHash": "0x4b7b25d47849924180af34ee17fd36dd3429925b0a6141c295d717a2f3da2003",
+    "evmDeployedBytecodeHash": "0x4b7b25d47849924180af34ee17fd36dd3429925b0a6141c295d717a2f3da2003"
   },
   {
     "contractName": "l1-contracts/ChainRegistrar",
