@@ -825,11 +825,11 @@
   },
   {
     "contractName": "l1-contracts/ChainAdminOwnable",
-    "zkBytecodeHash": "0x010001212d0c7e6f67d5bfc6149052a3dab3f2d2b92a6c3fb92ab073bdee3234",
+    "zkBytecodeHash": "0x010001358d2efaa6d2d0834a357b1f548af94c5d0f20d3d0f1dce3d553aff397",
     "zkBytecodePath": "/l1-contracts/zkout/ChainAdminOwnable.sol/ChainAdminOwnable.json",
-    "evmBytecodeHash": "0xbceb864954d26a417415bf864c62bf46996085b0bbbe73b59b4dc64afb035611",
+    "evmBytecodeHash": "0x51fa43e05faab1f7939c3ad5b7ce6ee34ca1f734dcb174807198ab11c83aced3",
     "evmBytecodePath": "/l1-contracts/out/ChainAdminOwnable.sol/ChainAdminOwnable.json",
-    "evmDeployedBytecodeHash": "0x8cb7dea8634d90c209dbd2518cea5076fdb5cc37603080059a1422b2ce54eb3f"
+    "evmDeployedBytecodeHash": "0x4b7b25d47849924180af34ee17fd36dd3429925b0a6141c295d717a2f3da2003",
   },
   {
     "contractName": "l1-contracts/ChainRegistrar",
