@@ -113,85 +113,85 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
     /// note we don't process L1 txs here, since we can do that when accepting the tx.
     // kl todo: estimate the txs size, and how much we can handle on GW.
     function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external {
-        uint256 msgCount = 0;
-        DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle
-            .Bytes32PushTree(
-                0,
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
-                0,
-                0
-            ); // todo 100 to const
-        reconstructedLogsTree.setupMemory(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-        uint256 logsLength = _processLogsInputs.logs.length;
-        for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
-            L2Log memory log = _processLogsInputs.logs[logCount];
-            bytes32 hashedLog = keccak256(
-                // solhint-disable-next-line func-named-parameters
-                abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
-            );
-            reconstructedLogsTree.pushMemory(hashedLog);
-            if (log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-                // its just a log and not a message
-                continue;
-            }
-            if (log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-                ++msgCount;
-                continue;
-            }
-            bytes memory message = _processLogsInputs.messages[msgCount];
-            ++msgCount;
+        // uint256 msgCount = 0;
+        // DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle
+        //     .Bytes32PushTree(
+        //         0,
+        //         new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
+        //         new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
+        //         0,
+        //         0
+        //     ); // todo 100 to const
+        // reconstructedLogsTree.setupMemory(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
+        // uint256 logsLength = _processLogsInputs.logs.length;
+        // for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
+        //     L2Log memory log = _processLogsInputs.logs[logCount];
+        //     bytes32 hashedLog = keccak256(
+        //         // solhint-disable-next-line func-named-parameters
+        //         abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
+        //     );
+        //     reconstructedLogsTree.pushMemory(hashedLog);
+        //     if (log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
+        //         // its just a log and not a message
+        //         continue;
+        //     }
+        //     if (log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
+        //         ++msgCount;
+        //         continue;
+        //     }
+        //     bytes memory message = _processLogsInputs.messages[msgCount];
+        //     ++msgCount;
 
-            if (log.value != keccak256(message)) {
-                revert InvalidMessage();
-            }
-            if (message[0] != BUNDLE_IDENTIFIER) {
-                continue;
-            }
+        //     if (log.value != keccak256(message)) {
+        //         revert InvalidMessage();
+        //     }
+        //     if (message[0] != BUNDLE_IDENTIFIER) {
+        //         continue;
+        //     }
 
-            InteropBundle memory interopBundle = this.parseInteropBundle(message);
+        //     InteropBundle memory interopBundle = this.parseInteropBundle(message);
 
-            // handle msg.value call separately
-            InteropCall memory interopCall = interopBundle.calls[0];
-            uint256 callsLength = interopBundle.calls.length;
-            for (uint256 callCount = 1; callCount < callsLength; ++callCount) {
-                interopCall = interopBundle.calls[callCount];
+        //     // handle msg.value call separately
+        //     InteropCall memory interopCall = interopBundle.calls[0];
+        //     uint256 callsLength = interopBundle.calls.length;
+        //     for (uint256 callCount = 1; callCount < callsLength; ++callCount) {
+        //         interopCall = interopBundle.calls[callCount];
 
-                // e.g. for direct calls we just skip
-                if (interopCall.from != L2_ASSET_ROUTER_ADDR) {
-                    continue;
-                }
+        //         // e.g. for direct calls we just skip
+        //         if (interopCall.from != L2_ASSET_ROUTER_ADDR) {
+        //             continue;
+        //         }
 
-                if (bytes4(interopCall.data) != IAssetRouterBase.finalizeDeposit.selector) {
-                    revert InvalidInteropCalldata(bytes4(interopCall.data));
-                }
-                (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(
-                    interopCall.data
-                );
-                (, , , uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
-                (uint256 tokenOriginChainId, , , ) = this.parseTokenData(erc20Metadata);
+        //         if (bytes4(interopCall.data) != IAssetRouterBase.finalizeDeposit.selector) {
+        //             revert InvalidInteropCalldata(bytes4(interopCall.data));
+        //         }
+        //         (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(
+        //             interopCall.data
+        //         );
+        //         (, , , uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
+        //         (uint256 tokenOriginChainId, , , ) = this.parseTokenData(erc20Metadata);
 
-                // if (!isMinterChain[fromChainId][assetId]) {
-                if (tokenOriginChainId != fromChainId) {
-                    chainBalance[fromChainId][assetId] -= amount;
-                }
-                // if (!isMinterChain[interopBundle.destinationChainId][assetId]) {
-                if (tokenOriginChainId != interopBundle.destinationChainId) {
-                    chainBalance[interopBundle.destinationChainId][assetId] += amount;
-                }
-            }
+        //         // if (!isMinterChain[fromChainId][assetId]) {
+        //         if (tokenOriginChainId != fromChainId) {
+        //             chainBalance[fromChainId][assetId] -= amount;
+        //         }
+        //         // if (!isMinterChain[interopBundle.destinationChainId][assetId]) {
+        //         if (tokenOriginChainId != interopBundle.destinationChainId) {
+        //             chainBalance[interopBundle.destinationChainId][assetId] += amount;
+        //         }
+        //     }
 
-            // kl todo add change minter role here
-        }
-        reconstructedLogsTree.extendUntilEndMemory();
-        bytes32 localLogsRootHash = reconstructedLogsTree.rootMemory();
-        bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
+        //     // kl todo add change minter role here
+        // }
+        // reconstructedLogsTree.extendUntilEndMemory();
+        // bytes32 localLogsRootHash = reconstructedLogsTree.rootMemory();
+        // bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
 
-        if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
-            revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);
-        }
+        // if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
+        //     revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);
+        // }
 
-        _appendChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
+        _appendChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, _processLogsInputs.chainBatchRoot);
     }
 
     /*//////////////////////////////////////////////////////////////
