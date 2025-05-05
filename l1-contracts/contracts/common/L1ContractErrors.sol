@@ -362,10 +362,6 @@ error UnknownVerifierType();
 // 0x456f8f7a
 error EmptyProofLength();
 
-error NotBlocklisted(address);
-
-error AlreadyBlocklisted(address);
-
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

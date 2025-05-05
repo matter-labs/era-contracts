@@ -4,12 +4,19 @@ pragma solidity 0.8.24;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress, NotBlocklisted, AlreadyBlocklisted} from "../common/L1ContractErrors.sol";
+import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../common/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
+
+/// @dev The errors below are written here instead of a dedicate file to avoid
+/// source code changes to another contracts.y
+// 0x55ccf3e4
+error NotBlocklisted(address);
+// 0x7b0b7f4f
+error AlreadyBlocklisted(address);
 
 /// @dev We want to ensure that only whitelisted contracts can ever be deployed,
 /// while allowing anyone to call any other method. Thus, we disallow calls that can deploy contracts
