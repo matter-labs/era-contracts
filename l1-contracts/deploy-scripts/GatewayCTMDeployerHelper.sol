@@ -91,7 +91,7 @@ library GatewayCTMDeployerHelper {
     /// @return verification        Structured metadata about every future deployment.
     /// @return create2Calldata     Calldata that must be sent to the factory so it
     ///                             actually deploys the `GatewayCTMDeployer` contract.
-    /// @return ctmDeployerAddress  Deterministic address of the deployer contract.
+    /// @return ctmDeployerVerificationInfo  Verification info of the deployer contract.
     function calculateAddresses(
         bytes32 _create2Salt,
         GatewayCTMDeployerConfig memory config
@@ -100,7 +100,7 @@ library GatewayCTMDeployerHelper {
         returns (
             VerificationDeployedContracts memory verification,
             bytes memory create2Calldata,
-            address ctmDeployerAddress
+            VerificationInfo memory ctmDeployerVerificationInfo
         )
     {
         (bytes32 bytecodeHash, bytes memory deployData) = Utils.getDeploymentCalldata(
@@ -112,7 +112,13 @@ library GatewayCTMDeployerHelper {
         // Create2Factory has the same interface as the usual deployer.
         create2Calldata = deployData;
 
-        ctmDeployerAddress = Utils.getL2AddressViaCreate2Factory(_create2Salt, bytecodeHash, abi.encode(config));
+        address ctmDeployerAddress = Utils.getL2AddressViaCreate2Factory(_create2Salt, bytecodeHash, abi.encode(config));
+        ctmDeployerVerificationInfo = VerificationInfo({
+            name: "GatewayCTMDeployer",
+            addr: ctmDeployerAddress,
+            constructorParams: abi.encode(config)
+        });
+
 
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: ctmDeployerAddress, salt: config.salt});
 

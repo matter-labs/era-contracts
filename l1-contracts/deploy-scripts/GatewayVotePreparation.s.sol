@@ -56,7 +56,7 @@ import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
 import {DeployL1Script} from "./DeployL1.s.sol";
 
-import {GatewayCTMDeployerHelper, VerificationDeployedContracts} from "./GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, VerificationDeployedContracts, VerificationInfo} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -64,6 +64,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
+import {DeploymentNotifier} from "./DeploymentNotifier.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
@@ -151,10 +152,10 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
-        require(
-            ctmProtocolVersion == config.contracts.latestProtocolVersion,
-            "The latest protocol version is not correct"
-        );
+        // require(
+        //     ctmProtocolVersion == config.contracts.latestProtocolVersion,
+        //     "The latest protocol version is not correct"
+        // );
         serverNotifier = ChainTypeManager(ctm).serverNotifierAddress();
         addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
 
@@ -179,41 +180,47 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     }
 
     function deployGatewayCTM() internal {
-        (VerificationDeployedContracts memory verificationInfo, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
+        (VerificationDeployedContracts memory verificationInfo, bytes memory create2Calldata, VerificationInfo memory ctmDeployerVerificationInfo) = GatewayCTMDeployerHelper
             .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
         GatewayCTMDeployerHelper.notifyAboutDeployments(verificationInfo);
+        DeploymentNotifier.notifyAboutDeployment(
+            ctmDeployerVerificationInfo.addr,
+            ctmDeployerVerificationInfo.name,
+            ctmDeployerVerificationInfo.constructorParams,
+            true
+        );
         DeployedContracts memory expectedGatewayContracts = GatewayCTMDeployerHelper.convertToDeployedContracts(verificationInfo);
 
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
 
-        for (uint i = 0; i < deps.length; i++) {
-            bytes[] memory localDeps = new bytes[](1);
-            localDeps[0] = deps[i];
-            Utils.runL1L2Transaction({
-                l2Calldata: hex"",
-                l2GasLimit: 72_000_000,
-                l2Value: 0,
-                factoryDeps: localDeps,
-                dstAddress: address(0),
-                chainId: gatewayChainId,
-                bridgehubAddress: addresses.bridgehub.bridgehubProxy,
-                l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-                refundRecipient: msg.sender
-            });
-        }
+        // for (uint i = 0; i < deps.length; i++) {
+        //     bytes[] memory localDeps = new bytes[](1);
+        //     localDeps[0] = deps[i];
+        //     Utils.runL1L2Transaction({
+        //         l2Calldata: hex"",
+        //         l2GasLimit: 72_000_000,
+        //         l2Value: 0,
+        //         factoryDeps: localDeps,
+        //         dstAddress: address(0),
+        //         chainId: gatewayChainId,
+        //         bridgehubAddress: addresses.bridgehub.bridgehubProxy,
+        //         l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
+        //         refundRecipient: msg.sender
+        //     });
+        // }
 
-        Utils.runL1L2Transaction({
-            l2Calldata: create2Calldata,
-            l2GasLimit: 72_000_000,
-            l2Value: 0,
-            factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDRESS,
-            chainId: gatewayChainId,
-            bridgehubAddress: addresses.bridgehub.bridgehubProxy,
-            l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-            refundRecipient: msg.sender
-        });
+        // Utils.runL1L2Transaction({
+        //     l2Calldata: create2Calldata,
+        //     l2GasLimit: 72_000_000,
+        //     l2Value: 0,
+        //     factoryDeps: new bytes[](0),
+        //     dstAddress: L2_CREATE2_FACTORY_ADDRESS,
+        //     chainId: gatewayChainId,
+        //     bridgehubAddress: addresses.bridgehub.bridgehubProxy,
+        //     l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
+        //     refundRecipient: msg.sender
+        // });
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
     }
