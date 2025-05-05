@@ -333,9 +333,7 @@ describe("SystemContext tests", () => {
 
     it("should set block again and check blockNumber & blockTimestamp also check getBlockHashEVM", async () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
-      const prevL2BlockHash = ethers.utils.keccak256(
-        ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)])
-      );
+      const prevL2BlockHash = await systemContext.getBlockHashEVM(blockData.blockNumber.sub(1));
       const blockTxsRollingHash = ethers.utils.hexlify(Buffer.alloc(32, 0));
       const prevBlockHash = await systemContext.getBlockHashEVM(blockData.blockNumber);
       const expectedBlockHash = ethers.utils.keccak256(
