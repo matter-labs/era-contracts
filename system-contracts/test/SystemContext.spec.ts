@@ -326,7 +326,7 @@ describe("SystemContext tests", () => {
           .setL2Block(blockData.blockNumber.add(1), 0, expectedBlockHash, false, 0)
       ).to.be.revertedWithCustomError(systemContext, "NonMonotonicL2BlockTimestamp");
       // Same timestamp is ok.
-      systemContext
+      await systemContext
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp, expectedBlockHash, false, 0)
     });
