@@ -327,8 +327,8 @@ describe("SystemContext tests", () => {
       ).to.be.revertedWithCustomError(systemContext, "NonMonotonicL2BlockTimestamp");
       // Same timestamp is ok.
       await systemContext
-          .connect(bootloaderAccount)
-          .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp, expectedBlockHash, false, 0)
+        .connect(bootloaderAccount)
+        .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp, expectedBlockHash, false, 0);
     });
 
     it("should set block again and check blockNumber & blockTimestamp also check getBlockHashEVM", async () => {
