@@ -56,7 +56,7 @@ import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
 import {DeployL1Script} from "./DeployL1.s.sol";
 
-import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, VerificationDeployedContracts} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -179,8 +179,11 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     }
 
     function deployGatewayCTM() internal {
-        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
+        (VerificationDeployedContracts memory verificationInfo, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
             .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
+
+        GatewayCTMDeployerHelper.notifyAboutDeployments(verificationInfo);
+        DeployedContracts memory expectedGatewayContracts = GatewayCTMDeployerHelper.convertToDeployedContracts(verificationInfo);
 
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
 

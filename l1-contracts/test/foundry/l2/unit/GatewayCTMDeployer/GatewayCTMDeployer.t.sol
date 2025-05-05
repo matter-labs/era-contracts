@@ -37,7 +37,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-import {GatewayCTMDeployerHelper} from "deploy-scripts/GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, VerificationDeployedContracts} from "deploy-scripts/GatewayCTMDeployerHelper.sol";
 
 import {L2_CREATE2_FACTORY_ADDRESS} from "deploy-scripts/Utils.sol";
 
@@ -146,10 +146,12 @@ contract GatewayCTMDeployerTest is Test {
         new GatewayCTMDeployer(deployerConfig);
 
         (
-            DeployedContracts memory calculatedDeployedContracts,
+            VerificationDeployedContracts memory verificationInfo,
             bytes memory create2Calldata,
             address ctmDeployerAddress
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
+
+        DeployedContracts memory calculatedDeployedContracts = GatewayCTMDeployerHelper.convertToDeployedContracts(verificationInfo);
 
         GatewayCTMDeployerTester tester = new GatewayCTMDeployerTester();
         (DeployedContracts memory deployedContracts, address correctCTMDeployerAddress) = tester.deployCTMDeployer(
