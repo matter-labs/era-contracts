@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
+import {PubdataPricingMode} from "../state-transition/chain-deps/ZKChainStorage.sol";
 
 /// @title ChainAdmin contract interface
 /// @author Matter Labs
@@ -34,4 +35,6 @@ interface IChainAdminOwnable {
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable;
 
     function setTokenMultiplier(IAdmin _chainContract, uint128 _nominator, uint128 _denominator) external;
+
+    function setPubdataPricingMode(IAdmin _chainContract, PubdataPricingMode _mode) external;
 }

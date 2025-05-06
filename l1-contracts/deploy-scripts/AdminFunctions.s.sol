@@ -28,6 +28,7 @@ import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridge
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -134,6 +135,14 @@ contract AdminFunctions is Script {
             restriction.grantRole(SET_TOKEN_MULTIPLIER_SETTER_ROLE, setter);
             vm.stopBroadcast();
         }
+    }
+
+    // This function should be called by the owner to update token multiplier setter role
+    function chainSetPubdataPricingMode(address chainAdmin, address diamondProxy, PubdataPricingMode mode) public {
+        IChainAdminOwnable admin = IChainAdminOwnable(chainAdmin);
+        vm.startBroadcast();
+        admin.setPubdataPricingMode(IAdmin(diamondProxy), mode);
+        vm.stopBroadcast();
     }
 
     function governanceExecuteCalls(bytes memory callsToExecute, address governanceAddr) public {
