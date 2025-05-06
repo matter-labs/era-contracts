@@ -166,8 +166,11 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
         return Utils.isCodeHashEVM(bytecodeHash);
     }
 
-    function isAccountDelegated(address _addr) external view override returns (bool) {
-        return delegatedEOAs[_addr] != address(0);
+    /// @notice Returns the address of the account that is delegated to execute transactions on behalf of the given
+    /// address.
+    /// @notice Returns the zero address if no delegation is set.
+    function getAccountDelegation(address _addr) external view override returns (address) {
+        return delegatedEOAs[_addr];
     }
 
     function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
@@ -239,21 +242,6 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
                 emit AccountDelegated(authority, item.addr);
             }
         }
-    }
-
-    // TODO: Function made to match signature of account methods for simplicity.
-    function delegateTx(
-        bytes32,
-        bytes32,
-        Transaction calldata _tx
-    ) external onlyCallFromBootloader returns (bool success) {
-        // Check if the transaction is delegated
-        address from = address(uint160(_tx.from));
-        address delegationAddress = delegatedEOAs[from];
-        if (delegationAddress == address(0)) {
-            return false;
-        }
-        return this._performRawMimicCall(uint32(gasleft()), from, delegationAddress, _tx.data, false);
     }
 
     // Needed to convert `memory` to `calldata`

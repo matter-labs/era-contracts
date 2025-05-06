@@ -694,10 +694,11 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
-            /// @notice Returns whether the account is a EIP-7702 delegated EOA .
+            /// @notice Returns the address of EIP-7702 delegation for the account (or zero, if account
+            /// is not delegated).
             /// @param addr The address of the account to check.
-            function isAccountDelegated(addr) -> ret {
-                mstore(0, {{RIGHT_PADDED_IS_ACCOUNT_DELEGATED_SELECTOR}})
+            function getDelegationAddress(addr) -> ret {
+                mstore(0, {{RIGHT_PADDED_GET_ACCOUNT_DELEGATION_SELECTOR}})
                 mstore(4, addr)
                 let success := staticcall(
                     gas(),
@@ -2005,6 +2006,15 @@ object "Bootloader" {
                 debugLog("from: ", from)
                 debugLog("to: ", to)
 
+                let delegation := getDelegationAddress(from)
+                debugLog("delegation: ", delegation)
+
+                if gt(delegation, 0) {
+                    // If the delegation is not zero, we need to invoke the delegation
+                    // target instead of the original `to` field.
+                    to := delegation
+                }
+
                 switch isEOA(from)
                 case true {
                     setTxOrigin(from)
@@ -2623,16 +2633,19 @@ object "Bootloader" {
             /// @dev Function responsible for the execution of the L2 transaction
             /// @dev Returns `true` or `false` depending on whether or not the tx has reverted.
             function executeL2Tx(txDataOffset, from) -> ret {
-                let isDelegated := isAccountDelegated(from)
+                let delegation := getDelegationAddress(from)
 
-                switch isDelegated
+                switch delegation
                     case 0 {
                         // Account not delegated: invoke the `execute` method
                         ret := callAccountMethod({{EXECUTE_TX_SELECTOR}}, from, txDataOffset)
                     }
                     default {
-                        // Account is delegated: invoke through AccountCodeStorage
-                        ret := callAccountMethod({{DELEGATE_TX_SELECTOR}}, ACCOUNT_CODE_STORAGE_ADDR(), txDataOffset)
+                        // Account is delegated: invoke through mimicall using calldata provided
+                        let innerTxDataOffset := add(txDataOffset, 32)
+                        let calldataPtr := getDataPtr(innerTxDataOffset)
+                        let value := getValue(innerTxDataOffset)
+                        ret := msgValueSimulatorMimicCall(delegation, from, value, calldataPtr)
                     }                
 
                 if iszero(ret) {
