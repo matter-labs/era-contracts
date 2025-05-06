@@ -6,7 +6,7 @@ import {
   TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
   TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
 } from "./shared/constants";
-import { prepareEnvironment, setResult } from "./shared/mocks";
+import { prepareEnvironment } from "./shared/mocks";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 import { ethers, network } from "hardhat";
 import { BigNumber } from "ethers";
@@ -117,9 +117,48 @@ describe("NonceHolder tests", () => {
       const result = await nonceHolder.getMinNonce(systemAccount.address);
       expect(result).to.equal(expectedNonce.add(1));
     });
+
+    it("should revert if trying to increment keyed nonce", async () => {
+      const keyedNonce = 1n << 64n;
+      await expect(
+        nonceHolder.connect(systemAccount).incrementMinNonceIfEquals(keyedNonce)
+      ).to.be.revertedWithCustomError(nonceHolder, "InvalidNonceKey");
+    });
   });
 
-  describe("incrementDeploymentNonce", async () => {
+  describe("incrementMinNonceIfEqualsKeyed", () => {
+    it("should revert This method require system call flag", async () => {
+      const keyedNonce = 1n << 64n;
+      await expect(nonceHolder.incrementMinNonceIfEquals(keyedNonce)).to.be.revertedWithCustomError(
+        nonceHolder,
+        "SystemCallFlagRequired"
+      );
+    });
+
+    it("should revert if trying to increment non-keyed nonce", async () => {
+      const expectedNonce = await nonceHolder.getMinNonce(systemAccount.address);
+      await expect(
+        nonceHolder.connect(systemAccount).incrementMinNonceIfEqualsKeyed(expectedNonce)
+      ).to.be.revertedWithCustomError(nonceHolder, "InvalidNonceKey");
+    });
+
+    it("should increment keyed nonce if equals to expected", async () => {
+      const nonceKey = 123;
+      const expectedNonce = await nonceHolder.getKeyedNonce(systemAccount.address, nonceKey);
+      await nonceHolder.connect(systemAccount).incrementMinNonceIfEqualsKeyed(expectedNonce);
+      const result = await nonceHolder.getKeyedNonce(systemAccount.address, nonceKey);
+      expect(result).to.equal(expectedNonce.add(1));
+    });
+
+    it("should revert if trying to increment keyed nonce with incorrect value", async () => {
+      const keyedNonce = (1n << 64n) + 2222222n;
+      await expect(
+        nonceHolder.connect(systemAccount).incrementMinNonceIfEqualsKeyed(keyedNonce)
+      ).to.be.revertedWithCustomError(nonceHolder, "ValueMismatch");
+    });
+  });
+
+  describe("incrementDeploymentNonce", () => {
     it("should revert Only the contract deployer can increment the deployment nonce", async () => {
       await expect(nonceHolder.incrementDeploymentNonce(deployerAccount.address)).to.be.revertedWithCustomError(
         nonceHolder,
@@ -139,96 +178,15 @@ describe("NonceHolder tests", () => {
     });
   });
 
-  describe("setValueUnderNonce and getValueUnderNonce", async () => {
-    it("should revert Nonce value cannot be set to 0", async () => {
-      const accountInfo = [1, 0];
-      const encodedAccountInfo = ethers.utils.defaultAbiCoder.encode(["tuple(uint8, uint8)"], [accountInfo]);
-      await setResult("ContractDeployer", "getAccountInfo", [systemAccount.address], {
-        failure: false,
-        returnData: encodedAccountInfo,
-      });
-      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(124, 0)).to.be.revertedWithCustomError(
-        nonceHolder,
-        "ZeroNonceError"
-      );
-    });
-
-    it("should revert Previous nonce has not been used", async () => {
-      const accountInfo = [1, 0];
-      const encodedAccountInfo = ethers.utils.defaultAbiCoder.encode(["tuple(uint8, uint8)"], [accountInfo]);
-      await setResult("ContractDeployer", "getAccountInfo", [systemAccount.address], {
-        failure: false,
-        returnData: encodedAccountInfo,
-      });
-      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(443, 111)).to.be.revertedWithCustomError(
-        nonceHolder,
-        "NonceJumpError"
-      );
-    });
-
-    it("should emit ValueSetUnderNonce event", async () => {
-      const currentNonce = await nonceHolder.getMinNonce(systemAccount.address);
-      const valueBefore = await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce);
-      const value = valueBefore.add(42);
-
-      const accountInfo = [1, 0];
-      const encodedAccountInfo = ethers.utils.defaultAbiCoder.encode(["tuple(uint8, uint8)"], [accountInfo]);
-      await setResult("ContractDeployer", "getAccountInfo", [systemAccount.address], {
-        failure: false,
-        returnData: encodedAccountInfo,
-      });
-      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce, value))
-        .to.emit(nonceHolder, "ValueSetUnderNonce")
-        .withArgs(systemAccount.address, currentNonce, value);
-
-      const valueAfter = await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce);
-      expect(valueAfter).to.equal(value);
-    });
-
-    it("should emit ValueSetUnderNonce event arbitrary ordering", async () => {
-      const currentNonce = await nonceHolder.getMinNonce(systemAccount.address);
-      const encodedAccountInfo = ethers.utils.defaultAbiCoder.encode(["tuple(uint8, uint8)"], [[1, 1]]);
-      await setResult("ContractDeployer", "getAccountInfo", [systemAccount.address], {
-        failure: false,
-        returnData: encodedAccountInfo,
-      });
-
-      const firstValue = (await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce)).add(111);
-      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce, firstValue))
-        .to.emit(nonceHolder, "ValueSetUnderNonce")
-        .withArgs(systemAccount.address, currentNonce, firstValue);
-
-      const secondValue = (await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce.add(2))).add(333);
-      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce.add(2), secondValue))
-        .to.emit(nonceHolder, "ValueSetUnderNonce")
-        .withArgs(systemAccount.address, currentNonce.add(2), secondValue);
-
-      const thirdValue = (await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce.add(1))).add(222);
-      await expect(nonceHolder.connect(systemAccount).setValueUnderNonce(currentNonce.add(1), thirdValue))
-        .to.emit(nonceHolder, "ValueSetUnderNonce")
-        .withArgs(systemAccount.address, currentNonce.add(1), thirdValue);
-
-      const storedValue = await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce);
-      expect(storedValue).to.equal(firstValue);
-      const storedValueNext = await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce.add(1));
-      expect(storedValueNext).to.equal(thirdValue);
-      const storedAfterNext = await nonceHolder.connect(systemAccount).getValueUnderNonce(currentNonce.add(2));
-      expect(storedAfterNext).to.equal(secondValue);
-    });
-  });
-
   describe("isNonceUsed", () => {
     it("used nonce because it too small", async () => {
       const isUsed = await nonceHolder.isNonceUsed(systemAccount.address, 1);
       expect(isUsed).to.equal(true);
     });
 
-    it("used nonce because set", async () => {
-      const currentNonce = await nonceHolder.getMinNonce(systemAccount.address);
-      const checkedNonce = currentNonce.add(1);
-      await nonceHolder.connect(systemAccount).setValueUnderNonce(checkedNonce, 5);
-
-      const isUsed = await nonceHolder.isNonceUsed(systemAccount.address, checkedNonce);
+    it("used keyed nonce", async () => {
+      const nonceKey = 123n;
+      const isUsed = await nonceHolder.isNonceUsed(systemAccount.address, nonceKey << 64n);
       expect(isUsed).to.equal(true);
     });
 
@@ -236,6 +194,13 @@ describe("NonceHolder tests", () => {
       const currentNonce = await nonceHolder.getMinNonce(systemAccount.address);
       const checkedNonce = currentNonce.add(2137 * 2 ** 10);
 
+      const isUsed = await nonceHolder.isNonceUsed(systemAccount.address, checkedNonce);
+      expect(isUsed).to.be.false;
+    });
+
+    it("not used keyed nonce", async () => {
+      const nonceKey = 123n;
+      const checkedNonce = (nonceKey << 64n) + 2222222n;
       const isUsed = await nonceHolder.isNonceUsed(systemAccount.address, checkedNonce);
       expect(isUsed).to.be.false;
     });
