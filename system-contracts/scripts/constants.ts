@@ -197,6 +197,7 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     address: "0x0000000000000000000000000000000000008016",
     codeName: "EntryPoint",
     lang: Language.Solidity,
+    location: SourceLocation.SystemContracts,
   },
   create2Factory: {
     // This is explicitly a non-system-contract address.
