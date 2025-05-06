@@ -1355,7 +1355,7 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             RollupDAManager.updateDAPair,
             (
                 gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
-                getExpectedL2Address("RollupL2DAValidator"),
+                getRollupL2DACommitmentScheme(),
                 true
             )
         );
