@@ -92,13 +92,16 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         bytes memory constructorArgs
     ) internal virtual override returns (address) {
         console.log("Deploying via create2 L2");
-        return L2Utils.deployViaCreat2L2(creationCode, constructorArgs, config.contracts.create2FactorySalt);
+        return L2Utils.deployViaCreat2L2(creationCode, constructorArgs, create2FactoryParams.factorySalt);
     }
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
 
-    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override returns (bytes memory) {
         revert("Not implemented");
     }
 
@@ -107,7 +110,8 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     }
 
     function deployTuppWithContract(
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal virtual override returns (address implementation, address proxy) {
         revert("Not implemented tupp");
     }

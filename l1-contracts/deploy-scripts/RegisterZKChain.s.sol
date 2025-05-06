@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 // solhint-disable no-console, gas-custom-errors, reason-string
 
@@ -65,7 +65,6 @@ struct Config {
     address create2FactoryAddress;
     bytes32 create2Salt;
     bool allowEvmEmulator;
-    address serverNotifierProxy;
 }
 
 contract RegisterZKChainScript is Script {
@@ -159,7 +158,6 @@ contract RegisterZKChainScript is Script {
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
         config.l1Erc20Bridge = toml.readAddress("$.deployed_addresses.bridges.erc20_bridge_proxy_addr");
-        config.serverNotifierProxy = toml.readAddress("$.deployed_addresses.server_notifier_proxy_addr");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");
@@ -214,7 +212,6 @@ contract RegisterZKChainScript is Script {
         config.nativeTokenVault = toml.readAddress("$.deployed_addresses.native_token_vault_addr");
         config.sharedBridgeProxy = toml.readAddress("$.deployed_addresses.bridges.shared_bridge_proxy_addr");
         config.l1Nullifier = toml.readAddress("$.deployed_addresses.bridges.l1_nullifier_proxy_addr");
-        config.serverNotifierProxy = toml.readAddress("$.deployed_addresses.server_notifier_proxy_addr");
 
         config.diamondCutData = toml.readBytes("$.contracts_config.diamond_cut_data");
         config.forceDeployments = toml.readBytes("$.contracts_config.force_deployments_data");

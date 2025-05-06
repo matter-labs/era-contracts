@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 // solhint-disable no-console
 
@@ -152,7 +152,8 @@ contract DeployZKScript is Script {
             addr,
             config.chainId,
             config.bridgehub,
-            config.l1SharedBridge
+            config.l1SharedBridge,
+            msg.sender
         );
     }
 

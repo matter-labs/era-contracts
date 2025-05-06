@@ -43,10 +43,22 @@ Update the system contracts hashes: `yarn sc calculate-hashes:fix`
 
 ### Run tests
 
-The tests of the system contracts utilize the ZKsync test node. In order to run the tests, execute the following commands in the root of the repository:
+The tests of the system contracts utilize the Anvil-ZKsync. In order to run the tests, execute the following commands in the root of the repository:
+
+```
+yarn install-anvil
+```
+
+If you want to run test-node with built-in contracts, run:
 
 ```
 yarn test-node
+```
+
+If you want to run test-node with local contracts for development, run:
+
+```
+yarn test-node-local-contracts
 ```
 
 It will run the test node, and you can see its logs in the output.
@@ -83,8 +95,10 @@ Also, when testing these contracts, some of them should also be deployed on the 
 - [Ecrecover.yul](contracts%2Fprecompiles%2FEcrecover.yul): uses precompile call instruction, which is address-dependent
 - [Keccak256.yul](contracts%2Fprecompiles%2FKeccak256.yul): uses precompile call instruction, which is address-dependent
 - [SHA256.yul](contracts%2Fprecompiles%2FSHA256.yul): uses precompile call instruction, which is address-dependent
-
-However, this is not the case for [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul) and [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul), so they can be deployed on any addresses, even outside kernel space.
+- [Modexp.yul](contracts%2Fprecompiles%2FModexp.yul): uses precompile call instruction, which is address-dependent
+- [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul): uses precompile call instruction, which is address-dependent
+- [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul): uses precompile call instruction, which is address-dependent
+- [EcPairing.yul](contracts%2Fprecompiles%2FEcPairing.yul): uses precompile call instruction, which is address-dependent
 
 #### Test contracts/features
 
@@ -147,6 +161,26 @@ merged back into the `dev` branch to keep it up-to-date.
 Since scripts, READMEs, etc., are code that is not subject to audits, these are to be merged directly into the `main`
 branch. The rest of the release branches as well as the `dev` branch should merge `main` to synchronize with these
 changes.
+
+## Verification of contracts
+
+To verify contracts deployed on a chain, ensure to firstly build all the contracts locally:
+
+```
+yarn build:foundry
+```
+
+and run the verification script afterward:
+
+```
+VERIFICATION_URL=<explorer-verification-url> yarn verify-on-explorer
+```
+
+For example, for zksync Era testnet environment it would look the following way:
+
+```
+VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-explorer
+```
 
 ## Official Links
 

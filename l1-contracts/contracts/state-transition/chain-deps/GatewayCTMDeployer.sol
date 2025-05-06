@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {MailboxFacet} from "./facets/Mailbox.sol";
 import {ExecutorFacet} from "./facets/Executor.sol";
@@ -13,8 +13,8 @@ import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.so
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
 import {DualVerifier} from "../verifiers/DualVerifier.sol";
-import {L2VerifierFflonk} from "../verifiers/L2VerifierFflonk.sol";
-import {L2VerifierPlonk} from "../verifiers/L2VerifierPlonk.sol";
+import {L1VerifierFflonk} from "../verifiers/L1VerifierFflonk.sol";
+import {L1VerifierPlonk} from "../verifiers/L1VerifierPlonk.sol";
 
 import {VerifierParams, IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
@@ -265,7 +265,7 @@ contract GatewayCTMDeployer {
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployServerNotifier(bytes32 _salt, DeployedContracts memory _deployedContracts) internal {
-        address serverNotifierImplementation = address(new ServerNotifier{salt: _salt}(true));
+        address serverNotifierImplementation = address(new ServerNotifier{salt: _salt}());
         _deployedContracts.stateTransition.serverNotifierImplementation = serverNotifierImplementation;
         _deployedContracts.stateTransition.serverNotifierProxy = address(
             new TransparentUpgradeableProxy{salt: _salt}(
@@ -286,9 +286,9 @@ contract GatewayCTMDeployer {
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts
     ) internal {
-        L2VerifierFflonk fflonkVerifier = new L2VerifierFflonk{salt: _salt}();
+        L1VerifierFflonk fflonkVerifier = new L1VerifierFflonk{salt: _salt}();
         _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);
-        L2VerifierPlonk verifierPlonk = new L2VerifierPlonk{salt: _salt}();
+        L1VerifierPlonk verifierPlonk = new L1VerifierPlonk{salt: _salt}();
         _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(

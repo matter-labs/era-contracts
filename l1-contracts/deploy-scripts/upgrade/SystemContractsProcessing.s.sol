@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Utils, L2_WETH_IMPL_ADDRESS, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
@@ -24,7 +24,7 @@ struct SystemContract {
 }
 
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
+uint256 constant SYSTEM_CONTRACTS_COUNT = 32;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 5;
 
@@ -89,165 +89,172 @@ library SystemContractsProcessing {
         });
 
         systemContracts[7] = SystemContract({
+            addr: 0x0000000000000000000000000000000000000005,
+            codeName: "Modexp",
+            lang: Language.Yul,
+            isPrecompile: true
+        });
+
+        systemContracts[8] = SystemContract({
             addr: 0x0000000000000000000000000000000000008001,
             codeName: "EmptyContract",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[8] = SystemContract({
+        systemContracts[9] = SystemContract({
             addr: 0x0000000000000000000000000000000000008002,
             codeName: "AccountCodeStorage",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[9] = SystemContract({
+        systemContracts[10] = SystemContract({
             addr: 0x0000000000000000000000000000000000008003,
             codeName: "NonceHolder",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[10] = SystemContract({
+        systemContracts[11] = SystemContract({
             addr: 0x0000000000000000000000000000000000008004,
             codeName: "KnownCodesStorage",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[11] = SystemContract({
+        systemContracts[12] = SystemContract({
             addr: 0x0000000000000000000000000000000000008005,
             codeName: "ImmutableSimulator",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[12] = SystemContract({
+        systemContracts[13] = SystemContract({
             addr: 0x0000000000000000000000000000000000008006,
             codeName: "ContractDeployer",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[13] = SystemContract({
+        systemContracts[14] = SystemContract({
             addr: 0x0000000000000000000000000000000000008008,
             codeName: "L1Messenger",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[14] = SystemContract({
+        systemContracts[15] = SystemContract({
             addr: 0x0000000000000000000000000000000000008009,
             codeName: "MsgValueSimulator",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[15] = SystemContract({
+        systemContracts[16] = SystemContract({
             addr: 0x000000000000000000000000000000000000800A,
             codeName: "L2BaseToken",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[16] = SystemContract({
+        systemContracts[17] = SystemContract({
             addr: 0x000000000000000000000000000000000000800B,
             codeName: "SystemContext",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[17] = SystemContract({
+        systemContracts[18] = SystemContract({
             addr: 0x000000000000000000000000000000000000800c,
             codeName: "BootloaderUtilities",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[18] = SystemContract({
+        systemContracts[19] = SystemContract({
             addr: 0x000000000000000000000000000000000000800d,
             codeName: "EventWriter",
             lang: Language.Yul,
             isPrecompile: false
         });
 
-        systemContracts[19] = SystemContract({
+        systemContracts[20] = SystemContract({
             addr: 0x000000000000000000000000000000000000800E,
             codeName: "Compressor",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[20] = SystemContract({
+        systemContracts[21] = SystemContract({
             addr: 0x000000000000000000000000000000000000800f,
             codeName: "ComplexUpgrader",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[21] = SystemContract({
+        systemContracts[22] = SystemContract({
             addr: 0x0000000000000000000000000000000000008010,
             codeName: "Keccak256",
             lang: Language.Yul,
             isPrecompile: true
         });
 
-        systemContracts[22] = SystemContract({
+        systemContracts[23] = SystemContract({
             addr: 0x0000000000000000000000000000000000008012,
             codeName: "CodeOracle",
             lang: Language.Yul,
             isPrecompile: true
         });
 
-        systemContracts[23] = SystemContract({
+        systemContracts[24] = SystemContract({
             addr: 0x0000000000000000000000000000000000008013,
             codeName: "EvmGasManager",
             lang: Language.Yul,
             isPrecompile: false
         });
 
-        systemContracts[24] = SystemContract({
+        systemContracts[25] = SystemContract({
             addr: 0x0000000000000000000000000000000000008014,
             codeName: "EvmPredeploysManager",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[25] = SystemContract({
+        systemContracts[26] = SystemContract({
             addr: 0x0000000000000000000000000000000000008015,
             codeName: "EvmHashesStorage",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[26] = SystemContract({
+        systemContracts[27] = SystemContract({
             addr: 0x0000000000000000000000000000000000000100,
             codeName: "P256Verify",
             lang: Language.Yul,
             isPrecompile: true
         });
 
-        systemContracts[27] = SystemContract({
+        systemContracts[28] = SystemContract({
             addr: 0x0000000000000000000000000000000000008011,
             codeName: "PubdataChunkPublisher",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[28] = SystemContract({
+        systemContracts[29] = SystemContract({
             addr: 0x0000000000000000000000000000000000010000,
             codeName: "Create2Factory",
             lang: Language.Solidity,
             isPrecompile: false
         });
-        systemContracts[29] = SystemContract({
+        systemContracts[30] = SystemContract({
             addr: 0x0000000000000000000000000000000000010001,
             codeName: "L2GenesisUpgrade",
             lang: Language.Solidity,
             isPrecompile: false
         });
-        systemContracts[30] = SystemContract({
+        systemContracts[31] = SystemContract({
             addr: 0x0000000000000000000000000000000000010006,
             codeName: "SloadContract",
             lang: Language.Solidity,

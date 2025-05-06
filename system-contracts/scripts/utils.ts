@@ -34,7 +34,7 @@ export interface DeployedDependency {
 
 export function readYulBytecode(description: YulContractDescription) {
   const contractName = description.codeName;
-  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.yul/${contractName}.yul.zbin`;
+  const path = `contracts-preprocessed/${description.path}/artifacts/${contractName}.yul/${contractName}.zbin`;
   return readBytecodeUtf8(path);
 }
 
@@ -368,10 +368,10 @@ export async function query(
 
   const response = await fetch(url, init);
   try {
-    return await response.json();
+    return await response.clone().json();
   } catch (e) {
     throw {
-      error: "Could not decode JSON in response",
+      error: `Could not decode JSON in response: ${await response.text()}`,
       status: `${response.status} ${response.statusText}`,
     };
   }
