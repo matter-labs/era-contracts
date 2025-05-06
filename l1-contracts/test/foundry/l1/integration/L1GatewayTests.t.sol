@@ -41,6 +41,15 @@ import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 
+import {GatewayUtils} from "deploy-scripts/GatewayUtils.s.sol";
+import {Utils} from "../unit/concrete/Utils/Utils.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
+import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
+
 contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
@@ -127,20 +136,19 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
+        gatewayScript.migrateChainToGateway(migratingChainId);
         require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
-        gatewayScript.governanceSetCTMAssetHandler(bytes32(0));
-        gatewayScript.registerAssetIdInBridgehub(address(0x01), bytes32(0));
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        gatewayScript.fullGatewayRegistration();
     }
 
-    function test_startMessageToL3() public {
+    function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
+        gatewayScript.migrateChainToGateway(migratingChainId);
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
@@ -157,7 +165,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
+        gatewayScript.migrateChainToGateway(migratingChainId);
 
         // Setup
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
@@ -232,7 +240,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
-        gatewayScript.migrateChainToGateway(migratingChain.getAdmin(), address(1), address(0), migratingChainId);
+        gatewayScript.migrateChainToGateway(migratingChainId);
         migrateBackChain();
     }
 
@@ -288,7 +296,10 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
             assetId,
             bridgehubMintData
         );
-        gatewayScript.finishMigrateChainFromGateway(
+
+        GatewayUtils userUtils = new GatewayUtils();
+        userUtils.finishMigrateChainFromGateway(
+            address(addresses.bridgehub),
             migratingChainId,
             gatewayChainId,
             0,
@@ -305,8 +316,52 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         assertEq(migratingChainContract.getBaseTokenAssetId(), baseTokenAssetId);
     }
 
+    function test_chainMigrationWithUpgrade() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(migratingChainId);
+
+        // Try to perform an upgrade
+
+        DefaultUpgrade upgradeImpl = new DefaultUpgrade();
+        uint256 currentProtocolVersion = migratingChain.getProtocolVersion();
+        (uint32 major, uint32 minor, uint32 patch) = SemVer.unpackSemVer(uint96(currentProtocolVersion));
+
+        ProposedUpgrade memory upgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
+            verifier: address(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
+            l1ContractsUpgradeCalldata: hex"",
+            postUpgradeCalldata: hex"",
+            upgradeTimestamp: 0,
+            newProtocolVersion: SemVer.packSemVer(major, minor + 1, patch)
+        });
+        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+            facetCuts: new Diamond.FacetCut[](0),
+            initAddress: address(upgradeImpl),
+            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (upgrade))
+        });
+
+        address ctm = migratingChain.getChainTypeManager();
+        vm.mockCall(
+            ctm,
+            abi.encodeCall(IChainTypeManager.upgradeCutHash, (currentProtocolVersion)),
+            abi.encode(keccak256(abi.encode(diamondCut)))
+        );
+
+        vm.startBroadcast(migratingChain.getAdmin());
+        migratingChain.upgradeChainFromVersion(currentProtocolVersion, diamondCut);
+        vm.stopBroadcast();
+    }
+
     /// to increase coverage, properly tested in L2GatewayTests
-    function test_forwardToL3OnGateway() public {
+    function test_forwardToL2OnGateway() public {
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);

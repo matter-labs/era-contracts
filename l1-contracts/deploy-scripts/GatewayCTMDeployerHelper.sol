@@ -97,7 +97,7 @@ library GatewayCTMDeployerHelper {
         address serverNotifierImplementation = _deployInternal(
             "ServerNotifier",
             "ServerNotifier.sol",
-            hex"",
+            abi.encode(),
             innerConfig
         );
 
@@ -181,9 +181,9 @@ library GatewayCTMDeployerHelper {
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
-        address verifierFflonk = _deployInternal("L2VerifierFflonk", "L2VerifierFflonk.sol", hex"", innerConfig);
+        address verifierFflonk = _deployInternal("L1VerifierFflonk", "L1VerifierFflonk.sol", hex"", innerConfig);
 
-        address verifierPlonk = _deployInternal("L2VerifierPlonk", "L2VerifierPlonk.sol", hex"", innerConfig);
+        address verifierPlonk = _deployInternal("L1VerifierPlonk", "L1VerifierPlonk.sol", hex"", innerConfig);
 
         bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk);
 
@@ -247,9 +247,6 @@ library GatewayCTMDeployerHelper {
             abi.encode(L2_BRIDGEHUB_ADDR),
             innerConfig
         );
-
-        address proxyAdmin = _deployInternal("ProxyAdmin", "ProxyAdmin.sol", hex"", innerConfig);
-        _deployedContracts.stateTransition.chainTypeManagerProxyAdmin = proxyAdmin;
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -361,8 +358,8 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L2VerifierFflonk.sol", "L2VerifierFflonk");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L2VerifierPlonk.sol", "L2VerifierPlonk");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
         // Include both verifiers since we cannot determine which one will be used
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
