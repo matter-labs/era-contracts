@@ -43,6 +43,10 @@ remappings = [
 ]
 optimizer = true
 optimizer_runs = 9999999
+# TODO(X): the latest foundry disallows reverts that happen inside the internal calls and we should fix tests that rely
+# on such reverts
+allow_internal_expect_revert = true
+
 [profile.default.zksync] 
 enable_eravm_extensions = true
 zksolc = "1.5.11"

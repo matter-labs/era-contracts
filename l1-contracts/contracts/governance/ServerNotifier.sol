@@ -7,20 +7,21 @@ import {InvalidProtocolVersion, ZeroAddress, Unauthorized} from "../common/L1Con
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 
-/// @title ServerNotifier contract
+/// @title ServerNotifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice The contract is designed to notify the server about migrations and protocol upgrade schedules.
+/// @notice This contract enables chain admins to emit migration events for the server.
+/// @dev The `owner` of this contract is expected to be the admin of the chainTypeManager contract.
 contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
-    /// @dev Address of the ChainTypeManager smart contract.
+    /// @notice The chainTypeManager, which is used to retrieve chain administrator addresses.
     IChainTypeManager public chainTypeManager;
 
-    /// @notice Emitted when a chain is migrated into the gateway.
-    /// @param chainId The ID of the chain being migrated.
+    /// @notice Emitted to notify the server before a chain migrates to the ZK gateway.
+    /// @param chainId The identifier for the chain initiating migration to the ZK gateway.
     event MigrateToGateway(uint256 indexed chainId);
 
-    /// @notice Emitted when a chain is migrated out of the gateway.
-    /// @param chainId The ID of the chain being migrated.
+    /// @notice Emitted to notify the server before a chain migrates from the ZK gateway.
+    /// @param chainId The identifier for the chain initiating migration to the ZK gateway.
     event MigrateFromGateway(uint256 indexed chainId);
 
     /// @notice Emitted whenever an upgrade timestamp is set.
@@ -33,7 +34,8 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
     mapping(uint256 chainId => mapping(uint256 protocolVersion => uint256 upgradeTimestamp))
         public protocolVersionToUpgradeTimestamp;
 
-    /// @notice Checks if the caller is the admin of the chain.
+    /// @notice Modifier to ensure the caller is the administrator of the specified chain.
+    /// @param _chainId The ID of the chain that requires the caller to be an admin.
     modifier onlyChainAdmin(uint256 _chainId) {
         if (msg.sender != chainTypeManager.getChainAdmin(_chainId)) {
             revert Unauthorized(msg.sender);
@@ -41,22 +43,23 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
         _;
     }
 
+    /// @dev Initialize the implementation to prevent Parity hack.
     constructor() {
         _disableInitializers();
     }
 
-    /// @notice Used to initialize the contract
-    /// @param _admin The owner of the contract
-    function initialize(address _admin) external reentrancyGuardInitializer {
-        if (_admin == address(0)) {
+    /// @notice Initializes the contract by setting the initial owner.
+    /// @param _initialOwner The address that will be set as the contract owner.
+    function initialize(address _initialOwner) public reentrancyGuardInitializer {
+        if (_initialOwner == address(0)) {
             revert ZeroAddress();
         }
-
-        _transferOwnership(_admin);
+        _transferOwnership(_initialOwner);
     }
 
-    /// @notice Sets a new chain type manager.
-    /// @param _chainTypeManager The address of new chain type manager.
+    /// @notice Sets the chainTypeManager contract which is responsible for providing chain administrator information.
+    /// @param _chainTypeManager The address of the chainTypeManager contract.
+    /// @dev Callable only by the current owner.
     function setChainTypeManager(IChainTypeManager _chainTypeManager) external onlyOwner {
         if (address(_chainTypeManager) == address(0)) {
             revert ZeroAddress();
@@ -64,14 +67,16 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
         chainTypeManager = IChainTypeManager(_chainTypeManager);
     }
 
-    /// @notice Used to notify server of a chain migation to Gateway.
-    /// @param _chainId The chainId of the ZKsync chain that is getting migrated.
+    /// @notice Emits an event to signal that the chain is migrating to a gateway.
+    /// @param _chainId The identifier of the chain that is migrating.
+    /// @dev Restricted to the chain administrator.
     function migrateToGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
         emit MigrateToGateway(_chainId);
     }
 
-    /// @notice Used to notify server of a chain migation from Gateway.
-    /// @param _chainId The chainId of the ZKsync chain that is getting migrated.
+    /// @notice Emits an event to signal that the chain is migrating from a gateway.
+    /// @param _chainId The identifier of the chain that is migrating.
+    /// @dev Restricted to the chain administrator.
     function migrateFromGateway(uint256 _chainId) external onlyChainAdmin(_chainId) {
         emit MigrateFromGateway(_chainId);
     }
