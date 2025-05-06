@@ -261,7 +261,6 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         calldataPtr += 64;
 
         /// Check logs. Full logs root hash is published even for Validiums without DA.
-        // TODO: makes sense to move to L2DAValidator as part of pubdata validation, but idk if we want to inflate audit scope
         uint32 numberOfL2ToL1Logs = uint32(bytes4(_operatorInput[calldataPtr:calldataPtr + 4]));
         if (numberOfL2ToL1Logs > L2_TO_L1_LOGS_MERKLE_TREE_LEAVES) {
             revert ReconstructionMismatch(
