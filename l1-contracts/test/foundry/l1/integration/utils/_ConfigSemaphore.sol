@@ -35,7 +35,7 @@ contract ConfigSemaphore is Script {
             try vm.removeFile(path) {
                 // Successfully removed
             } catch {
-                // Do nothing, hopefully it is removed alredy
+                // Do nothing, hopefully it is removed already
             }
         }
     }
