@@ -210,7 +210,6 @@ contract EcosystemUpgrade is Script, DeployL1Script {
         addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
 
         deployStateTransitionDiamondFacets();
-        deployBlobVersionedHashRetriever();
 
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
 
