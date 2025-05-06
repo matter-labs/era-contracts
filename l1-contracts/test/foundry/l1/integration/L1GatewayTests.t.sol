@@ -50,7 +50,14 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
-contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer, ConfigSemaphore {
+contract L1GatewayTests is
+    L1ContractDeployer,
+    ZKChainDeployer,
+    TokenDeployer,
+    L2TxMocker,
+    GatewayDeployer,
+    ConfigSemaphore
+{
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
