@@ -182,26 +182,6 @@ contract AdminFunctions is Script {
         );
     }
 
-    function setDAValidatorPair(
-        ChainAdmin chainAdmin,
-        address target,
-        address l1DaValidator,
-        address l2DaValidator
-    ) public {
-        IZKChain adminContract = IZKChain(target);
-
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: target,
-            value: 0,
-            data: abi.encodeCall(adminContract.setDAValidatorPair, (l1DaValidator, l2DaValidator))
-        });
-
-        vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
-        vm.stopBroadcast();
-    }
-
     function makePermanentRollup(ChainAdmin chainAdmin, address target) public {
         IZKChain adminContract = IZKChain(target);
 
@@ -424,6 +404,26 @@ contract AdminFunctions is Script {
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
+
+    function setDAValidatorPair(
+        address _bridgehub,
+        uint256 _chainId,
+        address _l1DaValidator,
+        address _l2DaValidator,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
     struct MigrateChainToGatewayParams {
         address bridgehub;
         uint256 l1GasPrice;
