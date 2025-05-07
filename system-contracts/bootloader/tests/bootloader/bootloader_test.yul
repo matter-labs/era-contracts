@@ -209,3 +209,72 @@ function TEST_saturatingSub() {
     testing_assertEq(saturatingSub(4, 2), 2, "Invalid subtraction")
     testing_assertEq(saturatingSub(2, 4), 0, "Invalid subtraction")
 }
+
+function TEST_setTxOrigin() {
+    let newTxOrigin := 0 
+    setTxOrigin(newTxOrigin)
+
+    testing_assertEq(newTxOrigin, mload(4), "Invalid Tx Origin")
+}
+
+function TEST_setGasPrice() {
+    let newGasPrice := 10
+    setGasPrice(newGasPrice)
+
+    testing_assertEq(newGasPrice, mload(4), "Invalid gas price")
+}
+
+function TEST_setPubdataInfo() {
+    let txPtr := TX_DESCRIPTION_BEGIN_BYTE()
+    let txDataOffset := mload(add(txPtr, 32))
+    let innerTxDataOffset := add(txDataOffset, 32)
+    let newGasPerPubdata := getGasPerPubdataByteLimit(innerTxDataOffset)
+    let basePubdataSpent := getPubdataCounter()
+
+    setPubdataInfo(newGasPerPubdata, basePubdataSpent)
+}
+
+function TEST_setNewBatch() {
+    let prevBatchHash := mload(32)
+    let newTimestamp := mload(64)
+    let newBatchNumber := mload(96)
+    let baseFee := 10
+
+    setNewBatch(prevBatchHash, newTimestamp, newBatchNumber, baseFee)
+
+    assertEq(baseFee, basefee(), "Invalid base fee")
+}
+
+function TEST_setL2Block() {
+    let txId := 0
+
+    setL2Block(txId)
+}
+
+function TEST_setL2BlockRevert() {
+    let txId := 1
+
+    testing_testWillFailWith(25)
+    setL2Block(txId)
+}
+
+function TEST_setContextVal() {
+    let selector := 0xbf1fe42000000000000000000000000000000000000000000000000000000000
+    let value := 10
+    mstore(0, selector)
+    mstore(4, value)
+
+    let expected := call(
+        gas(),
+        SYSTEM_CONTEXT_ADDR(),
+        0,
+        0,
+        36,
+        0,
+        0
+    )
+
+    let returnValue := setContextVal(selector, value)
+
+    testing_assertEq(expected, returnValue, "Invalid context value")
+}
