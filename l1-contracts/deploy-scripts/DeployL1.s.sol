@@ -19,6 +19,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -217,31 +218,8 @@ contract DeployL1Script is Script, DeployUtils {
         }
     }
 
-    function getRollupL2ValidatorAddress() internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
-                hex""
-            );
-    }
-
-    function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode()),
-                hex""
-            );
-    }
-
-    function getAvailL2ValidatorAddress() internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode()),
-                hex""
-            );
+    function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
+        return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 
     function deployVerifiers() internal {
@@ -274,7 +252,7 @@ contract DeployL1Script is Script, DeployUtils {
         }
         vm.startBroadcast(msg.sender);
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
-        rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2ValidatorAddress(), true);
+        rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true);
         vm.stopBroadcast();
     }
 
@@ -585,9 +563,6 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", getRollupL2ValidatorAddress());
-        vm.serializeAddress("root", "expected_no_da_validium_l2_validator_addr", getNoDAValidiumL2ValidatorAddress());
-        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getAvailL2ValidatorAddress());
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);

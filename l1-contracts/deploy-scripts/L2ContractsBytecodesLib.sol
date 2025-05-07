@@ -70,24 +70,6 @@ library L2ContractsBytecodesLib {
         return Utils.readZKFoundryBytecodeL2("ForceDeployUpgrader.sol", "ForceDeployUpgrader");
     }
 
-    /// @notice Reads the bytecode of the RollupL2DAValidator contract.
-    /// @return The bytecode of the RollupL2DAValidator contract.
-    function readRollupL2DAValidatorBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL2("RollupL2DAValidator.sol", "RollupL2DAValidator");
-    }
-
-    /// @notice Reads the bytecode of the ValidiumL2DAValidator contract for Avail.
-    /// @return The bytecode of the ValidiumL2DAValidator contract.
-    function readAvailL2DAValidatorBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL2("AvailL2DAValidator.sol", "AvailL2DAValidator");
-    }
-
-    /// @notice Reads the bytecode of the ValidiumL2DAValidator contract for NoDA validium.
-    /// @return The bytecode of the ValidiumL2DAValidator contract.
-    function readNoDAL2DAValidatorBytecode() internal view returns (bytes memory) {
-        return Utils.readZKFoundryBytecodeL2("ValidiumL2DAValidator.sol", "ValidiumL2DAValidator");
-    }
-
     /// @notice Reads the bytecode of the ChainTypeManager contract.
     /// @return The bytecode of the ChainTypeManager contract.
     function readChainTypeManagerBytecode() internal view returns (bytes memory) {

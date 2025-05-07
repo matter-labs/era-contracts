@@ -170,3 +170,18 @@ struct ZKChainCommitment {
 
 /// @dev Used as the `msg.sender` for system service transactions.
 address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF));
+
+/// @dev Pubdata commitment scheme used for DA.
+/// @param NONE Invalid option.
+/// @param EMPTY_NO_DA No DA commitment, used by Validiums.
+/// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
+/// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
+enum L2DACommitmentScheme {
+    NONE,
+    EMPTY_NO_DA,
+    PUBDATA_KECCAK256,
+    BLOBS_AND_PUBDATA_KECCAK256
+}
+
+/// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
+L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;

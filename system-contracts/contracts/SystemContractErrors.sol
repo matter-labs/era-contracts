@@ -54,6 +54,8 @@ error InsufficientFunds(uint256 required, uint256 actual);
 error InvalidCall();
 // 0x8cbd7f8b
 error InvalidCodeHash(CodeHashReason);
+// 0xc74537a1
+error InvalidDACommitmentScheme(uint256);
 // 0xb4fa3fb3
 error InvalidInput();
 // 0x60b85677
@@ -78,7 +80,8 @@ error NonEmptyMsgValue();
 error NotAllowedToDeployInKernelSpace();
 // 0x35278d12
 error Overflow();
-// 0xe5ec477a
+// Note: enum should be encoded as uint8 to calculate selector!
+// skip-errors-lint 0x7f7b0cf7
 error ReconstructionMismatch(PubdataField, bytes32 expected, bytes32 actual);
 // 0x3adb5f1d
 error ShaInvalidReturnData();
@@ -226,7 +229,9 @@ enum PubdataField {
     InputMsgsHash,
     InputBytecodeHash,
     Offset,
-    Length
+    Length,
+    StateDiffCompressionVersion,
+    ExtraData
 }
 
 enum BytecodeError {
