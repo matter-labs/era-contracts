@@ -78,6 +78,7 @@ interface IConsensusRegistry {
     error InvalidInputBLS12_381Signature();
     error NoPendingCommittee();
     error PreviousCommitStillPending();
+    error NoActiveLeader();
 
     event ValidatorAdded(
         address indexed validatorOwner,

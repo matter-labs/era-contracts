@@ -190,9 +190,27 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     function commitValidatorCommittee() external onlyOwner {
-        // If validatorsCommitBlock is still in the future, revert
+        // If validatorsCommitBlock is still in the future, revert.
         if (block.number < validatorsCommitBlock) {
             revert PreviousCommitStillPending();
+        }
+
+        // Check if there's at least one active leader validator
+        bool hasActiveLeader = false;
+        uint256 len = validatorOwners.length;
+
+        for (uint256 i = 0; i < len; ++i) {
+            Validator storage validator = validators[validatorOwners[i]];
+            ValidatorAttr memory validatorAttr = validator.latest;
+
+            if (validatorAttr.active && !validatorAttr.removed && validatorAttr.leader) {
+                hasActiveLeader = true;
+                break;
+            }
+        }
+
+        if (!hasActiveLeader) {
+            revert NoActiveLeader();
         }
 
         // Increment the commit number.
