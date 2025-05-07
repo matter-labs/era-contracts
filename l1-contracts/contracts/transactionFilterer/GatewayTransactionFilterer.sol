@@ -5,10 +5,16 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
+
+/// @dev We want to ensure that only whitelisted contracts can ever be deployed,
+/// while allowing anyone to call any other method. Thus, we disallow calls that can deploy contracts
+/// (i.e. calls to the predeployed Create2Factory or ContractDeployer).
+address constant MIN_ALLOWED_ADDRESS = address(0x20000);
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -73,7 +79,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     /// @return Whether the transaction is allowed
     function isTransactionAllowed(
         address sender,
-        address,
+        address contractL2,
         uint256,
         uint256,
         bytes calldata l2Calldata,
@@ -95,6 +101,13 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
             return _checkCTMAssetId(decodedAssetId);
         }
 
+        // We always allow calls to the L2AssetRouter contract. We expect that it will not
+        // cause deploying of any unwhitelisted code, but it is needed to facilitate withdrawals of chains.
+        if (contractL2 > MIN_ALLOWED_ADDRESS || contractL2 == L2_ASSET_ROUTER_ADDR) {
+            return true;
+        }
+
+        // Only whitelisted senders are allowed to use any built-in contracts.
         return whitelistedSenders[sender];
     }
 
