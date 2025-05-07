@@ -26,7 +26,7 @@ const L2_DA_COMMITMENT_SCHEME = {
   KECCAK: 3,
 };
 
-describe.only("L1Messenger tests", () => {
+describe("L1Messenger tests", () => {
   let l1Messenger: L1Messenger;
   let wallet: Wallet;
   let l1MessengerAccount: ethers.Signer;
