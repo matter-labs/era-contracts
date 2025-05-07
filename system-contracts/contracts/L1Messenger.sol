@@ -202,6 +202,8 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
     ) external onlyCallFromBootloader {
         uint256 calldataPtr = 0;
 
+        // Note that provided function sig and values of hashes are used only for backward compatibility and sanity checks.
+
         // Check function sig and data in the other hashes
         // 4 + 32 + 32 + 32 + 32 + 32 + 32
         // 4 bytes for L2 DA Validator `validatePubdata` function selector
@@ -213,6 +215,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         //                32 bytes for length
 
         bytes4 inputL2DAValidatePubdataFunctionSig = bytes4(_operatorInput[calldataPtr:calldataPtr + 4]);
+        // Implemented for backward compatibility with operator's encoding.
         if (inputL2DAValidatePubdataFunctionSig != IL2DAValidator.validatePubdata.selector) {
             revert ReconstructionMismatch(
                 PubdataField.InputDAFunctionSig,
@@ -223,22 +226,25 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         calldataPtr += 4;
 
         bytes32 inputChainedLogsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
+        // Sanity check
         if (inputChainedLogsHash != chainedLogsHash) {
             revert ReconstructionMismatch(PubdataField.InputLogsHash, chainedLogsHash, inputChainedLogsHash);
         }
         calldataPtr += 32;
 
-        // Check happens below after we reconstruct the logs root hash
+        // Sanity check happens below after we reconstruct the logs root hash
         bytes32 inputChainedLogsRootHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
         calldataPtr += 32;
 
         bytes32 inputChainedMsgsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
+        // Sanity check
         if (inputChainedMsgsHash != chainedMessagesHash) {
             revert ReconstructionMismatch(PubdataField.InputMsgsHash, chainedMessagesHash, inputChainedMsgsHash);
         }
         calldataPtr += 32;
 
         bytes32 inputChainedBytecodesHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
+        // Sanity check
         if (inputChainedBytecodesHash != chainedL1BytecodesRevealDataHash) {
             revert ReconstructionMismatch(
                 PubdataField.InputBytecodeHash,
@@ -290,6 +296,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             l2ToL1LogsTreeArray[i] = hashedLog;
             reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
         }
+        // Sanity check
         if (reconstructedChainedLogsHash != chainedLogsHash) {
             revert ReconstructionMismatch(PubdataField.LogsHash, chainedLogsHash, reconstructedChainedLogsHash);
         }
@@ -310,12 +317,15 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         bytes32 aggregatedRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
         bytes32 fullRootHash = keccak256(bytes.concat(localLogsRootHash, aggregatedRootHash));
 
+        // Sanity check
         if (inputChainedLogsRootHash != localLogsRootHash) {
             revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputChainedLogsRootHash);
         }
 
         // Validate pubdata and make commitment. Logs are not checked since we already checked them above.
         // Does nothing if commitment scheme is EMPTY_NO_DA.
+        // It is expected that operator data includes logs, messages, bytecodes and compressed state diffs.
+        // inputChainedMsgsHash and inputChainedBytecodesHash values are used to double-check messages and bytecodes validity.
         bytes32 l2DAValidatorOutputhash = L2DAValidator.makeDACommitment(
             _l2DACommitmentScheme,
             inputChainedMsgsHash,

@@ -82,7 +82,7 @@ library L2DAValidator {
     /// @param _chainedBytecodesHash The chained hash of bytecodes.
     /// @param _operatorData The data provided by opretator. Should include logs, messages, bytecodes, compressed and uncompressed state diffs.
     /// @return uncompressedStateDiffHash the hash of the uncompressed state diffs
-    /// @return totalL2Pubdata total pubdata that should be sent to L1. Includes logs, messages bytecodes and compressed state diffs.
+    /// @return totalL2Pubdata total pubdata that should be sent to L1. Includes logs, messages, bytecodes and compressed state diffs.
     /// @return leftoverSuffix the suffix left after pubdata and uncompressed state diffs.
     /// On Era or other "vanilla" rollups it is empty, but it can be used for providing additional data by the operator,
     /// e.g. DA committee signatures, etc.
