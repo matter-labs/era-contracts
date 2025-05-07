@@ -215,7 +215,12 @@ abstract contract Create2FactoryUtils is Script {
         }
 
         if (isZKBytecode) {
-            forgeMessage = string.concat(forgeMessage, " --verifier zksync");
+            forgeMessage = string.concat(forgeMessage, " --zksync --verifier zksync");
+        } else {
+            forgeMessage = string.concat(
+                forgeMessage,
+                " --chain=sepolia (only for testnet verification, omit for mainnet)"
+            );
         }
         console.log(forgeMessage);
     }
@@ -227,6 +232,19 @@ abstract contract Create2FactoryUtils is Script {
     function getDeployedContractName(string memory contractName) internal view virtual returns (string memory) {
         if (compareStrings(contractName, "BridgedTokenBeacon")) {
             return "UpgradeableBeacon";
+        } else if (compareStrings(contractName, "VerifierFflonk")) {
+            return "L1VerifierFflonk";
+        } else if (compareStrings(contractName, "VerifierPlonk")) {
+            return "L1VerifierPlonk";
+        } else if (compareStrings(contractName, "Verifier")) {
+            return "DualVerifier (TestnetVerifier for non-mainnet deployments)";
+        } else if (compareStrings(contractName, "MailboxFacet")) {
+            return "./contracts/state-transition/chain-deps/facets/Mailbox:MailboxFacet";
+        } else if (compareStrings(contractName, "Bridgehub")) {
+            return
+                "Bridgehub (ensure it is compiled with forge build --optimizer-runs 28000 contracts/bridgehub/Bridgehub.sol)";
+        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+            return "!!! BlobVersionedHashRetriever verification can be skipped as it wasn't compiled with sol !!!)";
         } else {
             return contractName;
         }
