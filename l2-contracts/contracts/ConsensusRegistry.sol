@@ -64,6 +64,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             latest: ValidatorAttr({
                 active: true,
                 removed: false,
+                leader: true,
                 weight: _validatorWeight,
                 pubKey: _validatorPubKey,
                 proofOfPossession: _validatorPoP
@@ -71,6 +72,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             snapshot: ValidatorAttr({
                 active: false,
                 removed: false,
+                leader: false,
                 weight: 0,
                 pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
                 proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
@@ -78,6 +80,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             previousSnapshot: ValidatorAttr({
                 active: false,
                 removed: false,
+                leader: false,
                 weight: 0,
                 pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
                 proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
@@ -133,6 +136,19 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         validator.latest.active = false;
 
         emit ValidatorDeactivated(_validatorOwner);
+    }
+
+    function changeValidatorLeader(address _validatorOwner, bool _isLeader) external onlyOwner {
+        _verifyValidatorOwnerExists(_validatorOwner);
+        (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
+        if (deleted) {
+            return;
+        }
+
+        _ensureValidatorSnapshot(validator);
+        validator.latest.leader = _isLeader;
+
+        emit ValidatorLeaderStatusChanged(_validatorOwner, _isLeader);
     }
 
     function changeValidatorWeight(address _validatorOwner, uint32 _weight) external onlyOwner {
@@ -231,6 +247,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             if (validatorAttr.active && !validatorAttr.removed) {
                 committee[count] = CommitteeValidator({
                     weight: validatorAttr.weight,
+                    leader: validatorAttr.leader,
                     pubKey: validatorAttr.pubKey,
                     proofOfPossession: validatorAttr.proofOfPossession
                 });

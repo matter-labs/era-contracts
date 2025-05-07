@@ -25,22 +25,26 @@ interface IConsensusRegistry {
     /// @dev Represents the attributes of a validator.
     /// @param active A flag stating if the validator is active.
     /// @param removed A flag stating if the validator has been removed (and is pending a deletion).
+    /// @param leader A flag stating if the validator is eligible to be a leader.
     /// @param weight Validator's voting weight.
     /// @param pubKey Validator's BLS12-381 public key.
     /// @param proofOfPossession Validator's Proof-of-possession (a signature over the public key).
     struct ValidatorAttr {
         bool active;
         bool removed;
+        bool leader;
         uint32 weight;
         BLS12_381PublicKey pubKey;
         BLS12_381Signature proofOfPossession;
     }
 
     /// @dev Represents a validator within a committee.
+    /// @param leader A flag stating if the validator is eligible to be a leader.
     /// @param weight Validator's voting weight.
     /// @param pubKey Validator's BLS12-381 public key.
     /// @param proofOfPossession Validator's Proof-of-possession (a signature over the public key).
     struct CommitteeValidator {
+        bool leader;
         uint32 weight;
         BLS12_381PublicKey pubKey;
         BLS12_381Signature proofOfPossession;
@@ -81,10 +85,11 @@ interface IConsensusRegistry {
         BLS12_381PublicKey validatorPubKey,
         BLS12_381Signature validatorPoP
     );
-    event ValidatorDeactivated(address indexed validatorOwner);
-    event ValidatorActivated(address indexed validatorOwner);
     event ValidatorRemoved(address indexed validatorOwner);
     event ValidatorDeleted(address indexed validatorOwner);
+    event ValidatorDeactivated(address indexed validatorOwner);
+    event ValidatorActivated(address indexed validatorOwner);
+    event ValidatorLeaderStatusChanged(address indexed validatorOwner, bool isLeader);
     event ValidatorWeightChanged(address indexed validatorOwner, uint32 newWeight);
     event ValidatorKeyChanged(address indexed validatorOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
     event ValidatorsCommitted(uint32 validatorsCommit, uint256 validatorsCommitBlock);
@@ -121,6 +126,13 @@ interface IConsensusRegistry {
     /// @dev Verifies that the validator owner exists in the registry.
     /// @param _validatorOwner The address of the owner of the validator to be inactivated.
     function deactivate(address _validatorOwner) external;
+
+    /// @notice Changes the validator's leader status in the registry.
+    /// @dev Only callable by the contract owner.
+    /// @dev Verifies that the validator owner exists in the registry.
+    /// @param _validatorOwner The address of the owner of the validator whose leader status will be changed.
+    /// @param _isLeader The new leader status to assign to the validator.
+    function changeValidatorLeader(address _validatorOwner, bool _isLeader) external;
 
     /// @notice Changes the validator weight of a validator in the registry.
     /// @dev Only callable by the contract owner.
