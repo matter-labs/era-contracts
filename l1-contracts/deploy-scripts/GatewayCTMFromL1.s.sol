@@ -85,7 +85,6 @@ contract GatewayCTMFromL1 is Script {
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
         uint256 latestProtocolVersion;
-        address expectedRollupL2DAValidator;
         bytes forceDeploymentsData;
     }
 
