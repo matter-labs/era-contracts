@@ -13,7 +13,7 @@ import {
 import { publishBytecode } from "../shared/utils";
 import type { Context } from "mocha";
 
-describe("L2LegacyBridgeFixUpgrade tests", function () {
+describe("L2LegacyBridgeFixUpgrade fork tests", function () {
   let oldBridgedEthVersion: number;
 
   const aliasedGovernanceAddress = ethers.utils.getAddress(
