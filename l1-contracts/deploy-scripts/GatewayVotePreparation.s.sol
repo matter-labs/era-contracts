@@ -92,6 +92,9 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     address internal serverNotifier;
     address internal refundRecipient;
 
+    address internal gatewayCTMDeployer;
+    bytes internal gatewayCTMDeployerCreate2Data;
+
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
     function initializeConfig(string memory configPath) internal virtual override {
@@ -183,6 +186,9 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         (VerificationDeployedContracts memory verificationInfo, bytes memory create2Calldata, VerificationInfo memory ctmDeployerVerificationInfo) = GatewayCTMDeployerHelper
             .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
+        gatewayCTMDeployer = ctmDeployerVerificationInfo.addr;
+        gatewayCTMDeployerCreate2Data = create2Calldata;
+
         GatewayCTMDeployerHelper.notifyAboutDeployments(verificationInfo);
         DeploymentNotifier.notifyAboutDeployment(
             ctmDeployerVerificationInfo.addr,
@@ -206,7 +212,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 chainId: gatewayChainId,
                 bridgehubAddress: addresses.bridgehub.bridgehubProxy,
                 l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-                refundRecipient: msg.sender
+                refundRecipient: refundRecipient
             });
         }
 
@@ -219,7 +225,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             chainId: gatewayChainId,
             bridgehubAddress: addresses.bridgehub.bridgehubProxy,
             l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-            refundRecipient: msg.sender
+            refundRecipient: refundRecipient
         });
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
@@ -389,7 +395,13 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         vm.serializeAddress("root", "validium_da_validator", output.validiumDAValidator);
         vm.serializeAddress("root", "rollup_da_manager", output.rollupDAManager);
         vm.serializeAddress("root", "server_notifier", serverNotifier);
-
+        vm.serializeAddress("root", "gateway_server_notifier", output.gatewayStateTransition.serverNotifierProxy);
+        vm.serializeAddress("root", "old_rollup_l2_da_validator", oldRollupL2DAValidator);
+        vm.serializeAddress("root", "refund_recipient", refundRecipient);
+        
+        vm.serializeAddress("root", "gateway_ctm_deployer", gatewayCTMDeployer);
+        vm.serializeBytes("root", "gateway_ctm_deployer_create2_data", gatewayCTMDeployerCreate2Data);
+        
         vm.serializeBytes("root", "governance_calls_to_execute", abi.encode(governanceCallsToExecute));
         vm.serializeBytes("root", "ecosystem_admin_calls_to_execute", abi.encode(ecosystemAdminCallsToExecute));
 
