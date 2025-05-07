@@ -20,7 +20,7 @@ contract AdminTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](13);
+        bytes4[] memory selectors = new bytes4[](14);
         selectors[0] = IAdmin.setPendingAdmin.selector;
         selectors[1] = IAdmin.acceptAdmin.selector;
         selectors[2] = IAdmin.setValidator.selector;
@@ -34,6 +34,7 @@ contract AdminTest is Test {
         selectors[10] = IAdmin.unfreezeDiamond.selector;
         selectors[11] = IAdmin.setTransactionFilterer.selector;
         selectors[12] = IAdmin.setPubdataPricingMode.selector;
+        selectors[13] = IAdmin.setDAValidatorPair.selector;
         return selectors;
     }
 

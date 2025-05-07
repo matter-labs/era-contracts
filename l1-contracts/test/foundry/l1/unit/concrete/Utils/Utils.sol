@@ -317,7 +317,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](44);
+        bytes4[] memory selectors = new bytes4[](45);
 
         selectors[0] = UtilsFacet.util_setChainId.selector;
         selectors[1] = UtilsFacet.util_getChainId.selector;
@@ -363,6 +363,7 @@ library Utils {
         selectors[41] = UtilsFacet.util_setTotalBatchesCommitted.selector;
         selectors[42] = UtilsFacet.util_getBaseTokenGasPriceMultiplierDenominator.selector;
         selectors[43] = UtilsFacet.util_getBaseTokenGasPriceMultiplierNominator.selector;
+        selectors[44] = UtilsFacet.util_getL2DACommimentScheme.selector;
 
         return selectors;
     }
