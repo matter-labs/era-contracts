@@ -42,13 +42,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _transferOwnership(_initialOwner);
     }
 
-    /// @notice Adds a new validator to the registry.
-    /// @dev Fails if validator owner already exists.
-    /// @dev Fails if a validator with the same public key already exists.
-    /// @param _validatorOwner The address of the validator's owner.
-    /// @param _validatorWeight The voting weight of the validator.
-    /// @param _validatorPubKey The BLS12-381 public key of the validator.
-    /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
     function add(
         address _validatorOwner,
         uint32 _validatorWeight,
@@ -103,10 +96,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         });
     }
 
-    /// @notice Removes a validator from the registry.
-    /// @dev Only callable by the contract owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator to be removed.
     function remove(address _validatorOwner) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
@@ -120,10 +109,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorRemoved(_validatorOwner);
     }
 
-    /// @notice Activates a previously inactive validator, allowing it to participate in committees.
-    /// @dev Only callable by the contract owner or the validator owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator to be activated.
     function activate(address _validatorOwner) external onlyOwnerOrValidatorOwner(_validatorOwner) {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
@@ -137,10 +122,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorActivated(_validatorOwner);
     }
 
-    /// @notice Deactivates a validator, preventing it from participating in committees.
-    /// @dev Only callable by the contract owner or the validator owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator to be inactivated.
     function deactivate(address _validatorOwner) external onlyOwnerOrValidatorOwner(_validatorOwner) {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
@@ -154,11 +135,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorDeactivated(_validatorOwner);
     }
 
-    /// @notice Changes the validator weight of a validator in the registry.
-    /// @dev Only callable by the contract owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator whose weight will be changed.
-    /// @param _weight The new validator weight to assign to the validator.
     function changeValidatorWeight(address _validatorOwner, uint32 _weight) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
@@ -172,12 +148,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorWeightChanged(_validatorOwner, _weight);
     }
 
-    /// @notice Changes the validator's public key and proof-of-possession in the registry.
-    /// @dev Only callable by the contract owner or the validator owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator whose key and PoP will be changed.
-    /// @param _pubKey The new BLS12-381 public key to assign to the validator.
-    /// @param _pop The new proof-of-possession (PoP) to assign to the validator.
     function changeValidatorKey(
         address _validatorOwner,
         BLS12_381PublicKey calldata _pubKey,
@@ -203,10 +173,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorKeyChanged(_validatorOwner, _pubKey, _pop);
     }
 
-    /// @notice Adds a new commit to the validator committee using the current block number plus delay.
-    /// @dev The committee will become active after committeeActivationDelay blocks.
-    /// @dev Only callable by the contract owner.
-    /// @dev Reverts if validatorsCommitBlock is still in the future.
     function commitValidatorCommittee() external onlyOwner {
         // If validatorsCommitBlock is still in the future, revert
         if (block.number < validatorsCommitBlock) {
@@ -222,20 +188,20 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorsCommitted(validatorsCommit, validatorsCommitBlock);
     }
 
-    /// @notice Returns an array of `ValidatorAttr` structs representing the current validator committee.
-    /// @dev Collects active and non-removed validators based on the latest commit to the committee.
     function getValidatorCommittee() public view returns (CommitteeValidator[] memory) {
         return _getCommittee(false);
     }
 
-    /// @notice Returns an array of `ValidatorAttr` structs representing the pending validator committee.
-    /// @dev Collects active and non-removed validators that will form the next committee after the current commit becomes active.
-    /// @dev Reverts if there is no pending committee (when block.number >= validatorsCommitBlock).
     function getNextValidatorCommittee() public view returns (CommitteeValidator[] memory) {
         if (block.number >= validatorsCommitBlock) {
             revert NoPendingCommittee();
         }
         return _getCommittee(true);
+    }
+
+    function setCommitteeActivationDelay(uint256 _delay) external onlyOwner {
+        committeeActivationDelay = _delay;
+        emit CommitteeActivationDelayChanged(_delay);
     }
 
     /// @notice Internal helper to build committee arrays
@@ -277,14 +243,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             mstore(committee, count)
         }
         return committee;
-    }
-
-    /// @notice Updates the delay for committee activation
-    /// @dev Only callable by the contract owner
-    /// @param _delay The new delay in blocks
-    function setCommitteeActivationDelay(uint256 _delay) external onlyOwner {
-        committeeActivationDelay = _delay;
-        emit CommitteeActivationDelayChanged(_delay);
     }
 
     /// @notice Returns the validator attributes based on current commits and snapshots
