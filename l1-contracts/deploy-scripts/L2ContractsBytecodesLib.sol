@@ -253,4 +253,10 @@ library L2ContractsBytecodesLib {
     function readChainAdminBytecode() internal view returns (bytes memory) {
         return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
     }
+
+    /// @notice Reads the bytecode of the ChainAdminOwnable contract.
+    /// @return The bytecode of the ChainAdminOwnable contract.
+    function readChainAdminOwnableBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL1("ChainAdminOwnable.sol", "ChainAdminOwnable");
+    }
 }
