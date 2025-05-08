@@ -24,7 +24,7 @@ force_deployments_data = "0x0000000000000000000000000000000000000000000000000000
 governance_min_delay = 0
 
 max_number_of_chains = 100
-create2_factory_salt = "0x1000000000000000000000000000000000000000000000000000000000000002"
+create2_factory_salt = "0xbe55d7b636cd46e3c4a74eb19d3a6218455bddfc0f5787f00c6286d02197fb17"
 create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
 validator_timelock_execution_delay = 0 # Not used in this upgrade
 
