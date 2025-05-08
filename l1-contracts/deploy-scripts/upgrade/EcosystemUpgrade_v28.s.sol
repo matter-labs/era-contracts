@@ -86,7 +86,7 @@ import {DeployL1Script} from "../DeployL1.s.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract EcosystemUpgrade is Script, DeployL1Script {
+contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     using stdToml for string;
 
     /**

@@ -86,7 +86,7 @@ import {DeployL1Script} from "../DeployL1.s.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract EcosystemUpgrade is Script, DeployL1Script {
+contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     using stdToml for string;
 
     /**
@@ -290,12 +290,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             require(isHashInFactoryDeps[forceDeployments[i].bytecodeHash], "Bytecode hash not in factory deps");
         }
 
-        bytes memory data = abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (forceDeployments));
+        (address target, bytes memory data) = _getL2UpgradeTargetAndData(forceDeployments);
 
         transaction = L2CanonicalTransaction({
             txType: SYSTEM_UPGRADE_L2_TX_TYPE,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-            to: uint256(uint160(address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR))),
+            to: uint256(uint160(target)),
             // TODO: dont use hardcoded values
             gasLimit: 72_000_000,
             gasPerPubdataByteLimit: 800,
@@ -314,6 +314,10 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             // But it is still here, just in case we want to enable some additional functionality
             reservedDynamic: new bytes(0)
         });
+    }
+
+    function _getL2UpgradeTargetAndData(IL2ContractDeployer.ForceDeployment[] memory _forceDeployments) internal virtual returns (address, bytes memory) {
+        return (address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR), abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments)););
     }
 
     function getNewProtocolVersion() public virtual returns (uint256) {
