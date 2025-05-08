@@ -26,6 +26,7 @@ contract DeployL2Script is Script {
         NoDA,
         Avail,
         EigenDAV1M0,
+        EigenDAV2M0,
         EigenDAV2M1
     }
 
@@ -153,7 +154,7 @@ contract DeployL2Script is Script {
         config.eraChainId = toml.readUint("$.era_chain_id");
 
         uint256 validatorTypeUint = toml.readUint("$.da_validator_type");
-        require(validatorTypeUint < 5, "Invalid DA validator type");
+        require(validatorTypeUint < 6, "Invalid DA validator type");
         config.validatorType = DAValidatorType(validatorTypeUint);
     }
 
@@ -179,6 +180,8 @@ contract DeployL2Script is Script {
         } else if (config.validatorType == DAValidatorType.Avail) {
             bytecode = L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode();
         } else if (config.validatorType == DAValidatorType.EigenDAV1M0) {
+            bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+        } else if (config.validatorType == DAValidatorType.EigenDAV2M0) {
             bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
         } else if (config.validatorType == DAValidatorType.EigenDAV2M1) {
             bytecode = L2ContractsBytecodesLib.readEigenDAL2DAValidatorBytecode();
