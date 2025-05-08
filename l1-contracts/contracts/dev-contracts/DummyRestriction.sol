@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Call} from "../governance/Common.sol";
 import {IRestriction, RESTRICTION_MAGIC} from "../governance/restriction/IRestriction.sol";

@@ -81,7 +81,6 @@ describe("L1Messenger tests", () => {
       emulator.addLog(logData.logs[0].log);
       await (await l1Messenger.connect(l1MessengerAccount).sendToL1(logData.messages[0].message)).wait();
       emulator.addLog(logData.messages[0].log);
-
       await (
         await l1Messenger
           .connect(bootloaderAccount)
@@ -92,7 +91,6 @@ describe("L1Messenger tests", () => {
           )
       ).wait();
     });
-
     it("should revert Too many L2->L1 logs", async () => {
       // set numberOfLogsBytes to 0x4002 to trigger the revert (max value is 0x4000)
       await expect(
@@ -104,7 +102,6 @@ describe("L1Messenger tests", () => {
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
-
     it("should revert Invalid input DA signature", async () => {
       await expect(
         l1Messenger
@@ -115,7 +112,6 @@ describe("L1Messenger tests", () => {
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
-
     it("should revert logshashes mismatch", async () => {
       await (
         await l1Messenger.connect(l1MessengerAccount).sendL2ToL1Log(logData.isService, logData.key, logData.value)
@@ -140,10 +136,8 @@ describe("L1Messenger tests", () => {
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
-
     it("should revert Invalid input msgs hash", async () => {
       const correctChainedMessagesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 2);
-
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
           ethers.constants.AddressZero,
@@ -153,10 +147,8 @@ describe("L1Messenger tests", () => {
         )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
-
     it("should revert Invalid bytecodes hash", async () => {
       const correctChainedBytecodesHash = await l1Messenger.provider.getStorageAt(l1Messenger.address, 3);
-
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
           ethers.constants.AddressZero,
@@ -166,7 +158,6 @@ describe("L1Messenger tests", () => {
         )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
-
     it("should revert Invalid offset", async () => {
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
@@ -177,7 +168,6 @@ describe("L1Messenger tests", () => {
         )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
-
     it("should revert Invalid length", async () => {
       await expect(
         l1Messenger
@@ -188,7 +178,6 @@ describe("L1Messenger tests", () => {
           )
       ).to.be.revertedWithCustomError(l1Messenger, "ReconstructionMismatch");
     });
-
     it("should revert Invalid root hash", async () => {
       await expect(
         l1Messenger.connect(bootloaderAccount).publishPubdataAndClearState(
@@ -208,7 +197,6 @@ describe("L1Messenger tests", () => {
         "CallerMustBeSystemContract"
       );
     });
-
     it("should emit L2ToL1LogSent event when called by the system contract", async () => {
       await expect(
         l1Messenger
@@ -226,7 +214,6 @@ describe("L1Messenger tests", () => {
         ]);
       emulator.addLog(logData.logs[0].log);
     });
-
     it("should emit L2ToL1LogSent event when called by the system contract with isService false", async () => {
       await expect(
         l1Messenger
@@ -281,7 +268,6 @@ describe("L1Messenger tests", () => {
         "Unauthorized"
       );
     });
-
     it("should emit event, called by known code system contract", async () => {
       await expect(
         l1Messenger
