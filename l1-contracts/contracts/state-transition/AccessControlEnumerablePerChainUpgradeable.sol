@@ -20,7 +20,8 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     /// @param account  The offending account.
     error RoleAccessDenied(uint256 chainId, bytes32 role, address account);
 
-    /// @dev Thrown when someone attempts to transfer or modify the `DEFAULT_ADMIN_ROLE`.
+    /// @dev Thrown when someone attempts to transfer or modify the `DEFAULT_ADMIN_ROLE`, since
+    /// `DEFAULT_ADMIN_ROLE` must always represent the exact chain admin of the chain.
     error DefaultAdminTransferNotAllowed();
 
     /// @notice Emitted when `role` is granted to `account` for a specific `chainId`.
@@ -103,7 +104,7 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     /// @param _role    The role identifier.
     /// @param index    A zero‑based index (ordering is not guaranteed).
     /// @dev `index` must be a value between 0 and {getRoleMemberCount}, non-inclusive.
-    function getRole(
+    function getRoleMember(
         uint256 _chainId,
         bytes32 _role,
         uint256 index
