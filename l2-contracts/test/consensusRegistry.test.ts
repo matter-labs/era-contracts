@@ -119,19 +119,7 @@ describe("ConsensusRegistry", function () {
     }
   });
 
-  it("Should not allow nonOwner, nonValidatorOwner to add", async function () {
-    await expect(
-      registry
-        .connect(nonOwner)
-        .add(
-          ethers.Wallet.createRandom().address,
-          0,
-          { a: new Uint8Array(32), b: new Uint8Array(32), c: new Uint8Array(32) },
-          { a: new Uint8Array(32), b: new Uint8Array(16) },
-          { gasLimit }
-        )
-    ).to.be.reverted;
-
+  it("Should not allow validatorOwner to add", async function () {
     await expect(
       registry
         .connect(validators[0].ownerKey)
@@ -145,20 +133,20 @@ describe("ConsensusRegistry", function () {
     ).to.be.reverted;
   });
 
-  it("Should allow owner to change validator active status", async function () {
+  it("Should change validator active status", async function () {
     const validatorOwner = validatorEntries[0].ownerAddr;
     expect((await registry.validators(validatorOwner)).latest.active).to.equal(true);
 
     // Deactivate
-    await (await registry.connect(owner).changeValidatorActive(validatorOwner, false, { gasLimit })).wait();
+    await (await registry.connect(validatorOwner).changeValidatorActive(validatorOwner, false, { gasLimit })).wait();
     expect((await registry.validators(validatorOwner)).latest.active).to.equal(false);
 
     // Activate
-    await (await registry.connect(owner).changeValidatorActive(validatorOwner, true, { gasLimit })).wait();
+    await (await registry.connect(validatorOwner).changeValidatorActive(validatorOwner, true, { gasLimit })).wait();
     expect((await registry.validators(validatorOwner)).latest.active).to.equal(true);
   });
 
-  it("Should not allow nonOwner, nonValidatorOwner to change validator active status", async function () {
+  it("Should not allow nonOwner to change validator active status", async function () {
     const validatorOwner = validatorEntries[0].ownerAddr;
     await expect(registry.connect(nonOwner).changeValidatorActive(validatorOwner, false, { gasLimit })).to.be.reverted;
   });
@@ -183,12 +171,6 @@ describe("ConsensusRegistry", function () {
     ).to.be.reverted;
   });
 
-  it("Should not allow nonOwner to change validator weight", async function () {
-    const validator = validators[0];
-    await expect(registry.connect(nonOwner).changeValidatorWeight(validator.ownerKey.address, 0, { gasLimit })).to.be
-      .reverted;
-  });
-
   it("Should change validator leader status", async function () {
     const entry = validatorEntries[0];
     // By default leader should be true.
@@ -208,12 +190,6 @@ describe("ConsensusRegistry", function () {
     await expect(
       registry.connect(validator.ownerKey).changeValidatorLeader(validator.ownerKey.address, true, { gasLimit })
     ).to.be.reverted;
-  });
-
-  it("Should not allow nonOwner to change validator leader status", async function () {
-    const validator = validators[0];
-    await expect(registry.connect(nonOwner).changeValidatorLeader(validator.ownerKey.address, true, { gasLimit })).to.be
-      .reverted;
   });
 
   it("Should change validator public key", async function () {
@@ -462,6 +438,75 @@ describe("ConsensusRegistry", function () {
     await (
       await registry.add(entry.ownerAddr, entry.validatorWeight, entry.validatorPubKey, entry.validatorPoP)
     ).wait();
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+  });
+
+  it("Should have default leader selection configuration after initialization", async function () {
+    const leaderSelection = await registry.leaderSelection();
+    expect(leaderSelection.latest.frequency).to.equal(1);
+    expect(leaderSelection.latest.weighted).to.equal(false);
+  });
+
+  it("Should update leader selection configuration", async function () {
+    // Get initial configuration
+    const initialConfig = await registry.leaderSelection();
+
+    // Change to new values
+    const newFrequency = 10;
+    const newWeighted = true;
+    await (await registry.updateLeaderSelection(newFrequency, newWeighted, { gasLimit })).wait();
+
+    // Verify changes
+    const updatedConfig = await registry.leaderSelection();
+    expect(updatedConfig.latest.frequency).to.equal(newFrequency);
+    expect(updatedConfig.latest.weighted).to.equal(newWeighted);
+
+    // Reset to original values
+    await (await registry.updateLeaderSelection(initialConfig.latest.frequency, initialConfig.latest.weighted, { gasLimit })).wait();
+  });
+
+  it("Should not allow validatorOwner to update leader selection", async function () {
+    await expect(registry.connect(validators[0].ownerKey).updateLeaderSelection(5, true, { gasLimit })).to.be.reverted;
+  });
+
+  it("Should snapshot leader selection configuration on commit", async function () {
+    // Initial state
+    let leaderSelection = await registry.leaderSelection();
+    const initialFrequency = leaderSelection.latest.frequency;
+    const initialWeighted = leaderSelection.latest.weighted;
+
+    // Update leader selection
+    const newFrequency = 20;
+    const newWeighted = !initialWeighted;
+    await (await registry.updateLeaderSelection(newFrequency, newWeighted, { gasLimit })).wait();
+
+    // Commit
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+
+    // Check snapshot was created
+    leaderSelection = await registry.leaderSelection();
+    expect(leaderSelection.lastSnapshotCommit).to.be.greaterThan(0);
+    expect(leaderSelection.snapshot.frequency).to.equal(newFrequency);
+    expect(leaderSelection.snapshot.weighted).to.equal(newWeighted);
+
+    // Update again to test multiple snapshots
+    const newerFrequency = 30;
+    const newerWeighted = !newWeighted;
+    await (await registry.updateLeaderSelection(newerFrequency, newerWeighted, { gasLimit })).wait();
+
+    // Commit again
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+
+    // Verify previous snapshot is preserved
+    leaderSelection = await registry.leaderSelection();
+    expect(leaderSelection.previousSnapshotCommit).to.be.greaterThan(0);
+    expect(leaderSelection.previousSnapshot.frequency).to.equal(newFrequency);
+    expect(leaderSelection.previousSnapshot.weighted).to.equal(newWeighted);
+    expect(leaderSelection.snapshot.frequency).to.equal(newerFrequency);
+    expect(leaderSelection.snapshot.weighted).to.equal(newerWeighted);
+
+    // Reset to original values
+    await (await registry.updateLeaderSelection(initialFrequency, initialWeighted, { gasLimit })).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
 

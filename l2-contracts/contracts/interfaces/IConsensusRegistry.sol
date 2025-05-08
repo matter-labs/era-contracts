@@ -38,6 +38,28 @@ interface IConsensusRegistry {
         BLS12_381Signature proofOfPossession;
     }
 
+    /// @dev Represents the leader selection process in the consensus protocol.
+    /// @param lastSnapshotCommit The `validatorsCommit` value when the last snapshot was made.
+    /// @param previousSnapshotCommit The `validatorsCommit` value when the previous snapshot was made.
+    /// @param latest LeaderSelectionAttr to read if `validatorsCommit` > `lastSnapshotCommit`.
+    /// @param snapshot LeaderSelectionAttr to read if `validatorsCommit` > `previousSnapshot`.
+    /// @param previousSnapshot LeaderSelectionAttr to read for older commits.
+    struct LeaderSelection {
+        uint32 lastSnapshotCommit;
+        uint32 previousSnapshotCommit;
+        LeaderSelectionAttr latest;
+        LeaderSelectionAttr snapshot;
+        LeaderSelectionAttr previousSnapshot;
+    }
+
+    /// @dev Attributes for the validator leader selection process.
+    /// @param frequency The number of views between leader changes. If it is 0 then the leader never rotates.
+    /// @param weighted Whether leaders are selectedproportionally to their weight. If false, then the leader is selected round-robin.
+    struct LeaderSelectionAttr {
+        uint64 frequency;
+        bool weighted;
+    }
+
     /// @dev Represents a validator within a committee.
     /// @param leader A flag stating if the validator is eligible to be a leader.
     /// @param weight Validator's voting weight.
@@ -94,6 +116,7 @@ interface IConsensusRegistry {
     event ValidatorKeyChanged(address indexed validatorOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
     event ValidatorsCommitted(uint32 validatorsCommit, uint256 validatorsCommitBlock);
     event CommitteeActivationDelayChanged(uint256 newDelay);
+    event LeaderSelectionChanged(LeaderSelectionAttr newLeaderSelection);
 
     /// @notice Adds a new validator to the registry.
     /// @dev Fails if validator owner already exists.
@@ -167,4 +190,10 @@ interface IConsensusRegistry {
     /// @dev Only callable by the contract owner
     /// @param _delay The new delay in blocks
     function setCommitteeActivationDelay(uint256 _delay) external;
+
+    /// @notice Updates the leader selection configuration
+    /// @dev Only callable by the contract owner
+    /// @param _frequency The number of views between leader changes. If it is 0 then the leader never rotates.
+    /// @param _weighted Whether leaders are selected proportionally to their weight. If false, then the leader is selected round-robin.
+    function updateLeaderSelection(uint64 _frequency, bool _weighted) external;
 }

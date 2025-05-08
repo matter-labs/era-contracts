@@ -27,6 +27,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     uint256 public validatorsCommitBlock;
     /// @dev The delay in blocks before a committee commit becomes active.
     uint256 public committeeActivationDelay;
+    /// @dev Represents the leader selection process configuration.
+    LeaderSelection public leaderSelection;
 
     modifier onlyOwnerOrValidatorOwner(address _validatorOwner) {
         if (owner() != msg.sender && _validatorOwner != msg.sender) {
@@ -40,6 +42,15 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             revert InvalidInputValidatorOwnerAddress();
         }
         _transferOwnership(_initialOwner);
+
+        // Initialize leaderSelection with default values
+        leaderSelection = LeaderSelection({
+            lastSnapshotCommit: 0,
+            previousSnapshotCommit: 0,
+            latest: LeaderSelectionAttr({frequency: 1, weighted: false}),
+            snapshot: LeaderSelectionAttr({frequency: 1, weighted: false}),
+            previousSnapshot: LeaderSelectionAttr({frequency: 1, weighted: false})
+        });
     }
 
     function add(
@@ -228,6 +239,20 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit CommitteeActivationDelayChanged(_delay);
     }
 
+    /// @notice Updates the leader selection configuration
+    /// @dev Only callable by the contract owner
+    /// @param _frequency The number of views between leader changes. If it is 0 then the leader never rotates.
+    /// @param _weighted Whether leaders are selected proportionally to their weight. If false, then the leader is selected round-robin.
+    function updateLeaderSelection(uint64 _frequency, bool _weighted) external onlyOwner {
+        // Ensure leader selection is properly snapshotted
+        _ensureLeaderSelectionSnapshot();
+
+        // Update with new values
+        leaderSelection.latest = LeaderSelectionAttr({frequency: _frequency, weighted: _weighted});
+
+        emit LeaderSelectionChanged(leaderSelection.latest);
+    }
+
     /// @notice Internal helper to build committee arrays
     /// @dev Handles the common logic for getting current or next validator committee
     /// @param _isNextCommittee Whether to get the next committee instead of the current one
@@ -330,6 +355,16 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             _validator.previousSnapshotCommit = _validator.lastSnapshotCommit;
             _validator.snapshot = _validator.latest;
             _validator.lastSnapshotCommit = validatorsCommit;
+        }
+    }
+
+    function _ensureLeaderSelectionSnapshot() private {
+        if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+            // When creating a snapshot, preserve the previous one
+            leaderSelection.previousSnapshot = leaderSelection.snapshot;
+            leaderSelection.previousSnapshotCommit = leaderSelection.lastSnapshotCommit;
+            leaderSelection.snapshot = leaderSelection.latest;
+            leaderSelection.lastSnapshotCommit = validatorsCommit;
         }
     }
 
