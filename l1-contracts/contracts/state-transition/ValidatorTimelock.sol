@@ -2,11 +2,22 @@
 
 pragma solidity 0.8.28;
 
-import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+
+import {AccessControlEnumerablePerChainUpgradeable} from "./AccessControlEnumerablePerChainUpgradeable.sol";
+
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IChainTypeManager} from "./IChainTypeManager.sol";
 import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
+
+struct ValidatorRotationParams {
+    bool rotatePrecommitterRole;
+    bool rotateCommitterRole;
+    bool rotateReverterRole;
+    bool rotateProverRole;
+    bool rotateExecutorRole;
+}
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -19,35 +30,35 @@ import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErr
 /// @dev The contract overloads all of the 4 methods, that are used in state transition. When the batch is committed,
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
-contract ValidatorTimelock is IExecutor, Ownable2Step {
+contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlEnumerablePerChainUpgradeable {
     using LibMap for LibMap.Uint32Map;
 
     /// @dev Part of the IBase interface. Not used in this contract.
     string public constant override getName = "ValidatorTimelock";
 
+    bytes32 public constant PRECOMMITTER_ROLE = keccak256("PRECOMMITTER_ROLE");
+    bytes32 public constant COMMITTER_ROLE = keccak256("COMMITTER_ROLE");
+    bytes32 public constant REVERTER_ROLE = keccak256("REVERTER_ROLE");
+    bytes32 public constant PROVER_ROLE = keccak256("PROVER_ROLE");
+    bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
+
+    // Note, that the below admin roles are OPTIONAL, i.e. by default the corresponding admin 
+    // roles belong to the chain admin
+    // However, if one does want to set the admin rol
+    bytes32 public constant OPTIONAL_PRECOMMITTER_ADMIN_ROLE = keccak256("OPTIONAL_PRECOMMITTER_ADMIN_ROLE");
+    bytes32 public constant OPTIONAL_COMMITTER_ADMIN_ROLE = keccak256("COMMITTER_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_REVERTER_ADMIN_ROLE = keccak256("REVERTER_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_PROVER_ADMIN_ROLE = keccak256("PROVER_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("EXECUTOR_MANAGER_ROLE");
+
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
-
-    /// @notice A new validator has been added.
-    event ValidatorAdded(uint256 indexed _chainId, address _addedValidator);
-
-    /// @notice A validator has been removed.
-    event ValidatorRemoved(uint256 indexed _chainId, address _removedValidator);
-
-    /// @notice Error for when an address is already a validator.
-    error AddressAlreadyValidator(uint256 _chainId);
-
-    /// @notice Error for when an address is not a validator.
-    error ValidatorDoesNotExist(uint256 _chainId);
 
     /// @dev The chainTypeManager smart contract.
     IChainTypeManager public chainTypeManager;
 
     /// @dev The mapping of L2 chainId => batch number => timestamp when it was committed.
     mapping(uint256 chainId => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
-
-    /// @dev The address that can commit/revert/validate/execute batches.
-    mapping(uint256 _chainId => mapping(address _validator => bool)) public validators;
 
     /// @dev The delay between committing and executing batches.
     uint32 public executionDelay;
@@ -65,38 +76,12 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         _;
     }
 
-    /// @notice Checks if the caller is a validator.
-    modifier onlyValidator(uint256 _chainId) {
-        if (!validators[_chainId][msg.sender]) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /// @dev Sets a new state transition manager.
     function setChainTypeManager(IChainTypeManager _chainTypeManager) external onlyOwner {
         if (address(_chainTypeManager) == address(0)) {
             revert ZeroAddress();
         }
         chainTypeManager = _chainTypeManager;
-    }
-
-    /// @dev Sets an address as a validator.
-    function addValidator(uint256 _chainId, address _newValidator) external onlyChainAdmin(_chainId) {
-        if (validators[_chainId][_newValidator]) {
-            revert AddressAlreadyValidator(_chainId);
-        }
-        validators[_chainId][_newValidator] = true;
-        emit ValidatorAdded(_chainId, _newValidator);
-    }
-
-    /// @dev Removes an address as a validator.
-    function removeValidator(uint256 _chainId, address _validator) external onlyChainAdmin(_chainId) {
-        if (!validators[_chainId][_validator]) {
-            revert ValidatorDoesNotExist(_chainId);
-        }
-        validators[_chainId][_validator] = false;
-        emit ValidatorRemoved(_chainId, _validator);
     }
 
     /// @dev Set the delay between committing and executing batches.
@@ -110,6 +95,81 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         return committedBatchTimestamp[_chainId].get(_l2BatchNumber);
     }
 
+    // It is a helper method for validator management, all the access control is done inside the `revokeRole` function
+    function removeValidatorRoles(uint256 _chainId, address _validator, ValidatorRotationParams memory params) public {
+        if (params.rotatePrecommitterRole) {
+            revokeRole(_chainId, PRECOMMITTER_ROLE, _validator);
+        }
+        if (params.rotateCommitterRole) {
+            revokeRole(_chainId, COMMITTER_ROLE, _validator);
+        }
+        if (params.rotateReverterRole) {
+            revokeRole(_chainId, REVERTER_ROLE, _validator);
+        }
+        if (params.rotateProverRole) {
+            revokeRole(_chainId, PROVER_ROLE, _validator);
+        }
+        if (params.rotateExecutorRole) {
+            revokeRole(_chainId, EXECUTOR_ROLE, _validator);
+        }
+    }
+
+    function removeValidator(uint256 _chainId, address _validator) external {
+        removeValidatorRoles(
+            _chainId,
+            _validator,
+            ValidatorRotationParams({
+                rotatePrecommitterRole: true,
+                rotateCommitterRole: true,
+                rotateReverterRole: true,
+                rotateProverRole: true,
+                rotateExecutorRole: true
+            })
+        ); 
+    }
+
+    // It is a helper method for validator management, all the access control is done inside the `grantRole` function
+    function addValidatorRoles(uint256 _chainId, address _validator, ValidatorRotationParams memory params) public {
+        if (params.rotatePrecommitterRole) {
+            grantRole(_chainId, PRECOMMITTER_ROLE, _validator);
+        }
+        if (params.rotateCommitterRole) {
+            grantRole(_chainId, COMMITTER_ROLE, _validator);
+        }
+        if (params.rotateReverterRole) {
+            grantRole(_chainId, REVERTER_ROLE, _validator);
+        }
+        if (params.rotateProverRole) {
+            grantRole(_chainId, PROVER_ROLE, _validator);
+        }
+        if (params.rotateExecutorRole) {
+            grantRole(_chainId, EXECUTOR_ROLE, _validator);
+        }
+    }
+
+    function addValidator(uint256 _chainId, address _validator) external {
+        addValidatorRoles(
+            _chainId,
+            _validator,
+            ValidatorRotationParams({
+                rotatePrecommitterRole: true,
+                rotateCommitterRole: true,
+                rotateReverterRole: true,
+                rotateProverRole: true,
+                rotateExecutorRole: true
+            })
+        ); 
+    }
+
+
+    function precommitSharedBridge(
+        uint256 _chainId, 
+        uint256,
+        bytes calldata
+    ) external onlyRole(_chainId, PRECOMMITTER_ROLE) {
+        _propagateToZKChain(_chainId);
+    }
+
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the zkChain diamond contract with the same calldata.
     function commitBatchesSharedBridge(
@@ -117,7 +177,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata
-    ) external onlyValidator(_chainId) {
+    ) external onlyRole(_chainId, COMMITTER_ROLE) {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
@@ -133,7 +193,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
-    function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyValidator(_chainId) {
+    function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyRole(_chainId, REVERTER_ROLE) {
         _propagateToZKChain(_chainId);
     }
 
@@ -145,7 +205,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         uint256, // _processBatchFrom
         uint256, // _processBatchTo
         bytes calldata
-    ) external onlyValidator(_chainId) {
+    ) external onlyRole(_chainId, PROVER_ROLE) {
         _propagateToZKChain(_chainId);
     }
 
@@ -156,7 +216,7 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata
-    ) external onlyValidator(_chainId) {
+    ) external onlyRole(_chainId, EXECUTOR_ROLE) {
         uint256 delay = executionDelay; // uint32
         unchecked {
             // We disable this check because calldata array length is cheap.
@@ -206,5 +266,9 @@ contract ValidatorTimelock is IExecutor, Ownable2Step {
                 return(0, size)
             }
         }
+    }
+
+    function _getChainAdmin(uint256 _chainId) internal view override returns (address) {
+        return chainTypeManager.getChainAdmin(_chainId);
     }
 }

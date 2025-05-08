@@ -16,6 +16,7 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+    L2_TXS_STATUS_ROLLING_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
@@ -28,6 +29,7 @@ struct LogProcessingOutput {
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
     bytes32 l2DAValidatorOutputHash;
+    bytes32 l2TxsStatusRollingHash;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
@@ -101,6 +103,16 @@ interface IExecutor is IZKChainBase {
         bytes32 eventsQueueStateHash;
         bytes systemLogs;
         bytes operatorDAInput;
+    }
+
+    struct TransactionStatusCommitment {
+        bytes32 txHash;
+        bool status;
+    }
+
+    // todo add doc comments
+    struct PrecommitInfo {
+        TransactionStatusCommitment[] txs;
     }
 
     /// @notice Function called by the operator to commit new batches. It is responsible for:

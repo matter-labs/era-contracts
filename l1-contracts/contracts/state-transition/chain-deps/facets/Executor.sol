@@ -80,6 +80,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
             revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
         }
+        verifyBatchPrecommitment(_newBatch.batchNumber, logOutput.l2TxsStatusRollingHash);
 
         // Check the timestamp of the new batch
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
@@ -121,6 +122,19 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
             );
+        }
+    }
+
+    function verifyBatchPrecommitment(
+        uint256 _batchNumber,
+        bytes32 _expectedL2TxsStatusRollingHash
+    ) internal view {
+        bytes32 storedPrecommitment = s.batchPrecommitments[_batchNumber];
+
+        // We do not require the operator to always provide the precommitments as it is an optional feature.
+        // However, if precommitments were provided, we do expect them to span over the entire batch
+        if (storedPrecommitment != bytes32(0) && storedPrecommitment != _expectedL2TxsStatusRollingHash) {
+            // todo error with expected and found precommitments.
         }
     }
 
@@ -236,6 +250,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2DAValidatorOutputHash = logValue;
+            } else if (logKey == uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY)) {
+                if (logSender != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
+                logOutput.l2TxsStatusRollingHash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 if (logSender != L2_BOOTLOADER_ADDRESS) {
                     revert InvalidLogSender(logSender, logKey);
@@ -248,16 +267,44 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
         }
 
-        // We only require 7 logs to be checked, the 8th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 7 logs: 2^7 - 1 = 127
-        // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
+        // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
+        // Without the protocol upgrade we expect 7 logs: 2^8 - 1 = 255
+        // With the protocol upgrade we expect 8 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            if (processedLogs != 127) {
-                revert MissingSystemLogs(127, processedLogs);
+            if (processedLogs != 255) {
+                revert MissingSystemLogs(255, processedLogs);
             }
-        } else if (processedLogs != 255) {
-            revert MissingSystemLogs(255, processedLogs);
+        } else if (processedLogs != 511) {
+            revert MissingSystemLogs(511, processedLogs);
         }
+    }
+
+    function precommitSharedBridge(
+        uint256 _batchNumber,
+        bytes calldata _precommitData
+    ) external nonReentrant onlyValidator onlySettlementLayer {
+        PrecommitInfo memory precommitInfo = BatchDecoder.decodeAndCheckPrecommitData(_precommitData);
+
+        if (_batchNumber != s.totalBatchesCommitted + 1) {
+            // todo; revert
+        }
+
+        if (precommitInfo.txs.length == 0) {
+            // todo revert
+        }
+
+        bytes32 currentPrecommitment = s.batchPrecommitments[_batchNumber];
+
+        for (uint256 i = 0; i < precommitInfo.txs.length; i++) {
+            // todo: can optimize via assembly
+            bytes32 txStatusCommitment = keccak256(abi.encode(precommitInfo.txs[i]));
+
+            currentPrecommitment = keccak256(abi.encode(currentPrecommitment, txStatusCommitment));
+        }
+
+        s.batchPrecommitments[_batchNumber] = currentPrecommitment;
+
+        // todo: emit event that new precommitment has been set for this batch
     }
 
     /// @inheritdoc IExecutor

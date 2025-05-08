@@ -44,6 +44,20 @@ library BatchDecoder {
         }
     }
 
+    function decodeAndCheckPrecommitData(
+        bytes calldata _precommitData
+    ) internal pure returns (IExecutor.PrecommitInfo memory precommitInfo) {
+        uint8 encodingVersion = uint8(_precommitData[0]);
+        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
+            (precommitInfo) = abi.decode(
+                _precommitData[1:],
+                (IExecutor.PrecommitInfo)
+            );
+        } else {
+            revert UnsupportedCommitBatchEncoding(encodingVersion);
+        }
+    }
+
     /// @notice Decodes the commit data and checks that the provided batch bounds are correct.
     /// @dev Note that it only checks that the last and the first batches in the array correspond to the provided bounds.
     /// The fact that the batches inside the array are provided in the correct order should be checked by the caller.

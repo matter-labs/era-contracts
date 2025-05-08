@@ -187,6 +187,7 @@ object "Bootloader" {
             }
 
             /// @dev The byte from which storing of the current canonical and signed hashes begins
+            /// Note, that the hashes are stored only for L2 transactions, not for the priority ones.
             function CURRENT_L2_TX_HASHES_BEGIN_BYTE() -> ret {
                 ret := mul(CURRENT_L2_TX_HASHES_BEGIN_SLOT(), 32)
             }
@@ -345,9 +346,22 @@ object "Bootloader" {
                 ret := mul(PRIORITY_TXS_L1_DATA_BEGIN_SLOT(), 32)
             }
 
+            /// @dev The byte from which storing of the priority txs L1 data begins.
+            function TXS_STATUS_ROLLING_HASH_RESERVED_SLOTS() -> ret {
+                ret := 1
+            }
+
+            function TXS_STATUS_ROLLING_HASH_BEGIN_SLOT() -> ret {
+                ret := add(PRIORITY_TXS_L1_DATA_BEGIN_SLOT(), PRIORITY_TXS_L1_DATA_RESERVED_SLOTS())
+            }
+
+            function TXS_STATUS_ROLLING_HASH_BEGIN_BYTE() -> ret {
+                ret := mul(TXS_STATUS_ROLLING_HASH_BEGIN_SLOT(), 32)
+            }
+
             /// @dev Slot from which storing of the L1 Messenger pubdata begins.
             function OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_BEGIN_SLOT() -> ret {
-                ret := add(PRIORITY_TXS_L1_DATA_BEGIN_SLOT(), PRIORITY_TXS_L1_DATA_RESERVED_SLOTS())
+                ret := add(TXS_STATUS_ROLLING_HASH_BEGIN_SLOT(), TXS_STATUS_ROLLING_HASH_RESERVED_SLOTS())
             }
 
             /// @dev The byte storing of the L1 Messenger pubdata begins.
@@ -1044,6 +1058,7 @@ object "Bootloader" {
 
                 // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
                 sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
+                appendTransactionStatus(canonicalL1TxHash, success)
 
                 if isPriorityOp {
                     // Update priority txs L1 data
@@ -1216,6 +1231,7 @@ object "Bootloader" {
 
                 notifyAboutRefund(refund)
                 mstore(resultPtr, success)
+                appendTransactionStatus(mload(CURRENT_L2_TX_HASHES_BEGIN_BYTE()), success)
             }
 
             /// @dev Calculates the L2 gas limit for the transaction
@@ -2923,6 +2939,26 @@ object "Bootloader" {
                 }
             }
 
+            function appendTransactionStatus(
+                txHash,
+                status
+            ) {
+                debugLog("Appending tx status", txHash)
+                debugLog("Status", status)
+
+                let currentCommitment := mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE())
+
+                mstore(0, txHash)
+                mstore(32, status)
+                let txStatusCommitment := keccak256(0, 64)
+
+                mstore(0, currentCommitment)
+                mstore(32, txStatusCommitment)
+                let newCommitment := keccak256(0, 64)
+
+                mstore(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE(), newCommitment)
+            }
+
             /// @notice Appends the transaction hash to the current L2 block.
             /// @param txHash The hash of the transaction to append.
             /// @param isL1Tx Whether the transaction is an L1 transaction. If it is an L1 transaction,
@@ -3907,9 +3943,13 @@ object "Bootloader" {
                 ret := 3
             }
 
+            function txsStatusRollingHashKey() -> ret {
+                ret := 7
+            }
+
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function protocolUpgradeTxHashKey() -> ret {
-                ret := 7
+                ret := 8
             }
 
             ////////////////////////////////////////////////////////////////////////////
@@ -4009,6 +4049,9 @@ object "Bootloader" {
             // At start storing keccak256("") as `chainedPriorityTxsHash` and 0 as `numberOfLayer1Txs`
             mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), EMPTY_STRING_KECCAK())
             mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), 0)
+
+            // At start we explicitly reset the rolling hash
+            mstore(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE(), 0)
 
             // Iterating through transaction descriptions
             let transactionIndex := 0
@@ -4115,6 +4158,7 @@ object "Bootloader" {
             // Sending system logs (to be processed on L1)
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
+            sendToL1Native(true, txsStatusRollingHashKey(), mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE()))
 
             l1MessengerPublishingCall()
         }
