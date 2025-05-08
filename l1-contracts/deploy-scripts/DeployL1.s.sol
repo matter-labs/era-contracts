@@ -818,7 +818,7 @@ contract DeployL1Script is Script, DeployUtils {
                 return Utils.readAvailL1DAValidatorBytecode();
             } else if (compareStrings(contractName, "DummyAvailBridge")) {
                 return Utils.readDummyAvailBridgeBytecode();
-            } } else if (compareStrings(contractName, "EigenDAL1DAValidator")) {
+            } else if (compareStrings(contractName, "EigenDAL1DAValidator")) {
                 return Utils.readEigenDAL1DAValidatorBytecode();
             } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
