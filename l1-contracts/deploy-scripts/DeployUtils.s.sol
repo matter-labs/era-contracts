@@ -46,7 +46,7 @@ struct DeployedAddresses {
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
-    address blobVersionedHashRetriever;
+    address create2Factory;
     address chainRegistrar;
     address protocolUpgradeHandlerProxy;
 }
@@ -215,10 +215,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function deployBlobVersionedHashRetriever() internal {
-        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever", false);
-    }
-
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (FacetCut[] memory facetCuts);
@@ -314,10 +310,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
         require(stateTransition.verifier != address(0), "verifier is zero");
 
-        if (!stateTransition.isOnGateway) {
-            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
-        }
-
         return
             DiamondInitializeDataNewChain({
                 verifier: IVerifier(stateTransition.verifier),
@@ -326,10 +318,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
                 l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
                 l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
                 priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-                feeParams: feeParams,
-                blobVersionedHashRetriever: stateTransition.isOnGateway
-                    ? ADDRESS_ONE
-                    : addresses.blobVersionedHashRetriever
+                feeParams: feeParams
             });
     }
 
@@ -419,8 +408,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
             return abi.encode(addresses.bridges.bridgedStandardERC20Implementation);
-        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
-            return abi.encode();
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {

@@ -3,8 +3,8 @@ import { existsSync, mkdirSync, chmodSync } from "fs";
 import { join } from "path";
 import os from "os";
 
-const VERSION = "v0.5.3-v28";
-const COMMIT_HASH = "aa7f1aa";
+const VERSION = "v0.6.1";
+const COMMIT_HASH = "v0.6.1";
 const BIN_DIR = join(__dirname, "../bin");
 const BINARY_PATH = join(BIN_DIR, "anvil-zksync");
 
