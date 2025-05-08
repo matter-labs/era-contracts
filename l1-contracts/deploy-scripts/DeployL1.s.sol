@@ -288,7 +288,7 @@ contract DeployL1Script is Script, DeployUtils {
                 console.log("EigenDACertAndBlobVerifier not deployed, do not use for production");
             }
             addresses.daAddresses.eigenDACertAndBlobVerifier = config.contracts.eigenDACertAndBlobVerifier;
-            addresses.daAddresses.eigenDAL1DAValidator = deploySimpleContract("EigenDAL1DAValidator");
+            addresses.daAddresses.eigenDAL1DAValidator = deploySimpleContract("EigenDAL1DAValidator", false);
         } else {
             addresses.daAddresses.eigenDAL1DAValidator = config.contracts.eigenDAL1DAValidator;
         }
