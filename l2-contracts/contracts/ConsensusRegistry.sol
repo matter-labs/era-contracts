@@ -112,7 +112,10 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorRemoved(_validatorOwner);
     }
 
-    function activate(address _validatorOwner) external onlyOwnerOrValidatorOwner(_validatorOwner) {
+    function changeValidatorActive(
+        address _validatorOwner,
+        bool _isActive
+    ) external onlyOwnerOrValidatorOwner(_validatorOwner) {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
@@ -120,22 +123,9 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         }
 
         _ensureValidatorSnapshot(validator);
-        validator.latest.active = true;
+        validator.latest.active = _isActive;
 
-        emit ValidatorActivated(_validatorOwner);
-    }
-
-    function deactivate(address _validatorOwner) external onlyOwnerOrValidatorOwner(_validatorOwner) {
-        _verifyValidatorOwnerExists(_validatorOwner);
-        (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
-        if (deleted) {
-            return;
-        }
-
-        _ensureValidatorSnapshot(validator);
-        validator.latest.active = false;
-
-        emit ValidatorDeactivated(_validatorOwner);
+        emit ValidatorActiveStatusChanged(_validatorOwner, _isActive);
     }
 
     function changeValidatorLeader(address _validatorOwner, bool _isLeader) external onlyOwner {

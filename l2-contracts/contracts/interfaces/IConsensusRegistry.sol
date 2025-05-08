@@ -88,8 +88,7 @@ interface IConsensusRegistry {
     );
     event ValidatorRemoved(address indexed validatorOwner);
     event ValidatorDeleted(address indexed validatorOwner);
-    event ValidatorDeactivated(address indexed validatorOwner);
-    event ValidatorActivated(address indexed validatorOwner);
+    event ValidatorActiveStatusChanged(address indexed validatorOwner, bool isActive);
     event ValidatorLeaderStatusChanged(address indexed validatorOwner, bool isLeader);
     event ValidatorWeightChanged(address indexed validatorOwner, uint32 newWeight);
     event ValidatorKeyChanged(address indexed validatorOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
@@ -116,17 +115,12 @@ interface IConsensusRegistry {
     /// @param _validatorOwner The address of the owner of the validator to be removed.
     function remove(address _validatorOwner) external;
 
-    /// @notice Activates a previously inactive validator, allowing it to participate in committees.
+    /// @notice Changes the active status of a validator, determining whether it can participate in committees.
     /// @dev Only callable by the contract owner or the validator owner.
     /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator to be activated.
-    function activate(address _validatorOwner) external;
-
-    /// @notice Deactivates a validator, preventing it from participating in committees.
-    /// @dev Only callable by the contract owner or the validator owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator to be inactivated.
-    function deactivate(address _validatorOwner) external;
+    /// @param _validatorOwner The address of the owner of the validator whose active status will be changed.
+    /// @param _isActive The new active status to assign to the validator.
+    function changeValidatorActive(address _validatorOwner, bool _isActive) external;
 
     /// @notice Changes the validator's leader status in the registry.
     /// @dev Only callable by the contract owner.
