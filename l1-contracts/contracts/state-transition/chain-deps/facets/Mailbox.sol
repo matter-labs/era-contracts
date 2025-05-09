@@ -80,7 +80,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         return
             _proveL2LogInclusion({
                 _chainId: s.chainId,
-                _batchOrBlockNumber: _batchNumber,
+                _blockOrBatchNumber: _batchNumber,
                 _index: _index,
                 _log: _l2MessageToLog(_message),
                 _proof: _proof
@@ -97,7 +97,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         return
             _proveL2LogInclusion({
                 _chainId: s.chainId,
-                _batchOrBlockNumber: _batchNumber,
+                _blockOrBatchNumber: _batchNumber,
                 _index: _index,
                 _log: _log,
                 _proof: _proof
@@ -134,7 +134,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         return
             _proveL2LogInclusion({
                 _chainId: s.chainId,
-                _batchOrBlockNumber: _l2BatchNumber,
+                _blockOrBatchNumber: _l2BatchNumber,
                 _index: _l2MessageIndex,
                 _log: l2Log,
                 _proof: _merkleProof

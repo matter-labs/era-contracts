@@ -461,14 +461,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             bytes32 correctRootHash;
             if (interopRoot.chainId == block.chainid) {
                 // For the same chain we verify using the MessageRoot contract
-                correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.batchOrBlockNumber));
+                correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
             } else if (interopRoot.chainId == L1_CHAIN_ID) {
                 // this case can only happen on GW.
                 // L1 chain root is stored in the storage contract.
 
                 correctRootHash = L2_INTEROP_ROOT_STORAGE.interopRoots(
                     uint256(interopRoot.chainId),
-                    uint256(interopRoot.batchOrBlockNumber)
+                    uint256(interopRoot.blockOrBatchNumber)
                 );
             } else {
                 revert CommitBasedInteropNotSupported();
@@ -481,7 +481,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 abi.encodePacked(
                     dependencyRootsRollingHash,
                     interopRoot.chainId,
-                    interopRoot.batchOrBlockNumber,
+                    interopRoot.blockOrBatchNumber,
                     interopRoot.sides
                 )
             );
