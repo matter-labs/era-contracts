@@ -17,6 +17,13 @@ contract DummyL2InteropRootStorage {
     mapping(bytes32 msgRoot => uint256 chainId) public chainIdFromMsgRoot;
 
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] msgRootSides)) public msgRootSides;
+    uint256 public pendingMessageRootIdsLength;
+    struct PendingMessageRootId {
+        uint256 chainId;
+        uint256 batchNumber;
+    }
+    mapping(uint256 index => PendingMessageRootId) public pendingMessageRootIds;
+    // mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
 
     event InteropRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, bytes32[] sides);
 
@@ -27,7 +34,12 @@ contract DummyL2InteropRootStorage {
             batchNumberFromMsgRoot[sides[0]] = batchNumber;
             chainIdFromMsgRoot[sides[0]] = chainId;
         } else {
-            revert("Only sides of length 1 are supported in this version of code");
+            // msgRootSides[chainId][batchNumber] = sides;
+            // pendingMessageRootIds[pendingMessageRootIdsLength] = PendingMessageRootId({
+            //     chainId: chainId,
+            //     batchNumber: batchNumber
+            // });
+            // pendingMessageRootIdsLength++;
         }
     }
 

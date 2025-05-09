@@ -20,8 +20,6 @@ enum SystemLogKey {
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
-uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
-
 struct LogProcessingOutput {
     uint256 numberOfLayer1Txs;
     bytes32 chainedPriorityTxsHash;
@@ -33,6 +31,9 @@ struct LogProcessingOutput {
     bytes32 l2DAValidatorOutputHash;
     bytes32 dependencyRootsRollingHash;
 }
+
+/// @dev Maximal value that SystemLogKey variable can be.
+uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
@@ -79,6 +80,7 @@ interface IExecutor is IZKChainBase {
 
     /// @notice Legacy StoredBatchInfo struct
     /// @dev dependencyRootsRollingHash is not included in the struct
+    // solhint-disable-next-line gas-struct-packing
     struct LegacyStoredBatchInfo {
         uint64 batchNumber;
         bytes32 batchHash;

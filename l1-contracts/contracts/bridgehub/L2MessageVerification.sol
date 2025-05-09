@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {MessageVerification} from "../state-transition/chain-deps/facets/MessageVerification.sol";
 import {MessageHashing, ProofVerificationResult} from "../common/libraries/MessageHashing.sol";
-import {L2_MESSAGE_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title The interface of the ZKsync L2MessageVerification contract that can be used to prove L2 message inclusion on the L2.
 /// @author Matter Labs
@@ -26,7 +26,7 @@ contract L2MessageVerification is MessageVerification {
         });
         if (proofVerificationResult.finalProofNode) {
             // For proof based interop this is the SL MessageRoot at block number _batchOrBlockNumber
-            bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE.msgRoots(_chainId, _batchOrBlockNumber);
+            bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.msgRoots(_chainId, _batchOrBlockNumber);
             return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
         }
 
