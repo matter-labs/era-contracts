@@ -47,11 +47,11 @@ If you need to add a word to the databases of these tools please insert it into 
 Some of the contracts inside the `l1-contracts` folder are predeployed on all ZK Chains. In order to verify those on explorer, build the contracts via `yarn build:foundry` and then run the following command:
 
 ```
-VERIFICATION_URL=<explorer-verification-url> yarn verify-l2-contracts
+VERIFICATION_URL=<explorer-verification-url> yarn verify-on-l2-explorer
 ```
 
-For example, for zksync Era testnet environment it would look the following way:
+For example, for ZKsync Era testnet environment it would look the following way:
 
 ```
-VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-l2-contracts
+VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-l2-explorer
 ```
