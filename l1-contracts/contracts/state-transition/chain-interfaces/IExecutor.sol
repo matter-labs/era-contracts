@@ -16,6 +16,7 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+    L2_TXS_STATUS_ROLLING_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
@@ -28,6 +29,7 @@ struct LogProcessingOutput {
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
     bytes32 l2DAValidatorOutputHash;
+    bytes32 l2TxsStatusRollingHash;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
@@ -101,6 +103,20 @@ interface IExecutor is IZKChainBase {
         bytes32 eventsQueueStateHash;
         bytes systemLogs;
         bytes operatorDAInput;
+    }
+
+    /// @notice Commitment to the status of a single L2 transaction.
+    /// @param txHash The keccak256 hash of the transaction data.
+    /// @param status The boolean status of the transaction (true = success, false = failure).
+    struct TransactionStatusCommitment {
+        bytes32 txHash;
+        bool status;
+    }
+
+    /// @notice Container for a list of `TransactionStatusCommitment`s to precommit.
+    /// @param txs Array of individual transaction status commitments for the batch.
+    struct PrecommitInfo {
+        TransactionStatusCommitment[] txs;
     }
 
     /// @notice Function called by the operator to commit new batches. It is responsible for:
@@ -178,4 +194,9 @@ interface IExecutor is IZKChainBase {
     /// @param totalBatchesExecuted Total number of executed batches
     /// @dev It has the name "BlocksRevert" and not "BatchesRevert" due to backward compatibility considerations
     event BlocksRevert(uint256 totalBatchesCommitted, uint256 totalBatchesVerified, uint256 totalBatchesExecuted);
+
+    /// @notice Emitted when a new precommitment is set for a batch.
+    /// @param batchNumber The batch number for which the precommitment was recorded.
+    /// @param precommitment The resulting rolling hash of all transaction statuses.
+    event BatchPrecommitmentSet(uint256 indexed batchNumber, bytes32 precommitment);
 }
