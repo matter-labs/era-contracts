@@ -1303,7 +1303,7 @@ library Utils {
     }
     // SYSCOIN
     function readBitcoinL1DAValidatorBytecode() internal view returns (bytes memory bytecode) {
-        bytecode = readFoundryBytecode("/../da-contracts/out/BitcoinL1DAValidator.sol/BitcoinL1DAValidator.json");
+        bytecode = readFoundryBytecode("/../l1-contracts/out/BitcoinL1DAValidator.sol/BitcoinL1DAValidator.json");
     }
 
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
