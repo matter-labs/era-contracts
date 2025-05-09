@@ -5,8 +5,8 @@ pragma solidity ^0.8.20;
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {IContractDeployer, L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
@@ -19,7 +19,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {SystemContractsCaller} from "contracts/common/libraries/SystemContractsCaller.sol";
+import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
 

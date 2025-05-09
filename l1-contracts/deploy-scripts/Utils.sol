@@ -14,8 +14,8 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IOwnable} from "./interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
 import {IProtocolUpgradeHandler} from "./interfaces/IProtocolUpgradeHandler.sol";
@@ -505,7 +505,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy,
         address refundRecipient
-    ) internal {
+    ) internal returns (bytes32 txHash) {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
@@ -534,7 +534,17 @@ library Utils {
         }
 
         vm.broadcast();
+        vm.recordLogs();
         bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed succeassfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
     }
 
     function prepareGovernanceL1L2DirectTransaction(
@@ -799,7 +809,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
         console.log("L2 Transaction hash is ");
@@ -843,7 +853,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
         console.log("L2 Transaction hash is ");

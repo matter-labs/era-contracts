@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
+
 // import {Vm} from "forge-std/Vm.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
@@ -95,6 +96,7 @@ contract GatewayCTMFromL1 is Script {
         bytes diamondCutData;
         address relayedSLDAValidator;
         address validiumDAValidator;
+        bytes32 txHash;
     }
 
     Config internal config;
@@ -137,7 +139,7 @@ contract GatewayCTMFromL1 is Script {
             });
         }
 
-        Utils.runL1L2Transaction({
+        bytes32 txHash = Utils.runL1L2Transaction({
             l2Calldata: create2Calldata,
             l2GasLimit: 72_000_000,
             l2Value: 0,
@@ -147,6 +149,7 @@ contract GatewayCTMFromL1 is Script {
             bridgehubAddress: config.bridgehub,
             l1SharedBridgeProxy: config.sharedBridgeProxy
         });
+        output.txHash = txHash;
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
         saveOutput();
@@ -178,7 +181,8 @@ contract GatewayCTMFromL1 is Script {
             multicall3: expectedGatewayContracts.multicall3,
             diamondCutData: expectedGatewayContracts.diamondCutData,
             relayedSLDAValidator: expectedGatewayContracts.daContracts.relayedSLDAValidator,
-            validiumDAValidator: expectedGatewayContracts.daContracts.validiumDAValidator
+            validiumDAValidator: expectedGatewayContracts.daContracts.validiumDAValidator,
+            txHash: output.txHash
         });
     }
 
@@ -326,6 +330,7 @@ contract GatewayCTMFromL1 is Script {
             "validator_timelock_addr",
             output.gatewayStateTransition.validatorTimelock
         );
+        vm.serializeBytes32("gateway_state_transition", "deploy_tx_hash", output.txHash);
         string memory gatewayStateTransition = vm.serializeAddress(
             "gateway_state_transition",
             "diamond_proxy_addr",

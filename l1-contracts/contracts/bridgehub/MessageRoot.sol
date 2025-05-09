@@ -2,9 +2,9 @@
 
 pragma solidity 0.8.28;
 
-import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 
+import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
@@ -35,6 +35,8 @@ contract MessageRoot is IMessageRoot, Initializable {
 
     event Preimage(bytes32 one, bytes32 two);
 
+    event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
+
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -52,6 +54,11 @@ contract MessageRoot is IMessageRoot, Initializable {
 
     /// @dev The incremental merkle tree storing the chain message roots.
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
+
+    /// @notice The mapping from block number to the global message root.
+    /// @dev Each block might have multiple txs that change the historical root.
+    /// This is ok, since the chains can use the latest one in the block.
+    mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
@@ -114,6 +121,11 @@ contract MessageRoot is IMessageRoot, Initializable {
         emit Preimage(chainRoot, MessageHashing.chainIdLeafHash(chainRoot, _chainId));
 
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+        bytes32 sharedTreeRoot = sharedTree.root();
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = sharedTreeRoot;
+        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+        historicalRoot[block.number] = sharedTreeRoot;
     }
 
     /// @dev Gets the aggregated root of all chains.
@@ -138,6 +150,11 @@ contract MessageRoot is IMessageRoot, Initializable {
         }
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
+        bytes32 newRoot = sharedTree.root();
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = newRoot;
+        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+        historicalRoot[block.number] = newRoot;
     }
 
     function _initialize() internal {

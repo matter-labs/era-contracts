@@ -28,6 +28,7 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -41,6 +42,7 @@ contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     Bridgehub internal bridgehub;
+    MessageRoot internal messageroot;
     address internal rollupL1DAValidator;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
@@ -62,8 +64,9 @@ contract ChainTypeManagerTest is Test {
 
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
+        messageroot = new MessageRoot(bridgehub);
         vm.prank(governor);
-        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageroot);
 
         vm.mockCall(
             address(sharedBridge),

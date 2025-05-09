@@ -117,6 +117,8 @@ error InvalidCaller(address);
 error InvalidDelay();
 // 0xc1780bd6
 error InvalidLogSender(address sender, uint256 logKey);
+// 0xa1ec1876
+error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
 // 0xd8e9405c
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
 // 0x09bde339
