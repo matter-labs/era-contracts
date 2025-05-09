@@ -174,15 +174,15 @@ describe("ConsensusRegistry", function () {
   it("Should change validator leader status", async function () {
     const entry = validatorEntries[0];
     // By default leader should be true.
-    const initialLeaderStatus = (await registry.validators(entry.ownerAddr)).latest['leader'];
+    const initialLeaderStatus = (await registry.validators(entry.ownerAddr)).latest["leader"];
 
     // Change to the opposite status
     await (await registry.changeValidatorLeader(entry.ownerAddr, !initialLeaderStatus, { gasLimit })).wait();
-    expect((await registry.validators(entry.ownerAddr)).latest['leader']).to.equal(!initialLeaderStatus);
+    expect((await registry.validators(entry.ownerAddr)).latest["leader"]).to.equal(!initialLeaderStatus);
 
     // Change back to original status
     await (await registry.changeValidatorLeader(entry.ownerAddr, initialLeaderStatus, { gasLimit })).wait();
-    expect((await registry.validators(entry.ownerAddr)).latest['leader']).to.equal(initialLeaderStatus);
+    expect((await registry.validators(entry.ownerAddr)).latest["leader"]).to.equal(initialLeaderStatus);
   });
 
   it("Should not allow validatorOwner to change validator leader status", async function () {
@@ -197,19 +197,25 @@ describe("ConsensusRegistry", function () {
     const newEntry = makeRandomValidatorEntry(makeRandomValidator(), 0);
 
     // Change public key.
-    await (await registry.changeValidatorKey(entry.ownerAddr, newEntry.validatorPubKey, newEntry.validatorPoP, { gasLimit })).wait();
+    await (
+      await registry.changeValidatorKey(entry.ownerAddr, newEntry.validatorPubKey, newEntry.validatorPoP, { gasLimit })
+    ).wait();
     expect((await registry.validators(entry.ownerAddr)).latest.pubKey.a).to.equal(newEntry.validatorPubKey.a);
 
     // Restore state.
-    await (await registry.changeValidatorKey(entry.ownerAddr, entry.validatorPubKey, entry.validatorPoP, { gasLimit })).wait();
+    await (
+      await registry.changeValidatorKey(entry.ownerAddr, entry.validatorPubKey, entry.validatorPoP, { gasLimit })
+    ).wait();
     expect((await registry.validators(entry.ownerAddr)).latest.pubKey.a).to.equal(entry.validatorPubKey.a);
   });
 
   it("Should not allow nonOwner to change validator public key", async function () {
     const validator = makeRandomValidatorEntry(makeRandomValidator(), 0);
-    await expect(registry.connect(nonOwner).changeValidatorKey(validator.ownerAddr, validator.validatorPubKey,
-      validator.validatorPoP, { gasLimit })).to.be
-      .reverted;
+    await expect(
+      registry
+        .connect(nonOwner)
+        .changeValidatorKey(validator.ownerAddr, validator.validatorPubKey, validator.validatorPoP, { gasLimit })
+    ).to.be.reverted;
   });
 
   it("Should not allow to add a validator with a public key which already exists", async function () {
@@ -295,8 +301,10 @@ describe("ConsensusRegistry", function () {
     }
 
     // Trying to commit should now fail with NoActiveLeader error
-    await expect(registry.commitValidatorCommittee({ gasLimit }))
-      .to.be.revertedWithCustomError(registry, "NoActiveLeader");
+    await expect(registry.commitValidatorCommittee({ gasLimit })).to.be.revertedWithCustomError(
+      registry,
+      "NoActiveLeader"
+    );
 
     // Set at least one validator as leader to restore state
     await (await registry.changeValidatorLeader(validatorEntries[0].ownerAddr, true, { gasLimit })).wait();
@@ -462,7 +470,9 @@ describe("ConsensusRegistry", function () {
     expect(updatedConfig.latest.weighted).to.equal(newWeighted);
 
     // Reset to original values
-    await (await registry.updateLeaderSelection(initialConfig.latest.frequency, initialConfig.latest.weighted, { gasLimit })).wait();
+    await (
+      await registry.updateLeaderSelection(initialConfig.latest.frequency, initialConfig.latest.weighted, { gasLimit })
+    ).wait();
   });
 
   it("Should not allow validatorOwner to update leader selection", async function () {
