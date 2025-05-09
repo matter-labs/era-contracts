@@ -35,7 +35,7 @@ bootloader_hash = "0x0100085f9382a7928dd83bfc529121827b5f29f18b9aa10d18aa68e1be7
 default_aa_hash = "0x010005f72e443c94460f4583fb38ef5d0c5cd9897021c41df840f91465c0392e"
 evm_emulator_hash = "0x01000d83e0329d9144ad041430fafcbc2b388e5434db8cb8a96e80157738a1da"
 bridgehub_proxy_address = "0x35A54c8C757806eB6820629bc82d90E056394C92"
-rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
+rollup_da_manager = "0xB168490e38E5E7e1B8eB256a701Ee8314Cbf0E15"
 
 governance_security_council_address = "0x25Ab0397DA109A50C8921A1d4a034e0973602469"
 latest_protocol_version = 0x1c00000000
