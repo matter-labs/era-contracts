@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT} from "./Constants.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
@@ -48,7 +48,7 @@ library L2GenesisForceDeploymentsHelper {
         // Prepare calldata to set addresses in BridgeHub.
         bytes memory data = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
-            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT))
+            (address(L2_ASSET_ROUTER), _ctmDeployer, address(L2_MESSAGE_ROOT))
         );
 
         // Execute the call to set addresses in BridgeHub.
@@ -160,7 +160,7 @@ library L2GenesisForceDeploymentsHelper {
         // Configure the Native Token Vault deployment.
         forceDeployments[3] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.l2NtvBytecodeHash,
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
+            newAddress: address(L2_NATIVE_TOKEN_VAULT),
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
@@ -191,7 +191,13 @@ library L2GenesisForceDeploymentsHelper {
     ) internal pure returns (bytes memory initData) {
         initData = abi.encodeCall(
             IL2WrappedBaseToken.initializeV3,
-            (_wrappedBaseTokenName, _wrappedBaseTokenSymbol, L2_ASSET_ROUTER, _baseTokenL1Address, _baseTokenAssetId)
+            (
+                _wrappedBaseTokenName,
+                _wrappedBaseTokenSymbol,
+                address(L2_ASSET_ROUTER),
+                _baseTokenL1Address,
+                _baseTokenAssetId
+            )
         );
     }
 

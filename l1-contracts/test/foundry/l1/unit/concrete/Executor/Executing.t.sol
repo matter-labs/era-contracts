@@ -8,7 +8,7 @@ import {ExecutorTest, EMPTY_PREPUBLISHED_COMMITMENT, POINT_EVALUATION_PRECOMPILE
 
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS} from "contracts/common/L2ContractAddresses.sol";
-import {COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {PriorityOperationsRollingHashMismatch, BatchHashMismatch, NonSequentialBatch, CantExecuteUnprovenBatches, QueueIsEmpty, TxHashMismatch} from "contracts/common/L1ContractErrors.sol";
 
@@ -77,7 +77,7 @@ contract ExecutingTest is ExecutorTest {
 
         // This currently only uses the legacy priority queue, not the priority tree.
         executor.setPriorityTreeStartIndex(1);
-        vm.warp(COMMIT_TIMESTAMP_NOT_OLDER + 1);
+        vm.warp(TESTNET_COMMIT_TIMESTAMP_NOT_OLDER + 1);
         currentTimestamp = block.timestamp;
 
         bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);

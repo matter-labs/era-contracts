@@ -142,11 +142,6 @@ struct DeployedContracts {
     bytes diamondCutData;
 }
 
-/// @dev The constant address to be used for the blobHashRetriever inside the contracts.
-/// At the time of this writing the blob hash retriever is not used at all, but the zero-address
-/// check is still yet present, so we use address one as the substitution.
-address constant BLOB_HASH_RETRIEVER_ADDR = address(uint160(1));
-
 /// @title GatewayCTMDeployer
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -377,8 +372,7 @@ contract GatewayCTMDeployer {
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
             priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
-            feeParams: _config.feeParams,
-            blobVersionedHashRetriever: BLOB_HASH_RETRIEVER_ADDR
+            feeParams: _config.feeParams
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
