@@ -35,10 +35,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @notice A new chainBatchRoot has been added to the chainTree.
     event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 batchRoot);
 
-    /// @notice A preimage of the chainBatchRoot that's being added to the chainTree is being emited.
+    /// @notice A preimage of the chainBatchRoot that's being added to the chainTree is being emitted.
     event Preimage(bytes32 chainRoot, bytes32 preimage);
 
-    /// @notice A new InteropRoot is being emited whenever sharedTree is updated.
+    /// @notice A new InteropRoot is being emitted whenever sharedTree is updated.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
