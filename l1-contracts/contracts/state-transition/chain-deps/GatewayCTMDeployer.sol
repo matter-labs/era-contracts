@@ -109,6 +109,8 @@ struct StateTransitionContracts {
     address diamondInit;
     /// @notice Address of the GenesisUpgrade contract.
     address genesisUpgrade;
+    /// @notice Address of the implementation of the ValidatorTimelock contract.
+    address validatorTimelockImplementation;
     /// @notice Address of the ValidatorTimelock contract.
     address validatorTimelock;
     /// @notice Address of the ProxyAdmin for ChainTypeManager.
@@ -184,16 +186,15 @@ contract GatewayCTMDeployer {
             _deployedContracts: contracts
         });
         _deployVerifier(salt, _config.testnetVerifier, contracts);
-
-        ValidatorTimelock timelock = new ValidatorTimelock{salt: salt}(address(this), 0);
-        contracts.stateTransition.validatorTimelock = address(timelock);
+        
+        _deployValidatorTimelock(salt, contracts);
 
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
 
         _deployServerNotifier(salt, contracts);
 
         _deployCTM(salt, _config, contracts);
-        _setChainTypeManagerInValidatorTimelock(_config.aliasedGovernanceAddress, timelock, contracts);
+        _setChainTypeManagerInValidatorTimelock(_config.aliasedGovernanceAddress, contracts);
         _setChainTypeManagerInServerNotifier(
             _config.aliasedGovernanceAddress,
             ServerNotifier(contracts.stateTransition.serverNotifierProxy),
@@ -254,6 +255,27 @@ contract GatewayCTMDeployer {
         proxyAdmin.transferOwnership(_aliasedGovernanceAddress);
         _deployedContracts.stateTransition.chainTypeManagerProxyAdmin = address(proxyAdmin);
     }
+
+    /// @notice Deploys the ValidatorTimelock contract.
+    /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the execution of this function.
+    function _deployValidatorTimelock(
+        bytes32 _salt,
+        DeployedContracts memory _deployedContracts
+    ) internal {
+        address timelockImplementation = address(new ValidatorTimelock{salt: _salt}());
+        _deployedContracts.stateTransition.validatorTimelockImplementation = timelockImplementation;
+        _deployedContracts.stateTransition.validatorTimelock = address(
+            new TransparentUpgradeableProxy{salt: _salt}(
+                timelockImplementation,
+                address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
+                // The initial owner is the GatewayCTMDeployer. This is needed for easier setup.
+                // At the end of the execution, the ownership will be transferred to the aliased governance.
+                abi.encodeCall(ValidatorTimelock.initialize, (address(this), 0))
+            )
+        );
+    }   
 
     /// @notice Deploys a ServerNotifier contract.
     /// @param _salt Salt used for CREATE2 deployments.
@@ -412,19 +434,18 @@ contract GatewayCTMDeployer {
 
     /// @notice Sets the previously deployed CTM inside the ValidatorTimelock
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
-    /// @param _timelock The address of the validator timelock
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _setChainTypeManagerInValidatorTimelock(
         address _aliasedGovernanceAddress,
-        ValidatorTimelock _timelock,
         DeployedContracts memory _deployedContracts
     ) internal {
-        _timelock.setChainTypeManager(IChainTypeManager(_deployedContracts.stateTransition.chainTypeManagerProxy));
+        ValidatorTimelock timelock = ValidatorTimelock(_deployedContracts.stateTransition.validatorTimelock);
+        timelock.setChainTypeManager(IChainTypeManager(_deployedContracts.stateTransition.chainTypeManagerProxy));
 
         // Note, that the governance still has to accept it.
         // It will happen in a separate voting after the deployment is done.
-        _timelock.transferOwnership(_aliasedGovernanceAddress);
+        timelock.transferOwnership(_aliasedGovernanceAddress);
     }
 
     /// @notice Sets the previously deployed CTM inside the ServerNotifier

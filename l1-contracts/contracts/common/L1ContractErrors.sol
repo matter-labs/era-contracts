@@ -368,6 +368,9 @@ error EmptyPrecommitData(uint256 batchNumber);
 
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 
+error RoleAccessDenied(uint256 chainId, bytes32 role, address account);
+
+error DefaultAdminTransferNotAllowed();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

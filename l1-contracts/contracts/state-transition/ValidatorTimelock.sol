@@ -31,9 +31,10 @@ struct ValidatorRotationParams {
 /// contract.
 /// @dev ZKsync actively monitors the chain activity and reacts to any suspicious activity by freezing the chain.
 /// This allows time for investigation and mitigation before resuming normal operations.
-/// @dev The contract overloads all of the 4 methods, that are used in state transition. When the batch is committed,
+/// @dev The contract overloads all of the 5 methods, that are used in state transition. When the batch is committed,
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
+/// @dev Expected to be deployed as a TransparentUpgradeableProxy.
 contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlEnumerablePerChainUpgradeable {
     using LibMap for LibMap.Uint32Map;
 
@@ -61,19 +62,19 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
 
     /// @notice Optional admin role hash for managing COMMITTER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
-    bytes32 public constant OPTIONAL_COMMITTER_ADMIN_ROLE = keccak256("COMMITTER_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_COMMITTER_ADMIN_ROLE = keccak256("OPTIONAL_COMMITTER_MANAGER_ROLE");
 
     /// @notice Optional admin role hash for managing REVERTER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
-    bytes32 public constant OPTIONAL_REVERTER_ADMIN_ROLE = keccak256("REVERTER_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_REVERTER_ADMIN_ROLE = keccak256("OPTIONAL_REVERTER_MANAGER_ROLE");
 
     /// @notice Optional admin role hash for managing PROVER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
-    bytes32 public constant OPTIONAL_PROVER_ADMIN_ROLE = keccak256("PROVER_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_PROVER_ADMIN_ROLE = keccak256("OPTIONAL_PROVER_MANAGER_ROLE");
 
     /// @notice Optional admin role hash for managing EXECUTOR_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
-    bytes32 public constant OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("EXECUTOR_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("OPTIONAL_EXECUTOR_MANAGER_ROLE");
 
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
@@ -87,7 +88,16 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @dev The delay between committing and executing batches.
     uint32 public executionDelay;
 
-    constructor(address _initialOwner, uint32 _executionDelay) {
+    constructor() {
+        // Disable initialization to prevent Parity hack.
+        _disableInitializers();
+    }
+
+    /// @notice Initializer for the contract.
+    /// @dev Expected to be delegatecalled in the constructor of the TransparentUpgradeableProxy
+    /// @param _initialOwner The initial owner of the Validator timelock.
+    /// @param _executionDelay The initial execution delay, i.e. minimal time between a batch is comitted and executed.
+    function initialize(address _initialOwner, uint32 _executionDelay) external initializer {
         _transferOwnership(_initialOwner);
         executionDelay = _executionDelay;
     }

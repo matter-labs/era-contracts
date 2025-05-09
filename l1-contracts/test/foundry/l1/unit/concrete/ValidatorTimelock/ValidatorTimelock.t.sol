@@ -3,6 +3,8 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ValidatorTimelock, IExecutor} from "contracts/state-transition/ValidatorTimelock.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -46,7 +48,7 @@ contract ValidatorTimelockTest is Test {
         executionDelay = 10;
 
         chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(owner, zkSync);
-        validator = new ValidatorTimelock(owner, executionDelay);
+        validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
         vm.prank(owner);
         validator.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
         vm.prank(owner);
@@ -55,8 +57,20 @@ contract ValidatorTimelockTest is Test {
         validator.addValidator(eraChainId, dan);
     }
 
+    function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
+        ProxyAdmin admin = new ProxyAdmin();
+        ValidatorTimelock timelockImplementation = new ValidatorTimelock(); 
+        return address(
+            new TransparentUpgradeableProxy(
+                address(timelockImplementation),
+                address(admin),
+                abi.encodeCall(ValidatorTimelock.initialize, (_initialOwner, _initialExecutionDelay))
+            )
+        );
+    }
+
     function test_SuccessfulConstruction() public {
-        ValidatorTimelock validator = new ValidatorTimelock(owner, executionDelay);
+        ValidatorTimelock validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
 
         assertEq(validator.owner(), owner);
         assertEq(validator.executionDelay(), executionDelay);

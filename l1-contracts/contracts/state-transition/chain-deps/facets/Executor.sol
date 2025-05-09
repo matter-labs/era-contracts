@@ -300,8 +300,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _batchNumber,
         bytes calldata _precommitData
     ) external nonReentrant onlyValidator onlySettlementLayer {
-        if (_batchNumber != expected) {
-            revert InvalidBatchNumber(_batchNumber, expected);
+        uint256 expectedBatchNumber = s.totalBatchesCommitted + 1;
+        if (_batchNumber != expectedBatchNumber) {
+            revert InvalidBatchNumber(_batchNumber, expectedBatchNumber);
         }
         PrecommitInfo memory info = BatchDecoder.decodeAndCheckPrecommitData(_precommitData);
         if (info.txs.length == 0) {
@@ -318,7 +319,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         s.batchPrecommitments[_batchNumber] = currentPrecommitment;
 
-        emit BatchPrecommitmentSet(_batchNumber, rolling);
+        emit BatchPrecommitmentSet(_batchNumber, currentPrecommitment);
     }
 
     /// @inheritdoc IExecutor

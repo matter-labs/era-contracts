@@ -3,6 +3,8 @@ pragma solidity ^0.8.28;
 
 import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/structs/EnumerableSetUpgradeable.sol";
 
+import {RoleAccessDenied, DefaultAdminTransferNotAllowed} from "../common/L1ContractErrors.sol";
+
 /// @title Chain‑Aware Role‑Based Access Control with Enumeration
 /// @notice Similar to OpenZeppelin's `AccessControlEnumerable`, but keeps a completely separate
 ///         role registry per `chainId`. This is useful for cross‑chain applications where the
@@ -13,16 +15,6 @@ import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/u
 ///      takes a `_chainId` argument.
 abstract contract AccessControlEnumerablePerChainUpgradeable {
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
-
-    /// @dev Thrown when `account` is missing `role` for the given `chainId`.
-    /// @param chainId  The chain identifier the check was performed against.
-    /// @param role     The role that was required.
-    /// @param account  The offending account.
-    error RoleAccessDenied(uint256 chainId, bytes32 role, address account);
-
-    /// @dev Thrown when someone attempts to transfer or modify the `DEFAULT_ADMIN_ROLE`, since
-    /// `DEFAULT_ADMIN_ROLE` must always represent the exact chain admin of the chain.
-    error DefaultAdminTransferNotAllowed();
 
     /// @notice Emitted when `role` is granted to `account` for a specific `chainId`.
     /// @param chainId  The chain identifier on which the role is granted.
@@ -104,6 +96,7 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     /// @param _role    The role identifier.
     /// @param index    A zero‑based index (ordering is not guaranteed).
     /// @dev `index` must be a value between 0 and {getRoleMemberCount}, non-inclusive.
+    /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
     function getRoleMember(
         uint256 _chainId,
         bytes32 _role,
@@ -113,6 +106,7 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     }
 
     /// @notice Returns the number of accounts that have `_role` on `_chainId`.
+    /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
     function getRoleMemberCount(
         uint256 _chainId,
         bytes32 _role
