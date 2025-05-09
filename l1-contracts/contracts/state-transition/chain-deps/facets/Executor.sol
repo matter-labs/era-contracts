@@ -478,7 +478,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
             dependencyRootsRollingHash = keccak256(
                 // solhint-disable-next-line func-named-parameters
-                abi.encodePacked(dependencyRootsRollingHash, interopRoot.chainId, interopRoot.batchOrBlockNumber, interopRoot.sides)
+                abi.encodePacked(
+                    dependencyRootsRollingHash,
+                    interopRoot.chainId,
+                    interopRoot.batchOrBlockNumber,
+                    interopRoot.sides
+                )
             );
         }
     }
