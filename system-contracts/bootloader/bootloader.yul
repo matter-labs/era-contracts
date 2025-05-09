@@ -346,15 +346,17 @@ object "Bootloader" {
                 ret := mul(PRIORITY_TXS_L1_DATA_BEGIN_SLOT(), 32)
             }
 
-            /// @dev The byte from which storing of the priority txs L1 data begins.
+            /// @dev Number of reserved storage slots for the transaction status rolling‐hash field.
             function TXS_STATUS_ROLLING_HASH_RESERVED_SLOTS() -> ret {
                 ret := 1
             }
-
+            
+            /// @dev Storage slot index where the transaction status rolling‐hash begins.
             function TXS_STATUS_ROLLING_HASH_BEGIN_SLOT() -> ret {
                 ret := add(PRIORITY_TXS_L1_DATA_BEGIN_SLOT(), PRIORITY_TXS_L1_DATA_RESERVED_SLOTS())
             }
 
+            /// @dev Byte offset where the transaction status rolling‐hash begins.
             function TXS_STATUS_ROLLING_HASH_BEGIN_BYTE() -> ret {
                 ret := mul(TXS_STATUS_ROLLING_HASH_BEGIN_SLOT(), 32)
             }
@@ -2941,6 +2943,9 @@ object "Bootloader" {
                 }
             }
 
+            /// @notice Appends a transaction’s status to the rolling‐hash commitment in storage.
+            /// @param txHash The canonical L2 transaction hash to include.
+            /// @param status The boolean status of the transaction (1 = success, 0 = failure).
             function appendTransactionStatus(
                 txHash,
                 status

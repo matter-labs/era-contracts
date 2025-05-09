@@ -3,14 +3,18 @@
 pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-
 import {AccessControlEnumerablePerChainUpgradeable} from "./AccessControlEnumerablePerChainUpgradeable.sol";
-
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IChainTypeManager} from "./IChainTypeManager.sol";
 import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
 
+/// @notice Struct specifying which validator roles to grant or revoke in a single call.
+/// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
+/// @param rotateCommitterRole Whether to rotate the COMMITTER_ROLE.
+/// @param rotateReverterRole Whether to rotate the REVERTER_ROLE.
+/// @param rotateProverRole Whether to rotate the PROVER_ROLE.
+/// @param rotateExecutorRole Whether to rotate the EXECUTOR_ROLE.
 struct ValidatorRotationParams {
     bool rotatePrecommitterRole;
     bool rotateCommitterRole;
@@ -36,19 +40,39 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @dev Part of the IBase interface. Not used in this contract.
     string public constant override getName = "ValidatorTimelock";
 
+    /// @notice Role hash for addresses allowed to precommit batches on a chain.
     bytes32 public constant PRECOMMITTER_ROLE = keccak256("PRECOMMITTER_ROLE");
+
+    /// @notice Role hash for addresses allowed to commit batches on a chain.
     bytes32 public constant COMMITTER_ROLE = keccak256("COMMITTER_ROLE");
+
+    /// @notice Role hash for addresses allowed to revert batches on a chain.
     bytes32 public constant REVERTER_ROLE = keccak256("REVERTER_ROLE");
+
+    /// @notice Role hash for addresses allowed to prove batches on a chain.
     bytes32 public constant PROVER_ROLE = keccak256("PROVER_ROLE");
+
+    /// @notice Role hash for addresses allowed to execute batches on a chain.
     bytes32 public constant EXECUTOR_ROLE = keccak256("EXECUTOR_ROLE");
 
-    // Note, that the below admin roles are OPTIONAL, i.e. by default the corresponding admin 
-    // roles belong to the chain admin
-    // However, if one does want to set the admin rol
+    /// @notice Optional admin role hash for managing PRECOMMITTER_ROLE assignments.
+    /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     bytes32 public constant OPTIONAL_PRECOMMITTER_ADMIN_ROLE = keccak256("OPTIONAL_PRECOMMITTER_ADMIN_ROLE");
+
+    /// @notice Optional admin role hash for managing COMMITTER_ROLE assignments.
+    /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     bytes32 public constant OPTIONAL_COMMITTER_ADMIN_ROLE = keccak256("COMMITTER_MANAGER_ROLE");
+
+    /// @notice Optional admin role hash for managing REVERTER_ROLE assignments.
+    /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     bytes32 public constant OPTIONAL_REVERTER_ADMIN_ROLE = keccak256("REVERTER_MANAGER_ROLE");
+
+    /// @notice Optional admin role hash for managing PROVER_ROLE assignments.
+    /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     bytes32 public constant OPTIONAL_PROVER_ADMIN_ROLE = keccak256("PROVER_MANAGER_ROLE");
+
+    /// @notice Optional admin role hash for managing EXECUTOR_ROLE assignments.
+    /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     bytes32 public constant OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("EXECUTOR_MANAGER_ROLE");
 
     /// @notice The delay between committing and executing batches is changed.
@@ -95,8 +119,16 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         return committedBatchTimestamp[_chainId].get(_l2BatchNumber);
     }
 
-    // It is a helper method for validator management, all the access control is done inside the `revokeRole` function
-    function removeValidatorRoles(uint256 _chainId, address _validator, ValidatorRotationParams memory params) public {
+    /// @notice Revokes the specified validator roles for a given validator on the target chain.
+    /// @param _chainId The identifier of the L2 chain.
+    /// @param _validator The address of the validator to update.
+    /// @param params Flags indicating which roles to revoke.
+    /// @dev Note that the access control is managed by the inner `revokeRole` functions.
+    function removeValidatorRoles(
+        uint256 _chainId,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) public        {
         if (params.rotatePrecommitterRole) {
             revokeRole(_chainId, PRECOMMITTER_ROLE, _validator);
         }
@@ -114,7 +146,13 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         }
     }
 
-    function removeValidator(uint256 _chainId, address _validator) external {
+    /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
+    /// @param _chainId The identifier of the L2 chain.
+    /// @param _validator The address of the validator to remove.
+    function removeValidator(
+        uint256 _chainId,
+        address _validator
+    ) external {
         removeValidatorRoles(
             _chainId,
             _validator,
@@ -128,8 +166,15 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         ); 
     }
 
-    // It is a helper method for validator management, all the access control is done inside the `grantRole` function
-    function addValidatorRoles(uint256 _chainId, address _validator, ValidatorRotationParams memory params) public {
+    /// @notice Grants the specified validator roles for a given validator on the target chain.
+    /// @param _chainId The identifier of the L2 chain.
+    /// @param _validator The address of the validator to update.
+    /// @param params Flags indicating which roles to grant.
+    function addValidatorRoles(
+        uint256 _chainId,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) public {
         if (params.rotatePrecommitterRole) {
             grantRole(_chainId, PRECOMMITTER_ROLE, _validator);
         }
@@ -147,7 +192,13 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         }
     }
 
-    function addValidator(uint256 _chainId, address _validator) external {
+    /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
+    /// @param _chainId The identifier of the L2 chain.
+    /// @param _validator The address of the validator to add.
+    function addValidator(
+        uint256 _chainId,
+        address _validator
+    ) external {        
         addValidatorRoles(
             _chainId,
             _validator,
@@ -162,8 +213,9 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     }
 
 
+    /// @dev Make a call to the zkChain diamond contract with the same calldata.
     function precommitSharedBridge(
-        uint256 _chainId, 
+        uint256 _chainId,
         uint256,
         bytes calldata
     ) external onlyRole(_chainId, PRECOMMITTER_ROLE) {
@@ -268,6 +320,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         }
     }
 
+    /// @inheritdoc AccessControlEnumerablePerChainUpgradeable
     function _getChainAdmin(uint256 _chainId) internal view override returns (address) {
         return chainTypeManager.getChainAdmin(_chainId);
     }

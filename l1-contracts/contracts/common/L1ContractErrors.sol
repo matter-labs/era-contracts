@@ -362,6 +362,13 @@ error UnknownVerifierType();
 // 0x456f8f7a
 error EmptyProofLength();
 
+error InvalidBatchNumber(uint256 provided, uint256 expected);
+
+error EmptyPrecommitData(uint256 batchNumber);
+
+error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
+
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

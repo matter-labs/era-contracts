@@ -15,7 +15,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch} from "../../../common/L1ContractErrors.sol";
 import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -91,7 +91,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
             revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
         }
-        verifyBatchPrecommitment(_newBatch.batchNumber, logOutput.l2TxsStatusRollingHash);
+        _verifyBatchPrecommitment(_newBatch.batchNumber, logOutput.l2TxsStatusRollingHash);
 
         // Check the timestamp of the new batch
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
@@ -136,7 +136,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    function verifyBatchPrecommitment(
+    /// @notice Verifies that a stored precommitment for a given batch matches the expected rolling hash.
+    /// @param _batchNumber The batch number whose precommitment is being verified.
+    /// @param _expectedL2TxsStatusRollingHash The expected rolling hash of L2 transaction statuses for the batch.
+    function _verifyBatchPrecommitment(
         uint256 _batchNumber,
         bytes32 _expectedL2TxsStatusRollingHash
     ) internal view {
@@ -290,32 +293,32 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    /// @notice Precommits the status of all L2 transactions for the next batch on the shared bridge.
+    /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
+    /// @param _precommitData ABI‐encoded transaction status list for the precommit.
     function precommitSharedBridge(
         uint256 _batchNumber,
         bytes calldata _precommitData
     ) external nonReentrant onlyValidator onlySettlementLayer {
-        PrecommitInfo memory precommitInfo = BatchDecoder.decodeAndCheckPrecommitData(_precommitData);
-
-        if (_batchNumber != s.totalBatchesCommitted + 1) {
-            // todo; revert
+        if (_batchNumber != expected) {
+            revert InvalidBatchNumber(_batchNumber, expected);
         }
-
-        if (precommitInfo.txs.length == 0) {
-            // todo revert
+        PrecommitInfo memory info = BatchDecoder.decodeAndCheckPrecommitData(_precommitData);
+        if (info.txs.length == 0) {
+            revert EmptyPrecommitData(_batchNumber);
         }
 
         bytes32 currentPrecommitment = s.batchPrecommitments[_batchNumber];
 
-        for (uint256 i = 0; i < precommitInfo.txs.length; i++) {
+        for (uint256 i = 0; i < info.txs.length; i++) {
             // todo: can optimize via assembly
-            bytes32 txStatusCommitment = keccak256(abi.encode(precommitInfo.txs[i]));
-
+            bytes32 txStatusCommitment = keccak256(abi.encode(info.txs[i]));
             currentPrecommitment = keccak256(abi.encode(currentPrecommitment, txStatusCommitment));
         }
 
         s.batchPrecommitments[_batchNumber] = currentPrecommitment;
 
-        // todo: emit event that new precommitment has been set for this batch
+        emit BatchPrecommitmentSet(_batchNumber, rolling);
     }
 
     /// @inheritdoc IExecutor

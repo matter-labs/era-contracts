@@ -44,6 +44,11 @@ library BatchDecoder {
         }
     }
 
+    /// @notice Decodes and validates precommit data for a batch, ensuring the encoding version is supported.
+    /// @dev The first byte of `_precommitData` is interpreted as the encoding version and must equal `SUPPORTED_ENCODING_VERSION`.
+    ///      If it does, the remainder of the data is decoded into an `IExecutor.PrecommitInfo` struct. Otherwise, this call reverts.
+    /// @param _precommitData ABI-encoded bytes where the first byte is the encoding version, followed by the encoded `PrecommitInfo`.
+    /// @return precommitInfo The decoded `PrecommitInfo` containing transaction status commitments.
     function decodeAndCheckPrecommitData(
         bytes calldata _precommitData
     ) internal pure returns (IExecutor.PrecommitInfo memory precommitInfo) {
