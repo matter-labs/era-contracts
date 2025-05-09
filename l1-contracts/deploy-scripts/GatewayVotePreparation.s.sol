@@ -235,6 +235,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         output = GatewayCTMOutput({
             gatewayStateTransition: StateTransitionDeployedAddresses({
                 chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
+                chainTypeManagerProxyAdmin: expectedGatewayContracts.stateTransition.chainTypeManagerProxyAdmin,
                 chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                 verifier: expectedGatewayContracts.stateTransition.verifier,
                 verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
@@ -341,6 +342,11 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     }
 
     function saveOutput(Call[] memory governanceCallsToExecute, Call[] memory ecosystemAdminCallsToExecute) internal {
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "chain_type_manager_proxy_addr",
+            output.gatewayStateTransition.chainTypeManagerProxy
+        );
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_proxy_addr",
