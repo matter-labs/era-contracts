@@ -12,29 +12,29 @@ pragma solidity ^0.8.24;
  * @dev
  */
 contract DummyL2InteropRootStorage {
-    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 msgRoot)) public msgRoots;
-    mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
-    mapping(bytes32 msgRoot => uint256 chainId) public chainIdFromMsgRoot;
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 interopRoot)) public interopRoots;
+    mapping(bytes32 interopRoot => uint256 batchNumber) public batchNumberFrominteropRoot;
+    mapping(bytes32 interopRoot => uint256 chainId) public chainIdFrominteropRoot;
 
-    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] msgRootSides)) public msgRootSides;
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32[] interopRootSides)) public interopRootSides;
     uint256 public pendingMessageRootIdsLength;
     struct PendingMessageRootId {
         uint256 chainId;
         uint256 batchNumber;
     }
     mapping(uint256 index => PendingMessageRootId) public pendingMessageRootIds;
-    // mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
+    // mapping(bytes32 interopRoot => uint256 batchNumber) public batchNumberFrominteropRoot;
 
     event InteropRootAdded(uint256 indexed chainId, uint256 indexed batchNumber, bytes32[] sides);
 
     function addInteropRoot(uint256 chainId, uint256 batchNumber, bytes32[] memory sides) external {
         emit InteropRootAdded(chainId, batchNumber, sides);
         if (sides.length == 1) {
-            msgRoots[chainId][batchNumber] = sides[0];
-            batchNumberFromMsgRoot[sides[0]] = batchNumber;
-            chainIdFromMsgRoot[sides[0]] = chainId;
+            interopRoots[chainId][batchNumber] = sides[0];
+            batchNumberFrominteropRoot[sides[0]] = batchNumber;
+            chainIdFrominteropRoot[sides[0]] = chainId;
         } else {
-            // msgRootSides[chainId][batchNumber] = sides;
+            // interopRootSides[chainId][batchNumber] = sides;
             // pendingMessageRootIds[pendingMessageRootIdsLength] = PendingMessageRootId({
             //     chainId: chainId,
             //     batchNumber: batchNumber
@@ -44,8 +44,8 @@ contract DummyL2InteropRootStorage {
     }
 
     function addThisChainInteropRoot(uint256 batchNumber, bytes32[] memory sides) external {
-        msgRoots[block.chainid][batchNumber] = sides[0];
-        batchNumberFromMsgRoot[sides[0]] = batchNumber;
-        chainIdFromMsgRoot[sides[0]] = block.chainid;
+        interopRoots[block.chainid][batchNumber] = sides[0];
+        batchNumberFrominteropRoot[sides[0]] = batchNumber;
+        chainIdFrominteropRoot[sides[0]] = block.chainid;
     }
 }

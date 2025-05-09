@@ -15,7 +15,7 @@ error InteropRootAlreadyExists();
  */
 contract L2InteropRootStorage is SystemContractBase {
     /// @notice Mapping of chain ID to block or batch number to message root.
-    mapping(uint256 chainId => mapping(uint256 batchOrBlockNumber => bytes32 msgRoot)) public msgRoots;
+    mapping(uint256 chainId => mapping(uint256 batchOrBlockNumber => bytes32 interopRoot)) public interopRoots;
 
     /// @dev Adds a message root to the L2InteropRootStorage contract.
     /// @dev For both proof-based and commit-based interop, the `sides` parameter contains only the root.
@@ -26,7 +26,7 @@ contract L2InteropRootStorage is SystemContractBase {
     /// @param chainId The chain ID of the chain that the message root is for.
     /// @param batchOrBlockNumber The block or batch number of the message root. Either of block number or batch number will be used,
     // depends on finality form of interop, mentioned above.
-    /// @param sides The message root sides.
+    /// @param sides The message root sides. Note, that `sides` here are coming from `DynamicIncrementalMerkle` nomenclature.
     function addInteropRoot(
         uint256 chainId,
         uint256 batchOrBlockNumber,
@@ -37,13 +37,13 @@ contract L2InteropRootStorage is SystemContractBase {
             revert SidesLengthNotOne();
         }
 
-        // Make sure that msgRoots for specified chainId and batchOrBlockNumber wasn't set already.
-        if (msgRoots[chainId][batchOrBlockNumber] != bytes32(0)) {
+        // Make sure that interopRoots for specified chainId and batchOrBlockNumber wasn't set already.
+        if (interopRoots[chainId][batchOrBlockNumber] != bytes32(0)) {
             revert InteropRootAlreadyExists();
         }
 
-        // Set msgRoots for specified chainId and batchOrBlockNumber, emit event.
-        msgRoots[chainId][batchOrBlockNumber] = sides[0];
+        // Set interopRoots for specified chainId and batchOrBlockNumber, emit event.
+        interopRoots[chainId][batchOrBlockNumber] = sides[0];
 
         emit InteropRootAdded(chainId, batchOrBlockNumber, sides);
     }

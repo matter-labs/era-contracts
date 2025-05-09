@@ -301,12 +301,12 @@ object "Bootloader" {
                 ret := mul(add(MAX_TRANSACTIONS_IN_BATCH(), 1), TX_OPERATOR_L2_BLOCK_INFO_SLOT_SIZE())
             }
 
-            /// @dev The slot right after the last slot of the last processed block number.
+            /// @dev The slot containing the last processed block number.
             function LAST_PROCESSED_BLOCK_NUMBER_SLOT() -> ret {
                 ret := add(TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT(), TX_OPERATOR_L2_BLOCK_INFO_SLOTS())
             }
 
-            /// @dev The byte right after the last slot of the last processed block number.
+            /// @dev The byte starting from which the last processed block number is stored.
             function LAST_PROCESSED_BLOCK_NUMBER_BYTE() -> ret {
                 ret := mul(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 32)
             }
@@ -3181,8 +3181,8 @@ object "Bootloader" {
             /// @notice Sends the rolling hash of the dependency interop roots to the L1.
             function sendInteropRootRollingHashToL1() {
                 debugLog("Sending interop roots to L1", 0)
-                let msgRootSlot := INTEROP_ROOT_BEGIN_SLOT()
-                let msgRootSlotSize := INTEROP_ROOT_SLOT_SIZE() 
+                let interopRootSlot := INTEROP_ROOT_BEGIN_SLOT()
+                let interopRootSlotSize := INTEROP_ROOT_SLOT_SIZE() 
                 let rollingHashOfProcessedRoots := 0
                 for {let i := 0} true {i := add(i, 1)} {
                     let interopRootStartSlot := getInteropRootByte(i)
@@ -3202,10 +3202,10 @@ object "Bootloader" {
                         break
                     }
                     /// We have an offset so we can preload the rolling hash into it later for hashing.
-                    let msgRootOffset := 64 
-                    mstore(add(msgRootOffset, 4), chainId)
-                    mstore(add(msgRootOffset, 36), blockNumber)
-                    let sidesLoadingOffset := add(msgRootOffset, 68)
+                    let interopRootOffset := 64 
+                    mstore(add(interopRootOffset, 4), chainId)
+                    mstore(add(interopRootOffset, 36), blockNumber)
+                    let sidesLoadingOffset := add(interopRootOffset, 68)
                     let sidesOffset := add(interopRootStartSlot, INTEROP_ROOT_SIDES_OFFSET_START())
                     for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
                         debugLog("Hashing", mload(sidesOffset))

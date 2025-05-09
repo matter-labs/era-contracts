@@ -457,28 +457,28 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
 
         for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
-            InteropRoot memory msgRoot = _dependencyRoots[i];
+            InteropRoot memory interopRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
-            if (msgRoot.chainId == block.chainid) {
+            if (interopRoot.chainId == block.chainid) {
                 // For the same chain we verify using the MessageRoot contract
-                correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.batchOrBlockNumber));
-            } else if (msgRoot.chainId == L1_CHAIN_ID) {
+                correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.batchOrBlockNumber));
+            } else if (interopRoot.chainId == L1_CHAIN_ID) {
                 // this case can only happen on GW.
                 // L1 chain root is stored in the storage contract.
 
-                correctRootHash = L2_INTEROP_ROOT_STORAGE.msgRoots(
-                    uint256(msgRoot.chainId),
-                    uint256(msgRoot.batchOrBlockNumber)
+                correctRootHash = L2_INTEROP_ROOT_STORAGE.interopRoots(
+                    uint256(interopRoot.chainId),
+                    uint256(interopRoot.batchOrBlockNumber)
                 );
             } else {
                 revert CommitBasedInteropNotSupported();
             }
-            if (msgRoot.sides.length != 1 || msgRoot.sides[0] != correctRootHash) {
-                revert InvalidMessageRoot(correctRootHash, msgRoot.sides[0]);
+            if (interopRoot.sides.length != 1 || interopRoot.sides[0] != correctRootHash) {
+                revert InvalidMessageRoot(correctRootHash, interopRoot.sides[0]);
             }
             dependencyRootsRollingHash = keccak256(
                 // solhint-disable-next-line func-named-parameters
-                abi.encodePacked(dependencyRootsRollingHash, msgRoot.chainId, msgRoot.batchOrBlockNumber, msgRoot.sides)
+                abi.encodePacked(dependencyRootsRollingHash, interopRoot.chainId, interopRoot.batchOrBlockNumber, interopRoot.sides)
             );
         }
     }

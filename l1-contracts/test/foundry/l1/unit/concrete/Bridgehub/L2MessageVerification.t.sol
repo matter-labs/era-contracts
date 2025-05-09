@@ -52,7 +52,7 @@ contract MessageRootTest is Test {
         proof[3] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
-            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.msgRoots.selector),
+            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
             abi.encode(bytes32(0x46ab0a3240394cd4339c065011ad354c67d269d3c6e0f8ad7eb2eb4b8a3ffb49))
         );
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
@@ -110,7 +110,7 @@ contract MessageRootTest is Test {
 
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
-            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.msgRoots.selector),
+            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
             abi.encode(bytes32(0x9df9ccdcc86232686d57ea501eadb14888fd7c9fe1fd72a74c91208f11e864d5))
         );
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
@@ -169,7 +169,7 @@ contract MessageRootTest is Test {
         proof[25] = bytes32(0x666f22468f106684d5ba1fb17ff37ea4b72a05341328aa2f06a4e6361e1759bc);
         vm.mockCall(
             address(L2_INTEROP_ROOT_STORAGE),
-            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.msgRoots.selector),
+            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
             abi.encode(bytes32(0x99fdc93ca122f259319be992fcd55b51c2bb5a100efb780ce2677b779ee7fec3))
         );
         // --- Execution ---
