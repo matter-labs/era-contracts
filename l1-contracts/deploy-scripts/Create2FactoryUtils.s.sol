@@ -5,6 +5,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Utils} from "./Utils.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
+import {DeploymentNotifier} from "./DeploymentNotifier.sol";
 
 /// @title Create2FactoryUtils
 /// @notice This abstract contract encapsulates all Create2Factory processing logic,
@@ -165,7 +166,7 @@ abstract contract Create2FactoryUtils is Script {
         string memory contractName,
         bytes memory constructorParams
     ) internal {
-        notifyAboutDeployment(contractAddr, contractName, constructorParams, contractName);
+        DeploymentNotifier.notifyAboutDeployment(contractAddr, contractName, constructorParams, false);
     }
 
     /// @notice Notifies about a deployment by printing messages to the console.
@@ -180,41 +181,7 @@ abstract contract Create2FactoryUtils is Script {
         bytes memory constructorParams,
         string memory displayName
     ) internal {
-        string memory basicMessage = string.concat(displayName, " has been deployed at ", vm.toString(contractAddr));
-        console.log(basicMessage);
-
-        string memory deployedContractName = getDeployedContractName(contractName);
-        string memory forgeMessage;
-        if (constructorParams.length == 0) {
-            forgeMessage = string.concat(
-                "forge verify-contract ",
-                vm.toString(contractAddr),
-                " ",
-                deployedContractName
-            );
-        } else {
-            forgeMessage = string.concat(
-                "forge verify-contract ",
-                vm.toString(contractAddr),
-                " ",
-                deployedContractName,
-                " --constructor-args ",
-                vm.toString(constructorParams)
-            );
-        }
-        console.log(forgeMessage);
-    }
-
-    /// @notice Returns the deployed contract name.
-    /// This function can be modified if the deployed name should differ from the internal name.
-    /// @param contractName The internal name of the contract.
-    /// @return The name to be used for verification.
-    function getDeployedContractName(string memory contractName) internal view virtual returns (string memory) {
-        if (compareStrings(contractName, "BridgedTokenBeacon")) {
-            return "UpgradeableBeacon";
-        } else {
-            return contractName;
-        }
+        DeploymentNotifier.notifyAboutDeployment(contractAddr, contractName, constructorParams, displayName, false);
     }
 
     /// @notice Compares two strings for equality.

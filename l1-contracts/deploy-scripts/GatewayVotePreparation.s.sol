@@ -56,7 +56,7 @@ import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
 import {DeployL1Script} from "./DeployL1.s.sol";
 
-import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper, VerificationDeployedContracts, VerificationInfo} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -64,6 +64,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
+import {DeploymentNotifier} from "./DeploymentNotifier.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
@@ -90,6 +91,9 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
 
     address internal serverNotifier;
     address internal refundRecipient;
+
+    address internal gatewayCTMDeployer;
+    bytes internal gatewayCTMDeployerCreate2Data;
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
@@ -179,8 +183,20 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     }
 
     function deployGatewayCTM() internal {
-        (DeployedContracts memory expectedGatewayContracts, bytes memory create2Calldata, ) = GatewayCTMDeployerHelper
+        (VerificationDeployedContracts memory verificationInfo, bytes memory create2Calldata, VerificationInfo memory ctmDeployerVerificationInfo) = GatewayCTMDeployerHelper
             .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
+
+        gatewayCTMDeployer = ctmDeployerVerificationInfo.addr;
+        gatewayCTMDeployerCreate2Data = create2Calldata;
+
+        GatewayCTMDeployerHelper.notifyAboutDeployments(verificationInfo);
+        DeploymentNotifier.notifyAboutDeployment(
+            ctmDeployerVerificationInfo.addr,
+            ctmDeployerVerificationInfo.name,
+            ctmDeployerVerificationInfo.constructorParams,
+            true
+        );
+        DeployedContracts memory expectedGatewayContracts = GatewayCTMDeployerHelper.convertToDeployedContracts(verificationInfo);
 
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
 
@@ -196,7 +212,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 chainId: gatewayChainId,
                 bridgehubAddress: addresses.bridgehub.bridgehubProxy,
                 l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-                refundRecipient: msg.sender
+                refundRecipient: refundRecipient
             });
         }
 
@@ -209,7 +225,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             chainId: gatewayChainId,
             bridgehubAddress: addresses.bridgehub.bridgehubProxy,
             l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,
-            refundRecipient: msg.sender
+            refundRecipient: refundRecipient
         });
 
         _saveExpectedGatewayContractsToOutput(expectedGatewayContracts);
@@ -219,6 +235,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         output = GatewayCTMOutput({
             gatewayStateTransition: StateTransitionDeployedAddresses({
                 chainTypeManagerProxy: expectedGatewayContracts.stateTransition.chainTypeManagerProxy,
+                chainTypeManagerProxyAdmin: expectedGatewayContracts.stateTransition.chainTypeManagerProxyAdmin,
                 chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                 verifier: expectedGatewayContracts.stateTransition.verifier,
                 verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
@@ -332,6 +349,11 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         );
         vm.serializeAddress(
             "gateway_state_transition",
+            "chain_type_manager_proxy_addr",
+            output.gatewayStateTransition.chainTypeManagerProxy
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
             "chain_type_manager_implementation_addr",
             output.gatewayStateTransition.chainTypeManagerImplementation
         );
@@ -377,6 +399,15 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         vm.serializeAddress("root", "multicall3_addr", output.multicall3);
         vm.serializeAddress("root", "relayed_sl_da_validator", output.relayedSLDAValidator);
         vm.serializeAddress("root", "validium_da_validator", output.validiumDAValidator);
+        vm.serializeAddress("root", "rollup_da_manager", output.rollupDAManager);
+        vm.serializeAddress("root", "server_notifier", serverNotifier);
+        vm.serializeAddress("root", "gateway_server_notifier", output.gatewayStateTransition.serverNotifierProxy);
+        vm.serializeAddress("root", "old_rollup_l2_da_validator", oldRollupL2DAValidator);
+        vm.serializeAddress("root", "refund_recipient", refundRecipient);
+        
+        vm.serializeAddress("root", "gateway_ctm_deployer", gatewayCTMDeployer);
+        vm.serializeBytes("root", "gateway_ctm_deployer_create2_data", gatewayCTMDeployerCreate2Data);
+        
         vm.serializeBytes("root", "governance_calls_to_execute", abi.encode(governanceCallsToExecute));
         vm.serializeBytes("root", "ecosystem_admin_calls_to_execute", abi.encode(ecosystemAdminCallsToExecute));
 
