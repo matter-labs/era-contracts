@@ -419,6 +419,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode(addresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
+        // SYSCOIN
+        } else if (compareStrings(contractName, "BitcoinL1DAValidator")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
             return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
         } else if (compareStrings(contractName, "VerifierFflonk")) {
