@@ -4,6 +4,9 @@ pragma solidity 0.8.24;
 import {OperatorDAInputTooSmall, InvalidL2DAOutputHash} from "../L1StateTransitionErrors.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../chain-interfaces/IL1DAValidator.sol";
 
+error BitcoinDAPrecompileCallFailed();
+error BitcoinDAVerificationFailed();
+
 contract BitcoinL1DAValidator is IL1DAValidator {
     function checkDA(
         uint256, // _chainId
@@ -62,9 +65,13 @@ contract BitcoinL1DAValidator is IL1DAValidator {
         address BITCOINDA_PRECOMPILE_ADDRESS = address(0x63);
         uint16 BITCOINDA_PRECOMPILE_COST = 1400;
         (bool success, bytes memory result) = BITCOINDA_PRECOMPILE_ADDRESS.staticcall{gas: BITCOINDA_PRECOMPILE_COST}(abi.encode(_dataHash));
-        
-        require(success, "PoDA Staticcall failed.");
-        require(result.length > 0, "Return PoDA must not be empty.");
+
+        if (!success) {
+            revert BitcoinDAPrecompileCallFailed();
+        }
+        if (result.length == 0) { // Assuming empty result means not found or verification failed
+            revert BitcoinDAVerificationFailed();
+        }
         
     }
 }
