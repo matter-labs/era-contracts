@@ -712,6 +712,14 @@
     "evmDeployedBytecodeHash": null
   },
   {
+    "contractName": "l2-contracts/BitcoinL2DAValidator",
+    "zkBytecodeHash": "0x01000119254008b70a7a09f100eab05ebe5cd1153c052a4941db78109f0a4187",
+    "zkBytecodePath": "/l2-contracts/zkout/BitcoinL2DAValidator.sol/BitcoinL2DAValidator.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
     "contractName": "l1-contracts/AccessControlRestriction",
     "zkBytecodeHash": "0x0100028164ab08e507abe4d22fbd9b17b62e89f531175b86acf6273555699a6c",
     "zkBytecodePath": "/l1-contracts/zkout/AccessControlRestriction.sol/AccessControlRestriction.json",
@@ -1558,6 +1566,14 @@
     "evmDeployedBytecodeHash": "0xcf4f93386cc8ffcdb9d13795199baac811a668773285cec0607918904dd556e4",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
+  },
+  {
+    "contractName": "l1-contracts/BitcoinL1DAValidator",
+    "evmBytecodeHash": "0xae60ab121ed856019e7a955a6b0e5b7e1862bad02e583b76455dc72dd2db0b19",
+    "evmBytecodePath": "/l1-contracts/out/BitcoinL1DAValidator.sol/BitcoinL1DAValidator.json",
+    "evmDeployedBytecodeHash": "0x7e75a3d4c17a7533e2c9928aaaaf04f6cb78f4c20f7cdfad9a969e77f5a627c4",
+    "zkBytecodeHash": "0x01000067e296e74444e5f49b2fae0f8ea15a8da672fc3094feb6d1c32a869ec3",
+    "zkBytecodePath": "/l1-contracts/zkout/BitcoinL1DAValidator.sol/BitcoinL1DAValidator.json"
   },
   {
     "contractName": "da-contracts/AvailL1DAValidator",
