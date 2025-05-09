@@ -96,10 +96,10 @@ library MessageHashing {
     }
 
     /// @notice Hashes the proof.
-    /// @param _chainId The chain id.
+    /// @param _chainId The chain id of the L2 where the leaf comes from.
     /// @param _batchNumber The batch number.
     /// @param _leafProofMask The leaf proof mask.
-    /// @param _leaf The leaf.
+    /// @param _leaf The leaf to be proven.
     /// @param _proof The proof.
     /// @return result The proof verification result.
     function hashProof(

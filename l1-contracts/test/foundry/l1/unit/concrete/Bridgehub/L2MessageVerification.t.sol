@@ -11,7 +11,7 @@ import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {L2MessageVerification} from "contracts/bridgehub/L2MessageVerification.sol";
 import {L2Log, L2Message} from "contracts/common/Messaging.sol";
 // import {IL2MessageRootStorage} from "contracts/common/interfaces/IL2MessageRootStorage.sol";
-import {L2_MESSAGE_ROOT_STORAGE} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_ROOT_STORAGE} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -51,8 +51,8 @@ contract MessageRootTest is Test {
         proof[2] = bytes32(0x74ba85451a61e8c7007a0f940e1ae069b3769932fca68148f2842d5c7edd253e);
         proof[3] = bytes32(0xe4ed1ec13a28c40715db6399f6f99ce04e5f19d60ad3ff6831f098cb6cf75944);
         vm.mockCall(
-            address(L2_MESSAGE_ROOT_STORAGE),
-            abi.encodeWithSelector(L2_MESSAGE_ROOT_STORAGE.msgRoots.selector),
+            address(L2_INTEROP_ROOT_STORAGE),
+            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
             abi.encode(bytes32(0x46ab0a3240394cd4339c065011ad354c67d269d3c6e0f8ad7eb2eb4b8a3ffb49))
         );
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
@@ -109,8 +109,8 @@ contract MessageRootTest is Test {
         proof[26] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
 
         vm.mockCall(
-            address(L2_MESSAGE_ROOT_STORAGE),
-            abi.encodeWithSelector(L2_MESSAGE_ROOT_STORAGE.msgRoots.selector),
+            address(L2_INTEROP_ROOT_STORAGE),
+            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
             abi.encode(bytes32(0x9df9ccdcc86232686d57ea501eadb14888fd7c9fe1fd72a74c91208f11e864d5))
         );
         bool isIncluded = l2MessageVerification.proveL2LogInclusionShared(
@@ -168,8 +168,8 @@ contract MessageRootTest is Test {
         proof[24] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
         proof[25] = bytes32(0x666f22468f106684d5ba1fb17ff37ea4b72a05341328aa2f06a4e6361e1759bc);
         vm.mockCall(
-            address(L2_MESSAGE_ROOT_STORAGE),
-            abi.encodeWithSelector(L2_MESSAGE_ROOT_STORAGE.msgRoots.selector),
+            address(L2_INTEROP_ROOT_STORAGE),
+            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector),
             abi.encode(bytes32(0x99fdc93ca122f259319be992fcd55b51c2bb5a100efb780ce2677b779ee7fec3))
         );
         // --- Execution ---

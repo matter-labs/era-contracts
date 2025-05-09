@@ -11,7 +11,7 @@ import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {L2_MESSAGE_ROOT_STORAGE} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_ROOT_STORAGE} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
@@ -457,28 +457,33 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
 
         for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
-            InteropRoot memory msgRoot = _dependencyRoots[i];
+            InteropRoot memory interopRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
-            if (msgRoot.chainId == block.chainid) {
+            if (interopRoot.chainId == block.chainid) {
                 // For the same chain we verify using the MessageRoot contract
-                correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.blockOrBatchNumber));
-            } else if (msgRoot.chainId == L1_CHAIN_ID) {
+                correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
+            } else if (interopRoot.chainId == L1_CHAIN_ID) {
                 // this case can only happen on GW.
                 // L1 chain root is stored in the storage contract.
 
-                correctRootHash = L2_MESSAGE_ROOT_STORAGE.msgRoots(
-                    uint256(msgRoot.chainId),
-                    uint256(msgRoot.blockOrBatchNumber)
+                correctRootHash = L2_INTEROP_ROOT_STORAGE.interopRoots(
+                    uint256(interopRoot.chainId),
+                    uint256(interopRoot.blockOrBatchNumber)
                 );
             } else {
                 revert CommitBasedInteropNotSupported();
             }
-            if (msgRoot.sides.length != 1 || msgRoot.sides[0] != correctRootHash) {
-                revert InvalidMessageRoot(correctRootHash, msgRoot.sides[0]);
+            if (interopRoot.sides.length != 1 || interopRoot.sides[0] != correctRootHash) {
+                revert InvalidMessageRoot(correctRootHash, interopRoot.sides[0]);
             }
             dependencyRootsRollingHash = keccak256(
                 // solhint-disable-next-line func-named-parameters
-                abi.encodePacked(dependencyRootsRollingHash, msgRoot.chainId, msgRoot.blockOrBatchNumber, msgRoot.sides)
+                abi.encodePacked(
+                    dependencyRootsRollingHash,
+                    interopRoot.chainId,
+                    interopRoot.blockOrBatchNumber,
+                    interopRoot.sides
+                )
             );
         }
     }
