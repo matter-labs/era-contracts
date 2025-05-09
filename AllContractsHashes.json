@@ -1569,10 +1569,10 @@
   },
   {
     "contractName": "l1-contracts/BitcoinL1DAValidator",
-    "evmBytecodeHash": "0xae60ab121ed856019e7a955a6b0e5b7e1862bad02e583b76455dc72dd2db0b19",
+    "evmBytecodeHash": "0x571c6173d7a15c95e2d0682f731a835c0224fdf0930af4423e0905db0f7a21cd",
     "evmBytecodePath": "/l1-contracts/out/BitcoinL1DAValidator.sol/BitcoinL1DAValidator.json",
-    "evmDeployedBytecodeHash": "0x7e75a3d4c17a7533e2c9928aaaaf04f6cb78f4c20f7cdfad9a969e77f5a627c4",
-    "zkBytecodeHash": "0x01000067e296e74444e5f49b2fae0f8ea15a8da672fc3094feb6d1c32a869ec3",
+    "evmDeployedBytecodeHash": "0xc240537fafe1bc991b4c0426b19abf8b894cf1d89085cfa2bf98051b8abfa418",
+    "zkBytecodeHash": "0x010000673444acfeea801fa1d9d2297e7bda4bc28ea71f65dbcd0331bc8d5385",
     "zkBytecodePath": "/l1-contracts/zkout/BitcoinL1DAValidator.sol/BitcoinL1DAValidator.json"
   },
   {
