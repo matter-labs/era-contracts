@@ -62,9 +62,9 @@ contract BitcoinL1DAValidator is IL1DAValidator {
         address BITCOINDA_PRECOMPILE_ADDRESS = address(0x63);
         uint16 BITCOINDA_PRECOMPILE_COST = 1400;
         (bool success, bytes memory result) = BITCOINDA_PRECOMPILE_ADDRESS.staticcall{gas: BITCOINDA_PRECOMPILE_COST}(abi.encode(_dataHash));
-
-        require(success, "Bitcoin DA precompile call failed.");
-        require(result.length > 0, "Bitcoin DA precompile: Data not found or verification failed.");
+        
+        require(success, "PoDA Staticcall failed.");
+        require(result.length > 0, "Return PoDA must not be empty.");
         
     }
 }
