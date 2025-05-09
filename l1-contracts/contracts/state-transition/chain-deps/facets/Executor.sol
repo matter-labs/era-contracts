@@ -148,7 +148,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // We do not require the operator to always provide the precommitments as it is an optional feature.
         // However, if precommitments were provided, we do expect them to span over the entire batch
         if (storedPrecommitment != bytes32(0) && storedPrecommitment != _expectedL2TxsStatusRollingHash) {
-            // todo error with expected and found precommitments.
+            revert PrecommitmentMismatch(_batchNumber, _expectedL2TxsStatusRollingHash, storedPrecommitment);
         }
     }
 
@@ -311,7 +311,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         bytes32 currentPrecommitment = s.batchPrecommitments[_batchNumber];
 
-        for (uint256 i = 0; i < info.txs.length; i++) {
+        uint256 length = info.txs.length;
+        for (uint256 i = 0; i < length; ++i) {
             // todo: can optimize via assembly
             bytes32 txStatusCommitment = keccak256(abi.encode(info.txs[i]));
             currentPrecommitment = keccak256(abi.encode(currentPrecommitment, txStatusCommitment));
