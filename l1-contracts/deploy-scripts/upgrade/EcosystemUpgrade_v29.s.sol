@@ -86,14 +86,18 @@ import {DeployL1Script} from "../DeployL1.s.sol";
 
 import {DefaultEcosystemUpgrade} from "./DefaultEcosystemUpgrade.s.sol";
 
-
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
-    function _getL2UpgradeTargetAndData(IL2ContractDeployer.ForceDeployment[] memory _forceDeployments) internal override returns (address, bytes memory) {
-        return (address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR), abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments)));
+    function _getL2UpgradeTargetAndData(
+        IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
+    ) internal override returns (address, bytes memory) {
+        return (
+            address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
+            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments))
+        );
     }
     // add this to be excluded from coverage report
     function test() internal override {}

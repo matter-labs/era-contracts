@@ -201,7 +201,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
-        addresses.b
+        // addresses.b
 
         addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
@@ -316,8 +316,13 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         });
     }
 
-    function _getL2UpgradeTargetAndData(IL2ContractDeployer.ForceDeployment[] memory _forceDeployments) internal virtual returns (address, bytes memory) {
-        return (address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR), abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments)););
+    function _getL2UpgradeTargetAndData(
+        IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
+    ) internal virtual returns (address, bytes memory) {
+        return (
+            address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
+            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments))
+        );
     }
 
     function getNewProtocolVersion() public virtual returns (uint256) {
