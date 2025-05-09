@@ -49,6 +49,7 @@ const L2_CONTRACTS: { [key: string]: ContractDescription } = {
 async function verifyContract(contractInfo: ContractDescription) {
   const codeNameWithPath = `${contractInfo.path}:${contractInfo.codeName}`;
   console.log(`Verifying ${contractInfo.codeName} on ${contractInfo.address} address..`);
+  // It's safe to pass '0x' for constructor args here because all contracts in L2_CONTRACTS are either deployed without constructor arguments or have default constructors. If a contract had required constructor arguments, verification would fail and should be handled explicitly.
   await spawn(
     `forge verify-contract --zksync --chain ${CHAIN} --watch --verifier zksync --verifier-url ${VERIFICATION_URL} --constructor-args 0x ${contractInfo.address} ${codeNameWithPath}`
   );
