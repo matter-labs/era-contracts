@@ -22,11 +22,11 @@ contract BitcoinL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
         // Operator data, that is related to the DA itself
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external returns (bytes32 outputHash) {
-        (bytes32 uncompressedStateDiffHash, bytes calldata _totalPubdata, bytes calldata leftover) = _produceStateDiffPubdata(
-            _chainedMessagesHash,
-            _chainedBytecodesHash,
-            _totalL2ToL1PubdataAndStateDiffs
-        );
+        (
+            bytes32 uncompressedStateDiffHash,
+            bytes calldata _totalPubdata,
+            bytes calldata leftover
+        ) = _produceStateDiffPubdata(_chainedMessagesHash, _chainedBytecodesHash, _totalL2ToL1PubdataAndStateDiffs);
 
         /// Check for calldata strict format
         if (leftover.length != 0) {
@@ -37,11 +37,6 @@ contract BitcoinL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
         // - First 32 bytes are the hash of the uncompressed state diff.
         // - Then, there is a 32-byte hash of the DA.
 
-        outputHash = keccak256(
-            abi.encodePacked(
-                uncompressedStateDiffHash,
-                EfficientCall.keccak(_totalPubdata)
-            )
-        );
+        outputHash = keccak256(abi.encodePacked(uncompressedStateDiffHash, EfficientCall.keccak(_totalPubdata)));
     }
 }

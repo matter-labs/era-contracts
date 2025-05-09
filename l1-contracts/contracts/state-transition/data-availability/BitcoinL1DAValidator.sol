@@ -16,11 +16,11 @@ contract BitcoinL1DAValidator is IL1DAValidator {
         uint256 maxBlobsSupported
     ) external override returns (L1DAValidatorOutput memory output) {
         {
-            (
-               bytes32 uncompressedStateDiffHash,
-               bytes32 fullPubdataHash
-            ) = _processL2RollupDAValidatorOutputHash(_l2DAValidatorOutputHash, _operatorDAInput);
-            // circuit will commit to the uncompressed diff hash but we related the compressed to the uncompressed one via validatePubData and recomputed the hash to check here. 
+            (bytes32 uncompressedStateDiffHash, bytes32 fullPubdataHash) = _processL2RollupDAValidatorOutputHash(
+                _l2DAValidatorOutputHash,
+                _operatorDAInput
+            );
+            // circuit will commit to the uncompressed diff hash but we related the compressed to the uncompressed one via validatePubData and recomputed the hash to check here.
             output.stateDiffHash = uncompressedStateDiffHash;
             // fullPubdataHash should include user_logs, l2_to_l1_messages, published_bytecodes, compressed state_diffs
             _verifyBitcoinDA(fullPubdataHash);
@@ -33,14 +33,7 @@ contract BitcoinL1DAValidator is IL1DAValidator {
     function _processL2RollupDAValidatorOutputHash(
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput
-    )
-        internal
-        pure
-        returns (
-            bytes32 uncompressedStateDiffHash,
-            bytes32 fullPubdataHash
-        )
-    {
+    ) internal pure returns (bytes32 uncompressedStateDiffHash, bytes32 fullPubdataHash) {
         if (_operatorDAInput.length < 64) {
             revert OperatorDAInputTooSmall(_operatorDAInput.length, 64);
         }
@@ -59,19 +52,19 @@ contract BitcoinL1DAValidator is IL1DAValidator {
         return interfaceId == type(IL1DAValidator).interfaceId;
     }
 
-    function _verifyBitcoinDA(
-        bytes32 _dataHash
-    ) internal view {
+    function _verifyBitcoinDA(bytes32 _dataHash) internal view {
         address BITCOINDA_PRECOMPILE_ADDRESS = address(0x63);
         uint16 BITCOINDA_PRECOMPILE_COST = 1400;
-        (bool success, bytes memory result) = BITCOINDA_PRECOMPILE_ADDRESS.staticcall{gas: BITCOINDA_PRECOMPILE_COST}(abi.encode(_dataHash));
+        (bool success, bytes memory result) = BITCOINDA_PRECOMPILE_ADDRESS.staticcall{gas: BITCOINDA_PRECOMPILE_COST}(
+            abi.encode(_dataHash)
+        );
 
         if (!success) {
             revert BitcoinDAPrecompileCallFailed();
         }
-        if (result.length == 0) { // Assuming empty result means not found or verification failed
+        if (result.length == 0) {
+            // Assuming empty result means not found or verification failed
             revert BitcoinDAVerificationFailed();
         }
-        
     }
 }

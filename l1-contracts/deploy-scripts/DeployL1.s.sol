@@ -786,7 +786,7 @@ contract DeployL1Script is Script, DeployUtils {
             return Utils.readAvailL1DAValidatorBytecode();
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return Utils.readDummyAvailBridgeBytecode();
-        // SYSCOIN
+            // SYSCOIN
         } else if (compareStrings(contractName, "BitcoinL1DAValidator")) {
             return Utils.readBitcoinL1DAValidatorBytecode();
         } else if (compareStrings(contractName, "Verifier")) {

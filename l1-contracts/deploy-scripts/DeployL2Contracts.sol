@@ -178,7 +178,7 @@ contract DeployL2Script is Script {
             bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
         } else if (config.validatorType == DAValidatorType.Avail) {
             bytecode = L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode();
-        // SYSCOIN
+            // SYSCOIN
         } else if (config.validatorType == DAValidatorType.Bitcoin) {
             bytecode = L2ContractsBytecodesLib.readBitcoinL2DAValidatorBytecode();
         } else {
