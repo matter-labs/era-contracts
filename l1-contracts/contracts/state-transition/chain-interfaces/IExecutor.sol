@@ -32,7 +32,7 @@ struct LogProcessingOutput {
     bytes32 dependencyRootsRollingHash;
 }
 
-/// @dev Maximal value that SystemLogKey variable can be.
+/// @dev Maximal value that SystemLogKey variable can have.
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)

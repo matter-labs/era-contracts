@@ -387,17 +387,17 @@ object "Bootloader" {
                 ret := 32
             }
 
-			/// @dev Returns the byte offset of the dependency block number within an interop root entry.
+            /// @dev Returns the byte offset of the dependency block number within an interop root entry.
             function INTEROP_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET() -> ret {
                 ret := 64
             }
 
-			/// @dev Returns the byte offset of the side length within an interop root entry.
+            /// @dev Returns the byte offset of the side length within an interop root entry.
             function INTEROP_ROOT_SIDE_LENGTH_OFFSET() -> ret {
                 ret := 96
             }
             
-			/// @dev Returns the byte offset of the sides data within an interop root entry.
+            /// @dev Returns the byte offset of the sides data within an interop root entry.
             function INTEROP_ROOT_SIDES_OFFSET_START() -> ret {
                 ret := 128
             }
