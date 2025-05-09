@@ -1798,6 +1798,19 @@ export class Deployer {
     this.addresses.RollupL1DAValidator = rollupDAValidatorAddress;
     this.addresses.ValidiumL1DAValidator = validiumDAValidatorAddress;
     this.addresses.RelayedSLDAValidator = relayedSLDAValidator;
+
+    // SYSCOIN Deploy Bitcoin L1 DA Validator
+    const bitcoinL1DAValidatorAddress = await this.deployViaCreate2(
+      "BitcoinL1DAValidator",
+      [], // Constructor arguments
+      create2Salt,
+      ethTxOptions,
+      undefined // Libraries
+    );
+    if (this.verbose) {
+      console.log(`CONTRACTS_L1_BITCOIN_DA_VALIDATOR_ADDR=${bitcoinL1DAValidatorAddress}`);
+    }
+    this.addresses.BitcoinL1DAValidator = bitcoinL1DAValidatorAddress;
   }
 
   public async updateBlobVersionedHashRetrieverZkMode() {

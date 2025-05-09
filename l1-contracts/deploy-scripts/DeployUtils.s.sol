@@ -63,6 +63,8 @@ struct DataAvailabilityDeployedAddresses {
     address noDAValidiumL1DAValidator;
     address availBridge;
     address availL1DAValidator;
+    // SYSCOIN
+    address bitcoinL1DAValidator;
 }
 
 // solhint-disable-next-line gas-struct-packing

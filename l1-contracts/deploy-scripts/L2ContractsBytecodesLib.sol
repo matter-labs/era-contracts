@@ -87,6 +87,12 @@ library L2ContractsBytecodesLib {
     function readNoDAL2DAValidatorBytecode() internal view returns (bytes memory) {
         return Utils.readZKFoundryBytecodeL2("ValidiumL2DAValidator.sol", "ValidiumL2DAValidator");
     }
+    // SYSCOIN
+    /// @notice Reads the bytecode of the BitcoinL2DAValidator contract for Bitcoin DA.
+    /// @return The bytecode of the BitcoinL2DAValidator contract.
+    function readBitcoinL2DAValidatorBytecode() internal view returns (bytes memory) {
+        return Utils.readZKFoundryBytecodeL2("BitcoinL2DAValidator.sol", "BitcoinL2DAValidator");
+    }
 
     /// @notice Reads the bytecode of the ChainTypeManager contract.
     /// @return The bytecode of the ChainTypeManager contract.

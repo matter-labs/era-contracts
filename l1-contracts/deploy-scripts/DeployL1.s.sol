@@ -234,6 +234,15 @@ contract DeployL1Script is Script, DeployUtils {
                 hex""
             );
     }
+    // SYSCOIN
+    function getBitcoinL2ValidatorAddress() internal returns (address) {
+        return
+            Utils.getL2AddressViaCreate2Factory(
+                bytes32(0),
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBitcoinL2DAValidatorBytecode()),
+                hex""
+            );
+    }
 
     function deployVerifiers() internal {
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
@@ -263,9 +272,15 @@ contract DeployL1Script is Script, DeployUtils {
         } else {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
+
+        // SYSCOIN Deploy Bitcoin L1 DA Validator
+        addresses.daAddresses.bitcoinL1DAValidator = deploySimpleContract("BitcoinL1DAValidator");
+
         vm.startBroadcast(msg.sender);
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2ValidatorAddress(), true);
+        // SYSCOIN Add Bitcoin DA Pair
+        rollupDAManager.updateDAPair(addresses.daAddresses.bitcoinL1DAValidator, getBitcoinL2ValidatorAddress(), true);
         vm.stopBroadcast();
     }
 
@@ -566,6 +581,12 @@ contract DeployL1Script is Script, DeployUtils {
             "avail_l1_da_validator_addr",
             addresses.daAddresses.availL1DAValidator
         );
+        // SYSCOIN
+        vm.serializeAddress(
+            "deployed_addresses",
+            "bitcoin_l1_da_validator_addr",
+            addresses.daAddresses.bitcoinL1DAValidator
+        );
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
@@ -584,6 +605,8 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", getRollupL2ValidatorAddress());
         vm.serializeAddress("root", "expected_no_da_validium_l2_validator_addr", getNoDAValidiumL2ValidatorAddress());
         vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getAvailL2ValidatorAddress());
+        // SYSCOIN
+        vm.serializeAddress("root", "expected_bitcoin_l2_da_validator_addr", getBitcoinL2ValidatorAddress());
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
@@ -763,6 +786,9 @@ contract DeployL1Script is Script, DeployUtils {
             return Utils.readAvailL1DAValidatorBytecode();
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return Utils.readDummyAvailBridgeBytecode();
+        // SYSCOIN
+        } else if (compareStrings(contractName, "BitcoinL1DAValidator")) {
+            return Utils.readBitcoinL1DAValidatorBytecode();
         } else if (compareStrings(contractName, "Verifier")) {
             if (config.testnetVerifier) {
                 return type(TestnetVerifier).creationCode;
