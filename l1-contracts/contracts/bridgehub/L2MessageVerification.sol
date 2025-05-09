@@ -33,7 +33,7 @@ contract L2MessageVerification is MessageVerification {
         return
             this.proveL2LeafInclusionShared({
                 _chainId: proofVerificationResult.settlementLayerChainId,
-                _batchNumber: proofVerificationResult.settlementLayerBatchNumber, // SL block number
+                _batchOrBlockNumber: proofVerificationResult.settlementLayerBatchNumber, // SL block number
                 _leafProofMask: proofVerificationResult.settlementLayerBatchRootMask,
                 _leaf: proofVerificationResult.chainIdLeaf,
                 _proof: MessageHashing.extractSliceUntilEnd(_proof, proofVerificationResult.ptr)
