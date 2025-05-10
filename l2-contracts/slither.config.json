@@ -1,9 +1,8 @@
 {
   "filter_paths": "(contracts/dev-contracts|contracts/TestnetPaymaster.sol|lib|node_modules|src)",
   "detectors_to_exclude": "assembly,solc-version,low-level-calls,conformance-to-solidity-naming-conventions,incorrect-equality,uninitialized-local",
-  "exclude_dependencies": true,
+  "exclude_dependencies": false,
   "compile_force_framework": "foundry",
-  "compile_custom_build": "forge build --zksync --build-info",
   "exclude_medium": false,
   "exclude_high": false,
   "exclude_low": true,
