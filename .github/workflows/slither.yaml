@@ -67,5 +67,7 @@ jobs:
 
       - name: Run Slither for L2 contracts
         working-directory: ./l2-contracts
+        env:
+          FOUNDRY_PROFILE: slither
         run: |
           slither --config ./slither.config.json --skip-assembly .

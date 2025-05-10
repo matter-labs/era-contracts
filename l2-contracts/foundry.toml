@@ -25,3 +25,15 @@ fs_permissions = [
 [profile.default.zksync] 
 enable_eravm_extensions = true
 zksolc = "1.5.7"
+
+[profile.slither]
+# Inherit everything from the default profile but turn the IR pipeline off
+via_ir = false
+
+# Recompile system-contracts with IR so they don't hit the stack-depth limit.
+additional_compiler_profiles = [ { name = "ir", via_ir = true } ]
+
+compilation_restrictions = [
+  { paths = "lib/@matterlabs/**", via_ir = true },
+  { paths = "../system-contracts/**", via_ir = true }
+]
