@@ -26,7 +26,10 @@ describe("EvmPredeploysManager tests", function () {
 
     const service_caller_signer = await ethers.getSigner(SERVICE_CALL_PSEUDO_CALLER);
 
-    const contractDeployer = ContractDeployerFactory.connect(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, service_caller_signer);
+    const contractDeployer = ContractDeployerFactory.connect(
+      TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
+      service_caller_signer
+    );
     await contractDeployer.setAllowedBytecodeTypesToDeploy(1); // Allow EVM contracts to be deployed
 
     await network.provider.request({
