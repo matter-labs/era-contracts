@@ -131,15 +131,16 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
         deployDAValidators();
-        (addresses.stateTransition.validatorTimelock) = deploySimpleContract("ValidatorTimelock", false);
-
         (addresses.governance) = deploySimpleContract("Governance", false);
         (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
+
+        // FIXME: maybe store implementation address
+        (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
+
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
-
-        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
             "Bridgehub",
             false
@@ -933,6 +934,8 @@ contract DeployL1Script is Script, DeployUtils {
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
+        } else if (compareStrings(contractName, "ValidatorTimelock")) {
+            return abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay)));
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

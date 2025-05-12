@@ -655,6 +655,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _revertBatches(uint256 _newLastBatch) internal onlySettlementLayer {
+        // FIXME: handle precommitments in reverts
+
         if (s.totalBatchesCommitted <= _newLastBatch) {
             revert RevertedBatchNotAfterNewLastBatch();
         }
