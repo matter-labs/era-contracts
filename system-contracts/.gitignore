@@ -13,8 +13,3 @@ docs/
 
 # Dotenv file
 .env
-
-# Test files
-.cache/
-anvil-zksync.log
-bin/

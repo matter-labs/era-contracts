@@ -70,12 +70,6 @@ yarn test
 
 Please note that you need to rerun the test node every time you are running the tests because, in the current version, tests will be affected by the state after the previous run.
 
-To run the bootloader tests:
-
-```shell
-yarn sc test:bootloader
-```
-
 ### Testing infrastructure overview
 
 #### Address space
