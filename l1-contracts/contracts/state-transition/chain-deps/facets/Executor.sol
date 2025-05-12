@@ -320,7 +320,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         s.precommitmentForTheLatestBatch = currentPrecommitment;
 
-        emit BatchPrecommitmentSet(_batchNumber, currentPrecommitment);
+        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, currentPrecommitment);
     }
 
     /// @inheritdoc IExecutor

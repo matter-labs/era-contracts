@@ -115,8 +115,10 @@ interface IExecutor is IZKChainBase {
 
     /// @notice Container for a list of `TransactionStatusCommitment`s to precommit.
     /// @param txs Array of individual transaction status commitments for the batch.
+    /// @param untrustedLastMiniblockNumberHint The "hint" for what the last miniblock that these txs represent is.
     struct PrecommitInfo {
         TransactionStatusCommitment[] txs;
+        uint256 untrustedLastMiniblockNumberHint;
     }
 
     /// @notice Function called by the operator to commit new batches. It is responsible for:
@@ -199,6 +201,8 @@ interface IExecutor is IZKChainBase {
 
     /// @notice Emitted when a new precommitment is set for a batch.
     /// @param batchNumber The batch number for which the precommitment was recorded.
+    /// @param untrustedLastMiniblockHint The hint to what miniblock the precommitment should correspond to. Note, that there are no 
+    /// guarantees on its correctness, it is just a way for the server to make external nodes' indexing simpler.
     /// @param precommitment The resulting rolling hash of all transaction statuses.
-    event BatchPrecommitmentSet(uint256 indexed batchNumber, bytes32 precommitment);
+    event BatchPrecommitmentSet(uint256 indexed batchNumber, uint256 indexed untrustedLastMiniblockHint, bytes32 precommitment);
 }
