@@ -56,8 +56,10 @@ contract EvmPredeploysManager {
 
     // https://gist.github.com/Agusx1211/de05dabf918d448d315aa018e2572031
     address private constant UNIVERSAL_DEPLOYER = 0x1B926fBB24A9F78DCDd3272f2d86F5D0660E59c0;
-    bytes32 private constant UNIVERSAL_DEPLOYER_INPUT_HASH = 0x9723946f8683ec5fa08df6e3dcda1f58e270d9046d7802090cd8a78bf615850d;
-    bytes32 private constant UNIVERSAL_DEPLOYER_BYTECODE_HASH = 0x020000992c2947f596b268dba258e025e4ae12d2fa66a427d76758a224d34e7d;
+    bytes32 private constant UNIVERSAL_DEPLOYER_INPUT_HASH =
+        0x9723946f8683ec5fa08df6e3dcda1f58e270d9046d7802090cd8a78bf615850d;
+    bytes32 private constant UNIVERSAL_DEPLOYER_BYTECODE_HASH =
+        0x020000992c2947f596b268dba258e025e4ae12d2fa66a427d76758a224d34e7d;
 
     /// @notice The method used to deploy pre-defined contract at specified address
     /// @dev Can only use the date of the corresponding presigned deployment transaction as constructorInput
