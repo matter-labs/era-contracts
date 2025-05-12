@@ -1,11 +1,10 @@
-import { expect } from "chai";
-import { network } from "hardhat";
+import { ethers, network } from "hardhat";
 import type { EvmPredeploysManager } from "../typechain";
 import { EvmPredeploysManagerFactory, ContractDeployerFactory } from "../typechain";
 import {
   TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
   TEST_EVM_PREDEPLOYS_MANAGER,
-  TEST_FORCE_DEPLOYER_ADDRESS,
+  SERVICE_CALL_PSEUDO_CALLER,
 } from "./shared/constants";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 
@@ -22,23 +21,25 @@ describe("EvmPredeploysManager tests", function () {
 
     await network.provider.request({
       method: "hardhat_impersonateAccount",
-      params: [TEST_FORCE_DEPLOYER_ADDRESS],
+      params: [SERVICE_CALL_PSEUDO_CALLER],
     });
 
-    const contractDeployer = ContractDeployerFactory.connect(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, wallet);
-    contractDeployer.setAllowedBytecodeTypesToDeploy(1); // Allow EVM contracts to be deployed
+    const service_caller_signer = await ethers.getSigner(SERVICE_CALL_PSEUDO_CALLER);
+
+    const contractDeployer = ContractDeployerFactory.connect(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, service_caller_signer);
+    await contractDeployer.setAllowedBytecodeTypesToDeploy(1); // Allow EVM contracts to be deployed
 
     await network.provider.request({
       method: "hardhat_stopImpersonatingAccount",
-      params: [TEST_FORCE_DEPLOYER_ADDRESS],
+      params: [SERVICE_CALL_PSEUDO_CALLER],
     });
   });
 
   describe("deployPredeployedContract", function () {
     it("successfully deploys all predeployed contracts", async () => {
       for (const predeploy of PREDEPLOYS_DATA) {
-        await expect(evmPredeploysManager.deployPredeployedContract(predeploy.address, predeploy.input)).to.be.not
-          .rejected;
+        const tx = await evmPredeploysManager.deployPredeployedContract(predeploy.address, predeploy.input);
+        await tx.wait();
       }
     });
   });
