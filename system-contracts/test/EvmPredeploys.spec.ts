@@ -1,46 +1,69 @@
-import { ethers, network } from "hardhat";
+import { ethers } from "hardhat";
 import type { EvmPredeploysManager } from "../typechain";
-import { EvmPredeploysManagerFactory, ContractDeployerFactory } from "../typechain";
+import { EvmPredeploysManagerFactory, ContractDeployerFactory, AccountCodeStorageFactory } from "../typechain";
 import {
   TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
   TEST_EVM_PREDEPLOYS_MANAGER,
   SERVICE_CALL_PSEUDO_CALLER,
+  TEST_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
+  TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS,
+  TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS,
+  TEST_EVM_HASHES_STORAGE,
+  TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS,
+  TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS,
+  REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
+  REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
 } from "./shared/constants";
 import { deployContractOnAddress, getWallets } from "./shared/utils";
 
 describe("EvmPredeploysManager tests", function () {
   let evmPredeploysManager: EvmPredeploysManager;
 
+  const setDummyEvmVersionedHash = async (contractAddress) => {
+    const real_deployer_signer = await ethers.getImpersonatedSigner(REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
+
+    const accountCodeStorage = AccountCodeStorageFactory.connect(
+      REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
+      real_deployer_signer
+    );
+
+    await accountCodeStorage.storeAccountConstructingCodeHash(
+      contractAddress,
+      "0x0201000000000000000000000000000000000000000000000000000000000000"
+    );
+  };
+
   before(async () => {
     const wallet = getWallets()[0];
 
+    // Ugly, but this is required to execute force-deploy
     await deployContractOnAddress(TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS, "ContractDeployer");
     await deployContractOnAddress(TEST_EVM_PREDEPLOYS_MANAGER, "EvmPredeploysManager");
+    await deployContractOnAddress(TEST_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS, "AccountCodeStorage");
+    await deployContractOnAddress(TEST_KNOWN_CODE_STORAGE_CONTRACT_ADDRESS, "KnownCodesStorage");
+    await deployContractOnAddress(TEST_NONCE_HOLDER_SYSTEM_CONTRACT_ADDRESS, "NonceHolder");
+    await deployContractOnAddress(TEST_EVM_HASHES_STORAGE, "EvmHashesStorage");
+    await deployContractOnAddress(TEST_L1_MESSENGER_SYSTEM_CONTRACT_ADDRESS, "L1Messenger");
+    await deployContractOnAddress(TEST_SYSTEM_CONTEXT_CONTRACT_ADDRESS, "SystemContext");
 
     evmPredeploysManager = EvmPredeploysManagerFactory.connect(TEST_EVM_PREDEPLOYS_MANAGER, wallet);
 
-    await network.provider.request({
-      method: "hardhat_impersonateAccount",
-      params: [SERVICE_CALL_PSEUDO_CALLER],
-    });
-
-    const service_caller_signer = await ethers.getSigner(SERVICE_CALL_PSEUDO_CALLER);
+    const service_caller_signer = await ethers.getImpersonatedSigner(SERVICE_CALL_PSEUDO_CALLER);
 
     const contractDeployer = ContractDeployerFactory.connect(
       TEST_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
       service_caller_signer
     );
     await contractDeployer.setAllowedBytecodeTypesToDeploy(1); // Allow EVM contracts to be deployed
-
-    await network.provider.request({
-      method: "hardhat_stopImpersonatingAccount",
-      params: [SERVICE_CALL_PSEUDO_CALLER],
-    });
   });
 
   describe("deployPredeployedContract", function () {
     it("successfully deploys all predeployed contracts", async () => {
       for (const predeploy of PREDEPLOYS_DATA) {
+        // We need tpo do this trick to actually force VM to call EVM emulator for contract construction.
+        // This is required since we use test version of account code storage and VM checks only the real one
+        await setDummyEvmVersionedHash(predeploy.address);
+
         const tx = await evmPredeploysManager.deployPredeployedContract(predeploy.address, predeploy.input);
         await tx.wait();
       }
