@@ -31,3 +31,6 @@
 [submodule "lib/risc0-ethereum"]
 	path = lib/risc0-ethereum
 	url = https://github.com/risc0/risc0-ethereum
+[submodule "lib/@matterlabs/zksync-contracts"]
+	path = lib/@matterlabs/zksync-contracts
+	url = https://github.com/matter-labs/v2-testnet-contracts

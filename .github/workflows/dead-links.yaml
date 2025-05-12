@@ -1,0 +1,22 @@
+name: Check Dead Links in Markdown Files
+
+on: pull_request
+
+jobs:
+  check-dead-links:
+    name: Check Dead Links in Markdown Files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust and Lychee
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+          ~/.cargo/bin/cargo install lychee
+
+      - name: Find and check markdown files
+        run: |
+          GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          find . -type f -name "*.md" ! -path "*/node_modules/*" ! -path "*/openzeppelin*" ! -path "*/murky/*" -exec lychee --github-token $GITHUB_TOKEN {} +

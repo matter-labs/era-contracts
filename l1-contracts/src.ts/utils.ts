@@ -9,7 +9,8 @@ import * as path from "path";
 import { DiamondInitFactory } from "../typechain";
 import type { DiamondCut, FacetCut } from "./diamondCut";
 import { diamondCut } from "./diamondCut";
-import { SYSTEM_CONFIG } from "../scripts/utils";
+import { SYSTEM_CONFIG, web3Url } from "../scripts/utils";
+import { Wallet as ZkWallet, Provider } from "zksync-ethers";
 
 export const testConfigPath = process.env.ZKSYNC_ENV
   ? path.join(process.env.ZKSYNC_HOME as string, "etc/test_config/constant")
@@ -21,13 +22,33 @@ export const REQUIRED_L2_GAS_PRICE_PER_PUBDATA = require("../../SystemConfig.jso
 
 export const SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
+export const ETH_ADDRESS_IN_CONTRACTS = ADDRESS_ONE;
 export const L1_TO_L2_ALIAS_OFFSET = "0x1111000000000000000000000000000000001111";
+export const L2_BRIDGEHUB_ADDRESS = "0x0000000000000000000000000000000000010002";
+export const L2_ASSET_ROUTER_ADDRESS = "0x0000000000000000000000000000000000010003";
+export const L2_NATIVE_TOKEN_VAULT_ADDRESS = "0x0000000000000000000000000000000000010004";
+export const L2_MESSAGE_ROOT_ADDRESS = "0x0000000000000000000000000000000000010005";
+export const DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
 export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 const CREATE2_PREFIX = ethers.utils.solidityKeccak256(["string"], ["zksyncCreate2"]);
 
+export const priorityTxMaxGasLimit = getNumberFromEnv("CONTRACTS_PRIORITY_TX_MAX_GAS_LIMIT");
+
 const ADDRESS_MODULO = ethers.BigNumber.from(2).pow(160);
+export const STORED_BATCH_INFO_ABI_STRING =
+  "tuple(uint64 batchNumber, bytes32 batchHash, uint64 indexRepeatedStorageChanges, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 l2LogsTreeRoot, uint256 timestamp, bytes32 commitment)";
+export const COMMIT_BATCH_INFO_ABI_STRING =
+  "tuple(uint64 batchNumber, uint64 timestamp, uint64 indexRepeatedStorageChanges, bytes32 newStateRoot, uint256 numberOfLayer1Txs, bytes32 priorityOperationsHash, bytes32 bootloaderHeapInitialContentsHash, bytes32 eventsQueueStateHash, bytes systemLogs, bytes operatorDAInput)";
+export const PRIORITY_OPS_BATCH_INFO_ABI_STRING =
+  "tuple(bytes32[] leftPath, bytes32[] rightPath, bytes32[] itemHashes)";
 export const DIAMOND_CUT_DATA_ABI_STRING =
   "tuple(tuple(address facet, uint8 action, bool isFreezable, bytes4[] selectors)[] facetCuts, address initAddress, bytes initCalldata)";
+export const FORCE_DEPLOYMENT_ABI_STRING =
+  "tuple(bytes32 bytecodeHash, address newAddress, bool callConstructor, uint256 value, bytes input)[]";
+export const BRIDGEHUB_CTM_ASSET_DATA_ABI_STRING = "tuple(uint256 chainId, bytes ctmData, bytes chainData)";
+export const FIXED_FORCE_DEPLOYMENTS_DATA_ABI_STRING =
+  "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl)";
+export const ADDITIONAL_FORCE_DEPLOYMENTS_DATA_ABI_STRING = "tuple(bytes32 baseTokenAssetId, address l2Weth)";
 
 export function applyL1ToL2Alias(address: string): string {
   return ethers.utils.hexlify(ethers.BigNumber.from(address).add(L1_TO_L2_ALIAS_OFFSET).mod(ADDRESS_MODULO));
@@ -40,6 +61,10 @@ export function readBytecode(path: string, fileName: string) {
 export function readInterface(path: string, fileName: string) {
   const abi = JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" })).abi;
   return new ethers.utils.Interface(abi);
+}
+
+export function readContract(path: string, fileName: string) {
+  return JSON.parse(fs.readFileSync(`${path}/${fileName}.sol/${fileName}.json`, { encoding: "utf-8" }));
 }
 
 export function hashL2Bytecode(bytecode: ethers.BytesLike): Uint8Array {
@@ -92,6 +117,15 @@ export function computeL2Create2Address(
   return ethers.utils.hexDataSlice(data, 12);
 }
 
+export function encodeNTVAssetId(chainId: number, tokenAddress: BytesLike) {
+  return ethers.utils.keccak256(
+    ethers.utils.defaultAbiCoder.encode(
+      ["uint256", "address", "bytes32"],
+      [chainId, L2_NATIVE_TOKEN_VAULT_ADDRESS, ethers.utils.hexZeroPad(tokenAddress, 32)]
+    )
+  );
+}
+
 export function getAddressFromEnv(envName: string): string {
   const address = process.env[envName];
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
@@ -133,9 +167,9 @@ export interface FeeParams {
 export interface ProposedUpgrade {
   // The tx for the upgrade call to the l2 system upgrade contract
   l2ProtocolUpgradeTx: L2CanonicalTransaction;
-  factoryDeps: BytesLike[];
   bootloaderHash: BytesLike;
   defaultAccountHash: BytesLike;
+  evmEmulatorHash: BytesLike;
   verifier: string;
   verifierParams: VerifierParams;
   l1ContractsUpgradeCalldata: BytesLike;
@@ -179,6 +213,20 @@ export interface L2CanonicalTransaction {
   reservedDynamic: BytesLike;
 }
 
+export function ethersWalletToZkWallet(wallet: ethers.Wallet): ZkWallet {
+  return new ZkWallet(wallet.privateKey, new Provider(web3Url()));
+}
+
+export function isZKMode(): boolean {
+  return process.env.CONTRACTS_BASE_NETWORK_ZKSYNC === "true";
+}
+
+const LOCAL_NETWORKS = ["localhost", "hardhat", "localhostL2"];
+
+export function isCurrentNetworkLocal(): boolean {
+  return LOCAL_NETWORKS.includes(process.env.CHAIN_ETH_NETWORK);
+}
+
 // Checks that the initial cut hash params are valid.
 // Sometimes it makes sense to allow dummy values for testing purposes, but in production
 // these values should be set correctly.
@@ -187,6 +235,7 @@ function checkValidInitialCutHashParams(
   verifierParams: VerifierParams,
   l2BootloaderBytecodeHash: string,
   l2DefaultAccountBytecodeHash: string,
+  l2EvmEmulatorBytecodeHash: string,
   verifier: string,
   blobVersionedHashRetriever: string,
   priorityTxMaxGasLimit: number
@@ -215,6 +264,9 @@ function checkValidInitialCutHashParams(
   if (l2DefaultAccountBytecodeHash === ethers.constants.HashZero) {
     throw new Error("L2 default account bytecode hash is zero");
   }
+  if (l2EvmEmulatorBytecodeHash === ethers.constants.HashZero) {
+    throw new Error("L2 evm emulator bytecode hash is zero");
+  }
   if (verifier === ethers.constants.AddressZero) {
     throw new Error("Verifier address is zero");
   }
@@ -234,6 +286,7 @@ export function compileInitialCutHash(
   verifierParams: VerifierParams,
   l2BootloaderBytecodeHash: string,
   l2DefaultAccountBytecodeHash: string,
+  l2EvmEmulatorBytecodeHash: string,
   verifier: string,
   blobVersionedHashRetriever: string,
   priorityTxMaxGasLimit: number,
@@ -246,6 +299,7 @@ export function compileInitialCutHash(
       verifierParams,
       l2BootloaderBytecodeHash,
       l2DefaultAccountBytecodeHash,
+      l2EvmEmulatorBytecodeHash,
       verifier,
       blobVersionedHashRetriever,
       priorityTxMaxGasLimit
@@ -268,22 +322,33 @@ export function compileInitialCutHash(
     {
       chainId: "0x0000000000000000000000000000000000000000000000000000000000000001",
       bridgehub: "0x0000000000000000000000000000000000001234",
-      stateTransitionManager: "0x0000000000000000000000000000000000002234",
+      chainTypeManager: "0x0000000000000000000000000000000000002234",
       protocolVersion: "0x0000000000000000000000000000000000002234",
       admin: "0x0000000000000000000000000000000000003234",
       validatorTimelock: "0x0000000000000000000000000000000000004234",
-      baseToken: "0x0000000000000000000000000000000000004234",
-      baseTokenBridge: "0x0000000000000000000000000000000000004234",
+      baseTokenAssetId: "0x0000000000000000000000000000000000000000000000000000000000004234",
       storedBatchZero: "0x0000000000000000000000000000000000000000000000000000000000005432",
       verifier,
       verifierParams,
       l2BootloaderBytecodeHash,
       l2DefaultAccountBytecodeHash,
+      l2EvmEmulatorBytecodeHash,
       priorityTxMaxGasLimit,
       feeParams,
       blobVersionedHashRetriever,
     },
   ]);
 
-  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 9 * 32) * 2));
+  return diamondCut(facetCuts, diamondInit, "0x" + diamondInitCalldata.slice(2 + (4 + 8 * 32) * 2));
+}
+
+export enum PubdataSource {
+  Rollup,
+  Validium,
+}
+
+export interface ChainAdminCall {
+  target: string;
+  value: BigNumberish;
+  data: BytesLike;
 }

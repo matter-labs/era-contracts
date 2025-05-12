@@ -3,9 +3,9 @@
 pragma solidity 0.8.24;
 
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
-import {ZkSyncHyperchainBase} from "../../state-transition/chain-deps/facets/ZkSyncHyperchainBase.sol";
+import {ZKChainBase} from "../../state-transition/chain-deps/facets/ZKChainBase.sol";
 
-contract DiamondProxyTest is ZkSyncHyperchainBase {
+contract DiamondProxyTest is ZKChainBase {
     // add this to be excluded from coverage report
     function test() internal virtual {}
 

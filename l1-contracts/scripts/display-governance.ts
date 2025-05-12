@@ -1,4 +1,4 @@
-/// Temporary script that generated the needed calldata for the migration of the governance.
+/// Temporary script that helps to generate the needed calldata for the migration of the governance.
 
 // hardhat import should be the first import in the file
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -13,7 +13,7 @@ import { UpgradeableBeaconFactory } from "../../l2-contracts/typechain/Upgradeab
 import { Provider } from "zksync-ethers";
 
 const l2SharedBridgeABI = JSON.parse(
-  fs.readFileSync("../zksync/artifacts-zk/contracts/bridge/L2SharedBridge.sol/L2SharedBridge.json").toString()
+  fs.readFileSync("../zksync/artifacts-zk/contracts/bridge/L2AssetRouter.sol/L2SharedBridge.json").toString()
 ).abi;
 
 async function getERC20BeaconAddress(l2SharedBridgeAddress: string) {

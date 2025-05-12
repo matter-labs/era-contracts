@@ -127,22 +127,4 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         // solhint-disable-next-line func-named-parameters
         return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
     }
-
-    /// @dev This method has not been stabilized and might be
-    /// removed later on.
-    function name() external pure override returns (string memory) {
-        return "Ether";
-    }
-
-    /// @dev This method has not been stabilized and might be
-    /// removed later on.
-    function symbol() external pure override returns (string memory) {
-        return "ETH";
-    }
-
-    /// @dev This method has not been stabilized and might be
-    /// removed later on.
-    function decimals() external pure override returns (uint8) {
-        return 18;
-    }
 }
