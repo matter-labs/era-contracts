@@ -173,6 +173,12 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
         return delegatedEOAs[_addr];
     }
 
+    /// @notice Allows the bootloader to override bytecode hash of account.
+    /// TODO: can we avoid it and do it in bootloader? Having it as a public interface feels very unsafe.
+    function setRawCodeHash(address addr, bytes32 rawBytecodeHash) external onlyCallFromBootloader {
+        _storeCodeHash(addr, rawBytecodeHash);
+    }
+
     function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
         for (uint256 i = 0; i < authorizationList.length; i++) {
             // Per EIP7702 rules, if any check for the tuple item fails,
@@ -217,7 +223,7 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
             address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
 
             // ZKsync has native account abstraction, so we only allow delegation for EOAs.
-            if (this.getRawCodeHash(authority) != 0x00) {
+            if (this.getRawCodeHash(authority) != 0x00 && this.getAccountDelegation(authority) == address(0)) {
                 continue;
             }
 
@@ -234,11 +240,15 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
             if (item.addr == address(0)) {
                 // If the delegation address is 0, we need to remove the delegation.
                 delete delegatedEOAs[authority];
+                _storeCodeHash(authority, 0x00);
                 emit AccountDelegationRemoved(authority);
             } else {
                 // Otherwise, store the delegation.
                 // TODO: Do we need any security checks here, e.g. non-default code hash or non-system contract?
                 delegatedEOAs[authority] = item.addr;
+
+                bytes32 codeHash = getRawCodeHash(item.addr);
+                _storeCodeHash(authority, codeHash); // TODO: Do we need additional checks here?
                 emit AccountDelegated(authority, item.addr);
             }
         }

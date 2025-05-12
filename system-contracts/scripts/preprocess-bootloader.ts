@@ -69,6 +69,7 @@ const params = {
   RIGHT_PADDED_GET_ACCOUNT_VERSION_SELECTOR: getPaddedSelector("ContractDeployer", "extendedAccountVersion"),
   RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR: getPaddedSelector("AccountCodeStorage", "getRawCodeHash"),
   RIGHT_PADDED_GET_ACCOUNT_DELEGATION_SELECTOR: getPaddedSelector("AccountCodeStorage", "getAccountDelegation"),
+  RIGHT_PADDED_SET_RAW_CODE_HASH_SELECTOR: getPaddedSelector("AccountCodeStorage", "setRawCodeHash"),
   PROCESS_DELEGATIONS_SELECTOR: getSelector("AccountCodeStorage", "processDelegations"),
   PAY_FOR_TX_SELECTOR: getSelector("DefaultAccount", "payForTransaction"),
   PRE_PAYMASTER_SELECTOR: getSelector("DefaultAccount", "prepareForPaymaster"),

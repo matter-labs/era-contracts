@@ -694,6 +694,50 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
+            
+
+            /// @notice Overrides the "raw" code hash of the address. "Raw" means that it must use exactly the value
+            /// that is stored in the AccountCodeStorage system contract for that address, without applying any
+            /// additional transformations.
+            /// This method is very unsafe and it shouldn't be used to do long-term modifications.
+            /// Right now it's only used to override the bytecode hash of delegated accounts to perform
+            /// transaction validation & payment.
+            /// @param addr The address of the account to set the code hash of.
+            /// @param codeHash The code hash to be set.
+            /// @param assertSuccess Whether to revert the bootloader if the call to the AccountCodeStorage fails. If `false`, only
+            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failure is user providing not
+            /// enough gas.
+            function setRawCodeHash(addr, codeHash, assertSuccess) -> ret {
+                mstore(0, {{RIGHT_PADDED_SET_RAW_CODE_HASH_SELECTOR}})
+                mstore(4, addr)
+                mstore(36, codeHash)
+                let success := staticcall(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    36,
+                    0,
+                    32
+                )
+
+                // In case the call to the account code storage fails,
+                // it most likely means that the caller did not provide enough gas for
+                // the call.
+                // In case the caller is certain that the amount of gas provided is enough, i.e.
+                // (`assertSuccess` = true), then we should panic.
+                if iszero(success) {
+                    if assertSuccess {
+                        // The call must've succeeded, but it didn't. So we revert the bootloader.
+                        assertionError("getRawCodeHash failed")
+                    }
+
+                    // Most likely not enough gas provided, revert the current frame.
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
+
             /// @notice Returns the address of EIP-7702 delegation for the account (or zero, if account
             /// is not delegated).
             /// @param addr The address of the account to check.
@@ -2239,28 +2283,48 @@ object "Bootloader" {
                 }
             }
 
-            /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
+            /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it or it's a 7702-delegated account)
             /// @param addr The address to check
             function isEOA(addr) -> ret {
                 ret := 0
+                let delegation := getDelegationAddress(addr)
 
+                // TODO: This logic is duplicated in several places, we should create a dedicated method.
                 if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
-                    ret := iszero(getRawCodeHash(addr, false))
+                    ret := or(
+                        iszero(getRawCodeHash(addr, false)),
+                        gt(delegation, 0)
+                    )
                 }
             }
 
             /// @dev Calls the `payForTransaction` method of an account
             function accountPayForTx(account, txDataOffset) -> success {
+                let delegation := getDelegationAddress(account)
+                let rawCodeHash := 0
+                if gt(delegation, 0) {
+                    rawCodeHash := getRawCodeHash(delegation, true)
+                    setRawCodeHash(account, 0, true)
+                }
                 success := callAccountMethod({{PAY_FOR_TX_SELECTOR}}, account, txDataOffset)
+                if gt(delegation, 0) {
+                    setRawCodeHash(account, rawCodeHash, true)
+                }
             }
 
             /// @dev Calls the `prepareForPaymaster` method of an account
             function accountPrePaymaster(account, txDataOffset) -> success {
+                // TODO: should we allow delegated accounts to use native paymasters?
+                // TODO: Gut feeling is that the answer is "NO" as we're deprecating EIP-712 txs
+                // TOOD: and native accounts have their own entrypoint.
                 success := callAccountMethod({{PRE_PAYMASTER_SELECTOR}}, account, txDataOffset)
             }
 
             /// @dev Calls the `validateAndPayForPaymasterTransaction` method of a paymaster
             function validateAndPayForPaymasterTransaction(paymaster, txDataOffset) -> success {
+                // TODO: should we allow delegated accounts to use native paymasters?
+                // TODO: Gut feeling is that the answer is "NO" as we're deprecating EIP-712 txs
+                // TOOD: and native accounts have their own entrypoint.
                 success := callAccountMethod({{VALIDATE_AND_PAY_PAYMASTER}}, paymaster, txDataOffset)
             }
 
@@ -2501,7 +2565,21 @@ object "Bootloader" {
                 setHook(VM_HOOK_ACCOUNT_VALIDATION_ENTERED())
                 debugLog("pre-validate",0)
                 debugLog("pre-validate",from)
+
+                // Override bytecode hash for validation if required.
+                // TODO: It should be safe, since delegation is only allowed for EOAs in the first place.
+                let delegation := getDelegationAddress(from)
+                let rawCodeHash := 0
+                if gt(delegation, 0) {
+                    rawCodeHash := getRawCodeHash(delegation, true)
+                    setRawCodeHash(from, 0, true)
+                }
+
                 let success := callAccountMethod({{VALIDATE_TX_SELECTOR}}, from, txDataOffset)
+                
+                if gt(delegation, 0) {
+                    setRawCodeHash(from, rawCodeHash, true)
+                }
                 setHook(VM_HOOK_NO_VALIDATION_ENTERED())
 
                 if iszero(success) {
@@ -2645,7 +2723,7 @@ object "Bootloader" {
                         let innerTxDataOffset := add(txDataOffset, 32)
                         let calldataPtr := getDataPtr(innerTxDataOffset)
                         let value := getValue(innerTxDataOffset)
-                        ret := msgValueSimulatorMimicCall(delegation, from, value, calldataPtr)
+                        ret := msgValueSimulatorMimicCall(from, from, value, calldataPtr)
                     }                
 
                 if iszero(ret) {
