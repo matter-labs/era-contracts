@@ -113,12 +113,12 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
             revert DefaultAdminTransferNotAllowed();
         }
 
-        // Silent no‑op if the role was already granted (same semantics as OZ implementation).
         if (!hasRole(_chainId, _role, _account)) {
             _roles[_chainId][_role].members[_account] = true;
             _roleMembers[_chainId][_role].add(_account);
             emit RoleGranted(_chainId, _role, _account);
         }
+        // Silent no‑op if the role was already granted (same semantics as OZ implementation).
     }
 
     /// @notice Revokes `_role` on `_chainId` from `_account`.
@@ -171,12 +171,12 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
             revert DefaultAdminTransferNotAllowed();
         }
 
-        // Silent no‑op if the role was absent (same semantics as OZ implementation).
         if (hasRole(_chainId, _role, _account)) {
             _roles[_chainId][_role].members[_account] = false;
             _roleMembers[_chainId][_role].remove(_account);
             emit RoleRevoked(_chainId, _role, _account);
         }
+        // Silent no‑op if the role was absent (same semantics as OZ implementation).
     }
 
     /// @notice Returns the single holder of `DEFAULT_ADMIN_ROLE` on `_chainId`.

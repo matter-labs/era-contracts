@@ -62,19 +62,19 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
 
     /// @notice Optional admin role hash for managing COMMITTER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
-    bytes32 public constant OPTIONAL_COMMITTER_ADMIN_ROLE = keccak256("OPTIONAL_COMMITTER_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_COMMITTER_ADMIN_ROLE = keccak256("OPTIONAL_COMMITTER_ADMIN_ROLE");
 
     /// @notice Optional admin role hash for managing REVERTER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
-    bytes32 public constant OPTIONAL_REVERTER_ADMIN_ROLE = keccak256("OPTIONAL_REVERTER_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_REVERTER_ADMIN_ROLE = keccak256("OPTIONAL_REVERTER_ADMIN_ROLE");
 
     /// @notice Optional admin role hash for managing PROVER_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
-    bytes32 public constant OPTIONAL_PROVER_ADMIN_ROLE = keccak256("OPTIONAL_PROVER_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_PROVER_ADMIN_ROLE = keccak256("OPTIONAL_PROVER_ADMIN_ROLE");
 
     /// @notice Optional admin role hash for managing EXECUTOR_ROLE assignments.
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
-    bytes32 public constant OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("OPTIONAL_EXECUTOR_MANAGER_ROLE");
+    bytes32 public constant OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("OPTIONAL_EXECUTOR_ADMIN_ROLE");
 
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
@@ -96,7 +96,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @notice Initializer for the contract.
     /// @dev Expected to be delegatecalled in the constructor of the TransparentUpgradeableProxy
     /// @param _initialOwner The initial owner of the Validator timelock.
-    /// @param _executionDelay The initial execution delay, i.e. minimal time between a batch is comitted and executed.
+    /// @param _executionDelay The initial execution delay, i.e. minimal time between a batch is committed and executed.
     function initialize(address _initialOwner, uint32 _executionDelay) external initializer {
         _transferOwnership(_initialOwner);
         executionDelay = _executionDelay;

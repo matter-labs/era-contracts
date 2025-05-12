@@ -164,6 +164,8 @@ interface IExecutor is IZKChainBase {
     /// @notice Reverts unexecuted batches
     /// @param _chainId Chain ID of the chain
     /// @param _newLastBatch batch number after which batches should be reverted
+    /// @dev When the _newLastBatch is equal to the number of committed batches,
+    /// only the precommitment is erased.
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
     function revertBatchesSharedBridge(uint256 _chainId, uint256 _newLastBatch) external;

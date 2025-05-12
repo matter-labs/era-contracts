@@ -174,6 +174,7 @@ struct ZKChainStorage {
     /// @notice Bytecode hash of evm emulator.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
-    /// todo
-    mapping(uint256 batchNumber => bytes32 precommitemnt) batchPrecommitments;
+    /// @notice The precommitment for the latest uncommitted batch (i.e. totalBatchesCommitted + 1).
+    /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to zero.
+    bytes32 precommitmentForTheLatestBatch;
 }

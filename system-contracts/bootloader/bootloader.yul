@@ -3950,6 +3950,7 @@ object "Bootloader" {
                 ret := 3
             }
 
+            /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
             function txsStatusRollingHashKey() -> ret {
                 ret := 7
             }

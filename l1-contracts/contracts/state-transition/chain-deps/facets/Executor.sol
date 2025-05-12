@@ -91,7 +91,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
             revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
         }
-        _verifyBatchPrecommitment(_newBatch.batchNumber, logOutput.l2TxsStatusRollingHash);
+        _verifyAndResetBatchPrecommitment(_newBatch.batchNumber, logOutput.l2TxsStatusRollingHash);
 
         // Check the timestamp of the new batch
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
@@ -139,14 +139,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Verifies that a stored precommitment for a given batch matches the expected rolling hash.
     /// @param _batchNumber The batch number whose precommitment is being verified.
     /// @param _expectedL2TxsStatusRollingHash The expected rolling hash of L2 transaction statuses for the batch.
-    function _verifyBatchPrecommitment(uint256 _batchNumber, bytes32 _expectedL2TxsStatusRollingHash) internal view {
-        bytes32 storedPrecommitment = s.batchPrecommitments[_batchNumber];
+    function _verifyAndResetBatchPrecommitment(uint256 _batchNumber, bytes32 _expectedL2TxsStatusRollingHash) internal {
+        bytes32 storedPrecommitment = s.precommitmentForTheLatestBatch;
 
         // We do not require the operator to always provide the precommitments as it is an optional feature.
         // However, if precommitments were provided, we do expect them to span over the entire batch
         if (storedPrecommitment != bytes32(0) && storedPrecommitment != _expectedL2TxsStatusRollingHash) {
             revert PrecommitmentMismatch(_batchNumber, _expectedL2TxsStatusRollingHash, storedPrecommitment);
         }
+
+        // Reseting the stored precommitment.
+        delete s.precommitmentForTheLatestBatch;
     }
 
     /// @notice checks that the timestamps of both the new batch and the new L2 block are correct.
@@ -279,8 +282,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 7 logs: 2^8 - 1 = 255
-        // With the protocol upgrade we expect 8 logs: 2^9 - 1 = 511
+        // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
+        // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
             if (processedLogs != 255) {
                 revert MissingSystemLogs(255, processedLogs);
@@ -306,7 +309,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert EmptyPrecommitData(_batchNumber);
         }
 
-        bytes32 currentPrecommitment = s.batchPrecommitments[_batchNumber];
+        bytes32 currentPrecommitment = s.precommitmentForTheLatestBatch;
 
         uint256 length = info.txs.length;
         for (uint256 i = 0; i < length; ++i) {
@@ -315,7 +318,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             currentPrecommitment = keccak256(abi.encode(currentPrecommitment, txStatusCommitment));
         }
 
-        s.batchPrecommitments[_batchNumber] = currentPrecommitment;
+        s.precommitmentForTheLatestBatch = currentPrecommitment;
 
         emit BatchPrecommitmentSet(_batchNumber, currentPrecommitment);
     }
@@ -652,14 +655,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _revertBatches(uint256 _newLastBatch) internal onlySettlementLayer {
-        // FIXME: handle precommitments in reverts
-
-        if (s.totalBatchesCommitted <= _newLastBatch) {
+        if (s.totalBatchesCommitted < _newLastBatch) {
             revert RevertedBatchNotAfterNewLastBatch();
         }
         if (_newLastBatch < s.totalBatchesExecuted) {
             revert CantRevertExecutedBatch();
         }
+
+        delete s.precommitmentForTheLatestBatch;
 
         if (_newLastBatch < s.totalBatchesVerified) {
             s.totalBatchesVerified = _newLastBatch;
