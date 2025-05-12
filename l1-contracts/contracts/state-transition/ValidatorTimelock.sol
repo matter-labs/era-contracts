@@ -213,7 +213,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         uint256 _chainId,
         uint256,
         bytes calldata
-    ) external onlyRole(_chainId, PRECOMMITTER_ROLE) {
+    ) external onlyRoleForChainId(_chainId, PRECOMMITTER_ROLE) {
         _propagateToZKChain(_chainId);
     }
 
@@ -224,7 +224,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata
-    ) external onlyRole(_chainId, COMMITTER_ROLE) {
+    ) external onlyRoleForChainId(_chainId, COMMITTER_ROLE) {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
@@ -240,7 +240,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
-    function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyRole(_chainId, REVERTER_ROLE) {
+    function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyRoleForChainId(_chainId, REVERTER_ROLE) {
         _propagateToZKChain(_chainId);
     }
 
@@ -252,7 +252,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         uint256, // _processBatchFrom
         uint256, // _processBatchTo
         bytes calldata
-    ) external onlyRole(_chainId, PROVER_ROLE) {
+    ) external onlyRoleForChainId(_chainId, PROVER_ROLE) {
         _propagateToZKChain(_chainId);
     }
 
@@ -263,7 +263,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata
-    ) external onlyRole(_chainId, EXECUTOR_ROLE) {
+    ) external onlyRoleForChainId(_chainId, EXECUTOR_ROLE) {
         uint256 delay = executionDelay; // uint32
         unchecked {
             // We disable this check because calldata array length is cheap.

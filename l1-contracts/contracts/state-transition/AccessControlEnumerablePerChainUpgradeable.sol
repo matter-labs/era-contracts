@@ -1,188 +1,212 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.28;
 
-import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/utils/structs/EnumerableSetUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable-v4/proxy/utils/Initializable.sol";
+import {AccessControlEnumerableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/AccessControlEnumerableUpgradeable.sol";
 
 import {RoleAccessDenied, DefaultAdminTransferNotAllowed} from "../common/L1ContractErrors.sol";
 
-/// @title Chain‑Aware Role‑Based Access Control with Enumeration
-/// @notice Similar to OpenZeppelin's `AccessControlEnumerable`, but keeps a completely separate
-///         role registry per `chainId`. This is useful for cross‑chain applications where the
-///         same contract state is deployed on multiple networks and a distinct set of operators
-///         is required on each of them.
-/// @dev This contract purposefully does *not* inherit from OZ's `AccessControlUpgradeable` to
-///      avoid global (cross‑chain) role collisions. Instead, every public method explicitly
-///      takes a `_chainId` argument.
-abstract contract AccessControlEnumerablePerChainUpgradeable {
-    using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
+/// @title Chain‑Aware Role‑Based Access Control (Enumerable)
+/// @notice Drop‑in replacement for the previous `AccessControlEnumerablePerChainUpgradeable` implementation
+///         that *reuses* OpenZeppelin's `AccessControlEnumerableUpgradeable` under the hood while exposing
+///         exactly the same external interface (explicit `_chainId` argument everywhere).
+///
+///         A role *key* `R` scoped to a particular chain `C` is materialised as the derived role identifier
+///         `keccak256(abi.encodePacked(R, C))` — i.e. `keccak(R, C)`.  All calls into the OZ base contract use
+///         this derived identifier; callers continue to supply the original (un‑hashed) role keys.
+///
+///         As in the original design, the "default admin" for a chain is NOT stored in storage and cannot be
+///         transferred.  It must be provided by the inheriting contract via `_getChainAdmin()`.
+abstract contract AccessControlEnumerablePerChainUpgradeable is Initializable, AccessControlEnumerableUpgradeable {
+    /// ----------------------------
+    /// --------- Storage ----------
+    /// ----------------------------
 
-    /// @notice Emitted when `role` is granted to `account` for a specific `chainId`.
-    /// @param chainId  The chain identifier on which the role is granted.
-    /// @param role     The granted role identifier.
-    /// @param account  The account receiving the role.
-    event RoleGranted(uint256 indexed chainId, bytes32 indexed role, address indexed account);
+    /**
+     * @dev Mapping that records, **per chain**, what *role key* acts as admin for another role key.
+     *      We must keep it ourselves (rather than rely on OZ) so that we can return *un‑hashed* keys
+     *      from {getRoleAdmin}.  Internally we still register the *derived* (hashed) admin with OZ so
+     *      that the permissioning logic works.
+     *
+     *      `_adminRoleKeys[chainId][childRoleKey] = parentAdminRoleKey`  (raw keys, *not* hashed).
+     */
+    mapping(uint256 => mapping(bytes32 => bytes32)) private _adminRoleKeys;
 
-    /// @notice Emitted when `role` is revoked from `account` for a specific `chainId`.
-    /// @param chainId  The chain identifier on which the role is revoked.
-    /// @param role     The revoked role identifier.
-    /// @param account  The account losing the role.
-    event RoleRevoked(uint256 indexed chainId, bytes32 indexed role, address indexed account);
+    /// ----------------------------
+    /// ---------- Events ----------
+    /// ----------------------------
 
-    /// @notice Emitted when the admin role that controls `role` on `chainId` changes.
-    /// @param chainId            The chain identifier on which the admin role is changed.
-    /// @param role               The affected role.
-    /// @param previousAdminRole  The role that previously had admin privileges.
-    /// @param newAdminRole       The new admin role.
+    /// @notice Emitted when `roleKey` is granted to `account` for a specific `chainId`.
+    event RoleGranted(uint256 indexed chainId, bytes32 indexed roleKey, address indexed account);
+
+    /// @notice Emitted when `roleKey` is revoked from `account` for a specific `chainId`.
+    event RoleRevoked(uint256 indexed chainId, bytes32 indexed roleKey, address indexed account);
+
+    /// @notice Emitted when the **admin role key** that controls `roleKey` on `chainId` changes.
     event RoleAdminChanged(
         uint256 indexed chainId,
-        bytes32 indexed role,
-        bytes32 previousAdminRole,
-        bytes32 newAdminRole
+        bytes32 indexed roleKey,
+        bytes32 previousAdminRoleKey,
+        bytes32 newAdminRoleKey
     );
 
-    struct RoleData {
-        mapping(address => bool) members;
-        bytes32 adminRole; // 0x00 means DEFAULT_ADMIN_ROLE
+    /// ----------------------------
+    /// -------- Initializer -------
+    /// ----------------------------
+
+    constructor() {
+        _disableInitializers();
     }
 
-    /// @notice Mapping that stores roles for each chainId
-    mapping(uint256 chainId => mapping(bytes32 role => RoleData)) private _roles;
+    function __AccessControlEnumerablePerChain_init() internal onlyInitializing {
+        __AccessControlEnumerable_init();
+    }
 
-    /// @dev Mapping that stores EnumerableSet of members for each role for each chainId
-    mapping(uint256 chainId => mapping(bytes32 role => EnumerableSetUpgradeable.AddressSet)) private _roleMembers;
+    /// ----------------------------
+    /// ---------- Helpers ---------
+    /// ----------------------------
 
-    /// @notice The default admin role.
-    /// @notice For each chain, the default admin role at any point of time belongs to
-    /// and only to the chain admin of the chain, which should be obtained by the `_getChainAdmin` function.
-    bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
+    /// @dev Deterministically compute the **derived** role identifier for (`roleKey`, `chainId`).
+    function _roleForChain(bytes32 roleKey, uint256 chainId) internal pure returns (bytes32) {
+        if (roleKey == DEFAULT_ADMIN_ROLE) {
+            // keccak(DEFAULT_ADMIN_ROLE, C) is unnecessary – the default admin is handled specially.
+            return DEFAULT_ADMIN_ROLE;
+        }
+        return keccak256(abi.encodePacked(roleKey, chainId));
+    }
 
-    /// @notice Ensures that `msg.sender` possesses `_role` on `_chainId`.
-    /// @param _chainId The chain identifier.
-    /// @param _role    The required role.
-    modifier onlyRole(uint256 _chainId, bytes32 _role) {
-        _checkRole(_chainId, _role, msg.sender);
+    /// @dev Internal check that mirrors OpenZeppelin's `_checkRole` but is aware of `_chainId` and the
+    ///      implicit chain admin owner for `DEFAULT_ADMIN_ROLE`.
+    function _checkRole(uint256 chainId, bytes32 roleKey, address account) internal view {
+        if (!hasRole(chainId, roleKey, account)) {
+            revert RoleAccessDenied(chainId, roleKey, account);
+        }
+    }
+
+    /// ----------------------------
+    /// -------- Modifiers ---------
+    /// ----------------------------
+
+    /// @notice Ensures that `msg.sender` possesses `roleKey` on `chainId`.
+    modifier onlyRoleForChainId(uint256 chainId, bytes32 roleKey) {
+        _checkRole(chainId, roleKey, msg.sender);
         _;
     }
 
-    /// @notice Returns `true` if `_account` holds `_role` for `_chainId`.
-    /// @param _chainId The chain identifier.
-    /// @param _role    The role identifier.
-    /// @param _account The account to check.
-    function hasRole(uint256 _chainId, bytes32 _role, address _account) public view returns (bool) {
-        if (_role == DEFAULT_ADMIN_ROLE) {
-            return _account == _getChainAdmin(_chainId);
+    /// ----------------------------
+    /// ------- View Getters -------
+    /// ----------------------------
+
+    /// @notice Returns `true` iff `_account` has `roleKey` on `chainId`.
+    function hasRole(uint256 chainId, bytes32 roleKey, address account) public view returns (bool) {
+        if (roleKey == DEFAULT_ADMIN_ROLE) {
+            return account == _getChainAdmin(chainId);
         }
-        return _roles[_chainId][_role].members[_account];
+        return super.hasRole(_roleForChain(roleKey, chainId), account);
     }
 
-    /// @notice Returns the admin role that controls `_role` on `_chainId`.
-    /// @dev If no admin role was explicitly set, `DEFAULT_ADMIN_ROLE` is returned.
-    function getRoleAdmin(uint256 _chainId, bytes32 _role) public view returns (bytes32) {
-        if (_role == DEFAULT_ADMIN_ROLE) {
+    /// @notice Returns the *admin role key* (raw, **not** hashed) that controls `roleKey` on `chainId`.
+    function getRoleAdmin(uint256 chainId, bytes32 roleKey) public view returns (bytes32) {
+        if (roleKey == DEFAULT_ADMIN_ROLE) {
             return DEFAULT_ADMIN_ROLE;
         }
-        return _roles[_chainId][_role].adminRole;
+        bytes32 adminKey = _adminRoleKeys[chainId][roleKey];
+        return adminKey == bytes32(0) ? DEFAULT_ADMIN_ROLE : adminKey;
     }
 
-    /// @notice Returns one of the accounts that have `_role` on `_chainId`.
-    /// @param _chainId The chain identifier.
-    /// @param _role    The role identifier.
-    /// @param index    A zero‑based index (ordering is not guaranteed).
-    /// @dev `index` must be a value between 0 and {getRoleMemberCount}, non-inclusive.
-    /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
-    function getRoleMember(uint256 _chainId, bytes32 _role, uint256 index) public view returns (address) {
-        return _roleMembers[_chainId][_role].at(index);
+    /// @notice Returns one of the accounts that have `roleKey` on `chainId`.
+    function getRoleMember(
+        uint256 chainId,
+        bytes32 roleKey,
+        uint256 index
+    ) public view returns (address) {
+        return super.getRoleMember(_roleForChain(roleKey, chainId), index);
     }
 
-    /// @notice Returns the number of accounts that have `_role` on `_chainId`.
-    /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
-    function getRoleMemberCount(uint256 _chainId, bytes32 _role) public view returns (uint256) {
-        return _roleMembers[_chainId][_role].length();
+    /// @notice Returns the number of accounts that possess `roleKey` on `chainId`.
+    function getRoleMemberCount(uint256 chainId, bytes32 roleKey) public view returns (uint256) {
+        return super.getRoleMemberCount(_roleForChain(roleKey, chainId));
     }
 
-    /// @notice Grants `_role` on `_chainId` to `_account`.
-    /// @param _chainId The chain identifier.
-    /// @param _role    The role to grant.
-    /// @param _account The beneficiary account.
+    /// ----------------------------
+    /// ------ Role Operations ------
+    /// ----------------------------
+
+    /// @notice Grants `roleKey` on `chainId` to `account`.
     function grantRole(
-        uint256 _chainId,
-        bytes32 _role,
-        address _account
-    ) public onlyRole(_chainId, getRoleAdmin(_chainId, _role)) {
-        if (_role == DEFAULT_ADMIN_ROLE) {
-            revert DefaultAdminTransferNotAllowed();
-        }
+        uint256 chainId,
+        bytes32 roleKey,
+        address account
+    ) public onlyRoleForChainId(chainId, getRoleAdmin(chainId, roleKey)) {
+        if (roleKey == DEFAULT_ADMIN_ROLE) revert DefaultAdminTransferNotAllowed();
 
-        if (!hasRole(_chainId, _role, _account)) {
-            _roles[_chainId][_role].members[_account] = true;
-            _roleMembers[_chainId][_role].add(_account);
-            emit RoleGranted(_chainId, _role, _account);
+        if (!hasRole(chainId, roleKey, account)) {
+            _grantRole(_roleForChain(roleKey, chainId), account);
+            emit RoleGranted(chainId, roleKey, account);
         }
-        // Silent no‑op if the role was already granted (same semantics as OZ implementation).
+        // Silent no‑op if already held (mirrors OZ semantics).
     }
 
-    /// @notice Revokes `_role` on `_chainId` from `_account`.
-    /// @param _chainId The chain identifier.
-    /// @param _role    The role to revoke.
-    /// @param _account The target account.
+    /// @notice Revokes `roleKey` on `chainId` from `account`.
     function revokeRole(
-        uint256 _chainId,
-        bytes32 _role,
-        address _account
-    ) public onlyRole(_chainId, getRoleAdmin(_chainId, _role)) {
-        _revokeRole(_chainId, _role, _account);
+        uint256 chainId,
+        bytes32 roleKey,
+        address account
+    ) public onlyRoleForChainId(chainId, getRoleAdmin(chainId, roleKey)) {
+        _revokeRoleInternal(chainId, roleKey, account);
     }
 
-    /// @notice Renounces `_role` on `_chainId` for the calling account.
-    /// @param _chainId The chain identifier.
-    /// @param _role    The role to renounce.
-    function renounceRole(uint256 _chainId, bytes32 _role) public onlyRole(_chainId, _role) {
-        _revokeRole(_chainId, _role, msg.sender);
+    /// @notice Renounces `roleKey` on `chainId` for the calling account.
+    function renounceRole(uint256 chainId, bytes32 roleKey) public onlyRoleForChainId(chainId, roleKey) {
+        _revokeRoleInternal(chainId, roleKey, msg.sender);
     }
 
-    /// @notice Sets a new admin role for `_role` on `_chainId`.
-    /// @param _chainId The chain identifier.
-    /// @param _role    The role being configured.
-    /// @param _adminRole The role that will act as admin for `_role`.
+    /// @notice Sets a new *admin role key* for `roleKey` on `chainId`.
     function setRoleAdmin(
-        uint256 _chainId,
-        bytes32 _role,
-        bytes32 _adminRole
-    ) public onlyRole(_chainId, getRoleAdmin(_chainId, _role)) {
-        if (_role == DEFAULT_ADMIN_ROLE) {
-            revert DefaultAdminTransferNotAllowed();
-        }
+        uint256 chainId,
+        bytes32 roleKey,
+        bytes32 newAdminRoleKey
+    ) public onlyRoleForChainId(chainId, getRoleAdmin(chainId, roleKey)) {
+        if (roleKey == DEFAULT_ADMIN_ROLE) revert DefaultAdminTransferNotAllowed();
 
-        bytes32 previousAdmin = getRoleAdmin(_chainId, _role);
-        _roles[_chainId][_role].adminRole = _adminRole;
-        emit RoleAdminChanged(_chainId, _role, previousAdmin, _adminRole);
+        bytes32 previousAdminKey = getRoleAdmin(chainId, roleKey);
+        _adminRoleKeys[chainId][roleKey] = newAdminRoleKey;
+
+        // Reflect the change in the underlying OZ storage as well.
+        _setRoleAdmin(
+            _roleForChain(roleKey, chainId),
+            _roleForChain(newAdminRoleKey, chainId)
+        );
+
+        emit RoleAdminChanged(chainId, roleKey, previousAdminKey, newAdminRoleKey);
     }
 
-    /// @dev Reverts unless `_account` possesses `_role` on `_chainId`.
-    function _checkRole(uint256 _chainId, bytes32 _role, address _account) internal view {
-        if (!hasRole(_chainId, _role, _account)) {
-            revert RoleAccessDenied(_chainId, _role, _account);
+    /// ----------------------------
+    /// ------- Internal ops -------
+    /// ----------------------------
+
+    /// @dev Internal implementation of role revocation (no access checks).
+    function _revokeRoleInternal(uint256 chainId, bytes32 roleKey, address account) internal {
+        if (roleKey == DEFAULT_ADMIN_ROLE) revert DefaultAdminTransferNotAllowed();
+
+        if (hasRole(chainId, roleKey, account)) {
+            _revokeRole(_roleForChain(roleKey, chainId), account);
+            emit RoleRevoked(chainId, roleKey, account);
         }
+        // Silent no‑op if the role was absent (same semantics as OZ).
     }
 
-    /// @dev Internal implementation of role revocation. Does *not* perform access checks.
-    function _revokeRole(uint256 _chainId, bytes32 _role, address _account) internal {
-        if (_role == DEFAULT_ADMIN_ROLE) {
-            revert DefaultAdminTransferNotAllowed();
-        }
+    /// ----------------------------
+    /// ------ Chain Admin hook -----
+    /// ----------------------------
 
-        if (hasRole(_chainId, _role, _account)) {
-            _roles[_chainId][_role].members[_account] = false;
-            _roleMembers[_chainId][_role].remove(_account);
-            emit RoleRevoked(_chainId, _role, _account);
-        }
-        // Silent no‑op if the role was absent (same semantics as OZ implementation).
-    }
+    /// @notice Returns the *single holder* of `DEFAULT_ADMIN_ROLE` on `chainId`.
+    /// @dev Must be implemented by the inheriting contract.
+    function _getChainAdmin(uint256 chainId) internal view virtual returns (address);
 
-    /// @notice Returns the single holder of `DEFAULT_ADMIN_ROLE` on `_chainId`.
-    /// @dev Must be implemented by the inheriting contract (e.g. read from storage or a getter).
-    function _getChainAdmin(uint256 _chainId) internal view virtual returns (address);
+    /// ----------------------------
+    /// ---- Storage gap (EIP‑7201)
+    /// ----------------------------
 
-    /// @dev Reserved storage space to allow for layout changes in future upgrades.
-    uint256[48] private __gap;
+    uint256[45] private __gap; // 50 ‑ 5 (in OZ) = 45
 }
