@@ -134,11 +134,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to revoke.
     /// @dev Note that the access control is managed by the inner `revokeRole` functions.
-    function removeValidatorRoles(
-        uint256 _chainId,
-        address _validator,
-        ValidatorRotationParams memory params
-    ) public        {
+    function removeValidatorRoles(uint256 _chainId, address _validator, ValidatorRotationParams memory params) public {
         if (params.rotatePrecommitterRole) {
             revokeRole(_chainId, PRECOMMITTER_ROLE, _validator);
         }
@@ -159,10 +155,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
     /// @param _chainId The identifier of the L2 chain.
     /// @param _validator The address of the validator to remove.
-    function removeValidator(
-        uint256 _chainId,
-        address _validator
-    ) external {
+    function removeValidator(uint256 _chainId, address _validator) external {
         removeValidatorRoles(
             _chainId,
             _validator,
@@ -173,18 +166,14 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
                 rotateProverRole: true,
                 rotateExecutorRole: true
             })
-        ); 
+        );
     }
 
     /// @notice Grants the specified validator roles for a given validator on the target chain.
     /// @param _chainId The identifier of the L2 chain.
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to grant.
-    function addValidatorRoles(
-        uint256 _chainId,
-        address _validator,
-        ValidatorRotationParams memory params
-    ) public {
+    function addValidatorRoles(uint256 _chainId, address _validator, ValidatorRotationParams memory params) public {
         if (params.rotatePrecommitterRole) {
             grantRole(_chainId, PRECOMMITTER_ROLE, _validator);
         }
@@ -205,10 +194,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
     /// @param _chainId The identifier of the L2 chain.
     /// @param _validator The address of the validator to add.
-    function addValidator(
-        uint256 _chainId,
-        address _validator
-    ) external {        
+    function addValidator(uint256 _chainId, address _validator) external {
         addValidatorRoles(
             _chainId,
             _validator,
@@ -219,9 +205,8 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
                 rotateProverRole: true,
                 rotateExecutorRole: true
             })
-        ); 
+        );
     }
-
 
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     function precommitSharedBridge(

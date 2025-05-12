@@ -935,7 +935,11 @@ contract DeployL1Script is Script, DeployUtils {
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay)));
+            return
+                abi.encodeCall(
+                    ValidatorTimelock.initialize,
+                    (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
+                );
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

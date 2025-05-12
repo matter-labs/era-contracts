@@ -175,5 +175,5 @@ struct ZKChainStorage {
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
     /// todo
-    mapping (uint256 batchNumber => bytes32 precommitemnt) batchPrecommitments;
+    mapping(uint256 batchNumber => bytes32 precommitemnt) batchPrecommitments;
 }

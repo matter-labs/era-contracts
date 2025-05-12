@@ -68,11 +68,7 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     /// @param _chainId The chain identifier.
     /// @param _role    The role identifier.
     /// @param _account The account to check.
-    function hasRole(
-        uint256 _chainId,
-        bytes32 _role,
-        address _account
-    ) public view returns (bool) {
+    function hasRole(uint256 _chainId, bytes32 _role, address _account) public view returns (bool) {
         if (_role == DEFAULT_ADMIN_ROLE) {
             return _account == _getChainAdmin(_chainId);
         }
@@ -81,10 +77,7 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
 
     /// @notice Returns the admin role that controls `_role` on `_chainId`.
     /// @dev If no admin role was explicitly set, `DEFAULT_ADMIN_ROLE` is returned.
-    function getRoleAdmin(
-        uint256 _chainId,
-        bytes32 _role
-    ) public view returns (bytes32) {
+    function getRoleAdmin(uint256 _chainId, bytes32 _role) public view returns (bytes32) {
         if (_role == DEFAULT_ADMIN_ROLE) {
             return DEFAULT_ADMIN_ROLE;
         }
@@ -97,20 +90,13 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     /// @param index    A zero‑based index (ordering is not guaranteed).
     /// @dev `index` must be a value between 0 and {getRoleMemberCount}, non-inclusive.
     /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
-    function getRoleMember(
-        uint256 _chainId,
-        bytes32 _role,
-        uint256 index
-    ) public view returns (address) {
+    function getRoleMember(uint256 _chainId, bytes32 _role, uint256 index) public view returns (address) {
         return _roleMembers[_chainId][_role].at(index);
     }
 
     /// @notice Returns the number of accounts that have `_role` on `_chainId`.
     /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
-    function getRoleMemberCount(
-        uint256 _chainId,
-        bytes32 _role
-    ) public view returns (uint256) {
+    function getRoleMemberCount(uint256 _chainId, bytes32 _role) public view returns (uint256) {
         return _roleMembers[_chainId][_role].length();
     }
 
@@ -196,7 +182,6 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     /// @notice Returns the single holder of `DEFAULT_ADMIN_ROLE` on `_chainId`.
     /// @dev Must be implemented by the inheriting contract (e.g. read from storage or a getter).
     function _getChainAdmin(uint256 _chainId) internal view virtual returns (address);
-
 
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
     uint256[48] private __gap;

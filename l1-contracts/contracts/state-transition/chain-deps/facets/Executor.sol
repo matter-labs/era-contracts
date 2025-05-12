@@ -139,10 +139,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Verifies that a stored precommitment for a given batch matches the expected rolling hash.
     /// @param _batchNumber The batch number whose precommitment is being verified.
     /// @param _expectedL2TxsStatusRollingHash The expected rolling hash of L2 transaction statuses for the batch.
-    function _verifyBatchPrecommitment(
-        uint256 _batchNumber,
-        bytes32 _expectedL2TxsStatusRollingHash
-    ) internal view {
+    function _verifyBatchPrecommitment(uint256 _batchNumber, bytes32 _expectedL2TxsStatusRollingHash) internal view {
         bytes32 storedPrecommitment = s.batchPrecommitments[_batchNumber];
 
         // We do not require the operator to always provide the precommitments as it is an optional feature.

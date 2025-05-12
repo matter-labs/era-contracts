@@ -54,10 +54,7 @@ library BatchDecoder {
     ) internal pure returns (IExecutor.PrecommitInfo memory precommitInfo) {
         uint8 encodingVersion = uint8(_precommitData[0]);
         if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (precommitInfo) = abi.decode(
-                _precommitData[1:],
-                (IExecutor.PrecommitInfo)
-            );
+            (precommitInfo) = abi.decode(_precommitData[1:], (IExecutor.PrecommitInfo));
         } else {
             revert UnsupportedCommitBatchEncoding(encodingVersion);
         }

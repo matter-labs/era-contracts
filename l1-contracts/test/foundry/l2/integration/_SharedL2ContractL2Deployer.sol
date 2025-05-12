@@ -62,10 +62,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             new TransparentUpgradeableProxy(
                 address(new ValidatorTimelock()),
                 addresses.transparentProxyAdmin,
-                abi.encodeCall(
-                    ValidatorTimelock.initialize,
-                    (config.deployerAddress, executionDelay)
-                )
+                abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, executionDelay))
             )
         );
         addresses.stateTransition.executorFacet = address(new ExecutorFacet(config.l1ChainId));

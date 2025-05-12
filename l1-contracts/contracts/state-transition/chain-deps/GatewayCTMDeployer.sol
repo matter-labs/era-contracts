@@ -186,7 +186,7 @@ contract GatewayCTMDeployer {
             _deployedContracts: contracts
         });
         _deployVerifier(salt, _config.testnetVerifier, contracts);
-        
+
         _deployValidatorTimelock(salt, contracts);
 
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
@@ -260,10 +260,7 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
-    function _deployValidatorTimelock(
-        bytes32 _salt,
-        DeployedContracts memory _deployedContracts
-    ) internal {
+    function _deployValidatorTimelock(bytes32 _salt, DeployedContracts memory _deployedContracts) internal {
         address timelockImplementation = address(new ValidatorTimelock{salt: _salt}());
         _deployedContracts.stateTransition.validatorTimelockImplementation = timelockImplementation;
         _deployedContracts.stateTransition.validatorTimelock = address(
@@ -275,7 +272,7 @@ contract GatewayCTMDeployer {
                 abi.encodeCall(ValidatorTimelock.initialize, (address(this), 0))
             )
         );
-    }   
+    }
 
     /// @notice Deploys a ServerNotifier contract.
     /// @param _salt Salt used for CREATE2 deployments.
