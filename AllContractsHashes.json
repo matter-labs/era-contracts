@@ -153,7 +153,7 @@
   },
   {
     "contractName": "system-contracts/EvmPredeploysManager",
-    "zkBytecodeHash": "0x010000f514a0337dca3e8c257d2276a08bc638b258f57590b4ed44405ea0e1dc",
+    "zkBytecodeHash": "0x010000fb91e928c2db260987b347bb85ba0d29a24467b7dc1d1f4dd4628a6117",
     "zkBytecodePath": "/system-contracts/zkout/EvmPredeploysManager.sol/EvmPredeploysManager.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
