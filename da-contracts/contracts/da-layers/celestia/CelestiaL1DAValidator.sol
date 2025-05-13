@@ -6,11 +6,8 @@ import {ISP1Verifier} from "./ISP1Verifier.sol";
 import {CelestiaZKStackInput} from "./types.sol";
 
 contract CelestiaL1DAValidator is IL1DAValidator {
-    // 0x08753982
     error InvalidProof();
-    // 0x4c53cffa
     error OperatorDAHashMismatch(bytes32 expected, bytes32 actual);
-    // 0x2c5211c6
     error DataRootMismatch(bytes32 expected, bytes32 actual);
 
     address public immutable SP1_GROTH_16_VERIFIER;
