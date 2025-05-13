@@ -23,7 +23,7 @@ const PATH_TO_PREDEPLOYS_DATA = "../scripts/evm-predeploys-data";
 describe("EvmPredeploysManager tests", function () {
   let evmPredeploysManager: EvmPredeploysManager;
 
-  const setDummyEvmVersionedHash = async (contractAddress) => {
+  const setDummyEvmVersionedHash = async (contractAddress: string) => {
     const real_deployer_signer = await ethers.getImpersonatedSigner(REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS);
 
     const accountCodeStorage = AccountCodeStorageFactory.connect(
