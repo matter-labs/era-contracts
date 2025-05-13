@@ -93,6 +93,7 @@ struct Config {
     address deployerAddress;
     uint256 eraChainId;
     address ownerAddress;
+    address adminAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
     ContractsConfig contracts;

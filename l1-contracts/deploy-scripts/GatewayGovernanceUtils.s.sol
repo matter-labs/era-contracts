@@ -93,7 +93,7 @@ abstract contract GatewayGovernanceUtils is Script {
         address _gatewayRollupDAManager,
         address _gatewayValidatorTimelock,
         address _gatewayServerNotifier,
-        address _gatewayChainAdmin,
+        address _ecosystemAdmin,
         address _refundRecipient
     ) internal view returns (Call[] memory calls) {
         calls = _getRegisterSettlementLayerCalls();
@@ -120,7 +120,7 @@ abstract contract GatewayGovernanceUtils is Script {
 
         // Setting the address of the L1 ChainTypeManager amdin as the GW ChainTypeManager admin.
         {
-            bytes memory data = abi.encodeCall(IChainTypeManager.setPendingAdmin, (_gatewayChainAdmin));
+            bytes memory data = abi.encodeCall(IChainTypeManager.setPendingAdmin, (_ecosystemAdmin));
 
             calls = Utils.mergeCalls(
                 calls,
