@@ -21,7 +21,12 @@ fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/contracts-preprocessed" }
 ]
+optimizer = true
+optimizer_runs = 100
 
 [profile.default.zksync] 
 enable_eravm_extensions = true
 zksolc = "1.5.7"
+optimizer = true
+optimizer_runs = 100
+
