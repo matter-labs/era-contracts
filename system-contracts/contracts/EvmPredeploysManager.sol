@@ -63,10 +63,8 @@ contract EvmPredeploysManager {
 
     // https://github.com/pcaversaccio/createx
     address private constant CREATEX = 0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed;
-    bytes32 private constant CREATEX_INPUT_HASH =
-        0x12ec861579b63a3ab9db3b5a23c57d56402ad3061475b088f17054e2f2daf22f;
-    bytes32 private constant CREATEX_BYTECODE_HASH =
-        0x02002e3ece4eb1376472ed3f5a29e6b29eb1bc9543121ae960336f76dbaf3c79;
+    bytes32 private constant CREATEX_INPUT_HASH = 0x12ec861579b63a3ab9db3b5a23c57d56402ad3061475b088f17054e2f2daf22f;
+    bytes32 private constant CREATEX_BYTECODE_HASH = 0x02002e3ece4eb1376472ed3f5a29e6b29eb1bc9543121ae960336f76dbaf3c79;
 
     /// @notice The method used to deploy pre-defined contract at specified address
     /// @dev Can only use the date of the corresponding presigned deployment transaction as constructorInput
