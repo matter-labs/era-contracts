@@ -151,7 +151,9 @@ contract GatewayCTMDeployerTest is Test {
             VerificationInfo memory ctmDeployer
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), deployerConfig);
 
-        DeployedContracts memory calculatedDeployedContracts = GatewayCTMDeployerHelper.convertToDeployedContracts(verificationInfo);
+        DeployedContracts memory calculatedDeployedContracts = GatewayCTMDeployerHelper.convertToDeployedContracts(
+            verificationInfo
+        );
 
         GatewayCTMDeployerTester tester = new GatewayCTMDeployerTester();
         (DeployedContracts memory deployedContracts, address correctCTMDeployerAddress) = tester.deployCTMDeployer(

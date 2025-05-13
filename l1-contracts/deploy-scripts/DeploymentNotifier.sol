@@ -29,11 +29,7 @@ library DeploymentNotifier {
         bool isZKBytecode
     ) internal pure {
         // Basic console message
-        string memory basicMessage = string.concat(
-            displayName,
-            " has been deployed at ",
-            vm.toString(contractAddr)
-        );
+        string memory basicMessage = string.concat(displayName, " has been deployed at ", vm.toString(contractAddr));
         console.log(basicMessage);
 
         // Forge verification command
@@ -43,12 +39,7 @@ library DeploymentNotifier {
             forgeCmd = string.concat(forgeCmd, "--zksync ");
         }
         if (constructorParams.length == 0) {
-            forgeCmd = string.concat(
-                forgeCmd,
-                vm.toString(contractAddr),
-                " ",
-                deployedName
-            );
+            forgeCmd = string.concat(forgeCmd, vm.toString(contractAddr), " ", deployedName);
         } else {
             forgeCmd = string.concat(
                 forgeCmd,

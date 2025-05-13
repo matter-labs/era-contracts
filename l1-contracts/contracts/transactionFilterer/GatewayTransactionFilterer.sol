@@ -90,7 +90,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     }
 
     /// @notice Blocklist an L2 contract
-    /// @param _l2Contract The contract to blocklist 
+    /// @param _l2Contract The contract to blocklist
     function blocklistL2Contract(address _l2Contract) external onlyOwner {
         if (blocklistedContracts[_l2Contract]) {
             revert AlreadyBlocklisted(_l2Contract);

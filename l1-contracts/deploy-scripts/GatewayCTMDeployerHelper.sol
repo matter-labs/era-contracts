@@ -50,15 +50,12 @@ struct VerificationStateTransitionContracts {
     VerificationInfo executorFacet;
     VerificationInfo gettersFacet;
     VerificationInfo adminFacet;
-
     VerificationInfo diamondInit;
     VerificationInfo genesisUpgrade;
     VerificationInfo verifier;
-
     VerificationInfo validatorTimelock;
     VerificationInfo chainTypeManagerProxyAdmin;
     VerificationInfo serverNotifierProxy;
-
     VerificationInfo chainTypeManagerImplementation;
     VerificationInfo chainTypeManagerProxy;
 }
@@ -112,13 +109,16 @@ library GatewayCTMDeployerHelper {
         // Create2Factory has the same interface as the usual deployer.
         create2Calldata = deployData;
 
-        address ctmDeployerAddress = Utils.getL2AddressViaCreate2Factory(_create2Salt, bytecodeHash, abi.encode(config));
+        address ctmDeployerAddress = Utils.getL2AddressViaCreate2Factory(
+            _create2Salt,
+            bytecodeHash,
+            abi.encode(config)
+        );
         ctmDeployerVerificationInfo = VerificationInfo({
             name: "GatewayCTMDeployer",
             addr: ctmDeployerAddress,
             constructorParams: abi.encode(config)
         });
-
 
         InnerDeployConfig memory innerConfig = InnerDeployConfig({deployerAddr: ctmDeployerAddress, salt: config.salt});
 
@@ -146,8 +146,18 @@ library GatewayCTMDeployerHelper {
             abi.encode(ctmDeployerAddress, 0),
             innerConfig
         );
-        verification.stateTransition.chainTypeManagerProxyAdmin = _deployInternal("ProxyAdmin", "ProxyAdmin.sol", hex"", innerConfig);
-        verification.stateTransition.serverNotifierProxy = _deployServerNotifier(salt, verification, innerConfig, ctmDeployerAddress);
+        verification.stateTransition.chainTypeManagerProxyAdmin = _deployInternal(
+            "ProxyAdmin",
+            "ProxyAdmin.sol",
+            hex"",
+            innerConfig
+        );
+        verification.stateTransition.serverNotifierProxy = _deployServerNotifier(
+            salt,
+            verification,
+            innerConfig,
+            ctmDeployerAddress
+        );
 
         verification = _deployCTM(salt, config, verification, innerConfig);
     }
@@ -178,9 +188,15 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.genesisUpgrade = verification.stateTransition.genesisUpgrade.addr;
         contracts.stateTransition.verifier = verification.stateTransition.verifier.addr;
         contracts.stateTransition.validatorTimelock = verification.stateTransition.validatorTimelock.addr;
-        contracts.stateTransition.chainTypeManagerProxyAdmin = verification.stateTransition.chainTypeManagerProxyAdmin.addr;
+        contracts.stateTransition.chainTypeManagerProxyAdmin = verification
+            .stateTransition
+            .chainTypeManagerProxyAdmin
+            .addr;
         contracts.stateTransition.serverNotifierProxy = verification.stateTransition.serverNotifierProxy.addr;
-        contracts.stateTransition.chainTypeManagerImplementation = verification.stateTransition.chainTypeManagerImplementation.addr;
+        contracts.stateTransition.chainTypeManagerImplementation = verification
+            .stateTransition
+            .chainTypeManagerImplementation
+            .addr;
         contracts.stateTransition.chainTypeManagerProxy = verification.stateTransition.chainTypeManagerProxy.addr;
 
         // Other raw data that can be copied verbatim
@@ -190,9 +206,7 @@ library GatewayCTMDeployerHelper {
     /// @notice Emits a `DeploymentNotifier.notifyAboutDeployment` call for every
     ///         contract contained in the given verification struct.
     /// @param verification  Struct holding the metadata for the deterministic deployments.
-    function notifyAboutDeployments(
-        VerificationDeployedContracts memory verification
-    ) internal {
+    function notifyAboutDeployments(VerificationDeployedContracts memory verification) internal {
         // Helper to keep the repetitive code short.
         _notify(verification.multicall3);
 
@@ -260,22 +274,26 @@ library GatewayCTMDeployerHelper {
         VerificationDeployedContracts memory _verificationContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (VerificationDeployedContracts memory) {
-            _verificationContracts.stateTransition.mailboxFacet = _deployInternal(
-                "MailboxFacet",
-                "Mailbox.sol",
-                abi.encode(_eraChainId, _l1ChainId),
-                innerConfig
-            );
+        _verificationContracts.stateTransition.mailboxFacet = _deployInternal(
+            "MailboxFacet",
+            "Mailbox.sol",
+            abi.encode(_eraChainId, _l1ChainId),
+            innerConfig
+        );
 
-            _verificationContracts.stateTransition.executorFacet = _deployInternal(
-                "ExecutorFacet",
-                "Executor.sol",
-                abi.encode(_l1ChainId),
-                innerConfig
-            );
+        _verificationContracts.stateTransition.executorFacet = _deployInternal(
+            "ExecutorFacet",
+            "Executor.sol",
+            abi.encode(_l1ChainId),
+            innerConfig
+        );
 
-        
-            _verificationContracts.stateTransition.gettersFacet = _deployInternal("GettersFacet", "Getters.sol", hex"", innerConfig);
+        _verificationContracts.stateTransition.gettersFacet = _deployInternal(
+            "GettersFacet",
+            "Getters.sol",
+            hex"",
+            innerConfig
+        );
 
         address rollupDAManager;
         (_verificationContracts, rollupDAManager) = _deployRollupDAManager(
@@ -293,9 +311,18 @@ library GatewayCTMDeployerHelper {
             innerConfig
         );
 
-
-        _verificationContracts.stateTransition.diamondInit = _deployInternal("DiamondInit", "DiamondInit.sol", hex"", innerConfig);
-        _verificationContracts.stateTransition.genesisUpgrade = _deployInternal("L1GenesisUpgrade", "L1GenesisUpgrade.sol", hex"", innerConfig);
+        _verificationContracts.stateTransition.diamondInit = _deployInternal(
+            "DiamondInit",
+            "DiamondInit.sol",
+            hex"",
+            innerConfig
+        );
+        _verificationContracts.stateTransition.genesisUpgrade = _deployInternal(
+            "L1GenesisUpgrade",
+            "L1GenesisUpgrade.sol",
+            hex"",
+            innerConfig
+        );
         return _verificationContracts;
     }
 
@@ -304,27 +331,27 @@ library GatewayCTMDeployerHelper {
         VerificationDeployedContracts memory _verificationContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (VerificationDeployedContracts memory) {
-        VerificationInfo memory verifierFflonk = _deployInternal("L2VerifierFflonk", "L2VerifierFflonk.sol", hex"", innerConfig);
+        VerificationInfo memory verifierFflonk = _deployInternal(
+            "L2VerifierFflonk",
+            "L2VerifierFflonk.sol",
+            hex"",
+            innerConfig
+        );
 
-        VerificationInfo memory verifierPlonk = _deployInternal("L2VerifierPlonk", "L2VerifierPlonk.sol", hex"", innerConfig);
+        VerificationInfo memory verifierPlonk = _deployInternal(
+            "L2VerifierPlonk",
+            "L2VerifierPlonk.sol",
+            hex"",
+            innerConfig
+        );
 
         bytes memory constructorParams = abi.encode(verifierFflonk.addr, verifierPlonk.addr);
 
         VerificationInfo memory finalVerifier;
         if (_testnetVerifier) {
-            finalVerifier = _deployInternal(
-                "TestnetVerifier",
-                "TestnetVerifier.sol",
-                constructorParams,
-                innerConfig
-            );
+            finalVerifier = _deployInternal("TestnetVerifier", "TestnetVerifier.sol", constructorParams, innerConfig);
         } else {
-            finalVerifier = _deployInternal(
-                "DualVerifier",
-                "DualVerifier.sol",
-                constructorParams,
-                innerConfig
-            );
+            finalVerifier = _deployInternal("DualVerifier", "DualVerifier.sol", constructorParams, innerConfig);
         }
 
         _verificationContracts.stateTransition.verifier = finalVerifier;
@@ -338,7 +365,12 @@ library GatewayCTMDeployerHelper {
         VerificationDeployedContracts memory _verificationContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (VerificationDeployedContracts memory, address) {
-        VerificationInfo memory daManager = _deployInternal("RollupDAManager", "RollupDAManager.sol", hex"", innerConfig);
+        VerificationInfo memory daManager = _deployInternal(
+            "RollupDAManager",
+            "RollupDAManager.sol",
+            hex"",
+            innerConfig
+        );
 
         VerificationInfo memory validiumDAValidator = _deployInternal(
             "ValidiumL1DAValidator",
@@ -374,7 +406,12 @@ library GatewayCTMDeployerHelper {
             innerConfig
         );
 
-        _verificationContracts.stateTransition.chainTypeManagerProxyAdmin = _deployInternal("ProxyAdmin", "ProxyAdmin.sol", hex"", innerConfig);
+        _verificationContracts.stateTransition.chainTypeManagerProxyAdmin = _deployInternal(
+            "ProxyAdmin",
+            "ProxyAdmin.sol",
+            hex"",
+            innerConfig
+        );
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({

@@ -183,8 +183,11 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     }
 
     function deployGatewayCTM() internal {
-        (VerificationDeployedContracts memory verificationInfo, bytes memory create2Calldata, VerificationInfo memory ctmDeployerVerificationInfo) = GatewayCTMDeployerHelper
-            .calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
+        (
+            VerificationDeployedContracts memory verificationInfo,
+            bytes memory create2Calldata,
+            VerificationInfo memory ctmDeployerVerificationInfo
+        ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
         gatewayCTMDeployer = ctmDeployerVerificationInfo.addr;
         gatewayCTMDeployerCreate2Data = create2Calldata;
@@ -196,7 +199,9 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             ctmDeployerVerificationInfo.constructorParams,
             true
         );
-        DeployedContracts memory expectedGatewayContracts = GatewayCTMDeployerHelper.convertToDeployedContracts(verificationInfo);
+        DeployedContracts memory expectedGatewayContracts = GatewayCTMDeployerHelper.convertToDeployedContracts(
+            verificationInfo
+        );
 
         bytes[] memory deps = GatewayCTMDeployerHelper.getListOfFactoryDeps();
 
@@ -404,10 +409,10 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         vm.serializeAddress("root", "gateway_server_notifier", output.gatewayStateTransition.serverNotifierProxy);
         vm.serializeAddress("root", "old_rollup_l2_da_validator", oldRollupL2DAValidator);
         vm.serializeAddress("root", "refund_recipient", refundRecipient);
-        
+
         vm.serializeAddress("root", "gateway_ctm_deployer", gatewayCTMDeployer);
         vm.serializeBytes("root", "gateway_ctm_deployer_create2_data", gatewayCTMDeployerCreate2Data);
-        
+
         vm.serializeBytes("root", "governance_calls_to_execute", abi.encode(governanceCallsToExecute));
         vm.serializeBytes("root", "ecosystem_admin_calls_to_execute", abi.encode(ecosystemAdminCallsToExecute));
 
