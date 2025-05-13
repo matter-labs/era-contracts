@@ -84,12 +84,20 @@ import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {FixedForceDeploymentsData, DeployedAddresses, ContractsConfig, TokensConfig} from "../DeployUtils.s.sol";
 import {DeployL1Script} from "../DeployL1.s.sol";
 
-import {DefaultEcosystemUpgrade} from "./DefaultEcosystemUpgrade.s.sol";
+import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
+
+    /// @notice E2e upgrade generation
+    function run() public virtual override {
+        initialize(vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_UPGRADE_ECOSYSTEM_OUTPUT"));
+        prepareEcosystemUpgrade();
+
+        prepareDefaultGovernanceCalls();
+    }
 
     function _getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
@@ -100,5 +108,4 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         );
     }
     // add this to be excluded from coverage report
-    function test() internal override {}
 }

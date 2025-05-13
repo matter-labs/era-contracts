@@ -433,12 +433,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
 
         // require(
-        addresses.protocolUpgradeHandlerProxy =
-            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner();
-            // "Incorrect ProtocolUpgradeHandlerProxy"
+        addresses.protocolUpgradeHandlerProxy = Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner();
+        // "Incorrect ProtocolUpgradeHandlerProxy"
         // );
-        config.ownerAddress =
-        Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner();
+        config.ownerAddress = Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner();
         // require(
         //     "Incorrect owner"
         // );
@@ -606,6 +604,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function saveOutput(string memory outputPath) internal virtual override {
+        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
         vm.serializeAddress(
             "bridgehub",
@@ -874,7 +873,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
-        vm.serializeAddress("deployed_addresses", "l2_wrapped_base_token_store_addr", upgradeAddresses.l2WrappedBaseTokenStore);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "l2_wrapped_base_token_store_addr",
+            upgradeAddresses.l2WrappedBaseTokenStore
+        );
 
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
@@ -888,7 +891,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeUint("root", "era_chain_id", config.eraChainId);
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
-        vm.serializeString("root", "contracts_newConfig", contractsConfig);
+        vm.serializeString("root", "contracts_config", contractsConfig);
+        vm.serializeAddress("root", "owner_address", config.ownerAddress);
         vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
@@ -899,6 +903,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             newConfig.governanceUpgradeTimerInitialDelay
         );
 
+        vm.serializeBytes("root", "gateway_diamond_cut", newlyGeneratedData.upgradeCutData); /// kl todo
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);
@@ -944,14 +949,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         // 1. Perform upgrade
         // 2. Unpause migration to/from Gateway
         stage0Calls = prepareStage0GovernanceCalls();
-        vm.serializeBytes("governance_calls", "governance_stage0_calls", abi.encode(stage0Calls));
+        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
-        vm.serializeBytes("governance_calls", "governance_stage1_calls", abi.encode(stage1Calls));
+        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
         stage2Calls = prepareStage2GovernanceCalls();
 
         string memory governanceCallsSerialized = vm.serializeBytes(
             "governance_calls",
-            "governance_stage2_calls",
+            "stage2_calls",
             abi.encode(stage2Calls)
         );
 
