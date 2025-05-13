@@ -319,6 +319,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             output.rollupDAManager,
             output.gatewayStateTransition.validatorTimelock,
             output.gatewayStateTransition.serverNotifierProxy,
+            addresses.chainAdmin,
             refundRecipient
         );
 
@@ -343,10 +344,26 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             );
         }
 
-        saveOutput(governanceCalls, ecosystemAdminCalls);
+        Call[] memory ecosystemAdminCallsToGW = Utils.prepareGovernanceL1L2DirectTransaction(
+            EXPECTED_MAX_L1_GAS_PRICE,
+            abi.encodeCall(IChainTypeManager.acceptAdmin, ()),
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            output.gatewayStateTransition.chainTypeManagerProxy,
+            gatewayChainId,
+            addresses.bridgehub.bridgehubProxy,
+            addresses.bridges.l1AssetRouterProxy,
+            refundRecipient
+        );
+
+        saveOutput(governanceCalls, ecosystemAdminCalls, ecosystemAdminCallsToGW);
     }
 
-    function saveOutput(Call[] memory governanceCallsToExecute, Call[] memory ecosystemAdminCallsToExecute) internal {
+    function saveOutput(
+        Call[] memory governanceCallsToExecute,
+        Call[] memory ecosystemAdminCallsToExecute,
+        Call[] memory ecosystemAdminCallsToGW
+    ) internal {
         vm.serializeAddress(
             "gateway_state_transition",
             "chain_type_manager_proxy_addr",
@@ -415,6 +432,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
 
         vm.serializeBytes("root", "governance_calls_to_execute", abi.encode(governanceCallsToExecute));
         vm.serializeBytes("root", "ecosystem_admin_calls_to_execute", abi.encode(ecosystemAdminCallsToExecute));
+        vm.serializeBytes("root", "ecosystem_admin_calls_to_gateway", abi.encode(ecosystemAdminCallsToGW));
 
         string memory toml = vm.serializeBytes("root", "diamond_cut_data", output.diamondCutData);
         string memory path = string.concat(vm.projectRoot(), vm.envString("GATEWAY_VOTE_PREPARATION_OUTPUT"));
