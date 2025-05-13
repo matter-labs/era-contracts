@@ -100,7 +100,7 @@ abstract contract GatewayGovernanceUtils is Script {
 
         // Registration of the new chain type manager inside the ZK Gateway chain
         {
-            bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (_gatewayChainAdmin));
+            bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (_gatewayCTMAddress));
 
             calls = Utils.mergeCalls(
                 calls,
@@ -120,7 +120,7 @@ abstract contract GatewayGovernanceUtils is Script {
 
         // Setting the address of the L1 ChainTypeManager amdin as the GW ChainTypeManager admin.
         {
-            bytes memory data = abi.encodeCall(IChainTypeManager.setPendingAdmin, (_gatewayCTMAddress));
+            bytes memory data = abi.encodeCall(IChainTypeManager.setPendingAdmin, (_gatewayChainAdmin));
 
             calls = Utils.mergeCalls(
                 calls,
