@@ -293,10 +293,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @notice Precommits the status of all L2 transactions for the next batch on the shared bridge.
-    /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
-    /// @param _precommitData ABI‐encoded transaction status list for the precommit.
+    /// @inheritdoc IExecutor
     function precommitSharedBridge(
+        uint256, // _chainId
         uint256 _batchNumber,
         bytes calldata _precommitData
     ) external nonReentrant onlyValidator onlySettlementLayer {
