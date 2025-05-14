@@ -32,7 +32,7 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @notice A new chain has been added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
     /// @param chainIndex The index of the chain that is being added. Note, that chain where
-    /// the MessageRoot contract was deployed has chainIndex of 0, and the event is not emmited for it.
+    /// the MessageRoot contract was deployed has chainIndex of 0, and the event is not emitted for it.
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
     /// @notice Emitted when a new chain batch root is appended to the chainTree.
@@ -46,10 +46,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @param preimage  The Merkle leaf value (chainIdLeafHash) computed from `chainRoot` and the chain’s ID, used to update the shared tree.
     event Preimage(bytes32 chainRoot, bytes32 preimage);
 
-    /// @notice Emmited whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
+    /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
     /// @param chainId The ID of the chain where the sharedTree was updated.
     /// @param blockNumber The block number of the block in which the sharedTree was updated.
-    /// @param logId The ID of the log emmited when a new InteropRoot. In this release always equal to 0.
+    /// @param logId The ID of the log emitted when a new InteropRoot. In this release always equal to 0.
     /// @param sides The "sides" of the interop root. In this release which uses proof-based interop the sides is an array
     /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);

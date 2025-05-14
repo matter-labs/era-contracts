@@ -302,10 +302,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (cachedStoredBatchHashes != _hashStoredBatchInfo(lastCommittedBatchData)) {
             if (cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)) {
                 // incorrect previous batch data
-                revert BatchHashMismatch(
-                    cachedStoredBatchHashes,
-                    _hashStoredBatchInfo(lastCommittedBatchData)
-                );
+                revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
             }
         }
 

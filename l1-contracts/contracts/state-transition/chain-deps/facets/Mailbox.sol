@@ -198,9 +198,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
             revert NotSettlementLayer();
         }
-        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(
-            proofData.settlementLayerChainId
-        );
+        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
 
         return
             IMailbox(settlementLayerAddress).proveL2LeafInclusion(
