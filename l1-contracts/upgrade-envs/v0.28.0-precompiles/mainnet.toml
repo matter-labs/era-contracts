@@ -1,6 +1,6 @@
 era_chain_id = 324
 testnet_verifier = false
-governance_upgrade_timer_initial_delay = 86400
+governance_upgrade_timer_initial_delay = 172800
 
 # Not used in this upgrade
 # TODO: should be clarified and refined in next upgrades
