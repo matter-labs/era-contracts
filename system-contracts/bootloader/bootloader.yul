@@ -694,6 +694,127 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
+            
+
+            /// @notice Overrides the "raw" code hash of the address. "Raw" means that it must use exactly the value
+            /// that is stored in the AccountCodeStorage system contract for that address, without applying any
+            /// additional transformations.
+            /// This method is very unsafe and it shouldn't be used to do long-term modifications.
+            /// Right now it's only used to override the bytecode hash of delegated accounts to perform
+            /// transaction validation & payment.
+            /// @param addr The address of the account to set the code hash of.
+            /// @param codeHash The code hash to be set.
+            /// @param assertSuccess Whether to revert the bootloader if the call to the AccountCodeStorage fails. If `false`, only
+            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failure is user providing not
+            /// enough gas.
+            function setRawCodeHash(addr, codeHash, assertSuccess) -> ret {
+                mstore(0, {{RIGHT_PADDED_SET_RAW_CODE_HASH_SELECTOR}})
+                mstore(4, addr)
+                mstore(36, codeHash)
+                let success := call(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    0,
+                    68,
+                    0,
+                    32
+                )
+
+                // In case the call to the account code storage fails,
+                // it most likely means that the caller did not provide enough gas for
+                // the call.
+                // In case the caller is certain that the amount of gas provided is enough, i.e.
+                // (`assertSuccess` = true), then we should panic.
+                if iszero(success) {
+                    if assertSuccess {
+                        // The call must've succeeded, but it didn't. So we revert the bootloader.
+                        assertionError("setRawCodeHash failed")
+                    }
+
+                    // Most likely not enough gas provided, revert the current frame.
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
+
+            /// @notice Returns the address of EIP-7702 delegation for the account (or zero, if account
+            /// is not delegated).
+            /// @param addr The address of the account to check.
+            function getDelegationAddress(addr) -> ret {
+                mstore(0, {{RIGHT_PADDED_GET_ACCOUNT_DELEGATION_SELECTOR}})
+                mstore(4, addr)
+                let success := staticcall(
+                    gas(),
+                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    0,
+                    36,
+                    0,
+                    32
+                )
+
+                // In case the call to the account code storage fails,
+                // it most likely means that the caller did not provide enough gas for
+                // the call.
+                // In case the caller is certain that the amount of gas provided is enough, i.e.
+                // (`assertSuccess` = true), then we should panic.
+                if iszero(success) {
+                    // Most likely not enough gas provided, revert the current frame.
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
+
+            /// @notice invokes the `processDelegations` method of the `AccountCodeStorage` contract.
+            /// @dev this method expects `reservedDynamic` to contain ABI-encoded `AuthorizationList`
+            /// @dev this method internally overwrites transaction data and restores it after the call.
+            /// This is done to avoid copying the data to a new memory location.
+            function processDelegations(innerTxDataOffset) {
+                debugLog("processDelegations", 0)
+                // 1. Read delegation length
+                let ptr := getReservedDynamicPtr(innerTxDataOffset)
+                let length := mload(ptr)
+
+                // Delegations are only processed if transaction is EIP7702 and
+                // authorization list is provided
+                let isEIP7702 := eq(getTxType(innerTxDataOffset), 4)
+                let isDelegationProvided := gt(length, 0)
+                let shouldProcess := and(isEIP7702, isDelegationProvided)
+                debugLog("shouldProcessDelegations", shouldProcess)
+
+                if shouldProcess {
+                    // 2. Overwrite the delegation length word with right-padded selector
+                    // This will work because `reservedDynamic` is `bytes`, so the first word
+                    // is the length; but for us the contents are already ABI-encoded data.
+                    mstore(ptr, {{PROCESS_DELEGATIONS_SELECTOR}})
+
+                    // 3. Call the method
+                    let calldataOffset := add(ptr, 28)
+                    let calldataLength := add(length, 4)
+                    let success := call(
+                        gas(),
+                        ACCOUNT_CODE_STORAGE_ADDR(),
+                        0,
+                        calldataOffset,
+                        calldataLength,
+                        0,
+                        0
+                    )
+
+                    // 4. Restore the length in memory
+                    mstore(ptr, length)
+
+                    // 5. Process the result
+                    // If the transaction failed, either there was not enough gas or compression is malformed.
+                    if iszero(success) {
+                        debugLog("processing delegations failed", 0)
+                        nearCallPanic()
+                    }
+                }
+            }
+
             /// @dev Calculates the canonical hash of the L1->L2 transaction that will be
             /// sent to L1 as a message to the L1 contract that a certain operation has been processed.
             function getCanonicalL1TxHash(txDataOffset) -> ret {
@@ -1465,6 +1586,8 @@ object "Bootloader" {
                     setTxOrigin(BOOTLOADER_FORMAL_ADDR())
                 }
 
+                processDelegations(innerTxDataOffset)
+
                 success := executeL2Tx(txDataOffset, from)
 
                 if isNotEnoughGasForPubdata(
@@ -1910,6 +2033,39 @@ object "Bootloader" {
 
 
             <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
+            function ethCallEvmConsturction(
+                from,
+                dataPtr
+            ) -> success {
+                // Set fake address
+                let to := 0xF234567890123456789012345678901234567890
+                // Set raw code hash to the constructing EVM contract
+                // so that we can get deployment bytecode as return value.
+                setRawCodeHash(to, 0x0201000000000000000000000000000000000000000000000000000000000000, true)
+
+                // TODO: transfer value
+
+                success := mimicCallOnlyResult(
+                    to,
+                    from,
+                    dataPtr,
+                    1, // Constructor
+                    0, // Not a mimic call
+                    0,
+                    0,
+                    0,
+                )
+
+                // Returned data bytes have structure: paddedBytecode.evmBytecodeLen.constructorReturnEvmGas
+                // So we need to load the 2nd from last word to get the bytecode length
+                if success {
+                    let returnSize := returndatasize()
+                    returndatacopy(0,0,returnSize)
+                    let bytecodeSize := mload(sub(returnSize, 0x40))
+                    return(0,bytecodeSize)
+                }
+            }
+
             function ZKSYNC_NEAR_CALL_ethCall(
                 abi,
                 txDataOffset,
@@ -1924,9 +2080,19 @@ object "Bootloader" {
                 let innerTxDataOffset := add(txDataOffset, 32)
                 let to := getTo(innerTxDataOffset)
                 let from := getFrom(innerTxDataOffset)
+                let isEvmConstruction := getReserved1(innerTxDataOffset)
 
                 debugLog("from: ", from)
                 debugLog("to: ", to)
+
+                let delegation := getDelegationAddress(from)
+                debugLog("delegation: ", delegation)
+
+                if gt(delegation, 0) {
+                    // If the delegation is not zero, we need to invoke the delegation
+                    // target instead of the original `to` field.
+                    to := delegation
+                }
 
                 switch isEOA(from)
                 case true {
@@ -1941,12 +2107,22 @@ object "Bootloader" {
 
                 let value := getValue(innerTxDataOffset)
 
-                let success := msgValueSimulatorMimicCall(
-                    to,
-                    from,
-                    value,
-                    dataPtr
-                )
+                let success := 0
+                switch isEvmConstruction
+                case 0 {
+                    success := msgValueSimulatorMimicCall(
+                        to,
+                        from,
+                        value,
+                        dataPtr
+                    )
+                }
+                default {
+                    success := ethCallEvmConsturction(
+                        from,
+                        dataPtr
+                    )
+                }
 
                 if iszero(success) {
                     // If success is 0, we need to revert
@@ -2152,28 +2328,48 @@ object "Bootloader" {
                 }
             }
 
-            /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it)
+            /// @dev Checks whether an address is an EOA (i.e. has not code deployed on it or it's a 7702-delegated account)
             /// @param addr The address to check
             function isEOA(addr) -> ret {
                 ret := 0
+                let delegation := getDelegationAddress(addr)
 
+                // TODO: This logic is duplicated in several places, we should create a dedicated method.
                 if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
-                    ret := iszero(getRawCodeHash(addr, false))
+                    ret := or(
+                        iszero(getRawCodeHash(addr, false)),
+                        gt(delegation, 0)
+                    )
                 }
             }
 
             /// @dev Calls the `payForTransaction` method of an account
             function accountPayForTx(account, txDataOffset) -> success {
+                let delegation := getDelegationAddress(account)
+                let rawCodeHash := 0
+                if gt(delegation, 0) {
+                    rawCodeHash := getRawCodeHash(delegation, true)
+                    setRawCodeHash(account, 0, true)
+                }
                 success := callAccountMethod({{PAY_FOR_TX_SELECTOR}}, account, txDataOffset)
+                if gt(delegation, 0) {
+                    setRawCodeHash(account, rawCodeHash, true)
+                }
             }
 
             /// @dev Calls the `prepareForPaymaster` method of an account
             function accountPrePaymaster(account, txDataOffset) -> success {
+                // TODO: should we allow delegated accounts to use native paymasters?
+                // TODO: Gut feeling is that the answer is "NO" as we're deprecating EIP-712 txs
+                // TOOD: and native accounts have their own entrypoint.
                 success := callAccountMethod({{PRE_PAYMASTER_SELECTOR}}, account, txDataOffset)
             }
 
             /// @dev Calls the `validateAndPayForPaymasterTransaction` method of a paymaster
             function validateAndPayForPaymasterTransaction(paymaster, txDataOffset) -> success {
+                // TODO: should we allow delegated accounts to use native paymasters?
+                // TODO: Gut feeling is that the answer is "NO" as we're deprecating EIP-712 txs
+                // TOOD: and native accounts have their own entrypoint.
                 success := callAccountMethod({{VALIDATE_AND_PAY_PAYMASTER}}, paymaster, txDataOffset)
             }
 
@@ -2414,7 +2610,21 @@ object "Bootloader" {
                 setHook(VM_HOOK_ACCOUNT_VALIDATION_ENTERED())
                 debugLog("pre-validate",0)
                 debugLog("pre-validate",from)
+
+                // Override bytecode hash for validation if required.
+                // TODO: It should be safe, since delegation is only allowed for EOAs in the first place.
+                let delegation := getDelegationAddress(from)
+                let rawCodeHash := 0
+                if gt(delegation, 0) {
+                    rawCodeHash := getRawCodeHash(delegation, true)
+                    setRawCodeHash(from, 0, true)
+                }
+
                 let success := callAccountMethod({{VALIDATE_TX_SELECTOR}}, from, txDataOffset)
+                
+                if gt(delegation, 0) {
+                    setRawCodeHash(from, rawCodeHash, true)
+                }
                 setHook(VM_HOOK_NO_VALIDATION_ENTERED())
 
                 if iszero(success) {
@@ -2546,7 +2756,20 @@ object "Bootloader" {
             /// @dev Function responsible for the execution of the L2 transaction
             /// @dev Returns `true` or `false` depending on whether or not the tx has reverted.
             function executeL2Tx(txDataOffset, from) -> ret {
-                ret := callAccountMethod({{EXECUTE_TX_SELECTOR}}, from, txDataOffset)
+                let delegation := getDelegationAddress(from)
+
+                switch delegation
+                    case 0 {
+                        // Account not delegated: invoke the `execute` method
+                        ret := callAccountMethod({{EXECUTE_TX_SELECTOR}}, from, txDataOffset)
+                    }
+                    default {
+                        // Account is delegated: invoke through mimicall using calldata provided
+                        let innerTxDataOffset := add(txDataOffset, 32)
+                        let calldataPtr := getDataPtr(innerTxDataOffset)
+                        let value := getValue(innerTxDataOffset)
+                        ret := msgValueSimulatorMimicCall(from, from, value, calldataPtr)
+                    }                
 
                 if iszero(ret) {
                     debugReturndata()
@@ -3105,12 +3328,8 @@ object "Bootloader" {
             /// @dev This function validates only L2 transactions, since the integrity of the L1->L2
             /// transactions is enforced by the L1 smart contracts.
             function validateTypedTxStructure(innerTxDataOffset) {
-                /// Some common checks for all transactions.
-                let reservedDynamicLength := getReservedDynamicBytesLength(innerTxDataOffset)
-                if gt(reservedDynamicLength, 0) {
-                    assertionError("non-empty reservedDynamic")
-                }
                 let txType := getTxType(innerTxDataOffset)
+                debugLog("txType", txType)
                 switch txType
                     case 0 {
                         let maxFeePerGas := getMaxFeePerGas(innerTxDataOffset)
@@ -3139,6 +3358,7 @@ object "Bootloader" {
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
                         assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
+                        assertEq(getReservedDynamicBytesLength(innerTxDataOffset), 0, "reservedDynamic non zero")
                     }
                     case 1 {
                         let maxFeePerGas := getMaxFeePerGas(innerTxDataOffset)
@@ -3165,6 +3385,7 @@ object "Bootloader" {
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
                         assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
+                        assertEq(getReservedDynamicBytesLength(innerTxDataOffset), 0, "reservedDynamic non zero")
                     }
                     case 2 {
                         assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
@@ -3188,6 +3409,35 @@ object "Bootloader" {
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
                         assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
                         assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
+                        assertEq(getReservedDynamicBytesLength(innerTxDataOffset), 0, "reservedDynamic non zero")
+                    }
+                    case 4 {
+                        assertEq(lte(getGasPerPubdataByteLimit(innerTxDataOffset), MAX_L2_GAS_PER_PUBDATA()), 1, "Gas per pubdata is wrong")
+                        assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
+
+                        <!-- @if BOOTLOADER_TYPE!='playground_batch' -->
+
+                        let from := getFrom(innerTxDataOffset)
+                        let iseoa := isEOA(from)
+                        assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+
+                        <!-- @endif -->
+
+                        <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
+
+                        assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
+                        // reserved1 used as marker that tx doesn't have field "to"
+                        // however, for EIP7702, transactions without "to" are not allowed.
+                        assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
+                        assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
+                        assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
+                        assertEq(getFactoryDepsBytesLength(innerTxDataOffset), 0, "factory deps non zero")
+                        assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
+
+                        // For EIP7702, we use `reservedDynamic` to pass encoded authorization list data.
+                        assertEq(gt(getReservedDynamicBytesLength(innerTxDataOffset), 0), 1, "reservedDynamic is zero for EIP7702")
                     }
                     case 113 {
                         let paymaster := getPaymaster(innerTxDataOffset)
@@ -3205,6 +3455,7 @@ object "Bootloader" {
                         // reserved1 used as marker that tx doesn't have field "to"
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
+                        assertEq(getReservedDynamicBytesLength(innerTxDataOffset), 0, "reservedDynamic non zero")
                     }
                     case 254 {
                         // Upgrade transaction, no need to validate as it is validated on L1.

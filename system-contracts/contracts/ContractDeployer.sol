@@ -56,10 +56,10 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
 
         // It is an EOA, it is still an account.
-        if (
-            _address > address(MAX_SYSTEM_CONTRACT_ADDRESS) &&
-            ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0
-        ) {
+        bool notSystem = _address > address(MAX_SYSTEM_CONTRACT_ADDRESS);
+        bool noCodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0;
+        bool delegated = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getAccountDelegation(_address) != address(0);
+        if (notSystem && (noCodeHash || delegated)) {
             return AccountAbstractionVersion.Version1;
         }
 
