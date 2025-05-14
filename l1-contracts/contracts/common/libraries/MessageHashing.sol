@@ -13,7 +13,7 @@ import {InvalidProofLengthForFinalNode} from "../../common/L1ContractErrors.sol"
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
 
-struct ProofVerificationResult {
+struct ProofData {
     uint256 settlementLayerChainId;
     uint256 settlementLayerBatchNumber;
     uint256 settlementLayerBatchRootMask;
@@ -102,13 +102,13 @@ library MessageHashing {
     /// @param _leaf The leaf to be proven.
     /// @param _proof The proof.
     /// @return result The proof verification result.
-    function hashProof(
+    function getProofData(
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) internal pure returns (ProofVerificationResult memory result) {
+    ) internal pure returns (ProofData memory result) {
         if (_proof.length == 0) {
             revert MerklePathEmpty();
         }
@@ -159,7 +159,7 @@ library MessageHashing {
             ++result.ptr;
         }
 
-        result = ProofVerificationResult({
+        result = ProofData({
             settlementLayerChainId: settlementLayerChainId,
             settlementLayerBatchNumber: settlementLayerBatchNumber,
             settlementLayerBatchRootMask: settlementLayerBatchRootMask,

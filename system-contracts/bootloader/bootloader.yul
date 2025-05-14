@@ -3155,6 +3155,14 @@ object "Bootloader" {
                 let sidesLoadingOffset := 132
                 let sidesOffset := add(interopRootStartSlot, INTEROP_ROOT_SIDES_OFFSET_START())
                 for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
+                /// Ensure we don’t write past the end of the scratch space.
+                /// In this release, `sides` occupies exactly one 32-byte slot, so if
+                /// `sidesLoadingOffset` exceeds
+                ///   (SCRATCH_SPACE_BEGIN_SLOT() + SCRATCH_SPACE_SLOTS() - 1) * 32
+                /// then we’d be writing outside of scratch space and must revert.
+                if gt(sidesLoadingOffset, mul(sub(add(SCRATCH_SPACE_BEGIN_SLOT(), SCRATCH_SPACE_SLOTS()), 1), 32)) {
+                    revertWithReason(TEMPORARY_DATA_OUTSIDE_SCRATCH_SPACE(), 0)
+                }
                     mstore(sidesLoadingOffset, mload(sidesOffset))
                     sidesOffset := add(sidesOffset, 32)
                     sidesLoadingOffset := add(sidesLoadingOffset, 32)
@@ -4051,6 +4059,10 @@ object "Bootloader" {
 
             function NON_DUMMY_INTEROP_ROOT() -> ret {
                 ret := 32
+            }
+
+            function TEMPORARY_DATA_OUTSIDE_SCRATCH_SPACE() -> ret {
+                ret := 33
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes

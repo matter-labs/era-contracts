@@ -298,11 +298,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert CanOnlyProcessOneBatch();
         }
         // Check that we commit batches after last committed batch
-        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
-            if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashLegacyStoredBatchInfo(lastCommittedBatchData)) {
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[s.totalBatchesCommitted];
+        if (cachedStoredBatchHashes != _hashStoredBatchInfo(lastCommittedBatchData)) {
+            if (cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)) {
                 // incorrect previous batch data
                 revert BatchHashMismatch(
-                    s.storedBatchHashes[s.totalBatchesCommitted],
+                    cachedStoredBatchHashes,
                     _hashStoredBatchInfo(lastCommittedBatchData)
                 );
             }
@@ -414,9 +415,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert PriorityOperationsRollingHashMismatch();
         }
         if (_dependencyRootsRollingHash != _storedBatch.dependencyRootsRollingHash) {
-            if (_storedBatch.batchNumber == (0)) {
-                return;
-            }
             revert DependencyRootsRollingHashMismatch(
                 _storedBatch.dependencyRootsRollingHash,
                 _dependencyRootsRollingHash
