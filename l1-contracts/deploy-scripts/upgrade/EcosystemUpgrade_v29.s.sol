@@ -123,7 +123,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         additionalForceDeployments[0] = getForceDeployment("L2GatewayUpgrade");
     }
 
-    function getExpectedL2Address(string memory contractName) internal override returns (address) {
+    function getExpectedL2Address(string memory contractName) public override returns (address) {
         if (compareStrings(contractName, "L2GatewayUpgrade")) {
             return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
         }
@@ -131,7 +131,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         return super.getExpectedL2Address(contractName);
     }
 
-    function getCreationCode(string memory contractName, bool isZKBytecode) internal override returns (bytes memory) {
+    function getCreationCode(string memory contractName, bool isZKBytecode) internal view override returns (bytes memory) {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "L2GatewayUpgrade")) {
                 revert("L2GatewayUpgrade is not a L1 contract");
