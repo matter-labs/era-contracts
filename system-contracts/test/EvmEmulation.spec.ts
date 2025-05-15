@@ -2,14 +2,9 @@ import { ethers } from "hardhat";
 import { enableEvmEmulation, getWallets } from "./shared/utils";
 import { ContractFactory } from "ethers";
 import { expect } from "chai";
-import type { Wallet } from "zksync-ethers";
+import { ZERO_HASH } from "zksync-ethers/build/utils";
 
 describe("EvmEmulation tests", function () {
-  let wallet: Wallet;
-
-  before(() => {
-    wallet = getWallets()[0];
-  });
   it("Can enable EVM emulation", async () => {
     await enableEvmEmulation();
   });
@@ -26,6 +21,8 @@ describe("EvmEmulation tests", function () {
 
   it("Can deploy EVM contract", async () => {
     await enableEvmEmulation();
+
+    let wallet = getWallets()[0];
 
     const testInterface = new ethers.utils.Interface(testAbi);
 
@@ -44,6 +41,8 @@ describe("EvmEmulation tests", function () {
 
     const testInterface = new ethers.utils.Interface(testAbi);
 
+    let wallet = getWallets()[1];
+
     const factory = new ContractFactory(testInterface, testEvmBytecode, wallet);
 
     const contract = await factory.deploy(101);
@@ -59,12 +58,14 @@ describe("EvmEmulation tests", function () {
 
     const testInterface = new ethers.utils.Interface(testAbi);
 
+    let wallet = getWallets()[2];
+
     const factory = new ContractFactory(testInterface, testEvmBytecode, wallet);
 
     const contract = await factory.deploy(101);
 
     const testValue = await contract.testBlobHash(0);
 
-    expect(testValue).to.be.eq(0);
+    expect(testValue).to.be.eq(ZERO_HASH);
   });
 });
