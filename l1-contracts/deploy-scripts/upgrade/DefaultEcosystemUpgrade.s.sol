@@ -9,7 +9,8 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Utils, PrepareL1L2TransactionParams, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, StateTransitionDeployedAddresses} from "../Utils.sol";
+import {Utils, PrepareL1L2TransactionParams, StateTransitionDeployedAddresses} from "../Utils.sol";
+import {L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2TransactionRequestDirect, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
@@ -197,7 +198,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         deployVerifiers();
         deployUpgradeStageValidator();
         // add custom upgrade deployment here instead of DefaultUpgrade if needed.
-        addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
 
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
@@ -363,8 +363,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             .getBaseForceDeployments();
 
         // Additional force deployments after Gateway
-        IL2ContractDeployer.ForceDeployment[]
-            memory additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
+        IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalFoceDeployments();
         // add additional force deployments here
 
         // TODO: do we update *all* fixed force deployments?
@@ -405,12 +404,20 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
         return
             IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, false)),
+                bytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true)),
                 newAddress: getExpectedL2Address(contractName),
                 callConstructor: true,
                 value: 0,
                 input: "" // todo add constructor args here?
             });
+    }
+
+    function getAdditionalForceDeployments()
+        internal
+        virtual
+        returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
+    {
+        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
     }
 
     function getEcosystemAdmin() external virtual returns (address) {
@@ -553,7 +560,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         return
             Utils.getL2AddressViaCreate2Factory(
                 bytes32(0), // the same as it is currently in the DeployL1.s.sol. Todo unify.
-                L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, false)),
+                L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true)),
                 hex"" // the same as it is currently in DeployL1.s.sol
             );
     }
@@ -1138,7 +1145,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.pauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDRESS);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
 
     function prepareUnpauseMigrationCallForGateway(
@@ -1147,7 +1154,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.unpauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDRESS);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
 
     function prepareNewChainCreationParamsCallForGateway(
@@ -1316,36 +1323,36 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](6);
 
-        calls[0] = _buildCallProxyUpgrade(
-            addresses.stateTransition.chainTypeManagerProxy,
-            addresses.stateTransition.chainTypeManagerImplementation
-        );
+        // calls[0] = _buildCallProxyUpgrade(
+        //     addresses.stateTransition.chainTypeManagerProxy,
+        //     addresses.stateTransition.chainTypeManagerImplementation
+        // );
 
-        calls[1] = _buildCallProxyUpgrade(
-            addresses.bridgehub.bridgehubProxy,
-            addresses.bridgehub.bridgehubImplementation
-        );
+        // calls[1] = _buildCallProxyUpgrade(
+        //     addresses.bridgehub.bridgehubProxy,
+        //     addresses.bridgehub.bridgehubImplementation
+        // );
 
-        // Note, that we do not need to run the initializer
-        calls[2] = _buildCallProxyUpgrade(
-            addresses.bridges.l1NullifierProxy,
-            addresses.bridges.l1NullifierImplementation
-        );
+        // // Note, that we do not need to run the initializer
+        // calls[2] = _buildCallProxyUpgrade(
+        //     addresses.bridges.l1NullifierProxy,
+        //     addresses.bridges.l1NullifierImplementation
+        // );
 
-        calls[3] = _buildCallProxyUpgrade(
-            addresses.bridges.l1AssetRouterProxy,
-            addresses.bridges.l1AssetRouterImplementation
-        );
+        // calls[3] = _buildCallProxyUpgrade(
+        //     addresses.bridges.l1AssetRouterProxy,
+        //     addresses.bridges.l1AssetRouterImplementation
+        // );
 
-        calls[4] = _buildCallProxyUpgrade(
-            addresses.vaults.l1NativeTokenVaultProxy,
-            addresses.vaults.l1NativeTokenVaultImplementation
-        );
+        // calls[4] = _buildCallProxyUpgrade(
+        //     addresses.vaults.l1NativeTokenVaultProxy,
+        //     addresses.vaults.l1NativeTokenVaultImplementation
+        // );
 
-        calls[5] = _buildCallProxyUpgrade(
-            addresses.bridgehub.messageRootProxy,
-            addresses.bridgehub.messageRootImplementation
-        );
+        // calls[5] = _buildCallProxyUpgrade(
+        //     addresses.bridgehub.messageRootProxy,
+        //     addresses.bridgehub.messageRootImplementation
+        // );
     }
 
     function _buildCallProxyUpgrade(
@@ -1404,9 +1411,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "GatewayUpgrade")) {
-                return type(GatewayUpgrade).creationCode;
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "BytecodesSupplier")) {
                 return type(BytecodesSupplier).creationCode;
@@ -1420,8 +1425,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
                 return L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
                 return L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
-            } else {
-                return super.getCreationCode(contractName, isZKBytecode);
             }
         } else {
             if (compareStrings(contractName, "GatewayUpgrade")) {
@@ -1442,10 +1445,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
                 return L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
                 return L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
-            } else {
-                return super.getCreationCode(contractName, isZKBytecode);
             }
         }
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getCreationCalldata(
@@ -1476,7 +1478,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             if (!isZKBytecode) {
                 return abi.encode(addresses.bridgehub.bridgehubProxy);
             } else {
-                return abi.encode(L2_BRIDGEHUB_ADDRESS);
+                return abi.encode(L2_BRIDGEHUB_ADDR);
             }
         } else if (compareStrings(contractName, "Verifier")) {
             if (!isZKBytecode) {

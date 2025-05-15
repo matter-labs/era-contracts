@@ -9,7 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Utils, PrepareL1L2TransactionParams, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, StateTransitionDeployedAddresses} from "../Utils.sol";
+import {Utils, PrepareL1L2TransactionParams, StateTransitionDeployedAddresses} from "../Utils.sol";
 import {L2TransactionRequestDirect, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
@@ -69,7 +69,7 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
@@ -103,9 +103,39 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal override returns (address, bytes memory) {
         return (
-            address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR),
-            abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (_forceDeployments))
+            address(COMPLEX_UPGRADER_ADDR),
+            abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (_forceDeployments, ))
         );
     }
-    // add this to be excluded from coverage report
+
+    function getAdditionalForceDeployments()
+        internal
+        override
+        returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
+    {
+        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](1);
+        additionalForceDeployments[0] = getForceDeployment("L2GatewayUpgrade");
+    }
+
+    function getExpectedL2Address(string memory contractName) internal override returns (address) {
+        if (compareStrings(contractName, "L2GatewayUpgrade")) {
+            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
+        }
+
+        return super.getExpectedL2Address(contractName);
+    }
+
+    function getCreationCode(string memory contractName, bool isZKBytecode) internal override returns (bytes memory) {
+        if (!isZKBytecode) {
+            if (compareStrings(contractName, "L2GatewayUpgrade")) {
+                revert("L2GatewayUpgrade is not a L1 contract");
+            }
+        } else {
+            if (compareStrings(contractName, "GatewayUpgrade")) {
+                return Utils.readZKFoundryBytecodeL1("GatewayUpgrade.sol", "GatewayUpgrade");
+            }
+        }
+
+        return super.getCreationCode(contractName, isZKBytecode);
+    }
 }

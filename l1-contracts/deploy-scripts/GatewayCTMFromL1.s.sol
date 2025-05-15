@@ -18,7 +18,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_CREATE2_FACTORY_ADDRESS, ADDRESS_ONE} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils, ADDRESS_ONE} from "./Utils.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -144,7 +145,7 @@ contract GatewayCTMFromL1 is Script {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDRESS,
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
             chainId: config.chainChainId,
             bridgehubAddress: config.bridgehub,
             l1SharedBridgeProxy: config.sharedBridgeProxy
@@ -434,7 +435,7 @@ contract GatewayCTMFromL1 is Script {
         console.log("Dummy diamond proxy deployed at", dp);
 
         output.gatewayStateTransition.chainTypeManagerImplementation = address(
-            _deployInternal(L2ContractsBytecodesLib.readChainTypeManagerBytecode(), abi.encode(L2_BRIDGEHUB_ADDRESS))
+            _deployInternal(L2ContractsBytecodesLib.readChainTypeManagerBytecode(), abi.encode(L2_BRIDGEHUB_ADDR))
         );
         console.log(
             "StateTransitionImplementation deployed at",

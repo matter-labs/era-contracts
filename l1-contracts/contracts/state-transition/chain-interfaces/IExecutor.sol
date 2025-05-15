@@ -79,6 +79,7 @@ interface IExecutor is IZKChainBase {
 
     /// @notice Legacy StoredBatchInfo struct
     /// @dev dependencyRootsRollingHash is not included in the struct
+    // solhint-disable-next-line gas-struct-packing
     struct LegacyStoredBatchInfo {
         uint64 batchNumber;
         bytes32 batchHash;

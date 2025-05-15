@@ -14,7 +14,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IOwnable} from "./interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
@@ -45,21 +45,6 @@ bytes32 constant EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH = keccak256(
 
 /// @dev EIP-712 TypeHash for protocol upgrades approval by the Security Council.
 bytes32 constant APPROVE_UPGRADE_SECURITY_COUNCIL_TYPEHASH = keccak256("ApproveUpgradeSecurityCouncil(bytes32 id)");
-
-/// @dev The offset from which the built-in, but user space contracts are located.
-uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
-
-// address constant
-address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
-address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03);
-address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
-address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
-address constant L2_WETH_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
-
-/// @dev the address of the Gateway-specific upgrader contract
-address constant L2_GATEWAY_SPECIFIC_UPGRADER = address(USER_CONTRACTS_OFFSET + 0x08);
-
-address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
 
 uint256 constant SECURITY_COUNCIL_SIZE = 12;
 
@@ -367,7 +352,7 @@ library Utils {
     ) internal view returns (address) {
         return
             L2ContractHelper.computeCreate2Address(
-                L2_CREATE2_FACTORY_ADDRESS,
+                L2_CREATE2_FACTORY_ADDR,
                 create2Salt,
                 bytecodeHash,
                 keccak256(constructorArgs)
@@ -418,7 +403,7 @@ library Utils {
             l2GasLimit: l2GasLimit,
             l2Value: 0,
             factoryDeps: _factoryDeps,
-            dstAddress: L2_CREATE2_FACTORY_ADDRESS,
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
             l1SharedBridgeProxy: l1SharedBridgeProxy,

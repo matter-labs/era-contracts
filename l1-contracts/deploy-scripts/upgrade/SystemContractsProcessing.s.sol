@@ -2,7 +2,8 @@
 pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Utils, L2_WETH_IMPL_ADDRESS, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
+import {Utils} from "../Utils.sol";
+import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_WETH_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -362,35 +363,35 @@ library SystemContractsProcessing {
 
         forceDeployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[0]),
-            newAddress: L2_BRIDGEHUB_ADDRESS,
+            newAddress: L2_BRIDGEHUB_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[1] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[1]),
-            newAddress: L2_ASSET_ROUTER_ADDRESS,
+            newAddress: L2_ASSET_ROUTER_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[2] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[2]),
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
+            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[3] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[3]),
-            newAddress: L2_MESSAGE_ROOT_ADDRESS,
+            newAddress: L2_MESSAGE_ROOT_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[4] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[4]),
-            newAddress: L2_WETH_IMPL_ADDRESS,
+            newAddress: L2_WETH_IMPL_ADDR,
             callConstructor: false,
             value: 0,
             input: ""

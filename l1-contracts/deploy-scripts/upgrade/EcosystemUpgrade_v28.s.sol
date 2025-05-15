@@ -9,7 +9,8 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Utils, PrepareL1L2TransactionParams, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, StateTransitionDeployedAddresses} from "../Utils.sol";
+import {Utils, PrepareL1L2TransactionParams, StateTransitionDeployedAddresses} from "../Utils.sol";
+import {L2_WETH_IMPL_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2TransactionRequestDirect, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
@@ -1120,7 +1121,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.pauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDRESS);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
 
     function prepareUnpauseMigrationCallForGateway(
@@ -1129,7 +1130,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(IBridgehub.unpauseMigration, ());
 
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDRESS);
+        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
 
     function prepareNewChainCreationParamsCallForGateway(
@@ -1458,7 +1459,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
             if (!isZKBytecode) {
                 return abi.encode(addresses.bridgehub.bridgehubProxy);
             } else {
-                return abi.encode(L2_BRIDGEHUB_ADDRESS);
+                return abi.encode(L2_BRIDGEHUB_ADDR);
             }
         } else if (compareStrings(contractName, "Verifier")) {
             if (!isZKBytecode) {

@@ -8,7 +8,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
+import {Utils} from "../Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Verifier} from "contracts/state-transition/Verifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/TestnetVerifier.sol";
@@ -129,7 +129,7 @@ contract EcosystemUpgrade_v26_1 is Script {
     using stdToml for string;
 
     address internal constant ADDRESS_ONE = 0x0000000000000000000000000000000000000001;
-    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
+    address internal constant DETERMINISTIC_CREATE2_ADDR = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     // solhint-disable-next-line gas-struct-packing
     struct DeployedAddresses {
@@ -422,7 +422,7 @@ contract EcosystemUpgrade_v26_1 is Script {
     function instantiateCreate2Factory() internal {
         address contractAddress;
 
-        bool isDeterministicDeployed = DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
+        bool isDeterministicDeployed = DETERMINISTIC_CREATE2_ADDR.code.length > 0;
         bool isConfigured = config.contracts.create2FactoryAddr != address(0);
 
         if (isConfigured) {
@@ -432,7 +432,7 @@ contract EcosystemUpgrade_v26_1 is Script {
             contractAddress = config.contracts.create2FactoryAddr;
             console.log("Using configured Create2Factory address:", contractAddress);
         } else if (isDeterministicDeployed) {
-            contractAddress = DETERMINISTIC_CREATE2_ADDRESS;
+            contractAddress = DETERMINISTIC_CREATE2_ADDR;
             console.log("Using deterministic Create2Factory address:", contractAddress);
         } else {
             contractAddress = Utils.deployCreate2Factory();
