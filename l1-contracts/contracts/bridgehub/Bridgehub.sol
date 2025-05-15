@@ -104,6 +104,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
+    address public chainAssetHandler;
+
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
             revert Unauthorized(msg.sender);
@@ -122,13 +124,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         /// There is no sender for the wrapping, we use a virtual address.
         if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
             revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
-        }
-        _;
-    }
-
-    modifier onlyAssetRouter() {
-        if (msg.sender != assetRouter) {
-            revert NotAssetRouter(msg.sender, assetRouter);
         }
         _;
     }
@@ -694,146 +689,30 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Chain migration
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
-    /// @param _settlementChainId the chainId of the settlement chain, i.e. where the message and the migrating chain is sent.
-    /// @param _assetId the assetId of the migrating chain's CTM
-    /// @param _originalCaller the message sender initiated a set of calls that leads to bridge burn
-    /// @param _data the data for the migration
-    function bridgeBurn(
-        uint256 _settlementChainId,
-        uint256 _l2MsgValue,
-        bytes32 _assetId,
-        address _originalCaller,
-        bytes calldata _data
-    )
-        external
-        payable
-        override
-        requireZeroValue(_l2MsgValue + msg.value)
-        onlyAssetRouter
-        whenMigrationsNotPaused
-        returns (bytes memory bridgehubMintData)
-    {
+
+    function forwardedBridgeBurnSetSettlmentLayer(uint256 _chainId, uint256 _newSettlementLayerChainId) external onlyChainAssetHandler returns (address zkChain, address ctm) {
         if (!whitelistedSettlementLayers[_settlementChainId]) {
             revert SLNotWhitelisted();
         }
 
-        BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        if (_assetId != ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
-            revert IncorrectChainAssetId(_assetId, ctmAssetIdFromChainId(bridgehubBurnData.chainId));
+        if (settlementLayer[_chainId] != block.chainid) {
+            revert NotCurrentSL(settlementLayer[_chainId], block.chainid);
         }
-        if (settlementLayer[bridgehubBurnData.chainId] != block.chainid) {
-            revert NotCurrentSL(settlementLayer[bridgehubBurnData.chainId], block.chainid);
-        }
-        settlementLayer[bridgehubBurnData.chainId] = _settlementChainId;
+        settlementLayer[_chainId] = _settlementChainId;
 
         if (whitelistedSettlementLayers[bridgehubBurnData.chainId]) {
             revert SettlementLayersMustSettleOnL1();
         }
-
-        address zkChain = zkChainMap.get(bridgehubBurnData.chainId);
-        if (zkChain == address(0)) {
-            revert HyperchainNotRegistered();
-        }
-        if (_originalCaller != IZKChain(zkChain).getAdmin()) {
-            revert IncorrectSender(_originalCaller, IZKChain(zkChain).getAdmin());
-        }
-
-        bytes memory ctmMintData = IChainTypeManager(chainTypeManager[bridgehubBurnData.chainId]).forwardedBridgeBurn(
-            bridgehubBurnData.chainId,
-            bridgehubBurnData.ctmData
-        );
-        bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
-            _settlementChainId == L1_CHAIN_ID
-                ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
-                : zkChainMap.get(_settlementChainId),
-            _originalCaller,
-            bridgehubBurnData.chainData
-        );
-        BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
-            chainId: bridgehubBurnData.chainId,
-            baseTokenAssetId: baseTokenAssetId[bridgehubBurnData.chainId],
-            ctmData: ctmMintData,
-            chainData: chainMintData
-        });
-        bridgehubMintData = abi.encode(bridgeMintStruct);
-
-        emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
+        zkChain = zkChainMap.get(bridgehubBurnData.chainId);
+        ctm = chainTypeManager[bridgehubBurnData.chainId];
+        return (zkChain, ctm);
     }
 
-    /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
-    /// @param _assetId the assetId of the chain's CTM
-    /// @param _bridgehubMintData the data for the mint
-    function bridgeMint(
-        uint256, // originChainId
-        bytes32 _assetId,
-        bytes calldata _bridgehubMintData
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenMigrationsNotPaused {
-        BridgehubMintCTMAssetData memory bridgehubMintData = abi.decode(
-            _bridgehubMintData,
-            (BridgehubMintCTMAssetData)
-        );
+    function forwardedBridgeMint
 
-        address ctm = ctmAssetIdToAddress[_assetId];
-        if (ctm == address(0)) {
-            revert NoCTMForAssetId(_assetId);
-        }
-        if (settlementLayer[bridgehubMintData.chainId] == block.chainid) {
-            revert AlreadyCurrentSL(block.chainid);
-        }
 
-        settlementLayer[bridgehubMintData.chainId] = block.chainid;
-        chainTypeManager[bridgehubMintData.chainId] = ctm;
-        baseTokenAssetId[bridgehubMintData.chainId] = bridgehubMintData.baseTokenAssetId;
-        // To keep `assetIdIsRegistered` consistent, we'll also automatically register the base token.
-        // It is assumed that if the bridging happened, the token was approved on L1 already.
-        assetIdIsRegistered[bridgehubMintData.baseTokenAssetId] = true;
+    /*////////////////////////////////////////////////////////////*/
 
-        address zkChain = getZKChain(bridgehubMintData.chainId);
-        bool contractAlreadyDeployed = zkChain != address(0);
-        if (!contractAlreadyDeployed) {
-            zkChain = IChainTypeManager(ctm).forwardedBridgeMint(bridgehubMintData.chainId, bridgehubMintData.ctmData);
-            if (zkChain == address(0)) {
-                revert ChainIdNotRegistered(bridgehubMintData.chainId);
-            }
-            // We want to allow any chain to be migrated,
-            _registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            messageRoot.addNewChain(bridgehubMintData.chainId);
-        }
-
-        IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
-
-        emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
-    }
-
-    /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
-    // / @param _chainId the chainId of the chain
-    /// @param _assetId the assetId of the chain's CTM
-    /// @param _data the data for the recovery.
-    function bridgeRecoverFailedTransfer(
-        uint256,
-        bytes32 _assetId,
-        address _depositSender,
-        bytes calldata _data
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
-        BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-
-        settlementLayer[bridgehubBurnData.chainId] = block.chainid;
-
-        IChainTypeManager(chainTypeManager[bridgehubBurnData.chainId]).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubBurnData.chainId,
-            _assetInfo: _assetId,
-            _depositSender: _depositSender,
-            _ctmData: bridgehubBurnData.ctmData
-        });
-
-        IZKChain(getZKChain(bridgehubBurnData.chainId)).forwardedBridgeRecoverFailedTransfer({
-            _chainId: bridgehubBurnData.chainId,
-            _assetInfo: _assetId,
-            _originalCaller: _depositSender,
-            _chainData: bridgehubBurnData.chainData
-        });
-    }
 
     /// @dev Registers an already deployed chain with the bridgehub
     /// @param _chainId The chain Id of the chain
