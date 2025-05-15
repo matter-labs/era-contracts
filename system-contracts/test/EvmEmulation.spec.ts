@@ -50,7 +50,7 @@ describe("EvmEmulation tests", function () {
 
     const testValue = await contract.testBlobBaseFee();
 
-    expect(testValue).to.be.eq(0);
+    expect(testValue).to.be.eq(1);
   });
 
   // TODO: anvil-zksync uses old EVM emulator

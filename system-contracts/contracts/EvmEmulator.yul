@@ -2148,9 +2148,9 @@ object "EvmEmulator" {
                 case 0x4A { // OP_BLOBBASEFEE
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
-                    // TODO: should it be 0 or 1?
-                    // We don't fully support BLOBBASEFEE. Just return 0
-                    sp, stackHead := pushStackItem(sp, 0, stackHead)
+                    // We don't fully support BLOBBASEFEE. Just return 1 as MIN_BASE_FEE_PER_BLOB_GAS (EIP-4844)
+                    // 1 instead of 0 may prevent some unexpected division by zero in user contracts
+                    sp, stackHead := pushStackItem(sp, 1, stackHead)
             
                     ip := add(ip, 1)
                 }
@@ -5213,9 +5213,9 @@ object "EvmEmulator" {
                     case 0x4A { // OP_BLOBBASEFEE
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
-                        // TODO: should it be 0 or 1?
-                        // We don't fully support BLOBBASEFEE. Just return 0
-                        sp, stackHead := pushStackItem(sp, 0, stackHead)
+                        // We don't fully support BLOBBASEFEE. Just return 1 as MIN_BASE_FEE_PER_BLOB_GAS (EIP-4844)
+                        // 1 instead of 0 may prevent some unexpected division by zero in user contracts
+                        sp, stackHead := pushStackItem(sp, 1, stackHead)
                 
                         ip := add(ip, 1)
                     }
