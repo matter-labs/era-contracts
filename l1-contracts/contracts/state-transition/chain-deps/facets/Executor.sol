@@ -299,11 +299,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
         // Check that we commit batches after last committed batch
         bytes32 cachedStoredBatchHashes = s.storedBatchHashes[s.totalBatchesCommitted];
-        if (cachedStoredBatchHashes != _hashStoredBatchInfo(lastCommittedBatchData)) {
-            if (cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)) {
-                // incorrect previous batch data
-                revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
-            }
+        if (
+            cachedStoredBatchHashes != _hashStoredBatchInfo(lastCommittedBatchData) &&
+            cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)
+        ) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
@@ -547,13 +548,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        if (_hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-            if (_hashLegacyStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-                revert BatchHashMismatch(
-                    s.storedBatchHashes[currentTotalBatchesVerified],
-                    _hashStoredBatchInfo(prevBatch)
-                );
-            }
+        if (
+            _hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified] &&
+            _hashLegacyStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]
+        ) {
+            revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
