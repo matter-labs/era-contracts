@@ -1,10 +1,8 @@
 era_chain_id = 324
 testnet_verifier = false
 governance_upgrade_timer_initial_delay = 172800
+owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
 
-# Not used in this upgrade
-# TODO: should be clarified and refined in next upgrades
-owner_address = "0x0000000000000000000000000000000000000000"
 # This should always be false for non-loadtest environments.
 support_l2_legacy_shared_bridge_test = false
 
