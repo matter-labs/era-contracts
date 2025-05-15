@@ -88,7 +88,7 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](30);
+        bytes4[] memory selectors = new bytes4[](31);
         selectors[0] = getters.getVerifier.selector;
         selectors[1] = getters.getAdmin.selector;
         selectors[2] = getters.getPendingAdmin.selector;
@@ -119,6 +119,7 @@ contract ExecutorTest is Test {
         selectors[27] = getters.getTotalBatchesVerified.selector;
         selectors[28] = getters.storedBlockHash.selector;
         selectors[29] = getters.isPriorityQueueActive.selector;
+        selectors[30] = getters.getChainTypeManager.selector;
         return selectors;
     }
 
