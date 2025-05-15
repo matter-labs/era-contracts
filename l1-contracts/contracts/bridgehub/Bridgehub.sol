@@ -135,6 +135,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
+    error NotChainAssetHandler(address sender, address chainAssetHandler);
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != chainAssetHandler) {
+            revert NotChainAssetHandler(msg.sender, chainAssetHandler);
+        }
+        _;
+    }
+
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
         _disableInitializers();
@@ -379,15 +387,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return _chainId;
     }
 
-    /// @notice This internal function is used to register a new zkChain in the system.
-    /// @param _chainId The chain ID of the ZK chain
-    /// @param _zkChain The address of the ZK chain's DiamondProxy contract.
-    /// @param _checkMaxNumberOfZKChains Whether to check that the limit for the number
-    /// of chains has not been crossed.
-    /// @dev Providing `_checkMaxNumberOfZKChains = false` may be preferable in cases
-    /// where we want to guarantee that a chain can be added. These include:
-    /// - Migration of a chain from the mapping in the old CTM
-    /// - Migration of a chain to a new settlement layer
     function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {
         // slither-disable-next-line unused-return
         zkChainMap.set(_chainId, _zkChain);
@@ -689,30 +688,75 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Chain migration
     //////////////////////////////////////////////////////////////*/
 
-
-    function forwardedBridgeBurnSetSettlmentLayer(uint256 _chainId, uint256 _newSettlementLayerChainId) external onlyChainAssetHandler returns (address zkChain, address ctm) {
-        if (!whitelistedSettlementLayers[_settlementChainId]) {
+    function forwardedBridgeBurnSetSettlmentLayer(
+        uint256 _chainId,
+        uint256 _newSettlementLayerChainId
+    ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
+        if (!whitelistedSettlementLayers[_newSettlementLayerChainId]) {
             revert SLNotWhitelisted();
         }
 
         if (settlementLayer[_chainId] != block.chainid) {
             revert NotCurrentSL(settlementLayer[_chainId], block.chainid);
         }
-        settlementLayer[_chainId] = _settlementChainId;
+        settlementLayer[_chainId] = _newSettlementLayerChainId;
 
-        if (whitelistedSettlementLayers[bridgehubBurnData.chainId]) {
+        if (whitelistedSettlementLayers[_chainId]) {
             revert SettlementLayersMustSettleOnL1();
         }
-        zkChain = zkChainMap.get(bridgehubBurnData.chainId);
-        ctm = chainTypeManager[bridgehubBurnData.chainId];
-        return (zkChain, ctm);
+        zkChain = zkChainMap.get(_chainId);
+        ctm = chainTypeManager[_chainId];
     }
 
-    function forwardedBridgeMint
+    function forwardedBridgeMint(
+        bytes32 _assetId,
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId
+    ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
+        ctm = ctmAssetIdToAddress[_assetId];
+        if (ctm == address(0)) {
+            revert NoCTMForAssetId(_assetId);
+        }
+        if (settlementLayer[_chainId] == block.chainid) {
+            revert AlreadyCurrentSL(block.chainid);
+        }
 
+        settlementLayer[_chainId] = block.chainid;
+        chainTypeManager[_chainId] = ctm;
+        baseTokenAssetId[_chainId] = _baseTokenAssetId;
+        // To keep `assetIdIsRegistered` consistent, we'll also automatically register the base token.
+        // It is assumed that if the bridging happened, the token was approved on L1 already.
+        assetIdIsRegistered[_baseTokenAssetId] = true;
+
+        zkChain = getZKChain(_chainId);
+    }
+
+    /// @notice This internal function is used to register a new zkChain in the system.
+    /// @param _chainId The chain ID of the ZK chain
+    /// @param _zkChain The address of the ZK chain's DiamondProxy contract.
+    /// @param _checkMaxNumberOfZKChains Whether to check that the limit for the number
+    /// of chains has not been crossed.
+    /// @dev Providing `_checkMaxNumberOfZKChains = false` may be preferable in cases
+    /// where we want to guarantee that a chain can be added. These include:
+    /// - Migration of a chain from the mapping in the old CTM
+    /// - Migration of a chain to a new settlement layer
+    function registerNewZKChain(
+        uint256 _chainId,
+        address _zkChain,
+        bool _checkMaxNumberOfZKChains
+    ) public onlyChainAssetHandler {
+        _registerNewZKChain(_chainId, _zkChain, _checkMaxNumberOfZKChains);
+    }
+
+    function forwardedBridgeRecoverFailedTransfer(
+        uint256 _chainId
+    ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
+        settlementLayer[_chainId] = block.chainid;
+        zkChain = getZKChain(_chainId);
+        ctm = chainTypeManager[_chainId];
+    }
 
     /*////////////////////////////////////////////////////////////*/
-
 
     /// @dev Registers an already deployed chain with the bridgehub
     /// @param _chainId The chain Id of the chain
