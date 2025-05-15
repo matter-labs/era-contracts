@@ -8,13 +8,11 @@ import "./interfaces/IHashValidator.sol";
  * @dev Manages a set of valid hashes with batch operations for efficiency.
  */
 contract HashValidator is Ownable, IHashValidator {
-    
     mapping(bytes32 => bool) private validEnclaveHashes;
     mapping(bytes32 => bool) private validTD10ReportBodyMrHashes;
 
     event EnclaveHashesUpdated(bytes32[] hashes, bool status);
     event TD10ReportBodyMrHashesUpdated(bytes32[] hashes, bool status);
-
 
     constructor(address owner) {
         _initializeOwner(owner);
@@ -30,7 +28,7 @@ contract HashValidator is Ownable, IHashValidator {
 
         for (uint256 i = 0; i < length; ++i) {
             bytes32 hash = hashes[i];
-            if(!validEnclaveHashes[hash]){
+            if (!validEnclaveHashes[hash]) {
                 validEnclaveHashes[hash] = true;
             }
         }
@@ -42,12 +40,12 @@ contract HashValidator is Ownable, IHashValidator {
      * @param hashes The array of hashes to be removed.
      */
     function removeValidEnclaveHashes(bytes32[] calldata hashes) external onlyOwner {
-       uint256 length = hashes.length;
+        uint256 length = hashes.length;
         require(length > 0, EmptyArray());
 
         for (uint256 i = 0; i < length; ++i) {
             bytes32 hash = hashes[i];
-            if(validEnclaveHashes[hash]){
+            if (validEnclaveHashes[hash]) {
                 validEnclaveHashes[hash] = false;
             }
         }
@@ -69,12 +67,12 @@ contract HashValidator is Ownable, IHashValidator {
      * @param hashes The array of hashes to be marked as valid.
      */
     function addValidTD10ReportBodyMrHashes(bytes32[] calldata hashes) external onlyOwner {
-       uint256 length = hashes.length;
+        uint256 length = hashes.length;
         require(length > 0, EmptyArray());
 
         for (uint256 i = 0; i < length; ++i) {
             bytes32 hash = hashes[i];
-            if(!validTD10ReportBodyMrHashes[hash]){
+            if (!validTD10ReportBodyMrHashes[hash]) {
                 validTD10ReportBodyMrHashes[hash] = true;
             }
         }
@@ -86,12 +84,12 @@ contract HashValidator is Ownable, IHashValidator {
      * @param hashes The array of hashes to be removed.
      */
     function removeValidTD10ReportBodyMrHashes(bytes32[] calldata hashes) external onlyOwner {
-       uint256 length = hashes.length;
+        uint256 length = hashes.length;
         require(length > 0, EmptyArray());
 
         for (uint256 i = 0; i < length; ++i) {
             bytes32 hash = hashes[i];
-            if(validTD10ReportBodyMrHashes[hash]){
+            if (validTD10ReportBodyMrHashes[hash]) {
                 validTD10ReportBodyMrHashes[hash] = false;
             }
         }
@@ -106,5 +104,4 @@ contract HashValidator is Ownable, IHashValidator {
     function isValidTD10ReportBodyMrHash(bytes32 hash) external view returns (bool isValid) {
         return validTD10ReportBodyMrHashes[hash];
     }
-    
 }
