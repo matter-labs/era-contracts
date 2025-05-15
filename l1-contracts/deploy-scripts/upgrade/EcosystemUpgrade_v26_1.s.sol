@@ -55,7 +55,7 @@ import {PermanentRestriction} from "contracts/governance/PermanentRestriction.so
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";

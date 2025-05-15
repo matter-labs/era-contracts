@@ -61,7 +61,7 @@ import {PermanentRestriction} from "contracts/governance/PermanentRestriction.so
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -559,10 +559,10 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
         bytes[] memory additionalDependencies = new bytes[](4); // Deps after Gateway upgrade
-        additionalDependencies[0] = L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
-        additionalDependencies[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
-        additionalDependencies[2] = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
-        additionalDependencies[3] = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
+        additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
+        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
+        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
@@ -576,18 +576,20 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readBeaconProxyBytecode()
+                ContractsBytecodesLib.getCreationCode("BeaconProxy")
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode()),
+            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(ContractsBytecodesLib.getCreationCode("Bridgehub")),
             l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2AssetRouterBytecode()
+                ContractsBytecodesLib.getCreationCode("L2AssetRouter")
             ),
             l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
+                ContractsBytecodesLib.getCreationCode("L2NativeTokenVault")
             ),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                ContractsBytecodesLib.getCreationCode("MessageRoot")
+            ),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),
@@ -1400,11 +1402,11 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return type(GovernanceUpgradeTimer).creationCode;
             } else if (compareStrings(contractName, "L2StandardERC20")) {
-                return L2ContractsBytecodesLib.readStandardERC20Bytecode();
+                return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
             } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
+                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             } else {
                 return super.getCreationCode(contractName, isZKBytecode);
             }
@@ -1420,13 +1422,13 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return Utils.readZKFoundryBytecodeL1("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer");
             } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-                return L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
+                return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
             } else if (compareStrings(contractName, "L2StandardERC20")) {
-                return L2ContractsBytecodesLib.readStandardERC20Bytecode();
+                return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
             } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
+                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             } else {
                 return super.getCreationCode(contractName, isZKBytecode);
             }

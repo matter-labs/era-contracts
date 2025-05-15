@@ -38,7 +38,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";

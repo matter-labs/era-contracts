@@ -6,7 +6,7 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";

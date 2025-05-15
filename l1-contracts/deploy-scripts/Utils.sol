@@ -244,31 +244,6 @@ library Utils {
     }
 
     /**
-     * @dev Returns the bytecode of a given system contract.
-     */
-    function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
-    }
-
-    /**
-     * @dev Returns the bytecode of a given system contract in yul.
-     */
-    function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return readFoundryBytecode(path);
-    }
-
-    /**
-     * @dev Returns the bytecode of a given precompile system contract.
-     */
-    function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return readFoundryBytecode(path);
-    }
-
-    /**
      * @dev Deploy a Create2Factory contract.
      */
     function deployCreate2Factory() internal returns (address) {
@@ -939,6 +914,40 @@ library Utils {
     }
 
     /**
+     * @dev Returns the bytecode of a given system contract.
+     */
+    function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
+        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
+    }
+
+    /**
+     * @dev Returns the bytecode of a given system contract in yul.
+     */
+    function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
+        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
+
+        return readFoundryBytecode(path);
+    }
+
+    /**
+     * @dev Returns the bytecode of a given precompile system contract.
+     */
+    function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
+        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
+
+        return readFoundryBytecode(path);
+    }
+    /**
+     * @dev Returns the bytecode of a given DA contract.
+     */
+    function readDAContractBytecode(string memory contractIdentifier) internal view returns (bytes memory) {
+        return
+            readFoundryBytecode(
+                string.concat("/../da-contracts/out/", contractIdentifier, ".sol/", contractIdentifier, ".json")
+            );
+    }
+
+    /**
      * @dev Read foundry bytecodes
      */
     function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
@@ -1271,18 +1280,6 @@ library Utils {
         info.admin = IGetters(info.diamondProxy).getAdmin();
         info.ctm = Bridgehub(_bridgehub).chainTypeManager(_chainId);
         info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
-    }
-
-    function readRollupDAValidatorBytecode() internal view returns (bytes memory bytecode) {
-        bytecode = readFoundryBytecode("/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json");
-    }
-
-    function readAvailL1DAValidatorBytecode() internal view returns (bytes memory bytecode) {
-        bytecode = readFoundryBytecode("/../da-contracts/out/AvailL1DAValidator.sol/AvailL1DAValidator.json");
-    }
-
-    function readDummyAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
-        bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
     }
 
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {

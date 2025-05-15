@@ -5,7 +5,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_WETH_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 // solhint-disable no-console, gas-custom-errors
@@ -344,11 +344,11 @@ library SystemContractsProcessing {
     function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
 
-        result[0] = L2ContractsBytecodesLib.getCreationCode("Bridgehub");
-        result[1] = L2ContractsBytecodesLib.getCreationCode("L2AssetRouter");
-        result[2] = L2ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
-        result[3] = L2ContractsBytecodesLib.getCreationCode("MessageRoot");
-        result[4] = L2ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
+        result[0] = ContractsBytecodesLib.getCreationCode("Bridgehub");
+        result[1] = ContractsBytecodesLib.getCreationCode("L2AssetRouter");
+        result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
+        result[3] = ContractsBytecodesLib.getCreationCode("MessageRoot");
+        result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
     }
 
     /// Note, that while proper initialization may require multiple steps,

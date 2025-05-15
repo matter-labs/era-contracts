@@ -21,7 +21,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {StateTransitionDeployedAddresses, Utils, ADDRESS_ONE} from "./Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
@@ -363,24 +363,24 @@ contract GatewayCTMFromL1 is Script {
 
     function deployGatewayFacets() internal {
         address adminFacet = address(
-            _deployInternal(L2ContractsBytecodesLib.getCreationCode("AdminFacet"), abi.encode(config.l1ChainId))
+            _deployInternal(ContractsBytecodesLib.getCreationCode("AdminFacet"), abi.encode(config.l1ChainId))
         );
         console.log("Admin facet deployed at", adminFacet);
 
         address mailboxFacet = address(
             _deployInternal(
-                L2ContractsBytecodesLib.getCreationCode("MailboxFacet"),
+                ContractsBytecodesLib.getCreationCode("MailboxFacet"),
                 abi.encode(config.l1ChainId, config.eraChainId)
             )
         );
         console.log("Mailbox facet deployed at", mailboxFacet);
 
         address executorFacet = address(
-            _deployInternal(L2ContractsBytecodesLib.getCreationCode("ExecutorFacet"), abi.encode(config.l1ChainId))
+            _deployInternal(ContractsBytecodesLib.getCreationCode("ExecutorFacet"), abi.encode(config.l1ChainId))
         );
         console.log("ExecutorFacet facet deployed at", executorFacet);
 
-        address gettersFacet = address(_deployInternal(L2ContractsBytecodesLib.getCreationCode("GettersFacet"), hex""));
+        address gettersFacet = address(_deployInternal(ContractsBytecodesLib.getCreationCode("GettersFacet"), hex""));
         console.log("Getters facet deployed at", gettersFacet);
 
         output.gatewayStateTransition.adminFacet = adminFacet;
@@ -391,25 +391,23 @@ contract GatewayCTMFromL1 is Script {
 
     function deployGatewayVerifier() internal returns (address verifier) {
         address verifierFflonk = address(
-            _deployInternal(L2ContractsBytecodesLib.getCreationCode("VerifierFflonk"), hex"")
+            _deployInternal(ContractsBytecodesLib.getCreationCode("VerifierFflonk"), hex"")
         );
         console.log("VerifierFflonk deployed at", verifierFflonk);
-        address verifierPlonk = address(
-            _deployInternal(L2ContractsBytecodesLib.getCreationCode("VerifierPlonk"), hex"")
-        );
+        address verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("VerifierPlonk"), hex""));
         console.log("VerifierPlonk deployed at", verifierPlonk);
 
         if (config.testnetVerifier) {
             verifier = address(
                 _deployInternal(
-                    L2ContractsBytecodesLib.getCreationCode("L2TestnetVerifier"),
+                    ContractsBytecodesLib.getCreationCode("L2TestnetVerifier"),
                     abi.encode(config.l1ChainId)
                 )
             );
         } else {
             verifier = address(
                 _deployInternal(
-                    L2ContractsBytecodesLib.getCreationCode("DualVerifier"),
+                    ContractsBytecodesLib.getCreationCode("DualVerifier"),
                     abi.encode(verifierFflonk, verifierPlonk)
                 )
             );
@@ -424,7 +422,7 @@ contract GatewayCTMFromL1 is Script {
         // Note: we do not apply alias because the deployer is an EOA.
         validatorTimelock = address(
             _deployInternal(
-                L2ContractsBytecodesLib.getCreationCode("ValidatorTimelock"),
+                ContractsBytecodesLib.getCreationCode("ValidatorTimelock"),
                 abi.encode(deployerAddress, 0, config.eraChainId)
             )
         );
@@ -436,14 +434,11 @@ contract GatewayCTMFromL1 is Script {
         // we can only do it via deploying its dummy version.
         // We could've published the dependency separately, but we just repeated the code that would be
         // used for pure L2 execution.
-        address dp = address(_deployInternal(L2ContractsBytecodesLib.getCreationCode("DiamondProxy"), hex""));
+        address dp = address(_deployInternal(ContractsBytecodesLib.getCreationCode("DiamondProxy"), hex""));
         console.log("Dummy diamond proxy deployed at", dp);
 
         output.gatewayStateTransition.chainTypeManagerImplementation = address(
-            _deployInternal(
-                L2ContractsBytecodesLib.getCreationCode("ChainTypeManager"),
-                abi.encode(L2_BRIDGEHUB_ADDR)
-            )
+            _deployInternal(ContractsBytecodesLib.getCreationCode("ChainTypeManager"), abi.encode(L2_BRIDGEHUB_ADDR))
         );
         console.log(
             "StateTransitionImplementation deployed at",
@@ -529,7 +524,7 @@ contract GatewayCTMFromL1 is Script {
         });
 
         output.gatewayStateTransition.chainTypeManagerProxy = _deployInternal(
-            L2ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
+            ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
             abi.encode(
                 output.gatewayStateTransition.chainTypeManagerImplementation,
                 deployerAddress,

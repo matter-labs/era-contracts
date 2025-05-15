@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import "./Utils.sol";
 
-/// @title L2ContractsBytecodesLib
+/// @title ContractsBytecodesLib
 /// @notice Library providing functions to read bytecodes of L2 contracts individually.
 library ContractsBytecodesLib {
     /// @notice Reads the bytecode of the specified contract using a unique identifier.
@@ -13,18 +13,12 @@ library ContractsBytecodesLib {
     /// @return The bytecode of the contract.
     /// @dev Reverts if the contractIdentifier is unknown or unsupported.
     function getCreationCode(string memory contractIdentifier) internal view returns (bytes memory) {
+        string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
 
-        string[3] memory DA_CONTRACT_IDENTIFIERS = [
-            "RollupL1DAValidator",
-            "AvailL1DAValidator",
-            "DummyAvailBridge"
-        ];
-        
-        
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[34] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[37] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
@@ -145,6 +139,6 @@ library ContractsBytecodesLib {
             }
         }
 
-        revert("L2ContractsBytecodesLib: Unknown or unsupported contract identifier");
+        revert("ContractsBytecodesLib: Unknown or unsupported contract identifier");
     }
 }
