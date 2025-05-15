@@ -82,7 +82,9 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
-import {FixedForceDeploymentsData, DeployedAddresses, ContractsConfig, TokensConfig} from "../DeployUtils.s.sol";
+import {DeployedAddresses, ContractsConfig, TokensConfig} from "../DeployUtils.s.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+
 import {DeployL1Script} from "../DeployL1.s.sol";
 
 /// @notice Script used for default upgrade flow

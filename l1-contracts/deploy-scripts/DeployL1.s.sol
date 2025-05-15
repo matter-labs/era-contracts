@@ -85,7 +85,8 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
-import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
+import {DeployUtils, GeneratedData, Config, DeployedAddresses} from "./DeployUtils.s.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;

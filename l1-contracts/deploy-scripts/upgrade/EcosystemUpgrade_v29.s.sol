@@ -69,7 +69,7 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
@@ -81,10 +81,14 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
-import {FixedForceDeploymentsData, DeployedAddresses, ContractsConfig, TokensConfig} from "../DeployUtils.s.sol";
+import {DeployedAddresses, ContractsConfig, TokensConfig} from "../DeployUtils.s.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+
 import {DeployL1Script} from "../DeployL1.s.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
+
+import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -102,9 +106,11 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     function _getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal override returns (address, bytes memory) {
+        bytes32 ethAssetId = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy).ETH_TOKEN_ASSET_ID();
+        bytes memory v29UpgradeCalldata = abi.encodeCall(IL2V29Upgrade.upgrade, (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId));
         return (
-            address(COMPLEX_UPGRADER_ADDR),
-            abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (_forceDeployments, ))
+            address(L2_COMPLEX_UPGRADER_ADDR),
+            abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata))
         );
     }
 

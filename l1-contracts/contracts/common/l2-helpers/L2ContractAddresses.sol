@@ -58,6 +58,9 @@ address constant L2_CREATE2_FACTORY_ADDR = address(USER_CONTRACTS_OFFSET + 0x00)
 /// @dev The address used to execute the genesis upgrade
 address constant L2_GENESIS_UPGRADE_ADDR = address(USER_CONTRACTS_OFFSET + 0x01);
 
+/// @dev The genesis upgrade address is reused for all version specific upgrades
+address constant L2_VERSION_SPECIFIC_UPGRADER_ADDR = L2_GENESIS_UPGRADE_ADDR;
+
 /// @dev The address of the L2 bridge hub system contract, used to start L1->L2 transactions
 address constant L2_BRIDGEHUB_ADDR = address(USER_CONTRACTS_OFFSET + 0x02);
 

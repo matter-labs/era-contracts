@@ -16,25 +16,6 @@ import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 
-struct FixedForceDeploymentsData {
-    uint256 l1ChainId;
-    uint256 eraChainId;
-    address l1AssetRouter;
-    bytes32 l2TokenProxyBytecodeHash;
-    address aliasedL1Governance;
-    uint256 maxNumberOfZKChains;
-    bytes32 bridgehubBytecodeHash;
-    bytes32 l2AssetRouterBytecodeHash;
-    bytes32 l2NtvBytecodeHash;
-    bytes32 messageRootBytecodeHash;
-    address l2SharedBridgeLegacyImpl;
-    address l2BridgedStandardERC20Impl;
-    // The forced beacon address. It is needed only for internal testing.
-    // MUST be equal to 0 in production.
-    // It will be the job of the governance to ensure that this value is set correctly.
-    address dangerousTestOnlyForcedBeacon;
-}
-
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
     BridgehubDeployedAddresses bridgehub;
