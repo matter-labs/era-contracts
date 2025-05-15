@@ -107,10 +107,16 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal override returns (address, bytes memory) {
         bytes32 ethAssetId = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy).ETH_TOKEN_ASSET_ID();
-        bytes memory v29UpgradeCalldata = abi.encodeCall(IL2V29Upgrade.upgrade, (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId));
+        bytes memory v29UpgradeCalldata = abi.encodeCall(
+            IL2V29Upgrade.upgrade,
+            (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
+        );
         return (
             address(L2_COMPLEX_UPGRADER_ADDR),
-            abi.encodeCall(IComplexUpgrader.forceDeployAndUpgrade, (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata))
+            abi.encodeCall(
+                IComplexUpgrader.forceDeployAndUpgrade,
+                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+            )
         );
     }
 
@@ -131,7 +137,10 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         return super.getExpectedL2Address(contractName);
     }
 
-    function getCreationCode(string memory contractName, bool isZKBytecode) internal view override returns (bytes memory) {
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view override returns (bytes memory) {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "L2GatewayUpgrade")) {
                 revert("L2GatewayUpgrade is not a L1 contract");
