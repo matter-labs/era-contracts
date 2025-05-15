@@ -670,6 +670,7 @@ for { } true { } {
     case 0x4A { // OP_BLOBBASEFEE
         evmGasLeft := chargeGas(evmGasLeft, 2)
 
+        // TODO: should it be 0 or 1?
         // We don't fully support BLOBBASEFEE. Just return 0
         sp, stackHead := pushStackItem(sp, 0, stackHead)
 
