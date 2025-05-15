@@ -191,6 +191,8 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         ) = GatewayCTMDeployerHelper.calculateAddresses(bytes32(0), gatewayCTMDeployerConfig);
 
         gatewayCTMDeployer = ctmDeployerVerificationInfo.addr;
+        console.log("GW CTM DEPLOYER");
+        console.log(gatewayCTMDeployer);
         gatewayCTMDeployerCreate2Data = create2Calldata;
 
         GatewayCTMDeployerHelper.notifyAboutDeployments(verificationInfo);
@@ -271,6 +273,16 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
 
     function run() public override {
         console.log("Setting up the Gateway script");
+
+        address deployer = msg.sender;
+        console.log("Deployer:");
+        console.log(deployer);
+        TestnetERC20Token zk = TestnetERC20Token(0x66A5cFB2e9c529f14FE6364Ad1075dF3a649C0A5);
+        address ntv = 0xbeD1EB542f9a5aA6419Ff3deb921A372681111f6;
+
+        vm.prank(ntv);
+        bool success = zk.bridgeMint(deployer, 1000000000000000000000000);
+        vm.stopPrank();
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));

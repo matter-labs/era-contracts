@@ -19,6 +19,11 @@ contract TestnetERC20Token is ERC20 {
         return true;
     }
 
+    function bridgeMint(address _to, uint256 _amount) public returns (bool) {
+        _mint(_to, _amount);
+        return true;
+    }
+
     function decimals() public view override returns (uint8) {
         return _decimals;
     }
