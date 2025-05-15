@@ -38,7 +38,8 @@ describe("EvmEmulation tests", function () {
     expect(testValue).to.be.eq(101);
   });
 
-  it("Can use BLOBBASEFEE opcode", async () => {
+  // TODO: anvil-zksync uses old EVM emulator
+  it.skip("Can use BLOBBASEFEE opcode", async () => {
     await enableEvmEmulation();
 
     const testInterface = new ethers.utils.Interface(testAbi);
@@ -52,7 +53,8 @@ describe("EvmEmulation tests", function () {
     expect(testValue).to.be.eq(0);
   });
 
-  it("Can use BLOBHASH opcode", async () => {
+  // TODO: anvil-zksync uses old EVM emulator
+  it.skip("Can use BLOBHASH opcode", async () => {
     await enableEvmEmulation();
 
     const testInterface = new ethers.utils.Interface(testAbi);
