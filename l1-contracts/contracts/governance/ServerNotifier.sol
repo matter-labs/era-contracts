@@ -25,7 +25,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
     event MigrateFromGateway(uint256 indexed chainId);
 
     /// @notice Emitted whenever an upgrade timestamp is set.
-    /// @param chainId The ID of the chain.
+    /// @param chainId The ID of the chain where the upgrade is scheduled.
     /// @param protocolVersion The protocol version being scheduled.
     /// @param upgradeTimestamp UNIX timestamp when the upgrade is expected.
     event UpgradeTimestampUpdated(uint256 indexed chainId, uint256 indexed protocolVersion, uint256 upgradeTimestamp);
