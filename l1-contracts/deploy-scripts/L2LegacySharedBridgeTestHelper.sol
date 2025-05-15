@@ -17,12 +17,12 @@ library L2LegacySharedBridgeTestHelper {
         // that supports the legacy bridge.
 
         bytes32 implHash = L2ContractHelper.hashL2Bytecode(
-            L2ContractsBytecodesLib.readL2LegacySharedBridgeDevBytecode()
+            L2ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev")
         );
         address implAddress = Utils.getL2AddressViaCreate2Factory(bytes32(0), implHash, hex"");
 
         bytes32 proxyHash = L2ContractHelper.hashL2Bytecode(
-            L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode()
+            L2ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy")
         );
 
         return
@@ -45,7 +45,7 @@ library L2LegacySharedBridgeTestHelper {
         address _ecosystemL1Governance
     ) internal view returns (bytes memory) {
         bytes32 beaconProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(
-            L2ContractsBytecodesLib.readBeaconProxyBytecode()
+            L2ContractsBytecodesLib.getCreationCode("BeaconProxy")
         );
 
         bytes memory initializeData = abi.encodeCall(
@@ -75,7 +75,7 @@ library L2LegacySharedBridgeTestHelper {
         );
 
         bytes32 bridgedL2ERC20Hash = L2ContractHelper.hashL2Bytecode(
-            L2ContractsBytecodesLib.readStandardERC20Bytecode()
+            L2ContractsBytecodesLib.getCreationCode("BridgedStandardERC20")
         );
         address bridgeL2ERC20ImplAddress = L2ContractHelper.computeCreate2Address(
             l2SharedBridgeAddress,
@@ -85,10 +85,10 @@ library L2LegacySharedBridgeTestHelper {
         );
 
         bytes32 tokenBeaconBytecodeHash = L2ContractHelper.hashL2Bytecode(
-            L2ContractsBytecodesLib.readUpgradeableBeaconBytecode()
+            L2ContractsBytecodesLib.getCreationCode("UpgradeableBeacon")
         );
         tokenBeaconProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(
-            L2ContractsBytecodesLib.readBeaconProxyBytecode()
+            L2ContractsBytecodesLib.getCreationCode("BeaconProxy")
         );
         tokenBeaconAddress = L2ContractHelper.computeCreate2Address(
             l2SharedBridgeAddress,

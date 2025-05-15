@@ -344,11 +344,11 @@ library SystemContractsProcessing {
     function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
 
-        result[0] = L2ContractsBytecodesLib.readBridgehubBytecode();
-        result[1] = L2ContractsBytecodesLib.readL2AssetRouterBytecode();
-        result[2] = L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode();
-        result[3] = L2ContractsBytecodesLib.readMessageRootBytecode();
-        result[4] = L2ContractsBytecodesLib.readL2WrappedBaseToken();
+        result[0] = L2ContractsBytecodesLib.getCreationCode("Bridgehub");
+        result[1] = L2ContractsBytecodesLib.getCreationCode("L2AssetRouter");
+        result[2] = L2ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
+        result[3] = L2ContractsBytecodesLib.getCreationCode("MessageRoot");
+        result[4] = L2ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
     }
 
     /// Note, that while proper initialization may require multiple steps,

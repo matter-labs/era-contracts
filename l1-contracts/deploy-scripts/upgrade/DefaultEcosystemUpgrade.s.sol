@@ -416,10 +416,17 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
     function getAdditionalForceDeployments()
         internal
-        virtual
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
     {
-        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](0);
+        string[] memory forceDeploymentNames = getForceDeploymentNames();
+        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentNames.length);
+        for (uint256 i; i < forceDeploymentNames.length; i++) {
+            additionalForceDeployments[i] = getForceDeployment(forceDeploymentNames[i]);
+        }
+    }
+
+    function getForceDeploymentNames() internal virtual returns (string[] memory forceDeploymentNames) {
+        forceDeploymentNames = new string[](0);
     }
 
     function getEcosystemAdmin() external virtual returns (address) {
@@ -575,10 +582,15 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
         bytes[] memory additionalDependencies = new bytes[](4); // Deps after Gateway upgrade
-        additionalDependencies[0] = L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
-        additionalDependencies[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
-        additionalDependencies[2] = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
-        additionalDependencies[3] = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+        additionalDependencies[0] = L2ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
+        additionalDependencies[1] = L2ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
+        additionalDependencies[2] = L2ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
+        additionalDependencies[3] = L2ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+
+        string[] memory additionalForceDeployments = getForceDeploymentNames();
+        for (uint256 i; i < additionalForceDeployments.length; i++) {
+            additionalDependencies[4 + i] = L2ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
+        }
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
@@ -592,18 +604,22 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readBeaconProxyBytecode()
+                L2ContractsBytecodesLib.getCreationCode("BeaconProxy")
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode()),
+            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.getCreationCode("Bridgehub")
+            ),
             l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2AssetRouterBytecode()
+                L2ContractsBytecodesLib.getCreationCode("L2AssetRouter")
             ),
             l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
+                L2ContractsBytecodesLib.getCreationCode("L2NativeTokenVault")
             ),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(
+                L2ContractsBytecodesLib.getCreationCode("MessageRoot")
+            ),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),
@@ -1422,11 +1438,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return type(GovernanceUpgradeTimer).creationCode;
             } else if (compareStrings(contractName, "L2StandardERC20")) {
-                return L2ContractsBytecodesLib.readStandardERC20Bytecode();
+                return L2ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
             } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
+                return L2ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+                return L2ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             }
         } else {
             if (compareStrings(contractName, "GatewayUpgrade")) {
@@ -1440,13 +1456,13 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
                 return Utils.readZKFoundryBytecodeL1("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer");
             } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-                return L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
+                return L2ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
             } else if (compareStrings(contractName, "L2StandardERC20")) {
-                return L2ContractsBytecodesLib.readStandardERC20Bytecode();
+                return L2ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
             } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
+                return L2ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+                return L2ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             }
         }
         return super.getCreationCode(contractName, isZKBytecode);

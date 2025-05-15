@@ -120,37 +120,16 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         );
     }
 
-    function getAdditionalForceDeployments()
-        internal
-        override
-        returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
-    {
-        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](1);
-        additionalForceDeployments[0] = getForceDeployment("L2GatewayUpgrade");
+    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
+        forceDeploymentNames = new string[](1);
+        forceDeploymentNames[0] = "L2V29Upgrade";
     }
 
     function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2GatewayUpgrade")) {
+        if (compareStrings(contractName, "L2V29Upgrade")) {
             return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
         }
 
         return super.getExpectedL2Address(contractName);
-    }
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "L2GatewayUpgrade")) {
-                revert("L2GatewayUpgrade is not a L1 contract");
-            }
-        } else {
-            if (compareStrings(contractName, "GatewayUpgrade")) {
-                return Utils.readZKFoundryBytecodeL1("GatewayUpgrade.sol", "GatewayUpgrade");
-            }
-        }
-
-        return super.getCreationCode(contractName, isZKBytecode);
     }
 }

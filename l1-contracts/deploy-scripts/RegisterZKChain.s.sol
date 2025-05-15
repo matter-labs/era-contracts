@@ -465,7 +465,7 @@ contract RegisterZKChainScript is Script {
     function deployLegacySharedBridge() internal {
         bytes[] memory emptyDeps = new bytes[](0);
         address legacyBridgeImplAddr = Utils.deployThroughL1Deterministic({
-            bytecode: L2ContractsBytecodesLib.readL2LegacySharedBridgeDevBytecode(),
+            bytecode: L2ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev"),
             constructorargs: hex"",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -476,7 +476,7 @@ contract RegisterZKChainScript is Script {
         });
 
         output.l2LegacySharedBridge = Utils.deployThroughL1Deterministic({
-            bytecode: L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
+            bytecode: L2ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
             constructorargs: L2LegacySharedBridgeTestHelper.getLegacySharedBridgeProxyConstructorParams(
                 legacyBridgeImplAddr,
                 config.l1Erc20Bridge,
@@ -495,10 +495,10 @@ contract RegisterZKChainScript is Script {
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
         bytes[] memory factoryDeps = new bytes[](4);
-        factoryDeps[0] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
-        factoryDeps[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
-        factoryDeps[2] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
-        factoryDeps[3] = L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecodeFromSystemContracts();
+        factoryDeps[0] = L2ContractsBytecodesLib.getCreationCode("BeaconProxy");
+        factoryDeps[1] = L2ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
+        factoryDeps[2] = L2ContractsBytecodesLib.getCreationCode("UpgradeableBeacon");
+        factoryDeps[3] = L2ContractsBytecodesLib.getCreationCode("SystemTransparentUpgradeableProxy");
         return factoryDeps;
     }
 

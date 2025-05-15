@@ -1303,6 +1303,10 @@ library Utils {
         result[a.length] = b;
     }
 
+    function compareStrings(string memory a, string memory b) public pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
+    }
+
     // add this to be excluded from coverage report
     function test() internal {}
 }
