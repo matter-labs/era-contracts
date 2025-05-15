@@ -6,51 +6,19 @@ import {Vm} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
-import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 
 contract PrecommittingTest is ExecutorTest {
-    ValidatorTimelock validatorTimelock;
+    uint256 constant TOTAL_TRANSACTIONS = 100;
+    uint256 batchNumber = 1;
+    uint256 miniblockNumber = 18;
 
-    function setUp() public {
-        DummyCTM chainTypeManager = new DummyCTM(owner, address(executor));
-        validatorTimelock = ValidatorTimelock(_deployValidatorTimelock(owner, 0));
+    function precommitData() internal view returns (bytes memory) {
+        IExecutor.TransactionStatusCommitment[] memory txs =
+            new IExecutor.TransactionStatusCommitment[](TOTAL_TRANSACTIONS);
 
-        vm.prank(owner);
-        validatorTimelock.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
-
-        vm.prank(owner);
-        validatorTimelock.addValidator(eraChainId, validator);
-
-        vm.prank(getters.getChainTypeManager());
-        admin.setValidator(address(validatorTimelock), true);
-    }
-
-    function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
-        ProxyAdmin admin = new ProxyAdmin();
-        ValidatorTimelock timelockImplementation = new ValidatorTimelock();
-        return
-            address(
-                new TransparentUpgradeableProxy(
-                    address(timelockImplementation),
-                    address(admin),
-                    abi.encodeCall(ValidatorTimelock.initialize, (_initialOwner, _initialExecutionDelay))
-                )
-            );
-    }
-
-    function test_SuccessfullyPrecommit() public {
-        uint256 totalTransactions = 1;
-        uint256 batchNumber = 1;
-        uint256 miniblockNumber = 18;
-
-        IExecutor.TransactionStatusCommitment[] memory txs = new IExecutor.TransactionStatusCommitment[](totalTransactions);
-        for (uint i = 0; i < totalTransactions; ++i) {
+        for (uint i = 0; i < TOTAL_TRANSACTIONS; ++i) {
             txs[i] = IExecutor.TransactionStatusCommitment({
                 txHash: keccak256(abi.encode(i)),
                 status: i % 3 != 0
@@ -62,17 +30,25 @@ contract PrecommittingTest is ExecutorTest {
             untrustedLastMiniblockNumberHint: miniblockNumber
         });
 
-        bytes memory precommitData = abi.encodePacked(
+        return abi.encodePacked(
             BatchDecoder.SUPPORTED_ENCODING_VERSION,
             abi.encode(precommitInfo)
         );
+    }
 
+    // For accurate metering of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
+    /// forge-config: default.isolate = true
+    function test_MeasureGas() public {
+        vm.prank(validator);
+        validatorTimelock.precommitSharedBridge(eraChainId, batchNumber, precommitData());
+        vm.snapshotGasLastCall("Executor", "precommit");
+    }
+
+    function test_SuccessfullyPrecommit() public {
         vm.prank(validator);
         vm.recordLogs();
 
-        // executor.precommitSharedBridge(eraChainId, batchNumber, precommitData);
-        validatorTimelock.precommitSharedBridge(eraChainId, batchNumber, precommitData);
-        vm.lastCallGas();
+        executor.precommitSharedBridge(eraChainId, batchNumber, precommitData());
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 

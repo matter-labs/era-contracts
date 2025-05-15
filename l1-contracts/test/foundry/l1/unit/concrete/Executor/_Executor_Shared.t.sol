@@ -2,11 +2,15 @@
 
 pragma solidity 0.8.28;
 
+import "forge-std/console.sol";
 import {Test} from "forge-std/Test.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_VALIDATOR_ADDRESS} from "../Utils/Utils.sol";
 import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
-import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
+import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
@@ -50,6 +54,7 @@ contract ExecutorTest is Test {
     IExecutor.CommitBatchInfo internal newCommitBatchInfo;
     IExecutor.StoredBatchInfo internal newStoredBatchInfo;
     DummyEraBaseTokenBridge internal sharedBridge;
+    ValidatorTimelock internal validatorTimelock;
     address internal rollupL1DAValidator;
     MessageRoot internal messageRoot;
 
@@ -145,6 +150,18 @@ contract ExecutorTest is Test {
         });
     }
 
+    function deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) private returns (address) {
+        ProxyAdmin proxyAdmin = new ProxyAdmin();
+        ValidatorTimelock timelockImplementation = new ValidatorTimelock();
+        return address(
+            new TransparentUpgradeableProxy(
+                address(timelockImplementation),
+                address(proxyAdmin),
+                abi.encodeCall(ValidatorTimelock.initialize, (_initialOwner, _initialExecutionDelay))
+            )
+        );
+    }
+
     constructor() {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
@@ -171,12 +188,21 @@ contract ExecutorTest is Test {
         executor = new TestExecutor();
         mailbox = new MailboxFacet(eraChainId, block.chainid);
 
-        DummyChainTypeManager chainTypeManager = new DummyChainTypeManager();
+        DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(
             address(chainTypeManager),
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
+
+        validatorTimelock = ValidatorTimelock(deployValidatorTimelock(owner, 0));
+        vm.prank(owner);
+        validatorTimelock.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
+        vm.prank(owner);
+        validatorTimelock.addValidator(eraChainId, validator);
+
+        console.log("validator timelock configured");
+
         DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;
@@ -200,7 +226,7 @@ contract ExecutorTest is Test {
             chainTypeManager: address(chainTypeManager),
             protocolVersion: 0,
             admin: owner,
-            validatorTimelock: validator,
+            validatorTimelock: address(validatorTimelock),
             baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier
@@ -257,12 +283,17 @@ contract ExecutorTest is Test {
         getters = GettersFacet(address(diamondProxy));
         mailbox = MailboxFacet(address(diamondProxy));
         admin = AdminFacet(address(diamondProxy));
+        chainTypeManager.setZKChain(eraChainId, address(diamondProxy));
 
         // Initiate the token multiplier to enable L1 -> L2 transactions.
         vm.prank(address(chainTypeManager));
         admin.setTokenMultiplier(1, 1);
         vm.prank(address(owner));
         admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
+
+        // Allow to call executor directly, without going through ValidatorTimelock
+        vm.prank(address(chainTypeManager));
+        admin.setValidator(address(validator), true);
 
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
