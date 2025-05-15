@@ -3097,12 +3097,6 @@ object "Bootloader" {
                     debugLog("first blockNumber", blockNumber)
                     leave
                 }
-                // let nextInteropRootBlockNumber  := mload(interopRootStartSlot) 
-
-                // if lt(setForBlockNumber, nextInteropRootBlockNumber) {
-                //     debugLog("Processed all interop roots for this block", 0)
-                //     leave
-                // }
 
                 debugLog("Setting interop roots 1", nextInteropRootNumber)
                 for {let i := nextInteropRootNumber} lt(i, sub(numberOfRoots, 1)) {i := add(i, 1)} {

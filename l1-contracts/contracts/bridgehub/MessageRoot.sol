@@ -146,9 +146,10 @@ contract MessageRoot is IMessageRoot, Initializable {
 
         // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
         // slither-disable-next-line unused-return
-        sharedTree.updateLeaf(chainIndex[_chainId], MessageHashing.chainIdLeafHash(chainRoot, _chainId));
+        bytes32 chainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
+        sharedTree.updateLeaf(chainIndex[_chainId], chainIdLeafHash);
 
-        emit Preimage(chainRoot, MessageHashing.chainIdLeafHash(chainRoot, _chainId));
+        emit Preimage(chainRoot, chainIdLeafHash);
 
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
