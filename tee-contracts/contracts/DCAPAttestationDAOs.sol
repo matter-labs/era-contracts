@@ -1,0 +1,203 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.27;
+
+import {
+EnclaveIdentityJsonObj,
+EnclaveIdentityHelper,
+IdentityObj
+} from "@automata-network/on-chain-pccs/helpers/EnclaveIdentityHelper.sol";
+import {TcbInfoJsonObj, FmspcTcbHelper} from "@automata-network/on-chain-pccs/helpers/FmspcTcbHelper.sol";
+
+import {CA} from "@automata-network/on-chain-pccs/Common.sol";
+import {AutomataDaoStorage} from "@automata-network/on-chain-pccs/automata_pccs/shared/AutomataDaoStorage.sol";
+import {AutomataPcsDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataPcsDao.sol";
+import {AutomataPckDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataPckDao.sol";
+import {AutomataEnclaveIdentityDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataEnclaveIdentityDao.sol";
+import {AutomataFmspcTcbDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataFmspcTcbDao.sol";
+import {PCCSRouter} from "automata-network/dcap-attestation/evm/contracts/PCCSRouter.sol";
+
+/**
+ * @title DCAPAttestationDAOs
+ * @dev Contains DAO contract instances needed for DCAP attestation
+ */
+contract DCAPAttestationDAOs {
+    AutomataDaoStorage public pccsStorage;
+    AutomataPcsDao public pcsDao;
+    AutomataPckDao public pckDao;
+    AutomataEnclaveIdentityDao public enclaveIdDao;
+    AutomataFmspcTcbDao public fmspcTcbDao;
+    PCCSRouter public pccsRouter;
+
+    /**
+     * @notice Initializes the DAO contracts with pre-deployed components
+     * @param _pccsStorage Address of the pre-deployed AutomataDaoStorage
+     * @param _pcsDao Address of the pre-deployed AutomataPcsDao
+     * @param _pckDao Address of the pre-deployed AutomataPckDao
+     * @param _enclaveIdDao Address of the pre-deployed AutomataEnclaveIdentityDao
+     * @param _fmspcTcbDao Address of the pre-deployed AutomataFmspcTcbDao
+     * @param _pccsRouter Address of the pre-deployed PCCSRouter
+     */
+    constructor(
+        address _pccsStorage,
+        address _pcsDao,
+        address _pckDao,
+        address _enclaveIdDao,
+        address _fmspcTcbDao,
+        address _pccsRouter
+    ) {
+        pccsStorage = AutomataDaoStorage(_pccsStorage);
+        pcsDao = AutomataPcsDao(_pcsDao);
+        pckDao = AutomataPckDao(_pckDao);
+        enclaveIdDao = AutomataEnclaveIdentityDao(_enclaveIdDao);
+        fmspcTcbDao = AutomataFmspcTcbDao(_fmspcTcbDao);
+        pccsRouter = PCCSRouter(_pccsRouter);
+    }
+
+    /**
+     * @notice Upserts PCS certificates into the DAO
+     * @param ca The CA types for the certificates
+     * @param certs The certificates data
+     * @return attestationIds The IDs of the attestations
+     */
+    function upsertPcsCertificates(CA[] calldata ca, bytes[] calldata certs) external returns (bytes32[] memory attestationIds) {
+        uint256 certificatesLength = certs.length;
+        require(certificatesLength > 0, "Empty array");
+        attestationIds = new bytes32[](certificatesLength);
+        for (uint256 i = 0; i < certificatesLength; ++i) {
+            attestationIds[i] = pcsDao.upsertPcsCertificates(ca[i], certs[i]);
+        }
+    }
+
+    /**
+     * @notice Upserts Root CA CRL into the DAO
+     * @param rootcacrl The root CA CRL data
+     * @return attestationId The ID of the attestation
+     */
+    function upsertRootCACrl(bytes calldata rootcacrl) external returns (bytes32 attestationId) {
+        attestationId = pcsDao.upsertRootCACrl(rootcacrl);
+    }
+
+    /**
+     * @notice Upserts PCK CRL into the DAO
+     * @param ca The CA type
+     * @param crl The CRL data
+     * @return attestationId The ID of the attestation
+     */
+    function upsertPckCrl(CA ca, bytes calldata crl) external returns (bytes32 attestationId) {
+        attestationId = pcsDao.upsertPckCrl(ca, crl);
+    }
+
+    /**
+     * @notice Upserts enclave identity into the DAO
+     * @param id The ID of the enclave
+     * @param quoteVersion The version of the quote
+     * @param identityJson The enclave identity JSON object
+     */
+    function upsertEnclaveIdentity(uint256 id, uint256 quoteVersion, EnclaveIdentityJsonObj calldata identityJson) external {
+        enclaveIdDao.upsertEnclaveIdentity(id, quoteVersion, identityJson);
+    }
+
+    /**
+     * @notice Upserts FMSPC TCB info into the DAO
+     * @param tcbInfoJson The TCB info JSON object
+     */
+    function upsertFmspcTcb(TcbInfoJsonObj calldata tcbInfoJson) external {
+        fmspcTcbDao.upsertFmspcTcb(tcbInfoJson);
+    }
+
+    /**
+     * @notice Sets the caller authorization for the resolver
+     * @param caller The address of the caller
+     * @param authorized Whether the caller is authorized
+     */
+    function setResolverCallerAuthorization(address caller, bool authorized) external {
+        pccsStorage.setCallerAuthorization(caller, authorized);
+    }
+
+    /**
+     * @notice Pauses the resolver caller restriction
+     */
+    function pauseResolverCallerRestriction() external {
+        pccsStorage.pauseCallerRestriction();
+    }
+
+    /**
+     * @notice Unpauses the resolver caller restriction
+     */
+    function unpauseResolverCallerRestriction() external {
+        pccsStorage.unpauseCallerRestriction();
+    }
+
+    /**
+     * @notice Updates the DAO addresses in the resolver
+     * @param _pcsDao The address of the PCS DAO
+     * @param _pckDao The address of the PCK DAO
+     * @param _fmspcTcbDao The address of the FMSPC TCB DAO
+     * @param _enclaveIdDao The address of the enclave ID DAO
+     */
+    function updateResolverDao(address _pcsDao, address _pckDao, address _fmspcTcbDao, address _enclaveIdDao) external {
+        pccsStorage.updateDao(_pcsDao, _pckDao, _fmspcTcbDao, _enclaveIdDao);
+    }
+
+    /**
+     * @notice Revokes a DAO in the resolver
+     * @param revoked The address of the DAO to revoke
+     */
+    function revokeResolverDao(address revoked) external {
+        pccsStorage.revokeDao(revoked);
+    }
+
+    /**
+     * @notice Sets the authorization for the router
+     * @param caller The address of the caller
+     * @param authorized Whether the caller is authorized
+     */
+    function setRouterAuthorization(address caller, bool authorized) external {
+        pccsRouter.setAuthorized(caller, authorized);
+    }
+
+    /**
+     * @notice Enables the caller restriction for the router
+     */
+    function enableRouterCallerRestriction() external {
+        pccsRouter.enableCallerRestriction();
+    }
+
+    /**
+     * @notice Disables the caller restriction for the router
+     */
+    function disableRouterCallerRestriction() external {
+        pccsRouter.disableCallerRestriction();
+    }
+
+    /**
+     * @notice Sets the configuration for the router
+     * @param _qeid The address of the QE ID
+     * @param _fmspcTcb The address of the FMSPC TCB
+     * @param _pcs The address of the PCS
+     * @param _pck The address of the PCK
+     * @param _x509 The address of the X509
+     * @param _x509Crl The address of the X509 CRL
+     * @param _tcbHelper The address of the TCB helper
+     */
+    function setRouterConfig(
+        address _qeid,
+        address _fmspcTcb,
+        address _pcs,
+        address _pck,
+        address _x509,
+        address _x509Crl,
+        address _tcbHelper
+    ) external {
+        pccsRouter.setConfig(_qeid, _fmspcTcb, _pcs, _pck, _x509, _x509Crl, _tcbHelper);
+    }
+    
+    /**
+     * @notice Returns the PCCSRouter instance
+     * @return The PCCSRouter instance
+     */
+    function getPCCSRouter() external view returns (PCCSRouter) {
+        return pccsRouter;
+    }
+}
