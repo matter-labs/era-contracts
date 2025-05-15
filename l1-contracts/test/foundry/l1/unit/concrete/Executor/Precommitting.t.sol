@@ -36,19 +36,11 @@ contract PrecommittingTest is ExecutorTest {
         );
     }
 
-    // For accurate metering of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
-    /// forge-config: default.isolate = true
-    function test_MeasureGas() public {
-        vm.prank(validator);
-        validatorTimelock.precommitSharedBridge(eraChainId, batchNumber, precommitData());
-        vm.snapshotGasLastCall("Executor", "precommit");
-    }
-
     function test_SuccessfullyPrecommit() public {
         vm.prank(validator);
         vm.recordLogs();
 
-        executor.precommitSharedBridge(eraChainId, batchNumber, precommitData());
+        executor.precommitSharedBridge(uint256(0), batchNumber, precommitData());
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -56,5 +48,13 @@ contract PrecommittingTest is ExecutorTest {
         assertEq(entries[0].topics[0], keccak256("BatchPrecommitmentSet(uint256,uint256,bytes32)"));
         assertEq(entries[0].topics[1], bytes32(batchNumber));
         assertEq(entries[0].topics[2], bytes32(miniblockNumber));
+    }
+
+    // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
+    /// forge-config: default.isolate = true
+    function test_MeasureGas() public {
+        vm.prank(validator);
+        validatorTimelock.precommitSharedBridge(eraChainId, batchNumber, precommitData());
+        vm.snapshotGasLastCall("Executor", "precommit");
     }
 }

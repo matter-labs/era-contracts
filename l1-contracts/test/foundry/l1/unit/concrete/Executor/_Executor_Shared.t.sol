@@ -201,8 +201,6 @@ contract ExecutorTest is Test {
         vm.prank(owner);
         validatorTimelock.addValidator(eraChainId, validator);
 
-        console.log("validator timelock configured");
-
         DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;
