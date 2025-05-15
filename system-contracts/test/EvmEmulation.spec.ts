@@ -22,7 +22,7 @@ describe("EvmEmulation tests", function () {
   it("Can deploy EVM contract", async () => {
     await enableEvmEmulation();
 
-    let wallet = getWallets()[0];
+    const wallet = getWallets()[0];
 
     const testInterface = new ethers.utils.Interface(testAbi);
 
@@ -41,7 +41,7 @@ describe("EvmEmulation tests", function () {
 
     const testInterface = new ethers.utils.Interface(testAbi);
 
-    let wallet = getWallets()[1];
+    const wallet = getWallets()[1];
 
     const factory = new ContractFactory(testInterface, testEvmBytecode, wallet);
 
@@ -58,7 +58,7 @@ describe("EvmEmulation tests", function () {
 
     const testInterface = new ethers.utils.Interface(testAbi);
 
-    let wallet = getWallets()[2];
+    const wallet = getWallets()[2];
 
     const factory = new ContractFactory(testInterface, testEvmBytecode, wallet);
 
