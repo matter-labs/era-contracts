@@ -66,6 +66,8 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 import {DeploymentNotifier} from "./DeploymentNotifier.sol";
 
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     using stdToml for string;
@@ -280,8 +282,8 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         TestnetERC20Token zk = TestnetERC20Token(0x66A5cFB2e9c529f14FE6364Ad1075dF3a649C0A5);
         address ntv = 0xbeD1EB542f9a5aA6419Ff3deb921A372681111f6;
 
-        vm.prank(ntv);
-        bool success = zk.bridgeMint(deployer, 1000000000000000000000000);
+        vm.startPrank(ntv);
+        BridgedStandardERC20(address(zk)).bridgeMint(deployer, 1000000000000000000000000);
         vm.stopPrank();
 
         string memory root = vm.projectRoot();
