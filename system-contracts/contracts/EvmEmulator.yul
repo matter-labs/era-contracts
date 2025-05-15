@@ -2134,6 +2134,25 @@ object "EvmEmulator" {
                     sp, stackHead := pushStackItem(sp, _baseFee, stackHead)
                     ip := add(ip, 1)
                 }
+                case 0x49 { // OP_BLOBHASH
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+            
+                    // "Consume" idx
+                    let _idx := accessStackHead(sp, stackHead)
+            
+                    // We don't fully support BLOBHASH. Just return 0
+                    stackHead := 0
+            
+                    ip := add(ip, 1)
+                }
+                case 0x4A { // OP_BLOBBASEFEE
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+            
+                    // We don't fully support BLOBBASEFEE. Just return 0
+                    sp, stackHead := pushStackItem(sp, 0, stackHead)
+            
+                    ip := add(ip, 1)
+                }
                 case 0x50 { // OP_POP
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
@@ -2794,12 +2813,6 @@ object "EvmEmulator" {
                     $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2F { // Unused opcode
-                    $llvm_NoInline_llvm$_invalid()
-                }
-                case 0x49 { // Unused opcode
-                    $llvm_NoInline_llvm$_invalid()
-                }
-                case 0x4A { // Unused opcode
                     $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4B { // Unused opcode
@@ -5185,6 +5198,25 @@ object "EvmEmulator" {
                         sp, stackHead := pushStackItem(sp, _baseFee, stackHead)
                         ip := add(ip, 1)
                     }
+                    case 0x49 { // OP_BLOBHASH
+                        evmGasLeft := chargeGas(evmGasLeft, 3)
+                
+                        // "Consume" idx
+                        let _idx := accessStackHead(sp, stackHead)
+                
+                        // We don't fully support BLOBHASH. Just return 0
+                        stackHead := 0
+                
+                        ip := add(ip, 1)
+                    }
+                    case 0x4A { // OP_BLOBBASEFEE
+                        evmGasLeft := chargeGas(evmGasLeft, 2)
+                
+                        // We don't fully support BLOBBASEFEE. Just return 0
+                        sp, stackHead := pushStackItem(sp, 0, stackHead)
+                
+                        ip := add(ip, 1)
+                    }
                     case 0x50 { // OP_POP
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
@@ -5845,12 +5877,6 @@ object "EvmEmulator" {
                         $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2F { // Unused opcode
-                        $llvm_NoInline_llvm$_invalid()
-                    }
-                    case 0x49 { // Unused opcode
-                        $llvm_NoInline_llvm$_invalid()
-                    }
-                    case 0x4A { // Unused opcode
                         $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4B { // Unused opcode
