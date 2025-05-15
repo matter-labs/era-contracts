@@ -106,12 +106,13 @@ object "CodeOracle" {
 
                 // Get the actual size of active pointer
                 let activePtrSize := verbatim_0i_1o("active_ptr_data_size")
-
+                
                 if gt(lenInBytes, activePtrSize) {
-                    // Should never happen
-                    revert(0,0) // TODO: dangerous                
+                    // Should never happen, means that we have invalid versioned bytecode hash
+                    revert(0,0)            
                 }
 
+                // Should not happen as well, but just in case truncate length of preimage
                 if gt(activePtrSize, lenInBytes) {
                     // Transforms `ACTIVE_PTR.length` into `ACTIVE_PTR.length - u32(_shrink)`. If underflow happens then it panics.
                     verbatim_1i_0o("active_ptr_shrink_assign", sub(activePtrSize, lenInBytes))
