@@ -96,6 +96,7 @@ contract ChainAssetHandler is
     /// @param _assetId the assetId of the migrating chain's CTM
     /// @param _originalCaller the message sender initiated a set of calls that leads to bridge burn
     /// @param _data the data for the migration
+    // slither-disable-next-line locked-ether
     function bridgeBurn(
         uint256 _settlementChainId,
         uint256 _l2MsgValue,
@@ -159,6 +160,7 @@ contract ChainAssetHandler is
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
     /// @param _assetId the assetId of the chain's CTM
     /// @param _bridgehubMintData the data for the mint
+    // slither-disable-next-line locked-ether
     function bridgeMint(
         uint256, // originChainId
         bytes32 _assetId,
@@ -195,6 +197,7 @@ contract ChainAssetHandler is
     // / @param _chainId the chainId of the chain
     /// @param _assetId the assetId of the chain's CTM
     /// @param _data the data for the recovery.
+    // slither-disable-next-line locked-ether
     function bridgeRecoverFailedTransfer(
         uint256,
         bytes32 _assetId,
@@ -218,5 +221,19 @@ contract ChainAssetHandler is
             _originalCaller: _depositSender,
             _chainData: bridgehubBurnData.chainData
         });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Pauses migration functions.
+    function pauseMigration() external onlyOwner {
+        migrationPaused = true;
+    }
+
+    /// @notice Unpauses migration functions.
+    function unpauseMigration() external onlyOwner {
+        migrationPaused = false;
     }
 }
