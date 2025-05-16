@@ -29,16 +29,29 @@ contract MessageRoot is IMessageRoot, Initializable {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
-    /// @notice A new chain has been added to the message root.
+    /// @notice Emitted when a new chain is added to the MessageRoot.
+    /// @param chainId The ID of the chain that is being added to the MessageRoot.
+    /// @param chainIndex The index of the chain that is being added. Note, that chain where
+    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is not emitted for it.
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
-    /// @notice A new chainBatchRoot has been added to the chainTree.
-    event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 batchRoot);
+    /// @notice Emitted when a new chain batch root is appended to the chainTree.
+    /// @param chainId The ID of the chain whose chain batch root is being added to the chainTree.
+    /// @param batchNumber The number of the batch to which chain batch root belongs.
+    /// @param chainBatchRoot The value of chain batch root which is being added.
+    event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 chainBatchRoot);
 
-    /// @notice A preimage of the chainBatchRoot that's being added to the chainTree is being emitted.
+    /// @notice Emitted when a new chainTree root is produced and its corresponding leaf in sharedTree is updated.
+    /// @param chainRoot The updated Merkle root of the chainTree after appending the latest batch root.
+    /// @param preimage  The Merkle leaf value (chainIdLeafHash) computed from `chainRoot` and the chain’s ID, used to update the shared tree.
     event Preimage(bytes32 chainRoot, bytes32 preimage);
 
-    /// @notice A new InteropRoot is being emitted whenever sharedTree is updated.
+    /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
+    /// @param chainId The ID of the chain where the sharedTree was updated.
+    /// @param blockNumber The block number of the block in which the sharedTree was updated.
+    /// @param logId The ID of the log emitted when a new InteropRoot. In this release always equal to 0.
+    /// @param sides The "sides" of the interop root. In this release which uses proof-based interop the sides is an array
+    /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
@@ -132,10 +145,11 @@ contract MessageRoot is IMessageRoot, Initializable {
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
 
         // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
+        bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
         // slither-disable-next-line unused-return
-        sharedTree.updateLeaf(chainIndex[_chainId], MessageHashing.chainIdLeafHash(chainRoot, _chainId));
+        sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
 
-        emit Preimage(chainRoot, MessageHashing.chainIdLeafHash(chainRoot, _chainId));
+        emit Preimage(chainRoot, cachedChainIdLeafHash);
 
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
