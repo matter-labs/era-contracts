@@ -56,7 +56,7 @@ token_weth_address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2"
 chain_id = 9075
 
 [gateway.gateway_state_transition]
-chain_type_manager_proxy_addr = "0x4a49BF58a609a51c17a48F7f6d807E025Acf83aE"
-rollup_da_manager = "0x403C5ea1f5c69274eD3C1521CFafC2D76D10FFf9"
-chain_type_manager_proxy_admin = "0xb281E0Ea78548042C32EE720691Fa911087ed133"
-rollup_sl_da_validator = "0xba48D0b85C840677856963C7c324381Bb7564632"
+chain_type_manager_proxy_addr = "0x912B84EEEEBeca74d307b9a2b09c68332aa5426C"
+rollup_da_manager = "0x5E12D7E0bB68029afbeC83ccB9E8eDE6019ef073"
+chain_type_manager_proxy_admin = "0x0A8a176B6F5962122C6E8F8815278f873D74021f"
+rollup_sl_da_validator = "0x595b8C88B9e5f3a4c596C3e81BE6e11D53Bb9200"
