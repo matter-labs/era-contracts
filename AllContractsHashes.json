@@ -520,14 +520,6 @@
     "evmDeployedBytecodeHash": null
   },
   {
-    "contractName": "l2-contracts/SafeCast",
-    "zkBytecodeHash": "0x01000007b282101328c65ceb77d9274924cef0b622d190307b80db972da1fb31",
-    "zkBytecodePath": "/l2-contracts/zkout/SafeCast.sol/SafeCast.json",
-    "evmBytecodeHash": null,
-    "evmBytecodePath": null,
-    "evmDeployedBytecodeHash": null
-  },
-  {
     "contractName": "l2-contracts/SafeERC20",
     "zkBytecodeHash": "0x01000007f106f65505866f4a53714a60401435effe0104a6657915370624613f",
     "zkBytecodePath": "/l2-contracts/zkout/SafeERC20.sol/SafeERC20.json",
