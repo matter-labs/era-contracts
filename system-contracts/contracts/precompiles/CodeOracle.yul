@@ -112,7 +112,7 @@ object "CodeOracle" {
                     revert(0,0)            
                 }
 
-                // Should not happen as well, but just in case truncate length of preimage
+                // Truncate length of preimage pointer
                 if gt(activePtrSize, lenInBytes) {
                     // Transforms `ACTIVE_PTR.length` into `ACTIVE_PTR.length - u32(_shrink)`. If underflow happens then it panics.
                     verbatim_1i_0o("active_ptr_shrink_assign", sub(activePtrSize, lenInBytes))
