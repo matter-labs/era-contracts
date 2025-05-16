@@ -9,7 +9,7 @@ import {GovernanceTest} from "./_Governance_Shared.t.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {OperationMustBeReady, OperationMustBePending, OperationExists, PreviousOperationNotExecuted, InvalidDelay} from "contracts/common/L1ContractErrors.sol";
 
-contract ExecutingTest is GovernanceTest {
+contract ExecutingGovernanceTest is GovernanceTest {
     using stdStorage for StdStorage;
 
     function test_ScheduleTransparentAndExecute() public {

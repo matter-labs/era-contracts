@@ -20,6 +20,10 @@ contract TestExecutor is ExecutorFacet {
         );
     }
 
+    function setPriorityTreeHistoricalRoot(bytes32 _root) external {
+        s.priorityTree.historicalRoots[_root] = true;
+    }
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 }

@@ -4,8 +4,8 @@ pragma solidity ^0.8.21;
 
 import {BytecodeError, MalformedBytecode, LengthIsNotDivisibleBy32} from "../L1ContractErrors.sol";
 
-import {UncheckedMath} from "./UncheckedMath.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../L2ContractAddresses.sol";
+import {UncheckedMath} from "../libraries/UncheckedMath.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractAddresses.sol";
 
 /**
  * @author Matter Labs
@@ -57,7 +57,7 @@ library L2ContractHelper {
     /// @param _message Data to be sent to L1.
     /// @return keccak256 hash of the sent message.
     function sendMessageToL1(bytes memory _message) internal returns (bytes32) {
-        return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(_message);
+        return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(_message);
     }
 
     /// @notice Validate the bytecode format and calculate its hash.

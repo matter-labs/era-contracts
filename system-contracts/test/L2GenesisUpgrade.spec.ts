@@ -83,8 +83,8 @@ describe("L2GenesisUpgrade tests", function () {
       returnData: "0x",
     });
 
-    const msgRootBytecode = (await loadArtifact("DummyMessageRoot")).bytecode;
-    const messageRootBytecodeHash = zksync.utils.hashBytecode(msgRootBytecode);
+    const interopRootBytecode = (await loadArtifact("DummyMessageRoot")).bytecode;
+    const messageRootBytecodeHash = zksync.utils.hashBytecode(interopRootBytecode);
 
     const ntvBytecode = (await loadArtifact("DummyL2NativeTokenVault")).bytecode;
     const ntvBytecodeHash = zksync.utils.hashBytecode(ntvBytecode);
