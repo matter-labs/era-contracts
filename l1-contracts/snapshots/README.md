@@ -1,4 +1,4 @@
-## Gas snapshots
+# Gas snapshots
 
 This directory contains gas snapshots emitted by the `snapshotGas*` cheatcodes.
 Currently, this is used to measure `Executor.sol` operations gas usage: `precommit`, `commit`, `prove`, `execute`.
