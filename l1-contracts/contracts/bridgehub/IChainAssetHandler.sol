@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.24;
 
-import {IBridgehub} from "./IBridgehub.sol";
-
 import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 
