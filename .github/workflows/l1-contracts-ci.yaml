@@ -175,6 +175,10 @@ jobs:
         working-directory: ./l1-contracts
         run: FOUNDRY_PROFILE=default yarn test:foundry
 
+      - name: Check gas snapshots
+        working-directory: ./l1-contracts
+        run: FOUNDRY_PROFILE=default forge test --match-test MeasureGas --gas-snapshot-check=true
+
   test-foundry-zksync:
     needs: [build, lint]
     runs-on: ubuntu-latest

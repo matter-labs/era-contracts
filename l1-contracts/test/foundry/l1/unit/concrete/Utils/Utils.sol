@@ -61,8 +61,8 @@ library Utils {
         return abi.encodePacked(servicePrefix, bytes2(0x0000), sender, key, value);
     }
 
-    function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](7);
+    function createSystemLogs(bytes32 _outputHash) public pure returns (bytes[] memory) {
+        bytes[] memory logs = new bytes[](8);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -104,6 +104,12 @@ library Utils {
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
             bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
+        );
+        logs[7] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
+            bytes32(0)
         );
 
         return logs;
