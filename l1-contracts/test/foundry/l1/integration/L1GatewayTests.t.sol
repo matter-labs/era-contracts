@@ -40,7 +40,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-
+import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 import {GatewayUtils} from "deploy-scripts/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -50,7 +50,14 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
-contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, GatewayDeployer {
+contract L1GatewayTests is
+    L1ContractDeployer,
+    ZKChainDeployer,
+    TokenDeployer,
+    L2TxMocker,
+    GatewayDeployer,
+    ConfigSemaphore
+{
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -78,6 +85,7 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
     function prepare() public {
         _generateUserAddresses();
 
+        takeConfigLock(); // Prevents race condition with configs
         _deployL1Contracts();
         _deployTokens();
         _registerNewTokens(tokens);
@@ -101,6 +109,8 @@ contract L1GatewayTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L
         }
 
         _initializeGatewayScript();
+
+        releaseConfigLock();
 
         vm.deal(ecosystemConfig.ownerAddress, 100000000000000000000000000000000000);
         migratingChain = IZKChain(IBridgehub(addresses.bridgehub).getZKChain(migratingChainId));

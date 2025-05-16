@@ -185,7 +185,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             genesisBatchHash: _chainCreationParams.genesisBatchHash,
             genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
+            newInitialCut: _chainCreationParams.diamondCut,
             newInitialCutHash: newInitialCutHash,
+            forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
             forceDeploymentHash: forceDeploymentHash
         });
     }

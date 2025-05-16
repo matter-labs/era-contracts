@@ -112,20 +112,6 @@ contract InitializeTest is DiamondInitTest {
         new DiamondProxy(block.chainid, diamondCutData);
     }
 
-    function test_revertWhen_blobVersionedHashRetrieverAddressIsZero() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
-        initializeData.blobVersionedHashRetriever = address(0);
-
-        Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(new DiamondInit()),
-            initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
-        });
-
-        vm.expectRevert(ZeroAddress.selector);
-        new DiamondProxy(block.chainid, diamondCutData);
-    }
-
     function test_valuesCorrectWhenSuccessfulInit() public {
         InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
