@@ -30,7 +30,6 @@ library L2Utils {
 
     address internal constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
 
-
     function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, artifactPath);
@@ -126,11 +125,12 @@ library L2Utils {
     }
 
     function forceDeployChainAssetHandler() internal {
-        new ChainAssetHandler(
-            IBridgehub(L2_BRIDGEHUB_ADDR),
-            L2_ASSET_ROUTER_ADDR
+        new ChainAssetHandler(IBridgehub(L2_BRIDGEHUB_ADDR), L2_ASSET_ROUTER_ADDR);
+        forceDeployWithConstructor(
+            "ChainAssetHandler",
+            L2_CHAIN_HANDLER_ADDR,
+            abi.encode(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR)
         );
-        forceDeployWithConstructor("ChainAssetHandler", L2_CHAIN_HANDLER_ADDR, abi.encode(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR));
     }
 
     /// @notice Deploys the L2AssetRouter contract.
