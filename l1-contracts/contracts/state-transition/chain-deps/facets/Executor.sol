@@ -11,7 +11,6 @@ import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {L2_INTEROP_ROOT_STORAGE} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
@@ -456,7 +455,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             InteropRoot memory interopRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
             if (interopRoot.chainId == block.chainid) {
-                // For the same chain we verify using the MessageRoot contract
+                // For the same chain we verify using the MessageRoot contract. Note, that in this
+                // release, import and export only happens on GW, so this is the only case we have to cover.
                 correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
             } else {
                 revert CommitBasedInteropNotSupported();
@@ -548,11 +548,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[currentTotalBatchesVerified];
         if (
-            _hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified] &&
-            _hashLegacyStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]
+            _hashStoredBatchInfo(prevBatch) != cachedStoredBatchHashes &&
+            _hashLegacyStoredBatchInfo(prevBatch) != cachedStoredBatchHashes
         ) {
-            revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(prevBatch));
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;

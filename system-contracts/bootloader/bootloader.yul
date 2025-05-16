@@ -3090,21 +3090,22 @@ object "Bootloader" {
                 
                 debugLog("numberOfRoots", numberOfRoots)
 
+                /// Note, that we provide bootloader with numberOfRoots equal to the actual value + 1.
+                /// That is done to be able to differentiate between empty and non-existent blocks on server level.
+                /// Thus, it's an invalid state where the numberOfRoots is equal to 0, we should revert.
                 if eq(numberOfRoots, 0) {
-                    debugLog("No interop roots for this block", 0)
-                    let interopRootStartSlot := getInteropRootByte(0)
-                    let blockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
-                    debugLog("first blockNumber", blockNumber)
-                    leave
+                    revertWithReason(ZERO_INTEROP_ROOTS(), 0)
                 }
 
+                /// Note, that as mentioned above, we provide bootloader with numberOfRoots equal to the actual value + 1.
+                /// The loop runs for (numberOfRoots - 1) iterations, intentionally skipping the extra +1.
                 debugLog("Setting interop roots 1", nextInteropRootNumber)
                 for {let i := nextInteropRootNumber} lt(i, sub(numberOfRoots, 1)) {i := add(i, 1)} {
                     debugLog("Setting interop roots 2", i)
                     let interopRootStartSlot := getInteropRootByte(i)
                     let currentBlockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET()))
                     let chainId  := mload(add(interopRootStartSlot, INTEROP_ROOT_CHAIN_ID_OFFSET())) 
-                    /// Note it might be a block or batchNumber. For proof based it is a block number.
+                    /// Note it might be a block or batchNumber. For proof based interop it is a block number.
                     /// For detailed explanation refer to L2InteropRootStorage contract.
                     let blockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
                     let sidesLength := mload(add(interopRootStartSlot, INTEROP_ROOT_SIDE_LENGTH_OFFSET()))
@@ -3183,8 +3184,6 @@ object "Bootloader" {
             /// @notice Sends the rolling hash of the dependency interop roots to the L1.
             function sendInteropRootRollingHashToL1() {
                 debugLog("Sending interop roots to L1", 0)
-                let interopRootSlot := INTEROP_ROOT_BEGIN_SLOT()
-                let interopRootSlotSize := INTEROP_ROOT_SLOT_SIZE() 
                 let rollingHashOfProcessedRoots := 0
                 for {let i := 0} true {i := add(i, 1)} {
                     let interopRootStartSlot := getInteropRootByte(i)
@@ -4057,6 +4056,10 @@ object "Bootloader" {
 
             function TEMPORARY_DATA_OUTSIDE_SCRATCH_SPACE() -> ret {
                 ret := 33
+            }
+
+            function ZERO_INTEROP_ROOTS() -> ret {
+                ret := 34
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes

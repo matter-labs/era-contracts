@@ -29,10 +29,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
-    /// @notice A new chain has been added to the MessageRoot.
+    /// @notice Emitted when a new chain is added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
     /// @param chainIndex The index of the chain that is being added. Note, that chain where
-    /// the MessageRoot contract was deployed has chainIndex of 0, and the event is not emitted for it.
+    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is not emitted for it.
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
     /// @notice Emitted when a new chain batch root is appended to the chainTree.
@@ -146,10 +146,10 @@ contract MessageRoot is IMessageRoot, Initializable {
 
         // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
         // slither-disable-next-line unused-return
-        bytes32 chainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
-        sharedTree.updateLeaf(chainIndex[_chainId], chainIdLeafHash);
+        bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
+        sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
 
-        emit Preimage(chainRoot, chainIdLeafHash);
+        emit Preimage(chainRoot, cachedChainIdLeafHash);
 
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
