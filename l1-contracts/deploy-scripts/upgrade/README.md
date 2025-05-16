@@ -12,21 +12,21 @@ If this fails you have some issues with foundry or your setup. Try cleaning your
 
 1. Create a file similar to one of those in the `/l1-contracts/upgrade-envs/` for our environment
 
-2. Simulate the deployment
+2. Simulate the deployment (Runs EcosystemUpgrade, simulates transactions, outputs the upgrade data, i.e. required addresses, config addresses, protocol version and the Diamond Cuts)
 
    ```sh
-   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v27-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000
+   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --private-key 0x1e3273afc83535c5bacf772f961b33fdeca520833941c116421d13e4d9fc5cea
    ```
 
-3. Run the following to prepare the ecosystem
+3. Run the following to prepare the ecosystem (Similar to the above, broadcasts all the txs, and saves them in run-latest.json). This step only has to be ran once. The private key has to be provided for this step.
 
    ```sh
-   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v27-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --slow
+   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --slow
    ```
 
 4. Verify contracts based on logs
 
-5. Generate the yaml file for the upgrade
+5. Generate the yaml file for the upgrade (generating calldata)
 
 ```sh
 UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/<CHAIN_ID>/run-latest.json yarn upgrade-yaml-output-generator
@@ -42,7 +42,7 @@ UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_
 
 This part will not be verified by governance as it can be done by anyone. To save up funds, we will use `MulticallWithGas` contract.
 
-### Deploying the multicall with gas contract
+### Deploying the multicall with gas contract (for v26 only)
 
 Firstly, you should deploy the `MulticallWithGas` contract.
 
@@ -58,9 +58,13 @@ forge script --sig <data-generated-by-zkstack> FinalizeUpgrade.s.sol:FinalizeUpg
  anvil --fork-url $SEPOLIA
 ```
 
+(same as testing without broadcast)
+
 ```sh
 UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.27.0-evm/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v27-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url localhost:8545 --gas-limit 20000000000 --broadcast --slow --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 ```
+
+Generate yaml file from toml:
 
 ```sh
 UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json YAML_OUTPUT_FILE=script-out/v27-stage-output.yaml yarn upgrade-yaml-output-generator
@@ -76,7 +80,7 @@ cargo run -- --ecosystem-yaml $ZKSYNC_HOME/contracts/l1-contracts/script-out/v27
 
 This part will not be verified by governance as it can be done by anyone. To save up funds, we will use `MulticallWithGas` contract.
 
-### Deploying the multicall with gas contract
+### Deploying the multicall with gas contract (for v26 only)
 
 Firstly, you should deploy the `MulticallWithGas` contract.
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
@@ -39,7 +39,8 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
             type(GatewayTransactionFilterer).creationCode,
             abi.encode(bridgehub, l1AssetRouter),
             "GatewayTransactionFilterer",
-            "GatewayTransactionFilterer"
+            "GatewayTransactionFilterer",
+            false
         );
 
         // Prepare the initialization calldata.
@@ -56,7 +57,8 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
                 initData // initialization calldata to set chainAdmin as owner
             ),
             "TransparentUpgradeableProxy",
-            "GatewayTxFiltererProxy"
+            "GatewayTxFiltererProxy",
+            false
         );
     }
 

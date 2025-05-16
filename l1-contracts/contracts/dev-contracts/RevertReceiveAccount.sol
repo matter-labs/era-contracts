@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 /// @title RevertReceiveAccount - An account which reverts receiving funds depending on the flag
 /// @dev Used for testing failed withdrawals from the ZKsync smart contract

@@ -5,7 +5,7 @@ out = "out"
 libs = ["./lib"]
 cache_path = "cache-forge"
 test = "test/foundry"
-solc_version = "0.8.24"
+solc_version = "0.8.28"
 evm_version = "cancun"
 fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
@@ -42,14 +42,14 @@ remappings = [
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
 ]
 optimizer = true
-optimizer_runs = 200
+optimizer_runs = 9999999
 # TODO(X): the latest foundry disallows reverts that happen inside the internal calls and we should fix tests that rely
 # on such reverts
 allow_internal_expect_revert = true
 
 [profile.default.zksync] 
 enable_eravm_extensions = true
-zksolc = "1.5.7"
+zksolc = "1.5.11"
 
 [profile.invariant_tests_l1context]
 test = "test"
