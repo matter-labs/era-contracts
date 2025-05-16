@@ -145,9 +145,7 @@ contract RollupL2DAValidatorTest is Test {
 
         bytes32 operatorDAHash = finalizeAndCall(new bytes(0));
         // SYSCOIN
-        bytes32 expectedOperatorDAHash = keccak256(
-            abi.encodePacked(stateDiffsHash, keccak256(totalPubdata))
-        );
+        bytes32 expectedOperatorDAHash = keccak256(abi.encodePacked(stateDiffsHash, keccak256(totalPubdata)));
 
         assertEq(operatorDAHash, expectedOperatorDAHash);
     }
