@@ -552,13 +552,16 @@ library Utils {
             blobAuxOutputWords[i * 2 + 1] = _blobCommitments[i];
         }
     }
-
+    // SYSCOIN
     function constructRollupL2DAValidatorOutputHash(
         bytes32 _stateDiffHash,
         bytes32 _totalPubdataHash,
         uint8 _blobsAmount,
         bytes32[] memory _blobHashes
     ) public pure returns (bytes32) {
+        if (_blobsAmount == 0) {
+            return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash));
+        }
         return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash, _blobsAmount, _blobHashes));
     }
 
