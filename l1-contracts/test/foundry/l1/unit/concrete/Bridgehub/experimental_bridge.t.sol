@@ -223,7 +223,7 @@ contract ExperimentalBridgeTest is Test {
         vm.startPrank(bridgeOwner);
         bridgeHub.addChainTypeManager(address(mockCTM));
         bridgeHub.addTokenAssetId(tokenAssetId);
-        bridgeHub.setAddresses(sharedBridgeAddress, ICTMDeploymentTracker(address(0)), messageRoot);
+        bridgeHub.setAddresses(sharedBridgeAddress, ICTMDeploymentTracker(address(0)), messageRoot, address(0));
         vm.stopPrank();
 
         vm.prank(l1Nullifier.owner());
@@ -425,7 +425,12 @@ contract ExperimentalBridgeTest is Test {
 
     function test_addAssetId(address randomAddress) public {
         vm.startPrank(bridgeOwner);
-        bridgeHub.setAddresses(address(mockSharedBridge), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        bridgeHub.setAddresses(
+            address(mockSharedBridge),
+            ICTMDeploymentTracker(address(0)),
+            IMessageRoot(address(0)),
+            address(0)
+        );
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
@@ -459,7 +464,12 @@ contract ExperimentalBridgeTest is Test {
         uint256 randomValue
     ) public useRandomToken(randomValue) {
         vm.startPrank(bridgeOwner);
-        bridgeHub.setAddresses(address(mockSharedBridge), ICTMDeploymentTracker(address(0)), IMessageRoot(address(0)));
+        bridgeHub.setAddresses(
+            address(mockSharedBridge),
+            ICTMDeploymentTracker(address(0)),
+            IMessageRoot(address(0)),
+            address(0)
+        );
         vm.stopPrank();
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, testTokenAddress);
@@ -497,7 +507,8 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot)
+            IMessageRoot(randomMessageRoot),
+            address(0)
         );
 
         assertTrue(bridgeHub.assetRouter() == randomAssetRouter, "Shared bridge is already there");
@@ -521,7 +532,8 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
-            IMessageRoot(randomMessageRoot)
+            IMessageRoot(randomMessageRoot),
+            address(0)
         );
 
         assertTrue(bridgeHub.assetRouter() == address(0), "Shared bridge is already there");
