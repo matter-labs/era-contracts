@@ -145,8 +145,8 @@ contract MessageRoot is IMessageRoot, Initializable {
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
 
         // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
-        // slither-disable-next-line unused-return
         bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
+        // slither-disable-next-line unused-return
         sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
 
         emit Preimage(chainRoot, cachedChainIdLeafHash);
