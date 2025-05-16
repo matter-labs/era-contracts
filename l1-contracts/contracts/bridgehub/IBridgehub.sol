@@ -224,7 +224,7 @@ interface IBridgehub {
 
     function unpauseMigration() external;
 
-    function forwardedBridgeBurnSetSettlmentLayer(
+    function forwardedBridgeBurnSetSettlementLayer(
         uint256 _chainId,
         uint256 _newSettlementLayerChainId
     ) external returns (address zkChain, address ctm);

@@ -121,7 +121,7 @@ contract ChainAssetHandler is
         // to avoid stack too deep
         {
             address ctm;
-            (zkChain, ctm) = BRIDGEHUB.forwardedBridgeBurnSetSettlmentLayer(
+            (zkChain, ctm) = BRIDGEHUB.forwardedBridgeBurnSetSettlementLayer(
                 bridgehubBurnData.chainId,
                 _settlementChainId
             );

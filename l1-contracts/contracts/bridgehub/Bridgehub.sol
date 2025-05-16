@@ -690,7 +690,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Chain migration
     //////////////////////////////////////////////////////////////*/
 
-    function forwardedBridgeBurnSetSettlmentLayer(
+    function forwardedBridgeBurnSetSettlementLayer(
         uint256 _chainId,
         uint256 _newSettlementLayerChainId
     ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
