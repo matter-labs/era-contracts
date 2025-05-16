@@ -2,8 +2,8 @@
 
 pragma solidity 0.8.24;
 
-import {IL1DAValidator, L1DAValidatorOutput} from "../chain-interfaces/IL1DAValidator.sol";
-import {OperatorDAInputTooSmall, InvalidL2DAOutputHash} from "../L1StateTransitionErrors.sol";
+import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
+import {OperatorDAInputTooSmall, InvalidL2DAOutputHash} from "./DAContractsErrors.sol";
 
 error BitcoinDAPrecompileCallFailed();
 error BitcoinDAVerificationFailed();
@@ -15,7 +15,7 @@ contract RollupL1DAValidator is IL1DAValidator {
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
         uint256 maxBlobsSupported
-    ) external override returns (L1DAValidatorOutput memory output) {
+    ) external view returns (L1DAValidatorOutput memory output) {
         {
             (bytes32 uncompressedStateDiffHash, bytes32 fullPubdataHash) = _processL2RollupDAValidatorOutputHash(
                 _l2DAValidatorOutputHash,
