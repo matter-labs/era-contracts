@@ -153,7 +153,7 @@ contract L1GatewayTests is
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
-        // gatewayScript.fullGatewayRegistration();
+        gatewayScript.fullGatewayRegistration();
     }
 
     function test_startMessageToL2() public {

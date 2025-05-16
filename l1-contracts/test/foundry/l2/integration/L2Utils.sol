@@ -13,6 +13,7 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -29,9 +30,6 @@ library L2Utils {
 
     address internal constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
 
-    string internal constant L2_ASSET_ROUTER_PATH = "./zkout/L2AssetRouter.sol/L2AssetRouter.json";
-    string internal constant L2_NATIVE_TOKEN_VAULT_PATH = "./zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json";
-    string internal constant BRIDGEHUB_PATH = "./zkout/Bridgehub.sol/Bridgehub.json";
 
     function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
@@ -84,6 +82,7 @@ library L2Utils {
             _args.legacySharedBridge,
             _args.l1CtmDeployer
         );
+        forceDeployChainAssetHandler();
         forceDeployAssetRouter(
             _args.l1ChainId,
             _args.eraChainId,
@@ -124,6 +123,14 @@ library L2Utils {
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
             L2_CHAIN_HANDLER_ADDR
         );
+    }
+
+    function forceDeployChainAssetHandler() internal {
+        new ChainAssetHandler(
+            IBridgehub(L2_BRIDGEHUB_ADDR),
+            L2_ASSET_ROUTER_ADDR
+        );
+        forceDeployWithConstructor("ChainAssetHandler", L2_CHAIN_HANDLER_ADDR, abi.encode(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR));
     }
 
     /// @notice Deploys the L2AssetRouter contract.
