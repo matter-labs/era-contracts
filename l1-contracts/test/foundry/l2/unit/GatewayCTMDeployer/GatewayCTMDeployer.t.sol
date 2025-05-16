@@ -39,7 +39,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 
 import {GatewayCTMDeployerHelper} from "deploy-scripts/GatewayCTMDeployerHelper.sol";
 
-import {L2_CREATE2_FACTORY_ADDRESS} from "deploy-scripts/Utils.sol";
+import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract
@@ -47,7 +47,7 @@ contract GatewayCTMDeployerTester {
     function deployCTMDeployer(
         bytes memory data
     ) external returns (DeployedContracts memory deployedContracts, address addr) {
-        (bool success, bytes memory result) = L2_CREATE2_FACTORY_ADDRESS.call(data);
+        (bool success, bytes memory result) = L2_CREATE2_FACTORY_ADDR.call(data);
         require(success, "failed to deploy");
 
         addr = abi.decode(result, (address));

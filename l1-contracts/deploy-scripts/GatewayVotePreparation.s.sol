@@ -16,9 +16,9 @@ import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridge
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_CREATE2_FACTORY_ADDRESS} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -32,12 +32,11 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
@@ -204,7 +203,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             l2GasLimit: 72_000_000,
             l2Value: 0,
             factoryDeps: new bytes[](0),
-            dstAddress: L2_CREATE2_FACTORY_ADDRESS,
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
             chainId: gatewayChainId,
             bridgehubAddress: addresses.bridgehub.bridgehubProxy,
             l1SharedBridgeProxy: addresses.bridges.l1AssetRouterProxy,

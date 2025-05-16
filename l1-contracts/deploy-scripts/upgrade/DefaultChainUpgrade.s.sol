@@ -19,7 +19,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-contract ChainUpgrade is Script {
+contract DefaultChainUpgrade is Script {
     using stdToml for string;
 
     struct ChainConfig {

@@ -21,7 +21,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
-import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
+import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
 import {InteropRoot} from "contracts/common/Messaging.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -646,7 +646,7 @@ library Utils {
     }
 
     function deployL1RollupDAValidatorBytecode() internal returns (address) {
-        bytes memory bytecode = DeployUtils.readRollupDAValidatorBytecode();
+        bytes memory bytecode = ContractsBytecodesLib.getCreationCode("RollupL1DAValidator");
 
         return deployViaCreate(bytecode);
     }
