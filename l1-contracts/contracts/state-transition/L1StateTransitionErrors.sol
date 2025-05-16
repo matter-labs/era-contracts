@@ -5,9 +5,6 @@ pragma solidity ^0.8.21;
 // 0x2e89f517
 error L1DAValidatorAddressIsZero();
 
-// 0x944bc075
-error L2DAValidatorAddressIsZero();
-
 // 0xca1c3cbc
 error AlreadyMigrated();
 
@@ -44,8 +41,8 @@ error NotSettlementLayer();
 // 0x32ddf9a2
 error NotHyperchain();
 
-// 0x2237c426
-error MismatchL2DAValidator();
+// 0x32fff278
+error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expectedScheme);
 
 // 0x2c01a4af
 error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);

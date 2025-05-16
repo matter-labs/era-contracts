@@ -113,6 +113,8 @@ error IncorrectBridgeHubAddress(address bridgehub);
 error InsufficientChainBalance();
 // 0xcbd9d2e0
 error InvalidCaller(address);
+// 0x3f98a77e
+error InvalidL2DACommitmentScheme(uint8);
 // 0x4fbe5dba
 error InvalidDelay();
 // 0xc1780bd6

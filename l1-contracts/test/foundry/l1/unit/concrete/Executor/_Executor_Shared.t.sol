@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_VALIDATOR_ADDRESS} from "../Utils/Utils.sol";
+import {Utils, DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_COMMITMENT_SCHEME} from "../Utils/Utils.sol";
 import {TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
@@ -260,7 +260,7 @@ contract ExecutorTest is Test {
         vm.prank(address(chainTypeManager));
         admin.setTokenMultiplier(1, 1);
         vm.prank(address(owner));
-        admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_VALIDATOR_ADDRESS);
+        admin.setDAValidatorPair(address(rollupL1DAValidator), L2_DA_COMMITMENT_SCHEME);
 
         // foundry's default value is 1 for the block's timestamp, it is expected
         // that block.timestamp > COMMIT_TIMESTAMP_NOT_OLDER + 1
