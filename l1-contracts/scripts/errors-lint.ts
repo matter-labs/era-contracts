@@ -15,7 +15,6 @@ const CONTRACTS_DIRECTORIES = {
   "deploy-scripts": ["ZkSyncScriptErrors.sol"],
   "../l2-contracts/contracts": ["errors/L2ContractErrors.sol"],
   "../system-contracts/contracts": ["SystemContractErrors.sol"],
-  "../da-contracts/contracts": ["DAContractsErrors.sol"],
 }; // Replace with your directories
 
 // Function to extract the error signature

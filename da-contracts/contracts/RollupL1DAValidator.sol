@@ -14,7 +14,7 @@ contract RollupL1DAValidator is IL1DAValidator {
         uint256, // _batchNumber
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
-        uint256 maxBlobsSupported
+        uint256 _maxBlobsSupported
     ) external view returns (L1DAValidatorOutput memory output) {
         {
             (bytes32 uncompressedStateDiffHash, bytes32 fullPubdataHash) = _processL2RollupDAValidatorOutputHash(
@@ -27,8 +27,8 @@ contract RollupL1DAValidator is IL1DAValidator {
             _verifyBitcoinDA(fullPubdataHash);
         }
         // The rest of the fields that relate to blobs are empty.
-        output.blobsLinearHashes = new bytes32[](maxBlobsSupported);
-        output.blobsOpeningCommitments = new bytes32[](maxBlobsSupported);
+        output.blobsLinearHashes = new bytes32[](_maxBlobsSupported);
+        output.blobsOpeningCommitments = new bytes32[](_maxBlobsSupported);
     }
 
     function _processL2RollupDAValidatorOutputHash(
