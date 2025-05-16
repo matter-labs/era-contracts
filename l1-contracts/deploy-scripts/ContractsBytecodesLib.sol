@@ -12,13 +12,38 @@ library ContractsBytecodesLib {
     /// "ForceDeployUpgrader" (L2 contract), "AdminFacet" (L1 special filename).
     /// @return The bytecode of the contract.
     /// @dev Reverts if the contractIdentifier is unknown or unsupported.
+
     function getCreationCode(string memory contractIdentifier) internal view returns (bytes memory) {
+        return getCreationCodeZK(contractIdentifier);
+    }
+
+    function getCreationCode(string memory contractIdentifier, bool isZKBytecode) internal view returns (bytes memory) {
+        if (isZKBytecode) {
+            return getCreationCodeZK(contractIdentifier);
+        } else {
+            return getCreationCodeEVM(contractIdentifier);
+        }
+    }
+    function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
         string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
 
+        uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
+        for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
+            if (Utils.compareStrings(DA_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
+                return Utils.readDAContractBytecode(contractIdentifier);
+            }
+        }
+
+        revert(
+            string.concat("ContractsBytecodesLib: Unknown or unsupported EVM contract identifier: ", contractIdentifier)
+        );
+    }
+
+    function getCreationCodeZK(string memory contractIdentifier) internal view returns (bytes memory) {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[37] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[38] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
@@ -27,6 +52,7 @@ library ContractsBytecodesLib {
             "BytecodesSupplier", // ???
             "ChainAdmin",
             "ChainAdminOwnable",
+            "ChainAssetHandler",
             "ChainRegistrar",
             "ChainTypeManager",
             "CTMDeploymentTracker",
@@ -117,13 +143,6 @@ library ContractsBytecodesLib {
             }
         }
 
-        uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
-        for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
-            if (Utils.compareStrings(DA_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
-                return Utils.readDAContractBytecode(contractIdentifier);
-            }
-        }
-
         uint256 L2_GENERIC_CONTRACT_IDENTIFIERS_LENGTH = L2_GENERIC_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < L2_GENERIC_CONTRACT_IDENTIFIERS_LENGTH; i++) {
             if (Utils.compareStrings(L2_GENERIC_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
@@ -139,6 +158,8 @@ library ContractsBytecodesLib {
             }
         }
 
-        revert("ContractsBytecodesLib: Unknown or unsupported contract identifier");
+        revert(
+            string.concat("ContractsBytecodesLib: Unknown or unsupported ZK contract identifier: ", contractIdentifier)
+        );
     }
 }

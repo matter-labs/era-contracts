@@ -646,7 +646,7 @@ library Utils {
     }
 
     function deployL1RollupDAValidatorBytecode() internal returns (address) {
-        bytes memory bytecode = ContractsBytecodesLib.getCreationCode("RollupL1DAValidator");
+        bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("RollupL1DAValidator");
 
         return deployViaCreate(bytecode);
     }

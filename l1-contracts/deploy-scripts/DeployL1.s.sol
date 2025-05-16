@@ -47,6 +47,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -176,6 +177,11 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridgehub.ctmDeploymentTrackerImplementation,
             addresses.bridgehub.ctmDeploymentTrackerProxy
         ) = deployTuppWithContract("CTMDeploymentTracker", false);
+
+        (
+            addresses.bridgehub.chainHandlerImplementation,
+            addresses.bridgehub.chainHandlerProxy
+        ) = deployTuppWithContract("ChainAssetHandler", false);
         setBridgehubParams();
 
         initializeGeneratedData();
@@ -330,7 +336,8 @@ contract DeployL1Script is Script, DeployUtils {
         bridgehub.setAddresses(
             addresses.bridges.l1AssetRouterProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-            IMessageRoot(addresses.bridgehub.messageRootProxy)
+            IMessageRoot(addresses.bridgehub.messageRootProxy),
+            addresses.bridgehub.chainHandlerProxy
         );
         vm.stopBroadcast();
         console.log("SharedBridge registered");
@@ -729,6 +736,8 @@ contract DeployL1Script is Script, DeployUtils {
                 // Bridgehub is a special case because its bytecode was generated using a low optimizer runs setting.
                 // return Utils.readFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
                 return type(Bridgehub).creationCode;
+            } else if (compareStrings(contractName, "ChainAssetHandler")) {
+                return type(ChainAssetHandler).creationCode;
             } else if (compareStrings(contractName, "MessageRoot")) {
                 return type(MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -798,9 +807,6 @@ contract DeployL1Script is Script, DeployUtils {
                 return type(ServerNotifier).creationCode;
             } else if (compareStrings(contractName, "UpgradeStageValidator")) {
                 return type(UpgradeStageValidator).creationCode;
-            } else {
-                /// kl todo not ideal as it might return a zk bytecode.
-                return ContractsBytecodesLib.getCreationCode(contractName);
             }
         } else {
             if (compareStrings(contractName, "Verifier")) {
@@ -809,10 +815,9 @@ contract DeployL1Script is Script, DeployUtils {
                 } else {
                     return getCreationCode("DualVerifier", true);
                 }
-            } else {
-                return ContractsBytecodesLib.getCreationCode(contractName);
             }
         }
+        return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
@@ -820,6 +825,8 @@ contract DeployL1Script is Script, DeployUtils {
             return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "MessageRoot")) {
             return abi.encodeCall(MessageRoot.initialize, ());
+        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "L1Nullifier")) {

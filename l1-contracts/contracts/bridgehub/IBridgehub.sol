@@ -168,7 +168,8 @@ interface IBridgehub {
     function setAddresses(
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot
+        IMessageRoot _messageRoot,
+        address _chainHandler
     ) external;
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
@@ -212,6 +213,8 @@ interface IBridgehub {
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external;
 
     function L1_CHAIN_ID() external view returns (uint256);
+
+    function chainHandler() external view returns (address);
 
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
 

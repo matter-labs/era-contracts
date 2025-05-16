@@ -54,6 +54,8 @@ struct BridgehubDeployedAddresses {
     address ctmDeploymentTrackerProxy;
     address messageRootImplementation;
     address messageRootProxy;
+    address chainHandlerImplementation;
+    address chainHandlerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -353,6 +355,8 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "MessageRoot")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
+        } else if (compareStrings(contractName, "ChainAssetHandler")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return

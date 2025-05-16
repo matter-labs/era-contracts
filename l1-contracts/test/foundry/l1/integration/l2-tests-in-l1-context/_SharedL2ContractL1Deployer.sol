@@ -16,12 +16,13 @@ import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
-import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_VERIFICATION, L2_INTEROP_ROOT_STORAGE} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_VERIFICATION, L2_INTEROP_ROOT_STORAGE, L2_CHAIN_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
@@ -87,7 +88,8 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
         Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            L2_CHAIN_HANDLER_ADDR
         );
 
         {
@@ -95,6 +97,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
             vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
             address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
             vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
+            address l2ChainHandler = address(
+                new ChainAssetHandler(IBridgehub(L2_BRIDGEHUB_ADDR), L2_ASSET_ROUTER_ADDR)
+            );
+            vm.etch(L2_CHAIN_HANDLER_ADDR, l2ChainHandler.code);
         }
 
         vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);

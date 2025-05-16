@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
+import {OnlyBridgehubOrChainHandler, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -65,10 +65,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
-            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+    /// @notice Checks that the message sender is the chain handler.
+    modifier onlyBridgehubOrChainHandler() {
+        if (msg.sender != address(BRIDGE_HUB) && msg.sender != address(BRIDGE_HUB.chainHandler())) {
+            revert OnlyBridgehubOrChainHandler(msg.sender, address(BRIDGE_HUB), address(BRIDGE_HUB.chainHandler()));
         }
         _;
     }
@@ -99,7 +99,7 @@ contract MessageRoot is IMessageRoot, Initializable {
 
     /// @notice Adds a single chain to the message root.
     /// @param _chainId The ID of the chain that is being added to the message root.
-    function addNewChain(uint256 _chainId) external onlyBridgehub {
+    function addNewChain(uint256 _chainId) external onlyBridgehubOrChainHandler {
         if (chainRegistered(_chainId)) {
             revert ChainExists();
         }
