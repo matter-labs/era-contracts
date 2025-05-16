@@ -25,7 +25,6 @@ contract DeployL2Script is Script {
         Rollup,
         NoDA,
         Avail,
-        Bitcoin
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -152,8 +151,7 @@ contract DeployL2Script is Script {
         config.eraChainId = toml.readUint("$.era_chain_id");
 
         uint256 validatorTypeUint = toml.readUint("$.da_validator_type");
-        // SYSCOIN
-        require(validatorTypeUint < 4, "Invalid DA validator type");
+        require(validatorTypeUint < 3, "Invalid DA validator type");
         config.validatorType = DAValidatorType(validatorTypeUint);
     }
 
@@ -178,9 +176,6 @@ contract DeployL2Script is Script {
             bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
         } else if (config.validatorType == DAValidatorType.Avail) {
             bytecode = L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode();
-            // SYSCOIN
-        } else if (config.validatorType == DAValidatorType.Bitcoin) {
-            bytecode = L2ContractsBytecodesLib.readBitcoinL2DAValidatorBytecode();
         } else {
             revert("Invalid DA validator type");
         }

@@ -247,8 +247,6 @@ export interface DeployedAddresses {
   RollupL1DAValidator: string;
   ValidiumL1DAValidator: string;
   RelayedSLDAValidator: string;
-  // SYSCOIN
-  BitcoinL1DAValidator: string;
   Create2Factory: string;
 }
 
@@ -306,8 +304,6 @@ export function deployedAddressesFromEnv(): DeployedAddresses {
     RollupL1DAValidator: getAddressFromEnv("CONTRACTS_L1_ROLLUP_DA_VALIDATOR"),
     ValidiumL1DAValidator: getAddressFromEnv("CONTRACTS_L1_VALIDIUM_DA_VALIDATOR"),
     RelayedSLDAValidator: getAddressFromEnv("CONTRACTS_L1_RELAYED_SL_DA_VALIDATOR"),
-    // SYSCOIN
-    BitcoinL1DAValidator: getAddressFromEnv("CONTRACTS_L1_BITCOIN_DA_VALIDATOR_ADDR"),
     BaseToken: getAddressFromEnv("CONTRACTS_BASE_TOKEN_ADDR"),
     BaseTokenAssetId: baseTokenAssetId,
     TransparentProxyAdmin: getAddressFromEnv("CONTRACTS_TRANSPARENT_PROXY_ADMIN_ADDR"),

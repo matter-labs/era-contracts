@@ -384,14 +384,6 @@
     "evmDeployedBytecodeHash": null
   },
   {
-    "contractName": "l2-contracts/BitcoinL2DAValidator",
-    "zkBytecodeHash": "0x01000119254008b70a7a09f100eab05ebe5cd1153c052a4941db78109f0a4187",
-    "zkBytecodePath": "/l2-contracts/zkout/BitcoinL2DAValidator.sol/BitcoinL2DAValidator.json",
-    "evmBytecodeHash": null,
-    "evmBytecodePath": null,
-    "evmDeployedBytecodeHash": null
-  },
-  {
     "contractName": "l2-contracts/BootloaderUtilities",
     "zkBytecodeHash": "0x010006ed0e396b971b54f3cd75d6934fb456119be1cbf18ba830d5484ece99b9",
     "zkBytecodePath": "/l2-contracts/zkout/BootloaderUtilities.sol/BootloaderUtilities.json",
@@ -782,14 +774,6 @@
     "evmBytecodeHash": "0x35ee8709377e972c1f0bc3060bcfe41fb8308a5e20670dc969ed9a61038ee038",
     "evmBytecodePath": "/l1-contracts/out/BeaconProxy.sol/BeaconProxy.json",
     "evmDeployedBytecodeHash": "0xc4df59cf968d64ae659b6788dc35aec9bf5baf0724fb11c0461d42f410e19fb9"
-  },
-  {
-    "contractName": "l1-contracts/BitcoinL1DAValidator",
-    "evmBytecodeHash": "0x571c6173d7a15c95e2d0682f731a835c0224fdf0930af4423e0905db0f7a21cd",
-    "evmBytecodePath": "/l1-contracts/out/BitcoinL1DAValidator.sol/BitcoinL1DAValidator.json",
-    "evmDeployedBytecodeHash": "0xc240537fafe1bc991b4c0426b19abf8b894cf1d89085cfa2bf98051b8abfa418",
-    "zkBytecodeHash": "0x010000673444acfeea801fa1d9d2297e7bda4bc28ea71f65dbcd0331bc8d5385",
-    "zkBytecodePath": "/l1-contracts/zkout/BitcoinL1DAValidator.sol/BitcoinL1DAValidator.json"
   },
   {
     "contractName": "l1-contracts/BridgeHelper",

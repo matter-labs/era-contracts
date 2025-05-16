@@ -1301,10 +1301,6 @@ library Utils {
     function readDummyAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
         bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
     }
-    // SYSCOIN
-    function readBitcoinL1DAValidatorBytecode() internal view returns (bytes memory bytecode) {
-        bytecode = readFoundryBytecode("/../l1-contracts/out/BitcoinL1DAValidator.sol/BitcoinL1DAValidator.json");
-    }
 
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
         result = new Call[](a.length + b.length);

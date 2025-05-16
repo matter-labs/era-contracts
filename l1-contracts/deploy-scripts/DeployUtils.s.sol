@@ -63,8 +63,6 @@ struct DataAvailabilityDeployedAddresses {
     address noDAValidiumL1DAValidator;
     address availBridge;
     address availL1DAValidator;
-    // SYSCOIN
-    address bitcoinL1DAValidator;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -418,9 +416,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "AvailL1DAValidator")) {
             return abi.encode(addresses.daAddresses.availBridge);
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
-            return abi.encode();
-            // SYSCOIN
-        } else if (compareStrings(contractName, "BitcoinL1DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
             return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
