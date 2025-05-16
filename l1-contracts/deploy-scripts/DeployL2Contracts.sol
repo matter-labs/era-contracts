@@ -24,7 +24,7 @@ contract DeployL2Script is Script {
     enum DAValidatorType {
         Rollup,
         NoDA,
-        Avail,
+        Avail
     }
 
     // solhint-disable-next-line gas-struct-packing
