@@ -15,14 +15,12 @@ contract PrecommittingTest is ExecutorTest {
     uint256 miniblockNumber = 18;
 
     function precommitData() internal view returns (bytes memory) {
-        IExecutor.TransactionStatusCommitment[] memory txs =
-            new IExecutor.TransactionStatusCommitment[](TOTAL_TRANSACTIONS);
+        IExecutor.TransactionStatusCommitment[] memory txs = new IExecutor.TransactionStatusCommitment[](
+            TOTAL_TRANSACTIONS
+        );
 
         for (uint i = 0; i < TOTAL_TRANSACTIONS; ++i) {
-            txs[i] = IExecutor.TransactionStatusCommitment({
-                txHash: keccak256(abi.encode(i)),
-                status: i % 3 != 0
-            });
+            txs[i] = IExecutor.TransactionStatusCommitment({txHash: keccak256(abi.encode(i)), status: i % 3 != 0});
         }
 
         IExecutor.PrecommitInfo memory precommitInfo = IExecutor.PrecommitInfo({
@@ -30,10 +28,7 @@ contract PrecommittingTest is ExecutorTest {
             untrustedLastMiniblockNumberHint: miniblockNumber
         });
 
-        return abi.encodePacked(
-            BatchDecoder.SUPPORTED_ENCODING_VERSION,
-            abi.encode(precommitInfo)
-        );
+        return abi.encodePacked(BatchDecoder.SUPPORTED_ENCODING_VERSION, abi.encode(precommitInfo));
     }
 
     function test_SuccessfullyPrecommit() public {

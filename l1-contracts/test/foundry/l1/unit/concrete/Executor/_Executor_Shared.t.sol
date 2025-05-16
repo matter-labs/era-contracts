@@ -153,13 +153,14 @@ contract ExecutorTest is Test {
     function deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) private returns (address) {
         ProxyAdmin proxyAdmin = new ProxyAdmin();
         ValidatorTimelock timelockImplementation = new ValidatorTimelock();
-        return address(
-            new TransparentUpgradeableProxy(
-                address(timelockImplementation),
-                address(proxyAdmin),
-                abi.encodeCall(ValidatorTimelock.initialize, (_initialOwner, _initialExecutionDelay))
-            )
-        );
+        return
+            address(
+                new TransparentUpgradeableProxy(
+                    address(timelockImplementation),
+                    address(proxyAdmin),
+                    abi.encodeCall(ValidatorTimelock.initialize, (_initialOwner, _initialExecutionDelay))
+                )
+            );
     }
 
     constructor() {

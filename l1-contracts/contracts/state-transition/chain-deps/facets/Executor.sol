@@ -148,7 +148,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert PrecommitmentMismatch(_batchNumber, _expectedL2TxsStatusRollingHash, storedPrecommitment);
         }
 
-        // Reseting the stored precommitment.
+        // Resetting the stored precommitment.
         delete s.precommitmentForTheLatestBatch;
     }
 

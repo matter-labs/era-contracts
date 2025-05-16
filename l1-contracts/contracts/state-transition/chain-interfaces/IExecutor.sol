@@ -125,11 +125,7 @@ interface IExecutor is IZKChainBase {
     /// @param _chainId Chain ID of the chain.
     /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
     /// @param _precommitData ABI‐encoded transaction status list for the precommit.
-    function precommitSharedBridge(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes calldata _precommitData
-    ) external;
+    function precommitSharedBridge(uint256 _chainId, uint256 _batchNumber, bytes calldata _precommitData) external;
 
     /// @notice Function called by the operator to commit new batches. It is responsible for:
     /// - Verifying the correctness of their timestamps.
