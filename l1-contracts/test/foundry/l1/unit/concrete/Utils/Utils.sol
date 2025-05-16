@@ -559,10 +559,7 @@ library Utils {
         uint8 _blobsAmount,
         bytes32[] memory _blobHashes
     ) public pure returns (bytes32) {
-        if (_blobsAmount == 0) {
-            return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash));
-        }
-        return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash, _blobsAmount, _blobHashes));
+        return keccak256(abi.encodePacked(_stateDiffHash, _totalPubdataHash));
     }
 
     function getDefaultBlobCommitment() public pure returns (bytes memory) {
