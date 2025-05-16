@@ -19,7 +19,7 @@ import {Utils} from "./Utils.sol";
 
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 
-import {GatewayCTMDeployerConfig, DeployedContracts, BLOB_HASH_RETRIEVER_ADDR} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
+import {GatewayCTMDeployerConfig, DeployedContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 
 // solhint-disable gas-custom-errors
 
@@ -281,8 +281,7 @@ library GatewayCTMDeployerHelper {
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
             priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
-            feeParams: _config.feeParams,
-            blobVersionedHashRetriever: BLOB_HASH_RETRIEVER_ADDR
+            feeParams: _config.feeParams
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({

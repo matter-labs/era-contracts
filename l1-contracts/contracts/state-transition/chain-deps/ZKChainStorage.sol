@@ -138,8 +138,7 @@ struct ZKChainStorage {
     /// charged at that level.
     FeeParams feeParams;
     /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
-    /// @dev Used only for testing.
-    address blobVersionedHashRetriever;
+    address __DEPRECATED_blobVersionedHashRetriever;
     /// @dev The chainId of the chain
     uint256 chainId;
     /// @dev The address of the bridgehub

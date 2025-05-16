@@ -2000,11 +2000,13 @@ object "Bootloader" {
                     eq(selector, {{CREATE2_SELECTOR}}),
                     eq(selector, {{CREATE2_ACCOUNT_SELECTOR}})
                 )
+                let isSelectorCreateEVM := eq(selector, {{CREATE_EVM_SELECTOR}})
+                let isSelectorCreate2EVM := eq(selector, {{CREATE2_EVM_SELECTOR}})
 
                 // Firstly, ensure that the selector is a valid deployment function
                 ret := or(
-                    isSelectorCreate,
-                    isSelectorCreate2
+                    or(isSelectorCreate, isSelectorCreate2),
+                    or(isSelectorCreateEVM, isSelectorCreate2EVM)
                 )
                 // Secondly, ensure that the callee is ContractDeployer
                 ret := and(ret, eq(to, CONTRACT_DEPLOYER_ADDR()))
