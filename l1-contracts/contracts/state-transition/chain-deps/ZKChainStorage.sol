@@ -175,4 +175,6 @@ struct ZKChainStorage {
     /// @notice Bytecode hash of evm emulator.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
+    /// @dev Boojum OS flag, if `true` settlement done using Boojum OS state transition, otherwise Era VM
+    bool boojumOS;
 }

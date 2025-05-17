@@ -131,6 +131,8 @@ error InvalidSelector(bytes4 func);
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
 error L2TimestampTooBig();
+// 0x55bde247
+error IncorrectBatchChainId();
 // 0x97e1359e
 error L2WithdrawalMessageWrongLength(uint256 messageLen);
 // 0xe37d2c02
