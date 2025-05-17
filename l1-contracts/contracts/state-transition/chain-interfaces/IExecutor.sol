@@ -63,13 +63,13 @@ interface IExecutor is IZKChainBase {
     // solhint-disable-next-line gas-struct-packing
     struct StoredBatchInfo {
         uint64 batchNumber;
-        bytes32 batchHash;
-        uint64 indexRepeatedStorageChanges;
+        bytes32 batchHash; // For Boojum OS batches we'll store here full state commitment
+        uint64 indexRepeatedStorageChanges; // For Boojum OS not used, 0
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
         bytes32 l2LogsTreeRoot;
-        uint256 timestamp;
-        bytes32 commitment;
+        uint256 timestamp; // For Boojum OS not used, 0
+        bytes32 commitment;// For Boojum OS batches we'll store public input here
     }
 
     /// @notice Data needed to commit new batch
@@ -100,6 +100,23 @@ interface IExecutor is IZKChainBase {
         bytes32 bootloaderHeapInitialContentsHash;
         bytes32 eventsQueueStateHash;
         bytes systemLogs;
+        bytes operatorDAInput;
+    }
+
+    struct CommitBoojumOSBatchInfo {
+        uint64 batchNumber;
+        bytes32 newStateCommitment;
+        // info about processed l1 txs, l2 to l1 logs and DA
+        uint256 numberOfLayer1Txs;
+        bytes32 priorityOperationsHash;
+        bytes32 l2LogsTreeRoot;
+        L2DACommitmentScheme l2DACommitmentScheme; // TODO: already saved in the storage, can just add from there to PI
+        bytes32 daCommitment;
+        // sending used batch inputs to validate on the settlement layer
+        uint64 firstBlockTimestamp;
+        uint64 lastBlockTimestamp;
+        uint256 chainId; // TODO: already saved in the storage, can just add from there to PI
+        // extra calldata to pass to da validator
         bytes operatorDAInput;
     }
 
