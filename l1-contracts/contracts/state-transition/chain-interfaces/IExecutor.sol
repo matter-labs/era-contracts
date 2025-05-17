@@ -16,6 +16,7 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+    L2_TXS_STATUS_ROLLING_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
@@ -28,6 +29,7 @@ struct LogProcessingOutput {
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
     bytes32 l2DAValidatorOutputHash;
+    bytes32 l2TxsStatusRollingHash;
 }
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
@@ -103,6 +105,27 @@ interface IExecutor is IZKChainBase {
         bytes operatorDAInput;
     }
 
+    /// @notice Commitment to the status of a single L2 transaction.
+    /// @param txHash The keccak256 hash of the transaction data.
+    /// @param status The boolean status of the transaction (true = success, false = failure).
+    struct TransactionStatusCommitment {
+        bytes32 txHash;
+        bool status;
+    }
+
+    /// @notice Container for a list of `TransactionStatusCommitment`s to precommit.
+    /// @param txs Array of individual transaction status commitments for the batch.
+    /// @param untrustedLastMiniblockNumberHint The "hint" for what the last miniblock that these txs represent is.
+    struct PrecommitInfo {
+        TransactionStatusCommitment[] txs;
+        uint256 untrustedLastMiniblockNumberHint;
+    }
+
+    /// @notice Precommits the status of all L2 transactions for the next batch on the shared bridge.
+    /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
+    /// @param _precommitData ABI‐encoded transaction status list for the precommit.
+    function precommitSharedBridge(uint256 _chainId, uint256 _batchNumber, bytes calldata _precommitData) external;
+
     /// @notice Function called by the operator to commit new batches. It is responsible for:
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
@@ -148,6 +171,8 @@ interface IExecutor is IZKChainBase {
     /// @notice Reverts unexecuted batches
     /// @param _chainId Chain ID of the chain
     /// @param _newLastBatch batch number after which batches should be reverted
+    /// @dev When the _newLastBatch is equal to the number of committed batches,
+    /// only the precommitment is erased.
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
     function revertBatchesSharedBridge(uint256 _chainId, uint256 _newLastBatch) external;
@@ -178,4 +203,15 @@ interface IExecutor is IZKChainBase {
     /// @param totalBatchesExecuted Total number of executed batches
     /// @dev It has the name "BlocksRevert" and not "BatchesRevert" due to backward compatibility considerations
     event BlocksRevert(uint256 totalBatchesCommitted, uint256 totalBatchesVerified, uint256 totalBatchesExecuted);
+
+    /// @notice Emitted when a new precommitment is set for a batch.
+    /// @param batchNumber The batch number for which the precommitment was recorded.
+    /// @param untrustedLastMiniblockHint The hint to what miniblock the precommitment should correspond to. Note, that there are no
+    /// guarantees on its correctness, it is just a way for the server to make external nodes' indexing simpler.
+    /// @param precommitment The resulting rolling hash of all transaction statuses.
+    event BatchPrecommitmentSet(
+        uint256 indexed batchNumber,
+        uint256 indexed untrustedLastMiniblockHint,
+        bytes32 precommitment
+    );
 }

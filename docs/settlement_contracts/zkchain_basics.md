@@ -112,6 +112,8 @@ The state transition is divided into three stages:
 
 Each L2 -> L1 system log will have a key that is part of the following:
 
+TODO: update the file if needed
+
 ```solidity
 enum SystemLogKey {
   L2_TO_L1_LOGS_TREE_ROOT_KEY,
@@ -121,6 +123,7 @@ enum SystemLogKey {
   PREV_BATCH_HASH_KEY,
   L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
   USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+  L2_TXS_STATUS_ROLLING_HASH_KEY,
   EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 ```

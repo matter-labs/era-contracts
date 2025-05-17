@@ -15,7 +15,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch} from "../../../common/L1ContractErrors.sol";
 import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -91,6 +91,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (logOutput.numberOfLayer1Txs != _newBatch.numberOfLayer1Txs) {
             revert ValueMismatch(logOutput.numberOfLayer1Txs, _newBatch.numberOfLayer1Txs);
         }
+        _verifyAndResetBatchPrecommitment(_newBatch.batchNumber, logOutput.l2TxsStatusRollingHash);
 
         // Check the timestamp of the new batch
         _verifyBatchTimestamp(logOutput.packedBatchAndL2BlockTimestamp, _newBatch.timestamp, _previousBatch.timestamp);
@@ -133,6 +134,22 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
             );
         }
+    }
+
+    /// @notice Verifies that a stored precommitment for a given batch matches the expected rolling hash.
+    /// @param _batchNumber The batch number whose precommitment is being verified.
+    /// @param _expectedL2TxsStatusRollingHash The expected rolling hash of L2 transaction statuses for the batch.
+    function _verifyAndResetBatchPrecommitment(uint256 _batchNumber, bytes32 _expectedL2TxsStatusRollingHash) internal {
+        bytes32 storedPrecommitment = s.precommitmentForTheLatestBatch;
+
+        // We do not require the operator to always provide the precommitments as it is an optional feature.
+        // However, if precommitments were provided, we do expect them to span over the entire batch
+        if (storedPrecommitment != bytes32(0) && storedPrecommitment != _expectedL2TxsStatusRollingHash) {
+            revert PrecommitmentMismatch(_batchNumber, _expectedL2TxsStatusRollingHash, storedPrecommitment);
+        }
+
+        // Reseting the stored precommitment.
+        delete s.precommitmentForTheLatestBatch;
     }
 
     /// @notice checks that the timestamps of both the new batch and the new L2 block are correct.
@@ -247,6 +264,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2DAValidatorOutputHash = logValue;
+            } else if (logKey == uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY)) {
+                if (logSender != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
+                logOutput.l2TxsStatusRollingHash = logValue;
             } else if (logKey == uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
                 if (logSender != L2_BOOTLOADER_ADDRESS) {
                     revert InvalidLogSender(logSender, logKey);
@@ -259,16 +281,47 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
         }
 
-        // We only require 7 logs to be checked, the 8th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 7 logs: 2^7 - 1 = 127
-        // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
+        // We only require 8 logs to be checked, the 9th is if we are expecting a protocol upgrade
+        // Without the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
+        // With the protocol upgrade we expect 9 logs: 2^9 - 1 = 511
         if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            if (processedLogs != 127) {
-                revert MissingSystemLogs(127, processedLogs);
+            if (processedLogs != 255) {
+                revert MissingSystemLogs(255, processedLogs);
             }
-        } else if (processedLogs != 255) {
-            revert MissingSystemLogs(255, processedLogs);
+        } else if (processedLogs != 511) {
+            revert MissingSystemLogs(511, processedLogs);
         }
+    }
+
+    /// @notice Precommits the status of all L2 transactions for the next batch on the shared bridge.
+    /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
+    /// @param _precommitData ABI‐encoded transaction status list for the precommit.
+    function precommitSharedBridge(
+        uint256, // _chainId
+        uint256 _batchNumber,
+        bytes calldata _precommitData
+    ) external nonReentrant onlyValidator onlySettlementLayer {
+        uint256 expectedBatchNumber = s.totalBatchesCommitted + 1;
+        if (_batchNumber != expectedBatchNumber) {
+            revert InvalidBatchNumber(_batchNumber, expectedBatchNumber);
+        }
+        PrecommitInfo memory info = BatchDecoder.decodeAndCheckPrecommitData(_precommitData);
+        if (info.txs.length == 0) {
+            revert EmptyPrecommitData(_batchNumber);
+        }
+
+        bytes32 currentPrecommitment = s.precommitmentForTheLatestBatch;
+
+        uint256 length = info.txs.length;
+        for (uint256 i = 0; i < length; ++i) {
+            // todo: can optimize via assembly
+            bytes32 txStatusCommitment = keccak256(abi.encode(info.txs[i]));
+            currentPrecommitment = keccak256(abi.encode(currentPrecommitment, txStatusCommitment));
+        }
+
+        s.precommitmentForTheLatestBatch = currentPrecommitment;
+
+        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, currentPrecommitment);
     }
 
     /// @inheritdoc IExecutor
@@ -603,12 +656,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _revertBatches(uint256 _newLastBatch) internal onlySettlementLayer {
-        if (s.totalBatchesCommitted <= _newLastBatch) {
+        if (s.totalBatchesCommitted < _newLastBatch) {
             revert RevertedBatchNotAfterNewLastBatch();
         }
         if (_newLastBatch < s.totalBatchesExecuted) {
             revert CantRevertExecutedBatch();
         }
+
+        delete s.precommitmentForTheLatestBatch;
 
         if (_newLastBatch < s.totalBatchesVerified) {
             s.totalBatchesVerified = _newLastBatch;
