@@ -36,7 +36,6 @@ contract UpgradeIntegrationTest is Test {
         console.log("Preparing chain for the upgrade");
         chainUpgrade.prepareChain(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT, CHAIN_INPUT, CHAIN_OUTPUT);
 
-        // Note: stage1 calls are not used for V27 upgrade. This step will be required after Gateway launch
         (
             Call[] memory upgradeGovernanceStage0Calls,
             Call[] memory upgradeGovernanceStage1Calls,
