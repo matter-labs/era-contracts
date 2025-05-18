@@ -16,7 +16,7 @@ import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridge
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR, L2_CHAIN_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -159,7 +159,7 @@ abstract contract GatewayGovernanceUtils is Script {
 
             bytes memory secondBridgeData = abi.encodePacked(
                 SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
-                abi.encode(chainAssetId, L2_CHAIN_HANDLER_ADDR)
+                abi.encode(chainAssetId, L2_CHAIN_ASSET_HANDLER_ADDR)
             );
 
             calls = Utils.mergeCalls(

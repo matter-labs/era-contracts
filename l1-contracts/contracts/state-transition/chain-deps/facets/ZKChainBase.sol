@@ -51,7 +51,7 @@ contract ZKChainBase is ReentrancyGuard {
     }
 
     modifier onlyChainAssetHandler() {
-        if (msg.sender != IBridgehub(s.bridgehub).chainHandler()) {
+        if (msg.sender != IBridgehub(s.bridgehub).chainAssetHandler()) {
             revert Unauthorized(msg.sender);
         }
         _;

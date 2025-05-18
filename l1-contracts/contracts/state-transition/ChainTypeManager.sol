@@ -102,7 +102,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @notice only the chain asset handler can call
     modifier onlyChainAssetHandler() {
-        if (msg.sender != IBridgehub(BRIDGE_HUB).chainHandler()) {
+        if (msg.sender != IBridgehub(BRIDGE_HUB).chainAssetHandler()) {
             revert Unauthorized(msg.sender);
         }
         _;

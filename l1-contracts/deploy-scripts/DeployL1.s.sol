@@ -179,8 +179,8 @@ contract DeployL1Script is Script, DeployUtils {
         ) = deployTuppWithContract("CTMDeploymentTracker", false);
 
         (
-            addresses.bridgehub.chainHandlerImplementation,
-            addresses.bridgehub.chainHandlerProxy
+            addresses.bridgehub.chainAssetHandlerImplementation,
+            addresses.bridgehub.chainAssetHandlerProxy
         ) = deployTuppWithContract("ChainAssetHandler", false);
         setBridgehubParams();
 
@@ -337,7 +337,7 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridges.l1AssetRouterProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy),
-            addresses.bridgehub.chainHandlerProxy
+            addresses.bridgehub.chainAssetHandlerProxy
         );
         vm.stopBroadcast();
         console.log("SharedBridge registered");

@@ -24,10 +24,8 @@ import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
-/// facilitating interactions between end user and bridges.
-/// It also manages state transition managers, base tokens, and chain registrations.
-/// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
+/// @dev The ChainAssetHandler contract is used for migrating chains between settlement layers,
+/// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 contract ChainAssetHandler is
     IChainAssetHandler,
@@ -197,6 +195,7 @@ contract ChainAssetHandler is
     // / @param _chainId the chainId of the chain
     /// @param _assetId the assetId of the chain's CTM
     /// @param _data the data for the recovery.
+    /// @param _depositSender the address of the entity that initiated the deposit.
     // slither-disable-next-line locked-ether
     function bridgeRecoverFailedTransfer(
         uint256,

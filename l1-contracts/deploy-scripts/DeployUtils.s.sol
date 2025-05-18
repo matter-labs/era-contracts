@@ -54,8 +54,8 @@ struct BridgehubDeployedAddresses {
     address ctmDeploymentTrackerProxy;
     address messageRootImplementation;
     address messageRootProxy;
-    address chainHandlerImplementation;
-    address chainHandlerProxy;
+    address chainAssetHandlerImplementation;
+    address chainAssetHandlerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing

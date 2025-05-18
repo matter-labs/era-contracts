@@ -6,10 +6,6 @@ import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
 import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 
 interface IChainAssetHandler is IAssetHandler, IL1AssetHandler {
-    // function BRIDGE_HUB() external view returns (IBridgehub);
-
-    // function addNewChain(uint256 _chainId) external;
-
     /// @notice Emitted when the bridging to the chain is started.
     /// @param chainId Chain ID of the ZK chain
     /// @param assetId Asset ID of the token for the zkChain's CTM

@@ -21,19 +21,15 @@ import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {NotL1, NotRelayedSender, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, NotCurrentSL, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
+import {NotL1, NotRelayedSender, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, NotCurrentSL, AlreadyCurrentSL, ChainNotLegacy, NotChainAssetHandler} from "./L1BridgehubErrors.sol";
 import {NoCTMForAssetId, SettlementLayersMustSettleOnL1, MigrationPaused, AssetIdAlreadyRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
-
-import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
-/// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
-/// between different settlement layers (for example from L1 to Gateway).
-contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable, AssetHandlerModifiers {
+contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice the asset id of Eth. This is only used on L1.
@@ -101,10 +97,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice we store registered assetIds (for arbitrary base token)
     mapping(bytes32 baseTokenAssetId => bool) public assetIdIsRegistered;
 
-    /// @notice used to pause the migrations of chains. Used for upgrades.
+    /// @notice used to pause the migrations of chains. Used for stopping migrations during upgrades.
     bool public migrationPaused;
 
-    address public chainHandler;
+    /// @notice the chain asset handler used for chain migration.
+    address public chainAssetHandler;
 
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
@@ -135,10 +132,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    error NotChainAssetHandler(address sender, address chainHandler);
     modifier onlyChainAssetHandler() {
-        if (msg.sender != chainHandler) {
-            revert NotChainAssetHandler(msg.sender, chainHandler);
+        if (msg.sender != chainAssetHandler) {
+            revert NotChainAssetHandler(msg.sender, chainAssetHandler);
         }
         _;
     }
@@ -217,12 +213,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainHandler
+        address _chainAssetHandler
     ) external onlyOwner {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
-        chainHandler = _chainHandler;
+        chainAssetHandler = _chainAssetHandler;
     }
 
     /// @notice Used to set the legacy chain data for the upgrade.
@@ -388,6 +384,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;
     }
+
+    /// @notice This function is used to register a new zkChain in the system.
+    /// @notice see external counterpart for full natspec.
 
     function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {
         // slither-disable-next-line unused-return
@@ -690,6 +689,11 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
                         Chain migration
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
+    /// @param _chainId The chain ID of the migrating chain.
+    /// @param _newSettlementLayerChainId The chain ID of the new settlement layer.
+    /// @return zkChain The address of the ZK chain.
+    /// @return ctm The address of the CTM of the chain.
     function forwardedBridgeBurnSetSettlementLayer(
         uint256 _chainId,
         uint256 _newSettlementLayerChainId
@@ -709,6 +713,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         zkChain = zkChainMap.get(_chainId);
         ctm = chainTypeManager[_chainId];
     }
+
+    /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
+    /// @param _assetId The asset ID of the chain.
+    /// @param _chainId The chain ID of the ZK chain.
+    /// @param _baseTokenAssetId The asset ID of the base token.
+    /// @return zkChain The address of the ZK chain.
+    /// @return ctm The address of the CTM of the chain.
 
     function forwardedBridgeMint(
         bytes32 _assetId,
@@ -733,7 +744,23 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         zkChain = getZKChain(_chainId);
     }
 
-    /// @notice This internal function is used to register a new zkChain in the system.
+    /// @notice Used to recover a failed migration.
+    /// @param _chainId The chain ID of the chain.
+    /// @return zkChain The address of the ZK chain.
+    /// @return ctm The address of the CTM of the chain.
+    function forwardedBridgeRecoverFailedTransfer(
+        uint256 _chainId
+    ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
+        settlementLayer[_chainId] = block.chainid;
+        zkChain = getZKChain(_chainId);
+        ctm = chainTypeManager[_chainId];
+    }
+
+    /*////////////////////////////////////////////////////////////
+                            Chain registration
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice This function is used to register a new zkChain in the system.
     /// @param _chainId The chain ID of the ZK chain
     /// @param _zkChain The address of the ZK chain's DiamondProxy contract.
     /// @param _checkMaxNumberOfZKChains Whether to check that the limit for the number
@@ -749,16 +776,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) public onlyChainAssetHandler {
         _registerNewZKChain(_chainId, _zkChain, _checkMaxNumberOfZKChains);
     }
-
-    function forwardedBridgeRecoverFailedTransfer(
-        uint256 _chainId
-    ) external onlyChainAssetHandler returns (address zkChain, address ctm) {
-        settlementLayer[_chainId] = block.chainid;
-        zkChain = getZKChain(_chainId);
-        ctm = chainTypeManager[_chainId];
-    }
-
-    /*////////////////////////////////////////////////////////////*/
 
     /// @dev Registers an already deployed chain with the bridgehub
     /// @param _chainId The chain Id of the chain

@@ -88,4 +88,4 @@ IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(a
 IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
 
 /// @dev The address of the L2 chain handler system contract
-address constant L2_CHAIN_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
+address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
