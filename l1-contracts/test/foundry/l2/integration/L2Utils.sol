@@ -81,7 +81,7 @@ library L2Utils {
             _args.legacySharedBridge,
             _args.l1CtmDeployer
         );
-        forceDeployChainAssetHandler();
+        forceDeployChainAssetHandler(_args.l1ChainId, _args.aliasedOwner);
         forceDeployAssetRouter(
             _args.l1ChainId,
             _args.eraChainId,
@@ -124,12 +124,18 @@ library L2Utils {
         );
     }
 
-    function forceDeployChainAssetHandler() internal {
-        new ChainAssetHandler(IBridgehub(L2_BRIDGEHUB_ADDR), L2_ASSET_ROUTER_ADDR);
+    function forceDeployChainAssetHandler(uint256 _l1ChainId, address _aliasedOwner) internal {
+        new ChainAssetHandler(
+            _l1ChainId,
+            _aliasedOwner,
+            IBridgehub(L2_BRIDGEHUB_ADDR),
+            L2_ASSET_ROUTER_ADDR,
+            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+        );
         forceDeployWithConstructor(
             "ChainAssetHandler",
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            abi.encode(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR)
+            abi.encode(_l1ChainId, _aliasedOwner, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR)
         );
     }
 

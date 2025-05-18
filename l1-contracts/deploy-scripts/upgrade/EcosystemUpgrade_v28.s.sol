@@ -397,7 +397,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
         return
             IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, false)),
+                bytecodeHash: getL2BytecodeHash(contractName),
                 newAddress: getExpectedL2Address(contractName),
                 callConstructor: true,
                 value: 0,
@@ -546,7 +546,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
         return
             Utils.getL2AddressViaCreate2Factory(
                 bytes32(0), // the same as it is currently in the DeployL1.s.sol. Todo unify.
-                L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, false)),
+                getL2BytecodeHash(contractName),
                 hex"" // the same as it is currently in DeployL1.s.sol
             );
     }
@@ -575,21 +575,14 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
-            l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                ContractsBytecodesLib.getCreationCode("BeaconProxy")
-            ),
+            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(ContractsBytecodesLib.getCreationCode("Bridgehub")),
-            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                ContractsBytecodesLib.getCreationCode("L2AssetRouter")
-            ),
-            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                ContractsBytecodesLib.getCreationCode("L2NativeTokenVault")
-            ),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                ContractsBytecodesLib.getCreationCode("MessageRoot")
-            ),
+            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
+            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
+            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
+            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
+            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),

@@ -720,7 +720,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _baseTokenAssetId The asset ID of the base token.
     /// @return zkChain The address of the ZK chain.
     /// @return ctm The address of the CTM of the chain.
-
     function forwardedBridgeMint(
         bytes32 _assetId,
         uint256 _chainId,

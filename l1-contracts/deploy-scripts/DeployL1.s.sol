@@ -216,12 +216,11 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function getL2ValidatorAddress(string memory contractName) internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true)),
-                hex""
-            );
+        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
+    }
+
+    function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
+        return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
     }
 
     function deployVerifiers() internal {
@@ -602,13 +601,14 @@ contract DeployL1Script is Script, DeployUtils {
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
-            l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode("BeaconProxy", true)),
+            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode("Bridgehub", true)),
-            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode("L2AssetRouter", true)),
-            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode("L2NativeTokenVault", true)),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(getCreationCode("MessageRoot", true)),
+            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
+            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
+            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
+            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
+            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),

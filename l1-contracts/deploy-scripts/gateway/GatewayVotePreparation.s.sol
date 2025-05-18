@@ -49,7 +49,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
-import {Create2AndTransfer} from "./Create2AndTransfer.sol";
+import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
 import {DeployL1Script} from "../DeployL1.s.sol";

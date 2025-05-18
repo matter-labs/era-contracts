@@ -72,17 +72,23 @@ contract ChainAssetHandler is
     }
 
     /// @notice to avoid parity hack
-    constructor(IBridgehub _bridgehub, address _assetRouter) reentrancyGuardInitializer {
+    constructor(
+        uint256 _l1ChainId,
+        address _owner,
+        IBridgehub _bridgehub,
+        address _assetRouter,
+        IMessageRoot _messageRoot
+    ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = _bridgehub;
-        L1_CHAIN_ID = _bridgehub.L1_CHAIN_ID();
+        L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = _assetRouter;
-        MESSAGE_ROOT = _bridgehub.messageRoot();
+        MESSAGE_ROOT = _messageRoot;
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-        _transferOwnership(IOwnable(address(_bridgehub)).owner());
+        _transferOwnership(_owner);
     }
 
     /*//////////////////////////////////////////////////////////////

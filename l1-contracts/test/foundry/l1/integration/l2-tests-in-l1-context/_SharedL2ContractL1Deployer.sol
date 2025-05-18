@@ -98,7 +98,13 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
             address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
             vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
             address l2ChainAssetHandler = address(
-                new ChainAssetHandler(IBridgehub(L2_BRIDGEHUB_ADDR), L2_ASSET_ROUTER_ADDR)
+                new ChainAssetHandler(
+                    _args.l1ChainId,
+                    _args.aliasedOwner,
+                    IBridgehub(L2_BRIDGEHUB_ADDR),
+                    L2_ASSET_ROUTER_ADDR,
+                    IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+                )
             );
             vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);
         }
