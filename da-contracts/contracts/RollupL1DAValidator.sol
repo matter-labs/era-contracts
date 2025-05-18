@@ -9,6 +9,10 @@ error BitcoinDAPrecompileCallFailed();
 error BitcoinDAVerificationFailed();
 
 contract RollupL1DAValidator is IL1DAValidator {
+    /// @dev The address of the Syscoin precompile to check for BitcoinDA via a hash lookup
+    address constant BITCOINDA_PRECOMPILE_ADDR = address(0x63);
+    /// @dev The static cost per precompile lookup
+    uint16 constant BITCOINDA_PRECOMPILE_COST = 1400;
     function checkDA(
         uint256, // _chainId
         uint256, // _batchNumber
@@ -54,9 +58,7 @@ contract RollupL1DAValidator is IL1DAValidator {
     }
 
     function _verifyBitcoinDA(bytes32 _dataHash) internal view {
-        address BITCOINDA_PRECOMPILE_ADDRESS = address(0x63);
-        uint16 BITCOINDA_PRECOMPILE_COST = 1400;
-        (bool success, bytes memory result) = BITCOINDA_PRECOMPILE_ADDRESS.staticcall{gas: BITCOINDA_PRECOMPILE_COST}(
+        (bool success, bytes memory result) = BITCOINDA_PRECOMPILE_ADDR.staticcall{gas: BITCOINDA_PRECOMPILE_COST}(
             abi.encode(_dataHash)
         );
 
