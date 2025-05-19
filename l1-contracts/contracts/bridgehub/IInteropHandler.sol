@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {Transaction} from "../common/l2-helpers/L2ContractHelper.sol";
-import {InteropCall, InteropBundle, MessageInclusionProof, L2Message} from "../common/Messaging.sol";
+import {InteropBundle, InteropCall, L2Message, MessageInclusionProof} from "../common/Messaging.sol";
 
 interface IInteropHandler {
     function setInteropAccountBytecode() external;

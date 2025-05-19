@@ -16,10 +16,10 @@ import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {TokenNotLegacy, EmptyAddress, L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented, L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported, L2AssetRouter_LegacyDataNotImplemented} from "../../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, L2AssetRouter_LegacyDataNotImplemented, L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented, L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

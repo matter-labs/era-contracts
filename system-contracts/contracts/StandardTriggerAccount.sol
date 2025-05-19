@@ -2,13 +2,12 @@
 
 pragma solidity ^0.8.24;
 
-import {IAccount, ACCOUNT_VALIDATION_SUCCESS_MAGIC} from "./interfaces/IAccount.sol";
+import {ACCOUNT_VALIDATION_SUCCESS_MAGIC, IAccount} from "./interfaces/IAccount.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION, INonceHolder} from "./Constants.sol";
-import {MessageInclusionProof, L2Message} from "./libraries/Messaging.sol";
-import {TransactionHelper, Transaction} from "./libraries/TransactionHelper.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, INonceHolder, L2_INTEROP_HANDLER, L2_MESSAGE_VERIFICATION, NONCE_HOLDER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {GasFields, InteropTrigger, L2Message, MessageInclusionProof, TRIGGER_IDENTIFIER} from "./libraries/Messaging.sol";
+import {Transaction, TransactionHelper} from "./libraries/TransactionHelper.sol";
 import {FailedToPayOperator} from "./SystemContractErrors.sol";
-import {InteropTrigger, GasFields, TRIGGER_IDENTIFIER} from "./libraries/Messaging.sol";
 import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 
 error MessageNotIncluded();

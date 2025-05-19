@@ -12,7 +12,6 @@ import {IAssetRouterBase, NEW_ENCODING_VERSION} from "../bridge/asset-router/IAs
 import {Call} from "./Common.sol";
 import {Restriction} from "./restriction/Restriction.sol";
 import {IChainAdmin} from "./IChainAdmin.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../bridgehub/IInteropCenter.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
