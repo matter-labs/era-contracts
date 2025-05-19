@@ -20,8 +20,8 @@ import {RelayedSLDAValidator} from "contracts/state-transition/data-availability
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {L2VerifierFflonk} from "contracts/state-transition/verifiers/L2VerifierFflonk.sol";
-import {L2VerifierPlonk} from "contracts/state-transition/verifiers/L2VerifierPlonk.sol";
+import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
+import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
@@ -37,9 +37,9 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-import {GatewayCTMDeployerHelper} from "deploy-scripts/GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 
-import {L2_CREATE2_FACTORY_ADDRESS} from "deploy-scripts/Utils.sol";
+import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract
@@ -47,7 +47,7 @@ contract GatewayCTMDeployerTester {
     function deployCTMDeployer(
         bytes memory data
     ) external returns (DeployedContracts memory deployedContracts, address addr) {
-        (bool success, bytes memory result) = L2_CREATE2_FACTORY_ADDRESS.call(data);
+        (bool success, bytes memory result) = L2_CREATE2_FACTORY_ADDR.call(data);
         require(success, "failed to deploy");
 
         addr = abi.decode(result, (address));
@@ -74,14 +74,14 @@ contract GatewayCTMDeployerTest is Test {
         new ChainTypeManager(address(0), address(0));
         new ProxyAdmin();
 
-        new L2VerifierFflonk();
-        new L2VerifierPlonk();
+        new L1VerifierFflonk();
+        new L1VerifierPlonk();
 
-        new TestnetVerifier(L2VerifierFflonk(address(0)), L2VerifierPlonk(address(0)));
-        new DualVerifier(L2VerifierFflonk(address(0)), L2VerifierPlonk(address(0)));
+        new TestnetVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
+        new DualVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
 
         new ValidatorTimelock(address(0), 0);
-        new ServerNotifier(false);
+        new ServerNotifier();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
         try new TransparentUpgradeableProxy(address(0), address(0), hex"") {} catch {}

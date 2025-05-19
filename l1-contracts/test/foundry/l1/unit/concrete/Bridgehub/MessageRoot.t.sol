@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {OnlyBridgehub, MessageRootNotRegistered} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {OnlyBridgehubOrChainAssetHandler, MessageRootNotRegistered} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
@@ -44,7 +44,20 @@ contract MessageRootTest is Test {
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
-        vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, address(this), bridgehub));
+        address chainAssetHandler = makeAddr("chainAssetHandler");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OnlyBridgehubOrChainAssetHandler.selector,
+                address(this),
+                bridgehub,
+                chainAssetHandler
+            )
+        );
+        vm.mockCall(
+            bridgehub,
+            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
         messageRoot.addNewChain(alphaChainId);
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
@@ -96,9 +109,9 @@ contract MessageRootTest is Test {
 
         vm.prank(assetTracker);
         vm.expectEmit(true, false, false, false);
-        emit MessageRoot.Preimage(bytes32(0), bytes32(0));
-        vm.expectEmit(true, false, false, false);
         emit MessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        vm.expectEmit(true, false, false, false);
+        emit MessageRoot.Preimage(bytes32(0), bytes32(0));
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
 

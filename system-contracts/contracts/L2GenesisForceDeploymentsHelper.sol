@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER, L2_INTEROP_HANDLER, L2_ASSET_TRACKER_ADDRESS} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER, L2_INTEROP_HANDLER, L2_ASSET_TRACKER_ADDRESS} from "./Constants.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
@@ -48,7 +48,7 @@ library L2GenesisForceDeploymentsHelper {
         // Prepare calldata to set addresses in BridgeHub.
         bytes memory bridgehubConstructorData = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
-            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT), address(L2_INTEROP_CENTER))
+            (address(L2_ASSET_ROUTER), _ctmDeployer, address(L2_MESSAGE_ROOT), address(L2_CHAIN_ASSET_HANDLER), address(L2_INTEROP_CENTER))
         );
 
         // Execute the call to set addresses in BridgeHub.
@@ -137,7 +137,7 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        forceDeployments = new ForceDeployment[](6);
+        forceDeployments = new ForceDeployment[](7);
 
         // Configure the MessageRoot deployment.
         forceDeployments[0] = ForceDeployment({
@@ -208,7 +208,7 @@ library L2GenesisForceDeploymentsHelper {
         // Configure the Native Token Vault deployment.
         forceDeployments[3] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.l2NtvBytecodeHash,
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
+            newAddress: address(L2_NATIVE_TOKEN_VAULT),
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
@@ -224,7 +224,23 @@ library L2GenesisForceDeploymentsHelper {
             )
         });
 
+
+        // Configure the ChainAssetHandler deployment.
         forceDeployments[4] = ForceDeployment({
+            bytecodeHash: fixedForceDeploymentsData.chainAssetHandlerBytecodeHash,
+            newAddress: address(L2_CHAIN_ASSET_HANDLER),
+            callConstructor: true,
+            value: 0,
+            input: abi.encode(
+                fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.aliasedL1Governance,
+                address(L2_BRIDGE_HUB),
+                address(L2_ASSET_ROUTER),
+                address(L2_MESSAGE_ROOT)
+            )
+        });
+
+        forceDeployments[5] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.interopCenterBytecodeHash,
             newAddress: address(L2_INTEROP_CENTER),
             callConstructor: true,
@@ -236,7 +252,7 @@ library L2GenesisForceDeploymentsHelper {
             )
         });
 
-        forceDeployments[5] = ForceDeployment({
+        forceDeployments[6] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.assetTrackerBytecodeHash,
             newAddress: L2_ASSET_TRACKER_ADDRESS,
             callConstructor: true,
@@ -266,7 +282,13 @@ library L2GenesisForceDeploymentsHelper {
     ) internal pure returns (bytes memory initData) {
         initData = abi.encodeCall(
             IL2WrappedBaseToken.initializeV3,
-            (_wrappedBaseTokenName, _wrappedBaseTokenSymbol, L2_ASSET_ROUTER, _baseTokenL1Address, _baseTokenAssetId)
+            (
+                _wrappedBaseTokenName,
+                _wrappedBaseTokenSymbol,
+                address(L2_ASSET_ROUTER),
+                _baseTokenL1Address,
+                _baseTokenAssetId
+            )
         );
     }
 

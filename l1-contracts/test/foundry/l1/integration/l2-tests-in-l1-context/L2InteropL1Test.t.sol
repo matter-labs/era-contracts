@@ -59,9 +59,10 @@ contract L2InteropL1Test is Test, SharedL2ContractL1Deployer, L2InteropTestAbstr
     }
 
     function getCreationCode(
-        string memory contractName
+        string memory contractName, 
+        bool isZKBytecode
     ) internal view virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getCreationCode(contractName);
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(

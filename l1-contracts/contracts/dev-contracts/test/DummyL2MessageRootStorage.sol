@@ -11,7 +11,7 @@ pragma solidity ^0.8.24;
  * @notice MessageRootStorage contract for imported L2 message roots..
  * @dev
  */
-contract DummyL2MessageRootStorage {
+contract DummyL2InteropRootStorage {
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 msgRoot)) public msgRoots;
     mapping(bytes32 msgRoot => uint256 batchNumber) public batchNumberFromMsgRoot;
     mapping(bytes32 msgRoot => uint256 chainId) public chainIdFromMsgRoot;

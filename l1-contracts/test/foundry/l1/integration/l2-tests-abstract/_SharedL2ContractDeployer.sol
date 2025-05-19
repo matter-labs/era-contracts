@@ -15,7 +15,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "../../../../../contracts/vendor/AddressAliasHelper.sol";
@@ -132,7 +132,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
             deployL2Contracts(L1_CHAIN_ID);
 
             vm.prank(aliasedL1AssetRouter);
-            l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_BRIDGEHUB_ADDR);
+            l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_CHAIN_ASSET_HANDLER_ADDR);
             vm.prank(ownerWallet);
             l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
             vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));

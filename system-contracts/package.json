@@ -68,12 +68,13 @@
     "preprocess:bootloader": "rm -rf ./bootloader/build && yarn ts-node scripts/preprocess-bootloader.ts",
     "preprocess:emulator": "rm -f ./contracts/EvmEmulator.yul && yarn ts-node scripts/preprocess-emulator.ts",
     "preprocess:system-contracts": "rm -rf ./contracts-preprocessed && ts-node scripts/preprocess-system-contracts.ts",
-    "verify-on-explorer": "hardhat run scripts/verify-on-explorer.ts",
-    "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode",
-    "test-no-build": "hardhat test --network zkSyncTestNode",
+    "verify-on-explorer": "yarn ts-node scripts/verify-on-explorer.ts",
+    "test": "yarn build:test-system-contracts && hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
+    "test-no-build": "hardhat test --network zkSyncTestNode test/*.spec.ts test/**/*.spec.ts",
+    "test-legacy-bridge-fix": "yarn build:system-contracts && hardhat test --network zkSyncTestNode test/manual-tests/L2LegacyBridgeFixUpgrade.manual.ts",
     "test-node": "./bin/anvil-zksync --protocol-version=28 --emulate-evm",
     "test-node-local-contracts": "yarn build:foundry && ./bin/anvil-zksync --protocol-version=28 --dev-system-contracts=local --system-contracts-path='.'",
-    "test:bootloader": "cd bootloader/test_infra && cargo run",
+    "test:bootloader": "cd ./bootloader/test_infra && cargo run",
     "install-anvil": "ts-node ./scripts/install-anvil.ts"
   }
 }

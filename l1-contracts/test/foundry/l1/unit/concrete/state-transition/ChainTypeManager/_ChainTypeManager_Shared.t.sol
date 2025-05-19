@@ -67,7 +67,7 @@ contract ChainTypeManagerTest is Test {
         bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
         messageroot = new MessageRoot(bridgehub);
         vm.prank(governor);
-        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageroot, address(0));
+        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageroot, address(0), address(0));
 
         vm.mockCall(
             address(sharedBridge),

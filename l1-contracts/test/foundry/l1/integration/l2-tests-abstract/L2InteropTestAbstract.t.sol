@@ -14,7 +14,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_MESSAGE_ROOT_STORAGE, L2_INTEROP_ACCOUNT_ADDR, L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_INTEROP_ROOT_STORAGE, L2_INTEROP_ACCOUNT_ADDR, L2_MESSAGE_VERIFICATION} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
@@ -66,8 +66,8 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         DummyL2StandardTriggerAccount account = new DummyL2StandardTriggerAccount();
         bytes memory emptyData = "";
         vm.mockCall(
-            address(L2_MESSAGE_ROOT_STORAGE),
-            abi.encodeCall(L2_MESSAGE_ROOT_STORAGE.msgRoots, (271, 9)),
+            address(L2_INTEROP_ROOT_STORAGE),
+            abi.encodeCall(L2_INTEROP_ROOT_STORAGE.interopRoots, (271, 9)),
             hex"17aa3cac6d09962014c3a1c5e40ed20a777050befb2157c43872de18dcbb21ee"
         );
         vm.mockCall(address(0x000000000000000000000000000000000000800A), emptyData, emptyData);

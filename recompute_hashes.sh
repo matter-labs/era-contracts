@@ -1,6 +1,8 @@
 # Script to recompile and recreate the hashes for the contracts.
 # source ./recompute_hashes.sh
 
+set -e
+
 # Expected Foundry version and commit
 EXPECTED_VERSION="0.0.2"
 EXPECTED_COMMIT="27360d4c8"
@@ -25,25 +27,28 @@ if [ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ] || [ "$INSTALLED_COMMIT" != "
   exit 1
 fi
 
+if [ "$(git rev-parse --show-toplevel)" != "$PWD" ]; then
+  echo "error: must be run at the root of matter-labs/era-contracts repository" >&2
+  exit 1
+fi
+
 # Update submodules (just in case)
 git submodule update --init --recursive
 
+yarn
 
 # Cleanup everything and recompile
-pushd da-contracts && \
-forge clean && popd && \
-pushd l1-contracts && \
-yarn clean && forge clean && popd && \
-pushd l2-contracts && \
-yarn clean && forge clean && popd && \
-pushd system-contracts && \
-yarn clean && forge clean && popd && \
-pushd da-contracts && \
-yarn build:foundry && popd && \
-pushd l1-contracts && \
-yarn build:foundry && popd && \
-pushd l2-contracts && \
-yarn build:foundry && popd && \
-pushd system-contracts && \
-yarn build:foundry && popd && \
+forge clean --root da-contracts
+yarn --cwd l1-contracts clean
+forge clean --root l1-contracts
+yarn --cwd l2-contracts clean
+forge clean --root l2-contracts
+yarn --cwd system-contracts clean
+forge clean --root system-contracts
+
+yarn --cwd da-contracts build:foundry
+yarn --cwd l1-contracts build:foundry
+yarn --cwd l2-contracts build:foundry
+yarn --cwd system-contracts build:foundry
+
 yarn calculate-hashes:fix

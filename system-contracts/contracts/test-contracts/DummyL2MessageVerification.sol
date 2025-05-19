@@ -3,8 +3,8 @@
 pragma solidity ^0.8.24;
 
 import {MessageVerification} from "./DummyMessageVerification.sol";
-import {MessageHashing, ProofVerificationResult} from "./libraries/MessageHashing.sol";
-import {L2_MESSAGE_ROOT_STORAGE} from "../Constants.sol";
+import {MessageHashing, ProofData} from "./libraries/MessageHashing.sol";
+import {L2_INTEROP_ROOT_STORAGE} from "../Constants.sol";
 
 contract DummyL2MessageVerification is MessageVerification {
     function _proveL2LeafInclusion(
@@ -14,7 +14,7 @@ contract DummyL2MessageVerification is MessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
-        ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof(
+        ProofData memory proofVerificationResult = MessageHashing.hashProof(
             _chainId,
             _batchNumber,
             _leafProofMask,
@@ -22,7 +22,7 @@ contract DummyL2MessageVerification is MessageVerification {
             _proof
         );
         if (proofVerificationResult.finalProofNode) {
-            bytes32 correctBatchRoot = L2_MESSAGE_ROOT_STORAGE.msgRoots(_chainId, _batchNumber);
+            bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.msgRoots(_chainId, _batchNumber);
             return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
         }
         // kl todo think this through. Does it work for the global MessageRoot, and for GW based chains, and both?

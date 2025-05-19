@@ -53,6 +53,8 @@ interface IAssetRouterBase {
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
+    function L1_CHAIN_ID() external view returns (uint256);
+    
     function INTEROP_CENTER() external view returns (IInteropCenter);
 
     /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.

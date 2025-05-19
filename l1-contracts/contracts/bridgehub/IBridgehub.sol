@@ -3,10 +3,8 @@
 pragma solidity ^0.8.21;
 
 import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {IAssetHandler} from "../bridge/interfaces/IAssetHandler.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
@@ -65,7 +63,7 @@ struct RouteBridgehubDepositStruct {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IBridgehub is IAssetHandler, IL1AssetHandler {
+interface IBridgehub {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -82,18 +80,6 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
     );
 
     event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
-
-    /// @notice Emitted when the bridging to the chain is started.
-    /// @param chainId Chain ID of the ZK chain
-    /// @param assetId Asset ID of the token for the zkChain's CTM
-    /// @param settlementLayerChainId The chain id of the settlement layer the chain migrates to.
-    event MigrationStarted(uint256 indexed chainId, bytes32 indexed assetId, uint256 indexed settlementLayerChainId);
-
-    /// @notice Emitted when the bridging to the chain is complete.
-    /// @param chainId Chain ID of the ZK chain
-    /// @param assetId Asset ID of the token for the zkChain's CTM
-    /// @param zkChain The address of the ZK chain on the chain where it is migrated to.
-    event MigrationFinalized(uint256 indexed chainId, bytes32 indexed assetId, address indexed zkChain);
 
     /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
@@ -197,6 +183,7 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
+        address _chainAssetHandler,
         address _interopCenter
     ) external;
 
@@ -236,6 +223,8 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function L1_CHAIN_ID() external view returns (uint256);
 
+    function chainAssetHandler() external view returns (address);
+
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
 
     function registerLegacyChain(uint256 _chainId) external;
@@ -244,6 +233,21 @@ interface IBridgehub is IAssetHandler, IL1AssetHandler {
 
     function unpauseMigration() external;
 
+    function forwardedBridgeBurnSetSettlementLayer(
+        uint256 _chainId,
+        uint256 _newSettlementLayerChainId
+    ) external returns (address zkChain, address ctm);
+    
+    function forwardedBridgeMint(
+        bytes32 _assetId,
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId
+    ) external returns (address zkChain, address ctm);
+    
+    function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
+    
+    function forwardedBridgeRecoverFailedTransfer(uint256 _chainId) external returns (address zkChain, address ctm);
+    
     function forwardTransactionOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,

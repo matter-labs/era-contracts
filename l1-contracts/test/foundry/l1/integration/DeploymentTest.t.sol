@@ -28,9 +28,10 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 
-contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -48,6 +49,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     }
 
     function prepare() public {
+        takeConfigLock(); // Prevents race condition with configs
         _generateUserAddresses();
 
         _deployL1Contracts();
@@ -61,6 +63,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         // _deployZKChain(tokens[0]);
         // _deployZKChain(tokens[1]);
         // _deployZKChain(tokens[1]);
+
+        releaseConfigLock();
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));

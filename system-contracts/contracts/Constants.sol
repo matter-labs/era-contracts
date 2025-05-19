@@ -19,9 +19,11 @@ import {IPubdataChunkPublisher} from "./interfaces/IPubdataChunkPublisher.sol";
 import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
 import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
 import {IEvmHashesStorage} from "./interfaces/IEvmHashesStorage.sol";
+import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
+import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 import {IInteropHandler} from "./interfaces/IInteropHandler.sol";
 import {IInteropCenter} from "./interfaces/IInteropCenter.sol";
-import {IL2MessageRootStorage} from "./interfaces/IL2MessageRootStorage.sol";
+import {IL2InteropRootStorage} from "./interfaces/IL2InteropRootStorage.sol";
 
 /// @dev All the system contracts introduced by ZKsync have their addresses
 /// started from 2^15 in order to avoid collision with Ethereum precompiles.
@@ -111,22 +113,24 @@ address constant EVM_PREDEPLOYS_MANAGER = address(SYSTEM_CONTRACTS_OFFSET + 0x14
 IEvmHashesStorage constant EVM_HASHES_STORAGE = IEvmHashesStorage(address(SYSTEM_CONTRACTS_OFFSET + 0x15));
 
 ICreate2Factory constant L2_CREATE2_FACTORY = ICreate2Factory(address(USER_CONTRACTS_OFFSET));
-address constant L2_ASSET_ROUTER = address(USER_CONTRACTS_OFFSET + 0x03);
+IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(address(USER_CONTRACTS_OFFSET + 0x03));
 IBridgehub constant L2_BRIDGE_HUB = IBridgehub(address(USER_CONTRACTS_OFFSET + 0x02));
-address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
+IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(address(USER_CONTRACTS_OFFSET + 0x04));
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(address(USER_CONTRACTS_OFFSET + 0x05));
 // Note, that on its own this contract does not provide much functionality, but having it on a constant address
 // serves as a convenient storage for its bytecode to be accessible via `extcodehash`.
 address constant SLOAD_CONTRACT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x06);
 
 address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
-IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
+IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
 IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(address(USER_CONTRACTS_OFFSET + 0x0a));
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x0b));
 address constant L2_INTEROP_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
 address constant L2_STANDARD_TRIGGER_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
 address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0e);
+
+address constant L2_CHAIN_ASSET_HANDLER = address(USER_CONTRACTS_OFFSET + 0x0a);
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.

@@ -11,7 +11,6 @@ import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {L2_MESSAGE_ROOT_STORAGE} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
@@ -303,12 +302,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert CanOnlyProcessOneBatch();
         }
         // Check that we commit batches after last committed batch
-        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[s.totalBatchesCommitted];
+        if (
+            cachedStoredBatchHashes != _hashStoredBatchInfo(lastCommittedBatchData) &&
+            cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)
+        ) {
             // incorrect previous batch data
-            revert BatchHashMismatch(
-                s.storedBatchHashes[s.totalBatchesCommitted],
-                _hashStoredBatchInfo(lastCommittedBatchData)
-            );
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
@@ -417,13 +417,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert PriorityOperationsRollingHashMismatch();
         }
         if (_dependencyRootsRollingHash != _storedBatch.dependencyRootsRollingHash) {
-            if (_storedBatch.batchNumber == (0)) {
-                return;
-            }
-            // revert DependencyRootsRollingHashMismatch(
-            //     _storedBatch.dependencyRootsRollingHash,
-            //     _dependencyRootsRollingHash
-            // );
+            revert DependencyRootsRollingHashMismatch(
+                _storedBatch.dependencyRootsRollingHash,
+                _dependencyRootsRollingHash
+            );
         }
     }
 
@@ -465,34 +462,32 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
 
         for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
-            InteropRoot memory msgRoot = _dependencyRoots[i];
+            InteropRoot memory interopRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
-            if (msgRoot.chainId == block.chainid) {
-                // For the same chain we verify using the MessageRoot contract
-                correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.blockOrBatchNumber));
-            } else if (msgRoot.chainId == L1_CHAIN_ID) {
-                // this case can only happen on GW.
-                // L1 chain root is stored in the storage contract.
-
-                correctRootHash = L2_MESSAGE_ROOT_STORAGE.msgRoots(
-                    uint256(msgRoot.chainId),
-                    uint256(msgRoot.blockOrBatchNumber)
-                );
+            if (interopRoot.chainId == block.chainid) {
+                // For the same chain we verify using the MessageRoot contract. Note, that in this
+                // release, import and export only happens on GW, so this is the only case we have to cover.
+                correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
             } else {
                 // @notice: here we will verify against the Diamond proxy contract of the sender directly.
                 // This means the receiving chain has to trust the sender chain's CTM.
                 // For now we will not allow permissionless CTMs to be added, so the ecosystem is secure.
                 // revert CommitBasedInteropNotSupported();
-                correctRootHash = IGetters(IBridgehub(s.bridgehub).getZKChain(msgRoot.chainId)).l2LogsRootHash(
-                    msgRoot.blockOrBatchNumber
+                correctRootHash = IGetters(IBridgehub(s.bridgehub).getZKChain(interopRoot.chainId)).l2LogsRootHash(
+                    interopRoot.blockOrBatchNumber
                 );
             }
-            if (msgRoot.sides.length != 1 || msgRoot.sides[0] != correctRootHash) {
-                revert InvalidMessageRoot(correctRootHash, msgRoot.sides[0]);
+            if (interopRoot.sides.length != 1 || interopRoot.sides[0] != correctRootHash) {
+                revert InvalidMessageRoot(correctRootHash, interopRoot.sides[0]);
             }
             dependencyRootsRollingHash = keccak256(
                 // solhint-disable-next-line func-named-parameters
-                abi.encodePacked(dependencyRootsRollingHash, msgRoot.chainId, msgRoot.blockOrBatchNumber, msgRoot.sides)
+                abi.encodePacked(
+                    dependencyRootsRollingHash,
+                    interopRoot.chainId,
+                    interopRoot.blockOrBatchNumber,
+                    interopRoot.sides
+                )
             );
         }
     }
@@ -579,8 +574,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        if (_hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-            revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[currentTotalBatchesVerified];
+        if (
+            _hashStoredBatchInfo(prevBatch) != cachedStoredBatchHashes &&
+            _hashLegacyStoredBatchInfo(prevBatch) != cachedStoredBatchHashes
+        ) {
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(prevBatch));
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
@@ -752,6 +751,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Returns the keccak hash of the ABI-encoded StoredBatchInfo
     function _hashStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
         return keccak256(abi.encode(_storedBatchInfo));
+    }
+
+    /// @notice Returns the keccak hash of the ABI-encoded Legacy StoredBatchInfo
+    function _hashLegacyStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
+        LegacyStoredBatchInfo memory legacyStoredBatchInfo = LegacyStoredBatchInfo({
+            batchNumber: _storedBatchInfo.batchNumber,
+            batchHash: _storedBatchInfo.batchHash,
+            indexRepeatedStorageChanges: _storedBatchInfo.indexRepeatedStorageChanges,
+            numberOfLayer1Txs: _storedBatchInfo.numberOfLayer1Txs,
+            priorityOperationsHash: _storedBatchInfo.priorityOperationsHash,
+            l2LogsTreeRoot: _storedBatchInfo.l2LogsTreeRoot,
+            timestamp: _storedBatchInfo.timestamp,
+            commitment: _storedBatchInfo.commitment
+        });
+        return keccak256(abi.encode(legacyStoredBatchInfo));
     }
 
     /// @notice Returns true if the bit at index {_index} is 1

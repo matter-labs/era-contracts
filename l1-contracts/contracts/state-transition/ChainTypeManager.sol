@@ -104,6 +104,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _;
     }
 
+    /// @notice only the chain asset handler can call
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != IBridgehub(BRIDGE_HUB).chainAssetHandler()) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @return The tuple of (major, minor, patch) protocol version.
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
         // slither-disable-next-line unused-return
@@ -190,7 +198,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             genesisBatchHash: _chainCreationParams.genesisBatchHash,
             genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
+            newInitialCut: _chainCreationParams.diamondCut,
             newInitialCutHash: newInitialCutHash,
+            forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
             forceDeploymentHash: forceDeploymentHash
         });
     }
@@ -473,7 +483,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function forwardedBridgeBurn(
         uint256 _chainId,
         bytes calldata _data
-    ) external view override onlyBridgehub returns (bytes memory ctmForwardedBridgeMintData) {
+    ) external view override onlyChainAssetHandler returns (bytes memory ctmForwardedBridgeMintData) {
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
         // happens. The correctness of it will be checked on the CTM on the new settlement layer.
         (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
@@ -503,7 +513,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function forwardedBridgeMint(
         uint256 _chainId,
         bytes calldata _ctmData
-    ) external override onlyBridgehub returns (address chainAddress) {
+    ) external override onlyChainAssetHandler returns (address chainAddress) {
         (bytes32 _baseTokenAssetId, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
             _ctmData,
             (bytes32, address, uint256, bytes)

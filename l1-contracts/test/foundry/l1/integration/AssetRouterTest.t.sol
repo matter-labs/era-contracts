@@ -38,8 +38,9 @@ import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/Bridg
 import {IBridgedStandardToken} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
-contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
     using stdStorage for StdStorage;
 
     uint256 constant TEST_USERS_COUNT = 10;
@@ -60,6 +61,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     function prepare() public {
         _generateUserAddresses();
 
+        takeConfigLock(); // Prevents race condition with configs
+
         _deployL1Contracts();
         _deployTokens();
         _registerNewTokens(tokens);
@@ -71,6 +74,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         // _deployHyperchain(tokens[0]);
         // _deployHyperchain(tokens[1]);
         // _deployHyperchain(tokens[1]);
+
+        releaseConfigLock();
 
         for (uint256 i = 0; i < zkChainIds.length; i++) {
             address contractAddress = makeAddr(string(abi.encode("contract", i)));

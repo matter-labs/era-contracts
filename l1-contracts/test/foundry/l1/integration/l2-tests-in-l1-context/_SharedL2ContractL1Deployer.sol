@@ -17,16 +17,21 @@ import {DeployedAddresses, Config} from "../../../../../deploy-scripts/DeployUti
 
 import {DeployUtils} from "../../../../../deploy-scripts/DeployUtils.s.sol";
 
-import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_VERIFICATION, L2_INTEROP_ROOT_STORAGE, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {MessageRoot} from "../../../../../contracts/bridgehub/MessageRoot.sol";
-import {L2AssetRouter} from "../../../../../contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L2NativeTokenVault} from "../../../../../contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {L2NativeTokenVaultDev} from "../../../../../contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
+import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
-import {ETH_TOKEN_ADDRESS} from "../../../../../contracts/common/Config.sol";
-import {IMessageRoot} from "../../../../../contracts/bridgehub/IMessageRoot.sol";
-import {ICTMDeploymentTracker} from "../../../../../contracts/bridgehub/ICTMDeploymentTracker.sol";
+
 
 import {SystemContractsArgs, SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
@@ -76,23 +81,25 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
         if (!_skip) {
             instantiateCreate2Factory();
         }
-        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade");
-        addresses.stateTransition.verifier = deploySimpleContract("Verifier");
-        addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock");
+
+        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
+        addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
+        addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
         deployStateTransitionDiamondFacets();
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager");
+        ) = deployTuppWithContract("ChainTypeManager", true);
     }
 
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployL1IntegrationScript, SharedL2ContractDeployer) {}
 
     function getCreationCode(
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
-        return super.getCreationCode(contractName);
+        return super.getCreationCode(contractName, false);
     }
 
     function getInitializeCalldata(

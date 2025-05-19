@@ -15,7 +15,7 @@ import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.so
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
-import {MessageHashing, ProofVerificationResult} from "../../../common/libraries/MessageHashing.sol";
+import {MessageHashing, ProofData} from "../../../common/libraries/MessageHashing.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
@@ -83,7 +83,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         return
             _proveL2LogInclusion({
                 _chainId: s.chainId,
-                _batchNumber: _batchNumber,
+                _blockOrBatchNumber: _batchNumber,
                 _index: _index,
                 _log: _l2MessageToLog(_message),
                 _proof: _proof
@@ -100,7 +100,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         return
             _proveL2LogInclusion({
                 _chainId: s.chainId,
-                _batchNumber: _batchNumber,
+                _blockOrBatchNumber: _batchNumber,
                 _index: _index,
                 _log: _log,
                 _proof: _proof
@@ -137,7 +137,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         return
             _proveL2LogInclusion({
                 _chainId: s.chainId,
-                _batchNumber: _l2BatchNumber,
+                _blockOrBatchNumber: _l2BatchNumber,
                 _index: _l2MessageIndex,
                 _log: l2Log,
                 _proof: _merkleProof
@@ -168,7 +168,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
-        ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof({
+        ProofData memory proofData = MessageHashing.getProofData({
             _chainId: _chainId,
             _batchNumber: _batchNumber,
             _leafProofMask: _leafProofMask,
@@ -178,7 +178,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         // If the `finalProofNode` is true, then we assume that this is L1 contract of the top-level
         // in the aggregation, i.e. the batch root is stored here on L1.
-        if (proofVerificationResult.finalProofNode) {
+        if (proofData.finalProofNode) {
             // Double checking that the batch has been executed.
             if (_batchNumber > s.totalBatchesExecuted) {
                 revert BatchNotExecuted(_batchNumber);
@@ -188,7 +188,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             if (correctBatchRoot == bytes32(0)) {
                 revert LocalRootIsZero();
             }
-            return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
+            return correctBatchRoot == proofData.batchSettlementRoot;
         }
 
         if (s.l2LogsRootHashes[_batchNumber] != bytes32(0)) {
@@ -198,19 +198,17 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // to a chain's message root only if the chain has indeed executed its batch on top of it.
         //
         // We trust all chains whitelisted by the Bridgehub governance.
-        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofVerificationResult.settlementLayerChainId)) {
+        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
             revert NotSettlementLayer();
         }
-        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(
-            proofVerificationResult.settlementLayerChainId
-        );
+        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
 
         return
             IMailbox(settlementLayerAddress).proveL2LeafInclusion(
-                proofVerificationResult.settlementLayerBatchNumber,
-                proofVerificationResult.settlementLayerBatchRootMask,
-                proofVerificationResult.chainIdLeaf,
-                MessageHashing.extractSliceUntilEnd(_proof, proofVerificationResult.ptr)
+                proofData.settlementLayerBatchNumber,
+                proofData.settlementLayerBatchRootMask,
+                proofData.chainIdLeaf,
+                MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
             );
     }
 
