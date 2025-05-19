@@ -361,15 +361,15 @@ error LegacyMethodForNonL1Token();
 error UnknownVerifierType();
 // 0x456f8f7a
 error EmptyProofLength();
-
+// 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
-
+// 0x84286507
 error EmptyPrecommitData(uint256 batchNumber);
-
+// 0x688c63e5
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
-
+// 0x8b57339d
 error RoleAccessDenied(uint256 chainId, bytes32 role, address account);
-
+// 0xf2885eb3
 error DefaultAdminTransferNotAllowed();
 
 enum SharedBridgeKey {
