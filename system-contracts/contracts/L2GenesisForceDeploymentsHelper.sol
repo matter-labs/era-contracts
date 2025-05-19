@@ -68,7 +68,7 @@ library L2GenesisForceDeploymentsHelper {
 
         bytes memory interopCenterConstructorData = abi.encodeCall(
             L2_INTEROP_CENTER.setAddresses,
-            (L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS)
+            (address(L2_ASSET_ROUTER), address(L2_ASSET_TRACKER_ADDRESS))
         );
 
         (bool success2, bytes memory returnData2) = SystemContractHelper.mimicCall(
@@ -208,7 +208,7 @@ library L2GenesisForceDeploymentsHelper {
         // Configure the Native Token Vault deployment.
         forceDeployments[3] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.l2NtvBytecodeHash,
-            newAddress: address(L2_NATIVE_TOKEN_VAULT),
+            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
@@ -260,10 +260,10 @@ library L2GenesisForceDeploymentsHelper {
             // solhint-disable-next-line func-named-parameters
             input: abi.encode(
                 fixedForceDeploymentsData.l1ChainId,
-                L2_BRIDGE_HUB,
-                L2_ASSET_ROUTER,
+                address(L2_BRIDGE_HUB),
+                address(L2_ASSET_ROUTER),
                 L2_NATIVE_TOKEN_VAULT_ADDR,
-                L2_MESSAGE_ROOT
+                address(L2_MESSAGE_ROOT)
             )
         });
     }

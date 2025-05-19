@@ -24,7 +24,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         string memory toml = vm.readFile(path);
 
         uint256 gatewayChainId = toml.readUint("$.chain.chain_chain_id");
-        // config.gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");
+        gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");
         // // currently there is a single gateway test file.
         // console.log("Gateway chain id skipped value = %s", toml.readUint("$.chain.chain_chain_id"));
 
@@ -33,7 +33,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         toml = vm.readFile(path);
 
         // config.gatewayChainId = 506; //toml.readUint("$.chain.chain_chain_id");
-        // // currently there is a single gateway test file.
+        // currently there is a single gateway test file.
         // console.log("Gateway chain id skipped value = %s", toml.readUint("$.chain.chain_chain_id"));
 
         // path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_OUTPUT"));

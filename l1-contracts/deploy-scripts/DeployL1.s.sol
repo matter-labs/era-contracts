@@ -755,7 +755,9 @@ contract DeployL1Script is Script, DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "ChainRegistrar")) {
+            if (compareStrings(contractName, "AssetTracker")) {
+                return type(AssetTracker).creationCode;
+            } else if (compareStrings(contractName, "ChainRegistrar")) {
                 return type(ChainRegistrar).creationCode;
             } else if (compareStrings(contractName, "Bridgehub")) {
                 return type(Bridgehub).creationCode;
@@ -771,6 +773,8 @@ contract DeployL1Script is Script, DeployUtils {
                 } else {
                     return type(L1Nullifier).creationCode;
                 }
+            } else if (compareStrings(contractName, "InteropCenter")) {
+                return type(InteropCenter).creationCode;
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return type(L1AssetRouter).creationCode;
             } else if (compareStrings(contractName, "L1ERC20Bridge")) {
