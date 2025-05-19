@@ -32,6 +32,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2InteropTestAbstract} from "../../l1/integration/l2-tests-abstract/L2InteropTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
 
 contract L2InteropTests is Test, L2InteropTestAbstract, SharedL2ContractL2Deployer {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
@@ -47,7 +48,7 @@ contract L2InteropTests is Test, L2InteropTestAbstract, SharedL2ContractL2Deploy
     function deployViaCreate2(
         bytes memory creationCode,
         bytes memory constructorArgs
-    ) internal override(DeployUtils, SharedL2ContractL2Deployer) returns (address) {
+    ) internal override(Create2FactoryUtils, SharedL2ContractL2Deployer) returns (address) {
         return super.deployViaCreate2(creationCode, constructorArgs);
     }
 
