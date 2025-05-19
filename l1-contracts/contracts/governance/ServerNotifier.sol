@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
-import {InvalidProtocolVersion, ZeroAddress, Unauthorized} from "../common/L1ContractErrors.sol";
+import {InvalidProtocolVersion, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 

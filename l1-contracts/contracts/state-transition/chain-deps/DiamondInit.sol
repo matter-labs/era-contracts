@@ -5,10 +5,10 @@ pragma solidity 0.8.28;
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
-import {InitializeData, IDiamondInit} from "../chain-interfaces/IDiamondInit.sol";
+import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
-import {ZeroAddress, EmptyAssetId, TooMuchGas, EmptyBytes32} from "../../common/L1ContractErrors.sol";
+import {EmptyAssetId, EmptyBytes32, TooMuchGas, ZeroAddress} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.

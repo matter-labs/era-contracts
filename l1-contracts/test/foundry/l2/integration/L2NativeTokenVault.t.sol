@@ -9,7 +9,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {SystemContractsArgs} from "./L2Utils.sol";
 
-import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
+import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2NativeTokenVaultTestAbstract} from "../../l1/integration/l2-tests-in-l1-context/L2NativeTokenVaultTestAbstract.t.sol";

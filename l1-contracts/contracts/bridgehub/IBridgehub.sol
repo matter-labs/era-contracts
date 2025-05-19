@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 
