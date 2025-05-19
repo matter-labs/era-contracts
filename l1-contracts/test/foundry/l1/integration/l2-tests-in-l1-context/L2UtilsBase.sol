@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {Vm} from "forge-std/Vm.sol";
+
 import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
@@ -37,12 +39,16 @@ import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDe
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
 
-contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1IntegrationScript {
+library L2UtilsBase {
     using stdToml for string;
     using stdStorage for StdStorage;
 
+    // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
+    address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
+    Vm internal constant vm = Vm(VM_ADDRESS);
+
     /// @dev We provide a fast form of debugging the L2 contracts using L1 foundry. We also test using zk foundry.
-    function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
+    function initSystemContracts(SystemContractsArgs memory _args) internal {
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         address wethToken = address(0x1);
         // we deploy the code to get the contract code with immutables which we then vm.etch
@@ -112,61 +118,15 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
             bytes32(uint256(1))
         );
 
-        stdstore
-            .target(L2_ASSET_ROUTER_ADDR)
-            .sig("assetHandlerAddress(bytes32)")
-            .with_key(baseTokenAssetId)
-            .checked_write(bytes32(uint256(uint160(L2_NATIVE_TOKEN_VAULT_ADDR))));
+        // stdstore
+        //     .target(L2_ASSET_ROUTER_ADDR)
+        //     .sig("assetHandlerAddress(bytes32)")
+        //     .with_key(baseTokenAssetId)
+        //     .checked_write(bytes32(uint256(uint160(L2_NATIVE_TOKEN_VAULT_ADDR))));
 
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));
         L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
-    }
-
-    function deployL2Contracts(uint256 _l1ChainId) public virtual override {
-        string memory root = vm.projectRoot();
-        string memory inputPath = string.concat(
-            root,
-            "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml"
-        );
-        initializeConfig(inputPath);
-        addresses.transparentProxyAdmin = address(0x1);
-        addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
-        addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
-        addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
-        config.l1ChainId = _l1ChainId;
-        console.log("Deploying L2 contracts");
-        instantiateCreate2Factory();
-        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
-        addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
-        addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
-        deployStateTransitionDiamondFacets();
-        (
-            addresses.stateTransition.chainTypeManagerImplementation,
-            addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", true);
-    }
-
-    // add this to be excluded from coverage report
-    function test() internal virtual override(DeployL1IntegrationScript, SharedL2ContractDeployer) {}
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
-    }
-
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal virtual override(DeployIntegrationUtils, DeployL1Script) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName);
-    }
-
-    function getFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override(DeployL1IntegrationScript, DeployIntegrationUtils) returns (FacetCut[] memory) {
-        return super.getFacetCuts(stateTransition);
     }
 }
