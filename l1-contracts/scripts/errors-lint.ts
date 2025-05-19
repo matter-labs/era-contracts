@@ -71,23 +71,19 @@ function sortErrorBlocks(lines: string[]): string[] {
 
   // Sort blocks by the first 'error Name'
   blocks.sort((a, b) => {
-    const nameA = a.find(l => /^\s*error\s+/.test(l))!.match(/error\s+(\w+)/)![1];
-    const nameB = b.find(l => /^\s*error\s+/.test(l))!.match(/error\s+(\w+)/)![1];
+    const nameA = a.find((l) => /^\s*error\s+/.test(l))!.match(/error\s+(\w+)/)![1];
+    const nameB = b.find((l) => /^\s*error\s+/.test(l))!.match(/error\s+(\w+)/)![1];
     return nameA.localeCompare(nameB);
   });
 
   // Reassemble file
   const sorted: string[] = [...before];
-  blocks.forEach(block => sorted.push(...block));
+  blocks.forEach((block) => sorted.push(...block));
   return sorted.concat(after);
 }
 
 // Process a file: handle selector insertion, multiline parsing, and sorting
-function processFile(
-  filePath: string,
-  fix: boolean,
-  collectedErrors: Map<string, [string, string]>
-): boolean {
+function processFile(filePath: string, fix: boolean, collectedErrors: Map<string, [string, string]>): boolean {
   const content = fs.readFileSync(filePath, "utf8");
   const lines = content.split(/\r?\n/);
   const output: string[] = [];
@@ -114,12 +110,12 @@ function processFile(
       const [, errName, params] = match;
       const types = params
         .split(",")
-        .map(p => p.trim().split(/\s+/)[0])
-        .filter(t => t);
+        .map((p) => p.trim().split(/\s+/)[0])
+        .filter((t) => t);
       const sig = `${errName}(${types.join(",")})`;
 
       if (collectedErrors.has(sig)) {
-        const [_, prev] = collectedErrors.get(sig)!;
+        const [, prev] = collectedErrors.get(sig)!;
         throw new Error(`Error ${errName} defined twice in ${prev} and ${filePath}`);
       }
       collectedErrors.set(sig, [errName, filePath]);
@@ -136,7 +132,7 @@ function processFile(
       }
 
       // Push block
-      blockLines.forEach(l => output.push(l));
+      blockLines.forEach((l) => output.push(l));
       i++;
     } else {
       output.push(line);
@@ -178,29 +174,20 @@ async function main() {
   const program = new Command();
   program
     .option("--fix", "Fix the errors by inserting selectors and sorting")
-    .option(
-      "--check",
-      "Check if the selectors are present without modifying files"
-    )
+    .option("--check", "Check if the selectors are present without modifying files")
     .parse(process.argv);
 
   const options = program.opts();
   if ((!options.fix && !options.check) || (options.fix && options.check)) {
-    console.error(
-      "Error: You must provide either --fix or --check, but not both."
-    );
+    console.error("Error: You must provide either --fix or --check, but not both.");
     process.exit(1);
   }
   let hasErrors = false;
-  for (const [contractsPath, errorsPaths] of Object.entries(
-    CONTRACTS_DIRECTORIES
-  )) {
+  for (const [contractsPath, errorsPaths] of Object.entries(CONTRACTS_DIRECTORIES)) {
     const declaredErrors = new Map<string, [string, string]>();
     const usedErrors = new Set<string>();
     for (const customErrorFile of errorsPaths) {
-      const absolutePath = path.resolve(
-        contractsPath + "/" + customErrorFile
-      );
+      const absolutePath = path.resolve(contractsPath + "/" + customErrorFile);
       const result = processFile(absolutePath, options.fix, declaredErrors);
       if (result && options.check) hasErrors = true;
     }
@@ -210,14 +197,10 @@ async function main() {
     }
     if (options.check) {
       collectErrorUsages([contractsPath], usedErrors);
-      const unusedErrors = [...declaredErrors].filter(
-        ([, [errorName]]) => !usedErrors.has(errorName)
-      );
+      const unusedErrors = [...declaredErrors].filter(([, [errorName]]) => !usedErrors.has(errorName));
       if (unusedErrors.length > 0) {
         for (const [errorSig, errorFile] of unusedErrors)
-          console.error(
-            `Error "${errorSig}" from ${errorFile} is declared but never used.`
-          );
+          console.error(`Error "${errorSig}" from ${errorFile} is declared but never used.`);
         process.exit(1);
       }
     }

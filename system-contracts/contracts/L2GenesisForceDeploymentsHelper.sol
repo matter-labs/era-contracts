@@ -182,6 +182,7 @@ library L2GenesisForceDeploymentsHelper {
             newAddress: address(L2_CHAIN_ASSET_HANDLER),
             callConstructor: true,
             value: 0,
+            // solhint-disable-next-line func-named-parameters
             input: abi.encode(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
