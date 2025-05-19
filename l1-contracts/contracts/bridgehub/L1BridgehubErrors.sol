@@ -26,6 +26,7 @@ error NoEthAllowed();
 error NotAssetRouter(address msgSender, address sharedBridge);
 // 0x8beee3a3
 error NotChainAssetHandler(address sender, address chainAssetHandler);
+error NotCurrentSettlementLayer(uint256 currentSettlementLayer, uint256 newSettlementLayer);
 
 // 0x23295f0e
 error NotOwner(address sender, address owner);

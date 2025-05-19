@@ -44,6 +44,7 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,

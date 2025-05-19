@@ -33,6 +33,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {SystemContractsArgs} from "./Utils.sol";
+import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment} from "contracts/common/Config.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
