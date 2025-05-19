@@ -4,40 +4,26 @@ pragma solidity ^0.8.21;
 
 // 0x587df426
 error AlreadyCurrentSL(uint256 blockChainId);
-
 // 0x65e8a019
 error ChainExists();
-
 // 0xff514c10
 error ChainIdAlreadyPresent();
-
 // 0x5de72107
 error ChainNotLegacy();
-
 // 0x4bd4ae07
 error ChainNotPresentInCTM();
-
-// 0x48857c1d
-error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
-
 // 0xeab895aa
 error HyperchainNotRegistered();
-
+// 0x48857c1d
+error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 // 0xf5e39c1f
 error IncorrectSender(address prevMsgSender, address chainAdmin);
-
 // 0x913183d8
 error MessageRootNotRegistered();
-
-// 0xc0ca9182
-error NotCurrentSL(uint256 settlementLayerChainId, uint256 blockChainId);
-
 // 0x7f4316f3
 error NoEthAllowed();
-
 // 0xf306a770
 error NotAssetRouter(address msgSender, address sharedBridge);
-
 // 0x8beee3a3
 error NotChainAssetHandler(address sender, address chainAssetHandler);
 
@@ -79,9 +65,7 @@ error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, addres
 
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
-
 // 0x90c7cbf1
 error SLNotWhitelisted();
-
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);

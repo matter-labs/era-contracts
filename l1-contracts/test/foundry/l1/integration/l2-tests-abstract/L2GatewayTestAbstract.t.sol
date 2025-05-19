@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 // solhint-disable gas-custom-errors
 
-import {StdStorage, stdStorage, Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
@@ -18,7 +18,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
@@ -31,7 +31,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {ZKChainCommitment} from "contracts/common/Config.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {SystemContractsArgs} from "./Utils.sol";

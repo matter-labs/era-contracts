@@ -20,7 +20,7 @@ import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegac
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {LegacyEncodingUsedForNonL1Token, LegacyBridgeUsesNonNativeToken, Unauthorized, AssetHandlerDoesNotExist, ZeroAddress, TokenNotSupported, TokensWithFeesNotSupported, AddressAlreadySet} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";

@@ -13,7 +13,7 @@ import {
 import { publishBytecode } from "../shared/utils";
 import type { Context } from "mocha";
 
-describe("L2LegacyBridgeFixUpgrade fork tests", function () {
+describe("L2V29Upgrade fork tests", function () {
   let oldBridgedEthVersion: number;
 
   const aliasedGovernanceAddress = ethers.utils.getAddress(
@@ -62,21 +62,21 @@ describe("L2LegacyBridgeFixUpgrade fork tests", function () {
       const forceDeployer = await ethers.getImpersonatedSigner(REAL_FORCE_DEPLOYER_ADDRESS);
       const complexUpgrader = ComplexUpgraderFactory.connect(REAL_COMPLEX_UPGRADER_CONTRACT_ADDRESS, forceDeployer);
 
-      const l2LegacyBridgeFixUpgradeFactory = await ethers.getContractFactory("L2LegacyBridgeFixUpgrade");
-      await publishBytecode(l2LegacyBridgeFixUpgradeFactory.bytecode);
+      const l2V29UpgradeFactory = await ethers.getContractFactory("L2V29Upgrade");
+      await publishBytecode(l2V29UpgradeFactory.bytecode);
       const proxyAdminFactory = await ethers.getContractFactory("ProxyAdmin");
       await publishBytecode(proxyAdminFactory.bytecode);
       // Creating a dummy deterministic address for deployment
       const dummyDeployAddress = create2Address(
         complexUpgrader.address,
-        ethers.utils.hexlify(hashBytecode(l2LegacyBridgeFixUpgradeFactory.bytecode)),
-        ethers.utils.formatBytes32String("L2LegacyBridgeFixUpgrade"),
+        ethers.utils.hexlify(hashBytecode(l2V29UpgradeFactory.bytecode)),
+        ethers.utils.formatBytes32String("L2V29Upgrade"),
         "0x"
       );
 
       const forceDeployments = [
         {
-          bytecodeHash: hashBytecode(l2LegacyBridgeFixUpgradeFactory.bytecode),
+          bytecodeHash: hashBytecode(l2V29UpgradeFactory.bytecode),
           newAddress: dummyDeployAddress,
           callConstructor: false,
           value: ethers.constants.Zero,
@@ -87,10 +87,7 @@ describe("L2LegacyBridgeFixUpgrade fork tests", function () {
       await complexUpgrader.forceDeployAndUpgrade(
         forceDeployments,
         dummyDeployAddress,
-        l2LegacyBridgeFixUpgradeFactory.interface.encodeFunctionData("upgrade", [
-          aliasedGovernanceAddress,
-          bridgedEthAssetId,
-        ])
+        l2V29UpgradeFactory.interface.encodeFunctionData("upgrade", [aliasedGovernanceAddress, bridgedEthAssetId])
       );
     });
 

@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {OnlyBridgehubOrChainAssetHandler, MessageRootNotRegistered} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
-import {PriorityQueue, PriorityOperation} from "../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityOperation, PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 
 pragma solidity 0.8.28;
 

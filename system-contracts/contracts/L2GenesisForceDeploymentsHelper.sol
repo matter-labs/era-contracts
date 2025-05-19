@@ -7,7 +7,6 @@ import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {WRAPPED_BASE_TOKEN_IMPL_ADDRESS, L2_ASSET_ROUTER} from "./Constants.sol";
 import {IL2WrappedBaseToken} from "./interfaces/IL2WrappedBaseToken.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -231,6 +230,7 @@ library L2GenesisForceDeploymentsHelper {
             newAddress: address(L2_CHAIN_ASSET_HANDLER),
             callConstructor: true,
             value: 0,
+            // solhint-disable-next-line func-named-parameters
             input: abi.encode(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
