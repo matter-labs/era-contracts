@@ -87,10 +87,7 @@ describe("L2V29Upgrade fork tests", function () {
       await complexUpgrader.forceDeployAndUpgrade(
         forceDeployments,
         dummyDeployAddress,
-        l2V29UpgradeFactory.interface.encodeFunctionData("upgrade", [
-          aliasedGovernanceAddress,
-          bridgedEthAssetId,
-        ])
+        l2V29UpgradeFactory.interface.encodeFunctionData("upgrade", [aliasedGovernanceAddress, bridgedEthAssetId])
       );
     });
 
