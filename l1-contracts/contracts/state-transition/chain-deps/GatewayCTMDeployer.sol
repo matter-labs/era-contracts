@@ -187,9 +187,9 @@ contract GatewayCTMDeployer {
         });
         _deployVerifier(salt, _config.testnetVerifier, contracts);
 
-        _deployValidatorTimelock(salt, contracts);
-
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
+
+        _deployValidatorTimelock(salt, contracts);
 
         _deployServerNotifier(salt, contracts);
 

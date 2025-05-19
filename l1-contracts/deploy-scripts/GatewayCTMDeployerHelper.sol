@@ -71,6 +71,13 @@ library GatewayCTMDeployerHelper {
             innerConfig
         );
 
+        contracts.stateTransition.chainTypeManagerProxyAdmin = _deployInternal(
+            "ProxyAdmin",
+            "ProxyAdmin.sol",
+            hex"",
+            innerConfig
+        );
+
         contracts.stateTransition.validatorTimelock = _deployInternal(
             "TransparentUpgradeableProxy",
             "TransparentUpgradeableProxy.sol",
@@ -79,13 +86,6 @@ library GatewayCTMDeployerHelper {
                 contracts.stateTransition.chainTypeManagerProxyAdmin,
                 abi.encodeCall(ValidatorTimelock.initialize, (ctmDeployerAddress, 0))
             ),
-            innerConfig
-        );
-
-        contracts.stateTransition.chainTypeManagerProxyAdmin = _deployInternal(
-            "ProxyAdmin",
-            "ProxyAdmin.sol",
-            hex"",
             innerConfig
         );
 
