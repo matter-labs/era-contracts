@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-
+import {Validatortimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
