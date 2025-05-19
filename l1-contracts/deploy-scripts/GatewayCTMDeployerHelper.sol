@@ -64,10 +64,21 @@ library GatewayCTMDeployerHelper {
         );
         contracts = _deployVerifier(config.testnetVerifier, contracts, innerConfig);
 
-        contracts.stateTransition.validatorTimelock = _deployInternal(
+        contracts.stateTransition.validatorTimelockImplementation = _deployInternal(
             "ValidatorTimelock",
             "ValidatorTimelock.sol",
-            abi.encode(ctmDeployerAddress, 0),
+            hex"",
+            innerConfig
+        );
+
+        constacts.stateTransition.validatorTimelock = _deployInternal(
+            "TransparentUpgradeableProxy",
+            "TransparentUpgradeableProxy.sol",
+            abi.encode(
+                contracts.stateTransition.validatorTimelockImplementation,
+                contracts.stateTransition.chainTypeManagerProxyAdmin,
+                abi.encodeCall(ValidatorTimelock.initialize, (ctmDeployerAddress, 0))
+            ),
             innerConfig
         );
 
