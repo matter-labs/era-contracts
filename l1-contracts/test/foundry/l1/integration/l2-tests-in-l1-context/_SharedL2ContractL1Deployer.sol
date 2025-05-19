@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
@@ -12,11 +11,9 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
+import {Config, DeployUtils, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-
-import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_VERIFICATION, L2_INTEROP_ROOT_STORAGE, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -30,16 +27,14 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
-import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
+import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
 import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
-import {StateTransitionDeployedAddresses, FacetCut, Action} from "deploy-scripts/Utils.sol";
 
 import {SystemContractsArgs} from "./Utils.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1IntegrationScript {

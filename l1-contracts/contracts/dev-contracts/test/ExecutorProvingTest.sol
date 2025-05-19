@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
 import {PubdataPricingMode} from "../../state-transition/chain-deps/ZKChainStorage.sol";
 import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {LogProcessingOutput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 
 contract ExecutorProvingTest is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
