@@ -50,7 +50,6 @@ allow_internal_expect_revert = true
 [profile.default.zksync] 
 enable_eravm_extensions = true
 zksolc = "1.5.11"
-optimization = "0"
 
 [profile.invariant_tests_l1context]
 test = "test"
