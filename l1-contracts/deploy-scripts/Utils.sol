@@ -11,11 +11,11 @@ import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {IOwnable} from "./interfaces/IOwnable.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "contracts/common/L2ContractAddresses.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {EIP712Utils} from "./EIP712Utils.sol";
 import {IProtocolUpgradeHandler} from "./interfaces/IProtocolUpgradeHandler.sol";
@@ -45,21 +45,6 @@ bytes32 constant EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH = keccak256(
 
 /// @dev EIP-712 TypeHash for protocol upgrades approval by the Security Council.
 bytes32 constant APPROVE_UPGRADE_SECURITY_COUNCIL_TYPEHASH = keccak256("ApproveUpgradeSecurityCouncil(bytes32 id)");
-
-/// @dev The offset from which the built-in, but user space contracts are located.
-uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
-
-// address constant
-address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
-address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03);
-address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
-address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
-address constant L2_WETH_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
-
-/// @dev the address of the Gateway-specific upgrader contract
-address constant L2_GATEWAY_SPECIFIC_UPGRADER = address(USER_CONTRACTS_OFFSET + 0x08);
-
-address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
 
 uint256 constant SECURITY_COUNCIL_SIZE = 12;
 
@@ -259,31 +244,6 @@ library Utils {
     }
 
     /**
-     * @dev Returns the bytecode of a given system contract.
-     */
-    function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
-    }
-
-    /**
-     * @dev Returns the bytecode of a given system contract in yul.
-     */
-    function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return readFoundryBytecode(path);
-    }
-
-    /**
-     * @dev Returns the bytecode of a given precompile system contract.
-     */
-    function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
-
-        return readFoundryBytecode(path);
-    }
-
-    /**
      * @dev Deploy a Create2Factory contract.
      */
     function deployCreate2Factory() internal returns (address) {
@@ -367,7 +327,7 @@ library Utils {
     ) internal view returns (address) {
         return
             L2ContractHelper.computeCreate2Address(
-                L2_CREATE2_FACTORY_ADDRESS,
+                L2_CREATE2_FACTORY_ADDR,
                 create2Salt,
                 bytecodeHash,
                 keccak256(constructorArgs)
@@ -418,7 +378,7 @@ library Utils {
             l2GasLimit: l2GasLimit,
             l2Value: 0,
             factoryDeps: _factoryDeps,
-            dstAddress: L2_CREATE2_FACTORY_ADDRESS,
+            dstAddress: L2_CREATE2_FACTORY_ADDR,
             chainId: chainId,
             bridgehubAddress: bridgehubAddress,
             l1SharedBridgeProxy: l1SharedBridgeProxy,
@@ -505,7 +465,7 @@ library Utils {
         address bridgehubAddress,
         address l1SharedBridgeProxy,
         address refundRecipient
-    ) internal {
+    ) internal returns (bytes32 txHash) {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
@@ -534,7 +494,17 @@ library Utils {
         }
 
         vm.broadcast();
+        vm.recordLogs();
         bridgehub.requestL2TransactionDirect{value: requiredValueToDeploy}(l2TransactionRequestDirect);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        console.log("Transaction executed succeassfully! Extracting logs...");
+
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+
+        txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
+
+        console.log("L2 Transaction hash is ");
+        console.logBytes32(txHash);
     }
 
     function prepareGovernanceL1L2DirectTransaction(
@@ -799,7 +769,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
         console.log("L2 Transaction hash is ");
@@ -843,7 +813,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getHyperchain(chainId);
+        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
         console.log("L2 Transaction hash is ");
@@ -941,6 +911,40 @@ library Utils {
             l1SharedBridgeProxy: l1SharedBridgeProxy,
             refundRecipient: refundRecipient
         });
+    }
+
+    /**
+     * @dev Returns the bytecode of a given system contract.
+     */
+    function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
+        return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
+    }
+
+    /**
+     * @dev Returns the bytecode of a given system contract in yul.
+     */
+    function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
+        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
+
+        return readFoundryBytecode(path);
+    }
+
+    /**
+     * @dev Returns the bytecode of a given precompile system contract.
+     */
+    function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
+        string memory path = string.concat("/../system-contracts/zkout/", filename, ".yul/", filename, ".json");
+
+        return readFoundryBytecode(path);
+    }
+    /**
+     * @dev Returns the bytecode of a given DA contract.
+     */
+    function readDAContractBytecode(string memory contractIdentifier) internal view returns (bytes memory) {
+        return
+            readFoundryBytecode(
+                string.concat("/../da-contracts/out/", contractIdentifier, ".sol/", contractIdentifier, ".json")
+            );
     }
 
     /**
@@ -1278,18 +1282,6 @@ library Utils {
         info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
     }
 
-    function readRollupDAValidatorBytecode() internal view returns (bytes memory bytecode) {
-        bytecode = readFoundryBytecode("/../da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json");
-    }
-
-    function readAvailL1DAValidatorBytecode() internal view returns (bytes memory bytecode) {
-        bytecode = readFoundryBytecode("/../da-contracts/out/AvailL1DAValidator.sol/AvailL1DAValidator.json");
-    }
-
-    function readDummyAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
-        bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
-    }
-
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
         result = new Call[](a.length + b.length);
         for (uint256 i = 0; i < a.length; i++) {
@@ -1306,6 +1298,10 @@ library Utils {
             result[i] = a[i];
         }
         result[a.length] = b;
+    }
+
+    function compareStrings(string memory a, string memory b) public pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
     // add this to be excluded from coverage report

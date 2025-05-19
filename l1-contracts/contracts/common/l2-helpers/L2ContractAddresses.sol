@@ -2,6 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
+import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
+import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
+
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
@@ -26,9 +30,11 @@ address constant L2_DEPLOYER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFF
 /// `diamond-initializers` contracts.
 address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07);
 
+/// @dev The address of the L2ToL1Messenger system contract
+address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08);
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
-IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = IL2ToL1Messenger(
-    address(SYSTEM_CONTRACTS_OFFSET + 0x08)
+IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
+    L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 );
 
 /// @dev The address of the eth token system contract
@@ -46,8 +52,14 @@ address constant L2_COMPLEX_UPGRADER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x
 /// @dev the address of the msg value system contract
 address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 
+/// @dev The address of the create2 factory contract
+address constant L2_CREATE2_FACTORY_ADDR = address(USER_CONTRACTS_OFFSET + 0x00);
+
 /// @dev The address used to execute the genesis upgrade
 address constant L2_GENESIS_UPGRADE_ADDR = address(USER_CONTRACTS_OFFSET + 0x01);
+
+/// @dev The genesis upgrade address is reused for all version specific upgrades
+address constant L2_VERSION_SPECIFIC_UPGRADER_ADDR = L2_GENESIS_UPGRADE_ADDR;
 
 /// @dev The address of the L2 bridge hub system contract, used to start L1->L2 transactions
 address constant L2_BRIDGEHUB_ADDR = address(USER_CONTRACTS_OFFSET + 0x02);
@@ -63,22 +75,17 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
 
-/**
- * @author Matter Labs
- * @custom:security-contact security@matterlabs.dev
- * @notice Smart contract for sending arbitrary length messages to L1
- * @dev by default ZkSync can send fixed-length messages on L1.
- * A fixed length message has 4 parameters `senderAddress`, `isService`, `key`, `value`,
- * the first one is taken from the context, the other three are chosen by the sender.
- * @dev To send a variable-length message we use this trick:
- * - This system contract accepts an arbitrary length message and sends a fixed length message with
- * parameters `senderAddress == this`, `isService == true`, `key == msg.sender`, `value == keccak256(message)`.
- * - The contract on L1 accepts all sent messages and if the message came from this system contract
- * it requires that the preimage of `value` be provided.
- */
-interface IL2ToL1Messenger {
-    /// @notice Sends an arbitrary length message to L1.
-    /// @param _message The variable length message to be sent to L1.
-    /// @return Returns the keccak256 hashed value of the message.
-    function sendToL1(bytes calldata _message) external returns (bytes32);
-}
+/// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
+address constant SLOAD_CONTRACT_ADDR = address(USER_CONTRACTS_OFFSET + 0x06);
+
+/// @dev The address of the WETH implementation contract
+address constant L2_WETH_IMPL_ADDR = address(USER_CONTRACTS_OFFSET + 0x07);
+
+/// @dev The address of the L2 interop root storage system contract
+IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
+
+/// @dev The address of the L2 message verification system contract
+IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
+
+/// @dev The address of the L2 chain handler system contract
+address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);

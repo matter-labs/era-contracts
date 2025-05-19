@@ -7,18 +7,14 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils, FacetCut, Action} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -27,7 +23,6 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -35,12 +30,8 @@ import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.s
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
-import {IOwnable} from "./interfaces/IOwnable.sol";
-
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-
-import {StateTransitionDeployedAddresses, Utils, FacetCut, Action} from "./Utils.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
@@ -56,6 +47,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -85,7 +77,8 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
-import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
+import {DeployUtils, GeneratedData, Config, DeployedAddresses} from "./DeployUtils.s.sol";
+import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
@@ -184,6 +177,11 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridgehub.ctmDeploymentTrackerImplementation,
             addresses.bridgehub.ctmDeploymentTrackerProxy
         ) = deployTuppWithContract("CTMDeploymentTracker", false);
+
+        (
+            addresses.bridgehub.chainAssetHandlerImplementation,
+            addresses.bridgehub.chainAssetHandlerProxy
+        ) = deployTuppWithContract("ChainAssetHandler", false);
         setBridgehubParams();
 
         initializeGeneratedData();
@@ -217,31 +215,12 @@ contract DeployL1Script is Script, DeployUtils {
         }
     }
 
-    function getRollupL2ValidatorAddress() internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode()),
-                hex""
-            );
+    function getL2ValidatorAddress(string memory contractName) internal returns (address) {
+        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
     }
 
-    function getNoDAValidiumL2ValidatorAddress() internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode()),
-                hex""
-            );
-    }
-
-    function getAvailL2ValidatorAddress() internal returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0),
-                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode()),
-                hex""
-            );
+    function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
+        return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
     }
 
     function deployVerifiers() internal {
@@ -274,7 +253,11 @@ contract DeployL1Script is Script, DeployUtils {
         }
         vm.startBroadcast(msg.sender);
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
-        rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2ValidatorAddress(), true);
+        rollupDAManager.updateDAPair(
+            addresses.daAddresses.l1RollupDAValidator,
+            getL2ValidatorAddress("RollupL2DAValidator"),
+            true
+        );
         vm.stopBroadcast();
     }
 
@@ -352,7 +335,8 @@ contract DeployL1Script is Script, DeployUtils {
         bridgehub.setAddresses(
             addresses.bridges.l1AssetRouterProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-            IMessageRoot(addresses.bridgehub.messageRootProxy)
+            IMessageRoot(addresses.bridgehub.messageRootProxy),
+            addresses.bridgehub.chainAssetHandlerProxy
         );
         vm.stopBroadcast();
         console.log("SharedBridge registered");
@@ -585,9 +569,17 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress("root", "expected_rollup_l2_da_validator_addr", getRollupL2ValidatorAddress());
-        vm.serializeAddress("root", "expected_no_da_validium_l2_validator_addr", getNoDAValidiumL2ValidatorAddress());
-        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getAvailL2ValidatorAddress());
+        vm.serializeAddress(
+            "root",
+            "expected_rollup_l2_da_validator_addr",
+            getL2ValidatorAddress("RollupL2DAValidator")
+        );
+        vm.serializeAddress(
+            "root",
+            "expected_no_da_validium_l2_validator_addr",
+            getL2ValidatorAddress("ValidiumL2DAValidator")
+        );
+        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getL2ValidatorAddress("AvailL2DAValidator"));
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
@@ -609,19 +601,14 @@ contract DeployL1Script is Script, DeployUtils {
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
-            l2TokenProxyBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readBeaconProxyBytecode()
-            ),
+            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode()),
-            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2AssetRouterBytecode()
-            ),
-            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
-            ),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
+            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
+            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
+            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
+            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -746,8 +733,9 @@ contract DeployL1Script is Script, DeployUtils {
             if (compareStrings(contractName, "ChainRegistrar")) {
                 return type(ChainRegistrar).creationCode;
             } else if (compareStrings(contractName, "Bridgehub")) {
-                // Bridgehub is a special case because its bytecode was generated using a low optimizer runs setting.
-                return Utils.readFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
+                return type(Bridgehub).creationCode;
+            } else if (compareStrings(contractName, "ChainAssetHandler")) {
+                return type(ChainAssetHandler).creationCode;
             } else if (compareStrings(contractName, "MessageRoot")) {
                 return type(MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -770,14 +758,8 @@ contract DeployL1Script is Script, DeployUtils {
                 return type(UpgradeableBeacon).creationCode;
             } else if (compareStrings(contractName, "RollupDAManager")) {
                 return type(RollupDAManager).creationCode;
-            } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-                return Utils.readRollupDAValidatorBytecode();
             } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
                 return type(ValidiumL1DAValidator).creationCode;
-            } else if (compareStrings(contractName, "AvailL1DAValidator")) {
-                return Utils.readAvailL1DAValidatorBytecode();
-            } else if (compareStrings(contractName, "DummyAvailBridge")) {
-                return Utils.readDummyAvailBridgeBytecode();
             } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
                     return type(TestnetVerifier).creationCode;
@@ -823,81 +805,17 @@ contract DeployL1Script is Script, DeployUtils {
                 return type(ServerNotifier).creationCode;
             } else if (compareStrings(contractName, "UpgradeStageValidator")) {
                 return type(UpgradeStageValidator).creationCode;
-            } else {
-                revert(string.concat("Contract ", contractName, " creation code not set"));
             }
         } else {
-            if (compareStrings(contractName, "ChainRegistrar")) {
-                return Utils.readZKFoundryBytecodeL1("ChainRegistrar.sol", "ChainRegistrar");
-            } else if (compareStrings(contractName, "Bridgehub")) {
-                return Utils.readZKFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return Utils.readZKFoundryBytecodeL1("MessageRoot.sol", "MessageRoot");
-            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-                return Utils.readZKFoundryBytecodeL1("CTMDeploymentTracker.sol", "CTMDeploymentTracker");
-            } else if (compareStrings(contractName, "L2AssetRouter")) {
-                return Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return Utils.readZKFoundryBytecodeL1("L1ERC20Bridge.sol", "L1ERC20Bridge");
-            } else if (compareStrings(contractName, "L2NativeTokenVault")) {
-                return Utils.readZKFoundryBytecodeL1("L2NativeTokenVault.sol", "L2NativeTokenVault");
-            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
-                return Utils.readZKFoundryBytecodeL1("BridgedStandardERC20.sol", "BridgedStandardERC20");
-            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
-                return Utils.readZKFoundryBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
-            } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
-                return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-            } else if (compareStrings(contractName, "RollupDAManager")) {
-                return Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
-            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
-                return Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
-            } else if (compareStrings(contractName, "Verifier")) {
+            if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
-                    return Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
+                    return getCreationCode("TestnetVerifier", true);
                 } else {
-                    return Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
+                    return getCreationCode("DualVerifier", true);
                 }
-            } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
-            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
-                return Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-            } else if (compareStrings(contractName, "ValidatorTimelock")) {
-                return Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
-            } else if (compareStrings(contractName, "Governance")) {
-                return Utils.readZKFoundryBytecodeL1("Governance.sol", "Governance");
-            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-                return Utils.readZKFoundryBytecodeL1("ChainAdminOwnable.sol", "ChainAdminOwnable");
-            } else if (compareStrings(contractName, "AccessControlRestriction")) {
-                // TODO(EVM-924): this function is unused
-                return Utils.readZKFoundryBytecodeL1("AccessControlRestriction.sol", "AccessControlRestriction");
-            } else if (compareStrings(contractName, "ChainAdmin")) {
-                return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
-            } else if (compareStrings(contractName, "ChainTypeManager")) {
-                return Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
-                return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
-            } else if (compareStrings(contractName, "ProxyAdmin")) {
-                return Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
-            } else if (compareStrings(contractName, "ExecutorFacet")) {
-                return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
-            } else if (compareStrings(contractName, "AdminFacet")) {
-                return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
-            } else if (compareStrings(contractName, "MailboxFacet")) {
-                return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
-            } else if (compareStrings(contractName, "GettersFacet")) {
-                return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
-            } else if (compareStrings(contractName, "DiamondInit")) {
-                return Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
-            } else if (compareStrings(contractName, "ServerNotifier")) {
-                return Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
-            } else {
-                revert(string.concat("Contract ", contractName, " creation code not set"));
             }
         }
+        return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
@@ -905,6 +823,8 @@ contract DeployL1Script is Script, DeployUtils {
             return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "MessageRoot")) {
             return abi.encodeCall(MessageRoot.initialize, ());
+        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "L1Nullifier")) {

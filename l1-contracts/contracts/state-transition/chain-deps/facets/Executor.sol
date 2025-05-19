@@ -6,20 +6,20 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
-import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, MAX_LOG_KEY, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
-import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidMessageRoot} from "../../../common/L1ContractErrors.sol";
+import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
+import {InteropRoot} from "../../../common/Messaging.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -30,7 +30,6 @@ uint8 constant RELAYED_EXECUTOR_VERSION = 0;
 /// @custom:security-contact security@matterlabs.dev
 contract ExecutorFacet is ZKChainBase, IExecutor {
     using UncheckedMath for uint256;
-    using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
@@ -110,6 +109,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
             priorityOperationsHash: _newBatch.priorityOperationsHash,
             l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
+            dependencyRootsRollingHash: logOutput.dependencyRootsRollingHash,
             timestamp: _newBatch.timestamp,
             commitment: commitment
         });
@@ -129,7 +129,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // The full preimage of `passThroughDataHash` consists of the state root as well as the `indexRepeatedStorageChanges`. All
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
             );
         }
@@ -211,7 +211,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
             // Need to check that each log was sent by the correct address.
             if (logKey == uint256(SystemLogKey.L2_TO_L1_LOGS_TREE_ROOT_KEY)) {
-                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2LogsTreeRoot = logValue;
@@ -236,14 +236,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 }
                 logOutput.numberOfLayer1Txs = uint256(logValue);
             } else if (logKey == uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)) {
-                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
                     revert MismatchL2DAValidator();
                 }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
-                if (logSender != address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR)) {
+                if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.l2DAValidatorOutputHash = logValue;
@@ -254,20 +254,20 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (_expectedSystemContractUpgradeTxHash != logValue) {
                     revert TxHashMismatch();
                 }
-            } else if (logKey > uint256(SystemLogKey.EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY)) {
+            } else if (logKey == uint256(SystemLogKey.MESSAGE_ROOT_ROLLING_HASH_KEY)) {
+                if (logSender != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
+                logOutput.dependencyRootsRollingHash = logValue;
+            } else if (logKey > MAX_LOG_KEY) {
                 revert UnexpectedSystemLog(logKey);
             }
         }
 
-        // We only require 7 logs to be checked, the 8th is if we are expecting a protocol upgrade
-        // Without the protocol upgrade we expect 7 logs: 2^7 - 1 = 127
-        // With the protocol upgrade we expect 8 logs: 2^8 - 1 = 255
-        if (_expectedSystemContractUpgradeTxHash == bytes32(0)) {
-            if (processedLogs != 127) {
-                revert MissingSystemLogs(127, processedLogs);
-            }
-        } else if (processedLogs != 255) {
-            revert MissingSystemLogs(255, processedLogs);
+        // We only require MAX_LOG_KEY - 1 logs to be checked, the MAX_LOG_KEY-th is if we are expecting a protocol upgrade
+        uint256 exponent = _expectedSystemContractUpgradeTxHash == bytes32(0) ? MAX_LOG_KEY : MAX_LOG_KEY + 1;
+        if (processedLogs != 2 ** exponent - 1) {
+            revert MissingSystemLogs(2 ** exponent - 1, processedLogs);
         }
     }
 
@@ -297,12 +297,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert CanOnlyProcessOneBatch();
         }
         // Check that we commit batches after last committed batch
-        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[s.totalBatchesCommitted];
+        if (
+            cachedStoredBatchHashes != _hashStoredBatchInfo(lastCommittedBatchData) &&
+            cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)
+        ) {
             // incorrect previous batch data
-            revert BatchHashMismatch(
-                s.storedBatchHashes[s.totalBatchesCommitted],
-                _hashStoredBatchInfo(lastCommittedBatchData)
-            );
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
@@ -383,18 +384,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @dev Pops the priority operations from the priority queue and returns a rolling hash of operations
-    function _collectOperationsFromPriorityQueue(uint256 _nPriorityOps) internal returns (bytes32 concatHash) {
-        concatHash = EMPTY_STRING_KECCAK;
-
-        for (uint256 i = 0; i < _nPriorityOps; i = i.uncheckedInc()) {
-            PriorityOperation memory priorityOp = s.priorityQueue.popFront();
-            concatHash = keccak256(abi.encode(concatHash, priorityOp.canonicalTxHash));
-        }
-
-        s.priorityTree.skipUntil(s.priorityQueue.getFirstUnprocessedPriorityTx());
-    }
-
     function _rollingHash(bytes32[] memory _hashes) internal pure returns (bytes32) {
         bytes32 hash = EMPTY_STRING_KECCAK;
         uint256 nHashes = _hashes.length;
@@ -409,7 +398,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     function _checkBatchData(
         StoredBatchInfo memory _storedBatch,
         uint256 _executedBatchIdx,
-        bytes32 _priorityOperationsHash
+        bytes32 _priorityOperationsHash,
+        bytes32 _dependencyRootsRollingHash
     ) internal view {
         uint256 currentBatchNumber = _storedBatch.batchNumber;
         if (currentBatchNumber != s.totalBatchesExecuted + _executedBatchIdx + 1) {
@@ -421,21 +411,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_priorityOperationsHash != _storedBatch.priorityOperationsHash) {
             revert PriorityOperationsRollingHashMismatch();
         }
-    }
-
-    /// @dev Executes one batch
-    /// @dev 1. Processes all pending operations (Complete priority requests)
-    /// @dev 2. Finalizes batch on Ethereum
-    /// @dev _executedBatchIdx is an index in the array of the batches that we want to execute together
-    function _executeOneBatch(StoredBatchInfo memory _storedBatch, uint256 _executedBatchIdx) internal {
-        bytes32 priorityOperationsHash = _collectOperationsFromPriorityQueue(_storedBatch.numberOfLayer1Txs);
-        _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
-
-        uint256 currentBatchNumber = _storedBatch.batchNumber;
-
-        // Save root hash of L2 -> L1 logs tree
-        s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
-        _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+        if (_dependencyRootsRollingHash != _storedBatch.dependencyRootsRollingHash) {
+            revert DependencyRootsRollingHashMismatch(
+                _storedBatch.dependencyRootsRollingHash,
+                _dependencyRootsRollingHash
+            );
+        }
     }
 
     /// @notice Executes one batch
@@ -445,13 +426,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     function _executeOneBatch(
         StoredBatchInfo memory _storedBatch,
         PriorityOpsBatchInfo memory _priorityOpsData,
+        InteropRoot[] memory _dependencyRoots,
         uint256 _executedBatchIdx
     ) internal {
         if (_priorityOpsData.itemHashes.length != _storedBatch.numberOfLayer1Txs) {
             revert MismatchNumberOfLayer1Txs(_priorityOpsData.itemHashes.length, _storedBatch.numberOfLayer1Txs);
         }
         bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
-        _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash);
+        bytes32 dependencyRootsRollingHash = _verifyDependencyInteropRoots(_dependencyRoots);
+        _checkBatchData(_storedBatch, _executedBatchIdx, priorityOperationsHash, dependencyRootsRollingHash);
         s.priorityTree.processBatch(_priorityOpsData);
 
         uint256 currentBatchNumber = _storedBatch.batchNumber;
@@ -459,6 +442,38 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
         _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+    }
+
+    /// @notice Verifies the dependency message roots that the chain relied on.
+    function _verifyDependencyInteropRoots(
+        InteropRoot[] memory _dependencyRoots
+    ) internal view returns (bytes32 dependencyRootsRollingHash) {
+        uint256 length = _dependencyRoots.length;
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+
+        for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
+            InteropRoot memory interopRoot = _dependencyRoots[i];
+            bytes32 correctRootHash;
+            if (interopRoot.chainId == block.chainid) {
+                // For the same chain we verify using the MessageRoot contract. Note, that in this
+                // release, import and export only happens on GW, so this is the only case we have to cover.
+                correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
+            } else {
+                revert CommitBasedInteropNotSupported();
+            }
+            if (interopRoot.sides.length != 1 || interopRoot.sides[0] != correctRootHash) {
+                revert InvalidMessageRoot(correctRootHash, interopRoot.sides[0]);
+            }
+            dependencyRootsRollingHash = keccak256(
+                // solhint-disable-next-line func-named-parameters
+                abi.encodePacked(
+                    dependencyRootsRollingHash,
+                    interopRoot.chainId,
+                    interopRoot.blockOrBatchNumber,
+                    interopRoot.sides
+                )
+            );
+        }
     }
 
     /// @notice Appends the batch message root to the global message.
@@ -484,29 +499,18 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processTo,
         bytes calldata _executeData
     ) external nonReentrant onlyValidator onlySettlementLayer {
-        (StoredBatchInfo[] memory batchesData, PriorityOpsBatchInfo[] memory priorityOpsData) = BatchDecoder
-            .decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
+        (
+            StoredBatchInfo[] memory batchesData,
+            PriorityOpsBatchInfo[] memory priorityOpsData,
+            InteropRoot[][] memory dependencyRoots
+        ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {
             revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
         }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {
-            if (_isPriorityQueueActive()) {
-                if (priorityOpsData[i].leftPath.length != 0) {
-                    revert PriorityOpsDataLeftPathLengthIsNotZero();
-                }
-                if (priorityOpsData[i].rightPath.length != 0) {
-                    revert PriorityOpsDataRightPathLengthIsNotZero();
-                }
-                if (priorityOpsData[i].itemHashes.length != 0) {
-                    revert PriorityOpsDataItemHashesLengthIsNotZero();
-                }
-
-                _executeOneBatch(batchesData[i], i);
-            } else {
-                _executeOneBatch(batchesData[i], priorityOpsData[i], i);
-            }
+            _executeOneBatch(batchesData[i], priorityOpsData[i], dependencyRoots[i], i);
             emit BlockExecution(batchesData[i].batchNumber, batchesData[i].batchHash, batchesData[i].commitment);
         }
 
@@ -544,8 +548,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        if (_hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-            revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[currentTotalBatchesVerified];
+        if (
+            _hashStoredBatchInfo(prevBatch) != cachedStoredBatchHashes &&
+            _hashLegacyStoredBatchInfo(prevBatch) != cachedStoredBatchHashes
+        ) {
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(prevBatch));
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
@@ -717,6 +725,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Returns the keccak hash of the ABI-encoded StoredBatchInfo
     function _hashStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
         return keccak256(abi.encode(_storedBatchInfo));
+    }
+
+    /// @notice Returns the keccak hash of the ABI-encoded Legacy StoredBatchInfo
+    function _hashLegacyStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
+        LegacyStoredBatchInfo memory legacyStoredBatchInfo = LegacyStoredBatchInfo({
+            batchNumber: _storedBatchInfo.batchNumber,
+            batchHash: _storedBatchInfo.batchHash,
+            indexRepeatedStorageChanges: _storedBatchInfo.indexRepeatedStorageChanges,
+            numberOfLayer1Txs: _storedBatchInfo.numberOfLayer1Txs,
+            priorityOperationsHash: _storedBatchInfo.priorityOperationsHash,
+            l2LogsTreeRoot: _storedBatchInfo.l2LogsTreeRoot,
+            timestamp: _storedBatchInfo.timestamp,
+            commitment: _storedBatchInfo.commitment
+        });
+        return keccak256(abi.encode(legacyStoredBatchInfo));
     }
 
     /// @notice Returns true if the bit at index {_index} is 1

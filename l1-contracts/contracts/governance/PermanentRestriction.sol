@@ -6,7 +6,7 @@ import {TooHighDeploymentNonce, CallNotAllowed, RemovingPermanentRestriction, Ze
 
 import {L2TransactionRequestTwoBridgesOuter, BridgehubBurnCTMAssetData} from "../bridgehub/IBridgehub.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {NEW_ENCODING_VERSION, IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 
 import {Call} from "./Common.sol";
@@ -231,18 +231,16 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         (uint256 chainId, bool chainIdQuerySuccess) = _getChainIdUnffallibleCall(_chain);
 
         if (!chainIdQuerySuccess) {
-            // It is not a hyperchain, so we can return `false` here.
+            // It is not a ZKChain, so we can return `false` here.
             return false;
         }
 
-        // Note, that here it is important to use the legacy `getHyperchain` function, so that the contract
-        // is compatible with the legacy ones.
-        if (BRIDGE_HUB.getHyperchain(chainId) != _chain) {
-            // It is not a hyperchain, so we can return `false` here.
+        if (BRIDGE_HUB.getZKChain(chainId) != _chain) {
+            // It is not a ZKChain, so we can return `false` here.
             return false;
         }
 
-        // Now, the chain is known to be a hyperchain, so it must implement the corresponding interface
+        // Now, the chain is known to be a ZKChain, so it must implement the corresponding interface
         address admin = IZKChain(_chain).getAdmin();
 
         return admin == msg.sender;
@@ -294,7 +292,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        address sharedBridge = BRIDGE_HUB.sharedBridge();
+        address sharedBridge = BRIDGE_HUB.assetRouter();
 
         // Assuming that correctly encoded calldata is provided, the following line must never fail,
         // since the correct selector was checked before.

@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
+import {Create2FactoryUtils} from "../Create2FactoryUtils.s.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";

@@ -16,16 +16,19 @@ import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
-import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_VERIFICATION, L2_INTEROP_ROOT_STORAGE, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
+import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
 import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
 
@@ -85,8 +88,26 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
         Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            L2_CHAIN_ASSET_HANDLER_ADDR
         );
+
+        {
+            address l2messageVerification = address(new L2MessageVerification());
+            vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
+            address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
+            vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
+            address l2ChainAssetHandler = address(
+                new ChainAssetHandler(
+                    _args.l1ChainId,
+                    _args.aliasedOwner,
+                    IBridgehub(L2_BRIDGEHUB_ADDR),
+                    L2_ASSET_ROUTER_ADDR,
+                    IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+                )
+            );
+            vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);
+        }
 
         vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
         // Initializing reentrancy guard

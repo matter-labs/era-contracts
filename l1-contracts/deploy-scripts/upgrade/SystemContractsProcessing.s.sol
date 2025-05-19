@@ -2,9 +2,10 @@
 pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Utils, L2_WETH_IMPL_ADDRESS, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
-import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
+import {Utils} from "../Utils.sol";
+import {L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_WETH_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 // solhint-disable no-console, gas-custom-errors
@@ -343,11 +344,11 @@ library SystemContractsProcessing {
     function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
 
-        result[0] = L2ContractsBytecodesLib.readBridgehubBytecode();
-        result[1] = L2ContractsBytecodesLib.readL2AssetRouterBytecode();
-        result[2] = L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode();
-        result[3] = L2ContractsBytecodesLib.readMessageRootBytecode();
-        result[4] = L2ContractsBytecodesLib.readL2WrappedBaseToken();
+        result[0] = ContractsBytecodesLib.getCreationCode("Bridgehub");
+        result[1] = ContractsBytecodesLib.getCreationCode("L2AssetRouter");
+        result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
+        result[3] = ContractsBytecodesLib.getCreationCode("MessageRoot");
+        result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -362,35 +363,35 @@ library SystemContractsProcessing {
 
         forceDeployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[0]),
-            newAddress: L2_BRIDGEHUB_ADDRESS,
+            newAddress: L2_BRIDGEHUB_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[1] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[1]),
-            newAddress: L2_ASSET_ROUTER_ADDRESS,
+            newAddress: L2_ASSET_ROUTER_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[2] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[2]),
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
+            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[3] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[3]),
-            newAddress: L2_MESSAGE_ROOT_ADDRESS,
+            newAddress: L2_MESSAGE_ROOT_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[4] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[4]),
-            newAddress: L2_WETH_IMPL_ADDRESS,
+            newAddress: L2_WETH_IMPL_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
