@@ -109,7 +109,7 @@ library Utils {
             true,
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
-            bytes32(0)
+            bytes32("")
         );
 
         return logs;
