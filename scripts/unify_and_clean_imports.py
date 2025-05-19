@@ -4,7 +4,7 @@ unify_and_clean_imports.py
 
 Walks through a directory recursively, finds all .sol files,
 unifies named imports from the same file path into a single import with sorted symbols,
-removes duplicate import statements, and also deduplicates repeated symbols within a single import.
+removes duplicate import statements, and also deduplicates & sorts symbols within a single import.
 """
 
 import os
@@ -19,30 +19,37 @@ IMPORT_REGEX = re.compile(r'^\s*import\s*{([^}]*)}\s*from\s*["\']([^"\']+)["\'];
 def process_file(path: str):
     """
     Reads a .sol file, unifies named imports, removes duplicate imports and duplicate symbols,
-    and writes back if changes were made.
+    sorts symbols within a single import, and writes back if changes were made.
     """
     with open(path, 'r', encoding='utf-8') as f:
         lines = f.readlines()
 
     imports = OrderedDict()  # import_path -> { 'symbols': list, 'first_index': int }
     duplicates_in_line = False
+    unsorted_in_line = False
 
-    # First pass: collect named imports and detect intra-line duplicates
+    # First pass: collect named imports, detect intra-line duplicates & unsorted
     for idx, line in enumerate(lines):
         m = IMPORT_REGEX.match(line)
-        if m:
-            raw_symbols = [s.strip() for s in m.group(1).split(',') if s.strip()]
-            # detect if the same symbol appears more than once in this line
-            if len(raw_symbols) != len(set(raw_symbols)):
-                duplicates_in_line = True
+        if not m:
+            continue
 
-            imp_path = m.group(2)
-            if imp_path not in imports:
-                imports[imp_path] = { 'symbols': [], 'first_index': idx }
-            # add each symbol once
-            for sym in raw_symbols:
-                if sym not in imports[imp_path]['symbols']:
-                    imports[imp_path]['symbols'].append(sym)
+        raw_symbols = [s.strip() for s in m.group(1).split(',') if s.strip()]
+        # detect duplicate symbols within this import
+        if len(raw_symbols) != len(set(raw_symbols)):
+            duplicates_in_line = True
+
+        # detect out-of-order symbols within this import
+        if raw_symbols != sorted(raw_symbols):
+            unsorted_in_line = True
+
+        imp_path = m.group(2)
+        if imp_path not in imports:
+            imports[imp_path] = {'symbols': [], 'first_index': idx}
+        # accumulate unique symbols
+        for sym in raw_symbols:
+            if sym not in imports[imp_path]['symbols']:
+                imports[imp_path]['symbols'].append(sym)
 
     # Count how many import statements per path
     occurrences = {imp_path: 0 for imp_path in imports}
@@ -51,8 +58,10 @@ def process_file(path: str):
         if m and m.group(2) in occurrences:
             occurrences[m.group(2)] += 1
 
-    # If no duplicate statements and no intra-line duplicates, nothing to do
-    if not any(count > 1 for count in occurrences.values()) and not duplicates_in_line:
+    # If nothing to unify (no multi-line duplicates), no intra-line duplicates, and everything already sorted → done
+    if not any(count > 1 for count in occurrences.values()) \
+       and not duplicates_in_line \
+       and not unsorted_in_line:
         return
 
     # Build unified import lines (sorted symbols)
@@ -63,7 +72,7 @@ def process_file(path: str):
             f"import {{{', '.join(symbols_sorted)}}} from \"{imp_path}\";\n"
         )
 
-    # Second pass: write new lines, replacing first occurrence (or only occurrence) with unified import
+    # Second pass: write new lines, replacing first occurrence (or only occurrence)
     output = []
     printed = set()
     for idx, line in enumerate(lines):
@@ -80,10 +89,10 @@ def process_file(path: str):
         else:
             output.append(line)
 
-    # Write back
+    # Write back if changed
     with open(path, 'w', encoding='utf-8') as f:
         f.writelines(output)
-    print(f"Unified and cleaned imports in: {path}")
+    print(f"Unified, sorted, and cleaned imports in: {path}")
 
 
 def walk_and_clean(root_dir: str):
@@ -95,7 +104,7 @@ def walk_and_clean(root_dir: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Unify named imports and remove duplicates in Solidity (.sol) files."
+        description="Unify named imports and remove duplicates/sort symbols in Solidity (.sol) files."
     )
     parser.add_argument('directory',
         help='Root directory to scan for Solidity files'
