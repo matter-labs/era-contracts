@@ -138,7 +138,7 @@ So most of the system contracts will be deployed the old way (via force deployme
 
 So entire flow can be summarized by the following:
 
-1. On L1, when `AdminFacet.upgradeChainFromVersion` is called by the Chain Admin, the contract delegatecalls to the [GatewayUpgrade](../../../l1-contracts/contracts/upgrades/GatewayUpgrade.sol) contract.
+1. On L1, when `AdminFacet.upgradeChainFromVersion` is called by the Chain Admin, the contract delegatecalls to the [GatewayUpgrade](https://github.com/matter-labs/era-contracts/blob/14961f1efecac1030139c4cf0655b14135197772/system-contracts/contracts/L2GatewayUpgrade.sol) contract.
 2. The `GatewayUpgrade` gathers all the needed data to compose the `ZKChainSpecificForceDeploymentsData`, while the `FixedForceDeploymentsData` is part is hardcoded inside the upgrade transaction.
 3. The combined upgrade transaction consists of many forced deployments (basically tuples of `(address, bytecodeHash, constructorInput)`) and one of these that is responsible for the temporary `L2GatewayUpgrade` gets its `constructorInput` set to contain the `ZKChainSpecificForceDeploymentsData` / `FixedForceDeploymentsData`.
 4. When the upgrade is executed on L2, it iterates over the forced deployments, deploys most of the contracts and then executes the `L2GatewayUpgrade`.
