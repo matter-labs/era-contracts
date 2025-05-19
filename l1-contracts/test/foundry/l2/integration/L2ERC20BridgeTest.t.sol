@@ -15,7 +15,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
+import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2Utils, SystemContractsArgs} from "./L2Utils.sol";

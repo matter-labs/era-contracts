@@ -6,7 +6,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 import {DeployGatewayTransactionFilterer} from "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol";
 
-import {Utils, ChainInfoFromBridgehub} from "deploy-scripts/Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "deploy-scripts/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {AdminFunctions} from "deploy-scripts/AdminFunctions.s.sol";
 import {Call} from "contracts/governance/Common.sol";
