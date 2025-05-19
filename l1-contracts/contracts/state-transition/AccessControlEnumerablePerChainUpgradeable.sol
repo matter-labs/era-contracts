@@ -41,6 +41,8 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     );
 
     struct RoleData {
+        // @dev Although this mapping seems redundant (having the `_roleMembers` mapping),
+        // it was left here to preserve the original OZ implementation.
         mapping(address => bool) members;
         bytes32 adminRole; // 0x00 means DEFAULT_ADMIN_ROLE
     }
@@ -115,6 +117,7 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
 
         if (!hasRole(_chainId, _role, _account)) {
             _roles[_chainId][_role].members[_account] = true;
+            // slither-disable-next-line unused-return
             _roleMembers[_chainId][_role].add(_account);
             emit RoleGranted(_chainId, _role, _account);
         }
@@ -173,6 +176,7 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
 
         if (hasRole(_chainId, _role, _account)) {
             _roles[_chainId][_role].members[_account] = false;
+            // slither-disable-next-line unused-return
             _roleMembers[_chainId][_role].remove(_account);
             emit RoleRevoked(_chainId, _role, _account);
         }
