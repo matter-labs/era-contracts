@@ -12,11 +12,11 @@ import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.s
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, InvalidDAForPermanentRollup, AlreadyPermanentRollup} from "../../../common/L1ContractErrors.sol";
-import {NotL1, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted, NotAllBatchesExecuted, OutdatedProtocolVersion, NotHistoricalRoot, ContractNotDeployed, NotMigrated} from "../../L1StateTransitionErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, PriorityQueueNotReady, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {IL2ContractDeployer, AllowedBytecodeTypes} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
