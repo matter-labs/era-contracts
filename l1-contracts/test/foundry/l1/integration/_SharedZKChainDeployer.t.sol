@@ -13,7 +13,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
-
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;
 

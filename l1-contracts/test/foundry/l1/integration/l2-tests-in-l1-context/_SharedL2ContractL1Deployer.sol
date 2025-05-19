@@ -13,7 +13,6 @@ import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Config, DeployUtils, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
 
-
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
