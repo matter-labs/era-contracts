@@ -37,7 +37,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-import {GatewayCTMDeployerHelper} from "deploy-scripts/GatewayCTMDeployerHelper.sol";
+import {GatewayCTMDeployerHelper} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 
 import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 

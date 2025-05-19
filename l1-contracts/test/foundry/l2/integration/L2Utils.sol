@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {Vm} from "forge-std/Vm.sol";
 import "forge-std/console.sol";
 
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -13,6 +13,7 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -28,10 +29,6 @@ library L2Utils {
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     address internal constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
-
-    string internal constant L2_ASSET_ROUTER_PATH = "./zkout/L2AssetRouter.sol/L2AssetRouter.json";
-    string internal constant L2_NATIVE_TOKEN_VAULT_PATH = "./zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json";
-    string internal constant BRIDGEHUB_PATH = "./zkout/Bridgehub.sol/Bridgehub.json";
 
     function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
@@ -84,6 +81,7 @@ library L2Utils {
             _args.legacySharedBridge,
             _args.l1CtmDeployer
         );
+        forceDeployChainAssetHandler(_args.l1ChainId, _args.aliasedOwner);
         forceDeployAssetRouter(
             _args.l1ChainId,
             _args.eraChainId,
@@ -121,7 +119,23 @@ library L2Utils {
         bridgehub.setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_l1CtmDeployer),
+            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            L2_CHAIN_ASSET_HANDLER_ADDR
+        );
+    }
+
+    function forceDeployChainAssetHandler(uint256 _l1ChainId, address _aliasedOwner) internal {
+        new ChainAssetHandler(
+            _l1ChainId,
+            _aliasedOwner,
+            IBridgehub(L2_BRIDGEHUB_ADDR),
+            L2_ASSET_ROUTER_ADDR,
             IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+        );
+        forceDeployWithConstructor(
+            "ChainAssetHandler",
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encode(_l1ChainId, _aliasedOwner, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR)
         );
     }
 

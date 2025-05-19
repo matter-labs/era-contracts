@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {OnlyBridgehub, MessageRootNotRegistered} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {OnlyBridgehubOrChainAssetHandler, MessageRootNotRegistered} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
@@ -38,7 +38,20 @@ contract MessageRootTest is Test {
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
-        vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, address(this), bridgeHub));
+        address chainAssetHandler = makeAddr("chainAssetHandler");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OnlyBridgehubOrChainAssetHandler.selector,
+                address(this),
+                bridgeHub,
+                chainAssetHandler
+            )
+        );
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
         messageRoot.addNewChain(alphaChainId);
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");

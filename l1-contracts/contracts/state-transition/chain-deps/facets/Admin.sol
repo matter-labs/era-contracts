@@ -292,7 +292,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         address _settlementLayer,
         address _originalCaller,
         bytes calldata _data
-    ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
+    ) external payable override onlyChainAssetHandler returns (bytes memory chainBridgeMintData) {
         if (s.settlementLayer != address(0)) {
             revert AlreadyMigrated();
         }
@@ -324,7 +324,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function forwardedBridgeMint(
         bytes calldata _data,
         bool _contractAlreadyDeployed
-    ) external payable override onlyBridgehub {
+    ) external payable override onlyChainAssetHandler {
         ZKChainCommitment memory _commitment = abi.decode(_data, (ZKChainCommitment));
 
         IChainTypeManager ctm = IChainTypeManager(s.chainTypeManager);
@@ -409,7 +409,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata _chainData
-    ) external payable override onlyBridgehub {
+    ) external payable override onlyChainAssetHandler {
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 

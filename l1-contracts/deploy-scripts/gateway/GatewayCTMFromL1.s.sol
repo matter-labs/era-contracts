@@ -18,10 +18,10 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {StateTransitionDeployedAddresses, Utils, ADDRESS_ONE} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils, ADDRESS_ONE} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 

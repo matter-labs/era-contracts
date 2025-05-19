@@ -1,10 +1,10 @@
 import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {GatewayGovernanceUtils} from "deploy-scripts/GatewayGovernanceUtils.s.sol";
+import {GatewayGovernanceUtils} from "deploy-scripts/gateway/GatewayGovernanceUtils.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
-import {DeployGatewayTransactionFilterer} from "deploy-scripts/DeployGatewayTransactionFilterer.s.sol";
+import {DeployGatewayTransactionFilterer} from "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol";
 
 import {Utils, ChainInfoFromBridgehub} from "deploy-scripts/Utils.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";

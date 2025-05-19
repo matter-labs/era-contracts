@@ -16,7 +16,7 @@ bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
-/// @title L2LegacyBridgeFixUpgrade
+/// @title L2V29Upgrade, contains legacy bridge fixes, and other miscellaneous fixes.
 /// @notice Performs governance‑related fixes and the Bridged‑ETH metadata patch on chains
 /// that have the legacy L2 Shared Bridge.
 /// @dev This contract is neither predeployed nor a system contract. It resides in this folder to facilitate code reuse.

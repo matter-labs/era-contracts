@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_BRIDGE_HUB, L2_ASSET_ROUTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_CHAIN_ASSET_HANDLER} from "./Constants.sol";
 import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
@@ -48,7 +48,7 @@ library L2GenesisForceDeploymentsHelper {
         // Prepare calldata to set addresses in BridgeHub.
         bytes memory data = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
-            (address(L2_ASSET_ROUTER), _ctmDeployer, address(L2_MESSAGE_ROOT))
+            (address(L2_ASSET_ROUTER), _ctmDeployer, address(L2_MESSAGE_ROOT), address(L2_CHAIN_ASSET_HANDLER))
         );
 
         // Execute the call to set addresses in BridgeHub.
@@ -89,7 +89,7 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        forceDeployments = new ForceDeployment[](4);
+        forceDeployments = new ForceDeployment[](5);
 
         // Configure the MessageRoot deployment.
         forceDeployments[0] = ForceDeployment({
@@ -173,6 +173,21 @@ library L2GenesisForceDeploymentsHelper {
                 contractsDeployedAlready,
                 wrappedBaseTokenAddress,
                 additionalForceDeploymentsData.baseTokenAssetId
+            )
+        });
+
+        // Configure the ChainAssetHandler deployment.
+        forceDeployments[4] = ForceDeployment({
+            bytecodeHash: fixedForceDeploymentsData.chainAssetHandlerBytecodeHash,
+            newAddress: address(L2_CHAIN_ASSET_HANDLER),
+            callConstructor: true,
+            value: 0,
+            input: abi.encode(
+                fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.aliasedL1Governance,
+                address(L2_BRIDGE_HUB),
+                address(L2_ASSET_ROUTER),
+                address(L2_MESSAGE_ROOT)
             )
         });
     }
