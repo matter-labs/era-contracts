@@ -38,7 +38,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {GatewayCTMDeployerHelper} from "deploy-scripts/gateway/GatewayCTMDeployerHelper.sol";
 
-
 // We need to use contract the zkfoundry consistently uses
 // zk environment only within a deployed contract
 contract GatewayCTMDeployerTester {
