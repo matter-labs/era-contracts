@@ -41,17 +41,12 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     );
 
     struct RoleData {
-        // @dev Although this mapping seems redundant (having the `_roleMembers` mapping),
-        // it was left here to preserve the original OZ implementation.
-        mapping(address => bool) members;
+        EnumerableSetUpgradeable.AddressSet members;
         bytes32 adminRole; // 0x00 means DEFAULT_ADMIN_ROLE
     }
 
     /// @notice Mapping that stores roles for each chainId
     mapping(uint256 chainId => mapping(bytes32 role => RoleData)) private _roles;
-
-    /// @dev Mapping that stores EnumerableSet of members for each role for each chainId
-    mapping(uint256 chainId => mapping(bytes32 role => EnumerableSetUpgradeable.AddressSet)) private _roleMembers;
 
     /// @notice The default admin role.
     /// @notice For each chain, the default admin role at any point of time belongs to
@@ -74,7 +69,7 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
         if (_role == DEFAULT_ADMIN_ROLE) {
             return _account == _getChainAdmin(_chainId);
         }
-        return _roles[_chainId][_role].members[_account];
+        return _roles[_chainId][_role].members.contains(_account);
     }
 
     /// @notice Returns the admin role that controls `_role` on `_chainId`.
@@ -93,13 +88,13 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
     /// @dev `index` must be a value between 0 and {getRoleMemberCount}, non-inclusive.
     /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
     function getRoleMember(uint256 _chainId, bytes32 _role, uint256 index) public view returns (address) {
-        return _roleMembers[_chainId][_role].at(index);
+        return _roles[_chainId][_role].members.at(index);
     }
 
     /// @notice Returns the number of accounts that have `_role` on `_chainId`.
     /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
     function getRoleMemberCount(uint256 _chainId, bytes32 _role) public view returns (uint256) {
-        return _roleMembers[_chainId][_role].length();
+        return _roles[_chainId][_role].members.length();
     }
 
     /// @notice Grants `_role` on `_chainId` to `_account`.
@@ -116,9 +111,8 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
         }
 
         if (!hasRole(_chainId, _role, _account)) {
-            _roles[_chainId][_role].members[_account] = true;
             // slither-disable-next-line unused-return
-            _roleMembers[_chainId][_role].add(_account);
+            _roles[_chainId][_role].members.add(_account);
             emit RoleGranted(_chainId, _role, _account);
         }
         // Silent no‑op if the role was already granted (same semantics as OZ implementation).
@@ -175,9 +169,8 @@ abstract contract AccessControlEnumerablePerChainUpgradeable {
         }
 
         if (hasRole(_chainId, _role, _account)) {
-            _roles[_chainId][_role].members[_account] = false;
             // slither-disable-next-line unused-return
-            _roleMembers[_chainId][_role].remove(_account);
+            _roles[_chainId][_role].members.remove(_account);
             emit RoleRevoked(_chainId, _role, _account);
         }
         // Silent no‑op if the role was absent (same semantics as OZ implementation).
