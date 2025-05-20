@@ -70,7 +70,7 @@ describe("L2GenesisUpgrade tests", function () {
         ctmDeployerAddress,
         REAL_L2_MESSAGE_ROOT_ADDRESS,
         REAL_L2_CHAIN_ASSET_HANDLER_ADDRESS,
-        REAL_L2_INTEROP_CENTER_ADDRESS
+        REAL_L2_INTEROP_CENTER_ADDRESS,
       ],
       {
         failure: false,
