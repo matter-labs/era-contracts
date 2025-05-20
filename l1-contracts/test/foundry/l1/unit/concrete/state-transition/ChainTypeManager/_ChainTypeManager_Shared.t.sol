@@ -71,6 +71,9 @@ contract ChainTypeManagerTest is Test {
             abi.encode(makeAddr("l2BridgeAddress"))
         );
 
+        // SYSCOIN: mock Bitcoin DA precompile (address 0x63) globally for CTM tests.
+        vm.mockCall(address(0x63), bytes(""), abi.encode(bytes32(uint256(1))));
+
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
