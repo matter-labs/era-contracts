@@ -133,6 +133,32 @@ describe("ConsensusRegistry", function () {
     ).to.be.reverted;
   });
 
+  it("Should not allow to add a validator with a public key which already exists", async function () {
+    const newEntry = makeRandomValidatorEntry(makeRandomValidator(), 0);
+    await expect(
+      registry.add(
+        newEntry.ownerAddr,
+        newEntry.validatorWeight,
+        validatorEntries[0].validatorPubKey,
+        newEntry.validatorPoP,
+        { gasLimit }
+      )
+    ).to.be.reverted;
+  });
+
+  it("Should not allow to add a validator with an owner address which already exists", async function () {
+    const newEntry = makeRandomValidatorEntry(makeRandomValidator(), 0);
+    await expect(
+      registry.add(
+        validatorEntries[0].ownerAddr, // Using an existing owner address
+        newEntry.validatorWeight,
+        newEntry.validatorPubKey,
+        newEntry.validatorPoP,
+        { gasLimit }
+      )
+    ).to.be.reverted;
+  });
+
   it("Should change validator active status", async function () {
     const validatorOwner = validatorEntries[0].ownerAddr;
     expect((await registry.validators(validatorOwner)).latest.active).to.equal(true);
@@ -218,29 +244,21 @@ describe("ConsensusRegistry", function () {
     ).to.be.reverted;
   });
 
-  it("Should not allow to add a validator with a public key which already exists", async function () {
-    const newEntry = makeRandomValidatorEntry(makeRandomValidator(), 0);
-    await expect(
-      registry.add(
-        newEntry.ownerAddr,
-        newEntry.validatorWeight,
-        validatorEntries[0].validatorPubKey,
-        newEntry.validatorPoP,
-        { gasLimit }
-      )
-    ).to.be.reverted;
-  });
-
   it("Should return validator committee once committed to", async function () {
     // Verify that committee was not committed to.
-    expect((await registry.getValidatorCommittee()).length).to.equal(0);
+    const [initialCommittee, initialLeaderSelection] = await registry.getValidatorCommittee();
+    expect(initialCommittee.length).to.equal(0);
+    expect(initialLeaderSelection.frequency).to.equal(1);
+    expect(initialLeaderSelection.weighted).to.equal(false);
 
     // Commit.
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
 
     // Read committee.
-    const validatorCommittee = await registry.getValidatorCommittee();
+    const [validatorCommittee, leaderSelection] = await registry.getValidatorCommittee();
     expect(validatorCommittee.length).to.equal(validators.length);
+    expect(leaderSelection.frequency).to.equal(1);
+    expect(leaderSelection.weighted).to.equal(false);
     for (let i = 0; i < validatorCommittee.length; i++) {
       const entry = validatorEntries[i];
       const validator = validatorCommittee[i];
@@ -261,11 +279,13 @@ describe("ConsensusRegistry", function () {
     await (await registry.changeValidatorActive(entry.ownerAddr, false, { gasLimit })).wait();
 
     // Verify no change.
-    expect((await registry.getValidatorCommittee()).length).to.equal(validators.length);
+    const [currentCommittee] = await registry.getValidatorCommittee();
+    expect(currentCommittee.length).to.equal(validators.length);
 
     // Commit validator committee and verify.
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
-    expect((await registry.getValidatorCommittee()).length).to.equal(validators.length - 1);
+    const [newCommittee] = await registry.getValidatorCommittee();
+    expect(newCommittee.length).to.equal(validators.length - 1);
 
     // Restore state.
     await (await registry.changeValidatorActive(entry.ownerAddr, true, { gasLimit })).wait();
@@ -280,11 +300,13 @@ describe("ConsensusRegistry", function () {
     await (await registry.remove(entry.ownerAddr, { gasLimit })).wait();
 
     // Verify no change.
-    expect((await registry.getValidatorCommittee()).length).to.equal(validators.length);
+    const [currentCommittee] = await registry.getValidatorCommittee();
+    expect(currentCommittee.length).to.equal(validators.length);
 
     // Commit validator committee and verify.
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
-    expect((await registry.getValidatorCommittee()).length).to.equal(validators.length - 1);
+    const [newCommittee] = await registry.getValidatorCommittee();
+    expect(newCommittee.length).to.equal(validators.length - 1);
 
     // Restore state.
     await (await registry.remove(entry.ownerAddr, { gasLimit })).wait();
@@ -333,11 +355,11 @@ describe("ConsensusRegistry", function () {
     );
 
     // Should have a pending committee
-    const pendingCommittee = await registry.getNextValidatorCommittee();
+    const [pendingCommittee] = await registry.getNextValidatorCommittee();
     expect(pendingCommittee[idx].weight).to.equal(entry.validatorWeight + 10);
 
     // Current committee should be unchanged until delay passes
-    const currentCommittee = await registry.getValidatorCommittee();
+    const [currentCommittee] = await registry.getValidatorCommittee();
     expect(currentCommittee[idx].weight).to.equal(entry.validatorWeight);
 
     // Restore state
@@ -351,22 +373,36 @@ describe("ConsensusRegistry", function () {
     const delay = 5;
     await (await registry.setCommitteeActivationDelay(delay, { gasLimit })).wait();
 
+    // Get initial leader selection configuration
+    const leaderInfo = await registry.leaderSelection();
+    const initialFrequency = leaderInfo.latest.frequency;
+    const initialWeighted = leaderInfo.latest.weighted;
+
     // Make changes to validator weight
     const idx = validatorEntries.length - 1;
     const entry = validatorEntries[idx];
     const newWeight = entry.validatorWeight + 20;
     await (await registry.changeValidatorWeight(entry.ownerAddr, newWeight, { gasLimit })).wait();
 
+    // Also update leader selection
+    const newFrequency = initialFrequency + 5;
+    const newWeighted = !initialWeighted;
+    await (await registry.updateLeaderSelection(newFrequency, newWeighted, { gasLimit })).wait();
+
     // Commit to create pending committee
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
 
-    // Verify pending committee has new weight
-    const pendingCommittee = await registry.getNextValidatorCommittee();
+    // Verify pending committee has new weight and leader selection
+    const [pendingCommittee, pendingLeaderSelection] = await registry.getNextValidatorCommittee();
     expect(pendingCommittee[idx].weight).to.equal(newWeight);
+    expect(pendingLeaderSelection.frequency).to.equal(newFrequency);
+    expect(pendingLeaderSelection.weighted).to.equal(newWeighted);
 
-    // Verify current committee still has old weight
-    let currentCommittee = await registry.getValidatorCommittee();
+    // Verify current committee still has old weight and leader selection
+    let [currentCommittee, currentLeaderSelection] = await registry.getValidatorCommittee();
     expect(currentCommittee[idx].weight).to.equal(entry.validatorWeight);
+    expect(currentLeaderSelection.frequency).to.equal(initialFrequency);
+    expect(currentLeaderSelection.weighted).to.equal(initialWeighted);
 
     // Mine blocks to pass the delay
     for (let i = 0; i < delay; i++) {
@@ -381,12 +417,15 @@ describe("ConsensusRegistry", function () {
       })
     ).wait();
 
-    // Now pending committee should have become the active committee
-    currentCommittee = await registry.getValidatorCommittee();
+    // Now pending committee should have become the active committee with new leader selection
+    [currentCommittee, currentLeaderSelection] = await registry.getValidatorCommittee();
     expect(currentCommittee[idx].weight).to.equal(newWeight);
+    expect(currentLeaderSelection.frequency).to.equal(newFrequency);
+    expect(currentLeaderSelection.weighted).to.equal(newWeighted);
 
     // Restore state
     await (await registry.changeValidatorWeight(entry.ownerAddr, entry.validatorWeight, { gasLimit })).wait();
+    await (await registry.updateLeaderSelection(initialFrequency, initialWeighted, { gasLimit })).wait();
     await (await registry.setCommitteeActivationDelay(0, { gasLimit })).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
@@ -399,14 +438,16 @@ describe("ConsensusRegistry", function () {
     await (await registry.changeValidatorWeight(entry.ownerAddr, entry.validatorWeight + 1, { gasLimit })).wait();
 
     // Verify no change.
-    const validator = (await registry.getValidatorCommittee())[idx];
+    const [validatorCommittee] = await registry.getValidatorCommittee();
+    const validator = validatorCommittee[idx];
     expect(validator.weight).to.equal(entry.validatorWeight);
 
     // Commit.
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
 
     // Verify change.
-    const committedValidator = (await registry.getValidatorCommittee())[idx];
+    const [newValidatorCommittee] = await registry.getValidatorCommittee();
+    const committedValidator = newValidatorCommittee[idx];
     expect(committedValidator.weight).to.equal(entry.validatorWeight + 1);
 
     // Restore state.

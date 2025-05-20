@@ -223,15 +223,15 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorsCommitted(validatorsCommit, validatorsCommitBlock);
     }
 
-    function getValidatorCommittee() public view returns (CommitteeValidator[] memory) {
-        return _getCommittee(false);
+    function getValidatorCommittee() public view returns (CommitteeValidator[] memory, LeaderSelectionAttr memory) {
+        return (_getCommittee(false), _getLeaderSelectionAttributes(false));
     }
 
-    function getNextValidatorCommittee() public view returns (CommitteeValidator[] memory) {
+    function getNextValidatorCommittee() public view returns (CommitteeValidator[] memory, LeaderSelectionAttr memory) {
         if (block.number >= validatorsCommitBlock) {
             revert NoPendingCommittee();
         }
-        return _getCommittee(true);
+        return (_getCommittee(true), _getLeaderSelectionAttributes(true));
     }
 
     function setCommitteeActivationDelay(uint256 _delay) external onlyOwner {
@@ -312,6 +312,33 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return validator.snapshot;
         } else {
             return validator.previousSnapshot;
+        }
+    }
+
+    function _getLeaderSelectionAttributes(bool _isNextCommittee) private view returns (LeaderSelectionAttr memory) {
+        if (_isNextCommittee) {
+            // Get the leader selection that will be active in the next committee
+            if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+                return leaderSelection.latest;
+            } else {
+                return leaderSelection.snapshot;
+            }
+        } else {
+            // Get currently active leader selection
+            uint32 currentActiveCommit;
+            if (block.number >= validatorsCommitBlock) {
+                currentActiveCommit = validatorsCommit;
+            } else {
+                currentActiveCommit = validatorsCommit - 1;
+            }
+
+            if (currentActiveCommit > leaderSelection.lastSnapshotCommit) {
+                return leaderSelection.latest;
+            } else if (currentActiveCommit > leaderSelection.previousSnapshotCommit) {
+                return leaderSelection.snapshot;
+            } else {
+                return leaderSelection.previousSnapshot;
+            }
         }
     }
 
