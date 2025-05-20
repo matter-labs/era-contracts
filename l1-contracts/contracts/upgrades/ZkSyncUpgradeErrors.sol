@@ -32,6 +32,7 @@ error PreviousUpgradeNotFinalized(bytes32 txHash);
 error PreviousUpgradeNotCleaned();
 // 0x5cb29523
 error InvalidTxType(uint256 txType);
-
+// 0xb334f781
+error GenesisUpgradeExpectedOnSettlementLayer();
 // 0x388b6f68
 error GatewayUpgradeFailed();

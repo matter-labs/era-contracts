@@ -38,6 +38,7 @@ uint160 constant USER_CONTRACTS_OFFSET = MAX_SYSTEM_CONTRACT_ADDRESS + 1;
 address constant ECRECOVER_SYSTEM_CONTRACT = address(0x01);
 address constant SHA256_SYSTEM_CONTRACT = address(0x02);
 address constant IDENTITY_SYSTEM_CONTRACT = address(0x04);
+address constant MODEXP_SYSTEM_CONTRACT = address(0x05);
 address constant ECADD_SYSTEM_CONTRACT = address(0x06);
 address constant ECMUL_SYSTEM_CONTRACT = address(0x07);
 address constant ECPAIRING_SYSTEM_CONTRACT = address(0x08);
