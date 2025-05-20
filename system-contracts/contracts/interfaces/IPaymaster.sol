@@ -11,6 +11,8 @@ enum ExecutionResult {
 
 bytes4 constant PAYMASTER_VALIDATION_SUCCESS_MAGIC = IPaymaster.validateAndPayForPaymasterTransaction.selector;
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IPaymaster {
     /// @dev Called by the bootloader to verify that the paymaster agrees to pay for the
     /// fee for the transaction. This transaction should also send the necessary amount of funds onto the bootloader
