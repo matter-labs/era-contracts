@@ -33,44 +33,12 @@ library L2Utils {
 
     address internal constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
 
-    // function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
-    //     string memory root = vm.projectRoot();
-    //     string memory path = string.concat(root, artifactPath);
-    //     string memory json = vm.readFile(path);
-    //     bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
-    //     return bytecode;
-    // }
-
-    // function readZKFoundryBytecodeL1(
-    //     string memory fileName,
-    //     string memory contractName
-    // ) internal view returns (bytes memory) {
-    //     string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
-    //     bytes memory bytecode = readFoundryBytecode(path);
-    //     return bytecode;
-    // }
-
-    // function readZKFoundryBytecodeSystemContracts(
-    //     string memory fileName,
-    //     string memory contractName
-    // ) internal view returns (bytes memory) {
-    //     string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
-    //     bytes memory bytecode = readFoundryBytecode(path);
-    //     return bytecode;
-    // }
-
-    // /// @notice Returns the bytecode of a given system contract.
-    // function readSystemContractsBytecode(string memory _filename) internal view returns (bytes memory) {
-    //     return readZKFoundryBytecodeSystemContracts(string.concat(_filename, ".sol"), _filename);
-    // }
-
     /**
      * @dev Initializes the system contracts.
      * @dev It is a hack needed to make the tests be able to call system contracts directly.
      */
     function initSystemContracts(SystemContractsArgs memory _args) internal {
         bytes memory contractDeployerBytecode = Utils.readSystemContractsBytecode("ContractDeployer");
-        // bytes memory contractDeployerBytecode = ("ContractDeployer");
         vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, contractDeployerBytecode);
         forceDeploySystemContracts(_args);
     }
