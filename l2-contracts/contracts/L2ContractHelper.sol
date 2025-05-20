@@ -25,7 +25,6 @@ interface IL1Messenger {
     function sendToL1(bytes calldata _message) external returns (bytes32);
 }
 
-
 /// @notice A struct that describes a forced deployment on an address.
 /// @param bytecodeHash The bytecode hash to put on an address.
 /// @param newAddress The address on which to deploy the bytecodehash to.
