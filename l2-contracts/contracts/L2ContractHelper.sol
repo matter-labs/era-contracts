@@ -25,6 +25,21 @@ interface IL1Messenger {
     function sendToL1(bytes calldata _message) external returns (bytes32);
 }
 
+
+/// @notice A struct that describes a forced deployment on an address.
+/// @param bytecodeHash The bytecode hash to put on an address.
+/// @param newAddress The address on which to deploy the bytecodehash to.
+/// @param callConstructor Whether to run the constructor on the force deployment.
+/// @param value The `msg.value` with which to initialize a contract.
+/// @param input The constructor calldata.
+struct ForceDeployment {
+    bytes32 bytecodeHash;
+    address newAddress;
+    bool callConstructor;
+    uint256 value;
+    bytes input;
+}
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
