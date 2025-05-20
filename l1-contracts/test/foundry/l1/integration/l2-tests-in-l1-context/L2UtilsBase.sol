@@ -117,12 +117,6 @@ library L2UtilsBase {
             bytes32(uint256(1))
         );
 
-        // stdstore
-        //     .target(L2_ASSET_ROUTER_ADDR)
-        //     .sig("assetHandlerAddress(bytes32)")
-        //     .with_key(baseTokenAssetId)
-        //     .checked_write(bytes32(uint256(uint160(L2_NATIVE_TOKEN_VAULT_ADDR))));
-
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));
