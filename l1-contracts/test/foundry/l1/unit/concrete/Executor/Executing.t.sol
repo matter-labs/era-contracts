@@ -419,7 +419,7 @@ contract ExecutingTest is ExecutorTest {
         executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
-    function test_ShouldExecuteBatchesuccessfully() public {
+    function test_ShouldExecuteBatchesSuccessfully() public {
         appendPriorityOps();
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
@@ -440,5 +440,22 @@ contract ExecutingTest is ExecutorTest {
 
         uint256 processed = getters.getFirstUnprocessedPriorityTx();
         assertEq(processed, 2);
+    }
+
+    // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
+    /// forge-config: default.isolate = true
+    function test_MeasureGas() public {
+        appendPriorityOps();
+
+        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+        storedBatchInfoArray[0] = newStoredBatchInfo;
+
+        vm.prank(validator);
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatchInfoArray,
+            Utils.generatePriorityOps(storedBatchInfoArray.length)
+        );
+        validatorTimelock.executeBatchesSharedBridge(eraChainId, executeBatchFrom, executeBatchTo, executeData);
+        vm.snapshotGasLastCall("Executor", "execute");
     }
 }

@@ -227,7 +227,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.blobhashes(defaultBlobVersionedHashes);
 
-        vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 127, 125));
+        vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 255, 253));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             wrongNewCommitBatchInfoArray
@@ -413,7 +413,7 @@ contract CommittingTest is ExecutorTest {
     }
 
     function test_RevertWhen_SystemLogIsMissing() public {
-        for (uint256 i = 0; i < 7; i++) {
+        for (uint256 i = 0; i < 8; i++) {
             bytes[] memory l2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
             delete l2Logs[i];
 
@@ -425,8 +425,8 @@ contract CommittingTest is ExecutorTest {
 
             vm.prank(validator);
 
-            uint256 allLogsProcessed = uint256(127);
-            vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 127, allLogsProcessed ^ (1 << i)));
+            uint256 allLogsProcessed = uint256(255);
+            vm.expectRevert(abi.encodeWithSelector(MissingSystemLogs.selector, 255, allLogsProcessed ^ (1 << i)));
             (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
                 genesisStoredBatchInfo,
                 wrongNewCommitBatchInfoArray
@@ -956,5 +956,39 @@ contract CommittingTest is ExecutorTest {
             correctCommitBatchInfoArray
         );
         executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    // For accurate measuring of gas usage via snapshot cheatcodes,
+    // isolation mode has to be enabled via `forge-config: default.isolate = true`.
+    // Unfortunately, it makes this test fail with no revert reason,
+    // so the gas estimation in this test is not accurate.
+    function test_MeasureGas() public {
+        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+            true,
+            L2_SYSTEM_CONTEXT_ADDRESS,
+            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+        );
+
+        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
+        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+
+        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+
+        vm.prank(validator);
+        vm.blobhashes(defaultBlobVersionedHashes);
+
+        vm.recordLogs();
+
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            genesisStoredBatchInfo,
+            correctCommitBatchInfoArray
+        );
+        validatorTimelock.commitBatchesSharedBridge(eraChainId, commitBatchFrom, commitBatchTo, commitData);
+        vm.snapshotGasLastCall("Executor", "commit");
     }
 }
