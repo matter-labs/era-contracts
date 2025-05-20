@@ -1577,9 +1577,9 @@
   },
   {
     "contractName": "da-contracts/RollupL1DAValidator",
-    "evmBytecodeHash": "0x8ad2bc3dfd3ab40a6e71b51a89d2277c6051a6b2828ac90d692ba539d66c34e3",
+    "evmBytecodeHash": "0x1e0af7191da85a7a06c2e42497d004a65523820c3d7849968c61f3185a9a847e",
     "evmBytecodePath": "/da-contracts/out/RollupL1DAValidator.sol/RollupL1DAValidator.json",
-    "evmDeployedBytecodeHash": "0x038cda0d200e7c40e0489751364a777bf8c5224b40a6d9ca717e40ba0d32f8f5",
+    "evmDeployedBytecodeHash": "0xfbf96a94d71eb479e5ae2455b1e7f5c333f42e8c59fa71fc3ecd51c942ba9cea",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },
