@@ -29,7 +29,6 @@ error InvalidDAForPermanentRollup();
 // 0x7a4902ad
 error TimerAlreadyStarted();
 
-
 // 0x2a5989a0
 error AlreadyPermanentRollup();
 // 0x0bfcef28
