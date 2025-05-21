@@ -308,7 +308,7 @@ describe("SystemContext tests", () => {
       ).to.be.revertedWithCustomError(systemContext, "IncorrectL2BlockHash");
     });
 
-    it("should revert The timestamp of the new L2 block must be greater than the timestamp of the previous L2 block", async () => {
+    it("should revert The timestamp of the new L2 block must be greater than or equal to the timestamp of the previous L2 block", async () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
       const prevL2BlockHash = ethers.utils.keccak256(
         ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)])
@@ -325,13 +325,15 @@ describe("SystemContext tests", () => {
           .connect(bootloaderAccount)
           .setL2Block(blockData.blockNumber.add(1), 0, expectedBlockHash, false, 0)
       ).to.be.revertedWithCustomError(systemContext, "NonMonotonicL2BlockTimestamp");
+      // Same timestamp is ok.
+      await systemContext
+        .connect(bootloaderAccount)
+        .setL2Block(blockData.blockNumber.add(1), blockData.blockTimestamp, expectedBlockHash, false, 0);
     });
 
     it("should set block again and check blockNumber & blockTimestamp also check getBlockHashEVM", async () => {
       const blockData = await systemContext.getL2BlockNumberAndTimestamp();
-      const prevL2BlockHash = ethers.utils.keccak256(
-        ethers.utils.solidityPack(["uint32"], [blockData.blockNumber.sub(1)])
-      );
+      const prevL2BlockHash = await systemContext.getBlockHashEVM(blockData.blockNumber.sub(1));
       const blockTxsRollingHash = ethers.utils.hexlify(Buffer.alloc(32, 0));
       const prevBlockHash = await systemContext.getBlockHashEVM(blockData.blockNumber);
       const expectedBlockHash = ethers.utils.keccak256(

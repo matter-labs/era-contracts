@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {BytecodeError, MalformedBytecode, LengthIsNotDivisibleBy32} from "../L1ContractErrors.sol";
+import {BytecodeError, LengthIsNotDivisibleBy32, MalformedBytecode} from "../L1ContractErrors.sol";
 
 import {UncheckedMath} from "../libraries/UncheckedMath.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "./L2ContractAddresses.sol";

@@ -8,7 +8,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOwner} from "./L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -30,12 +30,29 @@ contract MessageRoot is IMessageRoot, Initializable {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
+    /// @notice Emitted when a new chain is added to the MessageRoot.
+    /// @param chainId The ID of the chain that is being added to the MessageRoot.
+    /// @param chainIndex The index of the chain that is being added. Note, that chain where
+    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is not emitted for it.
     event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
 
-    event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 batchRoot);
+    /// @notice Emitted when a new chain batch root is appended to the chainTree.
+    /// @param chainId The ID of the chain whose chain batch root is being added to the chainTree.
+    /// @param batchNumber The number of the batch to which chain batch root belongs.
+    /// @param chainBatchRoot The value of chain batch root which is being added.
+    event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 chainBatchRoot);
 
-    event Preimage(bytes32 one, bytes32 two);
+    /// @notice Emitted when a new chainTree root is produced and its corresponding leaf in sharedTree is updated.
+    /// @param chainRoot The updated Merkle root of the chainTree after appending the latest batch root.
+    /// @param preimage  The Merkle leaf value (chainIdLeafHash) computed from `chainRoot` and the chain’s ID, used to update the shared tree.
+    event Preimage(bytes32 chainRoot, bytes32 preimage);
 
+    /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
+    /// @param chainId The ID of the chain where the sharedTree was updated.
+    /// @param blockNumber The block number of the block in which the sharedTree was updated.
+    /// @param logId The ID of the log emitted when a new InteropRoot. In this release always equal to 0.
+    /// @param sides The "sides" of the interop root. In this release which uses proof-based interop the sides is an array
+    /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
@@ -57,22 +74,27 @@ contract MessageRoot is IMessageRoot, Initializable {
     mapping(uint256 chainId => DynamicIncrementalMerkle.Bytes32PushTree tree) internal chainTree;
 
     /// @notice The mapping from block number to the global message root.
-    /// @dev Each block might have multiple txs that change the historical root.
-    /// This is ok, since the chains can use the latest one in the block.
+    /// @dev Each block might have multiple txs that change the historical root. You can safely use the final root in the block,
+    /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
+    /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
     address public assetTracker;
 
-    /// @notice only the bridgehub can call
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
-            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+    /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
+    modifier onlyBridgehubOrChainAssetHandler() {
+        if (msg.sender != address(BRIDGE_HUB) && msg.sender != address(BRIDGE_HUB.chainAssetHandler())) {
+            revert OnlyBridgehubOrChainAssetHandler(
+                msg.sender,
+                address(BRIDGE_HUB),
+                address(BRIDGE_HUB.chainAssetHandler())
+            );
         }
         _;
     }
 
-    /// @notice only the bridgehub can call
-    /// @param _chainId the chainId of the chain
+    /// @notice Checks that the message sender is the specified ZK Chain.
+    /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
         if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
             revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
@@ -97,6 +119,7 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
+    /// @param _bridgehub Address of the Bridgehub.
     constructor(IBridgehub _bridgehub) {
         BRIDGE_HUB = _bridgehub;
         _initialize();
@@ -112,7 +135,9 @@ contract MessageRoot is IMessageRoot, Initializable {
         assetTracker = _assetTracker;
     }
 
-    function addNewChain(uint256 _chainId) external onlyBridgehub {
+    /// @notice Adds a single chain to the message root.
+    /// @param _chainId The ID of the chain that is being added to the message root.
+    function addNewChain(uint256 _chainId) external onlyBridgehubOrChainAssetHandler {
         if (chainRegistered(_chainId)) {
             revert ChainExists();
         }
@@ -123,25 +148,36 @@ contract MessageRoot is IMessageRoot, Initializable {
         return (_chainId == block.chainid || chainIndex[_chainId] != 0);
     }
 
-    /// @dev add a new chainBatchRoot to the chainTree
+    /// @notice Adds a new chainBatchRoot to the chainTree.
+    /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
+    /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
+    /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
     function addChainBatchRoot(
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
     ) external onlyAssetTracker {
+        // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
         }
+
+        // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
         (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
 
-        // slither-disable-next-line unused-return
-        sharedTree.updateLeaf(chainIndex[_chainId], MessageHashing.chainIdLeafHash(chainRoot, _chainId));
-
-        emit Preimage(chainRoot, MessageHashing.chainIdLeafHash(chainRoot, _chainId));
-
         emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
+
+        // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
+        bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
+        // slither-disable-next-line unused-return
+        sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
+
+        emit Preimage(chainRoot, cachedChainIdLeafHash);
+
+        // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
+        // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
         bytes32 sharedTreeRoot = sharedTree.root();
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = sharedTreeRoot;
@@ -149,7 +185,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
-    /// @dev emit a new message root when committing a new batch
+    /// @notice emit a new message root when committing a new batch
     function emitMessageRoot(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -160,7 +196,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         emit NewInteropRoot(_chainId, _batchNumber, 0, _sides);
     }
 
-    /// @dev Gets the aggregated root of all chains.
+    /// @notice Gets the aggregated root of all chains.
     function getAggregatedRoot() external view returns (bytes32) {
         if (chainCount == 0) {
             return SHARED_ROOT_TREE_EMPTY_HASH;
@@ -169,7 +205,7 @@ contract MessageRoot is IMessageRoot, Initializable {
     }
 
     /// @dev Gets the message root of a single chain.
-    /// @param _chainId the chainId of the chain
+    /// @param _chainId The ID of the chain whose message root is being queried.
     function getChainRoot(uint256 _chainId) external view returns (bytes32) {
         return chainTree[_chainId].root();
     }
@@ -196,7 +232,7 @@ contract MessageRoot is IMessageRoot, Initializable {
     }
 
     /// @dev Adds a single chain to the message root.
-    /// @param _chainId the chainId of the chain
+    /// @param _chainId The ID of the chain that is being added to the message root.
     function _addNewChain(uint256 _chainId) internal {
         uint256 cachedChainCount = chainCount;
 

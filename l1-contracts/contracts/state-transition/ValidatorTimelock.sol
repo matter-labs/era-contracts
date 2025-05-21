@@ -6,7 +6,7 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 import {IChainTypeManager} from "./IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {TimeNotReached, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

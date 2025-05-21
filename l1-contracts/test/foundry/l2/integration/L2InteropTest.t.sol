@@ -12,16 +12,15 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {L2Utils, SystemContractsArgs} from "./L2Utils.sol";
 
@@ -32,6 +31,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2InteropTestAbstract} from "../../l1/integration/l2-tests-abstract/L2InteropTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
 
 contract L2InteropTests is Test, L2InteropTestAbstract, SharedL2ContractL2Deployer {
     // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
@@ -47,7 +47,7 @@ contract L2InteropTests is Test, L2InteropTestAbstract, SharedL2ContractL2Deploy
     function deployViaCreate2(
         bytes memory creationCode,
         bytes memory constructorArgs
-    ) internal override(DeployUtils, SharedL2ContractL2Deployer) returns (address) {
+    ) internal override(Create2FactoryUtils, SharedL2ContractL2Deployer) returns (address) {
         return super.deployViaCreate2(creationCode, constructorArgs);
     }
 

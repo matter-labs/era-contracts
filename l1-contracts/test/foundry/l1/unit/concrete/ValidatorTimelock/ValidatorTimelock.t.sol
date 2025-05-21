@@ -3,10 +3,10 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {ValidatorTimelock, IExecutor} from "contracts/state-transition/ValidatorTimelock.sol";
+import {IExecutor, ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
+import {TimeNotReached, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract ValidatorTimelockTest is Test {
     /// @notice A new validator has been added.

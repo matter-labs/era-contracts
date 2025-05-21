@@ -10,6 +10,7 @@ import {
   REAL_L2_MESSAGE_ROOT_ADDRESS,
   REAL_L2_INTEROP_CENTER_ADDRESS,
   REAL_L2_ASSET_TRACKER_ADDRESS,
+  REAL_L2_CHAIN_ASSET_HANDLER_ADDRESS,
   TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS,
   ADDRESS_ONE,
 } from "./shared/constants";
@@ -64,7 +65,13 @@ describe("L2GenesisUpgrade tests", function () {
     await setResult(
       "IBridgehub",
       "setAddresses",
-      [REAL_L2_ASSET_ROUTER_ADDRESS, ctmDeployerAddress, REAL_L2_MESSAGE_ROOT_ADDRESS, REAL_L2_INTEROP_CENTER_ADDRESS],
+      [
+        REAL_L2_ASSET_ROUTER_ADDRESS,
+        ctmDeployerAddress,
+        REAL_L2_MESSAGE_ROOT_ADDRESS,
+        REAL_L2_CHAIN_ASSET_HANDLER_ADDRESS,
+        REAL_L2_INTEROP_CENTER_ADDRESS,
+      ],
       {
         failure: false,
         returnData: "0x",
@@ -93,8 +100,8 @@ describe("L2GenesisUpgrade tests", function () {
       returnData: "0x",
     });
 
-    const msgRootBytecode = (await loadArtifact("DummyMessageRoot")).bytecode;
-    const messageRootBytecodeHash = zksync.utils.hashBytecode(msgRootBytecode);
+    const interopRootBytecode = (await loadArtifact("DummyMessageRoot")).bytecode;
+    const messageRootBytecodeHash = zksync.utils.hashBytecode(interopRootBytecode);
 
     const interopCenterBytecode = (await loadArtifact("DummyInteropCenter")).bytecode;
     const interopCenterBytecodeHash = zksync.utils.hashBytecode(interopCenterBytecode);
@@ -108,12 +115,15 @@ describe("L2GenesisUpgrade tests", function () {
     const bridgehubBytecode = (await loadArtifact("DummyBridgehub")).bytecode;
     const bridgehubBytecodeHash = zksync.utils.hashBytecode(bridgehubBytecode);
 
+    const chainAssetHandlerBytecode = (await loadArtifact("DummyChainAssetHandler")).bytecode;
+    const chainAssetHandlerBytecodeHash = zksync.utils.hashBytecode(chainAssetHandlerBytecode);
+
     const assetTrackerBytecode = (await loadArtifact("DummyAssetTracker")).bytecode;
     const assetTrackerBytecodeHash = zksync.utils.hashBytecode(assetTrackerBytecode);
 
     fixedForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
       [
-        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash, bytes32 interopCenterBytecodeHash, bytes32 assetTrackerBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address dangerousTestOnlyForcedBeacon)",
+        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash,  bytes32 chainAssetHandlerBytecodeHash, bytes32 interopCenterBytecodeHash, bytes32 assetTrackerBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address dangerousTestOnlyForcedBeacon)",
       ],
       [
         {
@@ -127,6 +137,7 @@ describe("L2GenesisUpgrade tests", function () {
           l2AssetRouterBytecodeHash: l2AssetRouterBytecodeHash,
           l2NtvBytecodeHash: ntvBytecodeHash,
           messageRootBytecodeHash: messageRootBytecodeHash,
+          chainAssetHandlerBytecodeHash: chainAssetHandlerBytecodeHash,
           interopCenterBytecodeHash: interopCenterBytecodeHash,
           assetTrackerBytecodeHash: assetTrackerBytecodeHash,
           // For genesis upgrade these values will always be zero

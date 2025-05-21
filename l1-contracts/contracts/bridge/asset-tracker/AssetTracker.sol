@@ -5,22 +5,20 @@ pragma solidity ^0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {IAssetTracker} from "./IAssetTracker.sol";
-import {L2Log} from "../../common/Messaging.sol";
-import {L2_INTEROP_CENTER_ADDR, L2_ASSET_ROUTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {InteropBundle, InteropCall} from "../../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log} from "../../common/Messaging.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {Unauthorized, InsufficientChainBalanceAssetTracker, ReconstructionMismatch, InvalidMessage, InvalidInteropCalldata} from "../../common/L1ContractErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, NotCurrentSettlementLayer, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
-import {BUNDLE_IDENTIFIER} from "../../common/Messaging.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {NotCurrentSL, SLNotWhitelisted} from "../../bridgehub/L1BridgehubErrors.sol";
+import {SLNotWhitelisted} from "../../bridgehub/L1BridgehubErrors.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
 
@@ -238,7 +236,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
         //     revert IncorrectChainAssetId(_assetId, (chainId));
         // }
         if (BRIDGE_HUB.settlementLayer(chainId) != _settlementChainId) {
-            revert NotCurrentSL(BRIDGE_HUB.settlementLayer(chainId), _settlementChainId);
+            revert NotCurrentSettlementLayer();
         }
         bool migratingChainIsMinter = isMinterChain[chainId][assetId];
         uint256 amount = chainBalance[chainId][assetId];

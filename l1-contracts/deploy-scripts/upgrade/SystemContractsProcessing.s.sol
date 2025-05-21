@@ -2,9 +2,10 @@
 pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Utils, L2_WETH_IMPL_ADDRESS, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "../Utils.sol";
+import {Utils} from "../Utils.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WETH_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {L2ContractsBytecodesLib} from "../L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 // solhint-disable no-console, gas-custom-errors
@@ -24,7 +25,7 @@ struct SystemContract {
 }
 
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
+uint256 constant SYSTEM_CONTRACTS_COUNT = 32;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 5;
 
@@ -89,165 +90,172 @@ library SystemContractsProcessing {
         });
 
         systemContracts[7] = SystemContract({
+            addr: 0x0000000000000000000000000000000000000005,
+            codeName: "Modexp",
+            lang: Language.Yul,
+            isPrecompile: true
+        });
+
+        systemContracts[8] = SystemContract({
             addr: 0x0000000000000000000000000000000000008001,
             codeName: "EmptyContract",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[8] = SystemContract({
+        systemContracts[9] = SystemContract({
             addr: 0x0000000000000000000000000000000000008002,
             codeName: "AccountCodeStorage",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[9] = SystemContract({
+        systemContracts[10] = SystemContract({
             addr: 0x0000000000000000000000000000000000008003,
             codeName: "NonceHolder",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[10] = SystemContract({
+        systemContracts[11] = SystemContract({
             addr: 0x0000000000000000000000000000000000008004,
             codeName: "KnownCodesStorage",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[11] = SystemContract({
+        systemContracts[12] = SystemContract({
             addr: 0x0000000000000000000000000000000000008005,
             codeName: "ImmutableSimulator",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[12] = SystemContract({
+        systemContracts[13] = SystemContract({
             addr: 0x0000000000000000000000000000000000008006,
             codeName: "ContractDeployer",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[13] = SystemContract({
+        systemContracts[14] = SystemContract({
             addr: 0x0000000000000000000000000000000000008008,
             codeName: "L1Messenger",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[14] = SystemContract({
+        systemContracts[15] = SystemContract({
             addr: 0x0000000000000000000000000000000000008009,
             codeName: "MsgValueSimulator",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[15] = SystemContract({
+        systemContracts[16] = SystemContract({
             addr: 0x000000000000000000000000000000000000800A,
             codeName: "L2BaseToken",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[16] = SystemContract({
+        systemContracts[17] = SystemContract({
             addr: 0x000000000000000000000000000000000000800B,
             codeName: "SystemContext",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[17] = SystemContract({
+        systemContracts[18] = SystemContract({
             addr: 0x000000000000000000000000000000000000800c,
             codeName: "BootloaderUtilities",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[18] = SystemContract({
+        systemContracts[19] = SystemContract({
             addr: 0x000000000000000000000000000000000000800d,
             codeName: "EventWriter",
             lang: Language.Yul,
             isPrecompile: false
         });
 
-        systemContracts[19] = SystemContract({
+        systemContracts[20] = SystemContract({
             addr: 0x000000000000000000000000000000000000800E,
             codeName: "Compressor",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[20] = SystemContract({
+        systemContracts[21] = SystemContract({
             addr: 0x000000000000000000000000000000000000800f,
             codeName: "ComplexUpgrader",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[21] = SystemContract({
+        systemContracts[22] = SystemContract({
             addr: 0x0000000000000000000000000000000000008010,
             codeName: "Keccak256",
             lang: Language.Yul,
             isPrecompile: true
         });
 
-        systemContracts[22] = SystemContract({
+        systemContracts[23] = SystemContract({
             addr: 0x0000000000000000000000000000000000008012,
             codeName: "CodeOracle",
             lang: Language.Yul,
             isPrecompile: true
         });
 
-        systemContracts[23] = SystemContract({
+        systemContracts[24] = SystemContract({
             addr: 0x0000000000000000000000000000000000008013,
             codeName: "EvmGasManager",
             lang: Language.Yul,
             isPrecompile: false
         });
 
-        systemContracts[24] = SystemContract({
+        systemContracts[25] = SystemContract({
             addr: 0x0000000000000000000000000000000000008014,
             codeName: "EvmPredeploysManager",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[25] = SystemContract({
+        systemContracts[26] = SystemContract({
             addr: 0x0000000000000000000000000000000000008015,
             codeName: "EvmHashesStorage",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[26] = SystemContract({
+        systemContracts[27] = SystemContract({
             addr: 0x0000000000000000000000000000000000000100,
             codeName: "P256Verify",
             lang: Language.Yul,
             isPrecompile: true
         });
 
-        systemContracts[27] = SystemContract({
+        systemContracts[28] = SystemContract({
             addr: 0x0000000000000000000000000000000000008011,
             codeName: "PubdataChunkPublisher",
             lang: Language.Solidity,
             isPrecompile: false
         });
 
-        systemContracts[28] = SystemContract({
+        systemContracts[29] = SystemContract({
             addr: 0x0000000000000000000000000000000000010000,
             codeName: "Create2Factory",
             lang: Language.Solidity,
             isPrecompile: false
         });
-        systemContracts[29] = SystemContract({
+        systemContracts[30] = SystemContract({
             addr: 0x0000000000000000000000000000000000010001,
             codeName: "L2GenesisUpgrade",
             lang: Language.Solidity,
             isPrecompile: false
         });
-        systemContracts[30] = SystemContract({
+        systemContracts[31] = SystemContract({
             addr: 0x0000000000000000000000000000000000010006,
             codeName: "SloadContract",
             lang: Language.Solidity,
@@ -336,11 +344,11 @@ library SystemContractsProcessing {
     function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
 
-        result[0] = L2ContractsBytecodesLib.readBridgehubBytecode();
-        result[1] = L2ContractsBytecodesLib.readL2AssetRouterBytecode();
-        result[2] = L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode();
-        result[3] = L2ContractsBytecodesLib.readMessageRootBytecode();
-        result[4] = L2ContractsBytecodesLib.readL2WrappedBaseToken();
+        result[0] = ContractsBytecodesLib.getCreationCode("Bridgehub");
+        result[1] = ContractsBytecodesLib.getCreationCode("L2AssetRouter");
+        result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
+        result[3] = ContractsBytecodesLib.getCreationCode("MessageRoot");
+        result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -355,35 +363,35 @@ library SystemContractsProcessing {
 
         forceDeployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[0]),
-            newAddress: L2_BRIDGEHUB_ADDRESS,
+            newAddress: L2_BRIDGEHUB_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[1] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[1]),
-            newAddress: L2_ASSET_ROUTER_ADDRESS,
+            newAddress: L2_ASSET_ROUTER_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[2] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[2]),
-            newAddress: L2_NATIVE_TOKEN_VAULT_ADDRESS,
+            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[3] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[3]),
-            newAddress: L2_MESSAGE_ROOT_ADDRESS,
+            newAddress: L2_MESSAGE_ROOT_ADDR,
             callConstructor: false,
             value: 0,
             input: ""
         });
         forceDeployments[4] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[4]),
-            newAddress: L2_WETH_IMPL_ADDRESS,
+            newAddress: L2_WETH_IMPL_ADDR,
             callConstructor: false,
             value: 0,
             input: ""

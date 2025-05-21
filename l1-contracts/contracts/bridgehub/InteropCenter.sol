@@ -7,7 +7,7 @@ pragma solidity ^0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, RouteBridgehubDepositStruct} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter, RouteBridgehubDepositStruct} from "./IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -15,15 +15,14 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Message, L2Log, TxStatus, InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest, BUNDLE_IDENTIFIER, TRIGGER_IDENTIFIER} from "../common/Messaging.sol";
+import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, GasFields, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, InteropTrigger, L2CanonicalTransaction, L2Log, L2Message, TRIGGER_IDENTIFIER, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {MsgValueMismatch, Unauthorized, WrongMagicValue, BridgehubOnL1, ChainIdNotRegistered} from "../common/L1ContractErrors.sol";
-import {NotL1, NotRelayedSender, DirectCallNonEmptyValue, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
+import {BridgehubOnL1, ChainIdNotRegistered, MsgValueMismatch, Unauthorized, WrongMagicValue} from "../common/L1ContractErrors.sol";
+import {AlreadyCurrentSL, ChainIdAlreadyPresent, ChainNotLegacy, ChainNotPresentInCTM, DirectCallNonEmptyValue, HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotCurrentSettlementLayer, NotInGatewayMode, NotL1, NotRelayedSender, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
 import {TransientInterop} from "./TransientInterop.sol";
@@ -218,8 +217,11 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             // when sending the trigger
             return interopBundleHash;
         } else {
-            emit InteropBundleSent(interopBundleHash, interopBundle);
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes));
+            // TODO use canonicalTxHash for linking it to the trigger, instead of interopBundleHash
+            bytes32 canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+                bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
+            );
+            emit InteropBundleSent(canonicalTxHash, interopBundleHash, interopBundle);
         }
     }
 
@@ -282,9 +284,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _sender,
         address _refundRecipient
     ) internal returns (bytes32 canonicalTxHash) {
-        emit InteropTriggerSent(_interopTrigger);
-        return
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger)));
+        canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger))
+        );
+        emit InteropTriggerSent(canonicalTxHash, _interopTrigger);
     }
 
     /*//////////////////////////////////////////////////////////////

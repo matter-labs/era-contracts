@@ -5,18 +5,17 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
-import {MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, MAX_LOG_KEY, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT, ProcessLogsInput} from "../../chain-interfaces/IExecutor.sol";
+import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "../../../common/Config.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, ProcessLogsInput, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {L2_MESSAGE_ROOT_STORAGE} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
-import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
+import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidMessageRoot} from "../../../common/L1ContractErrors.sol";
-import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch} from "../../L1StateTransitionErrors.sol";
+import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, HashMismatch, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
+import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -24,7 +23,6 @@ import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
 import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
 import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
-import {InteropRoot} from "../../../common/Messaging.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -330,12 +328,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert CanOnlyProcessOneBatch();
         }
         // Check that we commit batches after last committed batch
-        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[s.totalBatchesCommitted];
+        if (
+            cachedStoredBatchHashes != _hashStoredBatchInfo(lastCommittedBatchData) &&
+            cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)
+        ) {
             // incorrect previous batch data
-            revert BatchHashMismatch(
-                s.storedBatchHashes[s.totalBatchesCommitted],
-                _hashStoredBatchInfo(lastCommittedBatchData)
-            );
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
@@ -444,9 +443,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert PriorityOperationsRollingHashMismatch();
         }
         if (_dependencyRootsRollingHash != _storedBatch.dependencyRootsRollingHash) {
-            if (_storedBatch.batchNumber == (0)) {
-                return;
-            }
             revert DependencyRootsRollingHashMismatch(
                 _storedBatch.dependencyRootsRollingHash,
                 _dependencyRootsRollingHash
@@ -492,28 +488,32 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
 
         for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
-            InteropRoot memory msgRoot = _dependencyRoots[i];
+            InteropRoot memory interopRoot = _dependencyRoots[i];
             bytes32 correctRootHash;
-            if (msgRoot.chainId == block.chainid) {
-                // For the same chain we verify using the MessageRoot contract
-                correctRootHash = messageRootContract.historicalRoot(uint256(msgRoot.blockOrBatchNumber));
-            } else if (msgRoot.chainId == L1_CHAIN_ID) {
-                // this case can only happen on GW.
-                // L1 chain root is stored in the storage contract.
-
-                correctRootHash = L2_MESSAGE_ROOT_STORAGE.msgRoots(
-                    uint256(msgRoot.chainId),
-                    uint256(msgRoot.blockOrBatchNumber)
-                );
+            if (interopRoot.chainId == block.chainid) {
+                // For the same chain we verify using the MessageRoot contract. Note, that in this
+                // release, import and export only happens on GW, so this is the only case we have to cover.
+                correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
             } else {
-                revert CommitBasedInteropNotSupported();
+                // @notice: here we will verify against the Diamond proxy contract of the sender directly.
+                // This means the receiving chain has to trust the sender chain's CTM.
+                // For now we will not allow permissionless CTMs to be added, so the ecosystem is secure.
+                // revert CommitBasedInteropNotSupported();
+                correctRootHash = IGetters(IBridgehub(s.bridgehub).getZKChain(interopRoot.chainId)).l2LogsRootHash(
+                    interopRoot.blockOrBatchNumber
+                );
             }
-            if (msgRoot.sides.length != 1 || msgRoot.sides[0] != correctRootHash) {
-                revert InvalidMessageRoot(correctRootHash, msgRoot.sides[0]);
+            if (interopRoot.sides.length != 1 || interopRoot.sides[0] != correctRootHash) {
+                revert InvalidMessageRoot(correctRootHash, interopRoot.sides[0]);
             }
             dependencyRootsRollingHash = keccak256(
                 // solhint-disable-next-line func-named-parameters
-                abi.encodePacked(dependencyRootsRollingHash, msgRoot.chainId, msgRoot.blockOrBatchNumber, msgRoot.sides)
+                abi.encodePacked(
+                    dependencyRootsRollingHash,
+                    interopRoot.chainId,
+                    interopRoot.blockOrBatchNumber,
+                    interopRoot.sides
+                )
             );
         }
     }
@@ -600,8 +600,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256[] memory proofPublicInput = new uint256[](committedBatchesLength);
 
         // Check that the batch passed by the validator is indeed the first unverified batch
-        if (_hashStoredBatchInfo(prevBatch) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-            revert BatchHashMismatch(s.storedBatchHashes[currentTotalBatchesVerified], _hashStoredBatchInfo(prevBatch));
+        bytes32 cachedStoredBatchHashes = s.storedBatchHashes[currentTotalBatchesVerified];
+        if (
+            _hashStoredBatchInfo(prevBatch) != cachedStoredBatchHashes &&
+            _hashLegacyStoredBatchInfo(prevBatch) != cachedStoredBatchHashes
+        ) {
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(prevBatch));
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
@@ -773,6 +777,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @notice Returns the keccak hash of the ABI-encoded StoredBatchInfo
     function _hashStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
         return keccak256(abi.encode(_storedBatchInfo));
+    }
+
+    /// @notice Returns the keccak hash of the ABI-encoded Legacy StoredBatchInfo
+    function _hashLegacyStoredBatchInfo(StoredBatchInfo memory _storedBatchInfo) internal pure returns (bytes32) {
+        LegacyStoredBatchInfo memory legacyStoredBatchInfo = LegacyStoredBatchInfo({
+            batchNumber: _storedBatchInfo.batchNumber,
+            batchHash: _storedBatchInfo.batchHash,
+            indexRepeatedStorageChanges: _storedBatchInfo.indexRepeatedStorageChanges,
+            numberOfLayer1Txs: _storedBatchInfo.numberOfLayer1Txs,
+            priorityOperationsHash: _storedBatchInfo.priorityOperationsHash,
+            l2LogsTreeRoot: _storedBatchInfo.l2LogsTreeRoot,
+            timestamp: _storedBatchInfo.timestamp,
+            commitment: _storedBatchInfo.commitment
+        });
+        return keccak256(abi.encode(legacyStoredBatchInfo));
     }
 
     /// @notice Returns true if the bit at index {_index} is 1

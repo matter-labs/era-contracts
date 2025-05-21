@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
+import {PubdataField, ReconstructionMismatch} from "./DAErrors.sol";
 import {COMPRESSOR_CONTRACT, L2ContractHelper} from "../L2ContractHelper.sol";
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";

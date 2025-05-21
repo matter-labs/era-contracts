@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {SYSTEM_CONTEXT_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {InvalidChainId} from "contracts/SystemContractErrors.sol";
 import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";

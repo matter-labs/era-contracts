@@ -14,16 +14,15 @@ import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol"
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubMintCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -34,7 +33,7 @@ import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDe
 import {L2InteropTestAbstract} from "../l2-tests-abstract/L2InteropTestAbstract.t.sol";
 
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
+import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
 contract L2InteropL1Test is Test, SharedL2ContractL1Deployer, L2InteropTestAbstract {
@@ -59,9 +58,10 @@ contract L2InteropL1Test is Test, SharedL2ContractL1Deployer, L2InteropTestAbstr
     }
 
     function getCreationCode(
-        string memory contractName
+        string memory contractName, 
+        bool isZKBytecode
     ) internal view virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getCreationCode(contractName);
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(

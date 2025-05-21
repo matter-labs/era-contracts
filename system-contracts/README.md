@@ -70,6 +70,12 @@ yarn test
 
 Please note that you need to rerun the test node every time you are running the tests because, in the current version, tests will be affected by the state after the previous run.
 
+To run the bootloader tests:
+
+```shell
+yarn sc test:bootloader
+```
+
 ### Testing infrastructure overview
 
 #### Address space
@@ -127,6 +133,17 @@ Typically, one test case corresponds to one main function call, possibly with ad
 Therefore, considering all the information above, we can say that it's almost unit tests over external functions.
 Many examples can be found in [test](test).
 
+#### Manual tests
+
+Manual tests are not part of the main test suite and are rather run manually against an anvil-zksync fork of the chain to be upgraded. Currently there is only one manual test for the [L2V29Upgrade](contracts/L2V29Upgrade.sol) that can be run by doing:
+
+```
+./bin/anvil-zksync fork --fork-url [chain-rpc-url] &> era_test_node.log.anvil &
+ALIASED_GOVERNANCE_ADDRESS=[governance-address] L1_CHAIN_ID=[l1-chain-id] yarn test-l2-v29-upgrade
+```
+
+and specifying the chain-rpc-url for the fork to test the upgrade against. Optionally, you can specify the governance-address and the L1 chain id, these will default to a random address and 1 respectively.
+
 ## Update Process
 
 System contracts handle core functionalities and play a critical role in maintaining the integrity of our protocol. To
@@ -161,6 +178,26 @@ merged back into the `dev` branch to keep it up-to-date.
 Since scripts, READMEs, etc., are code that is not subject to audits, these are to be merged directly into the `main`
 branch. The rest of the release branches as well as the `dev` branch should merge `main` to synchronize with these
 changes.
+
+## Verification of contracts
+
+To verify contracts deployed on a chain, ensure to firstly build all the contracts locally:
+
+```
+yarn build:foundry
+```
+
+and run the verification script afterward:
+
+```
+VERIFICATION_URL=<explorer-verification-url> yarn verify-on-explorer
+```
+
+For example, for zksync Era testnet environment it would look the following way:
+
+```
+VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-explorer
+```
 
 ## Official Links
 

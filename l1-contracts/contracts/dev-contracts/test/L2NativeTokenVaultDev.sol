@@ -9,8 +9,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 
 import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
 import {NativeTokenVault} from "../../bridge/ntv/NativeTokenVault.sol";
-import {L2NativeTokenVault} from "../../bridge/ntv/L2NativeTokenVault.sol";
-import {BridgedStandardERC20} from "../../bridge/ntv/L2NativeTokenVault.sol";
+import {BridgedStandardERC20, L2NativeTokenVault} from "../../bridge/ntv/L2NativeTokenVault.sol";
 
 /// @author Matter Labs
 /// @notice This is used for fast debugging of the L2NTV by running it in L1 context, i.e. normal foundry instead of foundry --zksync.

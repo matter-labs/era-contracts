@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 // solhint-disable gas-custom-errors
 
 import {UncheckedMath} from "./UncheckedMath.sol";
-import {MerklePathEmpty, MerklePathOutOfBounds, MerkleIndexOutOfBounds} from "../SystemContractErrors.sol";
+import {MerkleIndexOutOfBounds, MerklePathEmpty, MerklePathOutOfBounds} from "../SystemContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

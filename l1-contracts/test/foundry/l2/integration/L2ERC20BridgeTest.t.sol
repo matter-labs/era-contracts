@@ -15,13 +15,15 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-import {StateTransitionDeployedAddresses, FacetCut} from "deploy-scripts/Utils.sol";
+import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2Utils, SystemContractsArgs} from "./L2Utils.sol";
 import {L2Erc20TestAbstract} from "../../l1/integration/l2-tests-abstract/L2Erc20TestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
+import {DeployIntegrationUtils} from "../../l1/integration/deploy-scripts/DeployIntegrationUtils.s.sol";
+import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
 
 contract L2Erc20Test is Test, L2Erc20TestAbstract, SharedL2ContractL2Deployer {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
@@ -35,7 +37,7 @@ contract L2Erc20Test is Test, L2Erc20TestAbstract, SharedL2ContractL2Deployer {
     function deployViaCreate2(
         bytes memory creationCode,
         bytes memory constructorArgs
-    ) internal override(DeployUtils, SharedL2ContractL2Deployer) returns (address) {
+    ) internal override(Create2FactoryUtils, SharedL2ContractL2Deployer) returns (address) {
         return super.deployViaCreate2(creationCode, constructorArgs);
     }
 

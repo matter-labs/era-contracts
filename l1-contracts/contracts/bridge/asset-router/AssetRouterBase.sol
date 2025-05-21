@@ -8,19 +8,18 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 // import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
-import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
-import {UnsupportedEncodingVersion, AssetIdNotSupported, NonEmptyMsgValue, AssetHandlerDoesNotExist, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {AssetHandlerDoesNotExist, AssetIdNotSupported, NonEmptyMsgValue, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
