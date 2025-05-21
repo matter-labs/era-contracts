@@ -129,7 +129,13 @@ library L2Utils {
         forceDeployWithConstructor(
             "ChainAssetHandler",
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            abi.encode(_args.l1ChainId, _args.aliasedOwner, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR),
+            abi.encode(
+                _args.l1ChainId,
+                _args.aliasedOwner,
+                L2_BRIDGEHUB_ADDR,
+                L2_ASSET_ROUTER_ADDR,
+                L2_MESSAGE_ROOT_ADDR
+            ),
             _args.broadcast
         );
     }

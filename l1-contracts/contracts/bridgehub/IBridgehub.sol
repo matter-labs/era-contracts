@@ -237,17 +237,17 @@ interface IBridgehub {
         uint256 _chainId,
         uint256 _newSettlementLayerChainId
     ) external returns (address zkChain, address ctm);
-    
+
     function forwardedBridgeMint(
         bytes32 _assetId,
         uint256 _chainId,
         bytes32 _baseTokenAssetId
     ) external returns (address zkChain, address ctm);
-    
+
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
-    
+
     function forwardedBridgeRecoverFailedTransfer(uint256 _chainId) external returns (address zkChain, address ctm);
-    
+
     function forwardTransactionOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,

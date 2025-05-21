@@ -570,9 +570,7 @@ library Utils {
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2Transaction(
-                params
-            );
+        ) = prepareL1L2Transaction(params);
 
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {

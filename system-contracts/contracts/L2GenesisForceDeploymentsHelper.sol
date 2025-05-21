@@ -47,7 +47,13 @@ library L2GenesisForceDeploymentsHelper {
         // Prepare calldata to set addresses in BridgeHub.
         bytes memory bridgehubConstructorData = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
-            (address(L2_ASSET_ROUTER), _ctmDeployer, address(L2_MESSAGE_ROOT), address(L2_CHAIN_ASSET_HANDLER), address(L2_INTEROP_CENTER))
+            (
+                address(L2_ASSET_ROUTER),
+                _ctmDeployer,
+                address(L2_MESSAGE_ROOT),
+                address(L2_CHAIN_ASSET_HANDLER),
+                address(L2_INTEROP_CENTER)
+            )
         );
 
         // Execute the call to set addresses in BridgeHub.
@@ -222,7 +228,6 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.baseTokenAssetId
             )
         });
-
 
         // Configure the ChainAssetHandler deployment.
         forceDeployments[4] = ForceDeployment({
