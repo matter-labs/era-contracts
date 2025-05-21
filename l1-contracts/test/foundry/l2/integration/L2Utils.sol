@@ -95,10 +95,6 @@ library L2Utils {
     }
 
     /// @notice Deploys the L2AssetRouter contract.
-    /// param _l1ChainId The chain ID of the L1 chain.
-    /// param _eraChainId The chain ID of the era chain.
-    /// param _l1AssetRouter The address of the L1 asset router.
-    /// param _legacySharedBridge The address of the legacy shared bridge.
     function forceDeployAssetRouter(SystemContractsArgs memory _args) internal {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
@@ -127,12 +123,6 @@ library L2Utils {
     }
 
     /// @notice Deploys the L2NativeTokenVault contract.
-    /// param _l1ChainId The chain ID of the L1 chain.
-    /// param _aliasedOwner The address of the aliased owner.
-    /// param _l2TokenProxyBytecodeHash The hash of the L2 token proxy bytecode.
-    /// param _legacySharedBridge The address of the legacy shared bridge.
-    /// param _l2TokenBeacon The address of the L2 token beacon.
-    /// param _contractsDeployedAlready Whether the contracts are deployed already.
     function forceDeployNativeTokenVault(SystemContractsArgs memory _args) internal {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
