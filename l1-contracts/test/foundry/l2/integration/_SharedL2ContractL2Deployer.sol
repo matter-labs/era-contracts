@@ -9,7 +9,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} fro
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
-import {SystemContractsArgs} from "../../l1/integration/l2-tests-in-l1-context/Utils.sol";
+import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
 import {ADDRESS_ONE, Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -27,7 +27,7 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 // import {DeployL1IntegrationScript} from "../../l1/integration/deploy-scripts/DeployL1Integration.s.sol";
 
-import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-in-l1-context/_SharedL2ContractDeployer.sol";
+import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     using stdToml for string;
