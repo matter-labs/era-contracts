@@ -75,6 +75,9 @@ interface IAdmin is IZKChainBase {
         bytes[] calldata _factoryDeps
     ) external;
 
+    /// @notice Returns address of the RollupDAManager of the ZK Chain.
+    function getRollupDAManager() external view returns (address);
+
     /// @notice Set the L1 DA validator address as well as the L2 DA validator address.
     /// @dev While in principle it is possible that updating only one of the addresses is needed,
     /// usually these should work in pair and L1 validator typically expects a specific input from the L2 Validator.

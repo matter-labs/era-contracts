@@ -17,13 +17,13 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {Utils, ADDRESS_ONE} from "./Utils.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ADDRESS_ONE, Utils} from "./Utils.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -465,7 +465,7 @@ contract RegisterZKChainScript is Script {
     function deployLegacySharedBridge() internal {
         bytes[] memory emptyDeps = new bytes[](0);
         address legacyBridgeImplAddr = Utils.deployThroughL1Deterministic({
-            bytecode: L2ContractsBytecodesLib.readL2LegacySharedBridgeDevBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev"),
             constructorargs: hex"",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -476,7 +476,7 @@ contract RegisterZKChainScript is Script {
         });
 
         output.l2LegacySharedBridge = Utils.deployThroughL1Deterministic({
-            bytecode: L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
             constructorargs: L2LegacySharedBridgeTestHelper.getLegacySharedBridgeProxyConstructorParams(
                 legacyBridgeImplAddr,
                 config.l1Erc20Bridge,
@@ -495,10 +495,10 @@ contract RegisterZKChainScript is Script {
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
         bytes[] memory factoryDeps = new bytes[](4);
-        factoryDeps[0] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
-        factoryDeps[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
-        factoryDeps[2] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
-        factoryDeps[3] = L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecodeFromSystemContracts();
+        factoryDeps[0] = ContractsBytecodesLib.getCreationCode("BeaconProxy");
+        factoryDeps[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
+        factoryDeps[2] = ContractsBytecodesLib.getCreationCode("UpgradeableBeacon");
+        factoryDeps[3] = ContractsBytecodesLib.getCreationCode("SystemTransparentUpgradeableProxy");
         return factoryDeps;
     }
 

@@ -16,6 +16,7 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     USED_L2_DA_VALIDATOR_ADDRESS_KEY,
+    MESSAGE_ROOT_ROLLING_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
@@ -28,7 +29,11 @@ struct LogProcessingOutput {
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
     bytes32 l2DAValidatorOutputHash;
+    bytes32 dependencyRootsRollingHash;
 }
+
+/// @dev Maximal value that SystemLogKey variable can have.
+uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 
 /// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
@@ -62,6 +67,21 @@ interface IExecutor is IZKChainBase {
     /// @param commitment Verified input for the ZKsync circuit
     // solhint-disable-next-line gas-struct-packing
     struct StoredBatchInfo {
+        uint64 batchNumber;
+        bytes32 batchHash;
+        uint64 indexRepeatedStorageChanges;
+        uint256 numberOfLayer1Txs;
+        bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash; // kl todo we might have to include a new and old version of this struct for migration
+        bytes32 l2LogsTreeRoot;
+        uint256 timestamp;
+        bytes32 commitment;
+    }
+
+    /// @notice Legacy StoredBatchInfo struct
+    /// @dev dependencyRootsRollingHash is not included in the struct
+    // solhint-disable-next-line gas-struct-packing
+    struct LegacyStoredBatchInfo {
         uint64 batchNumber;
         bytes32 batchHash;
         uint64 indexRepeatedStorageChanges;

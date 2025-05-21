@@ -6,8 +6,8 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, SystemLogKey, COMPLEX_UPGRADER_CONTRACT} from "./Constants.sol";
-import {InconsistentNewBatchTimestamp, InvalidNewL2BlockNumber, IncorrectVirtualBlockInsideMiniblock, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, CannotReuseL2BlockNumberFromPreviousBatch, NoVirtualBlocks, L2BlockAndBatchTimestampMismatch, UpgradeTransactionMustBeFirst, L2BlockNumberZero, PreviousL2BlockHashIsIncorrect, CannotInitializeFirstVirtualBlock, IncorrectL2BlockHash, NonMonotonicL2BlockTimestamp, CurrentBatchNumberMustBeGreaterThanZero, TimestampsShouldBeIncremental, ProvidedBatchNumberIsNotCorrect} from "contracts/SystemContractErrors.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, SystemLogKey} from "./Constants.sol";
+import {CannotInitializeFirstVirtualBlock, CannotReuseL2BlockNumberFromPreviousBatch, CurrentBatchNumberMustBeGreaterThanZero, InconsistentNewBatchTimestamp, IncorrectL2BlockHash, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, IncorrectVirtualBlockInsideMiniblock, InvalidNewL2BlockNumber, L2BlockAndBatchTimestampMismatch, L2BlockNumberZero, NoVirtualBlocks, NonMonotonicL2BlockTimestamp, PreviousL2BlockHashIsIncorrect, ProvidedBatchNumberIsNotCorrect, TimestampsShouldBeIncremental, UpgradeTransactionMustBeFirst} from "contracts/SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -409,7 +409,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             if (_expectedPrevL2BlockHash != pendingL2BlockHash) {
                 revert IncorrectL2BlockHash(_expectedPrevL2BlockHash, pendingL2BlockHash);
             }
-            if (_l2BlockTimestamp <= currentL2BlockTimestamp) {
+            if (_l2BlockTimestamp < currentL2BlockTimestamp) {
                 revert NonMonotonicL2BlockTimestamp(_l2BlockTimestamp, currentL2BlockTimestamp);
             }
 
