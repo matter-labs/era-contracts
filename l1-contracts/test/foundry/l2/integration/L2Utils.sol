@@ -260,21 +260,21 @@ library L2Utils {
         return contractAddress;
     }
 
-    function getCreationCode(string memory _contractName) internal view returns (bytes memory) {
-        if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("L2StandardTriggerAccount"))) {
-            return
-                abi.encodePacked(
-                    readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
-                );
-        } else if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("InteropAccount"))) {
-            return
-                abi.encodePacked(
-                    readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
-                );
-        }
-        bytes memory bytecode = readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
-        return bytecode;
-    }
+    // function getCreationCode(string memory _contractName) internal view returns (bytes memory) {
+    //     if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("L2StandardTriggerAccount"))) {
+    //         return
+    //             abi.encodePacked(
+    //                 readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
+    //             );
+    //     } else if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("InteropAccount"))) {
+    //         return
+    //             abi.encodePacked(
+    //                 readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
+    //             );
+    //     }
+    //     bytes memory bytecode = readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
+    //     return bytecode;
+    // }
 
     function prankOrBroadcast(bool _broadcast, address _from) public {
         if (_broadcast) {
