@@ -26,13 +26,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IBridgehub public immutable override BRIDGE_HUB;
+    IBridgehub public override BRIDGE_HUB;
 
     /// @dev Chain ID of L1 for bridging reasons
-    uint256 public immutable L1_CHAIN_ID;
+    uint256 public L1_CHAIN_ID;
 
     /// @dev Chain ID of Era for legacy reasons
-    uint256 public immutable ERA_CHAIN_ID;
+    uint256 public ERA_CHAIN_ID;
 
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
@@ -64,6 +64,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub) {
+        L1_CHAIN_ID = _l1ChainId;
+        ERA_CHAIN_ID = _eraChainId;
+        BRIDGE_HUB = _bridgehub;
+    }
+
+    // we set deployed code during genesis upgrade and calling this(only) method during the genesis upgrade
+    function init_boojum(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub) internal {
         L1_CHAIN_ID = _l1ChainId;
         ERA_CHAIN_ID = _eraChainId;
         BRIDGE_HUB = _bridgehub;

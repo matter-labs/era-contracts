@@ -8,6 +8,8 @@ pragma solidity ^0.8.20;
  * @custom:security-contact security@matterlabs.dev
  */
 interface IMessageRoot {
+    function init_boojum(address _bridgehub) external;
+
     /// @notice The aggregated root of the batches from different chains.
     /// @return aggregatedRoot of the batches from different chains.
     function getAggregatedRoot() external view returns (bytes32 aggregatedRoot);

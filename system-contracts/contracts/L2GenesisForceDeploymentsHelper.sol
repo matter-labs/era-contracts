@@ -29,42 +29,62 @@ library L2GenesisForceDeploymentsHelper {
         bytes memory _fixedForceDeploymentsData,
         bytes memory _additionalForceDeploymentsData
     ) internal {
-        // Decode and retrieve the force deployments data.
-        ForceDeployment[] memory forceDeployments = _getForceDeploymentsData(
+        // Decode the fixed and additional force deployments data.
+        FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
             _fixedForceDeploymentsData,
-            _additionalForceDeploymentsData
+            (FixedForceDeploymentsData)
+        );
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData = abi.decode(
+            _additionalForceDeploymentsData,
+            (ZKChainSpecificForceDeploymentsData)
         );
 
-        // Force deploy the contracts on specified addresses.
-        IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(forceDeployments);
+        // Configure the MessageRoot deployment.
+        L2_MESSAGE_ROOT.init_boojum(address(L2_BRIDGE_HUB));
 
-        // It is expected that either through the force deployments above
-        // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
-        // However, there is still some follow-up finalization that needs to be done.
 
-        // Retrieve the owner of the BridgeHub contract.
-        address bridgehubOwner = L2_BRIDGE_HUB.owner();
-
-        // Prepare calldata to set addresses in BridgeHub.
-        bytes memory data = abi.encodeCall(
-            L2_BRIDGE_HUB.setAddresses,
-            (L2_ASSET_ROUTER, _ctmDeployer, address(L2_MESSAGE_ROOT))
+        // Configure the AssetRouter deployment.
+        L2_ASSET_ROUTER.init_boojum(
+            fixedForceDeploymentsData.l1ChainId,
+            fixedForceDeploymentsData.eraChainId,
+            fixedForceDeploymentsData.l1AssetRouter,
+            additionalForceDeploymentsData.l2LegacySharedBridge,
+            additionalForceDeploymentsData.baseTokenAssetId,
+            fixedForceDeploymentsData.aliasedL1Governance
         );
 
-        // Execute the call to set addresses in BridgeHub.
-        (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
-            address(L2_BRIDGE_HUB),
-            bridgehubOwner,
-            data
+
+        // Ensure the WETH token is deployed and retrieve its address.
+        address wrappedBaseTokenAddress = _ensureWethToken({
+            _predeployedWethToken: additionalForceDeploymentsData.predeployedL2WethAddress,
+            _aliasedL1Governance: fixedForceDeploymentsData.aliasedL1Governance,
+            _baseTokenL1Address: additionalForceDeploymentsData.baseTokenL1Address,
+            _baseTokenAssetId: additionalForceDeploymentsData.baseTokenAssetId,
+            _baseTokenName: additionalForceDeploymentsData.baseTokenName,
+            _baseTokenSymbol: additionalForceDeploymentsData.baseTokenSymbol
+        });
+        // there is no legacy shared bridge on boojum os chains
+        address deployedTokenBeacon;
+        bool contractsDeployedAlready;
+        L2_NATIVE_TOKEN_VAULT.init_boojum(
+            fixedForceDeploymentsData.l1ChainId,
+            fixedForceDeploymentsData.aliasedL1Governance,
+            fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
+            additionalForceDeploymentsData.l2LegacySharedBridge,
+            deployedTokenBeacon,
+            contractsDeployedAlready,
+            wrappedBaseTokenAddress,
+            additionalForceDeploymentsData.baseTokenAssetId
         );
 
-        // Revert with the original revert reason if the call failed.
-        if (!success) {
-            /// @dev Propagate the revert reason from the failed call.
-            assembly {
-                revert(add(returnData, 0x20), returndatasize())
-            }
-        }
+        L2_BRIDGE_HUB.init_boojum(
+            fixedForceDeploymentsData.l1ChainId,
+            fixedForceDeploymentsData.aliasedL1Governance,
+            fixedForceDeploymentsData.maxNumberOfZKChains,
+            address(L2_ASSET_ROUTER),
+            _ctmDeployer,
+            address(L2_MESSAGE_ROOT)
+        );
     }
 
     /// @notice Retrieves and constructs the force deployments array.

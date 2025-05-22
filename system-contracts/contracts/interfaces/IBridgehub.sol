@@ -5,6 +5,15 @@ pragma solidity ^0.8.20;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IBridgehub {
+    function init_boojum(
+        uint256 _l1ChainId,
+        address _owner,
+        uint256 _maxNumberOfZKChains,
+        address _assetRouter,
+        address _l1CtmDeployer,
+        address _messageRoot
+    ) external;
+
     function setAddresses(address _assetRouter, address _ctmDeployer, address _messageRoot) external;
 
     function owner() external view returns (address);

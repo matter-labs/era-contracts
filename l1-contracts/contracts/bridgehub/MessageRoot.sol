@@ -9,6 +9,7 @@ import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
+import {L2_GENESIS_UPGRADE_ADDR} from "../common/L2ContractAddresses.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
@@ -36,7 +37,7 @@ contract MessageRoot is IMessageRoot, Initializable {
     event Preimage(bytes32 one, bytes32 two);
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IBridgehub public immutable override BRIDGE_HUB;
+    IBridgehub public override BRIDGE_HUB;
 
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
@@ -74,6 +75,15 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(IBridgehub _bridgehub) {
+        BRIDGE_HUB = _bridgehub;
+        _initialize();
+        _disableInitializers();
+    }
+
+    // we set deployed code during genesis upgrade and calling this(only) method during the genesis upgrade
+    function init_boojum(IBridgehub _bridgehub) external {
+        require(msg.sender == L2_GENESIS_UPGRADE_ADDR);
+
         BRIDGE_HUB = _bridgehub;
         _initialize();
         _disableInitializers();
