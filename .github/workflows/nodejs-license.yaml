@@ -23,6 +23,9 @@ env:
   # It has to be one line, there must be no space between packages.
   EXCLUDE_PACKAGES: testrpc@0.0.1;uuid@2.0.1;era-contracts@0.1.0;
 
+permissions:
+  contents: read
+
 jobs:
   generate-matrix:
     name: Lists modules
