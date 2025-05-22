@@ -5,7 +5,8 @@ on:
     - cron: "00 01 * * *"
   workflow_dispatch:
 
-permissions: read-all
+permissions:
+  contents: read
 
 jobs:
   define-matrix:
