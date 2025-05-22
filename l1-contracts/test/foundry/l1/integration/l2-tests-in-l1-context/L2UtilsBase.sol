@@ -1,34 +1,50 @@
 // SPDX-License-Identifier: MIT
-
 pragma solidity ^0.8.20;
 
 import {Vm} from "forge-std/Vm.sol";
-import "forge-std/console.sol";
+
 import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
+import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {DataEncoding} from "../../../../../contracts/common/libraries/DataEncoding.sol";
+import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {Config, DeployUtils, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
 
-import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
-import {IInteropCenter, InteropCenter} from "../../../../../contracts/bridgehub/InteropCenter.sol";
-import {IInteropHandler, InteropHandler} from "../../../../../contracts/bridgehub/InteropHandler.sol";
-import {MessageRoot} from "../../../../../contracts/bridgehub/MessageRoot.sol";
-import {ChainAssetHandler} from "../../../../../contracts/bridgehub/ChainAssetHandler.sol";
-import {L2AssetRouter} from "../../../../../contracts/bridge/asset-router/L2AssetRouter.sol";
-import {L2NativeTokenVault} from "../../../../../contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {L2NativeTokenVaultDev} from "../../../../../contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
-import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
-import {ETH_TOKEN_ADDRESS} from "../../../../../contracts/common/Config.sol";
-import {IMessageRoot} from "../../../../../contracts/bridgehub/IMessageRoot.sol";
-import {ICTMDeploymentTracker} from "../../../../../contracts/bridgehub/ICTMDeploymentTracker.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "/contracts/common/l2-helpers/L2ContractAddresses.sol";
+
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
+
+import {IInteropCenter, InteropCenter} from "../../../../../contracts/bridgehub/InteropCenter.sol";
+import {IInteropHandler, InteropHandler} from "../../../../../contracts/bridgehub/InteropHandler.sol";
+import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
+
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 import {DummyL2BaseTokenSystemContract} from "../../../../../contracts/dev-contracts/test/DummyBaseTokenSystemContract.sol";
 import {DummyL2InteropAccount} from "../../../../../contracts/dev-contracts/test/DummyL2InteropAccount.sol";
 
-import {Utils} from "../../../../../deploy-scripts/Utils.sol";
-import {SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+
+import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
+
+import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+
+import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
 
 library L2UtilsBase {
     using stdToml for string;
@@ -135,15 +151,6 @@ library L2UtilsBase {
             bytes32(uint256(1))
         );
 
-        // stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
-
-        // stdstore
-        //     .target(L2_ASSET_ROUTER_ADDR)
-        //     .sig("assetHandlerAddress(bytes32)")
-        //     .with_key(baseTokenAssetId)
-        //     .checked_write(bytes32(uint256(uint160(L2_NATIVE_TOKEN_VAULT_ADDR))));
-
-        // bytes memory ntvBytecode = Utils.readL1ContractsBytecode("bridge/ntv/", "L2NativeTokenVault");
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));

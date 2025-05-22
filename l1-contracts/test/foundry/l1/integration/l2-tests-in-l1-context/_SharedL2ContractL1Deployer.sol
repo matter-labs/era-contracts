@@ -36,16 +36,17 @@ import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.s
 
 import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
 
-import {SystemContractsArgs} from "../l2-tests-abstract/Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {L2UtilsBase} from "./L2UtilsBase.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1IntegrationScript {
     using stdToml for string;
     using stdStorage for StdStorage;
 
     /// @dev We provide a fast form of debugging the L2 contracts using L1 foundry. We also test using zk foundry.
+
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
         L2UtilsBase.initSystemContracts(_args);
     }
