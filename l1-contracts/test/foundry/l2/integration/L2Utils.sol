@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -26,6 +26,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
+import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../../l1/integration/l2-tests-abstract/Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
 import {Utils} from "deploy-scripts/Utils.sol";
@@ -59,8 +60,6 @@ library L2Utils {
         forceDeployNativeTokenVault(_args);
         forceDeployInteropCenter(_args);
         // forceDeployInteropHandler(_args);
-        // forceDeployInteropAccount(_args);
-        // forceDeployStandardTriggerAccount(_args);
     }
 
     function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
@@ -126,22 +125,6 @@ library L2Utils {
         interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
     }
 
-    function forceDeployInteropAccount(SystemContractsArgs memory _args) internal {
-        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
-        // new InteropAccount();
-        forceDeployWithConstructor("InteropAccount", L2_INTEROP_ACCOUNT_ADDR, abi.encode(), _args.broadcast);
-    }
-
-    function forceDeployStandardTriggerAccount(SystemContractsArgs memory _args) internal {
-        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
-        // new StandardTriggerAccount();
-        forceDeployWithConstructor(
-            "StandardTriggerAccount",
-            L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
-            abi.encode(),
-            _args.broadcast
-        );
-    }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
@@ -149,7 +132,6 @@ library L2Utils {
         forceDeployWithConstructor("InteropHandler", L2_INTEROP_HANDLER_ADDR, abi.encode(), _args.broadcast);
         InteropHandler interopHandler = InteropHandler(L2_INTEROP_HANDLER_ADDR);
         prankOrBroadcast(_args.broadcast, L2_FORCE_DEPLOYER_ADDR);
-        interopHandler.setInteropAccountBytecode();
     }
 
     /// @notice Deploys the L2AssetRouter contract.

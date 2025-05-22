@@ -2,10 +2,8 @@
 
 pragma solidity ^0.8.24;
 
-import {Transaction} from "../common/l2-helpers/L2ContractHelper.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {IInteropAccount} from "./IInteropAccount.sol";
-import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_CONTRACT_DEPLOYER, L2_INTEROP_ACCOUNT_ADDR, L2_MESSAGE_VERIFICATION} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_CONTRACT_DEPLOYER, L2_MESSAGE_VERIFICATION} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Message, MessageInclusionProof} from "../common/Messaging.sol";
 
@@ -23,9 +21,6 @@ contract InteropHandler is IInteropHandler {
     /// @notice The balances of the users.
     mapping(bytes32 bundleHash => bool bundleExecuted) public bundleExecuted;
 
-    function setInteropAccountBytecode() public {
-        bytecodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(L2_INTEROP_ACCOUNT_ADDR);
-    }
 
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bool _skipEmptyCalldata) public {
         _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
@@ -58,44 +53,21 @@ contract InteropHandler is IInteropHandler {
                 continue;
             }
 
-            address accountAddress = getAliasedAccount(interopCall.from, _proof.chainId);
-            IInteropAccount account = IInteropAccount(payable(accountAddress)); // kl todo add chainId
-            uint256 codeSize;
-            assembly {
-                codeSize := extcodesize(accountAddress)
-            }
-            if (codeSize == 0) {
-                // kl todo use create3.
-                address deployedAccount = deployInteropAccount(interopCall.from, _proof.chainId);
-                require(address(account) == deployedAccount, "calculated address incorrect");
-            }
+            // address accountAddress = getAliasedAccount(interopCall.from, _proof.chainId);
+            // IInteropAccount account = IInteropAccount(payable(accountAddress)); // kl todo add chainId
+        //     uint256 codeSize;
+        //     assembly {
+        //         codeSize := extcodesize(accountAddress)
+        //     }
+        //     if (codeSize == 0) {
+        //         // kl todo use create3.
+        //         address deployedAccount = deployInteropAccount(interopCall.from, _proof.chainId);
+        //         require(address(account) == deployedAccount, "calculated address incorrect");
+        //     }
 
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(account), interopCall.value);
-            account.forwardFromIC(interopCall.to, interopCall.value, interopCall.data);
+        //     L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(account), interopCall.value);
+        //     account.forwardFromIC(interopCall.to, interopCall.value, interopCall.data);
         }
     }
 
-    function deployInteropAccount(address _sender, uint256 _chainId) public returns (address) {
-        // kl todo: use figure out deployment mode.
-        // return new InteropAccount{
-        //     salt: keccak256(abi.encode(interopCall.from, _proof.chainId))
-        // }();
-        return
-            L2_CONTRACT_DEPLOYER.create2Account(
-                keccak256(abi.encode(_sender, _chainId)),
-                bytecodeHash,
-                abi.encode(_sender),
-                IL2ContractDeployer.AccountAbstractionVersion.Version1
-            );
-    }
-
-    function getAliasedAccount(address _sender, uint256 _chainId) public view returns (address) {
-        return
-            L2_CONTRACT_DEPLOYER.getNewAddressCreate2(
-                address(this),
-                bytecodeHash,
-                keccak256(abi.encode(_sender, _chainId)),
-                abi.encode(_sender)
-            );
-    }
 }

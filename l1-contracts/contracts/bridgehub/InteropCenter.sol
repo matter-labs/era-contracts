@@ -15,7 +15,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, GasFields, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, InteropTrigger, L2CanonicalTransaction, L2Log, L2Message, TRIGGER_IDENTIFIER, TxStatus} from "../common/Messaging.sol";
@@ -263,32 +263,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         }
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        Interop tx interface
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice sends the interopTrigger
-    /// @dev Dangerous to use by itself, the feeBundleId and executionBundleId are not checked for correctness.
-    /// @dev e.g. the bundles might not exist, point to wrong chains, etc.
-    function sendInteropTrigger(
-        InteropTrigger memory _interopTrigger
-    ) public override onlyL2NotToL1(_interopTrigger.destinationChainId) returns (bytes32 canonicalTxHash) {
-        _sendInteropTrigger(_interopTrigger, bytes32(0), bytes32(0), new bytes[](0), address(0), address(0));
-    }
-
-    function _sendInteropTrigger(
-        InteropTrigger memory _interopTrigger,
-        bytes32 _feeBundleId,
-        bytes32 _executionBundleId,
-        bytes[] memory _factoryDeps,
-        address _sender,
-        address _refundRecipient
-    ) internal returns (bytes32 canonicalTxHash) {
-        canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            bytes.concat(TRIGGER_IDENTIFIER, abi.encode(_interopTrigger))
-        );
-        emit InteropTriggerSent(canonicalTxHash, _interopTrigger);
-    }
 
     /*//////////////////////////////////////////////////////////////
                         EOA helpers
@@ -317,27 +291,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes[] factoryDeps;
     }
 
-    function requestInterop(
-        uint256 _destinationChainId,
-        address _executionAddress,
-        InteropCallStarter[] memory _feePaymentCallStarters,
-        InteropCallStarter[] memory _executionCallStarters,
-        GasFields memory _gasFields
-    ) public payable override onlyL2NotToL1(_destinationChainId) returns (bytes32 canonicalTxHash) {
-        return
-            _requestInterop(
-                _destinationChainId,
-                _feePaymentCallStarters,
-                _executionCallStarters,
-                _gasFields,
-                ExtraInputs({
-                    sender: msg.sender,
-                    executionAddress: _executionAddress,
-                    factoryDeps: new bytes[](0),
-                    refundRecipient: address(0)
-                })
-            );
-    }
 
     struct ViaIRStruct {
         bytes32 feeBundleId;
@@ -346,101 +299,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 executionBundleHash;
     }
 
-    function _requestInterop(
-        uint256 _destinationChainId,
-        InteropCallStarter[] memory _feePaymentCallStarters,
-        InteropCallStarter[] memory _executionCallStarters,
-        GasFields memory _gasFields,
-        ExtraInputs memory _extraInputs
-    ) internal returns (bytes32) {
-        if (block.chainid == L1_CHAIN_ID) {
-            // todo add restrictions to be L1->L2 txs compatible
-        }
-        ViaIRStruct memory viaIR = ViaIRStruct({
-            feeBundleId: bytes32(0),
-            feeBundleHash: bytes32(0),
-            executionBundleId: bytes32(0),
-            executionBundleHash: bytes32(0)
-        });
-        viaIR.feeBundleId = _startBundle(_destinationChainId, _extraInputs.sender);
-        // console.log("feeBundleId");
-        // console.logBytes32(viaIR.feeBundleId);
-        uint256 feeValue = 0;
-        uint256 ethIsBaseTokenMultiplier;
-        {
-            bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_destinationChainId);
-            ethIsBaseTokenMultiplier = (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) ? 1 : 0;
-        }
-        for (uint256 i = 0; i < _feePaymentCallStarters.length; i++) {
-            InteropCallStarter memory callStarter = _feePaymentCallStarters[i];
-            if (!callStarter.directCall) {
-                feeValue += callStarter.value;
-                // console.log("fee indirect call");
-                IL1AssetRouter(callStarter.nextContract).bridgehubAddCallToBundle{value: callStarter.value}(
-                    _destinationChainId,
-                    viaIR.feeBundleId,
-                    _extraInputs.sender,
-                    callStarter.requestedInteropCallValue,
-                    callStarter.data
-                );
-            } else {
-                feeValue += callStarter.requestedInteropCallValue * ethIsBaseTokenMultiplier;
-                // console.log("fee direct call");
-                _addCallToBundle(viaIR.feeBundleId, _requestFromStarter(callStarter), _extraInputs.sender);
-            }
-        }
-
-        viaIR.feeBundleHash = _finishAndSendBundleLong(
-            viaIR.feeBundleId,
-            _extraInputs.executionAddress,
-            feeValue,
-            _extraInputs.sender
-        );
-
-        viaIR.executionBundleId = _startBundle(_destinationChainId, _extraInputs.sender);
-        for (uint256 i = 0; i < _executionCallStarters.length; i++) {
-            InteropCallStarter memory callStarter = _executionCallStarters[i];
-            if (!callStarter.directCall) {
-                // console.log("execution indirect call");
-                IL1AssetRouter(callStarter.nextContract).bridgehubAddCallToBundle{value: callStarter.value}(
-                    _destinationChainId,
-                    viaIR.executionBundleId,
-                    _extraInputs.sender,
-                    callStarter.requestedInteropCallValue,
-                    callStarter.data
-                );
-            } else {
-                // console.log("executiondirect call");
-                // kl todo add second fee value checks here, so that msg.value - feeValue = feeValue2
-                _addCallToBundle(viaIR.executionBundleId, _requestFromStarter(callStarter), _extraInputs.sender);
-            }
-        }
-
-        bytes32 executionBundleHash = _finishAndSendBundleLong(
-            viaIR.executionBundleId,
-            _extraInputs.executionAddress,
-            msg.value - feeValue,
-            _extraInputs.sender
-        );
-        InteropTrigger memory interopTrigger = InteropTrigger({
-            sender: _extraInputs.sender,
-            recipient: _extraInputs.executionAddress,
-            destinationChainId: _destinationChainId,
-            feeBundleHash: viaIR.feeBundleHash,
-            executionBundleHash: executionBundleHash,
-            gasFields: _gasFields
-        });
-
-        return
-            _sendInteropTrigger(
-                interopTrigger,
-                viaIR.feeBundleId,
-                viaIR.executionBundleId,
-                _extraInputs.factoryDeps,
-                _extraInputs.sender,
-                _extraInputs.refundRecipient
-            );
-    }
 
     function _requestFromStarter(InteropCallStarter memory callStarter) internal returns (InteropCallRequest memory) {
         if (callStarter.value != 0) {
@@ -454,111 +312,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             });
     }
 
-    /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.
-    function requestInteropSingleCall(
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) public payable onlyL2 returns (bytes32 canonicalTxHash) {
-        // kl todo if to L1, empty message value. To withdraw value use singleDirectCall.
-        return _requestInteropSingleCall(_request, msg.sender);
-    }
-
-    function _requestInteropSingleCall(
-        L2TransactionRequestTwoBridgesOuter calldata _request,
-        address _sender
-    ) internal returns (bytes32 canonicalTxHash) {
-        InteropCallStarter[] memory feePaymentCallStarters = new InteropCallStarter[](1);
-        if (_request.mintValue <= _request.l2Value) {
-            revert MsgValueMismatch(_request.mintValue, _request.l2Value);
-        }
-        feePaymentCallStarters[0] = InteropCallStarter({
-            directCall: true,
-            nextContract: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
-            data: "",
-            value: _request.mintValue - _request.l2Value,
-            requestedInteropCallValue: _request.l2Value
-        });
-        InteropCallStarter[] memory executionCallStarters = new InteropCallStarter[](1);
-        executionCallStarters[0] = InteropCallStarter({
-            directCall: false,
-            nextContract: _request.secondBridgeAddress,
-            data: _request.secondBridgeCalldata,
-            value: _request.secondBridgeValue,
-            requestedInteropCallValue: _request.l2Value
-        });
-        return
-            _requestInterop(
-                _request.chainId,
-                feePaymentCallStarters,
-                executionCallStarters,
-                GasFields({
-                    gasLimit: _request.l2GasLimit,
-                    gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                    refundRecipient: _request.refundRecipient,
-                    paymaster: address(0),
-                    paymasterInput: ""
-                }),
-                ExtraInputs({
-                    sender: _sender,
-                    executionAddress: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
-                    factoryDeps: new bytes[](0),
-                    refundRecipient: _request.refundRecipient
-                })
-            );
-    }
-
-    /// the new version of two bridges, i.e. the minimal interopTx with a contract call and gas.
-    function requestInteropSingleDirectCall(
-        L2TransactionRequestDirect calldata _request
-    ) public payable override onlyL2 returns (bytes32 canonicalTxHash) {
-        // kl todo if to L1, empty message value or empty calldata, as we don't have calls on L1, only messages.
-        return _requestInteropSingleDirectCall(_request, msg.sender);
-    }
-
-    function _requestInteropSingleDirectCall(
-        L2TransactionRequestDirect calldata _request,
-        address _sender
-    ) internal returns (bytes32 canonicalTxHash) {
-        InteropCallStarter[] memory feePaymentDirectCalls = new InteropCallStarter[](1);
-        if (_request.mintValue <= _request.l2Value) {
-            // todo inequality here?
-            revert MsgValueMismatch(_request.mintValue, _request.l2Value);
-        }
-        uint256 feeValue = _request.mintValue - _request.l2Value;
-        feePaymentDirectCalls[0] = InteropCallStarter({
-            directCall: true,
-            nextContract: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
-            data: "0x",
-            value: feeValue,
-            requestedInteropCallValue: feeValue
-        });
-        InteropCallStarter[] memory executionDirectCall = new InteropCallStarter[](1);
-        executionDirectCall[0] = InteropCallStarter({
-            directCall: true,
-            nextContract: _request.l2Contract,
-            data: _request.l2Calldata,
-            value: _request.l2Value,
-            requestedInteropCallValue: _request.l2Value
-        });
-        return
-            _requestInterop(
-                _request.chainId,
-                feePaymentDirectCalls,
-                executionDirectCall,
-                GasFields({
-                    gasLimit: _request.l2GasLimit,
-                    gasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                    refundRecipient: _request.refundRecipient,
-                    paymaster: address(0),
-                    paymasterInput: ""
-                }),
-                ExtraInputs({
-                    sender: _sender,
-                    executionAddress: L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
-                    factoryDeps: _request.factoryDeps,
-                    refundRecipient: _request.refundRecipient
-                })
-            );
-    }
 
     function addCallToBundleFromRequest(
         bytes32 _bundleId,

@@ -84,23 +84,6 @@ interface IInteropCenter {
         address _executionAddress
     ) external payable returns (bytes32 interopBundleHash);
 
-    function sendInteropTrigger(InteropTrigger memory _interopTrigger) external returns (bytes32 canonicalTxHash);
-
-    function requestInterop(
-        uint256 _destinationChainId,
-        address _executionAddress,
-        InteropCallStarter[] memory _feePaymentCallStarters,
-        InteropCallStarter[] memory _executionCallStarters,
-        GasFields memory _gasFields
-    ) external payable returns (bytes32 canonicalTxHash);
-
-    function requestInteropSingleCall(
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
-
-    function requestInteropSingleDirectCall(
-        L2TransactionRequestDirect calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
 
     function forwardTransactionOnGatewayWithBalanceChange(
         uint256 _chainId,

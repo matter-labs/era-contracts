@@ -6,7 +6,6 @@ import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
 import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
-import {IAccountCodeStorage} from "./IAccountCodeStorage.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 
 /// @dev the offset for the system contracts
@@ -19,9 +18,9 @@ uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
 address constant L2_BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
 
 /// @dev The account code storage system contract
-IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
-    address(SYSTEM_CONTRACTS_OFFSET + 0x02)
-);
+// IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
+//     address(SYSTEM_CONTRACTS_OFFSET + 0x02)
+// );
 
 /// @dev The address of the known code storage system contract
 address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x04);
