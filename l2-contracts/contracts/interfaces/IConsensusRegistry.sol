@@ -184,7 +184,10 @@ interface IConsensusRegistry {
     /// @notice Returns an array of `ValidatorAttr` structs representing the pending validator committee and the pending leader selection configuration.
     /// @dev Collects active and non-removed validators that will form the next committee after the current commit becomes active.
     /// @dev Reverts if there is no pending committee (when block.number >= validatorsCommitBlock).
-    function getNextValidatorCommittee() external view returns (CommitteeValidator[] memory, LeaderSelectionAttr memory);
+    function getNextValidatorCommittee()
+        external
+        view
+        returns (CommitteeValidator[] memory, LeaderSelectionAttr memory);
 
     /// @notice Updates the delay for committee activation
     /// @dev Only callable by the contract owner
