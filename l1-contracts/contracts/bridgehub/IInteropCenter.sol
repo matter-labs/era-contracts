@@ -2,14 +2,13 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {BundleMetadata, GasFields, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, InteropTrigger, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {BundleMetadata, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "./IBridgehub.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
     event InteropBundleSent(bytes32 l2l1TxHash, bytes32 interopBundleHash, InteropBundle interopBundle);
-    event InteropTriggerSent(bytes32 l2l11TxHash, InteropTrigger _interopTrigger);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
