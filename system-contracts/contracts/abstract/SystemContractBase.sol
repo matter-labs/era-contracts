@@ -3,8 +3,8 @@
 pragma solidity ^0.8.20;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
-import {CallerMustBeBootloader, CallerMustBeEvmContract, CallerMustBeSystemContract, SystemCallFlagRequired, Unauthorized} from "../SystemContractErrors.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER, L2_INTEROP_CENTER, L2_INTEROP_HANDLER} from "../Constants.sol";
+import {CallerMustBeBootloader, CallerMustBeEvmContract, CallerMustBeInteropCenter, CallerMustBeSystemContract, SystemCallFlagRequired, Unauthorized} from "../SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -57,6 +57,24 @@ abstract contract SystemContractBase {
     modifier onlySystemCallFromEvmEmulator() {
         if (!SystemContractHelper.isSystemCallFromEvmEmulator()) {
             revert CallerMustBeEvmContract();
+        }
+        _;
+    }
+
+    /// @notice Modifier that makes sure that the method
+    /// can only be called from the bootloader.
+    modifier onlyCallFromBootloaderOrInteropHandler() {
+        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS && msg.sender != address(L2_INTEROP_HANDLER)) {
+            revert CallerMustBeBootloader();
+        }
+        _;
+    }
+
+    /// @notice Modifier that makes sure that the method
+    /// can only be called from the interop center.
+    modifier onlyCallFromInteropCenter() {
+        if (msg.sender != address(L2_INTEROP_CENTER)) {
+            revert CallerMustBeInteropCenter();
         }
         _;
     }

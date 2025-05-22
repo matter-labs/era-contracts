@@ -4,14 +4,12 @@ pragma solidity ^0.8.20;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IBridgehub {
-    function setAddresses(
-        address _assetRouter,
-        address _ctmDeployer,
-        address _messageRoot,
-        address _chainAssetHandler,
-        address _interopCenter
+interface IMailboxImpl {
+    function finalizeEthWithdrawal(
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBlock,
+        bytes calldata _message,
+        bytes32[] calldata _merkleProof
     ) external;
-
-    function owner() external view returns (address);
 }
