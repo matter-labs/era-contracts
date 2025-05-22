@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
-import {MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT} from "../../../common/Config.sol";
+import {MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, SystemLogKey, LogProcessingOutput, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
@@ -141,15 +141,22 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @param _expectedL2TxsStatusRollingHash The expected rolling hash of L2 transaction statuses for the batch.
     function _verifyAndResetBatchPrecommitment(uint256 _batchNumber, bytes32 _expectedL2TxsStatusRollingHash) internal {
         bytes32 storedPrecommitment = s.precommitmentForTheLatestBatch;
+        // The default value for the `storedPrecommitment` is expected to be `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`. 
+        // However, in case we did accidentally put 0 there, we want to handle this case as well.
+        if (storedPrecommitment == bytes32(0)) {
+            storedPrecommitment = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
+        }
 
         // We do not require the operator to always provide the precommitments as it is an optional feature.
         // However, if precommitments were provided, we do expect them to span over the entire batch
-        if (storedPrecommitment != bytes32(0) && storedPrecommitment != _expectedL2TxsStatusRollingHash) {
+        if (storedPrecommitment != DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH && storedPrecommitment != _expectedL2TxsStatusRollingHash) {
             revert PrecommitmentMismatch(_batchNumber, _expectedL2TxsStatusRollingHash, storedPrecommitment);
         }
 
         // Resetting the stored precommitment.
-        delete s.precommitmentForTheLatestBatch;
+        // Note, that the default value is not 0, but a non-zero value since rewriting a non-zero value
+        // is cheaper than going from 0 and back within different transactions.
+        s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
     }
 
     /// @notice checks that the timestamps of both the new batch and the new L2 block are correct.
@@ -309,6 +316,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         bytes32 currentPrecommitment = s.precommitmentForTheLatestBatch;
+        // We have a placeholder non-zero value equal to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`. 
+        // This is needed to ensure cheaper and more stable write costs.
+        if (currentPrecommitment == DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH) {
+            // The rolling hash calculation should start with 0.
+            currentPrecommitment = 0;
+        }
 
         uint256 length = info.txs.length;
         for (uint256 i = 0; i < length; ++i) {
@@ -317,6 +330,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             currentPrecommitment = keccak256(abi.encode(currentPrecommitment, txStatusCommitment));
         }
 
+        // The `length` is greater than zero, so we know that this value will be non-zero as well.
         s.precommitmentForTheLatestBatch = currentPrecommitment;
 
         emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, currentPrecommitment);
@@ -661,7 +675,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert CantRevertExecutedBatch();
         }
 
-        delete s.precommitmentForTheLatestBatch;
+        s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
 
         if (_newLastBatch < s.totalBatchesVerified) {
             s.totalBatchesVerified = _newLastBatch;
