@@ -18,6 +18,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
+import {L2_GENESIS_UPGRADE_ADDR} from "../common/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
@@ -37,15 +38,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice the asset id of Eth. This is only used on L1.
-    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
+    bytes32 internal ETH_TOKEN_ASSET_ID;
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
-    uint256 public immutable L1_CHAIN_ID;
+    uint256 public L1_CHAIN_ID;
 
     /// @notice The total number of ZK chains can be created/connected to this CTM.
     /// This is the temporary security measure.
-    uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
+    uint256 public MAX_NUMBER_OF_ZK_CHAINS;
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
     address public assetRouter;
@@ -152,6 +153,33 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
         _initializeInner();
+    }
+
+    // we set deployed code during genesis upgrade and calling this(only) method during the genesis upgrade
+    function init_boojum(
+        uint256 _l1ChainId,
+        address _owner,
+        uint256 _maxNumberOfZKChains,
+        address _assetRouter,
+        ICTMDeploymentTracker _l1CtmDeployer,
+        IMessageRoot _messageRoot
+    ) external {
+        require(msg.sender == L2_GENESIS_UPGRADE_ADDR);
+
+        _disableInitializers();
+        L1_CHAIN_ID = _l1ChainId;
+        MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
+
+        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
+        // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
+        // We will change this with interop.
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+        _transferOwnership(_owner);
+        _initializeInner();
+
+        assetRouter = _assetRouter;
+        l1CtmDeployer = _l1CtmDeployer;
+        messageRoot = _messageRoot;
     }
 
     /// @notice used to initialize the contract

@@ -53,6 +53,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     address public validatorTimelock;
 
     /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
+    /// @notice it doesn't store cutData for protocolVersion upgrade, it stores cutData to upgrade from protocolVersion
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
 
     /// @dev The address used to manage non critical updates

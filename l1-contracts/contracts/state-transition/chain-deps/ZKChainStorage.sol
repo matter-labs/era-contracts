@@ -177,4 +177,6 @@ struct ZKChainStorage {
     bytes32 l2EvmEmulatorBytecodeHash;
     /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     L2DACommitmentScheme l2DACommitmentScheme;
+    /// @dev Boojum OS flag, if `true` settlement done using Boojum OS state transition, otherwise Era VM
+    bool boojumOS;
 }

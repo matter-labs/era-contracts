@@ -17,7 +17,7 @@ import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2ContractHelper.sol";
 
 import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
@@ -32,10 +32,10 @@ import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenNotL
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     using SafeERC20 for IERC20;
 
-    IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
+    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal immutable L2_TOKEN_PROXY_BYTECODE_HASH;
+    bytes32 internal L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
     /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
@@ -56,6 +56,49 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         address _wethToken,
         bytes32 _baseTokenAssetId
     ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId, _l1ChainId) {
+        L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
+
+        if (_l2TokenProxyBytecodeHash == bytes32(0)) {
+            revert EmptyBytes32();
+        }
+        if (_aliasedOwner == address(0)) {
+            revert EmptyAddress();
+        }
+
+        L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
+        _transferOwnership(_aliasedOwner);
+
+        if (_contractsDeployedAlready) {
+            if (_bridgedTokenBeacon == address(0)) {
+                revert EmptyAddress();
+            }
+            bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
+        } else {
+            address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
+
+            UpgradeableBeacon tokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+
+            tokenBeacon.transferOwnership(owner());
+            bridgedTokenBeacon = IBeacon(address(tokenBeacon));
+            emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
+        }
+    }
+
+    // we set deployed code during genesis upgrade and calling this(only) method during the genesis upgrade
+    function init_boojum(
+        uint256 _l1ChainId,
+        address _aliasedOwner,
+        bytes32 _l2TokenProxyBytecodeHash,
+        address _legacySharedBridge,
+        address _bridgedTokenBeacon,
+        bool _contractsDeployedAlready,
+        address _wethToken,
+        bytes32 _baseTokenAssetId
+    ) external {
+        require(msg.sender == L2_GENESIS_UPGRADE_ADDR);
+
+        init_boojum(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId, _l1ChainId);
+
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
