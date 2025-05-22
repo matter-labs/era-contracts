@@ -28,7 +28,6 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         if (_chainId == 0) {
             revert InvalidChainId();
         }
-        ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
 
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             _ctmDeployer,

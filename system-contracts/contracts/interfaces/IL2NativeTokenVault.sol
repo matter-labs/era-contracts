@@ -8,5 +8,16 @@ pragma solidity ^0.8.20;
  * @notice The interface for the L2NativeTokenVault contract
  */
 interface IL2NativeTokenVault {
+    function init_boojum(
+        uint256 _l1ChainId,
+        address _aliasedOwner,
+        bytes32 _l2TokenProxyBytecodeHash,
+        address _legacySharedBridge,
+        address _bridgedTokenBeacon,
+        bool _contractsDeployedAlready,
+        address _wethToken,
+        bytes32 _baseTokenAssetId
+    ) external;
+
     function tokenAddress(bytes32 _assetId) external view returns (address);
 }

@@ -5,6 +5,8 @@ pragma solidity ^0.8.20;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL2WrappedBaseToken {
+    function init_boojum() external;
+
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
     /// @notice This function is used to integrate the previously deployed WETH token with the bridge.
     /// @dev Sets up `name`/`symbol`/`decimals` getters.

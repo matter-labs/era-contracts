@@ -15,7 +15,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TokenNotLegacy, EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
@@ -26,13 +26,13 @@ import {TokenNotLegacy, EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev The address of the L2 legacy shared bridge.
-    address public immutable L2_LEGACY_SHARED_BRIDGE;
+    address public L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev The asset id of the base token.
-    bytes32 public immutable BASE_TOKEN_ASSET_ID;
+    bytes32 public BASE_TOKEN_ASSET_ID;
 
     /// @dev The address of the L1 asset router counterpart.
-    address public immutable override L1_ASSET_ROUTER;
+    address public override L1_ASSET_ROUTER;
 
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
@@ -86,6 +86,30 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
     ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) reentrancyGuardInitializer {
+        L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
+        if (_l1AssetRouter == address(0)) {
+            revert EmptyAddress();
+        }
+        L1_ASSET_ROUTER = _l1AssetRouter;
+        _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+        _disableInitializers();
+        _transferOwnership(_aliasedOwner);
+    }
+
+    // we set deployed code during genesis upgrade and calling this(only) method during the genesis upgrade
+    function init_boojum(
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        address _l1AssetRouter,
+        address _legacySharedBridge,
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) external {
+        require(msg.sender == L2_GENESIS_UPGRADE_ADDR);
+
+        init_boojum(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR));
+
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
