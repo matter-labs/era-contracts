@@ -6,15 +6,15 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -23,14 +23,17 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
-import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+
+import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, GasFields, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, InteropTrigger, L2CanonicalTransaction, L2Log, L2Message, TRIGGER_IDENTIFIER, TxStatus} from "contracts/common/Messaging.sol";
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     function performDeposit(address depositor, address receiver, uint256 amount) internal {
@@ -45,12 +48,14 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function initializeTokenByDeposit() internal returns (address l2TokenAddress) {
-        performDeposit(makeAddr("someDepositor"), makeAddr("someReeiver"), 1);
+        performDeposit(makeAddr("someDepositor"), makeAddr("someReceiver"), 1);
 
         l2TokenAddress = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).l2TokenAddress(L1_TOKEN_ADDRESS);
         if (l2TokenAddress == address(0)) {
             revert("Token not initialized");
         }
+        vm.prank(L2_NATIVE_TOKEN_VAULT_ADDR);
+        BridgedStandardERC20(l2TokenAddress).bridgeMint(address(this), 100000);
     }
 
     function test_shouldFinalizeERC20Deposit() public {
@@ -85,7 +90,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), 18);
     }
 
-    function test_governanceShouldlNotBeAbleToSkipInitializerVersions() public {
+    function test_governanceShouldNotBeAbleToSkipInitializerVersions() public {
         address l2TokenAddress = initializeTokenByDeposit();
 
         BridgedStandardERC20.ERC20Getters memory getters = BridgedStandardERC20.ERC20Getters({
@@ -117,6 +122,62 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(
             assetId,
             DataEncoding.encodeBridgeBurnData(100, address(1), address(l2NativeToken))
+        );
+    }
+
+    function test_requestTokenTransferInterop() public {
+        address l2TokenAddress = initializeTokenByDeposit();
+        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
+        vm.deal(address(this), 1000 ether);
+
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
+        );
+
+        InteropCallStarter[] memory feePaymentCalls = new InteropCallStarter[](1);
+        feePaymentCalls[0] = InteropCallStarter({
+            directCall: true,
+            nextContract: address(this),
+            data: "",
+            value: 0,
+            requestedInteropCallValue: 1 ether
+        });
+
+        InteropCallStarter[] memory executionCalls = new InteropCallStarter[](1);
+        executionCalls[0] = InteropCallStarter({
+            directCall: false,
+            nextContract: L2_ASSET_ROUTER_ADDR,
+            data: secondBridgeCalldata,
+            value: 0,
+            requestedInteropCallValue: 0
+        });
+
+        GasFields memory options = GasFields({
+            gasLimit: 30000000,
+            gasPerPubdataByteLimit: 1000,
+            refundRecipient: address(this),
+            paymaster: address(0),
+            paymasterInput: ""
+        });
+        uint256 destinationChainId = 271;
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+
+        l2InteropCenter.requestInterop{value: 3 ether}(
+            destinationChainId,
+            address(0),
+            feePaymentCalls,
+            executionCalls,
+            options
         );
     }
 }

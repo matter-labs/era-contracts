@@ -24,21 +24,19 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
-import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
-import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {L2GatewayTestAbstract} from "../l2-tests-abstract/L2GatewayTestAbstract.t.sol";
-import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
-
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2GatewayTestAbstract} from "../l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 
+import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {L2InteropTestAbstract} from "../l2-tests-abstract/L2InteropTestAbstract.t.sol";
+
+import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
-contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer, L2GatewayTestAbstract {
+contract L2InteropL1Test is Test, SharedL2ContractL1Deployer, L2InteropTestAbstract {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
     function initSystemContracts(
@@ -63,7 +61,7 @@ contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer, L2GatewayTestAbstr
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(

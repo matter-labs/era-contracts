@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
@@ -16,7 +16,8 @@ import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
+import {BundleMetadata, GasFields, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, InteropTrigger, L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
@@ -30,9 +31,12 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, IBridgedStandardToken, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
+    using stdStorage for StdStorage;
+
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -77,12 +81,19 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
     function setUp() public {
         prepare();
+        bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(eraZKChainId, ETH_TOKEN_ADDRESS);
+        stdstore
+            .target(address(addresses.ecosystemAddresses.bridgehub.assetTrackerProxy))
+            .sig(IAssetTracker.chainBalance.selector)
+            .with_key(eraZKChainId)
+            .with_key(ETH_TOKEN_ASSET_ID)
+            .checked_write(100);
     }
 
     function depositToL1(address _tokenAddress) public {
         vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            address(addresses.interopCenter),
+            abi.encodeWithSelector(IInteropCenter.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
         uint256 chainId = eraZKChainId;
@@ -180,7 +191,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
         );
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
-        addresses.bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
+        addresses.interopCenter.requestL2TransactionTwoBridges{value: 250000000000100}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
@@ -191,6 +202,28 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
                 secondBridgeAddress: address(addresses.sharedBridge),
                 secondBridgeValue: 0,
                 secondBridgeCalldata: secondBridgeCalldata
+            })
+        );
+    }
+
+    function test_DepositDirect() public {
+        depositToL1(ETH_TOKEN_ADDRESS);
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
+        );
+        IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
+        addresses.interopCenter.requestL2TransactionDirect{value: 250000000000100}(
+            L2TransactionRequestDirect({
+                chainId: eraZKChainId,
+                mintValue: 250000000000100,
+                l2Contract: address(addresses.sharedBridge),
+                l2Value: 0,
+                l2Calldata: secondBridgeCalldata,
+                l2GasLimit: 1000000,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                factoryDeps: new bytes[](0),
+                refundRecipient: address(0)
             })
         );
     }

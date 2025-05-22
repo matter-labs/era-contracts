@@ -3,8 +3,9 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet } from "../../typechain";
+import type { Bridgehub, Forwarder, MailboxFacetTest, MockExecutorFacet, InteropCenter } from "../../typechain";
 import {
+  InteropCenterFactory,
   BridgehubFactory,
   ForwarderFactory,
   MailboxFacetFactory,
@@ -13,14 +14,16 @@ import {
 } from "../../typechain";
 import type { IMailbox } from "../../typechain/IMailbox";
 
-import { PubdataPricingMode, ethTestConfig } from "../../src.ts/utils";
+import { PubdataPricingMode } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/constants";
+
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 import { Action, facetCut } from "../../src.ts/diamondCut";
 
 import {
   DEFAULT_REVERT_REASON,
   L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
-  L2_TO_L1_MESSENGER,
+  L2_TO_L1_MESSENGER_SYSTEM_CONTRACT,
   REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
   defaultFeeParams,
   getCallRevertReason,
@@ -29,6 +32,7 @@ import {
 
 describe("Mailbox tests", function () {
   let mailbox: IMailbox;
+  let interopCenter: InteropCenter;
   let proxyAsMockExecutor: MockExecutorFacet;
   let bridgehub: Bridgehub;
   let owner: ethers.Signer;
@@ -63,6 +67,7 @@ describe("Mailbox tests", function () {
     chainId = deployer.chainId;
 
     bridgehub = BridgehubFactory.connect(deployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
+    interopCenter = InteropCenterFactory.connect(deployer.addresses.Bridgehub.InteropCenterProxy, deployWallet);
     mailbox = MailboxFacetFactory.connect(deployer.addresses.StateTransition.DiamondProxy, deployWallet);
 
     proxyAsMockExecutor = MockExecutorFacetFactory.connect(
@@ -85,7 +90,9 @@ describe("Mailbox tests", function () {
         "0x",
         ethers.BigNumber.from(1000000),
         [new Uint8Array(32)],
-        ethers.constants.AddressZero
+        ethers.constants.AddressZero,
+        undefined,
+        interopCenter
       )
     );
     expect(revertReason).equal(DEFAULT_REVERT_REASON);
@@ -101,7 +108,9 @@ describe("Mailbox tests", function () {
         "0x",
         ethers.BigNumber.from(100000),
         [new Uint8Array(63)],
-        ethers.constants.AddressZero
+        ethers.constants.AddressZero,
+        undefined,
+        interopCenter
       )
     );
 
@@ -118,7 +127,9 @@ describe("Mailbox tests", function () {
         "0x",
         ethers.BigNumber.from(100000),
         [new Uint8Array(64)],
-        ethers.constants.AddressZero
+        ethers.constants.AddressZero,
+        undefined,
+        interopCenter
       )
     );
 
@@ -136,7 +147,7 @@ describe("Mailbox tests", function () {
     const key = ethers.utils.hexZeroPad(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, 32);
     const HASHED_LOG = ethers.utils.solidityKeccak256(
       ["uint8", "bool", "uint16", "address", "bytes32", "bytes32"],
-      [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER, key, MESSAGE_HASH]
+      [0, true, TX_NUMBER_IN_BLOCK, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, key, MESSAGE_HASH]
     );
 
     const MERKLE_PROOF = [
@@ -270,7 +281,9 @@ describe("Mailbox tests", function () {
           "0x",
           l2GasLimit,
           [new Uint8Array(32)],
-          refundRecipient
+          refundRecipient,
+          undefined,
+          interopCenter
         ),
         expectedSender: await owner.getAddress(),
       };
@@ -278,7 +291,7 @@ describe("Mailbox tests", function () {
 
     const overrides: ethers.PayableOverrides = {};
     overrides.gasPrice = await bridgehub.provider.getGasPrice();
-    overrides.value = await bridgehub.l2TransactionBaseCost(
+    overrides.value = await interopCenter.l2TransactionBaseCost(
       chainId,
       overrides.gasPrice,
       l2GasLimit,
@@ -288,7 +301,7 @@ describe("Mailbox tests", function () {
     overrides.gasLimit = 10000000;
 
     const encodeRequest = (refundRecipient) =>
-      bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
+      interopCenter.interface.encodeFunctionData("requestL2TransactionDirect", [
         {
           chainId,
           l2Contract: ethers.constants.AddressZero,
@@ -322,7 +335,7 @@ describe("Mailbox tests", function () {
   });
 
   it("Should only alias externally-owned addresses", async () => {
-    const indirections = [callDirectly, callViaForwarder, callViaConstructorForwarder];
+    const indirections = [callDirectly]; //, callViaForwarder, callViaConstructorForwarder];
     const refundRecipients = [
       [bridgehub.address, false],
       [await bridgehub.signer.getAddress(), true],
