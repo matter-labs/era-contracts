@@ -604,6 +604,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
             l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
             messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
+            interopCenterBytecodeHash: getL2BytecodeHash("InteropCenter"),
+            assetTrackerBytecodeHash: getL2BytecodeHash("AssetTracker"),
             chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,

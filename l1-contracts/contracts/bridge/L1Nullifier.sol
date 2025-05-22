@@ -25,6 +25,7 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../bridgehub/IInteropCenter.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {EthTransferFailed, NativeTokenVaultAlreadySet, WrongL2Sender, WrongMsgLength} from "./L1BridgeContractErrors.sol";
@@ -38,6 +39,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
+
+    /// @dev InteropCenter smart contract that is used to used to operate with L2 via asynchronous L2 <-> L1 communication.
+    IInteropCenter internal immutable INTEROP_CENTER;
 
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
@@ -134,9 +138,15 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, uint256 _eraChainId, address _eraDiamondProxy) reentrancyGuardInitializer {
+    constructor(
+        IBridgehub _bridgehub,
+        IInteropCenter _interopCenter,
+        uint256 _eraChainId,
+        address _eraDiamondProxy
+    ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
+        INTEROP_CENTER = _interopCenter;
         ERA_CHAIN_ID = _eraChainId;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
     }
@@ -343,7 +353,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) internal whenNotPaused {
         {
-            bool proofValid = BRIDGE_HUB.proveL1ToL2TransactionStatus({
+            bool proofValid = INTEROP_CENTER.proveL1ToL2TransactionStatus({
                 _chainId: _chainId,
                 _l2TxHash: _l2TxHash,
                 _l2BatchNumber: _l2BatchNumber,
@@ -382,7 +392,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                     _transferData: _assetData
                 });
                 if (dataHash != txDataHash) {
-                    revert DepositDoesNotExist();
+                    revert DepositDoesNotExist(dataHash, txDataHash);
                 }
             }
         }
@@ -525,7 +535,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             });
         }
 
-        bool success = BRIDGE_HUB.proveL2MessageInclusion({
+        bool success = INTEROP_CENTER.proveL2MessageInclusion({
             _chainId: _finalizeWithdrawalParams.chainId,
             _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
             _index: _finalizeWithdrawalParams.l2MessageIndex,

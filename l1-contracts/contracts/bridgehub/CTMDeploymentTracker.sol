@@ -5,12 +5,13 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
+import {IInteropCenter} from "./IInteropCenter.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {NoEthAllowed, NotOwner, NotOwnerViaRouter, OnlyBridgehub, WrongCounterPart} from "./L1BridgehubErrors.sol";
+import {NoEthAllowed, NotOwner, NotOwnerViaRouter, OnlyBridgehub, OnlyInteropCenter, WrongCounterPart} from "./L1BridgehubErrors.sol";
 import {CTMNotRegistered, UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
 
 /// @dev The encoding version of the data.
@@ -26,10 +27,14 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
     /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
 
+    /// @dev Interop Center contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    IInteropCenter public immutable override INTEROP_CENTER;
+
     /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
-            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+    modifier onlyInteropCenter() {
+        // kl todo only IC
+        if (msg.sender != address(INTEROP_CENTER) && msg.sender != address(BRIDGE_HUB)) {
+            revert OnlyInteropCenter(msg.sender, address(INTEROP_CENTER));
         }
         _;
     }
@@ -44,9 +49,10 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
 
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IAssetRouterBase _l1AssetRouter) {
+    constructor(IBridgehub _bridgehub, IInteropCenter _interopCenter, IAssetRouterBase _l1AssetRouter) {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
+        INTEROP_CENTER = _interopCenter;
         L1_ASSET_ROUTER = _l1AssetRouter;
     }
 
@@ -70,12 +76,12 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
     }
 
     /// @notice The function responsible for registering the L2 counterpart of an CTM asset on the L2 Bridgehub.
-    /// @dev The function is called by the Bridgehub contract during the `Bridgehub.requestL2TransactionTwoBridges`.
+    /// @dev The function is called by the Bridgehub contract during the `InteropCenter.requestL2TransactionTwoBridges`.
     /// @dev Since the L2 settlement layers `_chainId` might potentially have ERC20 tokens as native assets,
     /// there are two ways to perform the L1->L2 transaction:
-    /// - via the `Bridgehub.requestL2TransactionDirect`. However, this would require the CTMDeploymentTracker to
+    /// - via the `InteropCenter.requestL2TransactionDirect`. However, this would require the CTMDeploymentTracker to
     /// handle the ERC20 balances to be used in the transaction.
-    /// - via the `Bridgehub.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
+    /// - via the `InteropCenter.requestL2TransactionTwoBridges`. This way it will be the sender that provides the funds
     /// for the L2 transaction.
     /// The second approach is used due to its simplicity even though it gives the sender slightly more control over the call:
     /// `gasLimit`, etc.
@@ -88,7 +94,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         address _originalCaller,
         uint256,
         bytes calldata _data
-    ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) external payable onlyInteropCenter returns (L2TransactionRequestTwoBridgesInner memory request) {
         if (msg.value != 0) {
             revert NoEthAllowed();
         }
@@ -111,7 +117,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external onlyBridgehub {}
+    ) external onlyInteropCenter {}
 
     /// @notice Used to register the ctm asset in L2 AssetRouter.
     /// @param _originalCaller the address that called the Router

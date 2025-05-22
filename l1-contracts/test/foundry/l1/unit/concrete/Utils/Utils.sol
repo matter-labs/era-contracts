@@ -12,6 +12,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {MessageVerification} from "contracts/state-transition/chain-deps/facets/MessageVerification.sol";
 import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -336,13 +337,14 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](44);
+        bytes4[] memory selectors = new bytes4[](45);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
         selectors[i++] = UtilsFacet.util_getChainId.selector;
         selectors[i++] = UtilsFacet.util_setBridgehub.selector;
         selectors[i++] = UtilsFacet.util_getBridgehub.selector;
+        selectors[i++] = UtilsFacet.util_setInteropCenter.selector;
         selectors[i++] = UtilsFacet.util_setBaseToken.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenAssetId.selector;
         selectors[i++] = UtilsFacet.util_setVerifier.selector;
@@ -416,6 +418,7 @@ library Utils {
                 chainId: 1,
                 bridgehub: address(dummyBridgehub),
                 chainTypeManager: address(0x1234567890876543567890),
+                interopCenter: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),

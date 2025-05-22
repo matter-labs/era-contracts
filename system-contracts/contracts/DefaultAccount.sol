@@ -7,7 +7,7 @@ import {EIP_712_TX_TYPE, L1_TO_L2_TX_TYPE, Transaction, TransactionHelper} from 
 import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, INonceHolder, NONCE_HOLDER_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, INonceHolder, L2_INTEROP_HANDLER, NONCE_HOLDER_SYSTEM_CONTRACT} from "./Constants.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {FailedToPayOperator, InsufficientFunds, InvalidSig, SigField} from "./SystemContractErrors.sol";
 
@@ -109,11 +109,7 @@ contract DefaultAccount is IAccount {
         }
     }
 
-    /// @notice Method called by the bootloader to execute the transaction.
-    /// @param _transaction The transaction to execute.
-    /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
-    /// the unique (canonical) hash of the transaction and the suggested signed
-    /// hash of the transaction.
+    /// @inheritdoc IAccount
     function executeTransaction(
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash
@@ -122,11 +118,7 @@ contract DefaultAccount is IAccount {
         _execute(_transaction);
     }
 
-    /// @notice Method that should be used to initiate a transaction from this account by an external call.
-    /// @dev The custom account is supposed to implement this method to initiate a transaction on behalf
-    /// of the account via L1 -> L2 communication. However, the default account can initiate a transaction
-    /// from L1, so we formally implement the interface method, but it doesn't execute any logic.
-    /// @param _transaction The transaction to execute.
+    /// @inheritdoc IAccount
     function executeTransactionFromOutside(Transaction calldata _transaction) external payable override {
         // Behave the same as for fallback/receive, just execute nothing, returns nothing
     }
@@ -217,14 +209,14 @@ contract DefaultAccount is IAccount {
 
         address recoveredAddress = ecrecover(_hash, v, r, s);
 
-        return recoveredAddress == address(this) && recoveredAddress != address(0);
+        return recoveredAddress == _getVerificationAddress() && recoveredAddress != address(0);
     }
 
-    /// @notice Method for paying the bootloader for the transaction.
-    /// @param _transaction The transaction for which the fee is paid.
-    /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
-    /// the unique (canonical) hash of the transaction and the suggested signed
-    /// hash of the transaction.
+    function _getVerificationAddress() internal view virtual returns (address) {
+        return address(this);
+    }
+
+    /// @inheritdoc IAccount
     function payForTransaction(
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash
@@ -236,13 +228,7 @@ contract DefaultAccount is IAccount {
         }
     }
 
-    /// @notice Method, where the user should prepare for the transaction to be
-    /// paid for by a paymaster.
-    /// @dev Here, the account should set the allowance for the smart contracts
-    /// @param _transaction The transaction.
-    /// @dev It also accepts unused _txHash and _suggestedSignedHash parameters:
-    /// the unique (canonical) hash of the transaction and the suggested signed
-    /// hash of the transaction.
+    /// @inheritdoc IAccount
     function prepareForPaymaster(
         bytes32, // _txHash
         bytes32, // _suggestedSignedHash

@@ -5,6 +5,8 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IInteropCenter} from "./IInteropCenter.sol";
+import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -51,6 +53,14 @@ struct BridgehubBurnCTMAssetData {
     bytes chainData;
 }
 
+struct RouteBridgehubDepositStruct {
+    address secondBridgeAddress;
+    uint256 chainId;
+    address sender;
+    uint256 l2Value;
+    bytes secondBridgeCalldata;
+}
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IBridgehub {
@@ -91,6 +101,10 @@ interface IBridgehub {
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
     function messageRoot() external view returns (IMessageRoot);
+
+    function interopCenter() external view returns (IInteropCenter);
+
+    // function assetTracker() external view returns (IAssetTracker);
 
     function getZKChain(uint256 _chainId) external view returns (address);
 
@@ -169,7 +183,8 @@ interface IBridgehub {
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler
+        address _chainAssetHandler,
+        address _interopCenter
     ) external;
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
@@ -195,12 +210,6 @@ interface IBridgehub {
     //     ZKChainCommitment calldata _commitment,
     //     bytes calldata _diamondCut
     // ) external;
-
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
 
     function ctmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
 
@@ -238,4 +247,21 @@ interface IBridgehub {
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
 
     function forwardedBridgeRecoverFailedTransfer(uint256 _chainId) external returns (address zkChain, address ctm);
+
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
+    function routeBridgehubConfirmL2Transaction(
+        address _secondBridgeAddress,
+        uint256 _chainId,
+        bytes32 _txDataHash,
+        bytes32 _canonicalTxHash
+    ) external;
+
+    function routeBridgehubDeposit(
+        RouteBridgehubDepositStruct calldata _request
+    ) external payable returns (L2TransactionRequestTwoBridgesInner memory outputRequest);
 }

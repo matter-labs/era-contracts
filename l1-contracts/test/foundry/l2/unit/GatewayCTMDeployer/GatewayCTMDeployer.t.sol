@@ -68,7 +68,7 @@ contract GatewayCTMDeployerTest is Test {
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ChainTypeManager(address(0));
+        new ChainTypeManager(address(0), address(0));
         new ProxyAdmin();
 
         new L1VerifierFflonk();

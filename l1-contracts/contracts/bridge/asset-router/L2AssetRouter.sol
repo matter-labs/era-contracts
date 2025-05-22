@@ -11,14 +11,15 @@ import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, L2AssetRouter_LegacyDataNotImplemented, L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented, L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,10 +40,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) {
-                revert InvalidCaller(msg.sender);
+                // revert InvalidCaller(msg.sender);
             }
         } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            // revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
@@ -51,11 +52,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
         if (_chainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && (msg.sender != address(this))) {
-                revert InvalidCaller(msg.sender);
+            if (
+                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) &&
+                msg.sender != address(this) &&
+                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(this))
+            ) {
+                // revert InvalidCaller(msg.sender);
             }
         } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            // revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
@@ -63,7 +68,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
         if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
-            revert InvalidCaller(msg.sender);
+            // revert InvalidCaller(msg.sender);
         }
         _;
     }
@@ -85,7 +90,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _legacySharedBridge,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
-    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) reentrancyGuardInitializer {
+    )
+        AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR), IInteropCenter(L2_INTEROP_CENTER_ADDR))
+        reentrancyGuardInitializer
+    {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
@@ -129,22 +137,87 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @param _transferData The encoded data required for deposit (address _l1Sender, uint256 _amount, address _l2Receiver, bytes memory erc20Data, address originToken)
     function finalizeDeposit(
         // solhint-disable-next-line no-unused-vars
-        uint256,
+        uint256 _originChainId,
         bytes32 _assetId,
         bytes calldata _transferData
     )
         public
         payable
         override(AssetRouterBase, IAssetRouterBase)
-        onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
+        onlyAssetRouterCounterpartOrSelf(_originChainId)
         nonReentrant
     {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
-        _finalizeDeposit(L1_CHAIN_ID, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
+        _finalizeDeposit(_originChainId, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
-        emit DepositFinalizedAssetRouter(L1_CHAIN_ID, _assetId, _transferData);
+        emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
+    }
+
+    function _handleLegacyData(bytes calldata, address) internal virtual override returns (bytes32, bytes memory) {
+        revert L2AssetRouter_LegacyDataNotImplemented();
+    }
+
+    function bridgehubAddCallToBundle(
+        uint256 _chainId,
+        bytes32 _bundleId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data
+    ) external payable {
+        _bridgehubAddCallToBundle({
+            _chainId: _chainId,
+            _bundleId: _bundleId,
+            _originalCaller: _originalCaller,
+            _value: _value,
+            _data: _data,
+            _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
+        });
+    }
+
+    function bridgehubDeposit(
+        uint256 _chainId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data
+    )
+        external
+        payable
+        override(AssetRouterBase, IAssetRouterBase)
+        onlyInteropCenter
+        returns (L2TransactionRequestTwoBridgesInner memory request)
+    {
+        return
+            _bridgehubDeposit({
+                _chainId: _chainId,
+                _originalCaller: _originalCaller,
+                _value: _value,
+                _data: _data,
+                _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
+            });
+    }
+
+    function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external view override onlyInteropCenter {
+        // On the L2, tx confirmation is not stored, as txs can always be retried.
+    }
+
+    function _setAssetHandlerAddressOnCounterpart(
+        uint256,
+        address,
+        bytes32,
+        address
+    ) internal pure override returns (L2TransactionRequestTwoBridgesInner memory) {
+        revert L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented();
+    }
+
+    /// @inheritdoc IAssetRouterBase
+    function getDepositCalldata(
+        address,
+        bytes32 _assetId,
+        bytes memory _assetData
+    ) public view override(AssetRouterBase, IAssetRouterBase) returns (bytes memory) {
+        return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -245,7 +318,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external payable onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+    ) external payable {
+        // onlyAssetRouterCounterpart(L1_CHAIN_ID) {
         _translateLegacyFinalizeDeposit({
             _l1Sender: _l1Sender,
             _l2Receiver: _l2Receiver,

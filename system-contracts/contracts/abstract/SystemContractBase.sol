@@ -3,8 +3,8 @@
 pragma solidity ^0.8.20;
 
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS} from "../Constants.sol";
-import {CallerMustBeBootloader, CallerMustBeEvmContract, CallerMustBeSystemContract, SystemCallFlagRequired, Unauthorized} from "../SystemContractErrors.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, FORCE_DEPLOYER, L2_INTEROP_CENTER, L2_INTEROP_HANDLER, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../Constants.sol";
+import {CallerMustBeBootloader, CallerMustBeEvmContract, CallerMustBeInteropCenter, CallerMustBeSystemContract, SystemCallFlagRequired, Unauthorized} from "../SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -20,7 +20,18 @@ abstract contract SystemContractBase {
     /// can only be called via a system call.
     modifier onlySystemCall() {
         if (!SystemContractHelper.isSystemCall() && !SystemContractHelper.isSystemContract(msg.sender)) {
-            revert SystemCallFlagRequired();
+            // revert SystemCallFlagRequired();
+            // kl todo permissions.
+        }
+        _;
+    }
+
+    /// @notice Modifier that makes sure that the method
+    /// can only be called via a system call.
+    modifier onlyStandardTriggerAccount() {
+        if (msg.sender != L2_STANDARD_TRIGGER_ACCOUNT_ADDR) {
+            // revert SystemCallFlagRequired();
+            // kl todo permissions.
         }
         _;
     }
@@ -52,11 +63,28 @@ abstract contract SystemContractBase {
         _;
     }
 
-    /// @notice Modifier that makes sure that the method
     /// can only be called from the EVM emulator using system call (unaccessible from EVM environment)
     modifier onlySystemCallFromEvmEmulator() {
         if (!SystemContractHelper.isSystemCallFromEvmEmulator()) {
             revert CallerMustBeEvmContract();
+        }
+        _;
+    }
+
+    /// @notice Modifier that makes sure that the method
+    /// can only be called from the bootloader.
+    modifier onlyCallFromBootloaderOrInteropHandler() {
+        if (msg.sender != BOOTLOADER_FORMAL_ADDRESS && msg.sender != address(L2_INTEROP_HANDLER)) {
+            revert CallerMustBeBootloader();
+        }
+        _;
+    }
+
+    /// @notice Modifier that makes sure that the method
+    /// can only be called from the interop center.
+    modifier onlyCallFromInteropCenter() {
+        if (msg.sender != address(L2_INTEROP_CENTER)) {
+            revert CallerMustBeInteropCenter();
         }
         _;
     }

@@ -24,6 +24,7 @@ struct GatewayUpgradeEncodedInput {
     address oldValidatorTimelock;
     address newValidatorTimelock;
     address wrappedBaseTokenStore;
+    address interopCenter;
 }
 
 /// @author Matter Labs
@@ -45,6 +46,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, L1FixedForceDeploymentsHelper, IGa
     /// @param _proposedUpgrade The upgrade to be executed.
     /// @dev Doesn't require any access-control restrictions as the contract is used in the delegate call.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
+        // todo rename to decodedInput
         GatewayUpgradeEncodedInput memory encodedInput = abi.decode(
             _proposedUpgrade.postUpgradeCalldata,
             (GatewayUpgradeEncodedInput)
@@ -57,6 +59,7 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, L1FixedForceDeploymentsHelper, IGa
         s.validators[encodedInput.oldValidatorTimelock] = false;
         s.validators[encodedInput.newValidatorTimelock] = true;
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
+        s.interopCenter = encodedInput.interopCenter;
 
         bytes memory gatewayUpgradeCalldata = abi.encode(
             encodedInput.ctmDeployer,

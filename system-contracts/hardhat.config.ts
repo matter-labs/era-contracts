@@ -8,7 +8,6 @@ import "hardhat-typechain";
 export default {
   zksolc: {
     version: "1.5.11",
-    compilerSource: "binary",
     settings: {
       enableEraVMExtensions: true,
       suppressedErrors: ["sendtransfer"],

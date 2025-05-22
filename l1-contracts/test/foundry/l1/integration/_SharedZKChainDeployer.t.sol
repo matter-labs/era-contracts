@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
+import {console} from "forge-std/console.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
@@ -54,11 +55,16 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function _deployZKChain(address _baseToken) internal {
+        _deployZKChain(_baseToken, 0);
+    }
+
+    function _deployZKChain(address _baseToken, uint256 _chainId) internal {
+        uint256 chainId = _chainId == 0 ? currentZKChainId : _chainId;
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             string.concat(
                 "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-",
-                Strings.toString(currentZKChainId),
+                Strings.toString(chainId),
                 ".toml"
             )
         );
@@ -66,13 +72,15 @@ contract ZKChainDeployer is L1ContractDeployer {
             "ZK_CHAIN_OUT",
             string.concat(
                 "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-zk-chain-",
-                Strings.toString(currentZKChainId),
+                Strings.toString(chainId),
                 ".toml"
             )
         );
-        zkChainIds.push(currentZKChainId);
-        saveZKChainConfig(_getDefaultDescription(currentZKChainId, _baseToken, currentZKChainId));
-        currentZKChainId++;
+        zkChainIds.push(chainId);
+        saveZKChainConfig(_getDefaultDescription(chainId, _baseToken, chainId));
+        if (chainId == currentZKChainId) {
+            currentZKChainId++;
+        }
         deployScript.runForTest();
     }
 
@@ -149,7 +157,12 @@ contract ZKChainDeployer is L1ContractDeployer {
     }
 
     function acceptPendingAdmin() public {
-        IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(currentZKChainId - 1));
+        acceptPendingAdmin(0);
+    }
+
+    function acceptPendingAdmin(uint256 _chainId) public {
+        uint256 chainId = _chainId == 0 ? currentZKChainId - 1 : _chainId;
+        IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(chainId));
         address admin = chain.getPendingAdmin();
         vm.startBroadcast(admin);
         chain.acceptAdmin();
@@ -166,20 +179,28 @@ contract ZKChainDeployer is L1ContractDeployer {
         address _admin,
         uint256 _protocolVersion,
         bytes32 _storedBatchZero,
-        address _bridgehub
+        address _bridgehub,
+        address _interopCenter
     ) internal returns (address) {
         Diamond.DiamondCutData memory diamondCut = abi.decode(
             ecosystemConfig.contracts.diamondCutData,
             (Diamond.DiamondCutData)
         );
-        bytes memory initData;
+        bytes memory initData1;
+        bytes memory initData2;
 
         {
-            initData = bytes.concat(
+            // stack too deep
+            initData1 = bytes.concat(
                 IDiamondInit.initialize.selector,
                 bytes32(_chainId),
                 bytes32(uint256(uint160(address(_bridgehub)))),
-                bytes32(uint256(uint160(address(this)))),
+                bytes32(uint256(uint160(address(_interopCenter)))),
+                bytes32(uint256(uint160(address(this))))
+            );
+        }
+        {
+            initData2 = bytes.concat(
                 bytes32(_protocolVersion),
                 bytes32(uint256(uint160(_admin))),
                 bytes32(uint256(uint160(address(0x1337)))),
@@ -188,6 +209,11 @@ contract ZKChainDeployer is L1ContractDeployer {
                 diamondCut.initCalldata
             );
         }
+        bytes memory initData;
+        {
+            initData = bytes.concat(initData1, initData2);
+        }
+
         diamondCut.initCalldata = initData;
         DiamondProxy hyperchainContract = new DiamondProxy{salt: bytes32(0)}(block.chainid, diamondCut);
         return address(hyperchainContract);

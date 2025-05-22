@@ -6,11 +6,14 @@ pragma solidity ^0.8.24;
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
+
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "../contracts/bridgehub/IInteropCenter.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
@@ -244,6 +247,88 @@ library Utils {
     }
 
     /**
+     * @dev Returns the bytecode of a given system contract.
+     */
+    // function readSystemContractsBytecode(string memory filename) internal view returns (bytes memory) {
+    //     return readZKFoundryBytecodeSystemContracts(string.concat(filename, ".sol"), filename);
+    // }
+
+    // /**
+    // * @dev Returns the bytecode of a given system contract.
+    // */
+    // function readL1ContractsBytecode(string memory path, string memory filename) internal view returns (bytes memory) {
+    //     string memory root = vm.projectRoot();
+    //     string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
+    //     string memory file = vm.readFile(
+    //         // solhint-disable-next-line func-named-parameters
+    //         string.concat(
+    //             root,
+    //             "/",
+    //             CONTRACTS_PATH,
+    //             "/l1-contracts/artifacts-zk/contracts/",
+    //             path,
+    //             filename,
+    //             ".sol/",
+    //             filename,
+    //             ".json"
+    //         )
+    //     );
+    //     bytes memory bytecode = vm.parseJson(file, "$.bytecode");
+    //     return bytecode;
+    // }
+
+    //     /**
+    // * @dev Returns the bytecode of a given system contract.
+    // */
+    // function getL1ContractsPath(string memory path, string memory filename) internal view returns (string memory) {
+    //     string memory root = vm.projectRoot();
+    //     string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
+
+    //     // solhint-disable-next-line func-named-parameters
+    //     return string.concat(
+    //         root,
+    //         "/",
+    //         CONTRACTS_PATH,
+    //         "/l1-contracts/artifacts-zk/contracts/",
+    //         path,
+    //         filename,
+    //         ".sol/",
+    //         filename,
+    //         ".json"
+    //     );
+    // }
+
+    // /**
+    //  * @dev Returns the bytecode of a given system contract in yul.
+    //  */
+    // function readSystemContractsYulBytecode(string memory filename) internal view returns (bytes memory) {
+    //     string memory path = string.concat(
+    //         "/../system-contracts/zkout/",
+    //         filename,
+    //         ".yul/contracts-preprocessed/",
+    //         filename,
+    //         ".yul.json"
+    //     );
+
+    //     return readFoundryBytecode(path);
+    // }
+
+    // /**
+    //  * @dev Returns the bytecode of a given precompile system contract.
+    //  */
+    // function readPrecompileBytecode(string memory filename) internal view returns (bytes memory) {
+    //     string memory path = string.concat(
+    //         "/../system-contracts/zkout/",
+    //         filename,
+    //         ".yul/contracts-preprocessed/precompiles/",
+    //         filename,
+    //         ".yul.json"
+    //     );
+
+    //     return readFoundryBytecode(path);
+    // }
+
+    /**
      * @dev Deploy a Create2Factory contract.
      */
     function deployCreate2Factory() internal returns (address) {
@@ -395,9 +480,10 @@ library Utils {
         returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy)
     {
         IBridgehub bridgehub = IBridgehub(params.bridgehubAddress);
+        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
 
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(
+            interopCenter.l2TransactionBaseCost(
                 params.chainId,
                 params.l1GasPrice,
                 params.l2GasLimit,
@@ -434,9 +520,10 @@ library Utils {
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
+        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
 
         requiredValueToDeploy =
-            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            interopCenter.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
             2;
 
         l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
@@ -467,23 +554,23 @@ library Utils {
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
+        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
+        PrepareL1L2TransactionParams memory params = PrepareL1L2TransactionParams({
+            l1GasPrice: bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
+            l2Calldata: l2Calldata,
+            l2GasLimit: l2GasLimit,
+            l2Value: l2Value,
+            factoryDeps: factoryDeps,
+            dstAddress: dstAddress,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            refundRecipient: refundRecipient
+        });
         (
             L2TransactionRequestDirect memory l2TransactionRequestDirect,
             uint256 requiredValueToDeploy
-        ) = prepareL1L2Transaction(
-                PrepareL1L2TransactionParams({
-                    l1GasPrice: bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
-                    l2Calldata: l2Calldata,
-                    l2GasLimit: l2GasLimit,
-                    l2Value: l2Value,
-                    factoryDeps: factoryDeps,
-                    dstAddress: dstAddress,
-                    chainId: chainId,
-                    bridgehubAddress: bridgehubAddress,
-                    l1SharedBridgeProxy: l1SharedBridgeProxy,
-                    refundRecipient: refundRecipient
-                })
-            );
+        ) = prepareL1L2Transaction(params);
 
         address baseTokenAddress = bridgehub.baseToken(chainId);
         if (ADDRESS_ONE != baseTokenAddress) {
@@ -505,6 +592,30 @@ library Utils {
 
         console.log("L2 Transaction hash is ");
         console.logBytes32(txHash);
+    }
+
+    /// TODO(EVM-748): make that function support non-ETH based chains
+    function supplyChainWallet(
+        address addr,
+        uint256 amount,
+        uint256 chainId,
+        address bridgehubAddress,
+        address l1SharedBridgeProxy
+    ) public returns (bytes32 txHash) {
+        runL1L2Transaction({
+            l2Calldata: hex"",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            l2Value: amount,
+            factoryDeps: new bytes[](0),
+            dstAddress: addr,
+            chainId: chainId,
+            bridgehubAddress: bridgehubAddress,
+            l1SharedBridgeProxy: l1SharedBridgeProxy,
+            refundRecipient: addr
+        });
+
+        // We record L2 tx hash only for governance operations
+        return bytes32(0);
     }
 
     function prepareGovernanceL1L2DirectTransaction(
@@ -546,7 +657,7 @@ library Utils {
         calls = mergeCalls(calls, newCalls);
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionDirect,
+            IInteropCenter.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -591,7 +702,7 @@ library Utils {
         calls = mergeCalls(calls, newCalls);
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionTwoBridges,
+            IInteropCenter.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
@@ -801,6 +912,7 @@ library Utils {
             secondBridgeCalldata,
             refundRecipient
         );
+        IInteropCenter interopCenter = IInteropCenter(IBridgehub(bridgehubAddress).interopCenter());
 
         console.log("Executing transaction");
         // 2) Record logs
@@ -988,7 +1100,18 @@ library Utils {
         string memory fileName,
         string memory contractName
     ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
+        // kl todo add contracts path here
+        string memory CONTRACTS_PATH = vm.envString("CONTRACTS_PATH");
+
+        string memory path = string.concat(
+            "/",
+            CONTRACTS_PATH,
+            "/system-contracts/zkout/",
+            fileName,
+            "/",
+            contractName,
+            ".json"
+        );
         bytes memory bytecode = readFoundryBytecode(path);
         return bytecode;
     }
