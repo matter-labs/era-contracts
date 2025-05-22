@@ -6,7 +6,7 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "../../../common/Config.sol";
-import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
+import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, ProcessLogsInput, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
@@ -19,7 +19,10 @@ import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, Inva
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {InteropRoot} from "../../../common/Messaging.sol";
+import {IGetters} from "../../chain-interfaces/IGetters.sol";
+import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
+import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
+import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -101,6 +104,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             daOutput.blobsOpeningCommitments,
             daOutput.blobsLinearHashes
         );
+        _emitMessageRoot(_newBatch.batchNumber, logOutput.l2LogsTreeRoot);
 
         storedBatchInfo = StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
@@ -260,7 +264,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 }
                 logOutput.dependencyRootsRollingHash = logValue;
             } else if (logKey > MAX_LOG_KEY) {
-                revert UnexpectedSystemLog(logKey);
+                // revert UnexpectedSystemLog(logKey);
             }
         }
 
@@ -441,7 +445,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
-        _appendMessageRoot(currentBatchNumber, _storedBatch.l2LogsTreeRoot);
+        _verifyDependencyInteropRoots(_dependencyRoots);
+    }
+
+    function _emitMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.emitMessageRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
     /// @notice Verifies the dependency message roots that the chain relied on.
@@ -459,7 +468,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 // release, import and export only happens on GW, so this is the only case we have to cover.
                 correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
             } else {
-                revert CommitBasedInteropNotSupported();
+                // @notice: here we will verify against the Diamond proxy contract of the sender directly.
+                // This means the receiving chain has to trust the sender chain's CTM.
+                // For now we will not allow permissionless CTMs to be added, so the ecosystem is secure.
+                // revert CommitBasedInteropNotSupported();
+                correctRootHash = IGetters(IBridgehub(s.bridgehub).getZKChain(interopRoot.chainId)).l2LogsRootHash(
+                    interopRoot.blockOrBatchNumber
+                );
             }
             if (interopRoot.sides.length != 1 || interopRoot.sides[0] != correctRootHash) {
                 revert InvalidMessageRoot(correctRootHash, interopRoot.sides[0]);
@@ -476,22 +491,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @notice Appends the batch message root to the global message.
-    /// @param _batchNumber The number of the batch
-    /// @param _messageRoot The root of the merkle tree of the messages to L1.
-    /// @dev The logic of this function depends on the settlement layer as we support
-    /// message root aggregation only on non-L1 settlement layers for ease for migration.
-    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
-        // During migration to the new protocol version, there will be a period when
-        // the bridgehub does not yet provide the `messageRoot` functionality.
-        // To ease up the migration, we never append messages to message root on L1.
-        if (block.chainid != L1_CHAIN_ID) {
-            // Once the batch is executed, we include its message to the message root.
-            IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-            messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
-        }
-    }
-
     /// @inheritdoc IExecutor
     function executeBatchesSharedBridge(
         uint256, // _chainId
@@ -502,11 +501,37 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         (
             StoredBatchInfo[] memory batchesData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
-            InteropRoot[][] memory dependencyRoots
+            InteropRoot[][] memory dependencyRoots,
+            L2Log[][] memory logs,
+            bytes[][] memory messages,
+            bytes32[] memory messageRoots
         ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {
             revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
+        }
+        if (batchesData.length != logs.length && block.chainid != L1_CHAIN_ID) {
+            revert InvalidBatchesDataLength(batchesData.length, logs.length);
+        }
+        if (batchesData.length != messages.length && block.chainid != L1_CHAIN_ID) {
+            revert InvalidBatchesDataLength(batchesData.length, messages.length);
+        }
+
+        // Interop is only allowed on GW currently, so we never append messages to message root on L1.
+        // kl todo. Is this what we want?
+        if (block.chainid != L1_CHAIN_ID) {
+            for (uint256 i = 0; i < messages.length; i = i.uncheckedInc()) {
+                ProcessLogsInput memory processLogsInput = ProcessLogsInput({
+                    logs: logs[i],
+                    messages: messages[i],
+                    chainId: s.chainId,
+                    batchNumber: batchesData[i].batchNumber,
+                    chainBatchRoot: batchesData[i].l2LogsTreeRoot,
+                    messageRoot: messageRoots[i]
+                });
+                IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
+                assetTracker.processLogsAndMessages(processLogsInput);
+            }
         }
 
         for (uint256 i = 0; i < nBatches; i = i.uncheckedInc()) {

@@ -17,7 +17,7 @@ import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
-
+import {IAssetTracker} from "../asset-tracker/IAssetTracker.sol";
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -35,9 +35,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
+    IAssetTracker public l1AssetTracker;
+
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
+    // kl todo deprecate
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -83,45 +86,49 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
     }
 
+    function setAssetTracker(address _l1AssetTracker) external {
+        l1AssetTracker = IAssetTracker(_l1AssetTracker);
+    }
+
     /// @notice Transfers tokens from shared bridge as part of the migration process.
     /// The shared bridge becomes the L1Nullifier contract.
     /// @dev Both ETH and ERC20 tokens can be transferred. Exhausts balance of shared bridge after the first call.
     /// @dev Calling second time for the same token will revert.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
-    function transferFundsFromSharedBridge(address _token) external {
-        ensureTokenIsRegistered(_token);
-        if (_token == ETH_TOKEN_ADDRESS) {
-            uint256 balanceBefore = address(this).balance;
-            L1_NULLIFIER.transferTokenToNTV(_token);
-            uint256 balanceAfter = address(this).balance;
-            if (balanceAfter <= balanceBefore) {
-                revert NoFundsTransferred();
-            }
-        } else {
-            uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
-            uint256 nullifierChainBalance = IERC20(_token).balanceOf(address(L1_NULLIFIER));
-            if (nullifierChainBalance == 0) {
-                revert ZeroAmountToTransfer();
-            }
-            L1_NULLIFIER.transferTokenToNTV(_token);
-            uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-            if (balanceAfter - balanceBefore < nullifierChainBalance) {
-                revert WrongAmountTransferred(balanceAfter - balanceBefore, nullifierChainBalance);
-            }
-        }
-    }
+    // function transferFundsFromSharedBridge(address _token) external {
+    //     ensureTokenIsRegistered(_token);
+    //     if (_token == ETH_TOKEN_ADDRESS) {
+    //         uint256 balanceBefore = address(this).balance;
+    //         L1_NULLIFIER.transferTokenToNTV(_token);
+    //         uint256 balanceAfter = address(this).balance;
+    //         if (balanceAfter <= balanceBefore) {
+    //             revert NoFundsTransferred();
+    //         }
+    //     } else {
+    //         uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
+    //         uint256 nullifierChainBalance = IERC20(_token).balanceOf(address(L1_NULLIFIER));
+    //         if (nullifierChainBalance == 0) {
+    //             revert ZeroAmountToTransfer();
+    //         }
+    //         L1_NULLIFIER.transferTokenToNTV(_token);
+    //         uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
+    //         if (balanceAfter - balanceBefore < nullifierChainBalance) {
+    //             revert WrongAmountTransferred(balanceAfter - balanceBefore, nullifierChainBalance);
+    //         }
+    //     }
+    // }
 
     /// @notice Updates chain token balance within NTV to account for tokens transferred from the shared bridge (part of the migration process).
     /// @dev Clears chain balance on the shared bridge after the first call. Subsequent calls will not affect the state.
     /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
     /// @param _targetChainId The chain ID of the corresponding ZK chain.
-    function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
-        uint256 nullifierChainBalance = L1_NULLIFIER.chainBalance(_targetChainId, _token);
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
-        chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
-        originChainId[assetId] = block.chainid;
-        L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
-    }
+    // function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
+    //     uint256 nullifierChainBalance = L1_NULLIFIER.chainBalance(_targetChainId, _token);
+    //     bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
+    //     // chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
+    //     originChainId[assetId] = block.chainid;
+    //     L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
+    // }
 
     /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
@@ -283,9 +290,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) internal override {
         // Note, that we do not update balances for chains where the assetId comes from,
         // since these chains can mint new instances of the token.
-        if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
-            chainBalance[_chainId][_assetId] += _amount;
-        }
+        l1AssetTracker.handleChainBalanceIncrease(_chainId, _assetId, _amount, _isNative);
     }
 
     function _handleChainBalanceDecrease(
@@ -294,15 +299,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         uint256 _amount,
         bool _isNative
     ) internal override {
-        // Note, that we do not update balances for chains where the assetId comes from,
-        // since these chains can mint new instances of the token.
-        if (!_hasInfiniteBalance(_isNative, _assetId, _chainId)) {
-            // Check that the chain has sufficient balance
-            if (chainBalance[_chainId][_assetId] < _amount) {
-                revert InsufficientChainBalance();
-            }
-            chainBalance[_chainId][_assetId] -= _amount;
-        }
+        // On L1 the asset tracker is triggered when the user withdraws.
+        l1AssetTracker.handleChainBalanceDecrease(_chainId, _assetId, _amount, _isNative);
     }
 
     /// @dev Returns whether a chain `_chainId` has infinite balance for an asset `_assetId`, i.e.
@@ -311,7 +309,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _assetId The asset id
     /// @param _chainId An id of a chain which we test against.
     /// @return Whether The chain `_chainId` has infinite balance of the token
-    function _hasInfiniteBalance(bool _isNative, bytes32 _assetId, uint256 _chainId) private view returns (bool) {
-        return !_isNative && originChainId[_assetId] == _chainId;
-    }
+    // function _hasInfiniteBalance(bool _isNative, bytes32 _assetId, uint256 _chainId) private view returns (bool) {
+    //     return !_isNative && originChainId[_assetId] == _chainId;
+    // }
 }

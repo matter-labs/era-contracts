@@ -77,7 +77,7 @@ contract InitializeL2WethTokenScript is Script {
         Bridgehub bridgehub = Bridgehub(config.bridgehubProxyAddr);
 
         uint256 gasPrice = Utils.bytesToUint256(vm.rpc("eth_gasPrice", "[]")) * config.gasMultiplier;
-        uint256 requiredValueToInitializeBridge = bridgehub.l2TransactionBaseCost(
+        uint256 requiredValueToInitializeBridge = interopCenter.l2TransactionBaseCost(
             config.eraChainId,
             gasPrice,
             config.deployL2BridgeCounterpartGasLimit,
@@ -98,7 +98,7 @@ contract InitializeL2WethTokenScript is Script {
         });
 
         vm.broadcast();
-        bridgehub.requestL2TransactionDirect{value: requiredValueToInitializeBridge}(l2TransactionRequestDirect);
+        interopCenter.requestL2TransactionDirect{value: requiredValueToInitializeBridge}(l2TransactionRequestDirect);
 
         console.log("L2 WETH token initialized");
     }

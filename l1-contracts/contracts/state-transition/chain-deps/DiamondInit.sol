@@ -42,6 +42,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         if (_initializeData.chainTypeManager == address(0)) {
             revert ZeroAddress();
         }
+        if (_initializeData.interopCenter == address(0)) {
+            revert ZeroAddress();
+        }
         if (_initializeData.baseTokenAssetId == bytes32(0)) {
             revert EmptyAssetId();
         }
@@ -61,6 +64,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
         s.chainTypeManager = _initializeData.chainTypeManager;
+        s.interopCenter = _initializeData.interopCenter;
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.protocolVersion = _initializeData.protocolVersion;
 
