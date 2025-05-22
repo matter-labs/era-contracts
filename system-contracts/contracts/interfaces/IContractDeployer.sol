@@ -177,9 +177,6 @@ interface IContractDeployer {
     /// @dev Note that it allows changes from account to non-account and vice versa.
     function updateAccountVersion(AccountAbstractionVersion _version) external;
 
-    /// @notice Can be called by an account to update its account version
-    function updateInteropAccountVersion(AccountAbstractionVersion _version) external;
-
     /// @notice Updates the nonce ordering of the account. Since only `KeyedSequential` ordering
     /// is supported, currently this method always reverts.
     function updateNonceOrdering(AccountNonceOrdering) external;

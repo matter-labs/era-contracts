@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {InvalidChainId} from "contracts/SystemContractErrors.sol";
 import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
@@ -31,23 +31,6 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
             revert InvalidChainId();
         }
         ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
-        // Execute the call to set addresses in BridgeHub.
-        (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
-            address(DEPLOYER_SYSTEM_CONTRACT),
-            L2_STANDARD_TRIGGER_ACCOUNT_ADDR,
-            abi.encodeCall(
-                IContractDeployer.updateInteropAccountVersion,
-                (IContractDeployer.AccountAbstractionVersion.Version1)
-            )
-        );
-
-        // Revert with the original revert reason if the call failed.
-        /// @dev Propagate the revert reason from the failed call.
-        if (!success) {
-            assembly {
-                revert(add(returnData, 0x20), returndatasize())
-            }
-        }
 
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             _ctmDeployer,
