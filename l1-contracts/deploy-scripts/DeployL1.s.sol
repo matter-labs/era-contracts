@@ -284,10 +284,10 @@ contract DeployL1Script is Script, DeployUtils {
         }
 
         if (config.contracts.eigenDAL1DAValidator == address(0)) {
-            if (config.contracts.eigenDACertAndBlobVerifier == address(0)) {
-                console.log("EigenDACertAndBlobVerifier not deployed, do not use for production");
+            if (config.contracts.eigenDARiscZeroVerifier == address(0)) {
+                console.log("EigenDARiscZeroVerifier not deployed, do not use for production");
             }
-            addresses.daAddresses.eigenDACertAndBlobVerifier = config.contracts.eigenDACertAndBlobVerifier;
+            addresses.daAddresses.eigenDARiscZeroVerifier = config.contracts.eigenDARiscZeroVerifier;
             addresses.daAddresses.eigenDAL1DAValidator = deploySimpleContract("EigenDAL1DAValidator", false);
         } else {
             addresses.daAddresses.eigenDAL1DAValidator = config.contracts.eigenDAL1DAValidator;
@@ -604,8 +604,8 @@ contract DeployL1Script is Script, DeployUtils {
 
         vm.serializeAddress(
             "deployed_addresses",
-            "eigenda_cert_and_blob_verifier_addr",
-            addresses.daAddresses.eigenDACertAndBlobVerifier
+            "eigenda_risc_zero_verifier_addr",
+            addresses.daAddresses.eigenDARiscZeroVerifier
         );
 
         string memory deployedAddresses = vm.serializeAddress(
