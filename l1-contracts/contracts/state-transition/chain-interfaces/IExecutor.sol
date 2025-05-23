@@ -105,19 +105,12 @@ interface IExecutor is IZKChainBase {
         bytes operatorDAInput;
     }
 
-    /// @notice Commitment to the status of a single L2 transaction.
-    /// @param txHash The keccak256 hash of the transaction data.
-    /// @param status The boolean status of the transaction (true = success, false = failure).
-    struct TransactionStatusCommitment {
-        bytes32 txHash;
-        bool status;
-    }
-
-    /// @notice Container for a list of `TransactionStatusCommitment`s to precommit.
-    /// @param txs Array of individual transaction status commitments for the batch.
+    /// @notice Container for a list of transaction statuses to precommit.
+    /// @param txs A packed array of individual transaction status commitments for the batch. Each is expected to be 
+    /// of length 33 and have the following format: <32-byte tx hash, 1-byte status>. where status is either 0 (failed) or 1 (success).
     /// @param untrustedLastMiniblockNumberHint The "hint" for what the last miniblock that these txs represent is.
     struct PrecommitInfo {
-        TransactionStatusCommitment[] txs;
+        bytes packedTxsCommitments;
         uint256 untrustedLastMiniblockNumberHint;
     }
 
