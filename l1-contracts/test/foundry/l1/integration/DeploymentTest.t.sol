@@ -27,6 +27,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
+import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -133,7 +134,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub)
+                address(addresses.bridgehub),
+                address(addresses.interopCenter)
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();
@@ -164,7 +166,8 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub.assetRouter())
+                address(addresses.bridgehub.assetRouter()),
+                address(addresses.interopCenter)
             );
 
             address stmAddr = IZKChain(chain).getChainTypeManager();

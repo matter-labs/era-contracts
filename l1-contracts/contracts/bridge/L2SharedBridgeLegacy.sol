@@ -125,7 +125,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
         ) {
-            revert InvalidCaller(msg.sender);
+            // revert InvalidCaller(msg.sender);
         }
 
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge({

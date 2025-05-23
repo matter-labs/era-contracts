@@ -26,24 +26,44 @@ error NoEthAllowed();
 error NotAssetRouter(address msgSender, address sharedBridge);
 // 0x8beee3a3
 error NotChainAssetHandler(address sender, address chainAssetHandler);
-// 0xc0ca9182
-error NotCurrentSL(uint256 settlementLayerChainId, uint256 blockChainId);
-// 0x472477e2
-error NotInGatewayMode();
-// 0xecb34449
-error NotL1(uint256 l1ChainId, uint256 blockChainId);
+error NotCurrentSettlementLayer(uint256 currentSettlementLayer, uint256 newSettlementLayer);
+
 // 0x23295f0e
 error NotOwner(address sender, address owner);
-// 0x693cd3dc
-error NotOwnerViaRouter(address msgSender, address originalCaller);
-// 0xa2ac02a0
-error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
+
+// 0xecb34449
+error NotL1(uint256 l1ChainId, uint256 blockChainId);
+
 // 0x527b87c7
 error OnlyBridgehub(address msgSender, address bridgehub);
-// 0x2d396674
-error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
+
+//
+error OnlyInteropCenter(address msgSender, address interopCenter);
+
+//
+error OnlyAssetTracker(address, address);
+
+//
+error DirectCallNonEmptyValue(address nextContract);
+
+//
+error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
+
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
+
+// 0xa2ac02a0
+error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
+
+// 0x693cd3dc
+error NotOwnerViaRouter(address msgSender, address originalCaller);
+
+// 0x472477e2
+error NotInGatewayMode();
+
+// 0x2d396674
+error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
+
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1

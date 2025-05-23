@@ -10,16 +10,18 @@ import type { IMailbox } from "../../typechain/IMailbox";
 import type { ExecutorFacet } from "../../typechain";
 
 import type { FeeParams, L2CanonicalTransaction } from "../../src.ts/utils";
+import { PubdataPricingMode } from "../../src.ts/utils";
 import {
   ADDRESS_ONE,
-  PubdataPricingMode,
   EMPTY_STRING_KECCAK,
   STORED_BATCH_INFO_ABI_STRING,
   COMMIT_BATCH_INFO_ABI_STRING,
   PRIORITY_OPS_BATCH_INFO_ABI_STRING,
-} from "../../src.ts/utils";
+} from "../../src.ts/constants";
+
 import { packSemver } from "../../scripts/utils";
 import { keccak256, hexConcat, defaultAbiCoder } from "ethers/lib/utils";
+import type { IInteropCenter } from "../../typechain/IInteropCenter";
 
 export const CONTRACTS_GENESIS_PROTOCOL_VERSION = packSemver(0, 21, 0).toString();
 // eslint-disable-next-line @typescript-eslint/no-var-requires
@@ -134,13 +136,14 @@ export async function requestExecute(
   l2GasLimit: ethers.BigNumber,
   factoryDeps: BytesLike[],
   refundRecipient: string,
-  overrides?: ethers.PayableOverrides
+  overrides?: ethers.PayableOverrides,
+  interopCenter?: IInteropCenter
 ) {
   overrides ??= {};
   overrides.gasPrice ??= bridgehub.provider.getGasPrice();
   // overrides.gasLimit ??= 30000000;
   if (!overrides.value) {
-    const baseCost = await bridgehub.l2TransactionBaseCost(
+    const baseCost = await interopCenter.l2TransactionBaseCost(
       chainId,
       await overrides.gasPrice,
       l2GasLimit,
@@ -149,7 +152,7 @@ export async function requestExecute(
     overrides.value = baseCost.add(l2Value);
   }
 
-  return await bridgehub.requestL2TransactionDirect(
+  return await interopCenter.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: to,

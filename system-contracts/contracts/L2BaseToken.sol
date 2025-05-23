@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
-import {IMailbox} from "./interfaces/IMailbox.sol";
+import {IMailboxImpl} from "./interfaces/IMailboxImpl.sol";
 import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
 
 /**
@@ -65,7 +65,7 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @dev This method is only callable by the bootloader.
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
-    function mint(address _account, uint256 _amount) external override onlyCallFromBootloader {
+    function mint(address _account, uint256 _amount) external override onlyCallFromBootloaderOrInteropHandler {
         totalSupply += _amount;
         balance[_account] += _amount;
         emit Mint(_account, _amount);
@@ -112,9 +112,13 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         }
     }
 
+    function burnMsgValue() external payable override onlyCallFromInteropCenter {
+        _burnMsgValue();
+    }
+
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
     function _getL1WithdrawMessage(address _to, uint256 _amount) internal pure returns (bytes memory) {
-        return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount);
+        return abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _to, _amount);
     }
 
     /// @dev Get the message to be sent to L1 to initiate a withdrawal.
@@ -125,6 +129,6 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
         bytes memory _additionalData
     ) internal pure returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IMailbox.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
+        return abi.encodePacked(IMailboxImpl.finalizeEthWithdrawal.selector, _to, _amount, _sender, _additionalData);
     }
 }

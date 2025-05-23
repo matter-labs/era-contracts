@@ -31,6 +31,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice Address of the bridgehub
     address public immutable BRIDGE_HUB;
 
+    /// @notice Address of the interop center
+    address public immutable INTEROP_CENTER;
+
     /// @notice The map from chainId => zkChain contract
     EnumerableMap.UintToAddressMap internal __DEPRECATED_zkChainMap;
 
@@ -74,8 +77,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// - It prevents the function from being called twice (including in the proxy impl).
     /// - It makes the local version consistent with the one in production, which already had the reentrancy guard
     /// initialized.
-    constructor(address _bridgehub) reentrancyGuardInitializer {
+    constructor(address _bridgehub, address _interopCenter) reentrancyGuardInitializer {
         BRIDGE_HUB = _bridgehub;
+        INTEROP_CENTER = _interopCenter;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
@@ -414,6 +418,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             IDiamondInit.initialize.selector,
             bytes32(_chainId),
             bytes32(uint256(uint160(BRIDGE_HUB))),
+            bytes32(uint256(uint160(INTEROP_CENTER))),
             bytes32(uint256(uint160(address(this)))),
             bytes32(protocolVersion),
             bytes32(uint256(uint160(_admin))),

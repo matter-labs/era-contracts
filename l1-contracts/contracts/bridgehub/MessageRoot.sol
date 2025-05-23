@@ -3,11 +3,12 @@
 pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainExists, MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "./L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -78,6 +79,8 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
+    address public assetTracker;
+
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
         if (msg.sender != address(BRIDGE_HUB) && msg.sender != address(BRIDGE_HUB.chainAssetHandler())) {
@@ -99,6 +102,20 @@ contract MessageRoot is IMessageRoot, Initializable {
         _;
     }
 
+    modifier onlyAssetTracker() {
+        if (msg.sender != assetTracker) {
+            revert OnlyAssetTracker(msg.sender, assetTracker);
+        }
+        _;
+    }
+
+    modifier onlyBridgehubOwner() {
+        if (msg.sender != Ownable(address(BRIDGE_HUB)).owner()) {
+            revert OnlyBridgehubOwner(msg.sender, Ownable(address(BRIDGE_HUB)).owner());
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -112,6 +129,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
     function initialize() external initializer {
         _initialize();
+    }
+
+    function setAddresses(address _assetTracker) external onlyBridgehubOwner {
+        assetTracker = _assetTracker;
     }
 
     /// @notice Adds a single chain to the message root.
@@ -135,7 +156,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
+    ) external onlyAssetTracker {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
@@ -162,6 +183,17 @@ contract MessageRoot is IMessageRoot, Initializable {
         _sides[0] = sharedTreeRoot;
         emit NewInteropRoot(block.chainid, block.number, 0, _sides);
         historicalRoot[block.number] = sharedTreeRoot;
+    }
+
+    /// @notice emit a new message root when committing a new batch
+    function emitMessageRoot(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        bytes32 _chainBatchRoot
+    ) external onlyChain(_chainId) {
+        bytes32[] memory _sides = new bytes32[](1);
+        _sides[0] = _chainBatchRoot;
+        emit NewInteropRoot(_chainId, _batchNumber, 0, _sides);
     }
 
     /// @notice Gets the aggregated root of all chains.

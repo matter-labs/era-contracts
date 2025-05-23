@@ -12,9 +12,13 @@ import {IBridgehub} from "./IBridgehub.sol";
 interface IMessageRoot {
     function BRIDGE_HUB() external view returns (IBridgehub);
 
+    function setAddresses(address _assetTracker) external;
+
     function addNewChain(uint256 _chainId) external;
 
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
+
+    function emitMessageRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _messageRoot) external;
 }

@@ -36,7 +36,8 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         L2Utils.initSystemContracts(_args);
     }
 
-    // note this is duplicate code, but the inheritance is already complex
+    /// @notice this is duplicate code, but the inheritance is already complex
+    /// here we have to deploy contracts manually with new Contract(), because that can be handled by the compiler.
     function deployL2Contracts(uint256 _l1ChainId) public virtual override {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(
@@ -68,7 +69,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.diamondInit = address(new DiamondInit());
         // Deploy ChainTypeManager implementation
         addresses.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager(addresses.bridgehub.bridgehubProxy)
+            new ChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)
         );
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager

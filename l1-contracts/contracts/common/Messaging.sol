@@ -2,6 +2,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+bytes1 constant BUNDLE_IDENTIFIER = 0x01;
+
 /// @dev The enum that represents the transaction execution status
 /// @param Failure The transaction execution failed
 /// @param Success The transaction execution succeeded
@@ -147,4 +149,73 @@ struct InteropRoot {
     // We are double overloading this. The sides of the dynamic incremental merkle tree normally contains the root, as well as the sides of the tree.
     // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
     bytes32[] sides;
+}
+
+struct InteropCallRequest {
+    address to;
+    uint256 value;
+    bytes data;
+}
+
+struct InteropCallStarter {
+    bool directCall;
+    address nextContract;
+    bytes data;
+    uint256 value;
+    // The value that is requested for the interop call.
+    // This has to be known beforehand, as the funds in the interop call belong to the user.
+    // This is because we cannot guarantee atomicity of xL2 txs (just the atimicity of calls on the destination chain)
+    // So contracts cannot send their own value, only stamp the value that belongs to the user.
+    uint256 requestedInteropCallValue;
+}
+
+struct InteropCall {
+    bool directCall;
+    address to;
+    address from;
+    uint256 value;
+    bytes data;
+}
+
+struct BundleMetadata {
+    uint256 destinationChainId;
+    address sender;
+    uint256 callCount;
+    // Note the total value is provided by the user.
+    // This is because we cannot guarantee atomicity of xL2 txs (just the atomicity of calls on the destination chain)
+    // So contracts cannot send their own value, only stamp the value that belongs to the user.
+    uint256 totalValue;
+}
+
+struct InteropBundle {
+    uint256 destinationChainId;
+    InteropCall[] calls;
+    // If not set - anyone can execute it.
+    address executionAddress;
+}
+
+
+/// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+struct MessageInclusionProof {
+    uint256 chainId;
+    uint256 l1BatchNumber;
+    uint256 l2MessageIndex;
+    L2Message message;
+    bytes32[] proof;
+}
+
+struct LogInclusionProof {
+    uint256 chainId;
+    uint256 l1BatchNumber;
+    uint256 l2LogIndex;
+    L2Log log;
+    bytes32[] proof;
+}
+
+struct LeafInclusionProof {
+    uint256 chainId;
+    uint256 l1BatchNumber;
+    uint256 l2LeafProofMask;
+    bytes32 leaf;
+    bytes32[] proof;
 }
