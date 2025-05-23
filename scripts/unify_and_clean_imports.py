@@ -15,6 +15,9 @@ from collections import OrderedDict
 # Regex to match named import statements: import {a, b} from "path";
 IMPORT_REGEX = re.compile(r'^\s*import\s*{([^}]*)}\s*from\s*["\']([^"\']+)["\'];')
 
+dependency_files = [
+    "contracts/l1-contracts/contracts/common/Dependencies.sol",
+]
 
 def process_file(path: str):
     """
@@ -27,6 +30,7 @@ def process_file(path: str):
     imports = OrderedDict()  # import_path -> { 'symbols': list, 'first_index': int }
     duplicates_in_line = False
     unsorted_in_line = False
+    to_be_removed = []
 
     # First pass: collect named imports, detect intra-line duplicates & unsorted
     for idx, line in enumerate(lines):
@@ -46,10 +50,31 @@ def process_file(path: str):
         imp_path = m.group(2)
         if imp_path not in imports:
             imports[imp_path] = {'symbols': [], 'first_index': idx}
-        # accumulate unique symbols
+        # accumulate unique symbols and check if they are used in the file
         for sym in raw_symbols:
             if sym not in imports[imp_path]['symbols']:
-                imports[imp_path]['symbols'].append(sym)
+                # Check if the symbol is used anywhere else in the file
+                symbol_used = False
+                if " as " in sym:
+                    symbol_used = True
+                for other_line in lines:
+                    if line == other_line:
+                        continue
+                    if sym in other_line and not IMPORT_REGEX.match(other_line):
+                        symbol_used = True
+                        if sym == "NotCurrentSettlementLayer":
+                            print(f"Symbol '{sym}' is used in the file")
+                            print(f"Line: {line}")
+                            print(f"Other line: {other_line}")
+                        break
+                if sym == "InitializeDataNewChain as DiamondInitializeDataNewChain":
+                    print(f"Symbol '{sym}' is used found {symbol_used} in {path}")
+                    print(f"Line: {line}")
+                    print(f"Other line: {other_line}")
+                if not symbol_used:
+                    to_be_removed.append(sym)
+                else:
+                    imports[imp_path]['symbols'].append(sym)
 
     # Count how many import statements per path
     occurrences = {imp_path: 0 for imp_path in imports}
@@ -61,15 +86,22 @@ def process_file(path: str):
     # If nothing to unify (no multi-line duplicates), no intra-line duplicates, and everything already sorted → done
     if not any(count > 1 for count in occurrences.values()) \
        and not duplicates_in_line \
-       and not unsorted_in_line:
+       and not unsorted_in_line \
+       and not to_be_removed:
         return
 
     # Build unified import lines (sorted symbols)
     unified_import_lines = {}
     for imp_path, data in imports.items():
         symbols_sorted = sorted(data['symbols'])
+        print(f"To be removed: {to_be_removed}")
+        if path in dependency_files:
+            symbols_filtered = symbols_sorted
+        else:
+            symbols_filtered = [sym for sym in symbols_sorted if sym not in to_be_removed]
+        empty_import = len(symbols_filtered) == 0
         unified_import_lines[imp_path] = (
-            f"import {{{', '.join(symbols_sorted)}}} from \"{imp_path}\";\n"
+            f"import {{{', '.join(symbols_filtered)}}} from \"{imp_path}\";\n" if not empty_import else "\n"
         )
 
     # Second pass: write new lines, replacing first occurrence (or only occurrence)
@@ -97,6 +129,9 @@ def process_file(path: str):
 
 def walk_and_clean(root_dir: str):
     for dirpath, _, filenames in os.walk(root_dir):
+        # Skip files in ./lib and node_modules directories
+        if dirpath.startswith(os.path.join(root_dir, 'lib')) or dirpath.startswith(os.path.join(root_dir, 'node_modules')):
+            continue
         for file in filenames:
             if file.endswith('.sol'):
                 process_file(os.path.join(dirpath, file))

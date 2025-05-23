@@ -3,9 +3,9 @@ pragma solidity ^0.8.24;
 
 // import {console} from "forge-std/console.sol";
 import {BundleMetadata, InteropCall} from "../common/Messaging.sol";
-import {TransientPrimitivesLib, taddress, tbytes32, tuint256} from "../common/libraries/TransientPrimitves/TransientPrimitives.sol";
+import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitves/TransientPrimitives.sol";
 import {TransientBytesLib} from "../common/libraries/TransientPrimitves/TransientBytesLib.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../common/l2-helpers/L2ContractAddresses.sol";
+
 
 bytes32 constant BUNDLE_METADATA_SLOT_MODIFIER = bytes32(uint256(keccak256("BUNDLE_METADATA_SLOT_MODIFIER")) - 1);
 bytes32 constant CALL_SLOT_MODIFIER = bytes32(uint256(keccak256("CALL_SLOT_MODIFIER")) - 1);

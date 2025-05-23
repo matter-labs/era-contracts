@@ -18,7 +18,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
-import {AssetHandlerDoesNotExist, AssetIdNotSupported, NonEmptyMsgValue, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
+import {AssetIdNotSupported, NonEmptyMsgValue, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
