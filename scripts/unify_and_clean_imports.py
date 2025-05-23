@@ -17,6 +17,7 @@ IMPORT_REGEX = re.compile(r'^\s*import\s*{([^}]*)}\s*from\s*["\']([^"\']+)["\'];
 
 dependency_files = [
     "contracts/l1-contracts/contracts/common/Dependencies.sol",
+    "contracts/l2-contracts/contracts/Dependencies.sol",
 ]
 
 def process_file(path: str):
@@ -62,15 +63,7 @@ def process_file(path: str):
                         continue
                     if sym in other_line and not IMPORT_REGEX.match(other_line):
                         symbol_used = True
-                        if sym == "NotCurrentSettlementLayer":
-                            print(f"Symbol '{sym}' is used in the file")
-                            print(f"Line: {line}")
-                            print(f"Other line: {other_line}")
                         break
-                if sym == "InitializeDataNewChain as DiamondInitializeDataNewChain":
-                    print(f"Symbol '{sym}' is used found {symbol_used} in {path}")
-                    print(f"Line: {line}")
-                    print(f"Other line: {other_line}")
                 if not symbol_used:
                     to_be_removed.append(sym)
                 else:
@@ -94,7 +87,6 @@ def process_file(path: str):
     unified_import_lines = {}
     for imp_path, data in imports.items():
         symbols_sorted = sorted(data['symbols'])
-        print(f"To be removed: {to_be_removed}")
         if path in dependency_files:
             symbols_filtered = symbols_sorted
         else:
@@ -130,7 +122,8 @@ def process_file(path: str):
 def walk_and_clean(root_dir: str):
     for dirpath, _, filenames in os.walk(root_dir):
         # Skip files in ./lib and node_modules directories
-        if dirpath.startswith(os.path.join(root_dir, 'lib')) or dirpath.startswith(os.path.join(root_dir, 'node_modules')):
+        if (dirpath.startswith(os.path.join(root_dir, 'lib')) or 
+            dirpath.startswith(os.path.join(root_dir, 'node_modules'))):
             continue
         for file in filenames:
             if file.endswith('.sol'):

@@ -8,7 +8,7 @@ import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {Utils} from "./libraries/Utils.sol";
-import {COMPUTATIONAL_PRICE_FOR_PUBDATA, KNOWN_CODE_STORAGE_CONTRACT, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, SYSTEM_CONTEXT_CONTRACT, SystemLogKey} from "./Constants.sol";
+import {COMPUTATIONAL_PRICE_FOR_PUBDATA, KNOWN_CODE_STORAGE_CONTRACT, L2_MESSAGE_ROOT, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, L2_TO_L1_LOGS_MERKLE_TREE_LEAVES, SYSTEM_CONTEXT_CONTRACT, SystemLogKey} from "./Constants.sol";
 import {PubdataField, ReconstructionMismatch} from "./SystemContractErrors.sol";
 import {IL2DAValidator} from "./interfaces/IL2DAValidator.sol";
 
