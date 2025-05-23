@@ -115,21 +115,21 @@ interface IExecutor is IZKChainBase {
     }
 
     /// @notice Precommits the status of all L2 transactions for the next batch on the shared bridge.
-    /// @param _chainId Chain ID of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain.
     /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
     /// @param _precommitData ABI‐encoded transaction status list for the precommit.
-    function precommitSharedBridge(uint256 _chainId, uint256 _batchNumber, bytes calldata _precommitData) external;
+    function precommitSharedBridge(address _chainAddress, uint256 _batchNumber, bytes calldata _precommitData) external;
 
     /// @notice Function called by the operator to commit new batches. It is responsible for:
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
     /// - Storing batch commitments.
-    /// @param _chainId Chain ID of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain.
     /// @param _processFrom The batch number from which the processing starts.
     /// @param _processTo The batch number at which the processing ends.
     /// @param _commitData The encoded data of the new batches to be committed.
     function commitBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _commitData
@@ -137,12 +137,12 @@ interface IExecutor is IZKChainBase {
 
     /// @notice Batches commitment verification.
     /// @dev Only verifies batch commitments without any other processing.
-    /// @param _chainId Chain ID of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain.
     /// @param _processBatchFrom The batch number from which the verification starts.
     /// @param _processBatchTo The batch number at which the verification ends.
     /// @param _proofData The encoded data of the new batches to be verified.
     function proveBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
@@ -151,25 +151,25 @@ interface IExecutor is IZKChainBase {
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
-    /// @param _chainId Chain ID of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain.
     /// @param _processFrom The batch number from which the execution starts.
     /// @param _processTo The batch number at which the execution ends.
     /// @param _executeData The encoded data of the new batches to be executed.
     function executeBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
     ) external;
 
     /// @notice Reverts unexecuted batches
-    /// @param _chainId Chain ID of the chain
+    /// @param _chainAddress Chain ID of the chain
     /// @param _newLastBatch batch number after which batches should be reverted
     /// @dev When the _newLastBatch is equal to the number of committed batches,
     /// only the precommitment is erased.
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
-    function revertBatchesSharedBridge(uint256 _chainId, uint256 _newLastBatch) external;
+    function revertBatchesSharedBridge(address _chainAddress, uint256 _newLastBatch) external;
 
     /// @notice Event emitted when a batch is committed
     /// @param batchNumber Number of the batch committed

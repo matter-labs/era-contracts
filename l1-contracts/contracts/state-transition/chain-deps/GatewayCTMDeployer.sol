@@ -261,7 +261,7 @@ contract GatewayCTMDeployer {
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployValidatorTimelock(bytes32 _salt, DeployedContracts memory _deployedContracts) internal {
-        address timelockImplementation = address(new ValidatorTimelock{salt: _salt}());
+        address timelockImplementation = address(new ValidatorTimelock{salt: _salt}(L2_BRIDGEHUB_ADDR));
         _deployedContracts.stateTransition.validatorTimelockImplementation = timelockImplementation;
         _deployedContracts.stateTransition.validatorTimelock = address(
             new TransparentUpgradeableProxy{salt: _salt}(
@@ -437,9 +437,8 @@ contract GatewayCTMDeployer {
         address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal {
+        // FIXME: maybe we dont need temporary ownership
         ValidatorTimelock timelock = ValidatorTimelock(_deployedContracts.stateTransition.validatorTimelock);
-        timelock.setChainTypeManager(IChainTypeManager(_deployedContracts.stateTransition.chainTypeManagerProxy));
-
         // Note, that the governance still has to accept it.
         // It will happen in a separate voting after the deployment is done.
         timelock.transferOwnership(_aliasedGovernanceAddress);

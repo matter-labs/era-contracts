@@ -310,7 +310,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @param _chainId the chainId of the chain
     /// @param _newLastBatch the new last batch
     function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZKChain(getZKChain(_chainId)).revertBatchesSharedBridge(_chainId, _newLastBatch);
+        address zkChainAddr = getZKChain(_chainId);
+        IZKChain(zkChainAddr).revertBatchesSharedBridge(zkChainAddr, _newLastBatch);
     }
 
     /// @dev execute predefined upgrade

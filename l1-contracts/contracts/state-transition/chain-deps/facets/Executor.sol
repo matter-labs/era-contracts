@@ -302,7 +302,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function precommitSharedBridge(
-        uint256, // _chainId
+        address, // addr
         uint256 _batchNumber,
         bytes calldata _precommitData
     ) external nonReentrant onlyValidator onlySettlementLayer {
@@ -367,7 +367,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function commitBatchesSharedBridge(
-        uint256, // _chainId
+        address, // _chainId
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _commitData
@@ -573,7 +573,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function executeBatchesSharedBridge(
-        uint256, // _chainId
+        address, // _chainId
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
@@ -619,7 +619,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function proveBatchesSharedBridge(
-        uint256, // _chainId
+        address, // _chainId
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
@@ -690,7 +690,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function revertBatchesSharedBridge(
-        uint256,
+        address,
         uint256 _newLastBatch
     ) external nonReentrant onlyValidatorOrChainTypeManager {
         _revertBatches(_newLastBatch);
