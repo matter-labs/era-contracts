@@ -315,7 +315,13 @@ describe("ConsensusRegistry", function () {
     // Restore state.
     await (await registry.remove(entry.ownerAddr, { gasLimit })).wait();
     await (
-      await registry.add(entry.ownerAddr, entry.validatorIsLeader, entry.validatorWeight, entry.validatorPubKey, entry.validatorPoP)
+      await registry.add(
+        entry.ownerAddr,
+        entry.validatorIsLeader,
+        entry.validatorWeight,
+        entry.validatorPubKey,
+        entry.validatorPoP
+      )
     ).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
@@ -489,7 +495,13 @@ describe("ConsensusRegistry", function () {
 
     // Restore state.
     await (
-      await registry.add(entry.ownerAddr, entry.validatorIsLeader, entry.validatorWeight, entry.validatorPubKey, entry.validatorPoP)
+      await registry.add(
+        entry.ownerAddr,
+        entry.validatorIsLeader,
+        entry.validatorWeight,
+        entry.validatorPubKey,
+        entry.validatorPoP
+      )
     ).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
