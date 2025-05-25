@@ -60,7 +60,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         addresses.stateTransition.validatorTimelock = address(
             new TransparentUpgradeableProxy(
-                address(new ValidatorTimelock()),
+                address(new ValidatorTimelock(L2_BRIDGEHUB_ADDR)),
                 addresses.transparentProxyAdmin,
                 abi.encodeCall(ValidatorTimelock.initialize, (config.deployerAddress, executionDelay))
             )

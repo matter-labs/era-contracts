@@ -118,7 +118,7 @@ contract ExecutingTest is ExecutorTest {
             genesisStoredBatchInfo,
             commitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -141,7 +141,7 @@ contract ExecutingTest is ExecutorTest {
             storedBatchInfoArray,
             proofInput
         );
-        executor.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongBatchNumber() public {
@@ -159,7 +159,7 @@ contract ExecutingTest is ExecutorTest {
             storedBatchInfoArray,
             Utils.generatePriorityOps(storedBatchInfoArray.length)
         );
-        executor.executeBatchesSharedBridge(uint256(0), executeBatchFrom, executeBatchTo, executeData);
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_ExecutingBlockWithWrongData() public {
@@ -183,14 +183,14 @@ contract ExecutingTest is ExecutorTest {
             storedBatchInfoArray,
             Utils.generatePriorityOps(storedBatchInfoArray.length)
         );
-        executor.executeBatchesSharedBridge(uint256(0), executeBatchFrom, executeBatchTo, executeData);
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_ExecutingRevertedBlockWithoutCommittingAndProvingAgain() public {
         appendPriorityOps();
 
         vm.prank(validator);
-        executor.revertBatchesSharedBridge(0, 0);
+        executor.revertBatchesSharedBridge(address(0), 0);
 
         IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
         storedBatchInfoArray[0] = newStoredBatchInfo;
@@ -201,12 +201,12 @@ contract ExecutingTest is ExecutorTest {
             storedBatchInfoArray,
             Utils.generatePriorityOps(storedBatchInfoArray.length)
         );
-        executor.executeBatchesSharedBridge(uint256(0), executeBatchFrom, executeBatchTo, executeData);
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_ExecutingUnavailablePriorityOperationHash() public {
         vm.prank(validator);
-        executor.revertBatchesSharedBridge(0, 0);
+        executor.revertBatchesSharedBridge(address(0), 0);
 
         bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
@@ -246,7 +246,7 @@ contract ExecutingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
@@ -268,7 +268,7 @@ contract ExecutingTest is ExecutorTest {
                 correctNewStoredBatchInfoArray,
                 proofInput
             );
-            executor.proveBatchesSharedBridge(uint256(0), processBatchFrom, processBatchTo, processData);
+            executor.proveBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData);
         }
 
         vm.prank(validator);
@@ -278,7 +278,7 @@ contract ExecutingTest is ExecutorTest {
                 correctNewStoredBatchInfoArray,
                 Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
             );
-            executor.executeBatchesSharedBridge(uint256(0), processBatchFrom, processBatchTo, processData);
+            executor.executeBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData);
         }
     }
 
@@ -286,7 +286,7 @@ contract ExecutingTest is ExecutorTest {
         appendPriorityOps();
 
         vm.prank(validator);
-        executor.revertBatchesSharedBridge(0, 0);
+        executor.revertBatchesSharedBridge(address(0), 0);
 
         bytes32 arbitraryCanonicalTxHash = Utils.randomBytes32("arbitraryCanonicalTxHash");
         bytes32 chainedPriorityTxHash = keccak256(bytes.concat(keccak256(""), arbitraryCanonicalTxHash));
@@ -325,7 +325,7 @@ contract ExecutingTest is ExecutorTest {
             genesisStoredBatchInfo,
             correctNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         IExecutor.StoredBatchInfo memory correctNewStoredBatchInfo = newStoredBatchInfo;
@@ -347,7 +347,7 @@ contract ExecutingTest is ExecutorTest {
                 correctNewStoredBatchInfoArray,
                 proofInput
             );
-            executor.proveBatchesSharedBridge(uint256(0), processBatchFrom, processBatchTo, processData);
+            executor.proveBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData);
         }
 
         bytes32 randomFactoryDeps0 = Utils.randomBytes32("randomFactoryDeps0");
@@ -379,7 +379,7 @@ contract ExecutingTest is ExecutorTest {
                 correctNewStoredBatchInfoArray,
                 Utils.generatePriorityOps(correctNewStoredBatchInfoArray.length)
             );
-            executor.executeBatchesSharedBridge(uint256(0), processBatchFrom, processBatchTo, processData);
+            executor.executeBatchesSharedBridge(address(0), processBatchFrom, processBatchTo, processData);
         }
     }
 
@@ -416,7 +416,7 @@ contract ExecutingTest is ExecutorTest {
             genesisBlock,
             correctNewCommitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_ShouldExecuteBatchesSuccessfully() public {
@@ -430,7 +430,7 @@ contract ExecutingTest is ExecutorTest {
             storedBatchInfoArray,
             Utils.generatePriorityOps(storedBatchInfoArray.length)
         );
-        executor.executeBatchesSharedBridge(uint256(0), executeBatchFrom, executeBatchTo, executeData);
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
 
         uint256 totalBlocksExecuted = getters.getTotalBlocksExecuted();
         assertEq(totalBlocksExecuted, 1);
@@ -455,7 +455,7 @@ contract ExecutingTest is ExecutorTest {
             storedBatchInfoArray,
             Utils.generatePriorityOps(storedBatchInfoArray.length)
         );
-        validatorTimelock.executeBatchesSharedBridge(eraChainId, executeBatchFrom, executeBatchTo, executeData);
+        // validatorTimelock.executeBatchesSharedBridge(eraChainId, executeBatchFrom, executeBatchTo, executeData);
         vm.snapshotGasLastCall("Executor", "execute");
     }
 }

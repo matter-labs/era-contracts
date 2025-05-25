@@ -166,7 +166,7 @@ struct ZKChainCommitment {
     PriorityTreeCommitment priorityTree;
     /// @notice Whether a chain is a permanent rollup.
     bool isPermanentRollup;
-    /// @notice The precommitment to the transactions of the latest batch. 
+    /// @notice The precommitment to the transactions of the latest batch.
     bytes32 precommitmentForTheLatestBatch;
 }
 

@@ -150,9 +150,9 @@ contract ExecutorTest is Test {
         });
     }
 
-    function deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) private returns (address) {
+    function deployValidatorTimelock(address bridgehubAddr, address _initialOwner, uint32 _initialExecutionDelay) private returns (address) {
         ProxyAdmin proxyAdmin = new ProxyAdmin();
-        ValidatorTimelock timelockImplementation = new ValidatorTimelock();
+        ValidatorTimelock timelockImplementation = new ValidatorTimelock(bridgehubAddr);
         return
             address(
                 new TransparentUpgradeableProxy(
@@ -196,9 +196,7 @@ contract ExecutorTest is Test {
             abi.encode(bool(true))
         );
 
-        validatorTimelock = ValidatorTimelock(deployValidatorTimelock(owner, 0));
-        vm.prank(owner);
-        validatorTimelock.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
+        validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
         vm.prank(owner);
         validatorTimelock.addValidator(eraChainId, validator);
 

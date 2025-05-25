@@ -15,7 +15,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch} from "../../../common/L1ContractErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
 import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -141,7 +141,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @param _expectedL2TxsStatusRollingHash The expected rolling hash of L2 transaction statuses for the batch.
     function _verifyAndResetBatchPrecommitment(uint256 _batchNumber, bytes32 _expectedL2TxsStatusRollingHash) internal {
         bytes32 storedPrecommitment = s.precommitmentForTheLatestBatch;
-        // The default value for the `storedPrecommitment` is expected to be `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`. 
+        // The default value for the `storedPrecommitment` is expected to be `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`.
         // However, in case we did accidentally put 0 there, we want to handle this case as well.
         if (storedPrecommitment == bytes32(0)) {
             storedPrecommitment = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
@@ -149,7 +149,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // We do not require the operator to always provide the precommitments as it is an optional feature.
         // However, if precommitments were provided, we do expect them to span over the entire batch
-        if (storedPrecommitment != DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH && storedPrecommitment != _expectedL2TxsStatusRollingHash) {
+        if (
+            storedPrecommitment != DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH &&
+            storedPrecommitment != _expectedL2TxsStatusRollingHash
+        ) {
             revert PrecommitmentMismatch(_batchNumber, _expectedL2TxsStatusRollingHash, storedPrecommitment);
         }
 
@@ -316,14 +319,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         bytes32 currentPrecommitment = s.precommitmentForTheLatestBatch;
-        // We have a placeholder non-zero value equal to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`. 
+        // We have a placeholder non-zero value equal to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`.
         // This is needed to ensure cheaper and more stable write costs.
         if (currentPrecommitment == DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH) {
             // The rolling hash calculation should start with 0.
             currentPrecommitment = 0;
         }
 
-        // We checked that the length of the precommitments is greater than zero, 
+        // We checked that the length of the precommitments is greater than zero,
         // so we know that this value will be non-zero as well.
         s.precommitmentForTheLatestBatch = _calculatePrecommitmentRollingHash(
             currentPrecommitment,
@@ -333,19 +336,20 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, currentPrecommitment);
     }
 
+    /// @notice Calculates rolling hash of precommitments received from `_packedTxPrecommitments`.
+    /// @param currentPrecommitment The previous precommitment
+    /// @param _packedTxPrecommitments The current precommitment
+    /// @dev This function expects the number of new precommitments to be non-zero.
     function _calculatePrecommitmentRollingHash(
         bytes32 currentPrecommitment,
         bytes memory _packedTxPrecommitments
     ) internal pure returns (bytes32 result) {
         unchecked {
-            uint256 length = _packedTxPrecommitments.length; 
-            if (length % PACKED_L2_PRECOMMITMENT_LENGTH != 0) {
-                // todo revert
-            }
+            uint256 length = _packedTxPrecommitments.length;
+            require(length % PACKED_L2_PRECOMMITMENT_LENGTH == 0, InvalidPackedPrecommitmentLength(length));
 
             // Caching two constants for use in assembly
             uint256 precommitmentLength = PACKED_L2_PRECOMMITMENT_LENGTH;
-            uint256 intervalLength = precommitmentLength - 1; 
             assembly {
                 mstore(0, currentPrecommitment)
 
@@ -354,8 +358,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 let ptr := add(_packedTxPrecommitments, 32)
                 let ptrTo := add(ptr, length)
 
-                for {} lt(ptr, ptrTo) {ptr := add(ptr, precommitmentLength)} {
-                    let txPrecommitment := keccak256(ptr, add(ptr, intervalLength))
+                for {
+
+                } lt(ptr, ptrTo) {
+                    ptr := add(ptr, precommitmentLength)
+                } {
+                    let txPrecommitment := keccak256(ptr, precommitmentLength)
                     mstore(32, txPrecommitment)
 
                     result := keccak256(0, 64)

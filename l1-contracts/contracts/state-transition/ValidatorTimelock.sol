@@ -79,7 +79,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     bytes32 public constant OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("OPTIONAL_EXECUTOR_ADMIN_ROLE");
 
     /// @notice The address of the bridgehub
-    address public immutable BRIDGE_HUB;
+    IBridgehub public immutable BRIDGE_HUB;
 
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
@@ -91,7 +91,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     uint32 public executionDelay;
 
     constructor(address _bridgehubAddr) {
-        BRIDGE_HUB = _bridgehubAddr;
+        BRIDGE_HUB = IBridgehub(_bridgehubAddr);
         // Disable initialization to prevent Parity hack.
         _disableInitializers();
     }
@@ -117,7 +117,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     }
 
     /// @notice Revokes the specified validator roles for a given validator on the target chain.
-    /// @param _chainAddress The address identifier of the L2 chain.
+    /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to revoke.
     /// @dev Note that the access control is managed by the inner `revokeRole` functions.
@@ -140,9 +140,9 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     }
 
     /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
-    /// @param _chainAddress The address identifier of the L2 chain.
+    /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to remove.
-    function removeValidator(address _chainAddress, address _validator) external {
+    function removeValidatorByAddress(address _chainAddress, address _validator) public {
         removeValidatorRoles(
             _chainAddress,
             _validator,
@@ -156,8 +156,15 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         );
     }
 
+    /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
+    /// @param _chainId The chain Id of the ZK chain.
+    /// @param _validator The address of the validator to remove.
+    function removeValidator(uint256 _chainId, address _validator) external {
+        removeValidatorByAddress(BRIDGE_HUB.getZKChain(_chainId), _validator);
+    }
+
     /// @notice Grants the specified validator roles for a given validator on the target chain.
-    /// @param _chainAddress The address identifier of the L2 chain.
+    /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to grant.
     function addValidatorRoles(address _chainAddress, address _validator, ValidatorRotationParams memory params) public {
@@ -179,9 +186,9 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     }
 
     /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
-    /// @param _chainAddress The address identifier of the L2 chain.
+    /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to add.
-    function addValidator(address _chainAddress, address _validator) external {
+    function addValidatorByAddress(address _chainAddress, address _validator) public {
         addValidatorRoles(
             _chainAddress,
             _validator,
@@ -194,13 +201,20 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
             })
         );
     }
+    
+    /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
+    /// @param _chainId The chain Id of the ZK chain.
+    /// @param _validator The address of the validator to add.
+    function addValidator(uint256 _chainId, address _validator) external {
+        addValidatorByAddress(BRIDGE_HUB.getZKChain(_chainId), _validator);
+    }
 
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     function precommitSharedBridge(
         address _chainAddress, // Changed from uint256
         uint256, // _l2BlockNumber (unused in this specific implementation)
         bytes calldata // _l2Block (unused in this specific implementation)
-    ) external onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
+    ) public onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
         _propagateToZKChain(_chainAddress);
     }
 

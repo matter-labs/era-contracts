@@ -374,6 +374,8 @@ error DefaultAdminTransferNotAllowed();
 
 error NotAZKChain(address addr);
 
+error InvalidPackedPrecommitmentLength(uint256 length);
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,
