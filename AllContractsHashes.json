@@ -1794,7 +1794,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/proved_batch.yul/Bootloader.json",
-    "zkBytecodeHash": "0x0100088367183e3f227f165ee7896e987a3cd041bbd28ea49efc89f668230266",
+    "zkBytecodeHash": "0x0100088546e0a7362a8d27cde9570692f0009e0e060422b03581feb2e6ef068d",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null

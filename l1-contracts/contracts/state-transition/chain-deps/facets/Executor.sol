@@ -15,7 +15,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch} from "../../../common/L1ContractErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
 import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -333,19 +333,20 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, currentPrecommitment);
     }
 
+    /// @notice Calculates rolling hash of precommitments received from `_packedTxPrecommitments`.
+    /// @param currentPrecommitment The previous precommitment
+    /// @param _packedTxPrecommitments The current precommitment
+    /// @dev This function expects the number of new precommitments to be non-zero.
     function _calculatePrecommitmentRollingHash(
         bytes32 currentPrecommitment,
         bytes memory _packedTxPrecommitments
     ) internal pure returns (bytes32 result) {
         unchecked {
-            uint256 length = _packedTxPrecommitments.length; 
-            if (length % PACKED_L2_PRECOMMITMENT_LENGTH != 0) {
-                // todo revert
-            }
+            uint256 length = _packedTxPrecommitments.length;
+            require(length % PACKED_L2_PRECOMMITMENT_LENGTH == 0, InvalidPackedPrecommitmentLength(length));
 
             // Caching two constants for use in assembly
             uint256 precommitmentLength = PACKED_L2_PRECOMMITMENT_LENGTH;
-            uint256 intervalLength = precommitmentLength - 1; 
             assembly {
                 mstore(0, currentPrecommitment)
 
@@ -355,7 +356,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 let ptrTo := add(ptr, length)
 
                 for {} lt(ptr, ptrTo) {ptr := add(ptr, precommitmentLength)} {
-                    let txPrecommitment := keccak256(ptr, add(ptr, intervalLength))
+                    let txPrecommitment := keccak256(ptr, precommitmentLength)
                     mstore(32, txPrecommitment)
 
                     result := keccak256(0, 64)
