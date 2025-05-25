@@ -141,7 +141,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @param _expectedL2TxsStatusRollingHash The expected rolling hash of L2 transaction statuses for the batch.
     function _verifyAndResetBatchPrecommitment(uint256 _batchNumber, bytes32 _expectedL2TxsStatusRollingHash) internal {
         bytes32 storedPrecommitment = s.precommitmentForTheLatestBatch;
-        // The default value for the `storedPrecommitment` is expected to be `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`. 
+        // The default value for the `storedPrecommitment` is expected to be `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`.
         // However, in case we did accidentally put 0 there, we want to handle this case as well.
         if (storedPrecommitment == bytes32(0)) {
             storedPrecommitment = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
@@ -149,7 +149,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // We do not require the operator to always provide the precommitments as it is an optional feature.
         // However, if precommitments were provided, we do expect them to span over the entire batch
-        if (storedPrecommitment != DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH && storedPrecommitment != _expectedL2TxsStatusRollingHash) {
+        if (
+            storedPrecommitment != DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH &&
+            storedPrecommitment != _expectedL2TxsStatusRollingHash
+        ) {
             revert PrecommitmentMismatch(_batchNumber, _expectedL2TxsStatusRollingHash, storedPrecommitment);
         }
 
@@ -316,14 +319,14 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         bytes32 currentPrecommitment = s.precommitmentForTheLatestBatch;
-        // We have a placeholder non-zero value equal to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`. 
+        // We have a placeholder non-zero value equal to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`.
         // This is needed to ensure cheaper and more stable write costs.
         if (currentPrecommitment == DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH) {
             // The rolling hash calculation should start with 0.
             currentPrecommitment = 0;
         }
 
-        // We checked that the length of the precommitments is greater than zero, 
+        // We checked that the length of the precommitments is greater than zero,
         // so we know that this value will be non-zero as well.
         s.precommitmentForTheLatestBatch = _calculatePrecommitmentRollingHash(
             currentPrecommitment,
@@ -355,7 +358,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 let ptr := add(_packedTxPrecommitments, 32)
                 let ptrTo := add(ptr, length)
 
-                for {} lt(ptr, ptrTo) {ptr := add(ptr, precommitmentLength)} {
+                for {
+
+                } lt(ptr, ptrTo) {
+                    ptr := add(ptr, precommitmentLength)
+                } {
                     let txPrecommitment := keccak256(ptr, precommitmentLength)
                     mstore(32, txPrecommitment)
 

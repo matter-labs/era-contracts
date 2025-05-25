@@ -374,7 +374,6 @@ error DefaultAdminTransferNotAllowed();
 
 error InvalidPackedPrecommitmentLength(uint256 length);
 
-
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

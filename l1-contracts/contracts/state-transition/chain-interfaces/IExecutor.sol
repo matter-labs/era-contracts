@@ -106,7 +106,7 @@ interface IExecutor is IZKChainBase {
     }
 
     /// @notice Container for a list of transaction statuses to precommit.
-    /// @param txs A packed array of individual transaction status commitments for the batch. Each is expected to be 
+    /// @param txs A packed array of individual transaction status commitments for the batch. Each is expected to be
     /// of length 33 and have the following format: <32-byte tx hash, 1-byte status>. where status is either 0 (failed) or 1 (success).
     /// @param untrustedLastMiniblockNumberHint The "hint" for what the last miniblock that these txs represent is.
     struct PrecommitInfo {
