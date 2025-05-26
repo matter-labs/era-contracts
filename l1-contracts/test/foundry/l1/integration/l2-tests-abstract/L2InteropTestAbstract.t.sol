@@ -14,7 +14,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
@@ -24,6 +24,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -58,6 +59,44 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         address recipient = L2_BRIDGEHUB_ADDR;
         // (bool success, ) = recipient.call(data);
         // assertTrue(success);
+    }
+
+    function test_realData_sendBundle() public {
+            // Note: get this from real local txs
+            bytes
+            memory data = hex"d6379a2d000000000000000000000000000000000000000000000000000000000000010400000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000100030000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c101e3766967b224d35b655b7d8ca7d24c463a6d4bf93274cd1dda010fa5b870016e000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000064000000000000000000000000e87e726c2d09f56dbc8cd17ec68b1ab711e58ba0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+    
+            vm.mockCall(
+                L2_BRIDGEHUB_ADDR,
+                abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+                abi.encode(ETH_TOKEN_ADDRESS)
+            );
+            vm.mockCall(
+                L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+                abi.encode(bytes32(0))
+            );
+            address recipient = L2_INTEROP_CENTER_ADDR;
+            (bool success, ) = recipient.call(data);
+            assertTrue(success);
+    }
+
+    function test_sendBundle() public {
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encode(ETH_TOKEN_ADDRESS)
+        );
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes32(0))
+        );
+        IInteropCenter recipient = IInteropCenter(L2_INTEROP_CENTER_ADDR);
+        // bytes32 bundleHash = recipient.sendBundle(
+        //     271,
+        //     new InteropCallStarter[](0)
+        // );
     }
 
     function test_executeInterop() public {

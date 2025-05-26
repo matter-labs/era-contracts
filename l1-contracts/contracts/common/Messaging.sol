@@ -158,15 +158,15 @@ struct InteropCallRequest {
 }
 
 struct InteropCallStarter {
-    bool directCall;
     address nextContract;
     bytes data;
-    uint256 value;
     // The value that is requested for the interop call.
-    // This has to be known beforehand, as the funds in the interop call belong to the user.
-    // This is because we cannot guarantee atomicity of xL2 txs (just the atimicity of calls on the destination chain)
+    // This has to be known beforehand even for indirect calls, as the funds in the interop call belong to the user,
+    // and are deposited in the base token deposit call separately.
+    // This is because we cannot guarantee atomicity of xL2 txs (just the atomicity of calls on the destination chain)
     // So contracts cannot send their own value, only stamp the value that belongs to the user.
     uint256 requestedInteropCallValue;
+    bytes[] attributes;
 }
 
 struct InteropCall {

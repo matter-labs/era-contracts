@@ -130,10 +130,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                         Bundle interface
     //////////////////////////////////////////////////////////////*/
 
+    event BundleStarted(bytes32 indexed bundleId);
     function startBundle(
         uint256 _destinationChainId
     ) external override onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleId) {
         bundleId = _startBundle(_destinationChainId, msg.sender);
+        emit BundleStarted(bundleId);
     }
 
     function _startBundle(uint256 _destinationChainId, address _sender) public returns (bytes32 bundleId) {
@@ -211,18 +213,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             executionAddress: _executionAddress
         });
         bytes memory interopBundleBytes = abi.encode(interopBundle);
+        // TODO use canonicalTxHash for linking it to the trigger, instead of interopBundleHash
+        bytes32 canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
+        );
+        emit InteropBundleSent(canonicalTxHash, interopBundleHash, interopBundle);
         interopBundleHash = keccak256(interopBundleBytes);
-        if (block.chainid == L1_CHAIN_ID) {
-            // we construct the L2CanonicalTransaction manually
-            // when sending the trigger
-            return interopBundleHash;
-        } else {
-            // TODO use canonicalTxHash for linking it to the trigger, instead of interopBundleHash
-            bytes32 canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-                bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
-            );
-            emit InteropBundleSent(canonicalTxHash, interopBundleHash, interopBundle);
-        }
     }
 
     function _ensureCorrectTotalValue(
@@ -231,35 +227,28 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _totalValue,
         uint256 _receivedMsgValue
     ) internal {
-        if (_totalValue == 0) {
-            return;
-        }
-
         bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_destinationChainId);
-        uint256 baseTokenMsgValue;
         if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) {
             // kl todo until we sort out chain registration on L2s we assume the same base token.
             if (_receivedMsgValue != _totalValue) {
                 revert MsgValueMismatch(_totalValue, _receivedMsgValue);
             }
-            baseTokenMsgValue = _totalValue;
         } else {
             if (_receivedMsgValue != 0) {
                 revert MsgValueMismatch(0, _receivedMsgValue);
             }
-            baseTokenMsgValue = 0;
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        if (block.chainid == L1_CHAIN_ID) {
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+        if (tokenAssetId == BRIDGE_HUB.baseTokenAssetId(block.chainid)) {
+            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalValue}();
+        } else {
+            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken(
                 _destinationChainId,
                 tokenAssetId,
                 _initiator,
                 _totalValue
             );
-        } else {
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalValue}();
         }
     }
 
@@ -284,24 +273,46 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         return bundleHash;
     }
 
-    struct ExtraInputs {
-        address sender;
-        address executionAddress;
-        address refundRecipient;
-        bytes[] factoryDeps;
+    function sendBundle(
+        uint256 _destinationChainId,
+        InteropCallStarter[] memory _callStarters
+    ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32) { 
+        return _sendBundle(_destinationChainId, _callStarters, msg.value, address(0), msg.sender);
+    }
+
+    function _sendBundle(
+        uint256 _destinationChainId,
+        InteropCallStarter[] memory _callStarters,
+        uint256 _msgValue,
+        address _executionAddress,
+        address _sender
+    ) internal returns (bytes32) {
+        bytes32 bundleId = _startBundle(_destinationChainId, _sender);
+        uint256 feeValue;
+        for (uint256 i = 0; i < _callStarters.length; i++) {
+            InteropCallStarter memory callStarter = _callStarters[i];
+            if (!callStarter.directCall) {
+                // console.log("fee indirect call");
+                IL1AssetRouter(callStarter.nextContract).bridgehubAddCallToBundle{value: callStarter.indirectCallMessageValue}(
+                    _destinationChainId,
+                    bundleId,
+                    _sender,
+                    callStarter.requestedInteropCallValue,
+                    callStarter.data
+                );
+            } else {
+                // console.log("fee direct call");
+                _addCallToBundle(bundleId, _requestFromStarter(callStarter), _sender);
+            }
+            feeValue += callStarter.requestedInteropCallValue;
+        }
+        bytes32 bundleHash = _finishAndSendBundleLong(bundleId, _executionAddress, feeValue, _sender);
+        return bundleHash;
     }
 
 
-    struct ViaIRStruct {
-        bytes32 feeBundleId;
-        bytes32 feeBundleHash;
-        bytes32 executionBundleId;
-        bytes32 executionBundleHash;
-    }
-
-
-    function _requestFromStarter(InteropCallStarter memory callStarter) internal returns (InteropCallRequest memory) {
-        if (callStarter.value != 0) {
+    function _requestFromStarter(InteropCallStarter memory callStarter) internal pure returns (InteropCallRequest memory) {
+        if (callStarter.indirectCallMessageValue != 0) {
             revert DirectCallNonEmptyValue(callStarter.nextContract);
         }
         return

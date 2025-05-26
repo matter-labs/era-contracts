@@ -104,20 +104,6 @@ library L2GenesisForceDeploymentsHelper {
                 revert(add(returnData3, 0x20), returndatasize())
             }
         }
-
-        bytes memory interopHandlerConstructorData = abi.encodeCall(L2_INTEROP_HANDLER.setInteropAccountBytecode, ());
-
-        (bool success4, bytes memory returnData4) = SystemContractHelper.mimicCall(
-            address(L2_INTEROP_HANDLER),
-            bridgehubOwner,
-            interopHandlerConstructorData
-        );
-        if (!success4) {
-            // Progapatate revert reason
-            assembly {
-                revert(add(returnData4, 0x20), returndatasize())
-            }
-        }
     }
 
     /// @notice Retrieves and constructs the force deployments array.

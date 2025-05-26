@@ -141,7 +141,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             directCall: true,
             nextContract: address(this),
             data: "",
-            value: 0,
+            indirectCallMessageValue: 0,
             requestedInteropCallValue: 1 ether
         });
 
@@ -150,7 +150,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             directCall: false,
             nextContract: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
-            value: 0,
+            indirectCallMessageValue: 0,
             requestedInteropCallValue: 0
         });
 
