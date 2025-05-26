@@ -27,11 +27,11 @@ import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenV
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
+import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
-import {IInteropCenter, InteropCenter} from "../../../../../contracts/bridgehub/InteropCenter.sol";
-import {IInteropHandler, InteropHandler} from "../../../../../contracts/bridgehub/InteropHandler.sol";
+import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
+import {IInteropHandler, InteropHandler} from "../../../../../contracts/interop/InteropHandler.sol";
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";

@@ -31,6 +31,7 @@ import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
@@ -138,19 +139,19 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
 
         InteropCallStarter[] memory feePaymentCalls = new InteropCallStarter[](1);
         feePaymentCalls[0] = InteropCallStarter({
-            directCall: true,
             nextContract: address(this),
             data: "",
-            indirectCallMessageValue: 0,
+            attributes: new bytes[](0),
             requestedInteropCallValue: 1 ether
         });
 
         InteropCallStarter[] memory executionCalls = new InteropCallStarter[](1);
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.directCall, (0));
         executionCalls[0] = InteropCallStarter({
-            directCall: false,
             nextContract: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
-            indirectCallMessageValue: 0,
+            attributes: attributes,
             requestedInteropCallValue: 0
         });
 

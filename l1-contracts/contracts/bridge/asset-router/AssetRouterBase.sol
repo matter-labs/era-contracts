@@ -17,7 +17,7 @@ import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {AssetIdNotSupported, NonEmptyMsgValue, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 

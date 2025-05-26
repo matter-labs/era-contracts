@@ -169,6 +169,14 @@ struct InteropCallStarter {
     bytes[] attributes;
 }
 
+struct InteropCallStarterInternal {
+    bool directCall;
+    address nextContract;
+    bytes data;
+    uint256 requestedInteropCallValue;
+    uint256 indirectCallMessageValue;
+}
+
 struct InteropCall {
     bool directCall;
     address to;

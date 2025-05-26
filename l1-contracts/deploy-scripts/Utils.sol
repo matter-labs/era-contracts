@@ -12,7 +12,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../contracts/bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "../contracts/interop/IInteropCenter.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";

@@ -11,7 +11,7 @@ import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 
@@ -47,7 +47,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {InteropCenter} from "contracts/bridgehub/InteropCenter.sol";
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";

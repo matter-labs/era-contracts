@@ -10,7 +10,7 @@ import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";

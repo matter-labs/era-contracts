@@ -5,7 +5,7 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {DeployL1IntegrationScript} from "./deploy-scripts/DeployL1Integration.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";

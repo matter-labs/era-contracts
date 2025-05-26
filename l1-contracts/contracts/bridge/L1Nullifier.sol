@@ -25,7 +25,7 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "../interop/IInteropCenter.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {EthTransferFailed, NativeTokenVaultAlreadySet, WrongL2Sender, WrongMsgLength} from "./L1BridgeContractErrors.sol";

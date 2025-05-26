@@ -8,7 +8,7 @@ import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {PriorityOperation, PriorityQueue} from "../../libraries/PriorityQueue.sol";

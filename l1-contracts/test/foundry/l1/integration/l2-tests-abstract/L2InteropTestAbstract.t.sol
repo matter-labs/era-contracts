@@ -24,7 +24,7 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IInteropCenter} from "contracts/bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";

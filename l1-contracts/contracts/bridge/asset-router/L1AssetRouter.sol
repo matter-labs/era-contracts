@@ -26,7 +26,7 @@ import {AddressAlreadySet, AssetHandlerDoesNotExist, LegacyBridgeUsesNonNativeTo
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 

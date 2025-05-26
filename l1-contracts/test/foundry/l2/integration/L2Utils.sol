@@ -17,9 +17,9 @@ import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
-import {IInteropCenter, InteropCenter} from "contracts/bridgehub/InteropCenter.sol";
-import {IInteropHandler, InteropHandler} from "contracts/bridgehub/InteropHandler.sol";
-// import {InteropAccount} from "contracts/bridgehub/InteropAccount.sol";
+import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IInteropHandler, InteropHandler} from "contracts/interop/InteropHandler.sol";
+// import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";

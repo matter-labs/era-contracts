@@ -22,7 +22,7 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
 import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
-import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.

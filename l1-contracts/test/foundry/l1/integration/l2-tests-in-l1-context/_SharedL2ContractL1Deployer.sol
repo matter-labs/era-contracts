@@ -5,7 +5,7 @@ import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
-import {IInteropCenter, InteropCenter} from "../../../../../contracts/bridgehub/InteropCenter.sol";
+import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L1AssetRouter} from "../../../../../contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "../../../../../contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "../../../../../contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -25,7 +25,7 @@ import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenV
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
+import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 

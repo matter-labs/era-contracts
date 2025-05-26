@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {InteropCenter} from "contracts/bridgehub/InteropCenter.sol";
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import "contracts/bridgehub/Bridgehub.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {BundleMetadata, InteropCall} from "../../common/Messaging.sol";
-import {TransientInterop} from "../../bridgehub/TransientInterop.sol";
+import {TransientInterop} from "../../interop/TransientInterop.sol";
 
 contract TransientInteropTester {
     function getBundleMetadata(bytes32 _bundleId) public view returns (BundleMetadata memory) {

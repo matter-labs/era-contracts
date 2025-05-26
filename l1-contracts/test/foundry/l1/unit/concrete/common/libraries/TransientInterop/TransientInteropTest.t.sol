@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {TransientInterop} from "contracts/bridgehub/TransientInterop.sol";
+import {TransientInterop} from "contracts/interop/TransientInterop.sol";
 import {TransientInteropTester} from "contracts/dev-contracts/test/TransientInteropTest.sol";
 import {BundleMetadata, InteropCall} from "contracts/common/Messaging.sol";
 import {console} from "forge-std/console.sol";

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {InteropBundle, InteropCallRequest, InteropCallStarter, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "../bridgehub/IBridgehub.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

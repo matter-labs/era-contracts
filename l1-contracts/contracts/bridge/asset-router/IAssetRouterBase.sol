@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
+import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 
 /// @dev The encoding version used for legacy txs.
 bytes1 constant LEGACY_ENCODING_VERSION = 0x00;

@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
-import {IInteropCenter} from "./IInteropCenter.sol";
+import {IInteropCenter} from "../interop/IInteropCenter.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";

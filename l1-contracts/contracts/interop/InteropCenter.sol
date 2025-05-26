@@ -7,7 +7,7 @@ pragma solidity ^0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter, RouteBridgehubDepositStruct} from "./IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter, RouteBridgehubDepositStruct} from "../bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -18,15 +18,17 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
-import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, InteropCallStarterInternal, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {ChainIdNotRegistered, MsgValueMismatch, Unauthorized, WrongMagicValue} from "../common/L1ContractErrors.sol";
-import {DirectCallNonEmptyValue, NotInGatewayMode, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {DirectCallNonEmptyValue, NotInGatewayMode, SecondBridgeAddressTooLow} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
 import {TransientInterop} from "./TransientInterop.sol";
-
+import {IERC7786GatewaySource} from "./IERC7786.sol";
+import {IERC7786Attributes} from "./IERC7786Attributes.sol";
+import {AttributesDecoder} from "./AttributesDecoder.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The InteropCenter contract serves as the primary entry point for L1<->L2 communication,
@@ -277,12 +279,39 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _destinationChainId,
         InteropCallStarter[] memory _callStarters
     ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32) { 
-        return _sendBundle(_destinationChainId, _callStarters, msg.value, address(0), msg.sender);
+        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](_callStarters.length);
+        for (uint256 i = 0; i < _callStarters.length; i++) {
+            (bool directCall, uint256 indirectCallMessageValue) = _parseCallStarter(_callStarters[i]);
+            callStartersInternal[i] = InteropCallStarterInternal({
+                nextContract: _callStarters[i].nextContract,
+                data: _callStarters[i].data,
+                requestedInteropCallValue: _callStarters[i].requestedInteropCallValue,
+                directCall: directCall,
+                indirectCallMessageValue: indirectCallMessageValue
+            });
+
+        }
+        return _sendBundle(_destinationChainId, callStartersInternal, msg.value, address(0), msg.sender);
+    }
+
+    function _parseCallStarter(InteropCallStarter memory _callStarter) internal pure returns (bool, uint256) {
+        if (_callStarter.attributes.length == 0) {
+            return (true, 0);
+        } else if (_callStarter.attributes.length == 1) {
+            bytes4 selector = bytes4(_callStarter.attributes[0]);
+            require(selector == IERC7786Attributes.directCall.selector, IERC7786GatewaySource.UnsupportedAttribute(selector));
+            uint256 indirectCallMessageValue;
+            (, indirectCallMessageValue) = AttributesDecoder.decodeDirectCall(_callStarter.attributes[0]);
+
+            return (false, indirectCallMessageValue);
+        } else {
+            revert IERC7786GatewaySource.UnsupportedAttribute(bytes4(0));
+        }
     }
 
     function _sendBundle(
         uint256 _destinationChainId,
-        InteropCallStarter[] memory _callStarters,
+        InteropCallStarterInternal[] memory _callStarters,
         uint256 _msgValue,
         address _executionAddress,
         address _sender
@@ -290,7 +319,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 bundleId = _startBundle(_destinationChainId, _sender);
         uint256 feeValue;
         for (uint256 i = 0; i < _callStarters.length; i++) {
-            InteropCallStarter memory callStarter = _callStarters[i];
+            InteropCallStarterInternal memory callStarter = _callStarters[i];
             if (!callStarter.directCall) {
                 // console.log("fee indirect call");
                 IL1AssetRouter(callStarter.nextContract).bridgehubAddCallToBundle{value: callStarter.indirectCallMessageValue}(
@@ -311,7 +340,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
 
-    function _requestFromStarter(InteropCallStarter memory callStarter) internal pure returns (InteropCallRequest memory) {
+    function _requestFromStarter(InteropCallStarterInternal memory callStarter) internal pure returns (InteropCallRequest memory) {
         if (callStarter.indirectCallMessageValue != 0) {
             revert DirectCallNonEmptyValue(callStarter.nextContract);
         }
