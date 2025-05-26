@@ -41,7 +41,7 @@ contract DummyBridgehub {
     }
 
     function getZKChain(uint256) external view returns (address) {
-        return address(0);
+        return zkChain;
     }
 
     function setSharedBridge(address addr) external {

@@ -188,7 +188,7 @@ contract ProvingTest is ExecutorTest {
             storedBatchInfoArray,
             proofInput
         );
-        // validatorTimelock.proveBatchesSharedBridge(eraChainId, proveBatchFrom, proveBatchTo, proveData);
+        validatorTimelock.proveBatchesSharedBridge(address(executor), proveBatchFrom, proveBatchTo, proveData);
         vm.snapshotGasLastCall("Executor", "prove");
     }
 }

@@ -147,7 +147,6 @@ contract DeployL1Script is Script, DeployUtils {
             false
         );
 
-        // FIXME: maybe store implementation address
         (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
 
         (

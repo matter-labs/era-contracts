@@ -351,9 +351,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // Caching two constants for use in assembly
             uint256 precommitmentLength = PACKED_L2_PRECOMMITMENT_LENGTH;
             assembly {
+                // Storing the current rolling hash in position 0. This way It will be more convenient 
+                // to recalculate it.
                 mstore(0, currentPrecommitment)
 
-                // In assembly to access elements of the array, we'll need to add 32 to the position
+                // In assembly to access the elements of the array, we'll need to add 32 to the position
                 // since the first 32 bytes store the length of the bytes array.
                 let ptr := add(_packedTxPrecommitments, 32)
                 let ptrTo := add(ptr, length)
@@ -364,8 +366,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     ptr := add(ptr, precommitmentLength)
                 } {
                     let txPrecommitment := keccak256(ptr, precommitmentLength)
-                    mstore(32, txPrecommitment)
 
+                    // Storing the precommitment for the transaction and recalculating the rolling hash
+                    mstore(32, txPrecommitment)
                     result := keccak256(0, 64)
                     mstore(0, result)
                 }

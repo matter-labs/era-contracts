@@ -13,6 +13,7 @@ import {RoleAccessDenied, DefaultAdminTransferNotAllowed} from "../common/L1Cont
 /// @dev This contract purposefully does *not* inherit from OZ's `AccessControlUpgradeable` to
 ///         avoid global (cross‑chain) role collisions. Instead, every public method explicitly
 ///         takes a `_chainAddress` argument.
+/// @dev Note, that the chains are identified, not by chain id, but by their Diamond Proxy address.
 abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
@@ -40,6 +41,9 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
         bytes32 newAdminRole
     );
 
+    /// @notice The struct representing data about each role.
+    /// @param members Enumerable set of members for each role.
+    /// @param adminRole The role that can grant or revoke rights for the role.
     struct RoleData {
         EnumerableSetUpgradeable.AddressSet members;
         bytes32 adminRole; // 0x00 means DEFAULT_ADMIN_ROLE
@@ -181,5 +185,5 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
     function _getChainAdmin(address _chainAddress) internal view virtual returns (address);
 
     /// @dev Reserved storage space to allow for layout changes in future upgrades.
-    uint256[48] private __gap;
+    uint256[49] private __gap;
 }

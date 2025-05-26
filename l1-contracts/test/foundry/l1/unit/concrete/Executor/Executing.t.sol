@@ -455,7 +455,7 @@ contract ExecutingTest is ExecutorTest {
             storedBatchInfoArray,
             Utils.generatePriorityOps(storedBatchInfoArray.length)
         );
-        // validatorTimelock.executeBatchesSharedBridge(eraChainId, executeBatchFrom, executeBatchTo, executeData);
+        validatorTimelock.executeBatchesSharedBridge(address(executor), executeBatchFrom, executeBatchTo, executeData);
         vm.snapshotGasLastCall("Executor", "execute");
     }
 }

@@ -14,42 +14,42 @@ contract PrecommittingTest is ExecutorTest {
     uint256 batchNumber = 1;
     uint256 miniblockNumber = 18;
 
-    // function precommitData() internal view returns (bytes memory) {
-    //     IExecutor.TransactionStatusCommitment[] memory txs = new IExecutor.TransactionStatusCommitment[](
-    //         TOTAL_TRANSACTIONS
-    //     );
+    function precommitData() internal view returns (bytes memory) {
+        bytes memory packedTxsCommitments = hex"";
+        for (uint i = 0; i < TOTAL_TRANSACTIONS; ++i) {
+            packedTxsCommitments = bytes.concat(
+                packedTxsCommitments,
+                abi.encodePacked(keccak256(abi.encode(i)), uint8(i % 3 == 0 ? 0 : 1))
+            );
+        }
 
-    //     for (uint i = 0; i < TOTAL_TRANSACTIONS; ++i) {
-    //         txs[i] = IExecutor.TransactionStatusCommitment({txHash: keccak256(abi.encode(i)), status: i % 3 != 0});
-    //     }
+        IExecutor.PrecommitInfo memory precommitInfo = IExecutor.PrecommitInfo({
+            packedTxsCommitments: packedTxsCommitments,
+            untrustedLastMiniblockNumberHint: miniblockNumber
+        });
 
-    //     IExecutor.PrecommitInfo memory precommitInfo = IExecutor.PrecommitInfo({
-    //         txs: txs,
-    //         untrustedLastMiniblockNumberHint: miniblockNumber
-    //     });
+        return abi.encodePacked(BatchDecoder.SUPPORTED_ENCODING_VERSION, abi.encode(precommitInfo));
+    }
 
-    //     return abi.encodePacked(BatchDecoder.SUPPORTED_ENCODING_VERSION, abi.encode(precommitInfo));
-    // }
+    function test_SuccessfullyPrecommit() public {
+        vm.prank(validator);
+        vm.recordLogs();
 
-    // function test_SuccessfullyPrecommit() public {
-    //     vm.prank(validator);
-    //     vm.recordLogs();
+        executor.precommitSharedBridge(address(0), batchNumber, precommitData());
 
-    //     executor.precommitSharedBridge(uint256(0), batchNumber, precommitData());
+        Vm.Log[] memory entries = vm.getRecordedLogs();
 
-    //     Vm.Log[] memory entries = vm.getRecordedLogs();
+        assertEq(entries.length, 1);
+        assertEq(entries[0].topics[0], keccak256("BatchPrecommitmentSet(uint256,uint256,bytes32)"));
+        assertEq(entries[0].topics[1], bytes32(batchNumber));
+        assertEq(entries[0].topics[2], bytes32(miniblockNumber));
+    }
 
-    //     assertEq(entries.length, 1);
-    //     assertEq(entries[0].topics[0], keccak256("BatchPrecommitmentSet(uint256,uint256,bytes32)"));
-    //     assertEq(entries[0].topics[1], bytes32(batchNumber));
-    //     assertEq(entries[0].topics[2], bytes32(miniblockNumber));
-    // }
-
-    // // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
-    // /// forge-config: default.isolate = true
-    // function test_MeasureGas() public {
-    //     vm.prank(validator);
-    //     validatorTimelock.precommitSharedBridge(eraChainId, batchNumber, precommitData());
-    //     vm.snapshotGasLastCall("Executor", "precommit");
-    // }
+    // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
+    /// forge-config: default.isolate = true
+    function test_MeasureGas() public {
+        vm.prank(validator);
+        validatorTimelock.precommitSharedBridge(address(executor), batchNumber, precommitData());
+        vm.snapshotGasLastCall("Executor", "precommit");
+    }
 }

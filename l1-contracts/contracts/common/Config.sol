@@ -173,7 +173,7 @@ struct ZKChainCommitment {
 /// @dev Used as the `msg.sender` for system service transactions.
 address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF));
 
-/// @dev To avoid higher costs the writes, we avoid keeping the slot zero.
+/// @dev To avoid higher costs the writes, we avoid making the slot zero.
 /// This ensures that the cost of writes is always 5k and avoids the 20k initial write from the non-zero value.
 bytes32 constant DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH = bytes32(uint256(1));
 

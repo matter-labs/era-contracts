@@ -216,9 +216,13 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         addValidatorByAddress(BRIDGE_HUB.getZKChain(_chainId), _validator);
     }
 
+    function hasRole(uint256 _chainId, bytes32 _role, address _address) public returns (bool) {
+        return hasRole(BRIDGE_HUB.getZKChain(_chainId), _role, _address);
+    }
+
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     function precommitSharedBridge(
-        address _chainAddress, // Changed from uint256
+        address _chainAddress,
         uint256, // _l2BlockNumber (unused in this specific implementation)
         bytes calldata // _l2Block (unused in this specific implementation)
     ) public onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
@@ -228,7 +232,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the zkChain diamond contract with the same calldata.
     function commitBatchesSharedBridge(
-        address _chainAddress, // Changed from uint256
+        address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata // _batchData (unused in this specific implementation)
@@ -252,7 +256,6 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         address _chainAddress,
         uint256 /*_l2BatchNumber*/
     ) external onlyRole(_chainAddress, REVERTER_ROLE) {
-        // Changed from uint256
         _propagateToZKChain(_chainAddress);
     }
 
@@ -260,7 +263,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
     function proveBatchesSharedBridge(
-        address _chainAddress, // Changed from uint256
+        address _chainAddress,
         uint256, // _processBatchFrom (unused in this specific implementation)
         uint256, // _processBatchTo (unused in this specific implementation)
         bytes calldata // _proofData (unused in this specific implementation)
@@ -271,7 +274,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkChain diamond contract with the same calldata.
     function executeBatchesSharedBridge(
-        address _chainAddress, // Changed from uint256
+        address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata // _batchData (unused in this specific implementation)
@@ -298,7 +301,6 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the zkChain diamond contract, not delegatecalled!
     function _propagateToZKChain(address _chainAddress) internal {
-        // Changed from uint256
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
@@ -325,7 +327,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     function _getChainAdmin(address _chainAddress) internal view override returns (address) {
         // This function is expected to be rarely used and so additional checks could be added here.
         // Since all ZK-chain related roles require that the owner of the `DEFAULT_ADMIN_ROLE` sets them,
-        // ensureing that this role is only available to chains that are part of the ecosystem is enough
+        // ensuring that this role is only available to chains that are part of the ecosystem is enough
         // to ensure that this contract only works with such chains.
 
         // Firstly, we check that the chain is indeed a part of the ecosystem
