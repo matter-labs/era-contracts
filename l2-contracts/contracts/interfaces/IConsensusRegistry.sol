@@ -122,11 +122,13 @@ interface IConsensusRegistry {
     /// @dev Fails if validator owner already exists.
     /// @dev Fails if a validator with the same public key already exists.
     /// @param _validatorOwner The address of the validator's owner.
+    /// @param _validatorIsLeader Flag indicating if the validator is a leader.
     /// @param _validatorWeight The voting weight of the validator.
     /// @param _validatorPubKey The BLS12-381 public key of the validator.
     /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
     function add(
         address _validatorOwner,
+        bool _validatorIsLeader,
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP

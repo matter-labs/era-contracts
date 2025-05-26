@@ -55,6 +55,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     function add(
         address _validatorOwner,
+        bool _validatorIsLeader,
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP
@@ -75,7 +76,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             latest: ValidatorAttr({
                 active: true,
                 removed: false,
-                leader: true,
+                leader: _validatorIsLeader,
                 weight: _validatorWeight,
                 pubKey: _validatorPubKey,
                 proofOfPossession: _validatorPoP
