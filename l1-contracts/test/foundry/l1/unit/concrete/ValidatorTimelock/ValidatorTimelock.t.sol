@@ -46,7 +46,6 @@ contract ValidatorTimelockTest is Test {
         // eraChainId = 9;
         // lastBatchNumber = 123;
         // executionDelay = 10;
-
         // chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(owner, zkSync);
         // validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
         // vm.prank(owner);
@@ -72,7 +71,6 @@ contract ValidatorTimelockTest is Test {
 
     function test_SuccessfulConstruction() public {
         // ValidatorTimelock validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
-
         // assertEq(validator.owner(), owner);
         // assertEq(validator.executionDelay(), executionDelay);
     }

@@ -150,7 +150,11 @@ contract ExecutorTest is Test {
         });
     }
 
-    function deployValidatorTimelock(address bridgehubAddr, address _initialOwner, uint32 _initialExecutionDelay) private returns (address) {
+    function deployValidatorTimelock(
+        address bridgehubAddr,
+        address _initialOwner,
+        uint32 _initialExecutionDelay
+    ) private returns (address) {
         ProxyAdmin proxyAdmin = new ProxyAdmin();
         ValidatorTimelock timelockImplementation = new ValidatorTimelock(bridgehubAddr);
         return

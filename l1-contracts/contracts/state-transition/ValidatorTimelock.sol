@@ -10,7 +10,6 @@ import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {TimeNotReached, NotAZKChain} from "../common/L1ContractErrors.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
-
 /// @notice Struct specifying which validator roles to grant or revoke in a single call.
 /// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
 /// @param rotateCommitterRole Whether to rotate the COMMITTER_ROLE.
@@ -121,7 +120,11 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to revoke.
     /// @dev Note that the access control is managed by the inner `revokeRole` functions.
-    function removeValidatorRoles(address _chainAddress, address _validator, ValidatorRotationParams memory params) public {
+    function removeValidatorRoles(
+        address _chainAddress,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) public {
         if (params.rotatePrecommitterRole) {
             revokeRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
         }
@@ -167,7 +170,11 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to grant.
-    function addValidatorRoles(address _chainAddress, address _validator, ValidatorRotationParams memory params) public {
+    function addValidatorRoles(
+        address _chainAddress,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) public {
         if (params.rotatePrecommitterRole) {
             grantRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
         }
@@ -201,7 +208,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
             })
         );
     }
-    
+
     /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
     /// @param _chainId The chain Id of the ZK chain.
     /// @param _validator The address of the validator to add.
@@ -241,7 +248,11 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
-    function revertBatchesSharedBridge(address _chainAddress, uint256 /*_l2BatchNumber*/) external onlyRole(_chainAddress, REVERTER_ROLE) { // Changed from uint256
+    function revertBatchesSharedBridge(
+        address _chainAddress,
+        uint256 /*_l2BatchNumber*/
+    ) external onlyRole(_chainAddress, REVERTER_ROLE) {
+        // Changed from uint256
         _propagateToZKChain(_chainAddress);
     }
 
@@ -286,7 +297,8 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
 
     /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the zkChain diamond contract, not delegatecalled!
-    function _propagateToZKChain(address _chainAddress) internal { // Changed from uint256
+    function _propagateToZKChain(address _chainAddress) internal {
+        // Changed from uint256
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
@@ -312,7 +324,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @inheritdoc AccessControlEnumerablePerChainAddressUpgradeable
     function _getChainAdmin(address _chainAddress) internal view override returns (address) {
         // This function is expected to be rarely used and so additional checks could be added here.
-        // Since all ZK-chain related roles require that the owner of the `DEFAULT_ADMIN_ROLE` sets them, 
+        // Since all ZK-chain related roles require that the owner of the `DEFAULT_ADMIN_ROLE` sets them,
         // ensureing that this role is only available to chains that are part of the ecosystem is enough
         // to ensure that this contract only works with such chains.
 
