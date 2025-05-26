@@ -153,8 +153,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId();
         }
-        if(_newBatch.l2DACommitmentScheme != s.l2DACommitmentScheme) {
-            revert MismatchL2DACommitmentScheme(uint256(_newBatch.l2DACommitmentScheme), uint256(s.l2DACommitmentScheme));
+        if(_newBatch.l2DaValidator != s.l2DAValidator) {
+            revert MismatchL2DAValidator();
         }
 
         // Create batch PI for the proof verification
@@ -163,7 +163,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _newBatch.chainId,
                 _newBatch.firstBlockTimestamp,
                 _newBatch.lastBlockTimestamp,
-                uint8(_newBatch.l2DACommitmentScheme),
+                uint256(uint160(_newBatch.l2DaValidator)),
                 _newBatch.daCommitment,
                 _newBatch.numberOfLayer1Txs,
                 _newBatch.priorityOperationsHash,
