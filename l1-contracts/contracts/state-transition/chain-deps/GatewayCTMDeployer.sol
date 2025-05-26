@@ -260,7 +260,7 @@ contract GatewayCTMDeployer {
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployValidatorTimelock(
-        bytes32 _salt, 
+        bytes32 _salt,
         address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal {

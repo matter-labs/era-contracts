@@ -315,7 +315,7 @@ contract ExecutorTest is Test {
         });
 
         dummyBridgehub.setZKChain(eraChainId, address(diamondProxy));
-        
+
         vm.prank(owner);
         validatorTimelock.addValidatorForChainId(eraChainId, validator);
 

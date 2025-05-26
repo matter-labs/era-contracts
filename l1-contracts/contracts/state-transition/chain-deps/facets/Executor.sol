@@ -351,7 +351,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // Caching two constants for use in assembly
             uint256 precommitmentLength = PACKED_L2_PRECOMMITMENT_LENGTH;
             assembly {
-                // Storing the current rolling hash in position 0. This way It will be more convenient 
+                // Storing the current rolling hash in position 0. This way It will be more convenient
                 // to recalculate it.
                 mstore(0, currentPrecommitment)
 

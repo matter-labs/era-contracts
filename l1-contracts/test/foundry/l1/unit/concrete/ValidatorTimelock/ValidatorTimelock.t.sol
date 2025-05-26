@@ -55,16 +55,8 @@ contract ValidatorTimelockTest is Test {
 
         chainTypeManager = new DummyChainTypeManagerForValidatorTimelock(owner, zkSync);
 
-        vm.mockCall(
-            zkSync, 
-            abi.encodeCall(IGetters.getAdmin, ()), 
-            abi.encode(owner)
-        );
-        vm.mockCall(
-            zkSync, 
-            abi.encodeCall(IGetters.getChainId, ()), 
-            abi.encode(chainId)
-        );
+        vm.mockCall(zkSync, abi.encodeCall(IGetters.getAdmin, ()), abi.encode(owner));
+        vm.mockCall(zkSync, abi.encodeCall(IGetters.getChainId, ()), abi.encode(chainId));
         dummyBridgehub.setZKChain(chainId, zkSync);
 
         validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
@@ -93,11 +85,7 @@ contract ValidatorTimelockTest is Test {
         assertEq(validator.executionDelay(), executionDelay);
     }
 
-    function _assertAllRoles(
-        uint256 _chainId, 
-        address _addr,
-        bool _expected
-    ) internal {
+    function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal {
         require(validator.hasRoleForChainId(_chainId, validator.PRECOMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.COMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.PROVER_ROLE(), _addr) == _expected);

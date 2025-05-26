@@ -593,7 +593,10 @@ contract AdminFunctions is Script {
             data.bridgehub,
             data.l2ChainId
         );
-        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (data.l2ChainId, data.validatorAddress));
+        bytes memory callData = abi.encodeCall(
+            ValidatorTimelock.addValidatorForChainId,
+            (data.l2ChainId, data.validatorAddress)
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             callData,
