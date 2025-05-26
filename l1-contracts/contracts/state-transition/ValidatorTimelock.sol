@@ -145,7 +145,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to remove.
-    function removeValidatorByAddress(address _chainAddress, address _validator) public {
+    function removeValidator(address _chainAddress, address _validator) public {
         removeValidatorRoles(
             _chainAddress,
             _validator,
@@ -162,8 +162,8 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
     /// @param _chainId The chain Id of the ZK chain.
     /// @param _validator The address of the validator to remove.
-    function removeValidator(uint256 _chainId, address _validator) external {
-        removeValidatorByAddress(BRIDGE_HUB.getZKChain(_chainId), _validator);
+    function removeValidatorForChainId(uint256 _chainId, address _validator) external {
+        removeValidator(BRIDGE_HUB.getZKChain(_chainId), _validator);
     }
 
     /// @notice Grants the specified validator roles for a given validator on the target chain.
@@ -195,7 +195,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to add.
-    function addValidatorByAddress(address _chainAddress, address _validator) public {
+    function addValidator(address _chainAddress, address _validator) public {
         addValidatorRoles(
             _chainAddress,
             _validator,
@@ -212,11 +212,15 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
     /// @param _chainId The chain Id of the ZK chain.
     /// @param _validator The address of the validator to add.
-    function addValidator(uint256 _chainId, address _validator) external {
-        addValidatorByAddress(BRIDGE_HUB.getZKChain(_chainId), _validator);
+    function addValidatorForChainId(uint256 _chainId, address _validator) external {
+        addValidator(BRIDGE_HUB.getZKChain(_chainId), _validator);
     }
 
-    function hasRole(uint256 _chainId, bytes32 _role, address _address) public returns (bool) {
+    /// @notice Convenience wrapper to retrieve whether a certain address has a role for a chain.
+    /// @param _chainId The chain Id of the ZK chain.
+    /// @param _role The bytes32 ID of the role.
+    /// @param _address The address that may have the role.
+    function hasRoleForChainId(uint256 _chainId, bytes32 _role, address _address) public returns (bool) {
         return hasRole(BRIDGE_HUB.getZKChain(_chainId), _role, _address);
     }
 

@@ -69,9 +69,9 @@ contract ValidatorTimelockTest is Test {
 
         validator = ValidatorTimelock(_deployValidatorTimelock(owner, executionDelay));
         vm.prank(owner);
-        validator.addValidator(chainId, alice);
+        validator.addValidatorForChainId(chainId, alice);
         vm.prank(owner);
-        validator.addValidator(eraChainId, dan);
+        validator.addValidatorForChainId(eraChainId, dan);
     }
 
     function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
@@ -98,13 +98,13 @@ contract ValidatorTimelockTest is Test {
         address _addr,
         bool _expected
     ) internal {
-        require(validator.hasRole(_chainId, validator.PRECOMMITTER_ROLE(), _addr) == _expected);
-        require(validator.hasRole(_chainId, validator.COMMITTER_ROLE(), _addr) == _expected);
-        require(validator.hasRole(_chainId, validator.PROVER_ROLE(), _addr) == _expected);
-        require(validator.hasRole(_chainId, validator.EXECUTOR_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.PRECOMMITTER_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.COMMITTER_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.PROVER_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.EXECUTOR_ROLE(), _addr) == _expected);
     }
 
-    function test_addValidator() public {
+    function test_addValidatorForChainId() public {
         _assertAllRoles(chainId, bob, false);
 
         vm.prank(owner);
@@ -112,14 +112,14 @@ contract ValidatorTimelockTest is Test {
         // // solhint-disable-next-line func-named-parameters
         // vm.expectEmit(true, true, true, true, address(validator));
         // emit ValidatorAdded(chainId, bob);
-        validator.addValidator(chainId, bob);
+        validator.addValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, true);
     }
 
-    function test_removeValidator() public {
+    function test_removeValidatorForChainId() public {
         vm.prank(owner);
-        validator.addValidator(chainId, bob);
+        validator.addValidatorForChainId(chainId, bob);
         _assertAllRoles(chainId, bob, true);
 
         vm.prank(owner);
@@ -127,7 +127,7 @@ contract ValidatorTimelockTest is Test {
         // solhint-disable-next-line func-named-parameters
         // vm.expectEmit(true, true, true, true, address(validator));
         // emit ValidatorRemoved(chainId, bob);
-        validator.removeValidator(chainId, bob);
+        validator.removeValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, false);
     }
