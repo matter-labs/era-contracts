@@ -367,13 +367,15 @@ error InvalidBatchNumber(uint256 provided, uint256 expected);
 error EmptyPrecommitData(uint256 batchNumber);
 // 0x688c63e5
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
-// 0x8b57339d
+// 0xfe0aa4f2
 error RoleAccessDenied(address chainAddress, bytes32 role, address account);
 // 0xf2885eb3
 error DefaultAdminTransferNotAllowed();
 
+// 0xb49df1f2
 error NotAZKChain(address addr);
 
+// 0x99f6cc22
 error InvalidPackedPrecommitmentLength(uint256 length);
 
 enum SharedBridgeKey {

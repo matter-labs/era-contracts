@@ -177,5 +177,5 @@ address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFf
 /// This ensures that the cost of writes is always 5k and avoids the 20k initial write from the non-zero value.
 bytes32 constant DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH = bytes32(uint256(1));
 
-/// @dev The length of a packed transaciton precommitment in bytes. It consists of two parts: 32-byte tx hash and 1-byte status (0 or 1).
+/// @dev The length of a packed transaction precommitment in bytes. It consists of two parts: 32-byte tx hash and 1-byte status (0 or 1).
 uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
