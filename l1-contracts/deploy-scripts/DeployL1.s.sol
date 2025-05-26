@@ -135,9 +135,6 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
         addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
 
-        // FIXME: maybe store implementation address
-        (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
-
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
@@ -149,6 +146,10 @@ contract DeployL1Script is Script, DeployUtils {
             "MessageRoot",
             false
         );
+
+        // FIXME: maybe store implementation address
+        (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
+
 
         (
             addresses.stateTransition.serverNotifierImplementation,
@@ -195,7 +196,6 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.stateTransition.chainTypeManagerProxy
         ) = deployTuppWithContract("ChainTypeManager", false);
         registerChainTypeManager();
-        setChainTypeManagerInValidatorTimelock();
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
@@ -314,15 +314,6 @@ contract DeployL1Script is Script, DeployUtils {
             sharedBridge.assetHandlerAddress(assetId),
             bridgehub.ctmAssetIdToAddress(assetId)
         );
-    }
-
-    function setChainTypeManagerInValidatorTimelock() public virtual {
-        IValidatorTimelock validatorTimelock = IValidatorTimelock(addresses.stateTransition.validatorTimelock);
-        if (address(validatorTimelock.chainTypeManager()) != addresses.stateTransition.chainTypeManagerProxy) {
-            vm.broadcast(msg.sender);
-            validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
-        }
-        console.log("ChainTypeManager set in ValidatorTimelock");
     }
 
     function deployDiamondProxy() internal {
