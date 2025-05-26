@@ -7,33 +7,33 @@ import {RoleAccessDenied, DefaultAdminTransferNotAllowed} from "../common/L1Cont
 
 /// @title Chain‑Address‑Aware Role‑Based Access Control with Enumeration
 /// @notice Similar to OpenZeppelin's `AccessControlEnumerable`, but keeps a completely separate
-///         role registry per `chainAddress`. This is useful for cross‑chain applications where the
-///         same contract state is deployed on multiple networks and a distinct set of operators
-///         is required on each of them.
+/// role registry per `chainAddress`. This is useful for cross‑chain applications where the
+/// same contract state is deployed on multiple networks and a distinct set of operators
+/// is required on each of them.
 /// @dev This contract purposefully does *not* inherit from OZ's `AccessControlUpgradeable` to
-///         avoid global (cross‑chain) role collisions. Instead, every public method explicitly
-///         takes a `_chainAddress` argument.
+/// avoid global (cross‑chain) role collisions. Instead, every public method explicitly
+/// takes a `_chainAddress` argument.
 /// @dev Note, that the chains are identified, not by chain id, but by their Diamond Proxy address.
 abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
     using EnumerableSetUpgradeable for EnumerableSetUpgradeable.AddressSet;
 
     /// @notice Emitted when `role` is granted to `account` for a specific `chainAddress`.
-    /// @param chainAddress  The chain address on which the role is granted.
-    /// @param role          The granted role identifier.
-    /// @param account       The account receiving the role.
+    /// @param chainAddress The chain address on which the role is granted.
+    /// @param role The granted role identifier.
+    /// @param account The account receiving the role.
     event RoleGranted(address indexed chainAddress, bytes32 indexed role, address indexed account);
 
     /// @notice Emitted when `role` is revoked from `account` for a specific `chainAddress`.
-    /// @param chainAddress  The chain address on which the role is revoked.
-    /// @param role          The revoked role identifier.
-    /// @param account       The account losing the role.
+    /// @param chainAddress The chain address on which the role is revoked.
+    /// @param role The revoked role identifier.
+    /// @param account The account losing the role.
     event RoleRevoked(address indexed chainAddress, bytes32 indexed role, address indexed account);
 
     /// @notice Emitted when the admin role that controls `role` on `chainAddress` changes.
-    /// @param chainAddress      The chain address on which the admin role is changed.
-    /// @param role              The affected role.
+    /// @param chainAddress The chain address on which the admin role is changed.
+    /// @param role The affected role.
     /// @param previousAdminRole The role that previously had admin privileges.
-    /// @param newAdminRole      The new admin role.
+    /// @param newAdminRole The new admin role.
     event RoleAdminChanged(
         address indexed chainAddress,
         bytes32 indexed role,
@@ -59,7 +59,7 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
 
     /// @notice Ensures that `msg.sender` possesses `_role` on `_chainAddress`.
     /// @param _chainAddress The chain address.
-    /// @param _role         The required role.
+    /// @param _role The required role.
     modifier onlyRole(address _chainAddress, bytes32 _role) {
         _checkRole(_chainAddress, _role, msg.sender);
         _;
@@ -67,8 +67,8 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
 
     /// @notice Returns `true` if `_account` holds `_role` for `_chainAddress`.
     /// @param _chainAddress The chain address.
-    /// @param _role         The role identifier.
-    /// @param _account      The account to check.
+    /// @param _role The role identifier.
+    /// @param _account The account to check.
     function hasRole(address _chainAddress, bytes32 _role, address _account) public view returns (bool) {
         if (_role == DEFAULT_ADMIN_ROLE) {
             return _account == _getChainAdmin(_chainAddress);
@@ -87,8 +87,8 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
 
     /// @notice Returns one of the accounts that have `_role` on `_chainAddress`.
     /// @param _chainAddress The chain address.
-    /// @param _role         The role identifier.
-    /// @param index         A zero‑based index (ordering is not guaranteed).
+    /// @param _role The role identifier.
+    /// @param index A zero‑based index (ordering is not guaranteed).
     /// @dev `index` must be a value between 0 and {getRoleMemberCount}, non-inclusive.
     /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
     function getRoleMember(address _chainAddress, bytes32 _role, uint256 index) public view returns (address) {
@@ -103,8 +103,8 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
 
     /// @notice Grants `_role` on `_chainAddress` to `_account`.
     /// @param _chainAddress The chain address.
-    /// @param _role         The role to grant.
-    /// @param _account      The beneficiary account.
+    /// @param _role The role to grant.
+    /// @param _account The beneficiary account.
     function grantRole(
         address _chainAddress,
         bytes32 _role,
@@ -124,8 +124,8 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
 
     /// @notice Revokes `_role` on `_chainAddress` from `_account`.
     /// @param _chainAddress The chain address.
-    /// @param _role         The role to revoke.
-    /// @param _account      The target account.
+    /// @param _role The role to revoke.
+    /// @param _account The target account.
     function revokeRole(
         address _chainAddress,
         bytes32 _role,
@@ -136,15 +136,15 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
 
     /// @notice Renounces `_role` on `_chainAddress` for the calling account.
     /// @param _chainAddress The chain address.
-    /// @param _role         The role to renounce.
+    /// @param _role The role to renounce.
     function renounceRole(address _chainAddress, bytes32 _role) public onlyRole(_chainAddress, _role) {
         _revokeRole(_chainAddress, _role, msg.sender);
     }
 
     /// @notice Sets a new admin role for `_role` on `_chainAddress`.
     /// @param _chainAddress The chain address.
-    /// @param _role         The role being configured.
-    /// @param _adminRole    The role that will act as admin for `_role`.
+    /// @param _role The role being configured.
+    /// @param _adminRole The role that will act as admin for `_role`.
     function setRoleAdmin(
         address _chainAddress,
         bytes32 _role,
