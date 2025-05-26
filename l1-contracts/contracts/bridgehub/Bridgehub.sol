@@ -42,7 +42,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
-    uint256 public L1_CHAIN_ID;
+    uint256 public immutable L1_CHAIN_ID;
 
     /// @notice The total number of ZK chains can be created/connected to this CTM.
     /// This is the temporary security measure.
@@ -167,7 +167,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         require(msg.sender == L2_GENESIS_UPGRADE_ADDR);
 
         _disableInitializers();
-        L1_CHAIN_ID = _l1ChainId;
+        // TODO: will not work on l2
+//        L1_CHAIN_ID = _l1ChainId;
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
