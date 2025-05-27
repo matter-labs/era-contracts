@@ -37,16 +37,16 @@ abstract contract NativeTokenVault is
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
-    address public immutable override WETH_TOKEN;
+    address public override WETH_TOKEN;
 
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
-    IAssetRouterBase public immutable override ASSET_ROUTER;
+    IAssetRouterBase public override ASSET_ROUTER;
 
     /// @dev The assetId of the base token.
-    bytes32 public immutable BASE_TOKEN_ASSET_ID;
+    bytes32 public BASE_TOKEN_ASSET_ID;
 
     /// @dev Chain ID of L1 for bridging reasons.
-    uint256 public immutable L1_CHAIN_ID;
+    uint256 public L1_CHAIN_ID;
 
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
@@ -81,6 +81,15 @@ abstract contract NativeTokenVault is
     /// @param _wethToken Address of WETH on deployed chain
     /// @param _assetRouter Address of assetRouter
     constructor(address _wethToken, address _assetRouter, bytes32 _baseTokenAssetId, uint256 _l1ChainId) {
+        _disableInitializers();
+        L1_CHAIN_ID = _l1ChainId;
+        ASSET_ROUTER = IAssetRouterBase(_assetRouter);
+        WETH_TOKEN = _wethToken;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+    }
+
+    // we set deployed code during genesis upgrade and calling this(only) method during the genesis upgrade
+    function init_boojum(address _wethToken, address _assetRouter, bytes32 _baseTokenAssetId, uint256 _l1ChainId) internal {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = IAssetRouterBase(_assetRouter);
