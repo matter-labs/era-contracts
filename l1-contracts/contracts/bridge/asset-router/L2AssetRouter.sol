@@ -20,12 +20,13 @@ import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} f
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, L2AssetRouter_LegacyDataNotImplemented, L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+import {IERC7786Receiver} from "../../interop/IERC7786Receiver.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Receiver {
     /// @dev The address of the L2 legacy shared bridge.
     address public immutable L2_LEGACY_SHARED_BRIDGE;
 
@@ -126,6 +127,20 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         // Note, that it is an asset handler, but not asset deployment tracker,
         // which is located on L1.
         _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+    }
+
+    function executeMessage( 
+        // kl todo: change back to strings
+        bytes32 messageId, // gateway specific, empty or unique
+        uint256 sourceChain, // [CAIP-2] chain identifier
+        address sender, // [CAIP-10] account address
+        bytes calldata payload,
+        bytes[] calldata attributes
+    ) external payable returns (bytes4) {
+        require(payload.length > 4, "L2AssetRouter: payload too short");
+        require(bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector, "L2AssetRouter: invalid selector");
+        address(this).call(payload);
+        return IERC7786Receiver.executeMessage.selector;
     }
 
     /*//////////////////////////////////////////////////////////////

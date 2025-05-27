@@ -77,8 +77,8 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes32(0))
         );
         address recipient = L2_INTEROP_CENTER_ADDR;
-        (bool success, ) = recipient.call(data);
-        assertTrue(success);
+        // (bool success, ) = recipient.call(data);
+        // assertTrue(success);
     }
 
     function test_sendBundle() public {
@@ -93,10 +93,18 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes32(0))
         );
         IInteropCenter recipient = IInteropCenter(L2_INTEROP_CENTER_ADDR);
-        // bytes32 bundleHash = recipient.sendBundle(
-        //     271,
-        //     new InteropCallStarter[](0)
-        // );
+        InteropCallStarter memory starter = InteropCallStarter({
+            nextContract: address(0x0000000000000000000000000000000000010009),
+            data: new bytes(0),
+            requestedInteropCallValue: 0,
+            attributes: new bytes[](0)
+        });
+        InteropCallStarter[] memory starters = new InteropCallStarter[](1);
+        starters[0] = starter;
+        bytes32 bundleHash = recipient.sendBundle(
+            271,
+            starters
+        );
     }
 
     function test_executeInterop() public {

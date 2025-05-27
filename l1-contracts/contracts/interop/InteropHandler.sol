@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_MESSAGE_VERIFICATION} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Message, MessageInclusionProof} from "../common/Messaging.sol";
-
+import {IERC7786Receiver} from "./IERC7786Receiver.sol";
 error MessageNotIncluded();
 error BundleAlreadyExecuted(bytes32 bundleHash);
 
@@ -20,6 +20,7 @@ contract InteropHandler is IInteropHandler {
     /// @notice The balances of the users.
     mapping(bytes32 bundleHash => bool bundleExecuted) public bundleExecuted;
 
+    error InvalidSelector(bytes4 selector);
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bool _skipEmptyCalldata) public {
         _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
         bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
@@ -44,27 +45,12 @@ contract InteropHandler is IInteropHandler {
 
         for (uint256 i = 0; i < interopBundle.calls.length; i++) {
             InteropCall memory interopCall = interopBundle.calls[i];
-            if (_skipEmptyCalldata && interopCall.data.length == 0) {
-                // kl todo: we skip calls in the account validation phase for now, as empty contracts cannot be called.
-                // remove with 7786 support.
-                L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(interopCall.to, interopCall.value);
-                continue;
+
+            L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
+            bytes4 selector = IERC7786Receiver(interopCall.to).executeMessage{value: interopCall.value}(bundleHash, _proof.chainId, interopCall.from, interopCall.data, new bytes[](0)); // attributes are not supported yet
+            if (selector != IERC7786Receiver.executeMessage.selector) {
+                revert InvalidSelector(selector);
             }
-
-            // address accountAddress = getAliasedAccount(interopCall.from, _proof.chainId);
-            // IInteropAccount account = IInteropAccount(payable(accountAddress)); // kl todo add chainId
-            //     uint256 codeSize;
-            //     assembly {
-            //         codeSize := extcodesize(accountAddress)
-            //     }
-            //     if (codeSize == 0) {
-            //         // kl todo use create3.
-            //         address deployedAccount = deployInteropAccount(interopCall.from, _proof.chainId);
-            //         require(address(account) == deployedAccount, "calculated address incorrect");
-            //     }
-
-            //     L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(account), interopCall.value);
-            //     account.forwardFromIC(interopCall.to, interopCall.value, interopCall.data);
         }
     }
 }
