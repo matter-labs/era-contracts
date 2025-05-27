@@ -3,11 +3,12 @@
 pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {AccessControlEnumerablePerChainUpgradeable} from "./AccessControlEnumerablePerChainUpgradeable.sol";
+import {AccessControlEnumerablePerChainAddressUpgradeable} from "./AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {IChainTypeManager} from "./IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {IZKChain} from "./chain-interfaces/IZKChain.sol";
+import {TimeNotReached, NotAZKChain} from "../common/L1ContractErrors.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 /// @notice Struct specifying which validator roles to grant or revoke in a single call.
 /// @param rotatePrecommitterRole Whether to rotate the PRECOMMITTER_ROLE.
@@ -35,7 +36,7 @@ struct ValidatorRotationParams {
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
-contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlEnumerablePerChainUpgradeable {
+contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlEnumerablePerChainAddressUpgradeable {
     using LibMap for LibMap.Uint32Map;
 
     /// @dev Part of the IBase interface. Not used in this contract.
@@ -76,19 +77,20 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @dev Note, that it is optional, meaning that by default the admin role is held by the chain admin
     bytes32 public constant OPTIONAL_EXECUTOR_ADMIN_ROLE = keccak256("OPTIONAL_EXECUTOR_ADMIN_ROLE");
 
+    /// @notice The address of the bridgehub
+    IBridgehub public immutable BRIDGE_HUB;
+
     /// @notice The delay between committing and executing batches is changed.
     event NewExecutionDelay(uint256 _newExecutionDelay);
 
-    /// @dev The chainTypeManager smart contract.
-    IChainTypeManager public chainTypeManager;
-
-    /// @dev The mapping of L2 chainId => batch number => timestamp when it was committed.
-    mapping(uint256 chainId => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
+    /// @dev The mapping of ZK chain address => batch number => timestamp when it was committed.
+    mapping(address chainAddress => LibMap.Uint32Map batchNumberToTimestampMapping) internal committedBatchTimestamp;
 
     /// @dev The delay between committing and executing batches.
     uint32 public executionDelay;
 
-    constructor() {
+    constructor(address _bridgehubAddr) {
+        BRIDGE_HUB = IBridgehub(_bridgehubAddr);
         // Disable initialization to prevent Parity hack.
         _disableInitializers();
     }
@@ -102,22 +104,6 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         executionDelay = _executionDelay;
     }
 
-    /// @notice Checks if the caller is the admin of the chain.
-    modifier onlyChainAdmin(uint256 _chainId) {
-        if (msg.sender != chainTypeManager.getChainAdmin(_chainId)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /// @dev Sets a new state transition manager.
-    function setChainTypeManager(IChainTypeManager _chainTypeManager) external onlyOwner {
-        if (address(_chainTypeManager) == address(0)) {
-            revert ZeroAddress();
-        }
-        chainTypeManager = _chainTypeManager;
-    }
-
     /// @dev Set the delay between committing and executing batches.
     function setExecutionDelay(uint32 _executionDelay) external onlyOwner {
         executionDelay = _executionDelay;
@@ -125,39 +111,43 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     }
 
     /// @dev Returns the timestamp when `_l2BatchNumber` was committed.
-    function getCommittedBatchTimestamp(uint256 _chainId, uint256 _l2BatchNumber) external view returns (uint256) {
-        return committedBatchTimestamp[_chainId].get(_l2BatchNumber);
+    function getCommittedBatchTimestamp(address _chainAddress, uint256 _l2BatchNumber) external view returns (uint256) {
+        return committedBatchTimestamp[_chainAddress].get(_l2BatchNumber);
     }
 
     /// @notice Revokes the specified validator roles for a given validator on the target chain.
-    /// @param _chainId The identifier of the L2 chain.
+    /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to revoke.
     /// @dev Note that the access control is managed by the inner `revokeRole` functions.
-    function removeValidatorRoles(uint256 _chainId, address _validator, ValidatorRotationParams memory params) public {
+    function removeValidatorRoles(
+        address _chainAddress,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) public {
         if (params.rotatePrecommitterRole) {
-            revokeRole(_chainId, PRECOMMITTER_ROLE, _validator);
+            revokeRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
         }
         if (params.rotateCommitterRole) {
-            revokeRole(_chainId, COMMITTER_ROLE, _validator);
+            revokeRole(_chainAddress, COMMITTER_ROLE, _validator);
         }
         if (params.rotateReverterRole) {
-            revokeRole(_chainId, REVERTER_ROLE, _validator);
+            revokeRole(_chainAddress, REVERTER_ROLE, _validator);
         }
         if (params.rotateProverRole) {
-            revokeRole(_chainId, PROVER_ROLE, _validator);
+            revokeRole(_chainAddress, PROVER_ROLE, _validator);
         }
         if (params.rotateExecutorRole) {
-            revokeRole(_chainId, EXECUTOR_ROLE, _validator);
+            revokeRole(_chainAddress, EXECUTOR_ROLE, _validator);
         }
     }
 
     /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
-    /// @param _chainId The identifier of the L2 chain.
+    /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to remove.
-    function removeValidator(uint256 _chainId, address _validator) external {
+    function removeValidator(address _chainAddress, address _validator) public {
         removeValidatorRoles(
-            _chainId,
+            _chainAddress,
             _validator,
             ValidatorRotationParams({
                 rotatePrecommitterRole: true,
@@ -169,34 +159,45 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         );
     }
 
+    /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
+    /// @param _chainId The chain Id of the ZK chain.
+    /// @param _validator The address of the validator to remove.
+    function removeValidatorForChainId(uint256 _chainId, address _validator) external {
+        removeValidator(BRIDGE_HUB.getZKChain(_chainId), _validator);
+    }
+
     /// @notice Grants the specified validator roles for a given validator on the target chain.
-    /// @param _chainId The identifier of the L2 chain.
+    /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to grant.
-    function addValidatorRoles(uint256 _chainId, address _validator, ValidatorRotationParams memory params) public {
+    function addValidatorRoles(
+        address _chainAddress,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) public {
         if (params.rotatePrecommitterRole) {
-            grantRole(_chainId, PRECOMMITTER_ROLE, _validator);
+            grantRole(_chainAddress, PRECOMMITTER_ROLE, _validator);
         }
         if (params.rotateCommitterRole) {
-            grantRole(_chainId, COMMITTER_ROLE, _validator);
+            grantRole(_chainAddress, COMMITTER_ROLE, _validator);
         }
         if (params.rotateReverterRole) {
-            grantRole(_chainId, REVERTER_ROLE, _validator);
+            grantRole(_chainAddress, REVERTER_ROLE, _validator);
         }
         if (params.rotateProverRole) {
-            grantRole(_chainId, PROVER_ROLE, _validator);
+            grantRole(_chainAddress, PROVER_ROLE, _validator);
         }
         if (params.rotateExecutorRole) {
-            grantRole(_chainId, EXECUTOR_ROLE, _validator);
+            grantRole(_chainAddress, EXECUTOR_ROLE, _validator);
         }
     }
 
     /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
-    /// @param _chainId The identifier of the L2 chain.
+    /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to add.
-    function addValidator(uint256 _chainId, address _validator) external {
+    function addValidator(address _chainAddress, address _validator) public {
         addValidatorRoles(
-            _chainId,
+            _chainAddress,
             _validator,
             ValidatorRotationParams({
                 rotatePrecommitterRole: true,
@@ -208,67 +209,85 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         );
     }
 
+    /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
+    /// @param _chainId The chain Id of the ZK chain.
+    /// @param _validator The address of the validator to add.
+    function addValidatorForChainId(uint256 _chainId, address _validator) external {
+        addValidator(BRIDGE_HUB.getZKChain(_chainId), _validator);
+    }
+
+    /// @notice Convenience wrapper to retrieve whether a certain address has a role for a chain.
+    /// @param _chainId The chain Id of the ZK chain.
+    /// @param _role The bytes32 ID of the role.
+    /// @param _address The address that may have the role.
+    function hasRoleForChainId(uint256 _chainId, bytes32 _role, address _address) public returns (bool) {
+        return hasRole(BRIDGE_HUB.getZKChain(_chainId), _role, _address);
+    }
+
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     function precommitSharedBridge(
-        uint256 _chainId,
-        uint256,
-        bytes calldata
-    ) external onlyRole(_chainId, PRECOMMITTER_ROLE) {
-        _propagateToZKChain(_chainId);
+        address _chainAddress,
+        uint256, // _l2BlockNumber (unused in this specific implementation)
+        bytes calldata // _l2Block (unused in this specific implementation)
+    ) public onlyRole(_chainAddress, PRECOMMITTER_ROLE) {
+        _propagateToZKChain(_chainAddress);
     }
 
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the zkChain diamond contract with the same calldata.
     function commitBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
-        bytes calldata
-    ) external onlyRole(_chainId, COMMITTER_ROLE) {
+        bytes calldata // _batchData (unused in this specific implementation)
+    ) external onlyRole(_chainAddress, COMMITTER_ROLE) {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
             uint32 timestamp = uint32(block.timestamp);
             // We disable this check because calldata array length is cheap.
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
-                committedBatchTimestamp[_chainId].set(i, timestamp);
+                committedBatchTimestamp[_chainAddress].set(i, timestamp);
             }
         }
-        _propagateToZKChain(_chainId);
+        _propagateToZKChain(_chainAddress);
     }
 
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
-    function revertBatchesSharedBridge(uint256 _chainId, uint256) external onlyRole(_chainId, REVERTER_ROLE) {
-        _propagateToZKChain(_chainId);
+    function revertBatchesSharedBridge(
+        address _chainAddress,
+        uint256 /*_l2BatchNumber*/
+    ) external onlyRole(_chainAddress, REVERTER_ROLE) {
+        _propagateToZKChain(_chainAddress);
     }
 
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
     function proveBatchesSharedBridge(
-        uint256 _chainId,
-        uint256, // _processBatchFrom
-        uint256, // _processBatchTo
-        bytes calldata
-    ) external onlyRole(_chainId, PROVER_ROLE) {
-        _propagateToZKChain(_chainId);
+        address _chainAddress,
+        uint256, // _processBatchFrom (unused in this specific implementation)
+        uint256, // _processBatchTo (unused in this specific implementation)
+        bytes calldata // _proofData (unused in this specific implementation)
+    ) external onlyRole(_chainAddress, PROVER_ROLE) {
+        _propagateToZKChain(_chainAddress);
     }
 
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkChain diamond contract with the same calldata.
     function executeBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
-        bytes calldata
-    ) external onlyRole(_chainId, EXECUTOR_ROLE) {
+        bytes calldata // _batchData (unused in this specific implementation)
+    ) external onlyRole(_chainAddress, EXECUTOR_ROLE) {
         uint256 delay = executionDelay; // uint32
         unchecked {
             // We disable this check because calldata array length is cheap.
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
-                uint256 commitBatchTimestamp = committedBatchTimestamp[_chainId].get(i);
+                uint256 commitBatchTimestamp = committedBatchTimestamp[_chainAddress].get(i);
 
                 // Note: if the `commitBatchTimestamp` is zero, that means either:
                 // * The batch was committed, but not through this contract.
@@ -280,24 +299,17 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
                 }
             }
         }
-        _propagateToZKChain(_chainId);
+        _propagateToZKChain(_chainAddress);
     }
 
     /// @dev Call the zkChain diamond contract with the same calldata as this contract was called.
     /// Note: it is called the zkChain diamond contract, not delegatecalled!
-    function _propagateToZKChain(uint256 _chainId) internal {
-        // Note, that it is important to use chain type manager and
-        // the legacy method here for obtaining the chain id in order for
-        // this contract to before the CTM upgrade is finalized.
-        address contractAddress = chainTypeManager.getHyperchain(_chainId);
-        if (contractAddress == address(0)) {
-            revert ZeroAddress();
-        }
+    function _propagateToZKChain(address _chainAddress) internal {
         assembly {
             // Copy function signature and arguments from calldata at zero position into memory at pointer position
             calldatacopy(0, 0, calldatasize())
             // Call method of the ZK chain diamond contract returns 0 on error
-            let result := call(gas(), contractAddress, 0, 0, calldatasize(), 0, 0)
+            let result := call(gas(), _chainAddress, 0, 0, calldatasize(), 0, 0)
             // Get the size of the last return data
             let size := returndatasize()
             // Copy the size length of bytes from return data at zero position to pointer position
@@ -315,8 +327,20 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
         }
     }
 
-    /// @inheritdoc AccessControlEnumerablePerChainUpgradeable
-    function _getChainAdmin(uint256 _chainId) internal view override returns (address) {
-        return chainTypeManager.getChainAdmin(_chainId);
+    /// @inheritdoc AccessControlEnumerablePerChainAddressUpgradeable
+    function _getChainAdmin(address _chainAddress) internal view override returns (address) {
+        // This function is expected to be rarely used and so additional checks could be added here.
+        // Since all ZK-chain related roles require that the owner of the `DEFAULT_ADMIN_ROLE` sets them,
+        // ensuring that this role is only available to chains that are part of the ecosystem is enough
+        // to ensure that this contract only works with such chains.
+
+        // Firstly, we check that the chain is indeed a part of the ecosystem
+        uint256 chainId = IZKChain(_chainAddress).getChainId();
+        if (IBridgehub(BRIDGE_HUB).getZKChain(chainId) != _chainAddress) {
+            revert NotAZKChain(_chainAddress);
+        }
+
+        // Now, we can extract the admin
+        return IZKChain(_chainAddress).getAdmin();
     }
 }

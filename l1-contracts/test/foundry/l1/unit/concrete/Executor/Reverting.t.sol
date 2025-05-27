@@ -44,7 +44,7 @@ contract RevertingTest is ExecutorTest {
             genesisStoredBatchInfo,
             commitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
         newStoredBatchInfo = IExecutor.StoredBatchInfo({
@@ -67,7 +67,7 @@ contract RevertingTest is ExecutorTest {
             storedBatchInfoArray,
             proofInput
         );
-        executor.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
     }
 
     function setUpCommitBatch() public {
@@ -107,7 +107,7 @@ contract RevertingTest is ExecutorTest {
     function test_RevertWhen_RevertingMoreBatchesThanAlreadyCommitted() public {
         vm.prank(validator);
         vm.expectRevert(RevertedBatchNotAfterNewLastBatch.selector);
-        executor.revertBatchesSharedBridge(0, 10);
+        executor.revertBatchesSharedBridge(address(0), 10);
     }
 
     function test_SuccessfulRevert() public {
@@ -118,7 +118,7 @@ contract RevertingTest is ExecutorTest {
         assertEq(totalBlocksVerifiedBefore, 1, "totalBlocksVerifiedBefore");
 
         vm.prank(validator);
-        executor.revertBatchesSharedBridge(0, 0);
+        executor.revertBatchesSharedBridge(address(0), 0);
 
         uint256 totalBlocksCommitted = getters.getTotalBlocksCommitted();
         assertEq(totalBlocksCommitted, 0, "totalBlocksCommitted");

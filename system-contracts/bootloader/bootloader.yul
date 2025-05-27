@@ -2955,9 +2955,10 @@ object "Bootloader" {
 
                 let currentCommitment := mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE())
 
+                // The precommitment for each transaction in the form of "<32 bytes tx hash, 1 byte status>
+                mstore(1, status)
                 mstore(0, txHash)
-                mstore(32, status)
-                let txStatusCommitment := keccak256(0, 64)
+                let txStatusCommitment := keccak256(0, 33)
 
                 mstore(0, currentCommitment)
                 mstore(32, txStatusCommitment)

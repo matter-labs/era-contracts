@@ -342,6 +342,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.totalBatchesVerified = batchesVerified;
         s.totalBatchesExecuted = batchesExecuted;
         s.isPermanentRollup = _commitment.isPermanentRollup;
+        s.precommitmentForTheLatestBatch = _commitment.precommitmentForTheLatestBatch;
 
         // Some consistency checks just in case.
         if (batchesExecuted > batchesVerified) {
@@ -439,6 +440,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
         commitment.isPermanentRollup = s.isPermanentRollup;
+        commitment.precommitmentForTheLatestBatch = s.precommitmentForTheLatestBatch;
 
         // just in case
         if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {

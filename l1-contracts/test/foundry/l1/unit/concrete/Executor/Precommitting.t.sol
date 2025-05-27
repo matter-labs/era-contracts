@@ -15,16 +15,16 @@ contract PrecommittingTest is ExecutorTest {
     uint256 miniblockNumber = 18;
 
     function precommitData() internal view returns (bytes memory) {
-        IExecutor.TransactionStatusCommitment[] memory txs = new IExecutor.TransactionStatusCommitment[](
-            TOTAL_TRANSACTIONS
-        );
-
+        bytes memory packedTxsCommitments = hex"";
         for (uint i = 0; i < TOTAL_TRANSACTIONS; ++i) {
-            txs[i] = IExecutor.TransactionStatusCommitment({txHash: keccak256(abi.encode(i)), status: i % 3 != 0});
+            packedTxsCommitments = bytes.concat(
+                packedTxsCommitments,
+                abi.encodePacked(keccak256(abi.encode(i)), uint8(i % 3 == 0 ? 0 : 1))
+            );
         }
 
         IExecutor.PrecommitInfo memory precommitInfo = IExecutor.PrecommitInfo({
-            txs: txs,
+            packedTxsCommitments: packedTxsCommitments,
             untrustedLastMiniblockNumberHint: miniblockNumber
         });
 
@@ -35,7 +35,7 @@ contract PrecommittingTest is ExecutorTest {
         vm.prank(validator);
         vm.recordLogs();
 
-        executor.precommitSharedBridge(uint256(0), batchNumber, precommitData());
+        executor.precommitSharedBridge(address(0), batchNumber, precommitData());
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -49,7 +49,7 @@ contract PrecommittingTest is ExecutorTest {
     /// forge-config: default.isolate = true
     function test_MeasureGas() public {
         vm.prank(validator);
-        validatorTimelock.precommitSharedBridge(eraChainId, batchNumber, precommitData());
+        validatorTimelock.precommitSharedBridge(address(executor), batchNumber, precommitData());
         vm.snapshotGasLastCall("Executor", "precommit");
     }
 }

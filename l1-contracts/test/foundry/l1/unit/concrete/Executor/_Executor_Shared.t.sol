@@ -93,7 +93,7 @@ contract ExecutorTest is Test {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](31);
+        bytes4[] memory selectors = new bytes4[](32);
         selectors[0] = getters.getVerifier.selector;
         selectors[1] = getters.getAdmin.selector;
         selectors[2] = getters.getPendingAdmin.selector;
@@ -125,6 +125,7 @@ contract ExecutorTest is Test {
         selectors[28] = getters.storedBlockHash.selector;
         selectors[29] = getters.isPriorityQueueActive.selector;
         selectors[30] = getters.getChainTypeManager.selector;
+        selectors[31] = getters.getChainId.selector;
         return selectors;
     }
 
@@ -150,9 +151,13 @@ contract ExecutorTest is Test {
         });
     }
 
-    function deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) private returns (address) {
+    function deployValidatorTimelock(
+        address bridgehubAddr,
+        address _initialOwner,
+        uint32 _initialExecutionDelay
+    ) private returns (address) {
         ProxyAdmin proxyAdmin = new ProxyAdmin();
-        ValidatorTimelock timelockImplementation = new ValidatorTimelock();
+        ValidatorTimelock timelockImplementation = new ValidatorTimelock(bridgehubAddr);
         return
             address(
                 new TransparentUpgradeableProxy(
@@ -196,11 +201,7 @@ contract ExecutorTest is Test {
             abi.encode(bool(true))
         );
 
-        validatorTimelock = ValidatorTimelock(deployValidatorTimelock(owner, 0));
-        vm.prank(owner);
-        validatorTimelock.setChainTypeManager(IChainTypeManager(address(chainTypeManager)));
-        vm.prank(owner);
-        validatorTimelock.addValidator(eraChainId, validator);
+        validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
         DiamondInit diamondInit = new DiamondInit();
 
@@ -312,6 +313,11 @@ contract ExecutorTest is Test {
             systemLogs: l2Logs,
             operatorDAInput: "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
         });
+
+        dummyBridgehub.setZKChain(eraChainId, address(diamondProxy));
+
+        vm.prank(owner);
+        validatorTimelock.addValidatorForChainId(eraChainId, validator);
 
         vm.mockCall(
             address(sharedBridge),

@@ -189,12 +189,11 @@ contract GatewayCTMDeployer {
 
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
 
-        _deployValidatorTimelock(salt, contracts);
+        _deployValidatorTimelock(salt, _config.aliasedGovernanceAddress, contracts);
 
         _deployServerNotifier(salt, contracts);
 
         _deployCTM(salt, _config, contracts);
-        _setChainTypeManagerInValidatorTimelock(_config.aliasedGovernanceAddress, contracts);
         _setChainTypeManagerInServerNotifier(
             _config.aliasedGovernanceAddress,
             ServerNotifier(contracts.stateTransition.serverNotifierProxy),
@@ -260,16 +259,18 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
-    function _deployValidatorTimelock(bytes32 _salt, DeployedContracts memory _deployedContracts) internal {
-        address timelockImplementation = address(new ValidatorTimelock{salt: _salt}());
+    function _deployValidatorTimelock(
+        bytes32 _salt,
+        address _aliasedGovernanceAddress,
+        DeployedContracts memory _deployedContracts
+    ) internal {
+        address timelockImplementation = address(new ValidatorTimelock{salt: _salt}(L2_BRIDGEHUB_ADDR));
         _deployedContracts.stateTransition.validatorTimelockImplementation = timelockImplementation;
         _deployedContracts.stateTransition.validatorTimelock = address(
             new TransparentUpgradeableProxy{salt: _salt}(
                 timelockImplementation,
                 address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
-                // The initial owner is the GatewayCTMDeployer. This is needed for easier setup.
-                // At the end of the execution, the ownership will be transferred to the aliased governance.
-                abi.encodeCall(ValidatorTimelock.initialize, (address(this), 0))
+                abi.encodeCall(ValidatorTimelock.initialize, (_aliasedGovernanceAddress, 0))
             )
         );
     }
@@ -427,22 +428,6 @@ contract GatewayCTMDeployer {
                 abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
             )
         );
-    }
-
-    /// @notice Sets the previously deployed CTM inside the ValidatorTimelock
-    /// @param _aliasedGovernanceAddress The aliased address of the governnace.
-    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
-    /// in the process of the execution of this function.
-    function _setChainTypeManagerInValidatorTimelock(
-        address _aliasedGovernanceAddress,
-        DeployedContracts memory _deployedContracts
-    ) internal {
-        ValidatorTimelock timelock = ValidatorTimelock(_deployedContracts.stateTransition.validatorTimelock);
-        timelock.setChainTypeManager(IChainTypeManager(_deployedContracts.stateTransition.chainTypeManagerProxy));
-
-        // Note, that the governance still has to accept it.
-        // It will happen in a separate voting after the deployment is done.
-        timelock.transferOwnership(_aliasedGovernanceAddress);
     }
 
     /// @notice Sets the previously deployed CTM inside the ServerNotifier

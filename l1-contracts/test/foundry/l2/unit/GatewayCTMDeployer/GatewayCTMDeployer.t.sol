@@ -80,7 +80,7 @@ contract GatewayCTMDeployerTest is Test {
         new TestnetVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
         new DualVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
 
-        new ValidatorTimelock();
+        new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published

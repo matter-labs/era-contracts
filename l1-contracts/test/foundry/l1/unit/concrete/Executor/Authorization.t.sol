@@ -49,7 +49,7 @@ contract AuthorizationTest is ExecutorTest {
             storedBatchInfo,
             commitBatchInfoArray
         );
-        executor.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
     function test_RevertWhen_ProvingByUnauthorisedAddress() public {
@@ -64,7 +64,7 @@ contract AuthorizationTest is ExecutorTest {
             storedBatchInfoArray,
             proofInput
         );
-        executor.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
+        executor.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
     }
 
     function test_RevertWhen_ExecutingByUnauthorizedAddress() public {
@@ -78,6 +78,6 @@ contract AuthorizationTest is ExecutorTest {
             storedBatchInfoArray,
             Utils.emptyData()
         );
-        executor.executeBatchesSharedBridge(uint256(0), executeBatchFrom, executeBatchTo, executeData);
+        executor.executeBatchesSharedBridge(address(0), executeBatchFrom, executeBatchTo, executeData);
     }
 }
