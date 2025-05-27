@@ -264,7 +264,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 }
                 logOutput.dependencyRootsRollingHash = logValue;
             } else if (logKey > MAX_LOG_KEY) {
-                // revert UnexpectedSystemLog(logKey);
+                revert UnexpectedSystemLog(logKey);
             }
         }
 

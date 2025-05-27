@@ -192,6 +192,8 @@ contract ExperimentalBridgeTest is Test {
         vm.store(address(mockChainContract), baseTokenGasPriceDenominatorLocation, bytes32(uint256(1)));
         // The ownership can only be transferred by the current owner to a new owner via the two-step approach
 
+        vm.mockCall(address(assetTracker), abi.encodeWithSelector(IAssetTracker.handleChainBalanceIncrease.selector), abi.encode());
+
         // Default owner calls transferOwnership
         vm.prank(defaultOwner);
         bridgehub.transferOwnership(bridgeOwner);
@@ -221,6 +223,14 @@ contract ExperimentalBridgeTest is Test {
 
     function _useFullSharedBridge() internal {
         ntv = _deployNTV(address(sharedBridge));
+        assetTracker = new AssetTracker(
+            block.chainid,
+            address(bridgehub),
+            address(mockSharedBridge),
+            address(ntv),
+            address(0)
+        );
+        ntv.setAssetTracker(address(assetTracker));
 
         secondBridgeAddress = address(sharedBridge);
     }

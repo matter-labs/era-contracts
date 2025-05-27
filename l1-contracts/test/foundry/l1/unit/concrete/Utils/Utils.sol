@@ -17,7 +17,7 @@ import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contract
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
@@ -33,6 +33,8 @@ address constant L2_DA_VALIDATOR_ADDRESS = 0x2f3Bc0cB46C9780990afbf86A60bdf6439D
 
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
+
+uint256 constant EVENT_INDEX = 1;
 
 library Utils {
     function packBatchTimestampAndBlockTimestamp(
@@ -242,12 +244,16 @@ library Utils {
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
+        L2Log[] memory l2Logs = new L2Log[](_batchesData.length);
+        bytes[] memory messages = new bytes[](_batchesData.length);
+        bytes32[] memory messageRoots = new bytes32[](_batchesData.length);
+
         return (
             _batchesData[0].batchNumber,
             _batchesData[_batchesData.length - 1].batchNumber,
             bytes.concat(
                 bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-                abi.encode(_batchesData, _priorityOpsData, dependencyRoots)
+                abi.encode(_batchesData, _priorityOpsData, dependencyRoots, l2Logs, messages, messageRoots)
             )
         );
     }

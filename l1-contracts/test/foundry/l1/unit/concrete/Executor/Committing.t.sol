@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
 import {Vm} from "forge-std/Test.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils, EVENT_INDEX} from "../Utils/Utils.sol";
 import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT} from "./_Executor_Shared.t.sol";
 
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -505,11 +505,11 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
-        assertEq(entries[0].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
-        assertEq(entries[0].topics[3], expectedBatchCommitment); // commitment
+        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries[EVENT_INDEX].topics[2], correctNewCommitBatchInfo.newStateRoot); // batchHash
+        assertEq(entries[EVENT_INDEX].topics[3], expectedBatchCommitment); // commitment
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
@@ -545,9 +545,9 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);
@@ -614,9 +614,9 @@ contract CommittingTest is ExecutorTest {
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
-        assertEq(entries.length, 1);
-        assertEq(entries[0].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
-        assertEq(entries[0].topics[1], bytes32(uint256(1))); // batchNumber
+        assertEq(entries.length, 1 + EVENT_INDEX);
+        assertEq(entries[EVENT_INDEX].topics[0], keccak256("BlockCommit(uint256,bytes32,bytes32)"));
+        assertEq(entries[EVENT_INDEX].topics[1], bytes32(uint256(1))); // batchNumber
 
         uint256 totalBatchesCommitted = getters.getTotalBatchesCommitted();
         assertEq(totalBatchesCommitted, 1);

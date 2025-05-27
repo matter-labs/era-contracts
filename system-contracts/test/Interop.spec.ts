@@ -44,7 +44,6 @@ describe("Interop tests", function () {
 
     await deployContractOnAddress(TEST_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS, "AccountCodeStorage", false);
 
-
     await deployContractOnAddress(REAL_L2_INTEROP_HANDLER_ADDRESS, "DummyInteropHandler", false);
 
     await deployContractOnAddress(REAL_L2_MESSAGE_VERIFICATION_ADDRESS, "DummyL2MessageVerification", false);
