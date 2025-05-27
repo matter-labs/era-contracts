@@ -32,7 +32,7 @@ abstract contract L1FixedForceDeploymentsHelper {
         address _wrappedBaseTokenStore,
         address _baseTokenAddress
     ) internal view returns (bytes memory) {
-        address sharedBridge = IBridgehub(s.bridgehub).sharedBridge();
+        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
         address legacySharedBridge = IL1SharedBridgeLegacy(sharedBridge).l2BridgeAddress(s.chainId);
 
         address l2WBaseToken;
