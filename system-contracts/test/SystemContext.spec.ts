@@ -377,6 +377,34 @@ describe("SystemContext tests", () => {
     });
   });
 
+  describe("setNewBatch after setL2Block", async () => {
+    it("should revert InconsistentNewBatchTimestamp", async () => {
+      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      const blockData = await systemContext.getL2BlockNumberAndTimestamp();
+
+      const newBatchTimestamp = blockData.blockTimestamp.sub(1);
+      const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [2138]));
+
+      await expect(
+        systemContext
+          .connect(bootloaderAccount)
+          .setNewBatch(newBatchHash, newBatchTimestamp, batchData.batchNumber.add(1), 2)
+      ).to.be.revertedWithCustomError(systemContext, "InconsistentNewBatchTimestamp");
+    });
+
+    it("should allow new batch timestamp to be the same as the timestamp of the previous L2 block", async () => {
+      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      const blockData = await systemContext.getL2BlockNumberAndTimestamp();
+
+      const newBatchTimestamp = blockData.blockTimestamp;
+      const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [2138]));
+
+      await systemContext
+        .connect(bootloaderAccount)
+        .setNewBatch(newBatchHash, newBatchTimestamp, batchData.batchNumber.add(1), 2);
+    });
+  });
+
   describe("publishTimestampDataToL1", async () => {
     it("should revert The current batch number must be greater than 0", async () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();
