@@ -377,6 +377,8 @@ describe("SystemContext tests", () => {
     });
   });
 
+  // One more describe section for `setNewBatch` tests. These tests require at least one `setL2Block` invocation before them.
+  // They should go after `setL2Block` section since tests from there rely on the fact that function `setL2Block` is not called before.
   describe("setNewBatch after setL2Block", async () => {
     it("should revert InconsistentNewBatchTimestamp", async () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();
