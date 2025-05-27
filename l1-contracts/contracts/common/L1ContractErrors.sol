@@ -372,12 +372,6 @@ error RoleAccessDenied(address chainAddress, bytes32 role, address account);
 // 0xf2885eb3
 error DefaultAdminTransferNotAllowed();
 
-// 0xb49df1f2
-error NotAZKChain(address addr);
-
-// 0x99f6cc22
-error InvalidPackedPrecommitmentLength(uint256 length);
-
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,
