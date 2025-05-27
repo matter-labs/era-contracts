@@ -336,7 +336,9 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
 
         // Firstly, we check that the chain is indeed a part of the ecosystem
         uint256 chainId = IZKChain(_chainAddress).getChainId();
-        require(IBridgehub(BRIDGE_HUB).getZKChain(chainId) == _chainAddress, NotAZKChain(_chainAddress));
+        if (IBridgehub(BRIDGE_HUB).getZKChain(chainId) != _chainAddress) {
+            revert NotAZKChain(_chainAddress);
+        }
 
         // Now, we can extract the admin
         return IZKChain(_chainAddress).getAdmin();

@@ -346,7 +346,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     ) internal pure returns (bytes32 result) {
         unchecked {
             uint256 length = _packedTxPrecommitments.length;
-            require(length % PACKED_L2_PRECOMMITMENT_LENGTH == 0, InvalidPackedPrecommitmentLength(length));
+            if (length % PACKED_L2_PRECOMMITMENT_LENGTH != 0) {
+                revert InvalidPackedPrecommitmentLength(length);
+            }
 
             // Caching two constants for use in assembly
             uint256 precommitmentLength = PACKED_L2_PRECOMMITMENT_LENGTH;
