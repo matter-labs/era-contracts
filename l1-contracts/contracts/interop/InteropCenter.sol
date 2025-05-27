@@ -254,7 +254,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         }
     }
 
-
     /*//////////////////////////////////////////////////////////////
                         EOA helpers
     //////////////////////////////////////////////////////////////*/
@@ -278,8 +277,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function sendBundle(
         uint256 _destinationChainId,
         InteropCallStarter[] memory _callStarters
-    ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32) { 
-        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](_callStarters.length);
+    ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32) {
+        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
+            _callStarters.length
+        );
         for (uint256 i = 0; i < _callStarters.length; i++) {
             (bool directCall, uint256 indirectCallMessageValue) = _parseCallStarter(_callStarters[i]);
             callStartersInternal[i] = InteropCallStarterInternal({
@@ -289,7 +290,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 directCall: directCall,
                 indirectCallMessageValue: indirectCallMessageValue
             });
-
         }
         return _sendBundle(_destinationChainId, callStartersInternal, msg.value, address(0), msg.sender);
     }
@@ -299,7 +299,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             return (true, 0);
         } else if (_callStarter.attributes.length == 1) {
             bytes4 selector = bytes4(_callStarter.attributes[0]);
-            require(selector == IERC7786Attributes.directCall.selector, IERC7786GatewaySource.UnsupportedAttribute(selector));
+            require(
+                selector == IERC7786Attributes.directCall.selector,
+                IERC7786GatewaySource.UnsupportedAttribute(selector)
+            );
             uint256 indirectCallMessageValue;
             (, indirectCallMessageValue) = AttributesDecoder.decodeDirectCall(_callStarter.attributes[0]);
 
@@ -322,13 +325,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             InteropCallStarterInternal memory callStarter = _callStarters[i];
             if (!callStarter.directCall) {
                 // console.log("fee indirect call");
-                IL1AssetRouter(callStarter.nextContract).bridgehubAddCallToBundle{value: callStarter.indirectCallMessageValue}(
-                    _destinationChainId,
-                    bundleId,
-                    _sender,
-                    callStarter.requestedInteropCallValue,
-                    callStarter.data
-                );
+                IL1AssetRouter(callStarter.nextContract).bridgehubAddCallToBundle{
+                    value: callStarter.indirectCallMessageValue
+                }(_destinationChainId, bundleId, _sender, callStarter.requestedInteropCallValue, callStarter.data);
             } else {
                 // console.log("fee direct call");
                 _addCallToBundle(bundleId, _requestFromStarter(callStarter), _sender);
@@ -339,8 +338,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         return bundleHash;
     }
 
-
-    function _requestFromStarter(InteropCallStarterInternal memory callStarter) internal pure returns (InteropCallRequest memory) {
+    function _requestFromStarter(
+        InteropCallStarterInternal memory callStarter
+    ) internal pure returns (InteropCallRequest memory) {
         if (callStarter.indirectCallMessageValue != 0) {
             revert DirectCallNonEmptyValue(callStarter.nextContract);
         }
@@ -351,7 +351,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 value: callStarter.requestedInteropCallValue
             });
     }
-
 
     function addCallToBundleFromRequest(
         bytes32 _bundleId,

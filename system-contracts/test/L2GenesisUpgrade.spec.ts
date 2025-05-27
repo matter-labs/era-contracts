@@ -85,10 +85,6 @@ describe("L2GenesisUpgrade tests", function () {
       failure: false,
       returnData: "0x",
     });
-    await setResult("IInteropHandler", "setInteropAccountBytecode", [], {
-      failure: false,
-      returnData: "0x",
-    });
 
     await setResult("SystemContext", "setChainId", [chainId], {
       failure: false,

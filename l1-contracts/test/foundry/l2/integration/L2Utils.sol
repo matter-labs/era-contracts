@@ -125,7 +125,6 @@ library L2Utils {
         interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
     }
 
-
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
         new InteropHandler();

@@ -44,24 +44,8 @@ describe("Interop tests", function () {
 
     await deployContractOnAddress(TEST_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS, "AccountCodeStorage", false);
 
-    await deployContractOnAddress(
-      REAL_L2_INTEROP_ACCOUNT_ADDRESS,
-      "InteropAccount",
-      false,
-      (await wallet.getAddress()).toString()
-    );
-
-    await deployContractOnAddress(
-      REAL_L2_STANDARD_TRIGGER_ACCOUNT_ADDRESS,
-      "StandardTriggerAccount",
-      false,
-      (await wallet.getAddress()).toString()
-    );
 
     await deployContractOnAddress(REAL_L2_INTEROP_HANDLER_ADDRESS, "DummyInteropHandler", false);
-    const interop_handler = DummyInteropHandlerFactory.connect(REAL_L2_INTEROP_HANDLER_ADDRESS, wallet);
-    await interop_handler.setInteropAccountBytecode();
-    console.log("kl todo 1");
 
     await deployContractOnAddress(REAL_L2_MESSAGE_VERIFICATION_ADDRESS, "DummyL2MessageVerification", false);
 
@@ -100,7 +84,7 @@ describe("Interop tests", function () {
     // const parsedTx2 = await zksyncV6.utils.parseEip712(txBytes);
 
     // const hexTx = zksync.utils.serialize(interopTx);
-    await broadcastTransaction(hexTx, account.provider);
+    // await broadcastTransaction(hexTx, account.provider);
     // await (account.provider as any).broadcastTransaction(hexTx);
   });
 

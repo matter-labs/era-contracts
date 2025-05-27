@@ -108,4 +108,3 @@ address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c)
 
 /// @dev the address of the L2 asset tracker
 address constant L2_ASSET_TRACKER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
-

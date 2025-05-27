@@ -36,7 +36,6 @@ import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.s
 
 import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
 
-
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";

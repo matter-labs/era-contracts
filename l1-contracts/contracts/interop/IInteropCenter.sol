@@ -83,7 +83,6 @@ interface IInteropCenter {
         address _executionAddress
     ) external payable returns (bytes32 interopBundleHash);
 
-
     function forwardTransactionOnGatewayWithBalanceChange(
         uint256 _chainId,
         bytes32 _canonicalTxHash,

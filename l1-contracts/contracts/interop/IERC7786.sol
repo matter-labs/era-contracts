@@ -6,7 +6,14 @@ pragma solidity ^0.8.24;
 /// @notice Interface for the ERC7786 gateway source
 /// https://github.com/ethereum/ERCs/blob/023a7d657666308568d3d1391c578d5972636093/ERCS/erc-7786.md
 interface IERC7786GatewaySource {
-    event MessagePosted(bytes32 indexed outboxId, string sender, string receiver, bytes payload, uint256 value, bytes[] attributes);
+    event MessagePosted(
+        bytes32 indexed outboxId,
+        string sender,
+        string receiver,
+        bytes payload,
+        uint256 value,
+        bytes[] attributes
+    );
 
     error UnsupportedAttribute(bytes4 selector);
 
@@ -28,9 +35,5 @@ interface IERC7786GatewaySource {
         string[] calldata refundReceivers
     ) external returns (uint256);
 
-    function requestRelay(
-        bytes32 outboxId,
-        uint256 gasLimit,
-        string[] calldata refundReceivers
-    ) external payable;
+    function requestRelay(bytes32 outboxId, uint256 gasLimit, string[] calldata refundReceivers) external payable;
 }

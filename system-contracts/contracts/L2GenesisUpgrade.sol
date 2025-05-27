@@ -7,9 +7,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {InvalidChainId} from "contracts/SystemContractErrors.sol";
 import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
 
-
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
-
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs

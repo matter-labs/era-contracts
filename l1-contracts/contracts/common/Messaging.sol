@@ -202,7 +202,6 @@ struct InteropBundle {
     address executionAddress;
 }
 
-
 /// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
 struct MessageInclusionProof {
     uint256 chainId;

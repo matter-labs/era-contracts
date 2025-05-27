@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.24;
 
-
 import {BASE_TOKEN_SYSTEM_CONTRACT, L2_MESSAGE_VERIFICATION} from "../Constants.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Message, MessageInclusionProof} from "../libraries/Messaging.sol";
 
@@ -19,7 +18,6 @@ contract DummyInteropHandler {
 
     /// @notice The balances of the users.
     mapping(bytes32 bundleHash => bool bundleExecuted) public bundleExecuted;
-
 
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bool _skipEmptyCalldata) public {
         _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
@@ -68,5 +66,4 @@ contract DummyInteropHandler {
             // account.forwardFromIC(interopCall.to, interopCall.value, interopCall.data);
         }
     }
-
 }
