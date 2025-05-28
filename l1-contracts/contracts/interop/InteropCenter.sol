@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-// import {console} from "forge-std/console.sol";
+import {console} from "forge-std/console.sol";
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
@@ -119,70 +119,63 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         assetRouter = _assetRouter;
         assetTracker = IAssetTracker(_assetTracker);
     }
-    /*//////////////////////////////////////////////////////////////
-                        Message interface
-    //////////////////////////////////////////////////////////////*/
 
-    function sendMessage(bytes calldata _msg) external onlyL2 returns (bytes32 canonicalTxHash) {
-        // kl todo modify messenger to specify original msg.sender
-        return L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(_msg);
-    }
 
     /*//////////////////////////////////////////////////////////////
                         Bundle interface
     //////////////////////////////////////////////////////////////*/
 
-    event BundleStarted(bytes32 indexed bundleId);
-    function startBundle(
-        uint256 _destinationChainId
-    ) external override onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleId) {
-        bundleId = _startBundle(_destinationChainId, msg.sender);
-        emit BundleStarted(bundleId);
-    }
+    // event BundleStarted(bytes32 indexed bundleId);
+    // function startBundle(
+    //     uint256 _destinationChainId
+    // ) external override onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleId) {
+    //     bundleId = _startBundle(_destinationChainId, msg.sender);
+    //     emit BundleStarted(bundleId);
+    // }
 
-    function _startBundle(uint256 _destinationChainId, address _sender) public returns (bytes32 bundleId) {
-        bundleId = keccak256(abi.encodePacked(bundleCount, _sender, _destinationChainId));
-        bundleCount++;
-        TransientInterop.setBundleMetadata(
-            bundleId,
-            BundleMetadata({destinationChainId: _destinationChainId, sender: _sender, callCount: 0, totalValue: 0})
-        );
-    }
+    // function _startBundle(uint256 _destinationChainId, address _sender) public returns (bytes32 bundleId) {
+    //     bundleId = keccak256(abi.encodePacked(bundleCount, _sender, _destinationChainId));
+    //     bundleCount++;
+    //     TransientInterop.setBundleMetadata(
+    //         bundleId,
+    //         BundleMetadata({destinationChainId: _destinationChainId, sender: _sender, callCount: 0, totalValue: 0})
+    //     );
+    // }
 
-    function addCallToBundle(
-        bytes32 _bundleId,
-        InteropCallRequest memory _interopCallRequest
-    ) external override onlyL2 {
-        _addCallToBundle(_bundleId, _interopCallRequest, msg.sender);
-    }
+    // function addCallToBundle(
+    //     bytes32 _bundleId,
+    //     InteropCallRequest memory _interopCallRequest
+    // ) external override onlyL2 {
+    //     _addCallToBundle(_bundleId, _interopCallRequest, msg.sender);
+    // }
 
-    function _addCallToBundle(
-        bytes32 _bundleId,
-        InteropCallRequest memory _interopCallRequest,
-        address _sender
-    ) internal {
-        InteropCall memory interopCall;
-        interopCall.to = _interopCallRequest.to;
-        interopCall.data = _interopCallRequest.data;
-        interopCall.value = _interopCallRequest.value;
-        interopCall.from = _sender;
-        TransientInterop.addCallToBundle(_bundleId, interopCall);
-    }
+    // function _addCallToBundle(
+    //     bytes32 _bundleId,
+    //     InteropCallRequest memory _interopCallRequest,
+    //     address _sender
+    // ) internal {
+    //     InteropCall memory interopCall;
+    //     interopCall.to = _interopCallRequest.to;
+    //     interopCall.data = _interopCallRequest.data;
+    //     interopCall.value = _interopCallRequest.value;
+    //     interopCall.from = _sender;
+    //     TransientInterop.addCallToBundle(_bundleId, interopCall);
+    // }
 
-    function finishAndSendBundle(
-        bytes32 _bundleId,
-        address _executionAddress
-    ) external payable override returns (bytes32 interopBundleHash) {
-        interopBundleHash = _finishAndSendBundle(_bundleId, _executionAddress);
-    }
+    // function finishAndSendBundle(
+    //     bytes32 _bundleId,
+    //     address _executionAddress
+    // ) external payable override returns (bytes32 interopBundleHash) {
+    //     interopBundleHash = _finishAndSendBundle(_bundleId, _executionAddress);
+    // }
 
-    function _finishAndSendBundle(
-        bytes32 _bundleId,
-        address _executionAddress
-    ) internal returns (bytes32 interopBundleHash) {
-        require(block.chainid != L1_CHAIN_ID, "InteropCenter: Cannot send bundle from L1");
-        interopBundleHash = _finishAndSendBundleLong(_bundleId, _executionAddress, msg.value, msg.sender);
-    }
+    // function _finishAndSendBundle(
+    //     bytes32 _bundleId,
+    //     address _executionAddress
+    // ) internal returns (bytes32 interopBundleHash) {
+    //     require(block.chainid != L1_CHAIN_ID, "InteropCenter: Cannot send bundle from L1");
+    //     interopBundleHash = _finishAndSendBundleLong(_bundleId, _executionAddress, msg.value, msg.sender);
+    // }
 
     function _finishAndSendBundleLong(
         bytes32 _bundleId,
@@ -276,7 +269,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     function sendBundle(
         uint256 _destinationChainId,
-        InteropCallStarter[] memory _callStarters
+        InteropCallStarter[] calldata _callStarters
     ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32) {
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
@@ -294,17 +287,17 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         return _sendBundle(_destinationChainId, callStartersInternal, msg.value, address(0), msg.sender);
     }
 
-    function _parseCallStarter(InteropCallStarter memory _callStarter) internal pure returns (bool, uint256) {
+    function _parseCallStarter(InteropCallStarter calldata _callStarter) internal pure returns (bool, uint256) {
         if (_callStarter.attributes.length == 0) {
             return (true, 0);
         } else if (_callStarter.attributes.length == 1) {
             bytes4 selector = bytes4(_callStarter.attributes[0]);
             require(
-                selector == IERC7786Attributes.directCall.selector,
+                selector == IERC7786Attributes.indirectCall.selector,
                 IERC7786GatewaySource.UnsupportedAttribute(selector)
             );
             uint256 indirectCallMessageValue;
-            (, indirectCallMessageValue) = AttributesDecoder.decodeDirectCall(_callStarter.attributes[0]);
+            (, indirectCallMessageValue) = AttributesDecoder.decodeIndirectCall(_callStarter.attributes[0]);
 
             return (false, indirectCallMessageValue);
         } else {
