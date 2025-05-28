@@ -76,7 +76,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
-        // FIXME: include it in the upgrade.
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
 
         // While this does not provide a protection in the production, it is needed for local testing
