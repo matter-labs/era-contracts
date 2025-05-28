@@ -138,6 +138,10 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
             return _checkCTMAssetId(decodedAssetId);
         }
 
+        if (whitelistedSenders[sender]) {
+            return true;
+        }
+
         if (blocklistedContracts[contractL2]) {
             return false;
         }
@@ -147,9 +151,6 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
         if (contractL2 > MIN_ALLOWED_ADDRESS || contractL2 == L2_ASSET_ROUTER_ADDR) {
             return true;
         }
-
-        // Only whitelisted senders are allowed to use any built-in contracts.
-        return whitelistedSenders[sender];
     }
 
     function _checkCTMAssetId(bytes32 assetId) internal view returns (bool) {
