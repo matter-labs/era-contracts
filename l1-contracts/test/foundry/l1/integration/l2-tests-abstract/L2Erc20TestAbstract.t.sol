@@ -147,7 +147,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
 
         InteropCallStarter[] memory executionCalls = new InteropCallStarter[](1);
         bytes[] memory attributes = new bytes[](1);
-        attributes[0] = abi.encodeCall(IERC7786Attributes.directCall, (0));
+        attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
         executionCalls[0] = InteropCallStarter({
             nextContract: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
