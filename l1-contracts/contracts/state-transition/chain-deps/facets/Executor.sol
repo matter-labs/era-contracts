@@ -341,7 +341,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     /// @param _packedTxPrecommitments The current precommitment
     /// @dev This function expects the number of new precommitments to be non-zero.
     function _calculatePrecommitmentRollingHash(
-        bytes32 currentPrecommitment,
+        bytes32 _currentPrecommitment,
         bytes memory _packedTxPrecommitments
     ) internal pure returns (bytes32 result) {
         unchecked {
