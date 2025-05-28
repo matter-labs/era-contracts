@@ -154,7 +154,7 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
             revert DefaultAdminTransferNotAllowed();
         }
 
-        bytes32 previousAdmin = getRoleAdmin(_chainAddress, _role);
+        bytes32 previousAdminRole = getRoleAdmin(_chainAddress, _role);
         _roles[_chainAddress][_role].adminRole = _adminRole;
         emit RoleAdminChanged(_chainAddress, _role, previousAdmin, _adminRole);
     }
