@@ -128,10 +128,21 @@ contract UtilsTest is Test {
             Utils.constructL2Log(
                 true,
                 L2_BOOTLOADER_ADDRESS,
+                uint256(SystemLogKey.MESSAGE_ROOT_ROLLING_HASH_KEY),
+                bytes32(uint256(uint160(0)))
+            ),
+            "log[7] should be correct"
+        );
+
+        assertEq(
+            logs[8],
+            Utils.constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
                 uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
                 bytes32("")
             ),
-            "log[7] should be correct"
+            "log[8] should be correct"
         );
     }
 
