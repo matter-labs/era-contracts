@@ -163,7 +163,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _newBatch.chainId,
                 _newBatch.firstBlockTimestamp,
                 _newBatch.lastBlockTimestamp,
-                uint256(uint160(_newBatch.l2DaValidator)),
+                uint160(_newBatch.l2DaValidator),
                 _newBatch.daCommitment,
                 _newBatch.numberOfLayer1Txs,
                 _newBatch.priorityOperationsHash,
