@@ -135,7 +135,9 @@ interface IExecutor is IZKChainBase {
     }
 
     /// @notice Precommits the status of all L2 transactions for the next batch on the shared bridge.
-    /// @param _chainAddress The address of the DiamondProxy of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
+    /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
+    /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
     /// @param _precommitData ABI‐encoded transaction status list for the precommit.
     function precommitSharedBridge(address _chainAddress, uint256 _batchNumber, bytes calldata _precommitData) external;
@@ -144,7 +146,9 @@ interface IExecutor is IZKChainBase {
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
     /// - Storing batch commitments.
-    /// @param _chainAddress The address of the DiamondProxy of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
+    /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
+    /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processFrom The batch number from which the processing starts.
     /// @param _processTo The batch number at which the processing ends.
     /// @param _commitData The encoded data of the new batches to be committed.
@@ -157,7 +161,9 @@ interface IExecutor is IZKChainBase {
 
     /// @notice Batches commitment verification.
     /// @dev Only verifies batch commitments without any other processing.
-    /// @param _chainAddress The address of the DiamondProxy of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
+    /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
+    /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processBatchFrom The batch number from which the verification starts.
     /// @param _processBatchTo The batch number at which the verification ends.
     /// @param _proofData The encoded data of the new batches to be verified.
@@ -171,7 +177,9 @@ interface IExecutor is IZKChainBase {
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
-    /// @param _chainAddress The address of the DiamondProxy of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
+    /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
+    /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processFrom The batch number from which the execution starts.
     /// @param _processTo The batch number at which the execution ends.
     /// @param _executeData The encoded data of the new batches to be executed.
@@ -183,7 +191,7 @@ interface IExecutor is IZKChainBase {
     ) external;
 
     /// @notice Reverts unexecuted batches
-    /// @param _chainAddress Chain ID of the chain
+    /// @param _chainAddress The address of the DiamondProxy of the chain.
     /// @param _newLastBatch batch number after which batches should be reverted
     /// @dev When the _newLastBatch is equal to the number of committed batches,
     /// only the precommitment is erased.

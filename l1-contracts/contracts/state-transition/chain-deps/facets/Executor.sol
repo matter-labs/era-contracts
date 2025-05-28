@@ -326,22 +326,21 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             currentPrecommitment = 0;
         }
 
+        bytes32 newPrecommitment = _calculatePrecommitmentRollingHash(currentPrecommitment, info.packedTxsCommitments);
+
         // We checked that the length of the precommitments is greater than zero,
         // so we know that this value will be non-zero as well.
-        s.precommitmentForTheLatestBatch = _calculatePrecommitmentRollingHash(
-            currentPrecommitment,
-            info.packedTxsCommitments
-        );
+        s.precommitmentForTheLatestBatch = newPrecommitment;
 
-        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, currentPrecommitment);
+        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, newPrecommitment);
     }
 
     /// @notice Calculates rolling hash of precommitments received from `_packedTxPrecommitments`.
-    /// @param currentPrecommitment The previous precommitment
+    /// @param _currentPrecommitment The previous precommitment
     /// @param _packedTxPrecommitments The current precommitment
     /// @dev This function expects the number of new precommitments to be non-zero.
     function _calculatePrecommitmentRollingHash(
-        bytes32 currentPrecommitment,
+        bytes32 _currentPrecommitment,
         bytes memory _packedTxPrecommitments
     ) internal pure returns (bytes32 result) {
         unchecked {
@@ -350,12 +349,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 revert InvalidPackedPrecommitmentLength(length);
             }
 
-            // Caching two constants for use in assembly
+            // Caching constant(s) for use in assembly
             uint256 precommitmentLength = PACKED_L2_PRECOMMITMENT_LENGTH;
             assembly {
                 // Storing the current rolling hash in position 0. This way It will be more convenient
                 // to recalculate it.
-                mstore(0, currentPrecommitment)
+                mstore(0, _currentPrecommitment)
 
                 // In assembly to access the elements of the array, we'll need to add 32 to the position
                 // since the first 32 bytes store the length of the bytes array.
