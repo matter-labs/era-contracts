@@ -167,7 +167,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _newBatch.daCommitment,
                 _newBatch.numberOfLayer1Txs,
                 _newBatch.priorityOperationsHash,
-                _newBatch.l2LogsTreeRoot
+                _newBatch.l2LogsTreeRoot,
+                bytes32(0) // upgrade tx hash
             )
         );
         // TODO: shift >> 32?
