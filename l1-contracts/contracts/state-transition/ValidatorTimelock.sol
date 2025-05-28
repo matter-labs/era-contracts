@@ -98,7 +98,7 @@ contract ValidatorTimelock is IExecutor, Ownable2StepUpgradeable, AccessControlE
     /// @notice Initializer for the contract.
     /// @dev Expected to be delegatecalled in the constructor of the TransparentUpgradeableProxy
     /// @param _initialOwner The initial owner of the Validator timelock.
-    /// @param _executionDelay The initial execution delay, i.e. minimal time between a batch is committed and executed.
+    /// @param _initialExecutionDelay The initial execution delay, i.e. minimal time between a batch is committed and executed.
     function initialize(address _initialOwner, uint32 _initialExecutionDelay) external initializer {
         _transferOwnership(_initialOwner);
         executionDelay = _initialExecutionDelay;

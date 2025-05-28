@@ -7,7 +7,7 @@ import {RoleAccessDenied, DefaultAdminTransferNotAllowed} from "../common/L1Cont
 
 /// @title Chain‑Address‑Aware Role‑Based Access Control with Enumeration
 /// @notice It is an adapted version of OpenZeppelin's `AccessControlEnumerable` that keeps a completely separate
-/// role registry per `chainAddress` (i.e. in case of ZK Chains it is their DiamondProxy). 
+/// role registry per `chainAddress` (i.e. in case of ZK Chains it is their DiamondProxy).
 /// This is useful for cross‑chain applications where the same contract state is deployed on multiple networks and a distinct set of operators
 /// is required on each of them. Using address instead of chain Id allows to save up gas spent on resolving
 /// the address of the `DiamondProxy` from the chainId.
@@ -89,8 +89,8 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
     /// @notice Returns one of the accounts that have `_role` on `_chainAddress`.
     /// @param _chainAddress The chain address.
     /// @param _role The role identifier.
-    /// @param index A zero‑based index (ordering is not guaranteed).
-    /// @dev `index` must be a value between 0 and {getRoleMemberCount}, non-inclusive.
+    /// @param _index A zero‑based index (ordering is not guaranteed).
+    /// @dev `_index` must be a value between 0 and {getRoleMemberCount}, non-inclusive.
     /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
     function getRoleMember(address _chainAddress, bytes32 _role, uint256 _index) public view returns (address) {
         return _roles[_chainAddress][_role].members.at(_index);
@@ -157,7 +157,7 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
 
         bytes32 previousAdminRole = getRoleAdmin(_chainAddress, _role);
         _roles[_chainAddress][_role].adminRole = _adminRole;
-        emit RoleAdminChanged(_chainAddress, _role, previousAdmin, _adminRole);
+        emit RoleAdminChanged(_chainAddress, _role, previousAdminRole, _adminRole);
     }
 
     /// @dev Reverts unless `_account` possesses `_role` on `_chainAddress`.
