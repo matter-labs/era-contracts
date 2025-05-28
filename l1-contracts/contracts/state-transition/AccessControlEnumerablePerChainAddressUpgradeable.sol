@@ -91,8 +91,8 @@ abstract contract AccessControlEnumerablePerChainAddressUpgradeable {
     /// @param index A zero‑based index (ordering is not guaranteed).
     /// @dev `index` must be a value between 0 and {getRoleMemberCount}, non-inclusive.
     /// @dev Does not work for `DEFAULT_ADMIN_ROLE` since it is implicitly derived as chain admin.
-    function getRoleMember(address _chainAddress, bytes32 _role, uint256 index) public view returns (address) {
-        return _roles[_chainAddress][_role].members.at(index);
+    function getRoleMember(address _chainAddress, bytes32 _role, uint256 _index) public view returns (address) {
+        return _roles[_chainAddress][_role].members.at(_index);
     }
 
     /// @notice Returns the number of accounts that have `_role` on `_chainAddress`.
