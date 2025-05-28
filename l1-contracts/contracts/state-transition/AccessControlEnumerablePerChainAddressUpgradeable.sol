@@ -6,10 +6,11 @@ import {EnumerableSetUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/u
 import {RoleAccessDenied, DefaultAdminTransferNotAllowed} from "../common/L1ContractErrors.sol";
 
 /// @title Chain‑Address‑Aware Role‑Based Access Control with Enumeration
-/// @notice Similar to OpenZeppelin's `AccessControlEnumerable`, but keeps a completely separate
-/// role registry per `chainAddress`. This is useful for cross‑chain applications where the
-/// same contract state is deployed on multiple networks and a distinct set of operators
-/// is required on each of them.
+/// @notice It is an adapted version of OpenZeppelin's `AccessControlEnumerable` that keeps a completely separate
+/// role registry per `chainAddress` (i.e. in case of ZK Chains it is their DiamondProxy). 
+/// This is useful for cross‑chain applications where the same contract state is deployed on multiple networks and a distinct set of operators
+/// is required on each of them. Using address instead of chain Id allows to save up gas spent on resolving
+/// the address of the `DiamondProxy` from the chainId.
 /// @dev This contract purposefully does *not* inherit from OZ's `AccessControlUpgradeable` to
 /// avoid global (cross‑chain) role collisions. Instead, every public method explicitly
 /// takes a `_chainAddress` argument.
