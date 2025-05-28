@@ -138,6 +138,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
             return _checkCTMAssetId(decodedAssetId);
         }
 
+        // Only whitelisted senders are allowed to use any built-in contracts.
         if (whitelistedSenders[sender]) {
             return true;
         }
