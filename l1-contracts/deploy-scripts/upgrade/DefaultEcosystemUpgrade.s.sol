@@ -575,13 +575,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
-        bytes[] memory additionalDependencies = new bytes[](4); // Deps after Gateway upgrade
+        string[] memory additionalForceDeployments = getForceDeploymentNames();
+
+        bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
 
-        string[] memory additionalForceDeployments = getForceDeploymentNames();
         for (uint256 i; i < additionalForceDeployments.length; i++) {
             additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
         }
