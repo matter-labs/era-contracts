@@ -84,14 +84,18 @@ import {DeployL1Script} from "../DeployL1.s.sol";
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
+import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 
-/// @notice Script used for default upgrade flow
-/// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
+/// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
+    address diamondUpgrade;
+
     /// @notice E2e upgrade generation
     function run() public virtual override {
+        diamondUpgrade = address(new L1V29Upgrade());
+
         initialize(vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
@@ -127,4 +131,58 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
         return super.getExpectedL2Address(contractName);
     }
+
+    /// @notice Generate upgrade cut data
+    function generateUpgradeCutData(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public override returns (Diamond.DiamondCutData memory upgradeCutData) {
+        require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
+
+        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
+
+        Diamond.FacetCut[] memory facetCuts;
+        facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
+        facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
+
+        VerifierParams memory verifierParams = getVerifierParams();
+
+        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
+            .getBaseForceDeployments();
+
+        // Additional force deployments after Gateway
+        IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
+        // add additional force deployments here
+
+        // TODO: do we update *all* fixed force deployments?
+
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
+            baseForceDeployments,
+            additionalForceDeployments
+        );
+        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
+            bootloaderHash: config.contracts.bootloaderHash,
+            defaultAccountHash: config.contracts.defaultAAHash,
+            evmEmulatorHash: config.contracts.evmEmulatorHash,
+            verifier: stateTransition.verifier,
+            verifierParams: verifierParams,
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: new bytes(0),
+            upgradeTimestamp: 0,
+            newProtocolVersion: getNewProtocolVersion()
+        });
+
+        upgradeCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: diamondUpgrade,
+            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
+        });
+
+        if (!stateTransition.isOnGateway) {
+            newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
+            upgradeConfig.upgradeCutPrepared = true;
+        } else {
+            gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
+        }
+    }    
 }
