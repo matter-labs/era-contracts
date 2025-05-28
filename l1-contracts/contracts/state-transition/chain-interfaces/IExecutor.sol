@@ -111,7 +111,7 @@ interface IExecutor is IZKChainBase {
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
         bytes32 l2LogsTreeRoot;
-        L2DACommitmentScheme l2DACommitmentScheme; // TODO: already saved in the storage, can just add from there to PI
+        address l2DaValidator; // TODO: already saved in the storage, can just add from there to PI
         bytes32 daCommitment;
         // sending used batch inputs to validate on the settlement layer
         uint64 firstBlockTimestamp;
