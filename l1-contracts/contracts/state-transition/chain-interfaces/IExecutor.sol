@@ -163,7 +163,7 @@ interface IExecutor is IZKChainBase {
     ) external;
 
     /// @notice Reverts unexecuted batches
-    /// @param _chainAddress Chain ID of the chain
+    /// @param _chainAddress The address of the DiamondProxy of the chain.
     /// @param _newLastBatch batch number after which batches should be reverted
     /// @dev When the _newLastBatch is equal to the number of committed batches,
     /// only the precommitment is erased.

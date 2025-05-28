@@ -326,14 +326,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             currentPrecommitment = 0;
         }
 
-        // We checked that the length of the precommitments is greater than zero,
-        // so we know that this value will be non-zero as well.
-        s.precommitmentForTheLatestBatch = _calculatePrecommitmentRollingHash(
+        bytes32 newPrecommitment = _calculatePrecommitmentRollingHash(
             currentPrecommitment,
             info.packedTxsCommitments
         );
 
-        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, currentPrecommitment);
+        // We checked that the length of the precommitments is greater than zero,
+        // so we know that this value will be non-zero as well.
+        s.precommitmentForTheLatestBatch = newPrecommitment; 
+
+        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, newPrecommitment);
     }
 
     /// @notice Calculates rolling hash of precommitments received from `_packedTxPrecommitments`.
@@ -350,7 +352,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 revert InvalidPackedPrecommitmentLength(length);
             }
 
-            // Caching two constants for use in assembly
+            // Caching constant(s) for use in assembly
             uint256 precommitmentLength = PACKED_L2_PRECOMMITMENT_LENGTH;
             assembly {
                 // Storing the current rolling hash in position 0. This way It will be more convenient

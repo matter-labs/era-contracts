@@ -671,6 +671,8 @@ object "Bootloader" {
                             }
                         <!-- @endif -->
                     }
+
+                appendTransactionStatus(mload(CURRENT_L2_TX_HASHES_BEGIN_BYTE()), mload(resultPtr))
             }
 
             /// @notice Returns "raw" code hash of the address. "Raw" means that it returns exactly the value
@@ -1055,12 +1057,12 @@ object "Bootloader" {
                 }
 
                 mstore(resultPtr, success)
+                saveL1TxHashToMemory(canonicalL1TxHash)
 
                 debugLog("Send message to L1", success)
 
                 // Sending the L2->L1 log so users will be able to prove transaction execution result on L1.
                 sendL2LogUsingL1Messenger(true, canonicalL1TxHash, success)
-                appendTransactionStatus(canonicalL1TxHash, success)
 
                 if isPriorityOp {
                     // Update priority txs L1 data
@@ -1233,7 +1235,6 @@ object "Bootloader" {
 
                 notifyAboutRefund(refund)
                 mstore(resultPtr, success)
-                appendTransactionStatus(mload(CURRENT_L2_TX_HASHES_BEGIN_BYTE()), success)
             }
 
             /// @dev Calculates the L2 gas limit for the transaction
@@ -2279,6 +2280,13 @@ object "Bootloader" {
                 if iszero(eq(returndatasize(), 64)) {
                     assertionError("saveTxHashes: returndata invalid")
                 }
+            }
+
+            /// @dev Stores the hash of an L1->L2 transaction (either priority or an upgrade transaction)
+            /// inside the bootloader memory.
+            function saveL1TxHashToMemory(txHash) {
+                mstore(CURRENT_L2_TX_HASHES_BEGIN_BYTE(), txHash)
+                mstore(add(CURRENT_L2_TX_HASHES_BEGIN_BYTE(), 32), txHash)
             }
 
             /// @dev Encodes and calls the postOp method of the contract.
