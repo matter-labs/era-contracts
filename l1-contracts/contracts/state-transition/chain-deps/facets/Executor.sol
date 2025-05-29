@@ -157,7 +157,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert MismatchL2DAValidator();
         }
 
-        // Create batch PI for the proof verification
+        // Create batch output for PI
         bytes32 batchOutputsHash = keccak256(
             abi.encodePacked(
                 _newBatch.chainId,
@@ -171,14 +171,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 bytes32(0) // upgrade tx hash
             )
         );
-        // TODO: shift >> 32?
-        bytes32 publicInput = keccak256(
-            abi.encode(
-                _previousBatch.batchHash,
-                _newBatch.newStateCommitment,
-                batchOutputsHash
-            )
-        );
 
         storedBatchInfo = StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
@@ -188,7 +180,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             priorityOperationsHash: _newBatch.priorityOperationsHash,
             l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
             timestamp: 0,
-            commitment: publicInput
+            commitment: batchOutputsHash
         });
 
         if (L1_CHAIN_ID != block.chainid) {
@@ -669,6 +661,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
+        bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
@@ -679,13 +672,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
+            bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
             if (s.boojumOS) {
-                proofPublicInput[i] = uint256(currentBatchCommitment);
+                proofPublicInput[i] = uint256(
+                    keccak256(abi.encodePacked(prevBatchStateCommitment, currentBatchStateCommitment, currentBatchCommitment))
+                ) >> PUBLIC_INPUT_SHIFT;
             } else {
                 proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
             }
 
             prevBatchCommitment = currentBatchCommitment;
+            prevBatchStateCommitment = currentBatchStateCommitment;
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
             revert VerifiedBatchesExceedsCommittedBatches();

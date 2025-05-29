@@ -69,7 +69,7 @@ interface IExecutor is IZKChainBase {
         bytes32 priorityOperationsHash;
         bytes32 l2LogsTreeRoot;
         uint256 timestamp; // For Boojum OS not used, 0
-        bytes32 commitment;// For Boojum OS batches we'll store public input here
+        bytes32 commitment;// For Boojum OS batches we'll store batch output hash here
     }
 
     /// @notice Data needed to commit new batch
@@ -105,6 +105,9 @@ interface IExecutor is IZKChainBase {
 
     struct CommitBoojumOSBatchInfo {
         uint64 batchNumber;
+        // chain state commitment, this preimage is not opened on l1,
+        // it's guaranteed that this commitment commits to any state that needed for execution
+        // (state root, block number, bloch hahes)
         bytes32 newStateCommitment;
         // info about processed l1 txs, l2 to l1 logs and DA
         uint256 numberOfLayer1Txs;
