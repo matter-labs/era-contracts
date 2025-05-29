@@ -111,7 +111,7 @@ contract DeployL1Script is Script, DeployUtils {
 
         deployVerifiers();
 
-        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
+        (addresses.stateTransition.usedUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
         deployDAValidators();
         (addresses.stateTransition.validatorTimelock) = deploySimpleContract("ValidatorTimelock", false);
@@ -422,7 +422,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
         vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
-        vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
+        vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.usedUpgrade);
         vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",

@@ -185,6 +185,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         console.log("Upgrade data generated!");
     }
 
+    function deployUsedUpgradeContract() internal virtual returns (address) {
+        return deploySimpleContract("DefaultUpgrade", false);
+    }
+
     /// @notice Deploy everything that should be deployed
     function deployNewEcosystemContracts() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
@@ -193,9 +197,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         deployVerifiers();
         deployUpgradeStageValidator();
-        // add custom upgrade deployment here instead of DefaultUpgrade if needed.
 
-        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
+        (addresses.stateTransition.usedUpgrade) = deployUsedUpgradeContract();
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
@@ -383,7 +386,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: stateTransition.defaultUpgrade,
+            initAddress: stateTransition.usedUpgrade,
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
 
@@ -656,8 +659,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
-            "default_upgrade_addr",
-            addresses.stateTransition.defaultUpgrade
+            "used_upgrade_addr",
+            addresses.stateTransition.usedUpgrade
         );
 
         vm.serializeAddress(
@@ -712,8 +715,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
         vm.serializeAddress(
             "gateway_state_transition",
-            "default_upgrade_addr",
-            gatewayConfig.gatewayStateTransition.defaultUpgrade
+            "used_upgrade_addr",
+            gatewayConfig.gatewayStateTransition.usedUpgrade
         );
         vm.serializeAddress(
             "gateway_state_transition",
@@ -1065,6 +1068,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         calls = preparePauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
     }
 
+    function deployUsedUpgradeContractGW() internal virtual returns (address) {
+        return deployGWContract("DefaultUpgrade");
+    }
+
     /// @notice Deploy everything that should be deployed for GW
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
@@ -1078,7 +1085,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
         gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract("GettersFacet");
         gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract("DiamondInit");
-        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployGWContract("DefaultUpgrade");
+        gatewayConfig.gatewayStateTransition.usedUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
         gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");

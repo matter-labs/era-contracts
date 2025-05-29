@@ -1128,7 +1128,7 @@ export class Deployer {
       console.log(`CONTRACTS_DEFAULT_UPGRADE_ADDR=${contractAddress}`);
     }
 
-    this.addresses.StateTransition.DefaultUpgrade = contractAddress;
+    this.addresses.stateTransition.usedUpgrade = contractAddress;
   }
 
   public async deployZKChainsUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
@@ -1138,7 +1138,7 @@ export class Deployer {
       console.log(`CONTRACTS_ZK_CHAIN_UPGRADE_ADDR=${contractAddress}`);
     }
 
-    this.addresses.StateTransition.DefaultUpgrade = contractAddress;
+    this.addresses.stateTransition.usedUpgrade = contractAddress;
   }
 
   public async deployGenesisUpgrade(create2Salt: string, ethTxOptions: ethers.providers.TransactionRequest) {
