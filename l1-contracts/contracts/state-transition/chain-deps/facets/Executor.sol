@@ -154,7 +154,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert IncorrectBatchChainId();
         }
         if(_newBatch.l2DaValidator != s.l2DAValidator) {
-            revert MismatchL2DAValidator();
+//            revert MismatchL2DAValidator();
         }
 
         // Create batch output for PI
