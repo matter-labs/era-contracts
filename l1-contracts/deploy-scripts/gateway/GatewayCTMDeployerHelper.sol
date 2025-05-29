@@ -67,7 +67,7 @@ library GatewayCTMDeployerHelper {
         contracts.stateTransition.validatorTimelockImplementation = _deployInternal(
             "ValidatorTimelock",
             "ValidatorTimelock.sol",
-            hex"",
+            abi.encode(L2_BRIDGEHUB_ADDR),
             innerConfig
         );
 
@@ -84,13 +84,12 @@ library GatewayCTMDeployerHelper {
             abi.encode(
                 contracts.stateTransition.validatorTimelockImplementation,
                 contracts.stateTransition.chainTypeManagerProxyAdmin,
-                abi.encodeCall(ValidatorTimelock.initialize, (ctmDeployerAddress, 0))
+                abi.encodeCall(ValidatorTimelock.initialize, (config.aliasedGovernanceAddress, 0))
             ),
             innerConfig
         );
 
         contracts.stateTransition.serverNotifierProxy = _deployServerNotifier(
-            salt,
             contracts,
             innerConfig,
             ctmDeployerAddress
@@ -100,7 +99,6 @@ library GatewayCTMDeployerHelper {
     }
 
     function _deployServerNotifier(
-        bytes32 _salt,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
         address ctmDeployerAddress
@@ -111,6 +109,7 @@ library GatewayCTMDeployerHelper {
             abi.encode(),
             innerConfig
         );
+        _deployedContracts.stateTransition.serverNotifierImplementation = serverNotifierImplementation;
 
         address serverNotifier = _deployInternal(
             "TransparentUpgradeableProxy",
@@ -193,8 +192,10 @@ library GatewayCTMDeployerHelper {
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
         address verifierFflonk = _deployInternal("L1VerifierFflonk", "L1VerifierFflonk.sol", hex"", innerConfig);
-
         address verifierPlonk = _deployInternal("L1VerifierPlonk", "L1VerifierPlonk.sol", hex"", innerConfig);
+
+        _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
+        _deployedContracts.stateTransition.verifierPlonk  = verifierPlonk;
 
         bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk);
 

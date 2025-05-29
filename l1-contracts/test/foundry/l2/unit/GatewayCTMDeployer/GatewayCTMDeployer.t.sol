@@ -178,11 +178,6 @@ library DeployedContractsComparator {
         StateTransitionContracts memory a,
         StateTransitionContracts memory b
     ) internal pure {
-        require(a.chainTypeManagerProxy == b.chainTypeManagerProxy, "chainTypeManagerProxy differs");
-        require(
-            a.chainTypeManagerImplementation == b.chainTypeManagerImplementation,
-            "chainTypeManagerImplementation differs"
-        );
         require(a.verifier == b.verifier, "verifier differs");
         require(a.adminFacet == b.adminFacet, "adminFacet differs");
         require(a.mailboxFacet == b.mailboxFacet, "mailboxFacet differs");
@@ -193,6 +188,11 @@ library DeployedContractsComparator {
         require(a.validatorTimelock == b.validatorTimelock, "validatorTimelock differs");
         require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");
         require(a.serverNotifierProxy == b.serverNotifierProxy, "serverNotifier proxy differs");
+        require(a.chainTypeManagerProxy == b.chainTypeManagerProxy, "chainTypeManagerProxy differs");
+        require(
+            a.chainTypeManagerImplementation == b.chainTypeManagerImplementation,
+            "chainTypeManagerImplementation differs"
+        );
     }
 
     function compareDAContracts(DAContracts memory a, DAContracts memory b) internal pure {
