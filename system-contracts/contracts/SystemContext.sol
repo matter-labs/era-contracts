@@ -453,7 +453,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @param _newTimestamp The timestamp of the new batch.
     function _ensureBatchConsistentWithL2Block(uint128 _newTimestamp) internal view {
         uint128 currentBlockTimestamp = currentL2BlockInfo.timestamp;
-        if (_newTimestamp <= currentBlockTimestamp) {
+        if (_newTimestamp < currentBlockTimestamp) {
             revert InconsistentNewBatchTimestamp(_newTimestamp, currentBlockTimestamp);
         }
     }
