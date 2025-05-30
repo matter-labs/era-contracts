@@ -46,8 +46,9 @@ library L2Utils {
     function forceDeploySystemContracts(SystemContractsArgs memory _args) internal {
         forceDeployMessageRoot();
         forceDeployBridgehub(_args);
-        // forceDeployAssetRouter(_args);
-        // forceDeployNativeTokenVault(_args);
+        forceDeployChainAssetHandler(_args);
+        forceDeployAssetRouter(_args);
+        forceDeployNativeTokenVault(_args);
     }
 
     function forceDeployMessageRoot() internal {
