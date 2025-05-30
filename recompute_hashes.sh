@@ -4,8 +4,8 @@
 set -e
 
 # Expected Foundry version and commit
-EXPECTED_VERSION="0.0.4"
-EXPECTED_COMMIT="ae913af"
+EXPECTED_VERSION="1.0.0-foundry-zksync-v0.0.16"
+EXPECTED_COMMIT="d94da1c47b312741a505fcba82c401c5e43896c2"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
@@ -15,14 +15,14 @@ fi
 
 # Get installed Foundry version
 FORGE_OUTPUT=$(forge --version)
-INSTALLED_VERSION=$(echo "$FORGE_OUTPUT" | awk '{print $2}')
-INSTALLED_COMMIT=$(echo "$FORGE_OUTPUT" | awk -F'[()]' '{print $2}' | awk '{print $1}')
+INSTALLED_VERSION=$(echo "$FORGE_OUTPUT" | awk 'NR==1 {print $3}')
+INSTALLED_COMMIT=$(echo "$FORGE_OUTPUT" | awk 'NR==2 {print $3}')
 
 # Check if Foundry version is as expected
 if [ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ] || [ "$INSTALLED_COMMIT" != "$EXPECTED_COMMIT" ]; then
   echo "Incorrect Foundry version."
-  echo "Expected: forge ${EXPECTED_VERSION} (${EXPECTED_COMMIT})"
-  echo "Found:    ${FORGE_OUTPUT})"
+  echo "Expected: ${EXPECTED_VERSION} (${EXPECTED_COMMIT})"
+  echo "Found:    ${FORGE_OUTPUT} (${INSTALLED_COMMIT})"
   echo "Run: foundryup-zksync --commit ${EXPECTED_COMMIT}"
   exit 1
 fi
