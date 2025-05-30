@@ -24,6 +24,7 @@ l1-contracts/coverage/*
 l1-contracts/out/*
 l1-contracts/zkout/*
 l1-contracts/broadcast/*
+l1-contracts/snapshots/*
 l1-contracts/script-config/*
 !l1-contracts/script-config/artifacts
 l1-contracts/script-out/*

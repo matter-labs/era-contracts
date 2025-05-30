@@ -113,19 +113,19 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
                 l1CtmDeployer: l1CTMDeployer
             })
         );
-        // deployL2Contracts(L1_CHAIN_ID);
+        deployL2Contracts(L1_CHAIN_ID);
 
-        // vm.prank(aliasedL1AssetRouter);
-        // l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_CHAIN_ASSET_HANDLER_ADDR);
-        // vm.prank(ownerWallet);
-        // l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
-        // vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
-        // l2Bridgehub.setCTMAssetAddress(
-        //     bytes32(uint256(uint160(l1CTM))),
-        //     address(addresses.stateTransition.chainTypeManagerProxy)
-        // );
-        // chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
-        // getExampleChainCommitment();
+        vm.prank(aliasedL1AssetRouter);
+        l2AssetRouter.setAssetHandlerAddress(L1_CHAIN_ID, ctmAssetId, L2_CHAIN_ASSET_HANDLER_ADDR);
+        vm.prank(ownerWallet);
+        l2Bridgehub.addChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+        vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1CTMDeployer));
+        l2Bridgehub.setCTMAssetAddress(
+            bytes32(uint256(uint160(l1CTM))),
+            address(addresses.stateTransition.chainTypeManagerProxy)
+        );
+        chainTypeManager = IChainTypeManager(address(addresses.stateTransition.chainTypeManagerProxy));
+        getExampleChainCommitment();
     }
 
     function getExampleChainCommitment() internal returns (bytes memory) {
