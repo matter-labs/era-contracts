@@ -215,6 +215,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
 
+        deploySimpleContract("DiamondProxy", false);
+
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
@@ -1422,7 +1424,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "DefaultUpgrade")) {
+            if (compareStrings(contractName, "DiamondProxy")) {
+                return type(DiamondProxy).creationCode;
+            } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "BytecodesSupplier")) {
                 return type(BytecodesSupplier).creationCode;
@@ -1509,6 +1513,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             }
         } else if (compareStrings(contractName, "UpgradeStageValidator")) {
             return abi.encode(addresses.stateTransition.chainTypeManagerProxy, config.contracts.latestProtocolVersion);
+        } else if (compareStrings(contractName, "DiamondProxy")) {
+            Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
+            Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+                facetCuts: facetCuts,
+                initAddress: address(0),
+                initCalldata: ""
+            });
+            return abi.encode(block.chainid, diamondCut);
         } else {
             return super.getCreationCalldata(contractName, isZKBytecode);
         }
