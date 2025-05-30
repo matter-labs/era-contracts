@@ -44,7 +44,7 @@ jobs:
         run: yarn sc build:foundry
 
       - name: Create cache
-        uses: actions/cache/save@v3
+        uses: actions/cache/save@v4
         with:
           key: artifacts-l1-${{ github.sha }}
           path: |
