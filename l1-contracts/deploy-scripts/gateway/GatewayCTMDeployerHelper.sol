@@ -195,7 +195,7 @@ library GatewayCTMDeployerHelper {
         address verifierPlonk = _deployInternal("L1VerifierPlonk", "L1VerifierPlonk.sol", hex"", innerConfig);
 
         _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
-        _deployedContracts.stateTransition.verifierPlonk  = verifierPlonk;
+        _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
 
         bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk);
 
