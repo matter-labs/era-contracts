@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
 
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IValidatorTimelock is IExecutor {
@@ -68,13 +67,17 @@ interface IValidatorTimelock is IExecutor {
     function setExecutionDelay(uint32 _executionDelay) external;
     /// @dev Returns the timestamp when `_l2BatchNumber` was committed.
     function getCommittedBatchTimestamp(address _chainAddress, uint256 _l2BatchNumber) external view returns (uint256);
-    
+
     /// @notice Revokes the specified validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to revoke.
     /// @dev Note that the access control is managed by the inner `revokeRole` functions.
-    function removeValidatorRoles(address _chainAddress, address _validator, ValidatorRotationParams memory params) external;
+    function removeValidatorRoles(
+        address _chainAddress,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) external;
     /// @notice Convenience wrapper to revoke all validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to remove.
@@ -87,7 +90,11 @@ interface IValidatorTimelock is IExecutor {
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to update.
     /// @param params Flags indicating which roles to grant.
-    function addValidatorRoles(address _chainAddress, address _validator, ValidatorRotationParams memory params) external;
+    function addValidatorRoles(
+        address _chainAddress,
+        address _validator,
+        ValidatorRotationParams memory params
+    ) external;
     /// @notice Convenience wrapper to grant all validator roles for a given validator on the target chain.
     /// @param _chainAddress The address identifier of the ZK chain.
     /// @param _validator The address of the validator to add.
@@ -107,7 +114,12 @@ interface IValidatorTimelock is IExecutor {
     function precommitSharedBridge(address _chainAddress, uint256 _l2BlockNumber, bytes calldata _l2Block) external;
     /// @dev Records the timestamp for all provided committed batches and make
     /// a call to the zkChain diamond contract with the same calldata.
-    function commitBatchesSharedBridge(address _chainAddress, uint256 _processBatchFrom, uint256 _processBatchTo, bytes calldata _batchData) external;
+    function commitBatchesSharedBridge(
+        address _chainAddress,
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata _batchData
+    ) external;
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: If the batch is reverted, it needs to be committed first before the execution.
     /// So it's safe to not override the committed batches.
@@ -115,8 +127,18 @@ interface IValidatorTimelock is IExecutor {
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
     /// Note: We don't track the time when batches are proven, since all information about
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
-    function proveBatchesSharedBridge(address _chainAddress, uint256 _prevBatch, uint256 _newBatch, bytes calldata _proof) external;
+    function proveBatchesSharedBridge(
+        address _chainAddress,
+        uint256 _prevBatch,
+        uint256 _newBatch,
+        bytes calldata _proof
+    ) external;
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkChain diamond contract with the same calldata.
-    function executeBatchesSharedBridge(address _chainAddress,  uint256 _processBatchFrom, uint256 _processBatchTo, bytes calldata _batchData) external;
-} 
+    function executeBatchesSharedBridge(
+        address _chainAddress,
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata _batchData
+    ) external;
+}

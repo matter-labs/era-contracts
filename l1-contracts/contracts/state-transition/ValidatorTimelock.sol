@@ -22,7 +22,11 @@ import {IValidatorTimelock} from "./IValidatorTimelock.sol";
 /// the timestamp is stored for it. Later, when the owner calls the batch execution, the contract checks that batch
 /// was committed not earlier than X time ago.
 /// @dev Expected to be deployed as a TransparentUpgradeableProxy.
-contract ValidatorTimelock is IValidatorTimelock, Ownable2StepUpgradeable, AccessControlEnumerablePerChainAddressUpgradeable {
+contract ValidatorTimelock is
+    IValidatorTimelock,
+    Ownable2StepUpgradeable,
+    AccessControlEnumerablePerChainAddressUpgradeable
+{
     using LibMap for LibMap.Uint32Map;
 
     /// @inheritdoc IValidatorTimelock
