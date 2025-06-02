@@ -27,6 +27,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     uint256 public validatorsCommitBlock;
     /// @dev The delay in blocks before a committee commit becomes active.
     uint256 public committeeActivationDelay;
+    /// @dev Represents the leader selection process configuration.
+    LeaderSelection public leaderSelection;
 
     modifier onlyOwnerOrValidatorOwner(address _validatorOwner) {
         if (owner() != msg.sender && _validatorOwner != msg.sender) {
@@ -40,15 +42,17 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             revert InvalidInputValidatorOwnerAddress();
         }
         _transferOwnership(_initialOwner);
+
+        // Initialize leaderSelection with default values
+        leaderSelection = LeaderSelection({
+            lastSnapshotCommit: 0,
+            previousSnapshotCommit: 0,
+            latest: LeaderSelectionAttr({frequency: 1, weighted: false}),
+            snapshot: LeaderSelectionAttr({frequency: 1, weighted: false}),
+            previousSnapshot: LeaderSelectionAttr({frequency: 1, weighted: false})
+        });
     }
 
-    /// @notice Adds a new validator to the registry.
-    /// @dev Fails if validator owner already exists.
-    /// @dev Fails if a validator with the same public key already exists.
-    /// @param _validatorOwner The address of the validator's owner.
-    /// @param _validatorWeight The voting weight of the validator.
-    /// @param _validatorPubKey The BLS12-381 public key of the validator.
-    /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
     function add(
         address _validatorOwner,
         uint32 _validatorWeight,
@@ -71,6 +75,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             latest: ValidatorAttr({
                 active: true,
                 removed: false,
+                leader: true,
                 weight: _validatorWeight,
                 pubKey: _validatorPubKey,
                 proofOfPossession: _validatorPoP
@@ -78,6 +83,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             snapshot: ValidatorAttr({
                 active: false,
                 removed: false,
+                leader: false,
                 weight: 0,
                 pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
                 proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
@@ -85,6 +91,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             previousSnapshot: ValidatorAttr({
                 active: false,
                 removed: false,
+                leader: false,
                 weight: 0,
                 pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
                 proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
@@ -103,10 +110,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         });
     }
 
-    /// @notice Removes a validator from the registry.
-    /// @dev Only callable by the contract owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator to be removed.
     function remove(address _validatorOwner) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
@@ -120,11 +123,10 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorRemoved(_validatorOwner);
     }
 
-    /// @notice Activates a previously inactive validator, allowing it to participate in committees.
-    /// @dev Only callable by the contract owner or the validator owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator to be activated.
-    function activate(address _validatorOwner) external onlyOwnerOrValidatorOwner(_validatorOwner) {
+    function changeValidatorActive(
+        address _validatorOwner,
+        bool _isActive
+    ) external onlyOwnerOrValidatorOwner(_validatorOwner) {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
@@ -132,16 +134,12 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         }
 
         _ensureValidatorSnapshot(validator);
-        validator.latest.active = true;
+        validator.latest.active = _isActive;
 
-        emit ValidatorActivated(_validatorOwner);
+        emit ValidatorActiveStatusChanged(_validatorOwner, _isActive);
     }
 
-    /// @notice Deactivates a validator, preventing it from participating in committees.
-    /// @dev Only callable by the contract owner or the validator owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator to be inactivated.
-    function deactivate(address _validatorOwner) external onlyOwnerOrValidatorOwner(_validatorOwner) {
+    function changeValidatorLeader(address _validatorOwner, bool _isLeader) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
@@ -149,16 +147,11 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         }
 
         _ensureValidatorSnapshot(validator);
-        validator.latest.active = false;
+        validator.latest.leader = _isLeader;
 
-        emit ValidatorDeactivated(_validatorOwner);
+        emit ValidatorLeaderStatusChanged(_validatorOwner, _isLeader);
     }
 
-    /// @notice Changes the validator weight of a validator in the registry.
-    /// @dev Only callable by the contract owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator whose weight will be changed.
-    /// @param _weight The new validator weight to assign to the validator.
     function changeValidatorWeight(address _validatorOwner, uint32 _weight) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
@@ -172,12 +165,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorWeightChanged(_validatorOwner, _weight);
     }
 
-    /// @notice Changes the validator's public key and proof-of-possession in the registry.
-    /// @dev Only callable by the contract owner or the validator owner.
-    /// @dev Verifies that the validator owner exists in the registry.
-    /// @param _validatorOwner The address of the owner of the validator whose key and PoP will be changed.
-    /// @param _pubKey The new BLS12-381 public key to assign to the validator.
-    /// @param _pop The new proof-of-possession (PoP) to assign to the validator.
     function changeValidatorKey(
         address _validatorOwner,
         BLS12_381PublicKey calldata _pubKey,
@@ -203,14 +190,28 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorKeyChanged(_validatorOwner, _pubKey, _pop);
     }
 
-    /// @notice Adds a new commit to the validator committee using the current block number plus delay.
-    /// @dev The committee will become active after committeeActivationDelay blocks.
-    /// @dev Only callable by the contract owner.
-    /// @dev Reverts if validatorsCommitBlock is still in the future.
     function commitValidatorCommittee() external onlyOwner {
-        // If validatorsCommitBlock is still in the future, revert
+        // If validatorsCommitBlock is still in the future, revert.
         if (block.number < validatorsCommitBlock) {
             revert PreviousCommitStillPending();
+        }
+
+        // Check if there's at least one active leader validator
+        bool hasActiveLeader = false;
+        uint256 len = validatorOwners.length;
+
+        for (uint256 i = 0; i < len; ++i) {
+            Validator storage validator = validators[validatorOwners[i]];
+            ValidatorAttr memory validatorAttr = validator.latest;
+
+            if (validatorAttr.active && !validatorAttr.removed && validatorAttr.leader) {
+                hasActiveLeader = true;
+                break;
+            }
+        }
+
+        if (!hasActiveLeader) {
+            revert NoActiveLeader();
         }
 
         // Increment the commit number.
@@ -222,20 +223,34 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorsCommitted(validatorsCommit, validatorsCommitBlock);
     }
 
-    /// @notice Returns an array of `ValidatorAttr` structs representing the current validator committee.
-    /// @dev Collects active and non-removed validators based on the latest commit to the committee.
-    function getValidatorCommittee() public view returns (CommitteeValidator[] memory) {
-        return _getCommittee(false);
+    function getValidatorCommittee() public view returns (CommitteeValidator[] memory, LeaderSelectionAttr memory) {
+        return (_getCommittee(false), _getLeaderSelectionAttributes(false));
     }
 
-    /// @notice Returns an array of `ValidatorAttr` structs representing the pending validator committee.
-    /// @dev Collects active and non-removed validators that will form the next committee after the current commit becomes active.
-    /// @dev Reverts if there is no pending committee (when block.number >= validatorsCommitBlock).
-    function getNextValidatorCommittee() public view returns (CommitteeValidator[] memory) {
+    function getNextValidatorCommittee() public view returns (CommitteeValidator[] memory, LeaderSelectionAttr memory) {
         if (block.number >= validatorsCommitBlock) {
             revert NoPendingCommittee();
         }
-        return _getCommittee(true);
+        return (_getCommittee(true), _getLeaderSelectionAttributes(true));
+    }
+
+    function setCommitteeActivationDelay(uint256 _delay) external onlyOwner {
+        committeeActivationDelay = _delay;
+        emit CommitteeActivationDelayChanged(_delay);
+    }
+
+    /// @notice Updates the leader selection configuration
+    /// @dev Only callable by the contract owner
+    /// @param _frequency The number of views between leader changes. If it is 0 then the leader never rotates.
+    /// @param _weighted Whether leaders are selected proportionally to their weight. If false, then the leader is selected round-robin.
+    function updateLeaderSelection(uint64 _frequency, bool _weighted) external onlyOwner {
+        // Ensure leader selection is properly snapshotted
+        _ensureLeaderSelectionSnapshot();
+
+        // Update with new values
+        leaderSelection.latest = LeaderSelectionAttr({frequency: _frequency, weighted: _weighted});
+
+        emit LeaderSelectionChanged(leaderSelection.latest);
     }
 
     /// @notice Internal helper to build committee arrays
@@ -265,6 +280,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             if (validatorAttr.active && !validatorAttr.removed) {
                 committee[count] = CommitteeValidator({
                     weight: validatorAttr.weight,
+                    leader: validatorAttr.leader,
                     pubKey: validatorAttr.pubKey,
                     proofOfPossession: validatorAttr.proofOfPossession
                 });
@@ -277,14 +293,6 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             mstore(committee, count)
         }
         return committee;
-    }
-
-    /// @notice Updates the delay for committee activation
-    /// @dev Only callable by the contract owner
-    /// @param _delay The new delay in blocks
-    function setCommitteeActivationDelay(uint256 _delay) external onlyOwner {
-        committeeActivationDelay = _delay;
-        emit CommitteeActivationDelayChanged(_delay);
     }
 
     /// @notice Returns the validator attributes based on current commits and snapshots
@@ -304,6 +312,33 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return validator.snapshot;
         } else {
             return validator.previousSnapshot;
+        }
+    }
+
+    function _getLeaderSelectionAttributes(bool _isNextCommittee) private view returns (LeaderSelectionAttr memory) {
+        if (_isNextCommittee) {
+            // Get the leader selection that will be active in the next committee
+            if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+                return leaderSelection.latest;
+            } else {
+                return leaderSelection.snapshot;
+            }
+        } else {
+            // Get currently active leader selection
+            uint32 currentActiveCommit;
+            if (block.number >= validatorsCommitBlock) {
+                currentActiveCommit = validatorsCommit;
+            } else {
+                currentActiveCommit = validatorsCommit - 1;
+            }
+
+            if (currentActiveCommit > leaderSelection.lastSnapshotCommit) {
+                return leaderSelection.latest;
+            } else if (currentActiveCommit > leaderSelection.previousSnapshotCommit) {
+                return leaderSelection.snapshot;
+            } else {
+                return leaderSelection.previousSnapshot;
+            }
         }
     }
 
@@ -347,6 +382,16 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             _validator.previousSnapshotCommit = _validator.lastSnapshotCommit;
             _validator.snapshot = _validator.latest;
             _validator.lastSnapshotCommit = validatorsCommit;
+        }
+    }
+
+    function _ensureLeaderSelectionSnapshot() private {
+        if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+            // When creating a snapshot, preserve the previous one
+            leaderSelection.previousSnapshot = leaderSelection.snapshot;
+            leaderSelection.previousSnapshotCommit = leaderSelection.lastSnapshotCommit;
+            leaderSelection.snapshot = leaderSelection.latest;
+            leaderSelection.lastSnapshotCommit = validatorsCommit;
         }
     }
 
