@@ -9,7 +9,7 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract V29L1Upgrade is BaseZkSyncUpgrade {
+contract L1V29Upgrade is BaseZkSyncUpgrade {
     /// @notice The parameters for the V29 upgrade.
     /// @param oldValidatorTimelocks The old validator timelocks that should be deactivated.
     /// @param newValidatorTimelock The new validator timelock that should be activated.

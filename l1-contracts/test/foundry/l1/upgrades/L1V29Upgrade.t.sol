@@ -2,7 +2,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {V29L1Upgrade} from "contracts/upgrades/V29L1Upgrade.sol";
+import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "contracts/common/Config.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -10,7 +10,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
 
-contract DummyV29L1Upgrade is V29L1Upgrade, BaseUpgradeUtils {
+contract DummyL1V29Upgrade is L1V29Upgrade, BaseUpgradeUtils {
     function setValidator(address _validator, bool _isActive) public {
         s.validators[_validator] = _isActive;
     }
@@ -24,8 +24,8 @@ contract DummyV29L1Upgrade is V29L1Upgrade, BaseUpgradeUtils {
     }
 }
 
-contract V29L1UpgradeTest is BaseUpgrade {
-    DummyV29L1Upgrade internal upgrade;
+contract L1V29UpgradeTest is BaseUpgrade {
+    DummyL1V29Upgrade internal upgrade;
     address internal oldValidatorTimelock1;
     address internal oldValidatorTimelock2;
     address internal newValidatorTimelock;
@@ -35,8 +35,8 @@ contract V29L1UpgradeTest is BaseUpgrade {
         oldValidatorTimelock2 = makeAddr("oldValidatorTimelock2");
         newValidatorTimelock = makeAddr("newValidatorTimelock");
 
-        // Deploy V29L1Upgrade
-        upgrade = new DummyV29L1Upgrade();
+        // Deploy L1V29Upgrade
+        upgrade = new DummyL1V29Upgrade();
 
         // Set initial validator states
         upgrade.setValidator(oldValidatorTimelock1, true);
@@ -58,7 +58,7 @@ contract V29L1UpgradeTest is BaseUpgrade {
         oldValidatorTimelocks[0] = oldValidatorTimelock1;
         oldValidatorTimelocks[1] = oldValidatorTimelock2;
 
-        V29L1Upgrade.V29UpgradeParams memory params = V29L1Upgrade.V29UpgradeParams({
+        L1V29Upgrade.V29UpgradeParams memory params = L1V29Upgrade.V29UpgradeParams({
             oldValidatorTimelocks: oldValidatorTimelocks,
             newValidatorTimelock: newValidatorTimelock
         });
