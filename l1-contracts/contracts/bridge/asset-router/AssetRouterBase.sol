@@ -12,7 +12,6 @@ import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from ".
 // import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {InteropCallRequest} from "../../common/Messaging.sol";
 
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";

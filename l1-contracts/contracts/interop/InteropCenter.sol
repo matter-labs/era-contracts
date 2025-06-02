@@ -19,7 +19,7 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
-import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, InteropCallStarterInternal, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {ChainIdNotRegistered, MsgValueMismatch, Unauthorized, WrongMagicValue} from "../common/L1ContractErrors.sol";
 import {DirectCallNonEmptyValue, NotInGatewayMode, SecondBridgeAddressTooLow} from "../bridgehub/L1BridgehubErrors.sol";
@@ -127,15 +127,15 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     function _addCallToBundle(
         InteropBundle memory _interopBundle,
-        InteropCallRequest memory _interopCallRequest,
+        InteropCallStarter memory _interopCallStarter,
         address _sender, 
         uint256 _index
     ) internal {
         InteropCall memory interopCall = InteropCall({
             shadowAccount: false,
-            to: _interopCallRequest.to,
-            data: _interopCallRequest.data,
-            value: _interopCallRequest.value,
+            to: _interopCallStarter.nextContract,
+            data: _interopCallStarter.data,
+            value: _interopCallStarter.requestedInteropCallValue,
             from: _sender
         });
         _interopBundle.calls[_index] = interopCall;
@@ -216,7 +216,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         });
         _addCallToBundle(
             bundle,
-            InteropCallRequest({to: _destinationAddress, value: _value, data: _data}),
+            InteropCallStarter({nextContract: _destinationAddress, requestedInteropCallValue: _value, data: _data, attributes: new bytes[](0)}),
             msg.sender,
             0
         );
@@ -278,35 +278,21 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         });
         for (uint256 i = 0; i < _callStarters.length; i++) {
             InteropCallStarterInternal memory callStarter = _callStarters[i];
-            InteropCallRequest memory interopCallRequest;
+            InteropCallStarter memory actualCallStarter;
             if (!callStarter.directCall) {
                 // console.log("fee indirect call");
-                interopCallRequest = IL2AssetRouter(callStarter.nextContract).interopCenterInitiateBridge{
+                actualCallStarter = IL2AssetRouter(callStarter.nextContract).interopCenterInitiateBridge{
                     value: callStarter.indirectCallMessageValue
                 }(_destinationChainId, _sender, callStarter.requestedInteropCallValue, callStarter.data);
             } else {
                 // console.log("fee direct call");
-                interopCallRequest = _requestFromStarter(callStarter);
+                actualCallStarter = callStarter;
             }
-            _addCallToBundle(bundle, interopCallRequest, _sender, i);
+            _addCallToBundle(bundle, actualCallStarter, _sender, i);
             feeValue += callStarter.requestedInteropCallValue;
         }
         bytes32 bundleHash = _finishAndSendBundleLong(bundle, feeValue, _executionAddress, _msgValue, _sender);
         return bundleHash;
-    }
-
-    function _requestFromStarter(
-        InteropCallStarterInternal memory callStarter
-    ) internal pure returns (InteropCallRequest memory) {
-        if (callStarter.indirectCallMessageValue != 0) {
-            revert DirectCallNonEmptyValue(callStarter.nextContract);
-        }
-        return
-            InteropCallRequest({
-                to: callStarter.nextContract,
-                data: callStarter.data,
-                value: callStarter.requestedInteropCallValue
-            });
     }
 
     /*//////////////////////////////////////////////////////////////

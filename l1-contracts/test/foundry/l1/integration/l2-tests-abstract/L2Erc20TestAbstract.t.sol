@@ -34,7 +34,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {GasFields, InteropTrigger, TRIGGER_IDENTIFIER} from "contracts/dev-contracts/test/Utils.sol";
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {

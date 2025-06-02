@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {InteropCallRequest} from "../../common/Messaging.sol";
+import {InteropCallStarter} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -43,5 +43,5 @@ interface IL2AssetRouter is IAssetRouterBase {
         address _originalCaller,
         uint256 _value,
         bytes calldata _data
-    ) external payable returns (InteropCallRequest memory interopCallRequest);
+    ) external payable returns (InteropCallStarter memory interopCallStarter);
 }

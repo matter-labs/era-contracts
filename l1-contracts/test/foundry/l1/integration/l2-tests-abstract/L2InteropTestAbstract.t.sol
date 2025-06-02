@@ -35,7 +35,7 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "./_SharedL2ContractDeployer.sol";
-import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 import {IMessageVerification} from "contracts/state-transition/chain-interfaces/IMessageVerification.sol";
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "./Utils.sol";

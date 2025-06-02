@@ -151,12 +151,7 @@ struct InteropRoot {
     bytes32[] sides;
 }
 
-struct InteropCallRequest {
-    address to;
-    uint256 value;
-    bytes data;
-}
-
+// This is the struct that is passed into the sendBundles function.
 struct InteropCallStarter {
     address nextContract;
     bytes data;
@@ -169,6 +164,7 @@ struct InteropCallStarter {
     bytes[] attributes;
 }
 
+// This is an internal struct with 
 struct InteropCallStarterInternal {
     bool directCall;
     address nextContract;
@@ -178,7 +174,7 @@ struct InteropCallStarterInternal {
 }
 
 struct InteropCall {
-    bool directCall;
+    bool shadowAccount;
     address to;
     address from;
     uint256 value;

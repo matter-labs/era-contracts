@@ -16,7 +16,7 @@ import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {InteropCallRequest} from "../../common/Messaging.sol";
+import {InteropCallStarter} from "../../common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -178,7 +178,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         address _originalCaller,
         uint256 _value,
         bytes calldata _data
-    ) external payable returns (InteropCallRequest memory interopCallRequest) {
+    ) external payable returns (InteropCallStarter memory interopCallStarter) {
         L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
             _chainId: _chainId,
             _originalCaller: _originalCaller,
@@ -186,10 +186,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             _data: _data,
             _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
         });
-        interopCallRequest = InteropCallRequest({
-            to: request.l2Contract,
+        interopCallStarter = InteropCallStarter({
+            nextContract: request.l2Contract,
             data: request.l2Calldata,
-            value: _value
+            requestedInteropCallValue: _value,
+            attributes: new bytes[](0)
         });
     }
 
