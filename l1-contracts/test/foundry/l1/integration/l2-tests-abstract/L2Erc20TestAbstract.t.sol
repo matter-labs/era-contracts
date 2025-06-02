@@ -137,31 +137,16 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
         );
 
-        InteropCallStarter[] memory feePaymentCalls = new InteropCallStarter[](1);
-        feePaymentCalls[0] = InteropCallStarter({
-            nextContract: address(this),
-            data: "",
-            attributes: new bytes[](0),
-            requestedInteropCallValue: 1 ether
-        });
-
-        InteropCallStarter[] memory executionCalls = new InteropCallStarter[](1);
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
-        executionCalls[0] = InteropCallStarter({
+        calls[0] = InteropCallStarter({
             nextContract: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
             attributes: attributes,
             requestedInteropCallValue: 0
         });
 
-        GasFields memory options = GasFields({
-            gasLimit: 30000000,
-            gasPerPubdataByteLimit: 1000,
-            refundRecipient: address(this),
-            paymaster: address(0),
-            paymasterInput: ""
-        });
         uint256 destinationChainId = 271;
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
@@ -174,12 +159,9 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(baseTokenAssetId)
         );
 
-        // l2InteropCenter.requestInterop{value: 3 ether}(
-        //     destinationChainId,
-        //     address(0),
-        //     feePaymentCalls,
-        //     executionCalls,
-        //     options
-        // );
+        l2InteropCenter.sendBundle(
+            271,
+            calls
+        );
     }
 }

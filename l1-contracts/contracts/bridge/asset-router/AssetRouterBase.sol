@@ -8,17 +8,18 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 // import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {InteropCallRequest} from "../../common/Messaging.sol";
 
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
-import {AssetIdNotSupported, NonEmptyMsgValue, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
+import {AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
@@ -98,43 +99,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         emit AssetDeploymentTrackerRegistered(assetId, _assetRegistrationData, msg.sender);
     }
 
-    function _setAssetHandlerAddressOnCounterpart(
-        uint256 _chainId,
-        address _originalCaller,
-        bytes32 _assetId,
-        address _assetHandlerAddressOnCounterpart
-    ) internal view virtual returns (L2TransactionRequestTwoBridgesInner memory request);
-
     /*//////////////////////////////////////////////////////////////
                             INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
-
-    /// @inheritdoc IAssetRouterBase
-    function bridgehubDeposit(
-        uint256 _chainId,
-        address _originalCaller,
-        uint256 _value,
-        bytes calldata _data
-    ) external payable virtual returns (L2TransactionRequestTwoBridgesInner memory request);
-
-    // todo we will probably have to create a new function for this to be backwards compatible
-    function _bridgehubAddCallToBundle(
-        uint256 _chainId,
-        bytes32 _bundleId,
-        address _originalCaller,
-        uint256 _value,
-        bytes calldata _data,
-        address _nativeTokenVault
-    ) internal virtual {
-        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
-            _chainId: _chainId,
-            _originalCaller: _originalCaller,
-            _value: _value,
-            _data: _data,
-            _nativeTokenVault: _nativeTokenVault
-        });
-        INTEROP_CENTER.addCallToBundleFromRequest(_bundleId, _value, request);
-    }
 
     function _bridgehubDeposit(
         uint256 _chainId,
@@ -143,31 +110,24 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes calldata _data,
         address _nativeTokenVault
     ) internal virtual onlyInteropCenter whenNotPaused returns (L2TransactionRequestTwoBridgesInner memory request) {
-        bytes32 assetId;
-        bytes memory transferData;
         bytes1 encodingVersion = _data[0];
-        // The new encoding ensures that the calldata is collision-resistant with respect to the legacy format.
-        // In the legacy calldata, the first input was the address, meaning the most significant byte was always `0x00`.
-        if (encodingVersion == SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION) {
-            if (msg.value != 0 || _value != 0) {
-                revert NonEmptyMsgValue();
-            }
-            (bytes32 _assetId, address _assetHandlerAddressOnCounterpart) = abi.decode(_data[1:], (bytes32, address));
-            return
-                _setAssetHandlerAddressOnCounterpart(
-                    _chainId,
-                    _originalCaller,
-                    _assetId,
-                    _assetHandlerAddressOnCounterpart
-                );
-        } else if (encodingVersion == NEW_ENCODING_VERSION) {
-            (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
-        } else if (encodingVersion == LEGACY_ENCODING_VERSION) {
-            (assetId, transferData) = _handleLegacyData(_data, _originalCaller);
+        if (encodingVersion == NEW_ENCODING_VERSION) {
+            return _bridgehubDepositRealAsset(_chainId, _originalCaller, _value, _data, _nativeTokenVault);
         } else {
             revert UnsupportedEncodingVersion();
         }
+    }
 
+    function _bridgehubDepositRealAsset(
+        uint256 _chainId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data,
+        address _nativeTokenVault
+    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
+        bytes1 encodingVersion = _data[0];
+
+        (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _originalCaller, _data);
         if (BRIDGE_HUB.baseTokenAssetId(_chainId) == assetId) {
             revert AssetIdNotSupported(assetId);
         }
@@ -204,6 +164,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             assetId: assetId,
             bridgeMintCalldata: bridgeMintCalldata
         });
+    }
+
+    function _getTransferData(bytes1 _encodingVersion, address, bytes calldata _data) internal virtual returns (bytes32 assetId, bytes memory transferData) {
+        if (_encodingVersion == NEW_ENCODING_VERSION) {
+            (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -286,12 +252,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         });
     }
 
-    /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
-    /// @dev Is not applicable for custom asset handlers.
-    /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
-    /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
-    function _handleLegacyData(bytes calldata _data, address) internal virtual returns (bytes32, bytes memory);
-
     /// @dev The request data that is passed to the bridgehub.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _assetId The deposited asset ID.
@@ -315,11 +275,14 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         });
     }
 
+    /// @inheritdoc IAssetRouterBase
     function getDepositCalldata(
-        address _sender,
+        address,
         bytes32 _assetId,
         bytes memory _assetData
-    ) public view virtual returns (bytes memory);
+    ) public view virtual override returns (bytes memory) {
+        return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
+    }
 
     /// @notice Ensures that token is registered with native token vault.
     /// @dev Only used when deposit is made with legacy data encoding format.

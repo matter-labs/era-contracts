@@ -25,6 +25,7 @@ import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -81,31 +82,6 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // assertTrue(success);
     }
 
-    function test_sendBundle() public {
-        vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
-            abi.encode(ETH_TOKEN_ADDRESS)
-        );
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes32(0))
-        );
-        IInteropCenter recipient = IInteropCenter(L2_INTEROP_CENTER_ADDR);
-        InteropCallStarter memory starter = InteropCallStarter({
-            nextContract: address(0x0000000000000000000000000000000000010009),
-            data: new bytes(0),
-            requestedInteropCallValue: 0,
-            attributes: new bytes[](0)
-        });
-        InteropCallStarter[] memory starters = new InteropCallStarter[](1);
-        starters[0] = starter;
-        bytes32 bundleHash = recipient.sendBundle(
-            271,
-            starters
-        );
-    }
 
     function test_l2MessageVerification() public {
         bytes32[] memory proof = new bytes32[](27);

@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-// import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 
@@ -145,6 +145,26 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
         bytes32[] calldata _merkleProof
     ) external;
 
+    /// @notice Initiates a transfer transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
+    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
+    /// @param _value The `msg.value` on the target chain tx.
+    /// @param _data The calldata for the second bridge deposit.
+    /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
+    /// @dev Data has the following abi encoding for legacy deposits:
+    /// address _l1Token,
+    /// uint256 _amount,
+    /// address _l2Receiver
+    /// for new deposits:
+    /// bytes32 _assetId,
+    /// bytes _transferData
+    function bridgehubDeposit(
+        uint256 _chainId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data
+    ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
+
     /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
     /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
     /// @param _chainId The chain ID of the ZK chain to which deposit.
@@ -157,6 +177,14 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
         address _originalCaller,
         uint256 _amount
     ) external payable;
+
+    /// @notice Routes the confirmation to nullifier for backward compatibility.
+    /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
+    /// This function is utilized by `requestL2TransactionTwoBridges` to validate the execution of a transaction.
+    /// @param _chainId The chain ID of the ZK chain to which confirm the deposit.
+    /// @param _txDataHash The keccak256 hash of 0x01 || abi.encode(bytes32, bytes) to identify deposits.
+    /// @param _txHash The hash of the L1->L2 transaction to confirm the deposit.
+    function bridgehubConfirmL2Transaction(uint256 _chainId, bytes32 _txDataHash, bytes32 _txHash) external;
 
     function isWithdrawalFinalized(
         uint256 _chainId,

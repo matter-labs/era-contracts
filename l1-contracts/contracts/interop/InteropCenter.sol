@@ -9,6 +9,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter, RouteBridgehubDepositStruct} from "../bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -25,7 +26,6 @@ import {DirectCallNonEmptyValue, NotInGatewayMode, SecondBridgeAddressTooLow} fr
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 
-import {TransientInterop} from "./TransientInterop.sol";
 import {IERC7786GatewaySource} from "./IERC7786.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
@@ -125,100 +125,50 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                         Bundle interface
     //////////////////////////////////////////////////////////////*/
 
-    // event BundleStarted(bytes32 indexed bundleId);
-    // function startBundle(
-    //     uint256 _destinationChainId
-    // ) external override onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleId) {
-    //     bundleId = _startBundle(_destinationChainId, msg.sender);
-    //     emit BundleStarted(bundleId);
-    // }
-
-    // function _startBundle(uint256 _destinationChainId, address _sender) public returns (bytes32 bundleId) {
-    //     bundleId = keccak256(abi.encodePacked(bundleCount, _sender, _destinationChainId));
-    //     bundleCount++;
-    //     TransientInterop.setBundleMetadata(
-    //         bundleId,
-    //         BundleMetadata({destinationChainId: _destinationChainId, sender: _sender, callCount: 0, totalValue: 0})
-    //     );
-    // }
-
-    // function addCallToBundle(
-    //     bytes32 _bundleId,
-    //     InteropCallRequest memory _interopCallRequest
-    // ) external override onlyL2 {
-    //     _addCallToBundle(_bundleId, _interopCallRequest, msg.sender);
-    // }
-
-    // function _addCallToBundle(
-    //     bytes32 _bundleId,
-    //     InteropCallRequest memory _interopCallRequest,
-    //     address _sender
-    // ) internal {
-    //     InteropCall memory interopCall;
-    //     interopCall.to = _interopCallRequest.to;
-    //     interopCall.data = _interopCallRequest.data;
-    //     interopCall.value = _interopCallRequest.value;
-    //     interopCall.from = _sender;
-    //     TransientInterop.addCallToBundle(_bundleId, interopCall);
-    // }
-
-    // function finishAndSendBundle(
-    //     bytes32 _bundleId,
-    //     address _executionAddress
-    // ) external payable override returns (bytes32 interopBundleHash) {
-    //     interopBundleHash = _finishAndSendBundle(_bundleId, _executionAddress);
-    // }
-
-    // function _finishAndSendBundle(
-    //     bytes32 _bundleId,
-    //     address _executionAddress
-    // ) internal returns (bytes32 interopBundleHash) {
-    //     require(block.chainid != L1_CHAIN_ID, "InteropCenter: Cannot send bundle from L1");
-    //     interopBundleHash = _finishAndSendBundleLong(_bundleId, _executionAddress, msg.value, msg.sender);
-    // }
+    function _addCallToBundle(
+        InteropBundle memory _interopBundle,
+        InteropCallRequest memory _interopCallRequest,
+        address _sender, 
+        uint256 _index
+    ) internal {
+        InteropCall memory interopCall = InteropCall({
+            shadowAccount: false,
+            to: _interopCallRequest.to,
+            data: _interopCallRequest.data,
+            value: _interopCallRequest.value,
+            from: _sender
+        });
+        _interopBundle.calls[_index] = interopCall;
+    }
 
     function _finishAndSendBundleLong(
-        bytes32 _bundleId,
+        // BundleMetadata memory _bundleMetadata,
+        InteropBundle memory _bundle,
+        uint256 _bundleCallsTotalValue,
         address _executionAddress,
         uint256 _receivedMsgValue,
         address _sender
     ) internal returns (bytes32 interopBundleHash) {
-        BundleMetadata memory bundleMetadata = TransientInterop.getBundleMetadata(_bundleId);
-        if (bundleMetadata.sender != _sender) {
-            revert Unauthorized(_sender);
-        }
-
-        InteropCall[] memory interopCalls = new InteropCall[](bundleMetadata.callCount);
-        for (uint256 i = 0; i < bundleMetadata.callCount; i++) {
-            InteropCall memory interopCall = TransientInterop.getBundleCall(_bundleId, i);
-            interopCalls[i] = interopCall;
-        }
 
         _ensureCorrectTotalValue(
-            bundleMetadata.destinationChainId,
-            bundleMetadata.sender,
-            bundleMetadata.totalValue,
+            _bundle.destinationChainId,
+            _bundleCallsTotalValue,
             _receivedMsgValue
         );
 
         address[] memory executionAddresses = new address[](1);
-        InteropBundle memory interopBundle = InteropBundle({
-            destinationChainId: bundleMetadata.destinationChainId,
-            calls: interopCalls,
-            executionAddress: _executionAddress
-        });
-        bytes memory interopBundleBytes = abi.encode(interopBundle);
+
+        bytes memory interopBundleBytes = abi.encode(_bundle);
         // TODO use canonicalTxHash for linking it to the trigger, instead of interopBundleHash
         bytes32 canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
         );
-        emit InteropBundleSent(canonicalTxHash, interopBundleHash, interopBundle);
+        emit InteropBundleSent(canonicalTxHash, interopBundleHash, _bundle);
         interopBundleHash = keccak256(interopBundleBytes);
     }
 
     function _ensureCorrectTotalValue(
         uint256 _destinationChainId,
-        address _initiator,
         uint256 _totalValue,
         uint256 _receivedMsgValue
     ) internal {
@@ -241,7 +191,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             IL1AssetRouter(assetRouter).bridgehubDepositBaseToken(
                 _destinationChainId,
                 tokenAssetId,
-                _initiator,
+                msg.sender,
                 _totalValue
             );
         }
@@ -257,13 +207,20 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes calldata _data,
         uint256 _value
     ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32) {
-        bytes32 bundleId = _startBundle(_destinationChainId, msg.sender);
+        // BundleMetadata memory bundleMetadata = _startBundle(_destinationChainId, msg.sender);
+        InteropBundle memory bundle = InteropBundle({
+            destinationChainId: _destinationChainId,
+            sendingBlockNumber: block.number,
+            calls: new InteropCall[](1),
+            executionAddress: address(0)
+        });
         _addCallToBundle(
-            bundleId,
+            bundle,
             InteropCallRequest({to: _destinationAddress, value: _value, data: _data}),
-            msg.sender
+            msg.sender,
+            0
         );
-        bytes32 bundleHash = _finishAndSendBundleLong(bundleId, address(0), msg.value, msg.sender);
+        bytes32 bundleHash = _finishAndSendBundleLong(bundle, _value, address(0), msg.value, msg.sender);
         return bundleHash;
     }
 
@@ -312,22 +269,29 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _executionAddress,
         address _sender
     ) internal returns (bytes32) {
-        bytes32 bundleId = _startBundle(_destinationChainId, _sender);
         uint256 feeValue;
+        InteropBundle memory bundle = InteropBundle({
+            destinationChainId: _destinationChainId,
+            sendingBlockNumber: block.number,
+            calls: new InteropCall[](_callStarters.length),
+            executionAddress: address(0)
+        });
         for (uint256 i = 0; i < _callStarters.length; i++) {
             InteropCallStarterInternal memory callStarter = _callStarters[i];
+            InteropCallRequest memory interopCallRequest;
             if (!callStarter.directCall) {
                 // console.log("fee indirect call");
-                IL1AssetRouter(callStarter.nextContract).bridgehubAddCallToBundle{
+                interopCallRequest = IL2AssetRouter(callStarter.nextContract).interopCenterInitiateBridge{
                     value: callStarter.indirectCallMessageValue
-                }(_destinationChainId, bundleId, _sender, callStarter.requestedInteropCallValue, callStarter.data);
+                }(_destinationChainId, _sender, callStarter.requestedInteropCallValue, callStarter.data);
             } else {
                 // console.log("fee direct call");
-                _addCallToBundle(bundleId, _requestFromStarter(callStarter), _sender);
+                interopCallRequest = _requestFromStarter(callStarter);
             }
+            _addCallToBundle(bundle, interopCallRequest, _sender, i);
             feeValue += callStarter.requestedInteropCallValue;
         }
-        bytes32 bundleHash = _finishAndSendBundleLong(bundleId, _executionAddress, feeValue, _sender);
+        bytes32 bundleHash = _finishAndSendBundleLong(bundle, feeValue, _executionAddress, _msgValue, _sender);
         return bundleHash;
     }
 
@@ -343,19 +307,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 data: callStarter.data,
                 value: callStarter.requestedInteropCallValue
             });
-    }
-
-    function addCallToBundleFromRequest(
-        bytes32 _bundleId,
-        uint256 _value,
-        L2TransactionRequestTwoBridgesInner memory _request
-    ) public onlyL2 {
-        // console.log("addCallToBundleFromRequest", msg.sender);
-        _addCallToBundle(
-            _bundleId,
-            InteropCallRequest({to: _request.l2Contract, value: _value, data: _request.l2Calldata}),
-            msg.sender
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -534,7 +485,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         );
 
         if (_request.secondBridgeAddress == address(assetRouter)) {
-            IAssetRouterBase(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+            IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
                 _request.chainId,
                 outputRequest.txDataHash,
                 canonicalTxHash

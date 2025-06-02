@@ -16,6 +16,7 @@ import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
+import {InteropCallRequest} from "../../common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -172,69 +173,24 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
     }
 
-    function _handleLegacyData(bytes calldata, address) internal virtual override returns (bytes32, bytes memory) {
-        revert L2AssetRouter_LegacyDataNotImplemented();
-    }
-
-    function bridgehubAddCallToBundle(
+    function interopCenterInitiateBridge(
         uint256 _chainId,
-        bytes32 _bundleId,
         address _originalCaller,
         uint256 _value,
         bytes calldata _data
-    ) external payable {
-        _bridgehubAddCallToBundle({
+    ) external payable returns (InteropCallRequest memory interopCallRequest) {
+        L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
             _chainId: _chainId,
-            _bundleId: _bundleId,
             _originalCaller: _originalCaller,
             _value: _value,
             _data: _data,
             _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
         });
-    }
-
-    function bridgehubDeposit(
-        uint256 _chainId,
-        address _originalCaller,
-        uint256 _value,
-        bytes calldata _data
-    )
-        external
-        payable
-        override(AssetRouterBase, IAssetRouterBase)
-        onlyInteropCenter
-        returns (L2TransactionRequestTwoBridgesInner memory request)
-    {
-        return
-            _bridgehubDeposit({
-                _chainId: _chainId,
-                _originalCaller: _originalCaller,
-                _value: _value,
-                _data: _data,
-                _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
-            });
-    }
-
-    function bridgehubConfirmL2Transaction(uint256, bytes32, bytes32) external view override onlyInteropCenter {
-        // On the L2, tx confirmation is not stored, as txs can always be retried.
-    }
-
-    function _setAssetHandlerAddressOnCounterpart(
-        uint256,
-        address,
-        bytes32,
-        address
-    ) internal pure override returns (L2TransactionRequestTwoBridgesInner memory) {
-        revert L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented();
-    }
-
-    /// @inheritdoc IAssetRouterBase
-    function getDepositCalldata(
-        address,
-        bytes32 _assetId,
-        bytes memory _assetData
-    ) public view override(AssetRouterBase, IAssetRouterBase) returns (bytes memory) {
-        return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
+        interopCallRequest = InteropCallRequest({
+            to: request.l2Contract,
+            data: request.l2Calldata,
+            value: _value
+        });
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1

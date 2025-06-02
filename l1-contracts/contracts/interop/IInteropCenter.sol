@@ -68,20 +68,6 @@ interface IInteropCenter {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
-    function addCallToBundleFromRequest(
-        bytes32 _bundleId,
-        uint256 _value,
-        L2TransactionRequestTwoBridgesInner memory _request
-    ) external;
-
-    function startBundle(uint256 _destinationChainId) external returns (bytes32 bundleId);
-
-    function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external;
-
-    function finishAndSendBundle(
-        bytes32 _bundleId,
-        address _executionAddress
-    ) external payable returns (bytes32 interopBundleHash);
 
     function forwardTransactionOnGatewayWithBalanceChange(
         uint256 _chainId,

@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {IAssetRouterBase, LEGACY_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {IAssetRouterBase, LEGACY_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
@@ -22,7 +22,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {AddressAlreadySet, AssetHandlerDoesNotExist, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {AddressAlreadySet, AssetHandlerDoesNotExist, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
@@ -176,7 +176,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _originalCaller,
         bytes32 _assetId,
         address _assetHandlerAddressOnCounterpart
-    ) internal view override returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal view returns (L2TransactionRequestTwoBridgesInner memory request) {
         IL1AssetDeploymentTracker(assetDeploymentTracker[_assetId]).bridgeCheckCounterpartAddress(
             _chainId,
             _assetId,
@@ -226,7 +226,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         emit BridgehubDepositBaseTokenInitiated(_chainId, _originalCaller, _assetId, _amount);
     }
 
-    /// @inheritdoc IAssetRouterBase
+    /// @inheritdoc IL1AssetRouter
     function bridgehubDeposit(
         uint256 _chainId,
         address _originalCaller,
@@ -236,11 +236,28 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         external
         payable
         virtual
-        override(AssetRouterBase, IAssetRouterBase)
+        override
         onlyInteropCenter
         whenNotPaused
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
+        bytes1 encodingVersion = _data[0];
+        if (encodingVersion == SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION) {
+            if (msg.value != 0 || _value != 0) {
+                revert NonEmptyMsgValue();
+            }
+
+            (bytes32 _assetId, address _assetHandlerAddressOnCounterpart) = abi.decode(_data[1:], (bytes32, address));
+            return
+                _setAssetHandlerAddressOnCounterpart(
+                    _chainId,
+                    _originalCaller,
+                    _assetId,
+                    _assetHandlerAddressOnCounterpart
+                );
+        } else if (encodingVersion == LEGACY_ENCODING_VERSION) {
+            return _bridgehubDepositRealAsset(_chainId, _originalCaller, _value, _data, address(nativeTokenVault));
+        }
         return
             _bridgehubDeposit({
                 _chainId: _chainId,
@@ -251,30 +268,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             });
     }
 
-    /// @inheritdoc IAssetRouterBase
+    /// @inheritdoc IL1AssetRouter
     function bridgehubConfirmL2Transaction(
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyInteropCenter whenNotPaused {
         L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
-    }
-
-    function bridgehubAddCallToBundle(
-        uint256 _chainId,
-        bytes32 _bundleId,
-        address _originalCaller,
-        uint256 _value,
-        bytes calldata _data
-    ) external payable {
-        _bridgehubAddCallToBundle({
-            _chainId: _chainId,
-            _bundleId: _bundleId,
-            _originalCaller: _originalCaller,
-            _value: _value,
-            _data: _data,
-            _nativeTokenVault: address(nativeTokenVault)
-        });
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -340,11 +340,21 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
 
+    function _getTransferData(bytes1 _encodingVersion, address _originalCaller, bytes calldata _data) internal override returns (bytes32 assetId, bytes memory transferData) {
+        // The new encoding ensures that the calldata is collision-resistant with respect to the legacy format.
+        // In the legacy calldata, the first input was the address, meaning the most significant byte was always `0x00`.
+        if (_encodingVersion == LEGACY_ENCODING_VERSION) {
+            (assetId, transferData) = _handleLegacyData(_data, _originalCaller);
+        } else {
+            (assetId, transferData) = super._getTransferData(_encodingVersion, _originalCaller, _data);
+        }
+    }
+
     /// @notice Decodes the transfer input for legacy data and transfers allowance to NTV.
     /// @dev Is not applicable for custom asset handlers.
     /// @param _data The encoded transfer data (address _l1Token, uint256 _depositAmount, address _l2Receiver).
     /// @return Tuple of asset ID and encoded transfer data to conform with new encoding standard.
-    function _handleLegacyData(bytes calldata _data, address) internal override returns (bytes32, bytes memory) {
+    function _handleLegacyData(bytes calldata _data, address) internal returns (bytes32, bytes memory) {
         (address _l1Token, uint256 _depositAmount, address _l2Receiver) = abi.decode(
             _data,
             (address, uint256, address)
@@ -428,7 +438,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             (nativeTokenVault.tokenAddress(_assetId) == address(0)) ||
             (nativeTokenVault.originChainId(_assetId) != block.chainid)
         ) {
-            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
+            return super.getDepositCalldata(_sender, _assetId, _assetData);
         } else {
             // slither-disable-next-line unused-return
             (, address _receiver, address _parsedNativeToken, uint256 _amount, bytes memory _gettersData) = DataEncoding

@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
+import {InteropCallRequest} from "../../common/Messaging.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -36,4 +37,11 @@ interface IL2AssetRouter is IAssetRouterBase {
     /// a legacy asset.
     /// @param _assetId The assetId of the legacy token.
     function setLegacyTokenAssetHandler(bytes32 _assetId) external;
+
+    function interopCenterInitiateBridge(
+        uint256 _chainId,
+        address _originalCaller,
+        uint256 _value,
+        bytes calldata _data
+    ) external payable returns (InteropCallRequest memory interopCallRequest);
 }

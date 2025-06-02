@@ -197,6 +197,8 @@ struct BundleMetadata {
 
 struct InteropBundle {
     uint256 destinationChainId;
+    /// This is needed to guarantee uniqueness of the bundleHash.
+    uint256 sendingBlockNumber;
     InteropCall[] calls;
     // If not set - anyone can execute it.
     address executionAddress;

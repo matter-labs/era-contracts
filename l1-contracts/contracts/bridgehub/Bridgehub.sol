@@ -11,6 +11,7 @@ import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesIn
 import {IInteropCenter} from "../interop/IInteropCenter.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
@@ -498,7 +499,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         RouteBridgehubDepositStruct calldata _request
     ) external payable onlyInteropCenter returns (L2TransactionRequestTwoBridgesInner memory outputRequest) {
         // slither-disable-next-line arbitrary-send-eth
-        outputRequest = IAssetRouterBase(_request.secondBridgeAddress).bridgehubDeposit{value: msg.value}(
+        outputRequest = IL1AssetRouter(_request.secondBridgeAddress).bridgehubDeposit{value: msg.value}(
             _request.chainId,
             _request.sender,
             _request.l2Value,
@@ -518,7 +519,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _txDataHash,
         bytes32 _canonicalTxHash
     ) external override onlyInteropCenter {
-        IAssetRouterBase(_secondBridgeAddress).bridgehubConfirmL2Transaction(_chainId, _txDataHash, _canonicalTxHash);
+        IL1AssetRouter(_secondBridgeAddress).bridgehubConfirmL2Transaction(_chainId, _txDataHash, _canonicalTxHash);
     }
 
     /// @notice Used to forward a transaction on the gateway to the chains mailbox (from L1).
@@ -537,7 +538,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 
-    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L2 message inclusion.
     /// @param _batchNumber The executed L2 batch number in which the message appeared
@@ -556,7 +556,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IZKChain(zkChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
 
-    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L2 log inclusion.
     /// @param _batchNumber The executed L2 batch number in which the log appeared
@@ -575,7 +574,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         return IZKChain(zkChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
 
-    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     /// @param _chainId The chain ID of the ZK chain where to prove L1->L2 tx status.
     /// @param _l2TxHash The L2 canonical transaction hash
@@ -607,7 +605,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             });
     }
 
-    /// @notice This will be deprecated, use InteropCenter instead
     /// @notice forwards function call to Mailbox based on ChainId
     function l2TransactionBaseCost(
         uint256 _chainId,
@@ -709,10 +706,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     ) public onlyChainAssetHandler {
         _registerNewZKChain(_chainId, _zkChain, _checkMaxNumberOfZKChains);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                        Chain registration
-    //////////////////////////////////////////////////////////////*/
 
     /// @dev Registers an already deployed chain with the bridgehub
     /// @param _chainId The chain Id of the chain

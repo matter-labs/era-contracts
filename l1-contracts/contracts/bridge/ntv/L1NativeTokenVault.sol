@@ -90,45 +90,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         l1AssetTracker = IAssetTracker(_l1AssetTracker);
     }
 
-    /// @notice Transfers tokens from shared bridge as part of the migration process.
-    /// The shared bridge becomes the L1Nullifier contract.
-    /// @dev Both ETH and ERC20 tokens can be transferred. Exhausts balance of shared bridge after the first call.
-    /// @dev Calling second time for the same token will revert.
-    /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
-    // function transferFundsFromSharedBridge(address _token) external {
-    //     ensureTokenIsRegistered(_token);
-    //     if (_token == ETH_TOKEN_ADDRESS) {
-    //         uint256 balanceBefore = address(this).balance;
-    //         L1_NULLIFIER.transferTokenToNTV(_token);
-    //         uint256 balanceAfter = address(this).balance;
-    //         if (balanceAfter <= balanceBefore) {
-    //             revert NoFundsTransferred();
-    //         }
-    //     } else {
-    //         uint256 balanceBefore = IERC20(_token).balanceOf(address(this));
-    //         uint256 nullifierChainBalance = IERC20(_token).balanceOf(address(L1_NULLIFIER));
-    //         if (nullifierChainBalance == 0) {
-    //             revert ZeroAmountToTransfer();
-    //         }
-    //         L1_NULLIFIER.transferTokenToNTV(_token);
-    //         uint256 balanceAfter = IERC20(_token).balanceOf(address(this));
-    //         if (balanceAfter - balanceBefore < nullifierChainBalance) {
-    //             revert WrongAmountTransferred(balanceAfter - balanceBefore, nullifierChainBalance);
-    //         }
-    //     }
-    // }
-
-    /// @notice Updates chain token balance within NTV to account for tokens transferred from the shared bridge (part of the migration process).
-    /// @dev Clears chain balance on the shared bridge after the first call. Subsequent calls will not affect the state.
-    /// @param _token The address of token to be transferred (address(1) for ether and contract address for ERC20).
-    /// @param _targetChainId The chain ID of the corresponding ZK chain.
-    // function updateChainBalancesFromSharedBridge(address _token, uint256 _targetChainId) external {
-    //     uint256 nullifierChainBalance = L1_NULLIFIER.chainBalance(_targetChainId, _token);
-    //     bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
-    //     // chainBalance[_targetChainId][assetId] = chainBalance[_targetChainId][assetId] + nullifierChainBalance;
-    //     originChainId[assetId] = block.chainid;
-    //     L1_NULLIFIER.nullifyChainBalanceByNTV(_targetChainId, _token);
-    // }
 
     /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
