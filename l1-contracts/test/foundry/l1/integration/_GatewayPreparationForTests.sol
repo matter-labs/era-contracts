@@ -114,6 +114,8 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
             address(uint160(1)),
             // Some non-zero address
             address(uint160(1)),
+            // Some non-zero address
+            address(uint160(1)),
             msg.sender
         );
         Utils.executeCalls(Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
