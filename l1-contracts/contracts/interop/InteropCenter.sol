@@ -19,7 +19,7 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
-import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, BundleMetadata, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {ChainIdNotRegistered, MsgValueMismatch, Unauthorized, WrongMagicValue} from "../common/L1ContractErrors.sol";
 import {DirectCallNonEmptyValue, NotInGatewayMode, SecondBridgeAddressTooLow} from "../bridgehub/L1BridgehubErrors.sol";
@@ -142,7 +142,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     function _finishAndSendBundleLong(
-        // BundleMetadata memory _bundleMetadata,
         InteropBundle memory _bundle,
         uint256 _bundleCallsTotalValue,
         address _executionAddress,
@@ -207,7 +206,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes calldata _data,
         uint256 _value
     ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32) {
-        // BundleMetadata memory bundleMetadata = _startBundle(_destinationChainId, msg.sender);
         InteropBundle memory bundle = InteropBundle({
             destinationChainId: _destinationChainId,
             sendingBlockNumber: block.number,

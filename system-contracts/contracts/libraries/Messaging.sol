@@ -158,16 +158,6 @@ struct InteropCall {
     bytes data;
 }
 
-struct BundleMetadata {
-    uint256 destinationChainId;
-    address sender;
-    uint256 callCount;
-    // Note the total value is provided by the user.
-    // This is because we cannot guarantee atomicity of xL2 txs (just the atomicity of calls on the destination chain)
-    // So contracts cannot send their own value, only stamp the value that belongs to the user.
-    uint256 totalValue;
-}
-
 struct InteropBundle {
     uint256 destinationChainId;
     InteropCall[] calls;
