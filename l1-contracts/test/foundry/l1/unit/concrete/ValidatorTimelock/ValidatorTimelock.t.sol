@@ -10,7 +10,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {DummyChainTypeManagerForValidatorTimelock} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Unauthorized, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, TimeNotReached, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
@@ -28,6 +28,9 @@ contract ValidatorTimelockTest is Test {
     /// @notice Error for when an address is not a validator.
     error ValidatorDoesNotExist(uint256 _chainId);
 
+    /// @notice The default admin role identifier.
+    bytes32 constant DEFAULT_ADMIN_ROLE = bytes32(0);
+
     ValidatorTimelock validator;
     DummyChainTypeManagerForValidatorTimelock chainTypeManager;
     DummyBridgehub dummyBridgehub;
@@ -44,8 +47,14 @@ contract ValidatorTimelockTest is Test {
 
     bytes32 precommitterRole;
     bytes32 committerRole;
+    bytes32 reverterRole;
     bytes32 proverRole;
     bytes32 executorRole;
+    bytes32 precommitterAdminRole;
+    bytes32 committerAdminRole;
+    bytes32 reverterAdminRole;
+    bytes32 proverAdminRole;
+    bytes32 executorAdminRole;
 
     function setUp() public {
         owner = makeAddr("owner");
@@ -74,8 +83,14 @@ contract ValidatorTimelockTest is Test {
 
         precommitterRole = validator.PRECOMMITTER_ROLE();
         committerRole = validator.COMMITTER_ROLE();
+        reverterRole = validator.REVERTER_ROLE();
         proverRole = validator.PROVER_ROLE();
         executorRole = validator.EXECUTOR_ROLE();
+        precommitterAdminRole = validator.OPTIONAL_PRECOMMITTER_ADMIN_ROLE();
+        committerAdminRole = validator.OPTIONAL_COMMITTER_ADMIN_ROLE();
+        reverterAdminRole = validator.OPTIONAL_REVERTER_ADMIN_ROLE();
+        proverAdminRole = validator.OPTIONAL_PROVER_ADMIN_ROLE();
+        executorAdminRole = validator.OPTIONAL_EXECUTOR_ADMIN_ROLE();
     }
 
     function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
@@ -100,6 +115,7 @@ contract ValidatorTimelockTest is Test {
     function _assertAllRoles(uint256 _chainId, address _addr, bool _expected) internal {
         require(validator.hasRoleForChainId(_chainId, validator.PRECOMMITTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.COMMITTER_ROLE(), _addr) == _expected);
+        require(validator.hasRoleForChainId(_chainId, validator.REVERTER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.PROVER_ROLE(), _addr) == _expected);
         require(validator.hasRoleForChainId(_chainId, validator.EXECUTOR_ROLE(), _addr) == _expected);
     }
@@ -112,6 +128,8 @@ contract ValidatorTimelockTest is Test {
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, precommitterRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, committerRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, reverterRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, proverRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
@@ -131,6 +149,8 @@ contract ValidatorTimelockTest is Test {
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, precommitterRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, committerRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, reverterRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
         emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, proverRole, bob);
         vm.expectEmit(true, true, true, true, address(validator));
@@ -291,6 +311,83 @@ contract ValidatorTimelockTest is Test {
         vm.expectRevert("Ownable: caller is not the owner");
         vm.prank(alice);
         validator.setExecutionDelay(20);
+    }
+
+    function test_RevertWhen_addValidatorNotAdmin() public {
+        _assertAllRoles(chainId, bob, false);
+
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, DEFAULT_ADMIN_ROLE, address(this)));
+        validator.addValidatorForChainId(chainId, bob);
+
+        _assertAllRoles(chainId, bob, false);
+    }
+
+    function test_RevertWhen_removeValidatorNotAdmin() public {
+        _assertAllRoles(chainId, alice, true);
+
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, DEFAULT_ADMIN_ROLE, address(this)));
+        validator.removeValidatorForChainId(chainId, alice);
+
+        _assertAllRoles(chainId, alice, true);
+    }
+
+    function test_RevertWhen_validatorCanMakeCallNotValidator() public {
+        IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
+        IExecutor.CommitBatchInfo memory batchToCommit = Utils.createCommitBatchInfo();
+
+        IExecutor.CommitBatchInfo[] memory batchesToCommit = new IExecutor.CommitBatchInfo[](1);
+        batchesToCommit[0] = batchToCommit;
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, committerRole, bob));
+        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+            storedBatch,
+            batchesToCommit
+        );
+        validator.commitBatchesSharedBridge(zkSync, commitBatchFrom, commitBatchTo, commitData);
+    }
+
+    function test_RevertWhen_revertBatchesNotValidator() public {
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, address(0), reverterRole, address(this)));
+        validator.revertBatchesSharedBridge(address(0), lastBatchNumber);
+    }
+
+    function test_RevertWhen_revertBatchesSharedBridgeNotValidator() public {
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, reverterRole, address(this)));
+        validator.revertBatchesSharedBridge(zkSync, lastBatchNumber);
+    }
+
+    function test_RevertWhen_proveBatchesSharedBridgeNotValidator() public {
+        IExecutor.StoredBatchInfo memory prevBatch = Utils.createStoredBatchInfo();
+        IExecutor.StoredBatchInfo memory batchToProve = Utils.createStoredBatchInfo();
+        uint256[] memory proof = new uint256[](0);
+
+        IExecutor.StoredBatchInfo[] memory batchesToProve = new IExecutor.StoredBatchInfo[](1);
+        batchesToProve[0] = batchToProve;
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, proverRole, bob));
+        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+            prevBatch,
+            batchesToProve,
+            proof
+        );
+        validator.proveBatchesSharedBridge(zkSync, proveBatchFrom, proveBatchTo, proveData);
+    }
+
+    function test_RevertWhen_executeBatchesSharedBridgeNotValidator() public {
+        IExecutor.StoredBatchInfo memory storedBatch = Utils.createStoredBatchInfo();
+
+        IExecutor.StoredBatchInfo[] memory storedBatches = new IExecutor.StoredBatchInfo[](1);
+        storedBatches[0] = storedBatch;
+
+        vm.prank(bob);
+        vm.expectRevert(abi.encodeWithSelector(RoleAccessDenied.selector, zkSync, executorRole, bob));
+        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+            storedBatches,
+            Utils.emptyData()
+        );
+        validator.executeBatchesSharedBridge(zkSync, executeBatchFrom, executeBatchTo, executeData);
     }
 
     function test_RevertWhen_executeBatchesSharedBridgeTooEarly() public {
