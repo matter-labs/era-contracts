@@ -1497,11 +1497,11 @@
   },
   {
     "contractName": "l1-contracts/V29L1Upgrade",
-    "zkBytecodeHash": "0x010002fd0c8ec6cc37ae9e1564607a27407e2f2ffd6c3c52879ea7dc8405d911",
+    "zkBytecodeHash": "0x010002fd5059db5b4f97ddcbd7701259dbcf3160adfa3eace021acceb736cc0f",
     "zkBytecodePath": "/l1-contracts/zkout/V29L1Upgrade.sol/V29L1Upgrade.json",
-    "evmBytecodeHash": "0xe8f68b2856537bf3cbdd3e3731669bf5db6a509f24ef8d8b37a5a72bdbc26e3e",
+    "evmBytecodeHash": "0x740e69e19f0e9832a6662bf843051147e72af393cf18964d49acee6c0790eb38",
     "evmBytecodePath": "/l1-contracts/out/V29L1Upgrade.sol/V29L1Upgrade.json",
-    "evmDeployedBytecodeHash": "0xa7917ec7fec4a179120046e6c961069653182c400f73e346cba993d7e14b8e02"
+    "evmDeployedBytecodeHash": "0xc91f1dac81452d2863eb43fdc75cbda990b07c5d3059af20720dc76b30a8d874"
   },
   {
     "contractName": "l1-contracts/ValidatorTimelock",

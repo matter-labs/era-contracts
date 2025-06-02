@@ -10,6 +10,11 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 contract V29L1Upgrade is BaseZkSyncUpgrade {
+    /// @notice The parameters for the V29 upgrade.
+    /// @param oldValidatorTimelocks The old validator timelocks that should be deactivated.
+    /// @param newValidatorTimelock The new validator timelock that should be activated.
+    /// @dev Note, that the presence of the old timelocks is not a security issue since they had a different interface,
+    /// but we clean those up just in case.
     struct V29UpgradeParams {
         address[] oldValidatorTimelocks;
         address newValidatorTimelock;
@@ -23,6 +28,7 @@ contract V29L1Upgrade is BaseZkSyncUpgrade {
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 
+    /// @inheritdoc BaseZkSyncUpgrade
     function _postUpgrade(bytes calldata _postUpgradeCalldata) internal override {
         V29UpgradeParams memory params = abi.decode(_postUpgradeCalldata, (V29UpgradeParams));
 
