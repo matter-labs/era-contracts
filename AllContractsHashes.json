@@ -1504,14 +1504,6 @@
     "evmDeployedBytecodeHash": "0xba4bfb9d8fdb5e5690b9c2e10d68acdd886790840a3da73771993f5ddd9cf23f"
   },
   {
-    "contractName": "l1-contracts/V29L1Upgrade",
-    "zkBytecodeHash": "0x010002fd5059db5b4f97ddcbd7701259dbcf3160adfa3eace021acceb736cc0f",
-    "zkBytecodePath": "/l1-contracts/zkout/V29L1Upgrade.sol/V29L1Upgrade.json",
-    "evmBytecodeHash": "0x740e69e19f0e9832a6662bf843051147e72af393cf18964d49acee6c0790eb38",
-    "evmBytecodePath": "/l1-contracts/out/V29L1Upgrade.sol/V29L1Upgrade.json",
-    "evmDeployedBytecodeHash": "0xc91f1dac81452d2863eb43fdc75cbda990b07c5d3059af20720dc76b30a8d874"
-  },
-  {
     "contractName": "l1-contracts/ValidatorTimelock",
     "zkBytecodeHash": "0x010009b34cbfc0b56de49d8d4caaa73e73a27b15f45cdef558c238f078c53dc7",
     "zkBytecodePath": "/l1-contracts/zkout/ValidatorTimelock.sol/ValidatorTimelock.json",
@@ -1770,7 +1762,7 @@
   {
     "contractName": "Bootloader",
     "zkBytecodePath": "/system-contracts/zkout/bootloader_test.yul/Bootloader.json",
-    "zkBytecodeHash": "0x010004137590ae3a0543901935942230da94d56e89e79803942e14caf250e94d",
+    "zkBytecodeHash": "0x0100044d3cc3eaa631b60e629774467f5cf53b98c7d4a5870b062a938172481a",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null
