@@ -1025,7 +1025,7 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x010003ed0a6fc155dffe7d5fd681574b7066b70f0d0658ee0adbffc9ab697303",
+    "zkBytecodeHash": "0x010003edb1388ea8e6e776f3b65cddd86ce1bd1a48a71d577e7efe7430b1e842",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
     "evmBytecodeHash": "0xf6b44bf8db9af47bdcb7617bdc3e303d0f1ad2eae379cb4f803d1759f522ef18",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
@@ -1110,6 +1110,14 @@
     "evmBytecodeHash": "0xc263f1d0c3c2e19b22afcf080e96d655b81fc3eaceea9e73000306685593ac87",
     "evmBytecodePath": "/l1-contracts/out/L1Nullifier.sol/L1Nullifier.json",
     "evmDeployedBytecodeHash": "0x5786020bf15d630bd384b6152658807e429be69e0475e588bb3d146c2b82ecf7"
+  },
+  {
+    "contractName": "l1-contracts/L1V29Upgrade",
+    "zkBytecodeHash": "0x010002fda1e4d966a7506d8a180712181964b085ef5dba6d8196f5758c8b3c07",
+    "zkBytecodePath": "/l1-contracts/zkout/L1V29Upgrade.sol/L1V29Upgrade.json",
+    "evmBytecodeHash": "0x3be6dc71d3ba3823a248ca7dafb5e6d941a15b980e8f135966d4e1b4bd75519e",
+    "evmBytecodePath": "/l1-contracts/out/L1V29Upgrade.sol/L1V29Upgrade.json",
+    "evmDeployedBytecodeHash": "0x092e4853d204ca7d22ba405137a531cab3eec9c8f7f83680dda1a587fddd6843"
   },
   {
     "contractName": "l1-contracts/L1VerifierFflonk",
@@ -1505,7 +1513,7 @@
   },
   {
     "contractName": "l1-contracts/ValidatorTimelock",
-    "zkBytecodeHash": "0x0100096397254772dc7cc4b4eaab26357b0070a4ecd0a3575b2bc327451bc268",
+    "zkBytecodeHash": "0x010009b34cbfc0b56de49d8d4caaa73e73a27b15f45cdef558c238f078c53dc7",
     "zkBytecodePath": "/l1-contracts/zkout/ValidatorTimelock.sol/ValidatorTimelock.json",
     "evmBytecodeHash": "0x3907666484dbe634d8fd1bebb1b79f9bd14c77a7a3f143e34b17e8b4daf60878",
     "evmBytecodePath": "/l1-contracts/out/ValidatorTimelock.sol/ValidatorTimelock.json",
@@ -1532,14 +1540,6 @@
     "evmBytecodeHash": "0xfebf807006627544db6eaf474508d47b688adb3d5195b5071b3bf34ead2f81b6",
     "evmBytecodePath": "/l1-contracts/out/Create2AndTransfer.sol/Create2AndTransfer.json",
     "evmDeployedBytecodeHash": "0x7e0b5656d9ac680e5d3ad8606eb48aca581a8f125a115c6c01e7cbb7ac068bd7",
-    "zkBytecodeHash": null,
-    "zkBytecodePath": null
-  },
-  {
-    "contractName": "l1-contracts/L1V29Upgrade",
-    "evmBytecodeHash": "0x3be6dc71d3ba3823a248ca7dafb5e6d941a15b980e8f135966d4e1b4bd75519e",
-    "evmBytecodePath": "/l1-contracts/out/L1V29Upgrade.sol/L1V29Upgrade.json",
-    "evmDeployedBytecodeHash": "0x092e4853d204ca7d22ba405137a531cab3eec9c8f7f83680dda1a587fddd6843",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },
