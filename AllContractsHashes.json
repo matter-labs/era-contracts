@@ -1025,11 +1025,11 @@
   },
   {
     "contractName": "l1-contracts/GatewayCTMDeployer",
-    "zkBytecodeHash": "0x010003ed5f4fad4ee48ef935e34f250b64d4d01f68ae79244c61721211929f2a",
+    "zkBytecodeHash": "0x010003ed0a6fc155dffe7d5fd681574b7066b70f0d0658ee0adbffc9ab697303",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmBytecodeHash": "0xa1c5c7998462e244885850d77718efe5b8a5d193f274cbc906686000bdb545a0",
+    "evmBytecodeHash": "0x3bc036dc3d5133b7b3f2ef76b37d5b79800d44c1ee97aa619f2ec4ae8fe6361a",
     "evmBytecodePath": "/l1-contracts/out/GatewayCTMDeployer.sol/GatewayCTMDeployer.json",
-    "evmDeployedBytecodeHash": "0x51fbd90515e741b6f77555f2eaadefa5c221531436c8efc64139de6f20a28bf6"
+    "evmDeployedBytecodeHash": "0xa5be65a6c0856e243613fd3f0aac412651ccb8475a73f8cea6dd74b26ef51033"
   },
   {
     "contractName": "l1-contracts/GatewayTransactionFilterer",
@@ -1505,11 +1505,11 @@
   },
   {
     "contractName": "l1-contracts/ValidatorTimelock",
-    "zkBytecodeHash": "0x01000963e4a4adb34cfdbfa81549ac7b2c55c8e1a40a607de1162491fc99b13f",
+    "zkBytecodeHash": "0x0100096397254772dc7cc4b4eaab26357b0070a4ecd0a3575b2bc327451bc268",
     "zkBytecodePath": "/l1-contracts/zkout/ValidatorTimelock.sol/ValidatorTimelock.json",
-    "evmBytecodeHash": "0x91c0b010e515a2336a0c86aedfe8776a450803f8ab5254dae004ac2533aa8557",
+    "evmBytecodeHash": "0x844d318ac84f8dded5721559fa58c86d60e0d4526228e6d11274ea779534ac3d",
     "evmBytecodePath": "/l1-contracts/out/ValidatorTimelock.sol/ValidatorTimelock.json",
-    "evmDeployedBytecodeHash": "0x5e93520c4f6fa26af5b3f5734c7052a31cd35ad8369d2341906c956f1b83aaca"
+    "evmDeployedBytecodeHash": "0x266e1354f9685daec0d5568d57a02dcdade43ea0d6f044246af107d5318170c7"
   },
   {
     "contractName": "l1-contracts/ValidiumL1DAValidator",
