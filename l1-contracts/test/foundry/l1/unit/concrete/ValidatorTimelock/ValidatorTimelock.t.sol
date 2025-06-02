@@ -13,6 +13,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {Unauthorized, TimeNotReached} from "contracts/common/L1ContractErrors.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
 
 contract ValidatorTimelockTest is Test {
     /// @notice A new validator has been added.
@@ -41,6 +42,11 @@ contract ValidatorTimelockTest is Test {
     uint256 lastBatchNumber;
     uint32 executionDelay;
 
+    bytes32 precommitterRole;
+    bytes32 committerRole;
+    bytes32 proverRole;
+    bytes32 executorRole;
+
     function setUp() public {
         owner = makeAddr("owner");
         zkSync = makeAddr("zkSync");
@@ -65,6 +71,11 @@ contract ValidatorTimelockTest is Test {
         validator.addValidatorForChainId(chainId, alice);
         vm.prank(owner);
         validator.addValidatorForChainId(eraChainId, dan);
+
+        precommitterRole = validator.PRECOMMITTER_ROLE();
+        committerRole = validator.COMMITTER_ROLE();
+        proverRole = validator.PROVER_ROLE();
+        executorRole = validator.EXECUTOR_ROLE();
     }
 
     function _deployValidatorTimelock(address _initialOwner, uint32 _initialExecutionDelay) internal returns (address) {
@@ -97,10 +108,14 @@ contract ValidatorTimelockTest is Test {
         _assertAllRoles(chainId, bob, false);
 
         vm.prank(owner);
-        // FIXME: restore event assertion
-        // // solhint-disable-next-line func-named-parameters
-        // vm.expectEmit(true, true, true, true, address(validator));
-        // emit ValidatorAdded(chainId, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, precommitterRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, committerRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, proverRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleGranted(zkSync, executorRole, bob);
         validator.addValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, true);
@@ -112,10 +127,14 @@ contract ValidatorTimelockTest is Test {
         _assertAllRoles(chainId, bob, true);
 
         vm.prank(owner);
-        // FIXME: restore event assertion
-        // solhint-disable-next-line func-named-parameters
-        // vm.expectEmit(true, true, true, true, address(validator));
-        // emit ValidatorRemoved(chainId, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, precommitterRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, committerRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, proverRole, bob);
+        vm.expectEmit(true, true, true, true, address(validator));
+        emit AccessControlEnumerablePerChainAddressUpgradeable.RoleRevoked(zkSync, executorRole, bob);
         validator.removeValidatorForChainId(chainId, bob);
 
         _assertAllRoles(chainId, bob, false);
