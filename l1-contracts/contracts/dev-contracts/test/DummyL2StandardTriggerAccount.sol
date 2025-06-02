@@ -58,14 +58,14 @@ contract DummyL2StandardTriggerAccount {
                 (bytes, bytes, address, address, bytes)
             );
             MessageInclusionProof memory paymasterInclusionProof = abi.decode(paymasterProof, (MessageInclusionProof));
-            L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof, true);
+            L2_INTEROP_HANDLER.executeBundle(paymasterBundle, paymasterInclusionProof);
         }
 
         /// execution bundle
         {
             (bytes memory executionBundle, bytes memory executionProof) = abi.decode(_transaction.data, (bytes, bytes));
             MessageInclusionProof memory executionInclusionProof = abi.decode(executionProof, (MessageInclusionProof));
-            L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof, false);
+            L2_INTEROP_HANDLER.executeBundle(executionBundle, executionInclusionProof);
         }
         return true;
     }

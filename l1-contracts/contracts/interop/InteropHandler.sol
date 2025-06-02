@@ -21,7 +21,7 @@ contract InteropHandler is IInteropHandler {
     mapping(bytes32 bundleHash => bool bundleExecuted) public bundleExecuted;
 
     error InvalidSelector(bytes4 selector);
-    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bool _skipEmptyCalldata) public {
+    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
         bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
             _proof.chainId,

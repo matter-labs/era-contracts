@@ -138,12 +138,6 @@ struct BridgehubL2TransactionRequest {
     address refundRecipient;
 }
 
-struct InteropCallRequest {
-    address to;
-    uint256 value;
-    bytes data;
-}
-
 struct InteropCallStarter {
     bool directCall;
     address nextContract;

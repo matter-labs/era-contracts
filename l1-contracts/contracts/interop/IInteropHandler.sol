@@ -5,5 +5,5 @@ pragma solidity ^0.8.20;
 import {MessageInclusionProof} from "../common/Messaging.sol";
 
 interface IInteropHandler {
-    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bool _skipEmptyCalldata) external;
+    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
 }

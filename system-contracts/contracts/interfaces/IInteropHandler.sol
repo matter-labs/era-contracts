@@ -6,5 +6,5 @@ import {MessageInclusionProof} from "../libraries/Messaging.sol";
 
 interface IInteropHandler {
     function setInteropAccountBytecode() external;
-    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bool _skipEmptyCalldata) external;
+    function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
 }
