@@ -159,7 +159,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Create batch output for PI
         bytes32 batchOutputsHash = keccak256(
-            abi.encode(
+            abi.encodePacked(
                 _newBatch.chainId,
                 _newBatch.firstBlockTimestamp,
                 _newBatch.lastBlockTimestamp,
