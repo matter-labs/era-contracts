@@ -997,7 +997,7 @@
     "zkBytecodePath": "/l1-contracts/zkout/GatewayTransactionFilterer.sol/GatewayTransactionFilterer.json",
     "evmBytecodeHash": "0xba0d07351ed53f8aa3a2de299e7dba066cebeb8b3a77edcf7f75e68944531681",
     "evmBytecodePath": "/l1-contracts/out/GatewayTransactionFilterer.sol/GatewayTransactionFilterer.json",
-    "evmDeployedBytecodeHash": "0xf6a9180339268ef70faca00fb48f38bc2984d364d0269b1dda5059d6c3835721"
+    "evmDeployedBytecodeHash": "0xe274d97bf4d91f09a9879229ec47803afb6c8143c6fb4b03a725772385014e74"
   },
   {
     "contractName": "l1-contracts/GatewayUpgrade",
