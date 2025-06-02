@@ -161,17 +161,9 @@ contract MatterLabsDCAPAttestationTest is Test {
 
         vm.warp(1741083457);
 
-        CA[] memory ca = new CA[](3);
-        ca[0] = CA.ROOT;
-        ca[1] = CA.SIGNING;
-        ca[2] = CA.PLATFORM;
-
-        bytes[] memory certs = new bytes[](3);
-        certs[0] = rootCaDer; // upsert rootca
-        certs[1] = tcbDer; // upsert tcb signing ca
-        certs[2] = platformDer; // upsert Platform intermediate CA
-
-        attestation.upsertPcsCertificates(ca, certs);
+        attestation.upsertRootCertificate(rootCaDer);
+        attestation.upsertSigningCertificate(tcbDer);
+        attestation.upsertPlatformCertificate(platformDer);
 
         // upsert rootca crl
         attestation.upsertRootCACrl(rootCrlDer);
@@ -195,6 +187,8 @@ contract MatterLabsDCAPAttestationTest is Test {
         bytes32 new_root_hash = hex"f55917eb178b9e187178192df60c7928c83d11fc92e81edaf7839c514ed4b85f";
 
         attestation.verifyAndAttestOnChain(rawQuote, new_root_hash, signature);
+        attestation.registerSigner(rawQuote);
+        attestation.verifyDigest(new_root_hash, signature);
     }
 
     function testTDXQuoteV4OnChainAttestation() public {

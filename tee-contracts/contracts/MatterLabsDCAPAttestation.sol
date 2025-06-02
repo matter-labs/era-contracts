@@ -87,7 +87,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         pccsRouter = PCCSRouter(_pccsRouter);
     }
 
-    function verifyAndAttestOnChain(bytes calldata rawQuote, bytes32 digest, bytes calldata signature) external {
+    function verifyAndAttestOnChain(bytes calldata rawQuote, bytes32 digest, bytes calldata signature) external view {
         uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
         bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4:8])));
         if (quoteVersion == 3 || (quoteVersion == 4 && teeType == SGX_TEE)) {
@@ -148,22 +148,30 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     // ============Functions to upsert Certificates to DAOs============
 
     /**
-     * @notice Upserts PCS certificates into the DAO
-     * @param ca The CA types for the certificates
-     * @param certs The certificates data
-     * @return attestationIds The IDs of the attestations
+     * @notice Upserts Root certificate into the DAO
+     * @param cert The certificate data
+     * @return attestationId The ID of the attestation
      */
-    function upsertPcsCertificates(
-        CA[] calldata ca,
-        bytes[] calldata certs
-    ) external returns (bytes32[] memory attestationIds) {
-        uint256 certificatesLength = certs.length;
-        require(certificatesLength > 0, EmptyArray());
-        require(ca.length == certificatesLength, ArrayLengthMismatch());
-        attestationIds = new bytes32[](certificatesLength);
-        for (uint256 i = 0; i < certificatesLength; ++i) {
-            attestationIds[i] = pcsDao.upsertPcsCertificates(ca[i], certs[i]);
-        }
+    function upsertRootCertificate(bytes calldata cert) external returns (bytes32 attestationId) {
+        attestationId = pcsDao.upsertPcsCertificates(CA.ROOT, cert);
+    }
+
+    /**
+     * @notice Upserts Signing certificate into the DAO
+     * @param cert The certificate data
+     * @return attestationId The ID of the attestation
+     */
+    function upsertSigningCertificate(bytes calldata cert) external returns (bytes32 attestationId) {
+        attestationId = pcsDao.upsertPcsCertificates(CA.SIGNING, cert);
+    }
+
+    /**
+     * @notice Upserts Platform certificate into the DAO
+     * @param cert The certificate data
+     * @return attestationId The ID of the attestation
+     */
+    function upsertPlatformCertificate(bytes calldata cert) external returns (bytes32 attestationId) {
+        attestationId = pcsDao.upsertPcsCertificates(CA.PLATFORM, cert);
     }
 
     /**

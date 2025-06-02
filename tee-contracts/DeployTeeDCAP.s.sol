@@ -171,13 +171,7 @@ contract DeployTeeDCAPScript is Script {
         vm.stopBroadcast();
 
         vm.startBroadcast();
-        CA[] memory ca = new CA[](1);
-        ca[0] = CA.ROOT;
-
-        bytes[] memory certs = new bytes[](1);
-        certs[0] = rootCaDer; // upsert rootca
-
-        attestation.upsertPcsCertificates(ca, certs);
+        attestation.upsertRootCertificate(rootCaDer);
         vm.stopBroadcast();
 
         // Save deployment information
