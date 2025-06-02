@@ -11,7 +11,7 @@ import {IAdmin} from "../state-transition/chain-interfaces/IAdmin.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract V29L1Upgrade is BaseZkSyncUpgrade {
     struct V29UpgradeParams {
-        address[] oldValidatorTimelock;
+        address[] oldValidatorTimelocks;
         address newValidatorTimelock;
     }
 
@@ -25,9 +25,11 @@ contract V29L1Upgrade is BaseZkSyncUpgrade {
 
     function _postUpgrade(bytes calldata _postUpgradeCalldata) internal override {
         V29UpgradeParams memory params = abi.decode(_postUpgradeCalldata, (V29UpgradeParams));
-        for (uint256 i = 0; i < params.oldValidatorTimelock.length; i++) {
-            s.validators[params.oldValidatorTimelock[i]] = false;
-            emit IAdmin.ValidatorStatusUpdate(params.oldValidatorTimelock[i], false);
+
+        uint256 cachedLength = params.oldValidatorTimelocks.length;
+        for (uint256 i = 0; i < cachedLength; ++i) {
+            s.validators[params.oldValidatorTimelocks[i]] = false;
+            emit IAdmin.ValidatorStatusUpdate(params.oldValidatorTimelocks[i], false);
         }
 
         s.validators[params.newValidatorTimelock] = true;
