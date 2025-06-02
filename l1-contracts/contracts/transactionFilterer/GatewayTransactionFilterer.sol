@@ -11,6 +11,13 @@ import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
+/// @dev The errors below are written here instead of a dedicate file to avoid
+/// source code changes to another contracts.y
+// 0x55ccf3e4
+error NotBlocklisted(address);
+// 0x7b0b7f4f
+error AlreadyBlocklisted(address);
+
 /// @dev We want to ensure that only whitelisted contracts can ever be deployed,
 /// while allowing anyone to call any other method. Thus, we disallow calls that can deploy contracts
 /// (i.e. calls to the predeployed Create2Factory or ContractDeployer).
@@ -27,14 +34,23 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     /// @notice Event emitted when sender is removed from whitelist
     event WhitelistRevoked(address indexed sender);
 
+    /// @notice Event emitted when contract is blocklisted
+    event Blocklisted(address indexed l2Contract);
+
+    /// @notice Event emitted when contract is removed from blocklist
+    event RemovedFromBlocklist(address indexed l2Contract);
+
     /// @notice The ecosystem's Bridgehub
     IBridgehub public immutable BRIDGE_HUB;
 
     /// @notice The L1 asset router
     address public immutable L1_ASSET_ROUTER;
 
-    /// @notice Indicates whether the sender is whitelisted to deposit to Gateway
+    /// @notice Indicates whether the sender is allowed to call any contract on Gateway
     mapping(address sender => bool whitelisted) public whitelistedSenders;
+
+    /// @notice Indicates whether the l2Contract is blacklisted from being called via L1->L2 transactions.
+    mapping(address l2Contract => bool blocklisted) public blocklistedContracts;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -73,6 +89,27 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
         emit WhitelistRevoked(sender);
     }
 
+    /// @notice Blocklist an L2 contract
+    /// @param _l2Contract The contract to blocklist
+    function blocklistL2Contract(address _l2Contract) external onlyOwner {
+        if (blocklistedContracts[_l2Contract]) {
+            revert AlreadyBlocklisted(_l2Contract);
+        }
+        blocklistedContracts[_l2Contract] = true;
+
+        emit Blocklisted(_l2Contract);
+    }
+
+    /// @notice Removes an L2 contract from the blocklist
+    /// @param _l2Contract The contract to remote from the blocklist
+    function removeFromBlocklist(address _l2Contract) external onlyOwner {
+        if (!blocklistedContracts[_l2Contract]) {
+            revert NotBlocklisted(_l2Contract);
+        }
+        blocklistedContracts[_l2Contract] = false;
+        emit RemovedFromBlocklist(_l2Contract);
+    }
+
     /// @notice Checks if the transaction is allowed
     /// @param sender The sender of the transaction
     /// @param l2Calldata The calldata of the L2 transaction
@@ -99,6 +136,10 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
 
             (, bytes32 decodedAssetId, ) = abi.decode(l2Calldata[4:], (uint256, bytes32, bytes));
             return _checkCTMAssetId(decodedAssetId);
+        }
+
+        if (!whitelistedSenders[sender] && blocklistedContracts[contractL2]) {
+            return false;
         }
 
         // We always allow calls to the L2AssetRouter contract. We expect that it will not

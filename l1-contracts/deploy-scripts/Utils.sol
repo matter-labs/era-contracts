@@ -66,6 +66,7 @@ uint256 constant SECURITY_COUNCIL_SIZE = 12;
 // solhint-disable-next-line gas-struct-packing
 struct StateTransitionDeployedAddresses {
     address chainTypeManagerProxy;
+    address chainTypeManagerProxyAdmin;
     address chainTypeManagerImplementation;
     address verifier;
     address verifierFflonk;
