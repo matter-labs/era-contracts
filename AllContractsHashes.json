@@ -993,9 +993,9 @@
   },
   {
     "contractName": "l1-contracts/GatewayTransactionFilterer",
-    "zkBytecodeHash": "0x010001754b7b23b287f0024f1bf59e917d1c3f3a0012b8cf60ec22b72e38613f",
+    "zkBytecodeHash": "0x0100017928cfc962b1bd162a0868290d1e3c11cc9ccb8a5508e468b4f098374f",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayTransactionFilterer.sol/GatewayTransactionFilterer.json",
-    "evmBytecodeHash": "0x0100017928cfc962b1bd162a0868290d1e3c11cc9ccb8a5508e468b4f098374f",
+    "evmBytecodeHash": "0x80ee4286e86b81853f7f1ede7b953f800255aa3c8d8633eb78d0a287cd108cb6",
     "evmBytecodePath": "/l1-contracts/out/GatewayTransactionFilterer.sol/GatewayTransactionFilterer.json",
     "evmDeployedBytecodeHash": "0xe274d97bf4d91f09a9879229ec47803afb6c8143c6fb4b03a725772385014e74"
   },
