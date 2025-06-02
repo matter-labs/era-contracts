@@ -13,7 +13,7 @@ import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, NotCurrentSettlementLayer, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {DynamicIncrementalMerkle} from "../../common/libraries/DynamicIncrementalMerkle.sol";
+import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
@@ -25,7 +25,7 @@ import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitves/
 error AlreadyMigrated();
 
 contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, AssetHandlerModifiers {
-    using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
+    using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
     uint256 public immutable L1_CHAIN_ID;
 
@@ -112,7 +112,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
     // kl todo: estimate the txs size, and how much we can handle on GW.
     function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external {
         uint256 msgCount = 0;
-        DynamicIncrementalMerkle.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkle
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkleMemory
             .Bytes32PushTree(
                 0,
                 new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
@@ -120,7 +120,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
                 0,
                 0
             ); // todo 100 to const
-        reconstructedLogsTree.setupMemory(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
+        reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         uint256 logsLength = _processLogsInputs.logs.length;
         for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
             L2Log memory log = _processLogsInputs.logs[logCount];
@@ -128,7 +128,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
                 // solhint-disable-next-line func-named-parameters
                 abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
             );
-            reconstructedLogsTree.pushMemory(hashedLog);
+            reconstructedLogsTree.push(hashedLog);
             if (log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                 // its just a log and not a message
                 continue;
@@ -181,8 +181,8 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
 
             // kl todo add change minter role here
         }
-        reconstructedLogsTree.extendUntilEndMemory();
-        bytes32 localLogsRootHash = reconstructedLogsTree.rootMemory();
+        reconstructedLogsTree.extendUntilEnd();
+        bytes32 localLogsRootHash = reconstructedLogsTree.root();
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {

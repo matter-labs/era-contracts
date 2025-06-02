@@ -21,7 +21,7 @@ import {Arrays} from "@openzeppelin/contracts-v4/utils/Arrays.sol";
  * This is a fork of OpenZeppelin's [`MerkleTree`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/9af280dc4b45ee5bda96ba47ff829b407eaab67e/contracts/utils/structs/MerkleTree.sol)
  * library, with the changes to support dynamic tree growth (doubling the size when full).
  */
-library DynamicIncrementalMerkle {
+library DynamicIncrementalMerkleMemory {
     /**
      * @dev A complete `bytes32` Merkle tree.
      *
@@ -41,6 +41,8 @@ library DynamicIncrementalMerkle {
         uint256 _nextLeafIndex;
         bytes32[] _sides;
         bytes32[] _zeros;
+        uint256 _sidesLengthMemory;
+        uint256 _zerosLengthMemory;
     }
 
     /**
@@ -50,34 +52,13 @@ library DynamicIncrementalMerkle {
      * IMPORTANT: The zero value should be carefully chosen since it will be stored in the tree representing
      * empty leaves. It should be a value that is not expected to be part of the tree.
      */
-    function setup(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
+    function setup(Bytes32PushTree memory self, bytes32 zero) internal pure returns (bytes32 initialRoot) {
         self._nextLeafIndex = 0;
-        self._zeros.push(zero);
-        self._sides.push(bytes32(0));
+        self._zeros[0] = zero;
+        self._zerosLengthMemory = 1;
+        self._sides[0] = bytes32(0);
+        self._sidesLengthMemory = 1;
         return bytes32(0);
-    }
-
-    /**
-     * @dev Resets the tree to a blank state.
-     * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
-     * @param zero The value that represents an empty leaf.
-     * @return initialRoot The initial root of the tree.
-     */
-    function reset(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
-        clear(self);
-        setup(self, zero);
-    }
-
-    function clear(Bytes32PushTree storage self) internal {
-        self._nextLeafIndex = 0;
-        uint256 length = self._zeros.length;
-        for (uint256 i = length; 0 < i; --i) {
-            self._zeros.pop();
-        }
-        length = self._sides.length;
-        for (uint256 i = length; 0 < i; --i) {
-            self._sides.pop();
-        }
     }
 
     /**
@@ -87,9 +68,9 @@ library DynamicIncrementalMerkle {
      * Hashing the leaf before calling this function is recommended as a protection against
      * second pre-image attacks.
      */
-    function push(Bytes32PushTree storage self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
+    function push(Bytes32PushTree memory self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
         // Cache read
-        uint256 levels = self._zeros.length - 1;
+        uint256 levels = self._zerosLengthMemory - 1;
 
         // Get leaf index
         // solhint-disable-next-line gas-increment-by-one
@@ -99,8 +80,10 @@ library DynamicIncrementalMerkle {
         if (index == 1 << levels) {
             bytes32 zero = self._zeros[levels];
             bytes32 newZero = Merkle.efficientHash(zero, zero);
-            self._zeros.push(newZero);
-            self._sides.push(bytes32(0));
+            self._zeros[self._zerosLengthMemory] = newZero;
+            ++self._zerosLengthMemory;
+            self._sides[self._sidesLengthMemory] = bytes32(0);
+            ++self._sidesLengthMemory;
             ++levels;
         }
 
@@ -114,55 +97,58 @@ library DynamicIncrementalMerkle {
 
             // If so, next time we will come from the right, so we need to save it
             if (isLeft && !updatedSides) {
-                Arrays.unsafeAccess(self._sides, i).value = currentLevelHash;
+                self._sides[i] = currentLevelHash;
+                // Note: in order to update the sides we should stop here. We continue in order to store the new root.
                 updatedSides = true;
             }
 
             // Compute the current node hash by using the hash function
             // with either its sibling (side) or the zero value for that level.
             currentLevelHash = Merkle.efficientHash(
-                isLeft ? currentLevelHash : Arrays.unsafeAccess(self._sides, i).value,
-                isLeft ? Arrays.unsafeAccess(self._zeros, i).value : currentLevelHash
+                isLeft ? currentLevelHash : self._sides[i],
+                isLeft ? self._zeros[i] : currentLevelHash
             );
 
             // Update node index
             currentIndex >>= 1;
         }
-
-        Arrays.unsafeAccess(self._sides, levels).value = currentLevelHash;
+        // Note this is overloading the sides array with the root.
+        self._sides[levels] = currentLevelHash;
         return (index, currentLevelHash);
     }
-
     /**
-    * @dev Extend until end.
-    */
+     * @dev Extend until end.
+     */
     /// @dev here we can extend the array, so the depth is not predetermined.
-    function extendUntilEnd(Bytes32PushTree storage self, uint256 finalDepth) internal {
-        bytes32 currentZero = self._zeros[self._zeros.length - 1];
+    function extendUntilEnd(Bytes32PushTree memory self) internal pure {
+        bytes32 currentZero = self._zeros[self._zerosLengthMemory - 1];
         if (self._nextLeafIndex == 0) {
             self._sides[0] = currentZero;
         }
-        bytes32 currentSide = self._sides[self._sides.length - 1];
-        for (uint256 i = self._sides.length; i < finalDepth; ++i) {
+        bytes32 currentSide = self._sides[self._sidesLengthMemory - 1];
+        uint256 finalDepth = self._sides.length;
+        for (uint256 i = self._sidesLengthMemory; i < finalDepth; ++i) {
             currentSide = Merkle.efficientHash(currentSide, currentZero);
             currentZero = Merkle.efficientHash(currentZero, currentZero);
-            // at i
-            self._zeros.push(currentZero);
-            self._sides.push(currentSide);
+            self._zeros[i] = currentZero;
+            self._sides[i] = currentSide;
         }
+        self._sidesLengthMemory = self._sides.length;
+        self._zerosLengthMemory = self._zeros.length;
     }
 
     /**
      * @dev Tree's root.
      */
-    function root(Bytes32PushTree storage self) internal view returns (bytes32) {
-        return Arrays.unsafeAccess(self._sides, self._sides.length - 1).value;
+    function root(Bytes32PushTree memory self) internal pure returns (bytes32) {
+        // note the last element of the sides array is the root, and is not really a side.
+        return self._sides[self._sidesLengthMemory - 1];
     }
 
     /**
      * @dev Tree's height (does not include the root node).
      */
-    function height(Bytes32PushTree storage self) internal view returns (uint256) {
-        return self._sides.length - 1;
+    function height(Bytes32PushTree memory self) internal pure returns (uint256) {
+        return self._sidesLengthMemory - 1;
     }
 }
