@@ -64,8 +64,16 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
-    modifier onlyInteropCenterOrEra(uint256 _chainId) {
-        if (msg.sender != address(INTEROP_CENTER) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
+    modifier onlyBridgehubOrEra(uint256 _chainId) {
+        if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyBridgehub() {
+        if (msg.sender != address(BRIDGE_HUB)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -207,7 +215,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override onlyInteropCenterOrEra(_chainId) whenNotPaused {
+    ) public payable virtual override onlyBridgehubOrEra(_chainId) whenNotPaused {
         address assetHandler = assetHandlerAddress[_assetId];
         if (assetHandler == address(0)) {
             revert AssetHandlerDoesNotExist(_assetId);
@@ -237,7 +245,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         payable
         virtual
         override
-        onlyInteropCenter
+        onlyBridgehub
         whenNotPaused
         returns (L2TransactionRequestTwoBridgesInner memory request)
     {
@@ -273,7 +281,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external override onlyInteropCenter whenNotPaused {
+    ) external override onlyBridgehub whenNotPaused {
         L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
     }
 
@@ -530,7 +538,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 factoryDeps: new bytes[](0),
                 refundRecipient: refundRecipient
             });
-            txHash = INTEROP_CENTER.requestL2TransactionDirect{value: msg.value}(request);
+            txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
         }
 
         {

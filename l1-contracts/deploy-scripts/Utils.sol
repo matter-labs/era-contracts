@@ -480,10 +480,9 @@ library Utils {
         returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy)
     {
         IBridgehub bridgehub = IBridgehub(params.bridgehubAddress);
-        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
 
         requiredValueToDeploy =
-            interopCenter.l2TransactionBaseCost(
+            bridgehub.l2TransactionBaseCost(
                 params.chainId,
                 params.l1GasPrice,
                 params.l2GasLimit,
@@ -520,10 +519,9 @@ library Utils {
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
-        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
 
         requiredValueToDeploy =
-            interopCenter.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
+            bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
             2;
 
         l2TransactionRequest = L2TransactionRequestTwoBridgesOuter({
@@ -657,7 +655,7 @@ library Utils {
         calls = mergeCalls(calls, newCalls);
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IInteropCenter.requestL2TransactionDirect,
+            IBridgehub.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -702,7 +700,7 @@ library Utils {
         calls = mergeCalls(calls, newCalls);
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IInteropCenter.requestL2TransactionTwoBridges,
+            IBridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
@@ -912,7 +910,6 @@ library Utils {
             secondBridgeCalldata,
             refundRecipient
         );
-        IInteropCenter interopCenter = IInteropCenter(IBridgehub(bridgehubAddress).interopCenter());
 
         console.log("Executing transaction");
         // 2) Record logs

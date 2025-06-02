@@ -53,14 +53,6 @@ struct BridgehubBurnCTMAssetData {
     bytes chainData;
 }
 
-struct RouteBridgehubDepositStruct {
-    address secondBridgeAddress;
-    uint256 chainId;
-    address sender;
-    uint256 l2Value;
-    bytes secondBridgeCalldata;
-}
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IBridgehub {
@@ -253,15 +245,4 @@ interface IBridgehub {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;
-
-    function routeBridgehubConfirmL2Transaction(
-        address _secondBridgeAddress,
-        uint256 _chainId,
-        bytes32 _txDataHash,
-        bytes32 _canonicalTxHash
-    ) external;
-
-    function routeBridgehubDeposit(
-        RouteBridgehubDepositStruct calldata _request
-    ) external payable returns (L2TransactionRequestTwoBridgesInner memory outputRequest);
 }

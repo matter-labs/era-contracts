@@ -353,7 +353,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) internal whenNotPaused {
         {
-            bool proofValid = INTEROP_CENTER.proveL1ToL2TransactionStatus({
+            bool proofValid = BRIDGE_HUB.proveL1ToL2TransactionStatus({
                 _chainId: _chainId,
                 _l2TxHash: _l2TxHash,
                 _l2BatchNumber: _l2BatchNumber,
@@ -535,7 +535,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             });
         }
 
-        bool success = INTEROP_CENTER.proveL2MessageInclusion({
+        bool success = BRIDGE_HUB.proveL2MessageInclusion({
             _chainId: _finalizeWithdrawalParams.chainId,
             _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
             _index: _finalizeWithdrawalParams.l2MessageIndex,

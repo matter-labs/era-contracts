@@ -270,7 +270,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             secondBridgeCalldata: hex""
         });
         if (!correctSecondBridge) {
-            call.data = abi.encodeCall(IInteropCenter.requestL2TransactionTwoBridges, (outer));
+            call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
             // 0 is not correct second bridge
             return call;
         }
@@ -290,7 +290,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
 
-        call.data = abi.encodeCall(IInteropCenter.requestL2TransactionTwoBridges, (outer));
+        call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
     }
 
     function assertInvalidMigrationCall(Call memory call) public {

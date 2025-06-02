@@ -226,8 +226,8 @@ contract L1AssetRouterTest is Test {
             abi.encode(block.chainid)
         );
         vm.mockCall(
-            interopCenterAddress,
-            abi.encodeWithSelector(IInteropCenter.requestL2TransactionDirect.selector),
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
         bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);

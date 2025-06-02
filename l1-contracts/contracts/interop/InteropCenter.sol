@@ -7,7 +7,7 @@ import {console} from "forge-std/console.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter, RouteBridgehubDepositStruct} from "../bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "../bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
@@ -50,7 +50,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     IAssetTracker public assetTracker;
 
     /// @notice The number of total sent bundles, used for bundle id generation and uniqueness.
-    uint256 public bundleCount;
+    mapping(address sender => uint256 bundleCount) public bundleCount;
 
     modifier onlyBridgehub() {
         if (msg.sender != address(BRIDGE_HUB)) {
@@ -286,303 +286,18 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 }(_destinationChainId, _sender, callStarter.requestedInteropCallValue, callStarter.data);
             } else {
                 // console.log("fee direct call");
-                actualCallStarter = callStarter;
+                actualCallStarter = InteropCallStarter({
+                    nextContract: callStarter.nextContract,
+                    data: callStarter.data,
+                    requestedInteropCallValue: callStarter.requestedInteropCallValue,
+                    attributes: new bytes[](0)
+                });
             }
             _addCallToBundle(bundle, actualCallStarter, _sender, i);
             feeValue += callStarter.requestedInteropCallValue;
         }
         bytes32 bundleHash = _finishAndSendBundleLong(bundle, feeValue, _executionAddress, _msgValue, _sender);
         return bundleHash;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                        Mailbox forwarder
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice the mailbox is called directly after the assetRouter received the deposit
-    /// this assumes that either ether is the base token or
-    /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
-    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
-    /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
-    function requestL2TransactionDirect(
-        L2TransactionRequestDirect calldata _request
-    ) external payable override returns (bytes32 canonicalTxHash) {
-        return _requestL2TransactionDirect(msg.sender, _request);
-        // return _requestInteropSingleDirectCall(_request, msg.sender);
-    }
-
-    function requestL2TransactionDirectSender(
-        address _sender,
-        L2TransactionRequestDirect calldata _request
-    ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
-        return _requestL2TransactionDirect(_sender, _request);
-        // return _requestInteropSingleDirectCall(_request, _sender);
-    }
-
-    /// @notice the mailbox is called directly after the assetRouter received the deposit
-    /// this assumes that either ether is the base token or
-    /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
-    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
-    /// In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
-    function _requestL2TransactionDirect(
-        address _sender,
-        L2TransactionRequestDirect calldata _request
-    ) internal nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        // Note: If the ZK chain with corresponding `chainId` is not yet created,
-        // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
-        {
-            bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_request.chainId);
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) {
-                if (msg.value != _request.mintValue) {
-                    revert MsgValueMismatch(_request.mintValue, msg.value);
-                }
-            } else {
-                if (msg.value != 0) {
-                    revert MsgValueMismatch(0, msg.value);
-                }
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
-                _request.chainId,
-                tokenAssetId,
-                _sender,
-                _request.mintValue
-            );
-        }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: _sender,
-                contractL2: _request.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: _request.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: _request.factoryDeps,
-                refundRecipient: address(0)
-            }),
-            _sender
-        );
-    }
-
-    /// @notice After depositing funds to the assetRouter, the secondBridge is called
-    ///  to return the actual L2 message which is sent to the Mailbox.
-    ///  This assumes that either ether is the base token or
-    ///  the msg.sender has approved the nativeTokenVault with the mintValue,
-    ///  and also the necessary approvals are given for the second bridge.
-    ///  In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
-    /// @notice The logic of this bridge is to allow easy depositing for bridges.
-    /// Each contract that handles the users ERC20 tokens needs approvals from the user, this contract allows
-    /// the user to approve for each token only its respective bridge
-    /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
-    /// @param _request the request for the L2 transaction
-    function requestL2TransactionTwoBridges(
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override returns (bytes32 canonicalTxHash) {
-        // note this is a temporary hack so that I don't have to migrate all the tooling to the new interface
-        // note claimFailedDeposit does not work with this hack!
-        return _requestL2TransactionTwoBridges(msg.sender, false, _request);
-        // return _requestInteropSingleCall(_request, msg.sender);
-    }
-
-    function requestL2TransactionTwoBridgesSender(
-        address _sender,
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override onlyBridgehub returns (bytes32 canonicalTxHash) {
-        // note this is a temporary hack so that I don't have to migrate all the tooling to the new interface
-        // note claimFailedDeposit does not work with this hack!
-        return _requestL2TransactionTwoBridges(_sender, true, _request);
-        // return _requestInteropSingleCall(_request, _sender);
-    }
-
-    function _requestL2TransactionTwoBridges(
-        address _sender,
-        bool _routeViaBridgehub,
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) internal nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
-            revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
-        }
-
-        {
-            bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_request.chainId);
-            uint256 baseTokenMsgValue;
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) {
-                if (msg.value != _request.mintValue + _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = _request.mintValue;
-            } else {
-                if (msg.value != _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = 0;
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-                _request.chainId,
-                tokenAssetId,
-                _sender,
-                _request.mintValue
-            );
-        }
-        L2TransactionRequestTwoBridgesInner memory outputRequest;
-        if (_request.secondBridgeAddress == address(assetRouter) || !_routeViaBridgehub) {
-            // slither-disable-next-line arbitrary-send-eth
-            outputRequest = IL1AssetRouter(_request.secondBridgeAddress).bridgehubDeposit{
-                value: _request.secondBridgeValue
-            }(_request.chainId, _sender, _request.l2Value, _request.secondBridgeCalldata);
-        } else {
-            outputRequest = BRIDGE_HUB.routeBridgehubDeposit{value: _request.secondBridgeValue}(
-                RouteBridgehubDepositStruct({
-                    secondBridgeAddress: _request.secondBridgeAddress,
-                    chainId: _request.chainId,
-                    sender: _sender,
-                    l2Value: _request.l2Value,
-                    secondBridgeCalldata: _request.secondBridgeCalldata
-                })
-            );
-        }
-
-        if (outputRequest.magicValue != TWO_BRIDGES_MAGIC_VALUE) {
-            revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
-        }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: _request.secondBridgeAddress,
-                contractL2: outputRequest.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: outputRequest.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: outputRequest.factoryDeps,
-                refundRecipient: address(0)
-            }),
-            _sender
-        );
-
-        if (_request.secondBridgeAddress == address(assetRouter)) {
-            IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
-                _request.chainId,
-                outputRequest.txDataHash,
-                canonicalTxHash
-            );
-        } else {
-            BRIDGE_HUB.routeBridgehubConfirmL2Transaction(
-                _request.secondBridgeAddress,
-                _request.chainId,
-                outputRequest.txDataHash,
-                canonicalTxHash
-            );
-        }
-    }
-
-    /// @notice This function is used to send a request to the ZK chain.
-    /// @param _chainId the chainId of the chain
-    /// @param _refundRecipient the refund recipient
-    /// @param _request the request
-    /// @return canonicalTxHash the canonical transaction hash
-    function _sendRequest(
-        uint256 _chainId,
-        address _refundRecipient,
-        BridgehubL2TransactionRequest memory _request,
-        address _sender
-    ) internal returns (bytes32 canonicalTxHash) {
-        address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _sender);
-        _request.refundRecipient = refundRecipient;
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        if (zkChain != address(0)) {
-            canonicalTxHash = IZKChain(zkChain).bridgehubRequestL2Transaction(_request);
-        } else {
-            revert ChainIdNotRegistered(_chainId);
-        }
-    }
-
-    /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId The chain ID of the ZK chain where to prove L2 message inclusion.
-    /// @param _batchNumber The executed L2 batch number in which the message appeared
-    /// @param _index The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _message Information about the sent message: sender address, the message itself, tx index in the L2 batch where the message was sent
-    /// @param _proof Merkle proof for inclusion of L2 log that was sent with the message
-    /// @return Whether the proof is valid
-    function proveL2MessageInclusion(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Message calldata _message,
-        bytes32[] calldata _proof
-    ) external view override returns (bool) {
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        return IZKChain(zkChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
-    }
-
-    /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId The chain ID of the ZK chain where to prove L2 log inclusion.
-    /// @param _batchNumber The executed L2 batch number in which the log appeared
-    /// @param _index The position of the l2log in the L2 logs Merkle tree
-    /// @param _log Information about the sent log
-    /// @param _proof Merkle proof for inclusion of the L2 log
-    /// @return Whether the proof is correct and L2 log is included in batch
-    function proveL2LogInclusion(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _index,
-        L2Log calldata _log,
-        bytes32[] calldata _proof
-    ) external view override returns (bool) {
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        return IZKChain(zkChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
-    }
-
-    /// @notice forwards function call to Mailbox based on ChainId
-    /// @param _chainId The chain ID of the ZK chain where to prove L1->L2 tx status.
-    /// @param _l2TxHash The L2 canonical transaction hash
-    /// @param _l2BatchNumber The L2 batch number where the transaction was processed
-    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
-    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent
-    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction
-    /// @param _status The execution status of the L1 -> L2 transaction (true - success & 0 - fail)
-    /// @return Whether the proof is correct and the transaction was actually executed with provided status
-    /// NOTE: It may return `false` for incorrect proof, but it doesn't mean that the L1 -> L2 transaction has an opposite status!
-    function proveL1ToL2TransactionStatus(
-        uint256 _chainId,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof,
-        TxStatus _status
-    ) external view override returns (bool) {
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        return
-            IZKChain(zkChain).proveL1ToL2TransactionStatus({
-                _l2TxHash: _l2TxHash,
-                _l2BatchNumber: _l2BatchNumber,
-                _l2MessageIndex: _l2MessageIndex,
-                _l2TxNumberInBatch: _l2TxNumberInBatch,
-                _merkleProof: _merkleProof,
-                _status: _status
-            });
-    }
-
-    /// @notice forwards function call to Mailbox based on ChainId
-    function l2TransactionBaseCost(
-        uint256 _chainId,
-        uint256 _gasPrice,
-        uint256 _l2GasLimit,
-        uint256 _l2GasPerPubdataByteLimit
-    ) external view returns (uint256) {
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        return IZKChain(zkChain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
 
     /*//////////////////////////////////////////////////////////////

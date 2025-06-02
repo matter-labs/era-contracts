@@ -94,8 +94,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
     function depositToL1(address _tokenAddress) public {
         vm.mockCall(
-            address(addresses.interopCenter),
-            abi.encodeWithSelector(IInteropCenter.proveL2MessageInclusion.selector),
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
         uint256 chainId = eraZKChainId;
@@ -193,7 +193,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
         );
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
-        addresses.interopCenter.requestL2TransactionTwoBridges{value: 250000000000100}(
+        addresses.bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
             L2TransactionRequestTwoBridgesOuter({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,
@@ -215,7 +215,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this)))
         );
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
-        addresses.interopCenter.requestL2TransactionDirect{value: 250000000000100}(
+        addresses.bridgehub.requestL2TransactionDirect{value: 250000000000100}(
             L2TransactionRequestDirect({
                 chainId: eraZKChainId,
                 mintValue: 250000000000100,

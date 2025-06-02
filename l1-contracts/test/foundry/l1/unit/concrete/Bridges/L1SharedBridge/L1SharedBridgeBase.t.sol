@@ -40,7 +40,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_bridgehubDepositBaseToken_Eth() public {
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, ETH_TOKEN_ASSET_ID, amount);
@@ -48,7 +48,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_bridgehubDepositBaseToken_Erc() public {
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, tokenAssetId, amount);
@@ -58,7 +58,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     function test_bridgehubDepositBaseToken_Erc_NoApproval() public {
         vm.prank(alice);
         token.approve(address(nativeTokenVault), 0);
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, tokenAssetId, amount);
@@ -78,7 +78,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         );
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         emit BridgehubDepositInitiated({
             chainId: chainId,
             txDataHash: txDataHash,
@@ -90,7 +90,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
     }
 
     function test_bridgehubDeposit_Erc() public {
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
@@ -111,7 +111,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
             abi.encodeWithSelector(IL1BaseTokenAssetHandler.tokenAddress.selector, tokenAssetId),
             abi.encode(address(token))
         );
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         sharedBridge.bridgehubDeposit(chainId, alice, 0, abi.encode(address(token), amount, bob));
     }
 
@@ -120,7 +120,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.expectEmit(true, true, true, false, address(l1Nullifier));
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositFinalized(chainId, txDataHash, txHash);
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
     }
 
@@ -130,10 +130,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL1ToL2TransactionStatus.selector,
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -171,10 +171,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL1ToL2TransactionStatus.selector,
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -213,10 +213,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL1ToL2TransactionStatus.selector,
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -257,10 +257,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -298,10 +298,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeCall(
-                IInteropCenter.proveL2MessageInclusion,
+                IBridgehub.proveL2MessageInclusion,
                 (chainId, l2BatchNumber, l2MessageIndex, l2ToL1Message, merkleProof)
             ),
             abi.encode(true)
@@ -340,10 +340,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -383,10 +383,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 chainId
                 // l2BatchNumber,
                 // l2MessageIndex,
@@ -429,10 +429,10 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -480,7 +480,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
 
     function test_bridgehubDeposit_Eth_storesCorrectTxHash() public {
         _setBaseTokenAssetId(tokenAssetId);
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),

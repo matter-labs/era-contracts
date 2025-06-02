@@ -33,7 +33,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IInteropCenter.requestL2TransactionDirect.selector),
+            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
 
@@ -69,10 +69,10 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 eraChainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -116,10 +116,10 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 eraChainId,
                 l2BatchNumber,
                 l2MessageIndex,

@@ -288,7 +288,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
 
-        if (bytes4(_call.data[:4]) != IInteropCenter.requestL2TransactionTwoBridges.selector) {
+        if (bytes4(_call.data[:4]) != IBridgehub.requestL2TransactionTwoBridges.selector) {
             return (address(0), false);
         }
 

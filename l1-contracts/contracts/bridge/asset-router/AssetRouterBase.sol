@@ -9,7 +9,6 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./IAssetRouterBase.sol";
-// import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
@@ -59,14 +58,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
      */
     uint256[48] private __gap;
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyInteropCenter() {
-        if (msg.sender != address(INTEROP_CENTER)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub, IInteropCenter _interopCenter) {
@@ -108,7 +99,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 _value,
         bytes calldata _data,
         address _nativeTokenVault
-    ) internal virtual onlyInteropCenter whenNotPaused returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal virtual whenNotPaused returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == NEW_ENCODING_VERSION) {
             return _bridgehubDepositRealAsset(_chainId, _originalCaller, _value, _data, _nativeTokenVault);

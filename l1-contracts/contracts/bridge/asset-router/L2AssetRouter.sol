@@ -20,7 +20,7 @@ import {InteropCallStarter} from "../../common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, L2AssetRouter_LegacyDataNotImplemented, L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, L2AssetRouter_LegacyDataNotImplemented, L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented, Unauthorized, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
 import {IERC7786Receiver} from "../../interop/IERC7786Receiver.sol";
 
 /// @author Matter Labs
@@ -78,6 +78,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     modifier onlyNTV() {
         if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
             revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Checks that the message sender is the interopCenter.
+    modifier onlyInteropCenter() {
+        if (msg.sender != address(INTEROP_CENTER)) {
+            revert Unauthorized(msg.sender);
         }
         _;
     }

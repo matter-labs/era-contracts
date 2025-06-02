@@ -164,7 +164,7 @@ contract L1GatewayTests is
             800,
             "0x"
         );
-        addresses.interopCenter.requestL2TransactionDirect{value: expectedValue}(request);
+        addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
     }
 
     function test_recoverFromFailedChainMigration() public {
@@ -204,9 +204,9 @@ contract L1GatewayTests is
 
         // Mock Call for Msg Inclusion
         vm.mockCall(
-            address(addresses.interopCenter),
+            address(addresses.bridgehub),
             abi.encodeWithSelector(
-                IInteropCenter.proveL1ToL2TransactionStatus.selector,
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
                 migratingChainId,
                 l2TxHash,
                 l2BatchNumber,
@@ -219,7 +219,7 @@ contract L1GatewayTests is
         );
 
         // Set Deposit Happened
-        vm.startBroadcast(address(addresses.interopCenter));
+        vm.startBroadcast(address(addresses.bridgehub));
         assetRouter.bridgehubConfirmL2Transaction({
             _chainId: migratingChainId,
             _txDataHash: txDataHash,
@@ -263,8 +263,8 @@ contract L1GatewayTests is
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(addresses.interopCenter),
-            abi.encodeWithSelector(IInteropCenter.proveL2MessageInclusion.selector),
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
         vm.mockCall(
@@ -369,7 +369,7 @@ contract L1GatewayTests is
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
-        addresses.interopCenter.forwardTransactionOnGatewayWithBalanceChange(migratingChainId, bytes32(0), 0, 0, 0, 0);
+        addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
         vm.stopBroadcast();
     }
 

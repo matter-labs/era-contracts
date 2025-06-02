@@ -899,7 +899,7 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            interopCenter.proveL2MessageInclusion({
+            bridgehub.proveL2MessageInclusion({
                 _chainId: mockChainId,
                 _batchNumber: mockBatchNumber,
                 _index: mockIndex,
@@ -954,7 +954,7 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            interopCenter.proveL2LogInclusion({
+            bridgehub.proveL2LogInclusion({
                 _chainId: mockChainId,
                 _batchNumber: mockBatchNumber,
                 _index: mockIndex,
@@ -1001,7 +1001,7 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            interopCenter.proveL1ToL2TransactionStatus({
+            bridgehub.proveL1ToL2TransactionStatus({
                 _chainId: randomChainId,
                 _l2TxHash: randomL2TxHash,
                 _l2BatchNumber: randomL2BatchNumber,
@@ -1035,12 +1035,8 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            interopCenter.l2TransactionBaseCost(
-                mockChainId,
-                mockGasPrice,
-                mockL2GasLimit,
-                mockL2GasPerPubdataByteLimit
-            ) == mockL2TxnCost
+            bridgehub.l2TransactionBaseCost(mockChainId, mockGasPrice, mockL2GasLimit, mockL2GasPerPubdataByteLimit) ==
+                mockL2TxnCost
         );
         vm.clearMockedCalls();
     }
@@ -1126,7 +1122,7 @@ contract ExperimentalBridgeTest is Test {
         vm.deal(randomCaller, msgValue);
         vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, mockMintValue, msgValue));
         vm.prank(randomCaller);
-        interopCenter.requestL2TransactionDirect{value: msgValue}(l2TxnReqDirect);
+        bridgehub.requestL2TransactionDirect{value: msgValue}(l2TxnReqDirect);
     }
 
     function test_requestL2TransactionDirect_ETHCase(
@@ -1162,7 +1158,7 @@ contract ExperimentalBridgeTest is Test {
         gasPrice = bound(gasPrice, 1_000, 50_000_000);
         vm.txGasPrice(gasPrice * 1 gwei);
         vm.prank(randomCaller);
-        bytes32 resultantHash = interopCenter.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
+        bytes32 resultantHash = bridgehub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
         assertTrue(resultantHash == hash);
     }
@@ -1224,7 +1220,7 @@ contract ExperimentalBridgeTest is Test {
         vm.deal(randomCaller, 1 ether);
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, 0, randomCaller.balance));
-        bytes32 resultantHash = interopCenter.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
+        bytes32 resultantHash = bridgehub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
         // Now, let's call the same function with zero msg.value
         testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
@@ -1235,7 +1231,7 @@ contract ExperimentalBridgeTest is Test {
         assertEq(testToken.balanceOf(address(this)), l2TxnReqDirect.mintValue);
         testToken.approve(sharedBridgeAddress, l2TxnReqDirect.mintValue);
 
-        resultantHash = interopCenter.requestL2TransactionDirect(l2TxnReqDirect);
+        resultantHash = bridgehub.requestL2TransactionDirect(l2TxnReqDirect);
 
         assertEq(canonicalHash, resultantHash);
     }
@@ -1296,7 +1292,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(WrongMagicValue.selector, TWO_BRIDGES_MAGIC_VALUE, magicValue));
         vm.prank(randomCaller);
-        interopCenter.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        bridgehub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
     }
 
     function test_requestL2TransactionTwoBridgesWrongBridgeAddress(
@@ -1380,7 +1376,7 @@ contract ExperimentalBridgeTest is Test {
             )
         );
         vm.prank(randomCaller);
-        interopCenter.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        bridgehub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
     }
 
     function test_requestL2TransactionTwoBridges_ERC20ToNonBase(
@@ -1440,7 +1436,7 @@ contract ExperimentalBridgeTest is Test {
         erc20Token.approve(secondBridgeAddress, l2Value);
         vm.stopPrank();
         vm.prank(randomCaller);
-        bytes32 resultHash = interopCenter.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
+        bytes32 resultHash = bridgehub.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
         assertEq(resultHash, canonicalHash);
 
         assertEq(erc20Token.balanceOf(randomCaller), 0);
@@ -1453,7 +1449,7 @@ contract ExperimentalBridgeTest is Test {
         vm.startPrank(randomCaller);
         testToken.approve(sharedBridgeAddress, l2TxnReq2BridgeOut.mintValue);
         vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, l2TxnReq2BridgeOut.secondBridgeValue, 0));
-        interopCenter.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
+        bridgehub.requestL2TransactionTwoBridges(l2TxnReq2BridgeOut);
         vm.stopPrank();
     }
 
@@ -1518,12 +1514,12 @@ contract ExperimentalBridgeTest is Test {
                 abi.encodeWithSelector(MsgValueMismatch.selector, l2TxnReq2BridgeOut.secondBridgeValue, msgValue)
             );
             vm.prank(randomCaller);
-            interopCenter.requestL2TransactionTwoBridges{value: msgValue}(l2TxnReq2BridgeOut);
+            bridgehub.requestL2TransactionTwoBridges{value: msgValue}(l2TxnReq2BridgeOut);
         }
 
         vm.deal(randomCaller, l2TxnReq2BridgeOut.secondBridgeValue);
         vm.prank(randomCaller);
-        interopCenter.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
+        bridgehub.requestL2TransactionTwoBridges{value: randomCaller.balance}(l2TxnReq2BridgeOut);
     }
 
     /////////////////////////////////////////////////////////
@@ -1743,10 +1739,10 @@ contract ExperimentalBridgeTest is Test {
         L2Message memory l2Message = _createMockL2Message(randomTxNumInBatch, randomSender, randomData);
 
         vm.mockCall(
-            address(interopCenter),
+            address(bridgehub),
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                bridgehub.proveL2MessageInclusion.selector,
                 mockChainId,
                 mockBatchNumber,
                 mockIndex,
@@ -1757,7 +1753,7 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            interopCenter.proveL2MessageInclusion({
+            bridgehub.proveL2MessageInclusion({
                 _chainId: mockChainId,
                 _batchNumber: mockBatchNumber,
                 _index: mockIndex,
@@ -1793,10 +1789,10 @@ contract ExperimentalBridgeTest is Test {
         });
 
         vm.mockCall(
-            address(interopCenter),
+            address(bridgehub),
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                interopCenter.proveL2LogInclusion.selector,
+                bridgehub.proveL2LogInclusion.selector,
                 mockChainId,
                 mockBatchNumber,
                 mockIndex,
@@ -1807,7 +1803,7 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            interopCenter.proveL2LogInclusion({
+            bridgehub.proveL2LogInclusion({
                 _chainId: mockChainId,
                 _batchNumber: mockBatchNumber,
                 _index: mockIndex,
@@ -1839,10 +1835,10 @@ contract ExperimentalBridgeTest is Test {
         }
 
         vm.mockCall(
-            address(interopCenter),
+            address(bridgehub),
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                interopCenter.proveL1ToL2TransactionStatus.selector,
+                bridgehub.proveL1ToL2TransactionStatus.selector,
                 randomChainId,
                 randomL2TxHash,
                 randomL2BatchNumber,
@@ -1855,7 +1851,7 @@ contract ExperimentalBridgeTest is Test {
         );
 
         assertTrue(
-            interopCenter.proveL1ToL2TransactionStatus({
+            bridgehub.proveL1ToL2TransactionStatus({
                 _chainId: randomChainId,
                 _l2TxHash: randomL2TxHash,
                 _l2BatchNumber: randomL2BatchNumber,

@@ -16,7 +16,8 @@ import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 // note, this should be the same as where hyper is disabled
 contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
     function test_bridgehubDepositBaseToken_Eth() public {
-        vm.prank(interopCenterAddress);
+        vm.deal(bridgehubAddress, amount);
+        vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, ETH_TOKEN_ASSET_ID, amount);
@@ -32,7 +33,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         token.mint(alice, amount);
         vm.prank(alice);
         token.approve(address(sharedBridge), amount);
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, true, address(sharedBridge));
         emit BridgehubDepositBaseTokenInitiated(chainId, alice, tokenAssetId, amount);
@@ -49,7 +50,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         _setBaseTokenAssetId(tokenAssetId);
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         emit BridgehubDepositInitiated({
             chainId: chainId,
@@ -67,7 +68,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
     }
 
     function test_bridgehubDeposit_Erc() public {
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         _setBaseTokenAssetId(ETH_TOKEN_ASSET_ID);
@@ -88,7 +89,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         vm.expectEmit(true, true, true, true, address(l1Nullifier));
         bytes32 txDataHash = keccak256(abi.encode(alice, address(token), amount));
         emit BridgehubDepositFinalized(chainId, txDataHash, txHash);
-        vm.prank(interopCenterAddress);
+        vm.prank(bridgehubAddress);
         sharedBridge.bridgehubConfirmL2Transaction(chainId, txDataHash, txHash);
     }
 
@@ -103,10 +104,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setAssetTrackerChainBalance(chainId, address(token), amount);
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL1ToL2TransactionStatus.selector,
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -146,10 +147,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         // require(address(bridgehub.deployer()) == address(31337), "BH: deployer wrong");
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL1ToL2TransactionStatus.selector,
+                IBridgehub.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -189,10 +190,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -231,10 +232,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -273,10 +274,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -315,10 +316,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 chainId
                 // l2BatchNumber,
                 // l2MessageIndex,
@@ -356,10 +357,10 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            interopCenterAddress,
+            bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IInteropCenter.proveL2MessageInclusion.selector,
+                IBridgehub.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
