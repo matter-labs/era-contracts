@@ -8,7 +8,7 @@ OUTPUT_FILE="sysSelectors.txt"
 > "$OUTPUT_FILE"
 
 # Iterate over all .sol files in the contracts directory
-for file in "$CONTRACTS_DIR"/*.sol; do
+find "$CONTRACTS_DIR" -type f -name "*.sol" | while read -r file; do
   if [[ -f $file ]]; then
     echo "Processing $file..."
     forge selectors list --contracts "$file" >> "$OUTPUT_FILE"
