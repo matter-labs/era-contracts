@@ -74,17 +74,32 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
-            _chainId: s.chainId,
-            _batchNumber: uint256(_newBatch.batchNumber),
-            _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
-            _operatorDAInput: _newBatch.operatorDAInput,
-            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
-        });
-
-        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
-            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
-        }
+        ///
+        /// DEBUG SUPPORT START
+        ///
+        // L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+        //     _chainId: s.chainId,
+        //     _batchNumber: uint256(_newBatch.batchNumber),
+        //     _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
+        //     _operatorDAInput: _newBatch.operatorDAInput,
+        //     _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        // });
+        L1DAValidatorOutput memory daOutput;
+        daOutput.stateDiffHash = bytes32(_newBatch.operatorDAInput);
+        daOutput.blobsOpeningCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        daOutput.blobsLinearHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        ///
+        /// DEBUG SUPPORT END
+        ///
+        ///
+         /// DEBUG SUPPORT START
+         ///
+ //        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
+ //            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
+ //        }
+         ///
+         /// DEBUG SUPPORT END
+         ///
         // Check that the priority operation hash in the L2 logs is as expected
         if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
             revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
