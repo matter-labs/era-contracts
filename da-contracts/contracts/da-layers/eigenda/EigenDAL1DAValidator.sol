@@ -30,7 +30,7 @@ contract EigenDAL1DAValidator is IL1DAValidator {
         uint256, // _chainId
         uint256, // _batchNumber,
         bytes32 l2DAValidatorOutputHash, // keccak(stateDiffHash, eigenDAHash) Calculated on EigenDAL2DAValidator and passed through L2->L1 Logs
-        bytes calldata operatorDAInput, // stateDiffHash + inclusion_data (inclusion data == abi encoded blobInfo, aka EigenDACert)
+        bytes calldata operatorDAInput, // stateDiffHash + inclusion_data (abi encoded EigenDAInclusionData)
         uint256 maxBlobsSupported
     ) external override returns (L1DAValidatorOutput memory output) {
         if (operatorDAInput.length < 32) {
