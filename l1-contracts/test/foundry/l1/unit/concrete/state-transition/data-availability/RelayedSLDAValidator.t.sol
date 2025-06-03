@@ -39,7 +39,7 @@ contract RelayedSLDAValidatorTest is Test {
         bytes32 stateDiffHash = Utils.randomBytes32("stateDiffHash");
         bytes32 fullPubdataHash = Utils.randomBytes32("fullPubdataHash");
         uint8 blobsProvided = 1;
-        uint256 maxBlobsSupported = 6;
+        uint256 maxBlobsSupported = 9;
         bytes32 blobLinearHash = Utils.randomBytes32("blobLinearHash");
 
         bytes memory daInput = abi.encodePacked(stateDiffHash, fullPubdataHash, blobsProvided, blobLinearHash);
@@ -61,7 +61,7 @@ contract RelayedSLDAValidatorTest is Test {
 
         bytes32 stateDiffHash = Utils.randomBytes32("stateDiffHash");
         uint8 blobsProvided = 1;
-        uint256 maxBlobsSupported = 6;
+        uint256 maxBlobsSupported = 9;
         bytes32 blobLinearHash = Utils.randomBytes32("blobLinearHash");
         uint8 pubdataSource = uint8(PubdataSource.Calldata);
         bytes memory l1DaInput = "verifydonttrust";
@@ -84,7 +84,7 @@ contract RelayedSLDAValidatorTest is Test {
 
         bytes32 stateDiffHash = Utils.randomBytes32("stateDiffHash");
         uint8 blobsProvided = 1;
-        uint256 maxBlobsSupported = 6;
+        uint256 maxBlobsSupported = 9;
         bytes32 blobLinearHash = Utils.randomBytes32("blobLinearHash");
         uint8 pubdataSource = uint8(PubdataSource.Calldata);
         bytes memory l1DaInput = "verifydonttrust";
@@ -106,7 +106,7 @@ contract RelayedSLDAValidatorTest is Test {
 
         bytes32 stateDiffHash = Utils.randomBytes32("stateDiffHash");
         uint8 blobsProvided = 1;
-        uint256 maxBlobsSupported = 6;
+        uint256 maxBlobsSupported = 9;
         bytes32 blobLinearHash = Utils.randomBytes32("blobLinearHash");
         uint8 pubdataSource = uint8(PubdataSource.Calldata);
         bytes memory l1DaInput = "verifydonttrustzkistheendgamemagicmoonmath";

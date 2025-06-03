@@ -45,7 +45,7 @@ uint256 constant L2_LOG_KEY_OFFSET = 24;
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
 
 /// @dev Max number of blobs currently supported
-uint256 constant MAX_NUMBER_OF_BLOBS = 6;
+uint256 constant MAX_NUMBER_OF_BLOBS = 9;
 
 /// @dev The number of blobs that must be present in the commitment to a batch.
 /// It represents the maximal number of blobs that circuits can support and can be larger
