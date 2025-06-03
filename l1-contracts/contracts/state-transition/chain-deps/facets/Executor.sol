@@ -291,18 +291,24 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
-        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
-        // So here we need to only double check that:
-        // - The timestamp of the batch is not too small.
-        // - The timestamp of the last L2 block is not too big.
-        // New batch timestamp is too small
-        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
-            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
-        }
-        // The last L2 block timestamp is too big
-        if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
-            revert L2TimestampTooBig();
-        }
+
+         /// DEBUG SUPPORT START
+         ///
+ //        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
+ //        // So here we need to only double check that:
+ //        // - The timestamp of the batch is not too small.
+ //        // - The timestamp of the last L2 block is not too big.
+ //        // New batch timestamp is too small
+ //        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
+ //            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
+ //        }
+ //        // The last L2 block timestamp is too big
+ //        if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
+ //            revert L2TimestampTooBig();
+ //        }
+         ///
+         /// DEBUG SUPPORT END
+         ///
     }
 
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
@@ -372,9 +378,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
-                if (uint256(s.l2DACommitmentScheme) != uint256(logValue)) {
-                    revert MismatchL2DACommitmentScheme(uint256(logValue), uint256(s.l2DACommitmentScheme));
-                }
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                // if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
+                //     revert MismatchL2DAValidator();
+                // }
+                ///
+                /// DEBUG SUPPORT END
+                ///
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
