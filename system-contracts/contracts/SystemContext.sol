@@ -449,11 +449,11 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         );
     }
 
-    /// @notice Ensures that the timestamp of the batch is greater than the timestamp of the last L2 block.
+    /// @notice Ensures that the timestamp of the batch is greater than or equal to the timestamp of the last L2 block.
     /// @param _newTimestamp The timestamp of the new batch.
     function _ensureBatchConsistentWithL2Block(uint128 _newTimestamp) internal view {
         uint128 currentBlockTimestamp = currentL2BlockInfo.timestamp;
-        if (_newTimestamp <= currentBlockTimestamp) {
+        if (_newTimestamp < currentBlockTimestamp) {
             revert InconsistentNewBatchTimestamp(_newTimestamp, currentBlockTimestamp);
         }
     }

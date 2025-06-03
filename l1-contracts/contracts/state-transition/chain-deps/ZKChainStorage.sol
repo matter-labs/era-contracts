@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
-// import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
 
@@ -174,6 +173,10 @@ struct ZKChainStorage {
     /// @notice Bytecode hash of evm emulator.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
+    /// @notice The precommitment for the latest uncommitted batch (i.e. totalBatchesCommitted + 1).
+    /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
+    /// (the value of the constant can be found in Config.sol).
+    bytes32 precommitmentForTheLatestBatch;
     /// @dev Interop Center, responsible for starting L1->L2 messages
     address interopCenter;
 }

@@ -373,22 +373,20 @@ error ZeroAddress();
 error ZeroChainId();
 // 0x601b6882
 error ZKChainLimitReached();
-// // 0xaa7feadc
-// error InvalidValue();
-// // 0x888b2f09
-// error L1TokenDeploymentWithZeroChainId(bytes32 assetId);
-// // 0xa4f62e33
-// error L2BridgeNotDeployed(uint256 chainId);
-// // 0xff8811ff
-// error L2BridgeNotSet(uint256 chainId);
-// // 0xcb5e4247
-// error L2BytecodeHashMismatch(bytes32 expected, bytes32 provided);
-// 0x4ef79e5a
-// error NonZeroAddress(address);
-// 0xdd629f86
-// error NotEnoughGas();
-// //
-// error SettlementLayerNotRegistered();
+// 0x9bf8b9aa
+error InvalidBatchNumber(uint256 provided, uint256 expected);
+// 0x84286507
+error EmptyPrecommitData(uint256 batchNumber);
+// 0x688c63e5
+error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
+// 0xfe0aa4f2
+error RoleAccessDenied(address chainAddress, bytes32 role, address account);
+// 0xf2885eb3
+error DefaultAdminTransferNotAllowed();
+// 0x99f6cc22
+error InvalidPackedPrecommitmentLength(uint256 length);
+// 0xb49df1f2
+error NotAZKChain(address addr);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
