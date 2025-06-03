@@ -215,7 +215,13 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             msg.sender,
             0
         );
-        bytes32 bundleHash = _finishAndSendBundleLong(bundle, _value, address(0), msg.value, msg.sender);
+        bytes32 bundleHash = _finishAndSendBundleLong({
+            _bundle: bundle,
+            _bundleCallsTotalValue: _value,
+            _executionAddress: address(0),
+            _receivedMsgValue: msg.value,
+            _sender: msg.sender
+        });
         return bundleHash;
     }
 
@@ -226,7 +232,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
         );
-        for (uint256 i = 0; i < _callStarters.length; i++) {
+        uint256 callStartersLength = _callStarters.length;
+        for (uint256 i = 0; i < callStartersLength; ++i) {
             (bool directCall, uint256 indirectCallMessageValue) = _parseCallStarter(_callStarters[i]);
             callStartersInternal[i] = InteropCallStarterInternal({
                 nextContract: _callStarters[i].nextContract,
@@ -236,7 +243,13 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 indirectCallMessageValue: indirectCallMessageValue
             });
         }
-        return _sendBundle(_destinationChainId, callStartersInternal, msg.value, address(0), msg.sender);
+        return _sendBundle({
+            _destinationChainId: _destinationChainId,
+            _callStarters: callStartersInternal,
+            _msgValue: msg.value,
+            _executionAddress: address(0),
+            _sender: msg.sender
+        });
     }
 
     function _parseCallStarter(InteropCallStarter calldata _callStarter) internal pure returns (bool, uint256) {
@@ -271,7 +284,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             calls: new InteropCall[](_callStarters.length),
             executionAddress: address(0)
         });
-        for (uint256 i = 0; i < _callStarters.length; i++) {
+        uint256 callStartersLength = _callStarters.length;
+        for (uint256 i = 0; i < callStartersLength; ++i) {
             InteropCallStarterInternal memory callStarter = _callStarters[i];
             InteropCallStarter memory actualCallStarter;
             if (!callStarter.directCall) {
@@ -291,7 +305,13 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             _addCallToBundle(bundle, actualCallStarter, _sender, i);
             feeValue += callStarter.requestedInteropCallValue;
         }
-        bytes32 bundleHash = _finishAndSendBundleLong(bundle, feeValue, _executionAddress, _msgValue, _sender);
+        bytes32 bundleHash = _finishAndSendBundleLong({
+            _bundle: bundle,
+            _bundleCallsTotalValue: feeValue,
+            _executionAddress: _executionAddress,
+            _receivedMsgValue: _msgValue,
+            _sender: _sender
+        });
         return bundleHash;
     }
 

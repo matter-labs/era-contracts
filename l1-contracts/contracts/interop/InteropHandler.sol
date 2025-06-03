@@ -23,13 +23,13 @@ contract InteropHandler is IInteropHandler {
     error InvalidSelector(bytes4 selector);
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
-        bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
-            _proof.chainId,
-            _proof.l1BatchNumber,
-            _proof.l2MessageIndex,
-            _proof.message,
-            _proof.proof
-        );
+        bool isIncluded = L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared({
+            _chainId: _proof.chainId,
+            _blockOrBatchNumber: _proof.l1BatchNumber,
+            _index: _proof.l2MessageIndex,
+            _message: _proof.message,
+            _proof: _proof.proof
+        });
         if (!isIncluded) {
             revert MessageNotIncluded();
         }
@@ -43,11 +43,18 @@ contract InteropHandler is IInteropHandler {
 
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
 
-        for (uint256 i = 0; i < interopBundle.calls.length; i++) {
+        uint256 callsLength = interopBundle.calls.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
             InteropCall memory interopCall = interopBundle.calls[i];
 
             L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
-            bytes4 selector = IERC7786Receiver(interopCall.to).executeMessage{value: interopCall.value}(bundleHash, _proof.chainId, interopCall.from, interopCall.data, new bytes[](0)); // attributes are not supported yet
+            bytes4 selector = IERC7786Receiver(interopCall.to).executeMessage{value: interopCall.value}({
+                messageId: bundleHash,
+                sourceChain: _proof.chainId,
+                sender: interopCall.from,
+                payload: interopCall.data,
+                attributes: new bytes[](0)
+            }); // attributes are not supported yet
             if (selector != IERC7786Receiver.executeMessage.selector) {
                 revert InvalidSelector(selector);
             }

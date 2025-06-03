@@ -520,7 +520,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Interop is only allowed on GW currently, so we never append messages to message root on L1.
         // kl todo. Is this what we want?
         if (block.chainid != L1_CHAIN_ID) {
-            for (uint256 i = 0; i < messages.length; i = i.uncheckedInc()) {
+            uint256 messagesLength = messages.length;
+            for (uint256 i = 0; i < messagesLength; i = i.uncheckedInc()) {
                 ProcessLogsInput memory processLogsInput = ProcessLogsInput({
                     logs: logs[i],
                     messages: messages[i],

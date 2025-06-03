@@ -19,10 +19,10 @@ struct Taddress {
     uint256 __placeholder;
 }
 
-using TransientPrimitivesLib for tuint256 global;
-using TransientPrimitivesLib for tint256 global;
-using TransientPrimitivesLib for tbytes32 global;
-using TransientPrimitivesLib for taddress global;
+using TransientPrimitivesLib for Tuint256 global;
+using TransientPrimitivesLib for Tint256 global;
+using TransientPrimitivesLib for Tbytes32 global;
+using TransientPrimitivesLib for Taddress global;
 
 library TransientPrimitivesLib {
     error ArithmeticOverflowUnderflow();
