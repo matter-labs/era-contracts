@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -16,7 +16,8 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-
+import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
+import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IInteropHandler, InteropHandler} from "contracts/interop/InteropHandler.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
@@ -58,8 +59,10 @@ library L2Utils {
         forceDeployChainAssetHandler(_args);
         forceDeployAssetRouter(_args);
         forceDeployNativeTokenVault(_args);
+        forceDeployL2MessageVerification(_args);
+        forceDeployL2InteropRootStorage(_args);
         forceDeployInteropCenter(_args);
-        // forceDeployInteropHandler(_args);
+        forceDeployInteropHandler(_args);
     }
 
     function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
@@ -107,6 +110,28 @@ library L2Utils {
                 L2_ASSET_ROUTER_ADDR,
                 L2_MESSAGE_ROOT_ADDR
             ),
+            _args.broadcast
+        );
+    }
+
+    function forceDeployL2MessageVerification(SystemContractsArgs memory _args) internal {
+        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
+        new L2MessageVerification();
+        forceDeployWithConstructor(
+            "L2MessageVerification",
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encode(),
+            _args.broadcast
+        );
+    }
+
+    function forceDeployL2InteropRootStorage(SystemContractsArgs memory _args) internal {
+        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
+        new DummyL2InteropRootStorage();
+        forceDeployWithConstructor(
+            "DummyL2InteropRootStorage",
+            address(L2_INTEROP_ROOT_STORAGE),
+            abi.encode(),
             _args.broadcast
         );
     }

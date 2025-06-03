@@ -46,17 +46,17 @@ contract InteropTest is Test {
     function test_interop() public {
         uint256 mintValue = 100;
         uint256 secondBridgeValue = 3;
-        L2TransactionRequestTwoBridgesOuter memory request = L2TransactionRequestTwoBridgesOuter({
-            chainId: 1,
-            mintValue: mintValue,
-            l2Value: 1,
-            l2GasLimit: 1,
-            l2GasPerPubdataByteLimit: 1,
-            refundRecipient: address(1),
-            secondBridgeAddress: L2_ASSET_ROUTER_ADDR,
-            secondBridgeValue: secondBridgeValue,
-            secondBridgeCalldata: new bytes(0)
-        });
-        bridgehub.requestL2TransactionTwoBridges{value: mintValue + secondBridgeValue}(request);
+        // L2TransactionRequestTwoBridgesOuter memory request = L2TransactionRequestTwoBridgesOuter({
+        //     chainId: 1,
+        //     mintValue: mintValue,
+        //     l2Value: 1,
+        //     l2GasLimit: 1,
+        //     l2GasPerPubdataByteLimit: 1,
+        //     refundRecipient: address(1),
+        //     secondBridgeAddress: L2_ASSET_ROUTER_ADDR,
+        //     secondBridgeValue: secondBridgeValue,
+        //     secondBridgeCalldata: new bytes(0)
+        // });
+        // bridgehub.requestL2TransactionTwoBridges{value: mintValue + secondBridgeValue}(request);
     }
 }

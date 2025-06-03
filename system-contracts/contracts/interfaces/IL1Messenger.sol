@@ -54,8 +54,5 @@ interface IL1Messenger {
     function requestBytecodeL1Publication(bytes32 _bytecodeHash) external;
 
     // This function is expected to be called only by the Bootloader system contract
-    function publishPubdataAndClearState(
-        address _l2DAValidator,
-        bytes calldata _operatorInput
-    ) external;
+    function publishPubdataAndClearState(address _l2DAValidator, bytes calldata _operatorInput) external;
 }
