@@ -39,8 +39,6 @@ error BatchNotExecuted(uint256 batchNumber);
 error BatchNumberMismatch(uint256 expectedBatchNumber, uint256 providedBatchNumber);
 // 0x6cf12312
 error BridgeHubAlreadyRegistered();
-// 0xc89f76ad
-error BridgehubOnL1();
 // 0xdb538614
 error BridgeMintNotImplemented();
 // 0xaa5f6180
@@ -136,8 +134,6 @@ error IncorrectBatchBounds(
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
-// 0x826fb11e
-error InsufficientChainBalance();
 // 0xddb74934
 error InsufficientChainBalanceAssetTracker(uint256 chainId, bytes32 assetId, uint256 amount);
 // 0x9bf8b9aa
@@ -176,12 +172,6 @@ error InvalidSelector(bytes4 func);
 error InvalidSystemLogsLength();
 // 0x0214acb6
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
-// 0xe43fe2ad
-error L2AssetRouter_bridgehubConfirmL2TransactionNotImplemented();
-// 0xd654e211
-error L2AssetRouter_LegacyDataNotImplemented();
-// 0x36bb4713
-error L2AssetRouter_setAssetHandlerAddressOnCounterpartNotImplemented();
 // 0xfb5c22e6
 error L2TimestampTooBig();
 // 0x97e1359e

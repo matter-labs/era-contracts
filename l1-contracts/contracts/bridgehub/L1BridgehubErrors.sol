@@ -12,8 +12,6 @@ error ChainIdAlreadyPresent();
 error ChainNotLegacy();
 // 0x4bd4ae07
 error ChainNotPresentInCTM();
-// 0x1df81911
-error DirectCallNonEmptyValue(address nextContract);
 // 0xeab895aa
 error HyperchainNotRegistered();
 // 0x48857c1d
@@ -50,8 +48,6 @@ error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, addres
 error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
-// 0x2b5e524f
-error OnlyInteropCenter(address msgSender, address interopCenter);
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1

@@ -4,8 +4,6 @@ pragma solidity ^0.8.20;
 
 // 0x86bb51b8
 error AddressHasNoCode(address);
-// 0x2078a6a0
-error BatchNotExecuted(uint256 batchNumber);
 // 0xefce78c7
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
