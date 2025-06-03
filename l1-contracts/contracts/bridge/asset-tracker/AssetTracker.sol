@@ -113,13 +113,13 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
     function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external {
         uint256 msgCount = 0;
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkleMemory
-            .Bytes32PushTree(
-                0,
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
-                new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
-                0,
-                0
-            ); // todo 100 to const
+            .Bytes32PushTree({
+                _nextLeafIndex: 0,
+                _sides: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
+                _zeros: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
+                _sidesLengthMemory: 0,
+                _zerosLengthMemory: 0
+            }); // todo 100 to const
         reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         uint256 logsLength = _processLogsInputs.logs.length;
         for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
@@ -223,7 +223,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
     function bridgeBurn(
         uint256 _settlementChainId,
         uint256,
-        bytes32 _assetId,
+        bytes32, // _assetId todo add check on it.
         address,
         bytes calldata _data
     ) external payable requireZeroValue(msg.value) onlyAssetRouter returns (bytes memory _bridgeMintData) {
@@ -271,14 +271,14 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
         }
 
         return
-            DataEncoding.encodeAssetTrackerData(
-                chainId,
-                assetId,
-                amount,
-                migratingChainIsMinter,
-                numberOfSettlingMintingChains[assetId] > 0,
-                newSLBalance
-            );
+            DataEncoding.encodeAssetTrackerData({
+                _chainId: chainId,
+                _assetId: assetId,
+                _amount: amount,
+                _migratingChainIsMinter: migratingChainIsMinter,
+                _hasSettlingMintingChains: numberOfSettlingMintingChains[assetId] > 0,
+                _newSLBalance: newSLBalance
+            });
     }
     /*//////////////////////////////////////////////////////////////
                             Helper Functions

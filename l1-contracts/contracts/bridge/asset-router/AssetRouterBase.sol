@@ -102,7 +102,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     ) internal virtual whenNotPaused returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == NEW_ENCODING_VERSION) {
-            return _bridgehubDepositRealAsset(_chainId, _originalCaller, _value, _data, _nativeTokenVault);
+            return _bridgehubDepositRealAsset({
+                _chainId: _chainId,
+                _originalCaller: _originalCaller,
+                _value: _value,
+                _data: _data,
+                _nativeTokenVault: _nativeTokenVault
+            });
         } else {
             revert UnsupportedEncodingVersion();
         }

@@ -142,8 +142,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         InteropBundle memory _bundle,
         uint256 _bundleCallsTotalValue,
         address _executionAddress,
-        uint256 _receivedMsgValue,
-        address _sender
+        uint256 _receivedMsgValue
     ) internal returns (bytes32 interopBundleHash) {
 
         _ensureCorrectTotalValue(
@@ -153,6 +152,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         );
 
         address[] memory executionAddresses = new address[](1);
+        executionAddresses[0] = _executionAddress;
+        _bundle.executionAddress = _executionAddress;
 
         bytes memory interopBundleBytes = abi.encode(_bundle);
         // TODO use canonicalTxHash for linking it to the trigger, instead of interopBundleHash
@@ -219,8 +220,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             _bundle: bundle,
             _bundleCallsTotalValue: _value,
             _executionAddress: address(0),
-            _receivedMsgValue: msg.value,
-            _sender: msg.sender
+            _receivedMsgValue: msg.value
         });
         return bundleHash;
     }
@@ -309,8 +309,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             _bundle: bundle,
             _bundleCallsTotalValue: feeValue,
             _executionAddress: _executionAddress,
-            _receivedMsgValue: _msgValue,
-            _sender: _sender
+            _receivedMsgValue: _msgValue
         });
         return bundleHash;
     }

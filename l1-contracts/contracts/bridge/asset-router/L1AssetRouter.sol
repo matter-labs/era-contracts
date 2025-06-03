@@ -264,7 +264,13 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                     _assetHandlerAddressOnCounterpart
                 );
         } else if (encodingVersion == LEGACY_ENCODING_VERSION) {
-            return _bridgehubDepositRealAsset(_chainId, _originalCaller, _value, _data, address(nativeTokenVault));
+            return _bridgehubDepositRealAsset({
+                _chainId: _chainId,
+                _originalCaller: _originalCaller,
+                _value: _value,
+                _data: _data,
+                _nativeTokenVault: address(nativeTokenVault)
+            });
         }
         return
             _bridgehubDeposit({
