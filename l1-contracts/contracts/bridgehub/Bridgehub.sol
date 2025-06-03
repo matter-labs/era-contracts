@@ -144,13 +144,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    modifier onlyInteropCenter() {
-        if (msg.sender != address(interopCenter)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /// @notice to avoid parity hack
     constructor(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
         _disableInitializers();

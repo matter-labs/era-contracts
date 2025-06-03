@@ -17,11 +17,6 @@ uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
 /// @dev The formal address of the initial program of the system: the bootloader
 address constant L2_BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
 
-/// @dev The account code storage system contract
-// IAccountCodeStorage constant ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT = IAccountCodeStorage(
-//     address(SYSTEM_CONTRACTS_OFFSET + 0x02)
-// );
-
 /// @dev The address of the known code storage system contract
 address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x04);
 

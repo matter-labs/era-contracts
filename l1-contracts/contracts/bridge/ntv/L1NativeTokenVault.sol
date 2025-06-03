@@ -263,14 +263,4 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // On L1 the asset tracker is triggered when the user withdraws.
         l1AssetTracker.handleChainBalanceDecrease(_chainId, _assetId, _amount, _isNative);
     }
-
-    /// @dev Returns whether a chain `_chainId` has infinite balance for an asset `_assetId`, i.e.
-    /// it can be minted by it.
-    /// @param _isNative Whether the asset is native to the L1 chain.
-    /// @param _assetId The asset id
-    /// @param _chainId An id of a chain which we test against.
-    /// @return Whether The chain `_chainId` has infinite balance of the token
-    // function _hasInfiniteBalance(bool _isNative, bytes32 _assetId, uint256 _chainId) private view returns (bool) {
-    //     return !_isNative && originChainId[_assetId] == _chainId;
-    // }
 }
