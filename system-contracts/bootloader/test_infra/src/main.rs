@@ -70,7 +70,7 @@ fn execute_internal_bootloader_test() {
         execution_mode: TxExecutionMode::VerifyExecute,
         default_validation_computational_gas_limit: u32::MAX,
         chain_id: zksync_types::L2ChainId::from(299),
-        pubdata_params: Default::default(),
+        // pubdata_params: Default::default(),
     };
 
     let mut l1_batch_env = L1BatchEnv {
@@ -134,7 +134,7 @@ fn execute_internal_bootloader_test() {
         // We are passing id of the test in location (0) where we normally put the operator.
         // This is then picked up by the testing framework.
         l1_batch_env.fee_account = zksync_types::H160::from(u256_to_h256(U256::from(test_id)));
-        let mut vm : Vm<_, HistoryDisabled> = vm_latest::Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
+        let mut vm : Vm<_, HistoryDisabled> = Vm::new(l1_batch_env.clone(), system_env.clone(), storage.clone());
 
         let test_result = Arc::new(OnceCell::default());
         let requested_assert = Arc::new(OnceCell::default());
@@ -150,11 +150,8 @@ fn execute_internal_bootloader_test() {
 
         // Let's insert transactions into slots. They are not executed, but the tests can run functions against them.
         let json_str = include_str!("test_transactions/0.json");
-        let json_str2 = include_str!("test_transactions/1.json");
         let tx: Transaction = serde_json::from_str(json_str).unwrap();
-        let tx2: Transaction = serde_json::from_str(json_str2).unwrap();
         vm.push_transaction(tx);
-        vm.push_transaction(tx2);
 
         let result = vm.inspect(&mut tracer_dispatcher, InspectExecutionMode::Bootloader);
         drop(tracer_dispatcher);
@@ -180,7 +177,7 @@ fn execute_internal_bootloader_test() {
                     )),
                     ExecutionResult::Halt { reason } => {
                         if let Halt::UnexpectedVMBehavior(reason) = reason {
-                            let reason = reason.strip_prefix("Assertion error: ").unwrap_or(reason);
+                            let reason = reason.strip_prefix("Assertion error: ").unwrap_or(&reason);
                             if reason == requested_assert {
                                 Ok(())
                             } else {
