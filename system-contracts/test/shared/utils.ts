@@ -203,8 +203,8 @@ export async function setConstructingCodeHash(address: string, bytecode: string)
 export interface StateDiff {
   key: BytesLike;
   index: number;
-  initValue: BigNumber;
-  finalValue: BigNumber;
+  initValue: bigint;
+  finalValue: bigint;
 }
 
 export function encodeStateDiffs(stateDiffs: StateDiff[]): string {
@@ -233,35 +233,35 @@ export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: Sta
   const initial = [];
   const repeated = [];
   for (const stateDiff of stateDiffs) {
-    const addition = stateDiff.finalValue.sub(stateDiff.initValue).add(TWO_IN_256).mod(TWO_IN_256);
-    const subtraction = stateDiff.initValue.sub(stateDiff.finalValue).add(TWO_IN_256).mod(TWO_IN_256);
+    const addition = (stateDiff.finalValue - stateDiff.initValue + TWO_IN_256) % TWO_IN_256;
+    const subtraction = (stateDiff.initValue - stateDiff.finalValue + TWO_IN_256) % TWO_IN_256;
     let op = 3;
     let min = stateDiff.finalValue;
-    if (addition.lt(min)) {
+    if (addition < min) {
       min = addition;
       op = 1;
     }
-    if (subtraction.lt(min)) {
+    if (subtraction < min) {
       min = subtraction;
       op = 2;
     }
-    if (min.gte(BigNumber.from(2).pow(248))) {
+    if (min >= 2n ** 248n) {
       min = stateDiff.finalValue;
       op = 0;
     }
     let len = 0;
-    const minHex = min.eq(0) ? "0x" : min.toHexString();
+    const minHex = min === 0n ? "0x00" : "0x" + (min.toString(16).length % 2 === 1 ? "0" : "") + min.toString(16);
     if (op > 0) {
       len = (minHex.length - 2) / 2;
     }
     const metadata = (len << 3) + op;
     if (stateDiff.index === 0) {
       numInitial += 1;
-      initial.push(ethers.utils.solidityPack(["bytes32", "uint8", "bytes"], [stateDiff.key, metadata, minHex]));
+      initial.push(ethers.utils.solidityPack(["bytes32", "uint8", "bytes"], [stateDiff.key, metadata, BigNumber.from(minHex)]));
     } else {
       const enumerationIndexType = "uint" + (enumerationIndexSize * 8).toString();
       repeated.push(
-        ethers.utils.solidityPack([enumerationIndexType, "uint8", "bytes"], [stateDiff.index, metadata, minHex])
+        ethers.utils.solidityPack([enumerationIndexType, "uint8", "bytes"], [stateDiff.index, metadata, BigNumber.from(minHex)])
       );
     }
   }

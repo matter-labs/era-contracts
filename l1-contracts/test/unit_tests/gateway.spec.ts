@@ -3,8 +3,8 @@ import * as ethers from "ethers";
 import { Wallet } from "ethers";
 import * as hardhat from "hardhat";
 
-import type { Bridgehub, InteropCenter } from "../../typechain";
-import { BridgehubFactory, InteropCenterFactory } from "../../typechain";
+import type { Bridgehub } from "../../typechain";
+import { BridgehubFactory } from "../../typechain";
 
 import {
   initialTestnetDeploymentProcess,
@@ -19,7 +19,6 @@ import type { Deployer } from "../../src.ts/deploy";
 
 describe("Gateway", function () {
   let bridgehub: Bridgehub;
-  let interopCenter: InteropCenter;
   // let stateTransition: ChainTypeManager;
   let owner: ethers.Signer;
   let migratingDeployer: Deployer;
@@ -56,10 +55,6 @@ describe("Gateway", function () {
     chainId = migratingDeployer.chainId;
 
     bridgehub = BridgehubFactory.connect(migratingDeployer.addresses.Bridgehub.BridgehubProxy, deployWallet);
-    interopCenter = InteropCenterFactory.connect(
-      migratingDeployer.addresses.Bridgehub.InteropCenterProxy,
-      deployWallet
-    );
 
     gatewayDeployer = await defaultDeployerForTests(deployWallet, ownerAddress);
     gatewayDeployer.chainId = 10;
@@ -90,12 +85,7 @@ describe("Gateway", function () {
     const ctm = migratingDeployer.chainTypeManagerContract(migratingDeployer.deployWallet);
     const gasPrice = await migratingDeployer.deployWallet.provider.getGasPrice();
     const value = (
-      await interopCenter.l2TransactionBaseCost(
-        chainId,
-        gasPrice,
-        priorityTxMaxGasLimit,
-        REQUIRED_L2_GAS_PRICE_PER_PUBDATA
-      )
+      await bridgehub.l2TransactionBaseCost(chainId, gasPrice, priorityTxMaxGasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(10);
 
     const ctmDeploymentTracker = migratingDeployer.ctmDeploymentTracker(migratingDeployer.deployWallet);
@@ -103,7 +93,7 @@ describe("Gateway", function () {
     const assetId = await bridgehub.ctmAssetIdFromChainId(chainId);
 
     await migratingDeployer.executeUpgrade(
-      interopCenter.address,
+      bridgehub.address,
       value,
       bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
         {
@@ -122,7 +112,7 @@ describe("Gateway", function () {
       ])
     );
     await migratingDeployer.executeUpgrade(
-      interopCenter.address,
+      bridgehub.address,
       value,
       bridgehub.interface.encodeFunctionData("requestL2TransactionTwoBridges", [
         {
@@ -144,7 +134,7 @@ describe("Gateway", function () {
 
   it("Check start message to L2 on L1", async () => {
     const amount = ethers.utils.parseEther("2");
-    await interopCenter.requestL2TransactionDirect(
+    await bridgehub.requestL2TransactionDirect(
       {
         chainId: migratingDeployer.chainId,
         mintValue: amount,
@@ -185,6 +175,6 @@ describe("Gateway", function () {
       paymasterInput: "0x",
       reservedDynamic: "0x",
     };
-    interopCenter.forwardTransactionOnGateway(mintChainId, tx, [], ethers.constants.HashZero, 0);
+    bridgehub.forwardTransactionOnGateway(mintChainId, tx, [], ethers.constants.HashZero, 0);
   });
 });
