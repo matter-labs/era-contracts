@@ -429,6 +429,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             } else {
                 IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
                 (bytes32 assetId, uint256 amount) = (assetTracker.getBalanceChange(s.chainId));
+                // slither-disable-next-line unused-return
                 IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                     _chainId: s.chainId,
                     _canonicalTxHash: canonicalTxHash,

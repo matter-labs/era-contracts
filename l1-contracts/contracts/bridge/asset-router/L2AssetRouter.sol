@@ -140,6 +140,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     error L2AssetRouter_InvalidSelector();
     error L2AssetRouter_PayloadTooShort();
+    error L2AssetRouter_ExecuteMessageFailed();
     function executeMessage(
         // kl todo: change back to strings
         bytes32, // messageId, gateway specific, empty or unique
@@ -150,7 +151,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     ) external payable returns (bytes4) {
         require(payload.length > 4, L2AssetRouter_PayloadTooShort());
         require(bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector, L2AssetRouter_InvalidSelector());
-        address(this).call(payload);
+        (bool success, ) = address(this).call(payload);
+        require(success, L2AssetRouter_ExecuteMessageFailed());
         return IERC7786Receiver.executeMessage.selector;
     }
 

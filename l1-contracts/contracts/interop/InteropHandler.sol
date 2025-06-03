@@ -48,6 +48,7 @@ contract InteropHandler is IInteropHandler {
             InteropCall memory interopCall = interopBundle.calls[i];
 
             L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
+            // slither-disable-next-line arbitrary-send-eth
             bytes4 selector = IERC7786Receiver(interopCall.to).executeMessage{value: interopCall.value}({
                 messageId: bundleHash,
                 sourceChain: _proof.chainId,

@@ -120,6 +120,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
                 _sidesLengthMemory: 0,
                 _zerosLengthMemory: 0
             }); // todo 100 to const
+        // slither-disable-next-line unused-return
         reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         uint256 logsLength = _processLogsInputs.logs.length;
         for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
@@ -128,6 +129,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
                 // solhint-disable-next-line func-named-parameters
                 abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
             );
+            // slither-disable-next-line unused-return
             reconstructedLogsTree.push(hashedLog);
             if (log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                 // its just a log and not a message
@@ -166,7 +168,9 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
                 (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(
                     interopCall.data
                 );
+                // slither-disable-next-line unused-return
                 (, , , uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
+                // slither-disable-next-line unused-return
                 (uint256 tokenOriginChainId, , , ) = this.parseTokenData(erc20Metadata);
 
                 // if (!isMinterChain[fromChainId][assetId]) {
@@ -196,6 +200,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
                             AssetHandler Functions
     //////////////////////////////////////////////////////////////*/
 
+    // slither-disable-next-line locked-ether
     function bridgeMint(
         uint256 _originSettlementChainId,
         bytes32 _assetId,
@@ -220,6 +225,7 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
         }
     }
 
+    // slither-disable-next-line locked-ether
     function bridgeBurn(
         uint256 _settlementChainId,
         uint256,

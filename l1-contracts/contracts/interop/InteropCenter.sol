@@ -261,6 +261,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 IERC7786GatewaySource.UnsupportedAttribute(selector)
             );
             uint256 indirectCallMessageValue;
+            // slither-disable-next-line unused-return
             (, indirectCallMessageValue) = AttributesDecoder.decodeIndirectCall(_callStarter.attributes[0]);
 
             return (false, indirectCallMessageValue);
@@ -289,6 +290,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             InteropCallStarter memory actualCallStarter;
             if (!callStarter.directCall) {
                 // console.log("fee indirect call");
+                // slither-disable-next-line arbitrary-send-eth
                 actualCallStarter = IL2AssetRouter(callStarter.nextContract).interopCenterInitiateBridge{
                     value: callStarter.indirectCallMessageValue
                 }(_destinationChainId, _sender, callStarter.requestedInteropCallValue, callStarter.data);
