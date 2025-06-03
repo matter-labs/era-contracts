@@ -6,7 +6,7 @@ import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 
 import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
 
-/// Rollup DA validator. It will publish data that would allow to use either calldata or blobs.
+/// EigenDA L2 DA validator. It will create a commitment to the pubdata that can later be verified during settlement.
 contract EigenDAL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
     function validatePubdata(
         // The rolling hash of the user L2->L1 logs.
