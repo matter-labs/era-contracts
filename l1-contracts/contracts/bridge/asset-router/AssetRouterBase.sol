@@ -8,7 +8,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {IAssetRouterBase, NEW_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 

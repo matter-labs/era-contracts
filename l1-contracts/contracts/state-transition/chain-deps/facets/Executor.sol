@@ -15,7 +15,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, HashMismatch, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
-import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
+import {DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";

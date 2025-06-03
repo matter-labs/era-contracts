@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS, L2_BRIDGE_HUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER, L2_INTEROP_HANDLER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, WRAPPED_BASE_TOKEN_IMPL_ADDRESS} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS, L2_BRIDGE_HUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, WRAPPED_BASE_TOKEN_IMPL_ADDRESS} from "./Constants.sol";
 import {ForceDeployment, IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";

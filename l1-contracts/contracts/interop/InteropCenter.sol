@@ -2,15 +2,13 @@
 
 pragma solidity ^0.8.24;
 
-import {console} from "forge-std/console.sol";
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "../bridgehub/IBridgehub.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
@@ -18,11 +16,10 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 
 import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
-import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {ChainIdNotRegistered, MsgValueMismatch, Unauthorized, WrongMagicValue} from "../common/L1ContractErrors.sol";
-import {DirectCallNonEmptyValue, NotInGatewayMode, SecondBridgeAddressTooLow} from "../bridgehub/L1BridgehubErrors.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
+import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
+import {MsgValueMismatch, Unauthorized} from "../common/L1ContractErrors.sol";
+import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 

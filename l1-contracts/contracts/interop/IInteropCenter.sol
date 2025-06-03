@@ -2,8 +2,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {InteropBundle, InteropCallStarter, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "../bridgehub/IBridgehub.sol";
+import {InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
+import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

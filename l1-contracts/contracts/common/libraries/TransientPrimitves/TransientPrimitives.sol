@@ -3,19 +3,19 @@ pragma solidity ^0.8.24;
 
 /// @author philogy <https://github.com/philogy>
 
-struct tuint256 {
+struct Tuint256 {
     uint256 __placeholder;
 }
 
-struct tint256 {
+struct Tint256 {
     uint256 __placeholder;
 }
 
-struct tbytes32 {
+struct Tbytes32 {
     uint256 __placeholder;
 }
 
-struct taddress {
+struct Taddress {
     uint256 __placeholder;
 }
 

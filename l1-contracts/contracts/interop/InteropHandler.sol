@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_MESSAGE_VERIFICATION} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
-import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Message, MessageInclusionProof} from "../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, MessageInclusionProof} from "../common/Messaging.sol";
 import {IERC7786Receiver} from "./IERC7786Receiver.sol";
 error MessageNotIncluded();
 error BundleAlreadyExecuted(bytes32 bundleHash);
