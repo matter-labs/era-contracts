@@ -130,7 +130,6 @@ library L2Utils {
         new InteropHandler();
         forceDeployWithConstructor("InteropHandler", L2_INTEROP_HANDLER_ADDR, abi.encode(), _args.broadcast);
         InteropHandler interopHandler = InteropHandler(L2_INTEROP_HANDLER_ADDR);
-        prankOrBroadcast(_args.broadcast, L2_FORCE_DEPLOYER_ADDR);
     }
 
     /// @notice Deploys the L2AssetRouter contract.
@@ -217,7 +216,7 @@ library L2Utils {
         });
         console.logBytes32(bytecodehash);
 
-        prankOrBroadcast(_broadcast, RANDOM_ADDRESS);
+        prankOrBroadcast(_broadcast, L2_FORCE_DEPLOYER_ADDR);
         IContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(deployments);
     }
 

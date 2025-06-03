@@ -92,7 +92,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         }
         standardErc20Impl = new BridgedStandardERC20();
         beacon = new UpgradeableBeacon(address(standardErc20Impl));
-        beacon.transferOwnership(ownerWallet);
+        // beacon.transferOwnership(ownerWallet);
 
         // One of the purposes of deploying it here is to publish its bytecode
         BeaconProxy beaconProxy = new BeaconProxy(address(beacon), new bytes(0));
