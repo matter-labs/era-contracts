@@ -264,13 +264,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                     _assetHandlerAddressOnCounterpart
                 );
         } else if (encodingVersion == LEGACY_ENCODING_VERSION) {
-            return _bridgehubDepositRealAsset({
-                _chainId: _chainId,
-                _originalCaller: _originalCaller,
-                _value: _value,
-                _data: _data,
-                _nativeTokenVault: address(nativeTokenVault)
-            });
+            return
+                _bridgehubDepositRealAsset({
+                    _chainId: _chainId,
+                    _originalCaller: _originalCaller,
+                    _value: _value,
+                    _data: _data,
+                    _nativeTokenVault: address(nativeTokenVault)
+                });
         }
         return
             _bridgehubDeposit({
@@ -354,7 +355,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                      Internal & Helpers
     //////////////////////////////////////////////////////////////*/
 
-    function _getTransferData(bytes1 _encodingVersion, address _originalCaller, bytes calldata _data) internal override returns (bytes32 assetId, bytes memory transferData) {
+    function _getTransferData(
+        bytes1 _encodingVersion,
+        address _originalCaller,
+        bytes calldata _data
+    ) internal override returns (bytes32 assetId, bytes memory transferData) {
         // The new encoding ensures that the calldata is collision-resistant with respect to the legacy format.
         // In the legacy calldata, the first input was the address, meaning the most significant byte was always `0x00`.
         if (_encodingVersion == LEGACY_ENCODING_VERSION) {

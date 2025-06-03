@@ -284,8 +284,8 @@ describe("Compressor tests", function () {
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901235",
           index: 255,
-          initValue: (TWO_IN_256 / 2n) - 2n,
-          finalValue: (TWO_IN_256 / 2n) - 1n,
+          initValue: TWO_IN_256 / 2n - 2n,
+          finalValue: TWO_IN_256 / 2n - 1n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
@@ -302,11 +302,11 @@ describe("Compressor tests", function () {
           key: "0x1234567890123456789012345678901234567890123456789012345678901236",
           index: 0,
           initValue: TWO_IN_256 / 4n,
-          finalValue: (TWO_IN_256 / 4n) - 5n,
+          finalValue: TWO_IN_256 / 4n - 5n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
-      stateDiffs[0].finalValue = (TWO_IN_256 / 4n) - 1n;
+      stateDiffs[0].finalValue = TWO_IN_256 / 4n - 1n;
       const compressedStateDiffs = compressStateDiffs(1, stateDiffs);
       await expect(
         compressor.connect(l1MessengerAccount).verifyCompressedStateDiffs(1, 1, encodedStateDiffs, compressedStateDiffs)
@@ -319,7 +319,7 @@ describe("Compressor tests", function () {
           key: "0x1234567890123456789012345678901234567890123456789012345678901236",
           index: 0,
           initValue: TWO_IN_256 / 4n,
-          finalValue: (TWO_IN_256 / 4n) - 5n,
+          finalValue: TWO_IN_256 / 4n - 5n,
         },
       ];
       const encodedStateDiffs = encodeStateDiffs(stateDiffs);
@@ -338,7 +338,7 @@ describe("Compressor tests", function () {
           key: "0x1234567890123456789012345678901234567890123456789012345678901236",
           index: 0,
           initValue: TWO_IN_256 / 4n,
-          finalValue: (TWO_IN_256 / 4n) - 5n,
+          finalValue: TWO_IN_256 / 4n - 5n,
         },
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901239",
@@ -366,7 +366,7 @@ describe("Compressor tests", function () {
           key: "0x1234567890123456789012345678901234567890123456789012345678901236",
           index: 0,
           initValue: TWO_IN_256 / 4n,
-          finalValue: (TWO_IN_256 / 4n) - 5n,
+          finalValue: TWO_IN_256 / 4n - 5n,
         },
         {
           key: "0x1234567890123456789012345678901234567890123456789012345678901239",

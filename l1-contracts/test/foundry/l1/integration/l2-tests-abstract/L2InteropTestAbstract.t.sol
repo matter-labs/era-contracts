@@ -82,7 +82,6 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // assertTrue(success);
     }
 
-
     function test_l2MessageVerification() public {
         bytes32[] memory proof = new bytes32[](27);
         proof[0] = bytes32(0x010f050000000000000000000000000000000000000000000000000000000000);

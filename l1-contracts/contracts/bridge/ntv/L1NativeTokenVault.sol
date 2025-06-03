@@ -90,7 +90,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         l1AssetTracker = IAssetTracker(_l1AssetTracker);
     }
 
-
     /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
     function bridgeCheckCounterpartAddress(

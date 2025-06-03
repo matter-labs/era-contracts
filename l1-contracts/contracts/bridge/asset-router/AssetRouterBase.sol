@@ -102,13 +102,14 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     ) internal virtual whenNotPaused returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == NEW_ENCODING_VERSION) {
-            return _bridgehubDepositRealAsset({
-                _chainId: _chainId,
-                _originalCaller: _originalCaller,
-                _value: _value,
-                _data: _data,
-                _nativeTokenVault: _nativeTokenVault
-            });
+            return
+                _bridgehubDepositRealAsset({
+                    _chainId: _chainId,
+                    _originalCaller: _originalCaller,
+                    _value: _value,
+                    _data: _data,
+                    _nativeTokenVault: _nativeTokenVault
+                });
         } else {
             revert UnsupportedEncodingVersion();
         }
@@ -162,7 +163,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         });
     }
 
-    function _getTransferData(bytes1 _encodingVersion, address, bytes calldata _data) internal virtual returns (bytes32 assetId, bytes memory transferData) {
+    function _getTransferData(
+        bytes1 _encodingVersion,
+        address,
+        bytes calldata _data
+    ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         if (_encodingVersion == NEW_ENCODING_VERSION) {
             (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
         }

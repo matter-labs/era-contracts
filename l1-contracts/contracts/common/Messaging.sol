@@ -164,7 +164,7 @@ struct InteropCallStarter {
     bytes[] attributes;
 }
 
-// This is an internal struct with 
+// This is an internal struct with
 struct InteropCallStarterInternal {
     bool directCall;
     address nextContract;

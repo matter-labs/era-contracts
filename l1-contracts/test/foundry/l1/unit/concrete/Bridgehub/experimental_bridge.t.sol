@@ -192,7 +192,11 @@ contract ExperimentalBridgeTest is Test {
         vm.store(address(mockChainContract), baseTokenGasPriceDenominatorLocation, bytes32(uint256(1)));
         // The ownership can only be transferred by the current owner to a new owner via the two-step approach
 
-        vm.mockCall(address(assetTracker), abi.encodeWithSelector(IAssetTracker.handleChainBalanceIncrease.selector), abi.encode());
+        vm.mockCall(
+            address(assetTracker),
+            abi.encodeWithSelector(IAssetTracker.handleChainBalanceIncrease.selector),
+            abi.encode()
+        );
 
         // Default owner calls transferOwnership
         vm.prank(defaultOwner);

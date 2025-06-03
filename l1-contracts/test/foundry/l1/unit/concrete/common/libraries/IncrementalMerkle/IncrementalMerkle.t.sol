@@ -23,7 +23,13 @@ contract IncrementalMerkleTestTest is Test {
 
     function setUpMemory() public returns (DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory) {
         // merkleTestMemory = DynamicIncrementalMerkle;
-        merkleTestMemory = DynamicIncrementalMerkleMemory.Bytes32PushTree(0, new bytes32[](14), new bytes32[](14), 0, 0);
+        merkleTestMemory = DynamicIncrementalMerkleMemory.Bytes32PushTree(
+            0,
+            new bytes32[](14),
+            new bytes32[](14),
+            0,
+            0
+        );
         merkleTestMemory.setup(zero);
     }
 
@@ -147,13 +153,8 @@ contract IncrementalMerkleTestTest is Test {
 
     function testFromServer() public {
         uint256 length = 15;
-        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory = DynamicIncrementalMerkleMemory.Bytes32PushTree(
-            0,
-            new bytes32[](length),
-            new bytes32[](length),
-            0,
-            0
-        );
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory = DynamicIncrementalMerkleMemory
+            .Bytes32PushTree(0, new bytes32[](length), new bytes32[](length), 0, 0);
         merkleTestMemory.setup(zero);
         merkleTestMemory.push(bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd"));
         merkleTestMemory.push(bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12"));

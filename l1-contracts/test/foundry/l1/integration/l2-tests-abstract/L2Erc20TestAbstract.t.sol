@@ -159,9 +159,6 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(baseTokenAssetId)
         );
 
-        l2InteropCenter.sendBundle(
-            271,
-            calls
-        );
+        l2InteropCenter.sendBundle(271, calls);
     }
 }

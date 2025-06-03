@@ -134,8 +134,8 @@ library DynamicIncrementalMerkle {
     }
 
     /**
-    * @dev Extend until end.
-    */
+     * @dev Extend until end.
+     */
     /// @dev here we can extend the array, so the depth is not predetermined.
     function extendUntilEnd(Bytes32PushTree storage self, uint256 finalDepth) internal {
         bytes32 currentZero = self._zeros[self._zeros.length - 1];

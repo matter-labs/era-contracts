@@ -2,7 +2,6 @@
 
 pragma solidity ^0.8.24;
 
-
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
@@ -117,7 +116,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         assetTracker = IAssetTracker(_assetTracker);
     }
 
-
     /*//////////////////////////////////////////////////////////////
                         Bundle interface
     //////////////////////////////////////////////////////////////*/
@@ -125,7 +123,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function _addCallToBundle(
         InteropBundle memory _interopBundle,
         InteropCallStarter memory _interopCallStarter,
-        address _sender, 
+        address _sender,
         uint256 _index
     ) internal {
         InteropCall memory interopCall = InteropCall({
@@ -144,12 +142,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _executionAddress,
         uint256 _receivedMsgValue
     ) internal returns (bytes32 interopBundleHash) {
-
-        _ensureCorrectTotalValue(
-            _bundle.destinationChainId,
-            _bundleCallsTotalValue,
-            _receivedMsgValue
-        );
+        _ensureCorrectTotalValue(_bundle.destinationChainId, _bundleCallsTotalValue, _receivedMsgValue);
 
         address[] memory executionAddresses = new address[](1);
         executionAddresses[0] = _executionAddress;
@@ -212,7 +205,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         });
         _addCallToBundle(
             bundle,
-            InteropCallStarter({nextContract: _destinationAddress, requestedInteropCallValue: _value, data: _data, attributes: new bytes[](0)}),
+            InteropCallStarter({
+                nextContract: _destinationAddress,
+                requestedInteropCallValue: _value,
+                data: _data,
+                attributes: new bytes[](0)
+            }),
             msg.sender,
             0
         );
@@ -243,13 +241,14 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 indirectCallMessageValue: indirectCallMessageValue
             });
         }
-        return _sendBundle({
-            _destinationChainId: _destinationChainId,
-            _callStarters: callStartersInternal,
-            _msgValue: msg.value,
-            _executionAddress: address(0),
-            _sender: msg.sender
-        });
+        return
+            _sendBundle({
+                _destinationChainId: _destinationChainId,
+                _callStarters: callStartersInternal,
+                _msgValue: msg.value,
+                _executionAddress: address(0),
+                _sender: msg.sender
+            });
     }
 
     function _parseCallStarter(InteropCallStarter calldata _callStarter) internal pure returns (bool, uint256) {
