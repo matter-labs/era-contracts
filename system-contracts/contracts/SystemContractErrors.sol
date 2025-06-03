@@ -10,7 +10,7 @@ error BatchNotExecuted(uint256 batchNumber);
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
 error CallerMustBeEvmContract();
-///
+// 0x775f8864
 error CallerMustBeInteropCenter();
 // 0x9eedbd2b
 error CallerMustBeSystemContract();
