@@ -15,7 +15,7 @@ describe("PubdataChunkPublisher tests", () => {
 
   const genRandHex = (size: number) => ethers.utils.hexlify(ethers.utils.randomBytes(size));
   const blobSizeInBytes = 126_976;
-  const maxNumberBlobs = 6;
+  const maxNumberBlobs = 9;
 
   const chunkData = (data: string) => {
     const strippedHex = data.slice(2);

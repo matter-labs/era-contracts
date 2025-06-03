@@ -189,7 +189,7 @@ uint256 constant STATE_DIFF_FINAL_VALUE_OFFSET = 124;
 uint256 constant BLOB_SIZE_BYTES = 126_976;
 
 /// @dev Max number of blobs currently supported
-uint256 constant MAX_NUMBER_OF_BLOBS = 6;
+uint256 constant MAX_NUMBER_OF_BLOBS = 9;
 
 /// @dev Marker of EraVM bytecode
 uint8 constant ERA_VM_BYTECODE_FLAG = 1;
