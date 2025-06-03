@@ -418,8 +418,8 @@ contract RegisterZKChainScript is Script {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
 
         vm.startBroadcast(msg.sender);
-        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidator(config.chainChainId, config.validatorSenderOperatorBlobsEth);
+        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorCommitEth);
+        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorBlobsEth);
         vm.stopBroadcast();
 
         console.log("Validators added");

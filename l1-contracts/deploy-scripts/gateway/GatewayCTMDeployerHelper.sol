@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-
+import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
@@ -64,10 +64,10 @@ library GatewayCTMDeployerHelper {
         );
         contracts = _deployVerifier(config.testnetVerifier, contracts, innerConfig);
 
-        contracts.stateTransition.validatorTimelock = _deployInternal(
+        contracts.stateTransition.validatorTimelockImplementation = _deployInternal(
             "ValidatorTimelock",
             "ValidatorTimelock.sol",
-            abi.encode(ctmDeployerAddress, 0),
+            abi.encode(L2_BRIDGEHUB_ADDR),
             innerConfig
         );
 
@@ -78,8 +78,18 @@ library GatewayCTMDeployerHelper {
             innerConfig
         );
 
+        contracts.stateTransition.validatorTimelock = _deployInternal(
+            "TransparentUpgradeableProxy",
+            "TransparentUpgradeableProxy.sol",
+            abi.encode(
+                contracts.stateTransition.validatorTimelockImplementation,
+                contracts.stateTransition.chainTypeManagerProxyAdmin,
+                abi.encodeCall(ValidatorTimelock.initialize, (config.aliasedGovernanceAddress, 0))
+            ),
+            innerConfig
+        );
+
         contracts.stateTransition.serverNotifierProxy = _deployServerNotifier(
-            salt,
             contracts,
             innerConfig,
             ctmDeployerAddress
@@ -89,7 +99,6 @@ library GatewayCTMDeployerHelper {
     }
 
     function _deployServerNotifier(
-        bytes32 _salt,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
         address ctmDeployerAddress
@@ -100,6 +109,7 @@ library GatewayCTMDeployerHelper {
             abi.encode(),
             innerConfig
         );
+        _deployedContracts.stateTransition.serverNotifierImplementation = serverNotifierImplementation;
 
         address serverNotifier = _deployInternal(
             "TransparentUpgradeableProxy",
@@ -182,8 +192,10 @@ library GatewayCTMDeployerHelper {
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
         address verifierFflonk = _deployInternal("L1VerifierFflonk", "L1VerifierFflonk.sol", hex"", innerConfig);
-
         address verifierPlonk = _deployInternal("L1VerifierPlonk", "L1VerifierPlonk.sol", hex"", innerConfig);
+
+        _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
+        _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
 
         bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk);
 
