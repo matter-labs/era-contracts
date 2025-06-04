@@ -104,10 +104,10 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @custom:throws InvalidSigner when signature verification fails
      * @custom:throws VerificationFailed when on-chain attestation verification fails
      */
-    function verifyAndAttestOnChain(bytes calldata rawQuote, bytes32 digest, bytes calldata signature) external view {
-        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
-        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4:8])));
-        if (quoteVersion == 3 || (quoteVersion == 4 && teeType == SGX_TEE)) {
+    function verifyAndAttestOnChain(bytes calldata rawQuote, bytes32 digest, bytes calldata signature) external {
+        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0 : 2]));
+        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4 : 8])));
+        if ((quoteVersion == 3 || quoteVersion == 4) && teeType == SGX_TEE) {
             _checkMrEnclave(rawQuote);
             uint256 reportDataOffset = ENCLAVE_REPORT_DATA_OFFSET;
             _checkSigner(rawQuote, digest, signature, reportDataOffset);
@@ -132,9 +132,9 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      */
     function registerSigner(bytes calldata rawQuote) external {
         address signer;
-        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
-        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4:8])));
-        if (quoteVersion == 3 || (quoteVersion == 4 && teeType == SGX_TEE)) {
+        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0 : 2]));
+        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4 : 8])));
+        if ((quoteVersion == 3 || quoteVersion == 4) && teeType == SGX_TEE) {
             _checkMrEnclave(rawQuote);
             uint256 reportDataOffset = ENCLAVE_REPORT_DATA_OFFSET;
             signer = _extractSigner(rawQuote, reportDataOffset);
@@ -162,7 +162,16 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @custom:throws InvalidSigner when the signature was not created by a registered signer
      */
     function verifyDigest(bytes32 digest, bytes calldata signature) external view {
-        address recovered = digest.recover(signature);
+        hasSigner(digest.recover(signature));
+    }
+
+    /**
+     * @notice Checks if the provided address is a registered signer
+     * @dev Iterates through the signers array to find a match
+     * @param recovered The address to check against the registered signers
+     * @custom:throws InvalidSigner when the address is not a registered signer
+     */
+    function hasSigner(address recovered) public view {
         bool signerFound = false;
         for (uint i = 0; i < totalSigners; i++) {
             if (recovered == signers[i]) {
