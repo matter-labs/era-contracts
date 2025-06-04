@@ -150,7 +150,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes[] calldata // attributes
     ) external payable returns (bytes4) {
         require(payload.length > 4, L2AssetRouter_PayloadTooShort());
-        require(bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector, L2AssetRouter_InvalidSelector());
+        // require(bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector, L2AssetRouter_InvalidSelector());
         (bool success, ) = address(this).call(payload);
         require(success, L2AssetRouter_ExecuteMessageFailed());
         return IERC7786Receiver.executeMessage.selector;

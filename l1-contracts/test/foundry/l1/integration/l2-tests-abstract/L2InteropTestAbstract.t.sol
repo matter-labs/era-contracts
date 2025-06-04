@@ -14,7 +14,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
@@ -24,7 +24,9 @@ import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {IInteropHandler, CallStatus} from "contracts/interop/IInteropHandler.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
@@ -35,7 +37,7 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "./_SharedL2ContractDeployer.sol";
-import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof, TxStatus} from "contracts/common/Messaging.sol";
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 import {IMessageVerification} from "contracts/state-transition/chain-interfaces/IMessageVerification.sol";
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "./Utils.sol";
@@ -81,8 +83,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // (bool success, ) = recipient.call(data);
         // assertTrue(success);
     }
-
-    function test_l2MessageVerification() public {
+    function getInclusionProof() public view returns (MessageInclusionProof memory) {
         bytes32[] memory proof = new bytes32[](27);
         proof[0] = bytes32(0x010f050000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
@@ -111,16 +112,28 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         proof[24] = bytes32(0x0102000100000000000000000000000000000000000000000000000000000000);
         proof[25] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
         proof[26] = bytes32(0xe25714e53790167f58b1da56145a1c025a461008fe358f583f53d764000ca847);
-        L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
-            271,
-            31,
-            0,
-            L2Message(
+
+        return MessageInclusionProof({
+            chainId: 271,
+            l1BatchNumber: 31,
+            l2MessageIndex: 0,
+            message: L2Message(
                 0,
                 address(0x0000000000000000000000000000000000010003),
                 hex"9c884fd1000000000000000000000000000000000000000000000000000000000000010f76b59944c0e577e988c1b823ef4ad168478ddfe6044cca433996ade7637ec70d00000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d81300000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d813000000000000000000000000ee0dcf9b8c3048530fd6b2211ae3ba32e8590905000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001c1010000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004574254430000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000"
             ),
-            proof
+            proof: proof
+        });
+    }
+
+    function test_l2MessageVerification() public {
+        MessageInclusionProof memory proof = getInclusionProof();
+        L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
+            proof.chainId,
+            proof.l1BatchNumber,
+            proof.l2MessageIndex,
+            proof.message,
+            proof.proof
         );
     }
 
@@ -131,5 +144,85 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             abi.encodePacked(IMessageVerification.proveL2MessageInclusionShared.selector, data)
         );
         require(success);
+    }
+
+    function test_executeBundle() public {
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof();
+        vm.mockCall(
+            address(L2_INTEROP_ROOT_STORAGE),
+            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector, 506, 159),
+            abi.encode(bytes32(0x2b902ead86c984cb3ac0e1ef86c64f8765b0d1565dc3f5ff0a59a2a64678d4c0))
+        );
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
+            abi.encode(bytes(""))
+        );
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).executeBundle(bundle, proof);
+    }
+
+    function test_unbundleBundle() public {
+        InteropBundle memory interopBundle = getInteropBundle(3);
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof();
+        vm.mockCall(
+            address(L2_INTEROP_ROOT_STORAGE),
+            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector, 506, 159),
+            abi.encode(bytes32(0xe9c0b373d96a3f9fc7f7143cfe375d2bdd16fe8ab12570fcd0ac76fc004aec23))
+        );
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
+            abi.encode(bytes(""))
+        );
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+        CallStatus[] memory callStatuses1 = new CallStatus[](3);
+        callStatuses1[0] = CallStatus.Unprocessed;
+        callStatuses1[1] = CallStatus.Cancelled;
+        callStatuses1[2] = CallStatus.Executed;
+        CallStatus[] memory callStatuses2 = new CallStatus[](3);
+        callStatuses2[0] = CallStatus.Executed;
+        callStatuses2[1] = CallStatus.Cancelled;
+        callStatuses2[2] = CallStatus.Unprocessed;
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, proof.l2MessageIndex, bundle, callStatuses1);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, proof.l2MessageIndex, bundle, callStatuses2);
+    }
+
+    function getInteropBundle(uint256 amount) public returns (InteropBundle memory) {
+        address depositor = makeAddr("someDepositor");
+        address receiver = makeAddr("someReceiver");
+        address token = makeAddr("someToken");
+        InteropCall[] memory calls = new InteropCall[](3);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, token);
+        calls[0] = InteropCall({
+            shadowAccount: false,
+            to: L2_ASSET_ROUTER_ADDR,
+            from: L2_ASSET_ROUTER_ADDR,
+            value: 0,
+            data: abi.encodeCall(IAssetRouterBase.finalizeDeposit, (L1_CHAIN_ID, assetId, DataEncoding.encodeBridgeMintData(depositor, receiver, token, amount, encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS))))
+        });
+        calls[1] = InteropCall({
+            shadowAccount: false,
+            to: L2_ASSET_ROUTER_ADDR,
+            from: L2_ASSET_ROUTER_ADDR,
+            value: 0,
+            data: abi.encodeCall(IAssetRouterBase.finalizeDeposit, (L1_CHAIN_ID, assetId, DataEncoding.encodeBridgeMintData(depositor, receiver, token, amount, encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS))))
+        });
+        calls[2] = InteropCall({
+            shadowAccount: false,
+            to: L2_ASSET_ROUTER_ADDR,
+            from: L2_ASSET_ROUTER_ADDR,
+            value: 0,
+            data: abi.encodeCall(IAssetRouterBase.finalizeDeposit, (L1_CHAIN_ID, assetId, DataEncoding.encodeBridgeMintData(depositor, receiver, token, amount, encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS))))
+        });
+        InteropBundle memory interopBundle = InteropBundle({
+            destinationChainId: 271,
+            sendingBlockNumber: 31,
+            calls: calls,
+            executionAddress: address(0)
+        });
+        return interopBundle;
     }
 }
