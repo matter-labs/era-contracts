@@ -87,6 +87,22 @@ contract InteropHandler is IInteropHandler {
         }
         bundleStatus[bundleHash] = BundleStatus.Unbundled;
 
+        uint256 callsLength = interopBundle.calls.length;
+        for (uint256 i = 0; i < callsLength; ++i) {
+            CallStatus recordedCallStatus = callStatus[bundleHash][i];
+            CallStatus requestedCallStatus = _callStatus[i];
+            if (requestedCallStatus == CallStatus.Executed) {
+                require(recordedCallStatus == CallStatus.Unprocessed, CallNotExecutable(bundleHash, i));
+                callStatus[bundleHash][i] = CallStatus.Executed;
+            } else if (requestedCallStatus == CallStatus.Cancelled) {
+                require(recordedCallStatus != CallStatus.Executed, CallAlreadyExecuted(bundleHash, i));
+                if (recordedCallStatus == CallStatus.Unprocessed) {
+                    // We update the call if needed.
+                    callStatus[bundleHash][i] = CallStatus.Cancelled;
+                }
+            }
+        }
+
         _executeCalls({
             _sourceChainId: _sourceChainId,
             _bundleHash: bundleHash,
@@ -119,25 +135,12 @@ contract InteropHandler is IInteropHandler {
         uint256 callsLength = _interopBundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
             if (!_executeAllCalls) {
-                CallStatus recordedCallStatus = callStatus[_bundleHash][i];
                 CallStatus requestedCallStatus = _callStatus[i];
-                if (requestedCallStatus == CallStatus.Unprocessed) {
+                if (requestedCallStatus != CallStatus.Executed) {
                     // We skip the call.
                     continue;
-                } else if (requestedCallStatus == CallStatus.Cancelled) {
-                    require(recordedCallStatus != CallStatus.Executed, CallAlreadyExecuted(_bundleHash, i));
-                    if (recordedCallStatus == CallStatus.Unprocessed) {
-                        // We update the call if needed.
-                        callStatus[_bundleHash][i] = CallStatus.Cancelled;
-                    }
-                    continue;
-                } else {
-                    require(recordedCallStatus == CallStatus.Unprocessed, CallNotExecutable(_bundleHash, i));
-                    callStatus[_bundleHash][i] = CallStatus.Executed;
                 }
             }
-        }
-        for (uint256 i = 0; i < callsLength; ++i) {
             InteropCall memory interopCall = _interopBundle.calls[i];
 
             L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
