@@ -9,6 +9,7 @@ import {IERC7786Receiver} from "./IERC7786Receiver.sol";
 error MessageNotIncluded();
 error BundleAlreadyProcessed(bytes32 bundleHash);
 error CanNotUnbundle(bytes32 bundleHash);
+error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
 error InvalidSelector(bytes4 selector);
 error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
 
@@ -118,11 +119,25 @@ contract InteropHandler is IInteropHandler {
         uint256 callsLength = _interopBundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
             if (!_executeAllCalls) {
-                if (_callStatus[i] != CallStatus.Executed) {
+                CallStatus recordedCallStatus = callStatus[_bundleHash][i];
+                CallStatus requestedCallStatus = _callStatus[i];
+                if (requestedCallStatus == CallStatus.Unprocessed) {
+                    // We skip the call.
                     continue;
+                } else if (requestedCallStatus == CallStatus.Cancelled) {
+                    require(recordedCallStatus != CallStatus.Executed, CallAlreadyExecuted(_bundleHash, i));
+                    if (recordedCallStatus == CallStatus.Unprocessed) {
+                        // We update the call if needed.
+                        callStatus[_bundleHash][i] = CallStatus.Cancelled;
+                    }
+                    continue;
+                } else {
+                    require(recordedCallStatus == CallStatus.Unprocessed, CallNotExecutable(_bundleHash, i));
+                    callStatus[_bundleHash][i] = CallStatus.Executed;
                 }
-                require(callStatus[_bundleHash][i] == CallStatus.Unprocessed, CallNotExecutable(_bundleHash, i));
             }
+        }
+        for (uint256 i = 0; i < callsLength; ++i) {
             InteropCall memory interopCall = _interopBundle.calls[i];
 
             L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
