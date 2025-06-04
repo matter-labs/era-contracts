@@ -113,17 +113,18 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         proof[25] = bytes32(0xf84927dc03d95cc652990ba75874891ccc5a4d79a0e10a2ffdd238a34a39f828);
         proof[26] = bytes32(0xe25714e53790167f58b1da56145a1c025a461008fe358f583f53d764000ca847);
 
-        return MessageInclusionProof({
-            chainId: 271,
-            l1BatchNumber: 31,
-            l2MessageIndex: 0,
-            message: L2Message(
-                0,
-                address(0x0000000000000000000000000000000000010003),
-                hex"9c884fd1000000000000000000000000000000000000000000000000000000000000010f76b59944c0e577e988c1b823ef4ad168478ddfe6044cca433996ade7637ec70d00000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d81300000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d813000000000000000000000000ee0dcf9b8c3048530fd6b2211ae3ba32e8590905000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001c1010000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004574254430000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000"
-            ),
-            proof: proof
-        });
+        return
+            MessageInclusionProof({
+                chainId: 271,
+                l1BatchNumber: 31,
+                l2MessageIndex: 0,
+                message: L2Message(
+                    0,
+                    address(0x0000000000000000000000000000000000010003),
+                    hex"9c884fd1000000000000000000000000000000000000000000000000000000000000010f76b59944c0e577e988c1b823ef4ad168478ddfe6044cca433996ade7637ec70d00000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d81300000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d813000000000000000000000000ee0dcf9b8c3048530fd6b2211ae3ba32e8590905000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001c1010000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004574254430000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000"
+                ),
+                proof: proof
+            });
     }
 
     function test_l2MessageVerification() public {
@@ -186,8 +187,18 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         callStatuses2[0] = CallStatus.Executed;
         callStatuses2[1] = CallStatus.Cancelled;
         callStatuses2[2] = CallStatus.Unprocessed;
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, proof.l2MessageIndex, bundle, callStatuses1);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, proof.l2MessageIndex, bundle, callStatuses2);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(
+            proof.chainId,
+            proof.l2MessageIndex,
+            bundle,
+            callStatuses1
+        );
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(
+            proof.chainId,
+            proof.l2MessageIndex,
+            bundle,
+            callStatuses2
+        );
     }
 
     function getInteropBundle(uint256 amount) public returns (InteropBundle memory) {
@@ -201,21 +212,60 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             to: L2_ASSET_ROUTER_ADDR,
             from: L2_ASSET_ROUTER_ADDR,
             value: 0,
-            data: abi.encodeCall(IAssetRouterBase.finalizeDeposit, (L1_CHAIN_ID, assetId, DataEncoding.encodeBridgeMintData(depositor, receiver, token, amount, encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS))))
+            data: abi.encodeCall(
+                IAssetRouterBase.finalizeDeposit,
+                (
+                    L1_CHAIN_ID,
+                    assetId,
+                    DataEncoding.encodeBridgeMintData(
+                        depositor,
+                        receiver,
+                        token,
+                        amount,
+                        encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
+                    )
+                )
+            )
         });
         calls[1] = InteropCall({
             shadowAccount: false,
             to: L2_ASSET_ROUTER_ADDR,
             from: L2_ASSET_ROUTER_ADDR,
             value: 0,
-            data: abi.encodeCall(IAssetRouterBase.finalizeDeposit, (L1_CHAIN_ID, assetId, DataEncoding.encodeBridgeMintData(depositor, receiver, token, amount, encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS))))
+            data: abi.encodeCall(
+                IAssetRouterBase.finalizeDeposit,
+                (
+                    L1_CHAIN_ID,
+                    assetId,
+                    DataEncoding.encodeBridgeMintData(
+                        depositor,
+                        receiver,
+                        token,
+                        amount,
+                        encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
+                    )
+                )
+            )
         });
         calls[2] = InteropCall({
             shadowAccount: false,
             to: L2_ASSET_ROUTER_ADDR,
             from: L2_ASSET_ROUTER_ADDR,
             value: 0,
-            data: abi.encodeCall(IAssetRouterBase.finalizeDeposit, (L1_CHAIN_ID, assetId, DataEncoding.encodeBridgeMintData(depositor, receiver, token, amount, encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS))))
+            data: abi.encodeCall(
+                IAssetRouterBase.finalizeDeposit,
+                (
+                    L1_CHAIN_ID,
+                    assetId,
+                    DataEncoding.encodeBridgeMintData(
+                        depositor,
+                        receiver,
+                        token,
+                        amount,
+                        encodeTokenData(TOKEN_DEFAULT_NAME, TOKEN_DEFAULT_SYMBOL, TOKEN_DEFAULT_DECIMALS)
+                    )
+                )
+            )
         });
         InteropBundle memory interopBundle = InteropBundle({
             destinationChainId: 271,

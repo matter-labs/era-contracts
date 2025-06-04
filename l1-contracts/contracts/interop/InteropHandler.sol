@@ -24,11 +24,16 @@ contract InteropHandler is IInteropHandler {
     /// @notice The status of the calls in the bundle. The status of the bundle must be Unbundled.
     mapping(bytes32 bundleHash => mapping(uint256 callIndex => CallStatus callStatus)) public callStatus;
 
-    /// @notice Executes the bundle is the normal case 
+    /// @notice Executes the bundle is the normal case
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         _verifyBundle(_bundle, _proof);
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
-        bytes32 bundleHash = _calculateBundleHash(_proof.chainId, interopBundle.sendingBlockNumber, _proof.l2MessageIndex, _bundle);
+        bytes32 bundleHash = _calculateBundleHash(
+            _proof.chainId,
+            interopBundle.sendingBlockNumber,
+            _proof.l2MessageIndex,
+            _bundle
+        );
 
         BundleStatus status = bundleStatus[bundleHash];
         if (status == BundleStatus.FullyExecuted || status == BundleStatus.Unbundled) {
@@ -48,7 +53,12 @@ contract InteropHandler is IInteropHandler {
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public {
         _verifyBundle(_bundle, _proof);
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
-        bytes32 bundleHash = _calculateBundleHash(_proof.chainId, interopBundle.sendingBlockNumber, _proof.l2MessageIndex, _bundle);
+        bytes32 bundleHash = _calculateBundleHash(
+            _proof.chainId,
+            interopBundle.sendingBlockNumber,
+            _proof.l2MessageIndex,
+            _bundle
+        );
         BundleStatus status = bundleStatus[bundleHash];
         if (status != BundleStatus.Unreceived && status != BundleStatus.Verified) {
             revert BundleAlreadyProcessed(bundleHash);
@@ -56,7 +66,12 @@ contract InteropHandler is IInteropHandler {
         bundleStatus[bundleHash] = BundleStatus.Verified;
     }
 
-    function unbundleBundle(uint256 _sourceChainId, uint256 _l2MessageIndex, bytes memory _bundle, CallStatus[] calldata _callStatus) public {
+    function unbundleBundle(
+        uint256 _sourceChainId,
+        uint256 _l2MessageIndex,
+        bytes memory _bundle,
+        CallStatus[] calldata _callStatus
+    ) public {
         InteropBundle memory interopBundle = abi.decode(_bundle, (InteropBundle));
         bytes32 bundleHash = _calculateBundleHash({
             _sourceChainId: _sourceChainId,
@@ -70,7 +85,7 @@ contract InteropHandler is IInteropHandler {
             revert CanNotUnbundle(bundleHash);
         }
         bundleStatus[bundleHash] = BundleStatus.Unbundled;
-        
+
         _executeCalls({
             _sourceChainId: _sourceChainId,
             _bundleHash: bundleHash,
@@ -84,20 +99,29 @@ contract InteropHandler is IInteropHandler {
                             Internal functions
     //////////////////////////////////////////////////////////////*/
 
-    function _calculateBundleHash(uint256 _sourceChainId, uint256 _sendingBlockNumber, uint256 _l2MessageIndex, bytes memory _bundle) internal pure returns (bytes32 bundleHash) {
-        bundleHash = keccak256(
-            abi.encode(_sourceChainId, _sendingBlockNumber, _l2MessageIndex, _bundle)
-        );
+    function _calculateBundleHash(
+        uint256 _sourceChainId,
+        uint256 _sendingBlockNumber,
+        uint256 _l2MessageIndex,
+        bytes memory _bundle
+    ) internal pure returns (bytes32 bundleHash) {
+        bundleHash = keccak256(abi.encode(_sourceChainId, _sendingBlockNumber, _l2MessageIndex, _bundle));
     }
 
-    function _executeCalls(uint256 _sourceChainId, bytes32 _bundleHash, InteropBundle memory _interopBundle, bool _executeAllCalls, CallStatus[] memory _callStatus) internal {
+    function _executeCalls(
+        uint256 _sourceChainId,
+        bytes32 _bundleHash,
+        InteropBundle memory _interopBundle,
+        bool _executeAllCalls,
+        CallStatus[] memory _callStatus
+    ) internal {
         uint256 callsLength = _interopBundle.calls.length;
         for (uint256 i = 0; i < callsLength; ++i) {
-            if (!_executeAllCalls){
+            if (!_executeAllCalls) {
                 if (_callStatus[i] != CallStatus.Executed) {
                     continue;
                 }
-                require(callStatus[_bundleHash][i] == CallStatus.Unprocessed, CallNotExecutable(_bundleHash, i)); 
+                require(callStatus[_bundleHash][i] == CallStatus.Unprocessed, CallNotExecutable(_bundleHash, i));
             }
             InteropCall memory interopCall = _interopBundle.calls[i];
 
