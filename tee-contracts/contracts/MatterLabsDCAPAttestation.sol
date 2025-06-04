@@ -32,6 +32,11 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     error VerificationFailed(bytes output);
     error ArrayLengthMismatch();
 
+    uint256 private constant SIGNER_ARRAY_SIZE = 50;
+    uint256 private currentSignerIndex;
+    uint256 private totalSigners;
+    address[SIGNER_ARRAY_SIZE] private signers;
+
     using ECDSA for bytes32;
 
     uint256 constant MR_ENCLAVE_OFFSET = HEADER_LENGTH + 64;
@@ -87,6 +92,18 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         pccsRouter = PCCSRouter(_pccsRouter);
     }
 
+    /**
+     * @notice Verifies and attests a TEE (Trusted Execution Environment) quote on-chain
+     * @dev Processes quotes from both SGX and TDX TEE types, with different handling based on quote version
+     * @param rawQuote The raw attestation quote data from the TEE
+     * @param digest The message digest that was signed by the enclave
+     * @param signature The signature of the digest created by the enclave signer
+     * @custom:throws InvalidMrEnclave when the enclave measurement doesn't match allowed values
+     * @custom:throws InvalidTD10ReportBodyMrHash when the TD10 report hash is invalid
+     * @custom:throws IncorrectVersion when the quote version is incorrect
+     * @custom:throws InvalidSigner when signature verification fails
+     * @custom:throws VerificationFailed when on-chain attestation verification fails
+     */
     function verifyAndAttestOnChain(bytes calldata rawQuote, bytes32 digest, bytes calldata signature) external view {
         uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
         bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4:8])));
@@ -102,6 +119,58 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
 
         (bool success, bytes memory output) = _verifyAndAttestOnChain(rawQuote);
         require(success, VerificationFailed(output));
+    }
+
+    /**
+     * @notice Registers a new signer from a valid TEE quote
+     * @dev Extracts the signer from the quote after verifying its authenticity
+     * @param rawQuote The raw attestation quote data from the TEE
+     * @custom:throws InvalidMrEnclave when the enclave measurement doesn't match allowed values
+     * @custom:throws InvalidTD10ReportBodyMrHash when the TD10 report hash is invalid
+     * @custom:throws IncorrectVersion when the quote version is incorrect
+     * @custom:throws VerificationFailed when on-chain attestation verification fails
+     */
+    function registerSigner(bytes calldata rawQuote) external {
+        address signer;
+        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
+        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4:8])));
+        if (quoteVersion == 3 || (quoteVersion == 4 && teeType == SGX_TEE)) {
+            _checkMrEnclave(rawQuote);
+            uint256 reportDataOffset = ENCLAVE_REPORT_DATA_OFFSET;
+            signer = _extractSigner(rawQuote, reportDataOffset);
+        } else if (quoteVersion == 4 && teeType == TDX_TEE) {
+            _checkTD10Mr(rawQuote);
+            uint256 reportDataOffset = TD10_REPORT_DATA_OFFSET;
+            signer = _extractSigner(rawQuote, reportDataOffset);
+        }
+
+        (bool success, bytes memory output) = _verifyAndAttestOnChain(rawQuote);
+        require(success, VerificationFailed(output));
+
+        if (totalSigners < SIGNER_ARRAY_SIZE) {
+            totalSigners++;
+        }
+        signers[currentSignerIndex] = signer;
+        currentSignerIndex = (currentSignerIndex + 1) % SIGNER_ARRAY_SIZE;
+    }
+
+    /**
+     * @notice Verifies that a message digest was signed by a registered TEE signer
+     * @dev Recovers the signer address from the signature and checks against the list of registered signers
+     * @param digest The message digest that was signed
+     * @param signature The signature to verify
+     * @custom:throws InvalidSigner when the signature was not created by a registered signer
+     */
+    function verifyDigest(bytes32 digest, bytes calldata signature) external view {
+        address recovered = digest.recover(signature);
+        bool signerFound = false;
+        for (uint i = 0; i < totalSigners; i++) {
+            if (recovered == signers[i]) {
+                signerFound = true;
+                break;
+            }
+        }
+        require(signerFound, InvalidSigner(recovered));
     }
 
     function _checkMrEnclave(bytes calldata rawQuote) internal view {
@@ -120,6 +189,13 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
             hashValidator.isValidTD10ReportBodyMrHash(tD10ReportBodyMrHash),
             InvalidTD10ReportBodyMrHash(tD10ReportBodyMrHash)
         );
+    }
+
+    function _extractSigner(bytes calldata rawQuote, uint256 reportDataOffset) internal pure returns (address) {
+        address signer = address(bytes20(rawQuote[reportDataOffset:reportDataOffset + 32]));
+        uint256 version = uint256(bytes32(rawQuote[reportDataOffset + 32:reportDataOffset + 64]));
+        require(version == 1, IncorrectVersion(version));
+        return signer;
     }
 
     function _checkSigner(

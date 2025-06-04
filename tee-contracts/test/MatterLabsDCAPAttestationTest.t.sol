@@ -206,6 +206,8 @@ contract MatterLabsDCAPAttestationTest is Test {
         bytes32 new_root_hash = hex"8ac786c8f405e392baa59432c5fee7729e896a1220fbba788d9cffe953db8649";
 
         attestation.verifyAndAttestOnChain(rawQuote, new_root_hash, signature);
+        attestation.registerSigner(rawQuote);
+        attestation.verifyDigest(new_root_hash, signature);
     }
 
     function qeIdDaoUpsert(uint256 quoteVersion, string memory path) internal {
