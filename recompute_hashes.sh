@@ -4,8 +4,8 @@
 set -e
 
 # Expected Foundry version and commit
-EXPECTED_VERSION="0.0.2"
-EXPECTED_COMMIT="27360d4c8"
+EXPECTED_VERSION="forge 0.0.4"
+EXPECTED_COMMIT="ae913af65"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
@@ -13,16 +13,15 @@ if ! command -V forge &> /dev/null; then
   exit 1
 fi
 
-# Get installed Foundry version
-FORGE_OUTPUT=$(forge --version)
-INSTALLED_VERSION=$(echo "$FORGE_OUTPUT" | awk '{print $2}')
-INSTALLED_COMMIT=$(echo "$FORGE_OUTPUT" | awk -F'[()]' '{print $2}' | awk '{print $1}')
+# Get installed Foundry version (first line only)
+FORGE_OUTPUT=$(forge --version | head -n 1)
 
-# Check if Foundry version is as expected
-if [ "$INSTALLED_VERSION" != "$EXPECTED_VERSION" ] || [ "$INSTALLED_COMMIT" != "$EXPECTED_COMMIT" ]; then
+# Accept anything that begins with: "${EXPECTED_VERSION} (${EXPECTED_COMMIT}"
+EXPECTED_PREFIX="${EXPECTED_VERSION} (${EXPECTED_COMMIT}"
+if [[ "$FORGE_OUTPUT" != "$EXPECTED_PREFIX"* ]]; then
   echo "Incorrect Foundry version."
-  echo "Expected: forge ${EXPECTED_VERSION} (${EXPECTED_COMMIT})"
-  echo "Found:    ${FORGE_OUTPUT})"
+  echo "Expected something starting with: ${EXPECTED_PREFIX}"
+  echo "Found:    ${FORGE_OUTPUT}"
   echo "Run: foundryup-zksync --commit ${EXPECTED_COMMIT}"
   exit 1
 fi

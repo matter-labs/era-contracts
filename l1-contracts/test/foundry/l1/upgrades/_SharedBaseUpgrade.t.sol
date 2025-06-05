@@ -24,6 +24,27 @@ contract BaseUpgrade is Test {
 
     address verifier;
 
+    function _prepareEmptyProposedUpgrade() internal {
+        protocolVersion = SemVer.packSemVer(0, 1, 0);
+
+        proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: l2CanonicalTransaction,
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
+            verifier: address(0),
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: new bytes(0),
+            upgradeTimestamp: 0,
+            newProtocolVersion: protocolVersion
+        });
+    }
+
     function _prepareProposedUpgrade() internal {
         bytes[] memory bytesEmptyArray = new bytes[](1);
         bytesEmptyArray[0] = "11111111111111111111111111111111";
