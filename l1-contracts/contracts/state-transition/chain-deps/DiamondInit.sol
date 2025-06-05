@@ -45,9 +45,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         if (_initializeData.baseTokenAssetId == bytes32(0)) {
             revert EmptyAssetId();
         }
-        if (_initializeData.blobVersionedHashRetriever == address(0)) {
-            revert ZeroAddress();
-        }
 
         if (_initializeData.l2BootloaderBytecodeHash == bytes32(0)) {
             revert EmptyBytes32();
@@ -78,7 +75,6 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
-        s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
         s.boojumOS = true;
 
