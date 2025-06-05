@@ -49,7 +49,26 @@ library UnsafeBytes {
         result = new bytes(arrayLen);
 
         assembly {
-            mcopy(add(result, 0x20), add(_bytes, add(0x20, _start)), arrayLen)
+    // Replace MCOPY with Shanghai-compatible memory copying
+    let src := add(add(_bytes, 0x20), _start)
+    let dest := add(result, 0x20)
+    let end := add(src, arrayLen)
+    
+    // Copy in 32-byte chunks for efficiency
+    for { } lt(src, end) { } {
+        let remaining := sub(end, src)
+        if lt(remaining, 0x20) {
+            // Handle the last partial word (< 32 bytes)
+            let mask := sub(shl(mul(remaining, 8), 1), 1)
+            let data := and(mload(src), mask)
+            mstore(dest, data)
+            break
         }
+        // Copy full 32-byte word
+        mstore(dest, mload(src))
+        src := add(src, 0x20)
+        dest := add(dest, 0x20)
+    }
+}
     }
 }

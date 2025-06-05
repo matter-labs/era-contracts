@@ -6,7 +6,7 @@ libs = ["./lib"]
 cache_path = "cache-forge"
 test = "test/foundry"
 solc_version = "0.8.28"
-evm_version = "cancun"
+evm_version = "shangai"
 fs_permissions = [
     { access = "read", path = "../system-contracts/bootloader/build/artifacts" },
     { access = "read", path = "../system-contracts/artifacts-zk/" },
@@ -43,17 +43,27 @@ remappings = [
 ]
 optimizer = true
 optimizer_runs = 9999999
+via_ir = true
 # TODO(X): the latest foundry disallows reverts that happen inside the internal calls and we should fix tests that rely
 # on such reverts
 allow_internal_expect_revert = true
 
-[profile.default.zksync] 
+[profile.default.zksync]
 enable_eravm_extensions = true
 zksolc = "1.5.11"
 
 [profile.invariant_tests_l1context]
 test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+ignored_error_codes = [
+    "missing-receive-ether",
+    "code-size",
+    2018,
+    5667,
+    2519,
+    6321,
+    3149,
+    3860,
+]
 optimizer = false
 [profile.invariant_tests_l1context.zksync]
 suppressed_warnings = ["txorigin"]
@@ -63,7 +73,16 @@ depth = 1000
 
 [profile.invariant_tests_l2context]
 test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+ignored_error_codes = [
+    "missing-receive-ether",
+    "code-size",
+    2018,
+    5667,
+    2519,
+    6321,
+    3149,
+    3860,
+]
 optimizer = false
 [profile.invariant_tests_l2context.zksync]
 suppressed_warnings = ["txorigin"]
@@ -73,7 +92,16 @@ depth = 100
 
 [profile.invariant_tests_l1context_ci]
 test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+ignored_error_codes = [
+    "missing-receive-ether",
+    "code-size",
+    2018,
+    5667,
+    2519,
+    6321,
+    3149,
+    3860,
+]
 optimizer = false
 [profile.invariant_tests_l1context_ci.zksync]
 suppressed_warnings = ["txorigin"]
@@ -83,7 +111,16 @@ depth = 10000
 
 [profile.invariant_tests_l2context_ci]
 test = "test"
-ignored_error_codes = ["missing-receive-ether", "code-size", 2018, 5667, 2519, 6321, 3149, 3860]
+ignored_error_codes = [
+    "missing-receive-ether",
+    "code-size",
+    2018,
+    5667,
+    2519,
+    6321,
+    3149,
+    3860,
+]
 optimizer = false
 [profile.invariant_tests_l2context_ci.zksync]
 suppressed_warnings = ["txorigin"]
