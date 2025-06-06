@@ -9,9 +9,20 @@ error EmptyArray();
  */
 interface IHashValidator {
     function addValidEnclaveHashes(bytes32[] calldata hashes) external;
+
     function removeValidEnclaveHashes(bytes32[] calldata hashes) external;
+
     function isValidEnclaveHash(bytes32 hash) external view returns (bool);
+
+    function addValidEnclaveSigners(bytes32[] calldata hashes) external;
+
+    function removeValidEnclaveSigners(bytes32[] calldata hashes) external;
+
+    function isValidEnclaveSigner(bytes32 hash) external view returns (bool);
+
     function addValidTD10ReportBodyMrHashes(bytes32[] calldata hashes) external;
+
     function removeValidTD10ReportBodyMrHashes(bytes32[] calldata hashes) external;
+
     function isValidTD10ReportBodyMrHash(bytes32 hash) external view returns (bool);
 }

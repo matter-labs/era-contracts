@@ -10,8 +10,10 @@ import {IHashValidator, EmptyArray} from "./interfaces/IHashValidator.sol";
  */
 contract HashValidator is Ownable, IHashValidator {
     mapping(bytes32 => bool) private validEnclaveHashes;
+    mapping(bytes32 => bool) private validEnclaveSigners;
     mapping(bytes32 => bool) private validTD10ReportBodyMrHashes;
 
+    event EnclaveSignersUpdated(bytes32[] signers, bool status);
     event EnclaveHashesUpdated(bytes32[] hashes, bool status);
     event TD10ReportBodyMrHashesUpdated(bytes32[] hashes, bool status);
 
@@ -60,6 +62,49 @@ contract HashValidator is Ownable, IHashValidator {
      */
     function isValidEnclaveHash(bytes32 hash) external view returns (bool isValid) {
         return validEnclaveHashes[hash];
+    }
+
+    /**
+     * @notice Adds multiple enclave signers to the valid list.
+     * @param signers The array of signer addresses to be marked as valid.
+     */
+    function addValidEnclaveSigners(bytes32[] calldata signers) external onlyOwner {
+        uint256 length = signers.length;
+        require(length > 0, EmptyArray());
+
+        for (uint256 i = 0; i < length; ++i) {
+            bytes32 signer = signers[i];
+            if (!validEnclaveSigners[signer]) {
+                validEnclaveSigners[signer] = true;
+            }
+        }
+        emit EnclaveSignersUpdated(signers, true);
+    }
+
+    /**
+     * @notice Removes multiple enclave signers from the valid list.
+     * @param signers The array of signer addresses to be removed.
+     */
+    function removeValidEnclaveSigners(bytes32[] calldata signers) external onlyOwner {
+        uint256 length = signers.length;
+        require(length > 0, EmptyArray());
+
+        for (uint256 i = 0; i < length; ++i) {
+            bytes32 signer = signers[i];
+            if (validEnclaveSigners[signer]) {
+                validEnclaveSigners[signer] = false;
+            }
+        }
+        emit EnclaveSignersUpdated(signers, false);
+    }
+
+    /**
+     * @notice Checks if a given enclave signer address is in the valid list.
+     * @param signer The signer address to check.
+     * @return isValid True if the signer is in the valid list, false otherwise.
+     */
+    function isValidEnclaveSigner(bytes32 signer) external view returns (bool isValid) {
+        return validEnclaveSigners[signer];
     }
 
     /**

@@ -28,6 +28,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     error IncorrectVersion(uint256 version);
     error InvalidSigner(address recoveredSigner);
     error InvalidMrEnclave(bytes32 mrEnclave);
+    error InvalidMrSigner(bytes32 mrSigner);
     error InvalidTD10ReportBodyMrHash(bytes32 tD10ReportBodyMrHash);
     error VerificationFailed(bytes output);
     error ArrayLengthMismatch();
@@ -40,6 +41,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     using ECDSA for bytes32;
 
     uint256 constant MR_ENCLAVE_OFFSET = HEADER_LENGTH + 64;
+    uint256 constant MR_SIGNER_OFFSET = HEADER_LENGTH + 128;
     uint256 constant ENCLAVE_REPORT_DATA_OFFSET = HEADER_LENGTH + 320;
     uint256 constant TD10_MRTD_OFFSET = HEADER_LENGTH + 136;
     uint256 constant TD10_RTMR0_OFFSET = HEADER_LENGTH + 328;
@@ -105,8 +107,8 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @custom:throws VerificationFailed when on-chain attestation verification fails
      */
     function verifyAndAttestOnChain(bytes calldata rawQuote, bytes32 digest, bytes calldata signature) external {
-        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0 : 2]));
-        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4 : 8])));
+        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
+        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4:8])));
         if ((quoteVersion == 3 || quoteVersion == 4) && teeType == SGX_TEE) {
             _checkMrEnclave(rawQuote);
             uint256 reportDataOffset = ENCLAVE_REPORT_DATA_OFFSET;
@@ -132,8 +134,8 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      */
     function registerSigner(bytes calldata rawQuote) external {
         address signer;
-        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0 : 2]));
-        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4 : 8])));
+        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
+        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4:8])));
         if ((quoteVersion == 3 || quoteVersion == 4) && teeType == SGX_TEE) {
             _checkMrEnclave(rawQuote);
             uint256 reportDataOffset = ENCLAVE_REPORT_DATA_OFFSET;
@@ -184,7 +186,10 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
 
     function _checkMrEnclave(bytes calldata rawQuote) internal view {
         bytes32 mrEnclave = bytes32(rawQuote[MR_ENCLAVE_OFFSET:MR_ENCLAVE_OFFSET + 32]);
-        require(hashValidator.isValidEnclaveHash(mrEnclave), InvalidMrEnclave(mrEnclave));
+        bytes32 mrSigner = bytes32(rawQuote[MR_SIGNER_OFFSET:MR_SIGNER_OFFSET + 32]);
+        bool isValidEnclaveHash = hashValidator.isValidEnclaveHash(mrEnclave);
+        bool isValidEnclaveSigner = hashValidator.isValidEnclaveSigner(mrSigner);
+        require(isValidEnclaveHash || isValidEnclaveSigner, InvalidMrEnclave(mrEnclave));
     }
 
     function _checkTD10Mr(bytes calldata rawQuote) internal view {
