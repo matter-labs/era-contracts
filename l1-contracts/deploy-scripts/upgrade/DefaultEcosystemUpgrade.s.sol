@@ -198,7 +198,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         deployVerifiers();
         deployUpgradeStageValidator();
 
-        (addresses.stateTransition.usedUpgrade) = deployUsedUpgradeContract();
+        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
@@ -388,7 +388,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: stateTransition.usedUpgrade,
+            initAddress: stateTransition.defaultUpgrade,
             initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
         });
 
@@ -661,8 +661,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
-            "used_upgrade_addr",
-            addresses.stateTransition.usedUpgrade
+            "default_upgrade_addr",
+            addresses.stateTransition.defaultUpgrade
         );
 
         vm.serializeAddress(
@@ -717,8 +717,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
         vm.serializeAddress(
             "gateway_state_transition",
-            "used_upgrade_addr",
-            gatewayConfig.gatewayStateTransition.usedUpgrade
+            "default_upgrade_addr",
+            gatewayConfig.gatewayStateTransition.defaultUpgrade
         );
         vm.serializeAddress(
             "gateway_state_transition",
@@ -1087,7 +1087,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
         gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract("GettersFacet");
         gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract("DiamondInit");
-        gatewayConfig.gatewayStateTransition.usedUpgrade = deployUsedUpgradeContractGW();
+        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
         gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");

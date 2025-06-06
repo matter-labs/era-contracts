@@ -500,7 +500,7 @@ contract EcosystemUpgrade_v26_1 is Script {
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
-            addresses.stateTransition.usedUpgrade
+            addresses.stateTransition.defaultUpgrade
         );
 
         vm.serializeUint(

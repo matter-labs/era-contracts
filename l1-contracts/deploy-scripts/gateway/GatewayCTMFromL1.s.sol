@@ -322,7 +322,7 @@ contract GatewayCTMFromL1 is Script {
         vm.serializeAddress(
             "gateway_state_transition",
             "default_upgrade_addr",
-            output.gatewayStateTransition.usedUpgrade
+            output.gatewayStateTransition.defaultUpgrade
         );
         vm.serializeAddress(
             "gateway_state_transition",
