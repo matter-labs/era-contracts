@@ -172,6 +172,11 @@ contract DeployTeeDCAPScript is Script {
 
         vm.startBroadcast();
         attestation.upsertRootCertificate(rootCaDer);
+        // FIXME: TEE - remove after testing, only apply for staging
+        bytes32[] memory enclaveHashes = new bytes32[](1);
+        enclaveHashes[0] = bytes32(0xc5591a72b8b86e0d8814d6e8750e3efe66aea2d102b8ba2405365559b858697d);
+        hashValidator.addValidEnclaveSigners(enclaveHashes);
+
         vm.stopBroadcast();
 
         // Save deployment information
