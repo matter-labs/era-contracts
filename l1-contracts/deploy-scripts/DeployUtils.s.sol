@@ -5,36 +5,15 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {StateTransitionDeployedAddresses, FacetCut, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, ADDRESS_ONE} from "./Utils.sol";
-import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
-struct FixedForceDeploymentsData {
-    uint256 l1ChainId;
-    uint256 eraChainId;
-    address l1AssetRouter;
-    bytes32 l2TokenProxyBytecodeHash;
-    address aliasedL1Governance;
-    uint256 maxNumberOfZKChains;
-    bytes32 bridgehubBytecodeHash;
-    bytes32 l2AssetRouterBytecodeHash;
-    bytes32 l2NtvBytecodeHash;
-    bytes32 messageRootBytecodeHash;
-    bytes32 interopCenterBytecodeHash;
-    bytes32 assetTrackerBytecodeHash;
-    address l2SharedBridgeLegacyImpl;
-    address l2BridgedStandardERC20Impl;
-    // The forced beacon address. It is needed only for internal testing.
-    // MUST be equal to 0 in production.
-    // It will be the job of the governance to ensure that this value is set correctly.
-    address dangerousTestOnlyForcedBeacon;
-}
+import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -47,7 +26,6 @@ struct DeployedAddresses {
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
-    address blobVersionedHashRetriever;
     address create2Factory;
     address chainRegistrar;
     address protocolUpgradeHandlerProxy;
@@ -75,6 +53,8 @@ struct BridgehubDeployedAddresses {
     address ctmDeploymentTrackerProxy;
     address messageRootImplementation;
     address messageRootProxy;
+    address chainAssetHandlerImplementation;
+    address chainAssetHandlerProxy;
     address interopCenterImplementation;
     address interopCenterProxy;
     address assetTrackerImplementation;
@@ -98,6 +78,7 @@ struct Config {
     uint256 l1ChainId;
     address deployerAddress;
     uint256 eraChainId;
+    uint256 gatewayChainId;
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
@@ -107,8 +88,6 @@ struct Config {
 
 // solhint-disable-next-line gas-struct-packing
 struct ContractsConfig {
-    bytes32 create2FactorySalt;
-    address create2FactoryAddr;
     address multicall3Addr;
     uint256 validatorTimelockExecutionDelay;
     bytes32 genesisRoot;
@@ -144,10 +123,8 @@ struct GeneratedData {
     bytes forceDeploymentsData;
 }
 
-abstract contract DeployUtils is Script {
+abstract contract DeployUtils is Create2FactoryUtils {
     using stdToml for string;
-
-    address internal constant DETERMINISTIC_CREATE2_ADDRESS = 0x4e59b44847b379578588920cA78FbF26c0B4956C;
 
     Config public config;
     GeneratedData internal generatedData;
@@ -172,10 +149,14 @@ abstract contract DeployUtils is Script {
         );
         config.contracts.governanceMinDelay = toml.readUint("$.contracts.governance_min_delay");
         config.contracts.maxNumberOfChains = toml.readUint("$.contracts.max_number_of_chains");
-        config.contracts.create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+
+        bytes32 create2FactorySalt = toml.readBytes32("$.contracts.create2_factory_salt");
+        address create2FactoryAddr;
         if (vm.keyExistsToml(toml, "$.contracts.create2_factory_addr")) {
-            config.contracts.create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
+            create2FactoryAddr = toml.readAddress("$.contracts.create2_factory_addr");
         }
+        _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
+
         config.contracts.validatorTimelockExecutionDelay = toml.readUint(
             "$.contracts.validator_timelock_execution_delay"
         );
@@ -212,35 +193,12 @@ abstract contract DeployUtils is Script {
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
 
-    function instantiateCreate2Factory() internal {
-        address contractAddress;
-
-        bool isDeterministicDeployed = DETERMINISTIC_CREATE2_ADDRESS.code.length > 0;
-        bool isConfigured = config.contracts.create2FactoryAddr != address(0);
-
-        if (isConfigured) {
-            if (config.contracts.create2FactoryAddr.code.length == 0) {
-                revert AddressHasNoCode(config.contracts.create2FactoryAddr);
-            }
-            contractAddress = config.contracts.create2FactoryAddr;
-            console.log("Using configured Create2Factory address:", contractAddress);
-        } else if (isDeterministicDeployed) {
-            contractAddress = DETERMINISTIC_CREATE2_ADDRESS;
-            console.log("Using deterministic Create2Factory address:", contractAddress);
-        } else {
-            contractAddress = Utils.deployCreate2Factory();
-            console.log("Create2Factory deployed at:", contractAddress);
-        }
-
-        addresses.create2Factory = contractAddress;
-    }
-
     function deployStateTransitionDiamondFacets() internal {
-        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet");
-        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet");
-        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet");
-        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet");
-        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit");
+        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet", false);
+        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
+        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
+        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet", false);
+        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
     function getFacetCuts(
@@ -336,6 +294,8 @@ abstract contract DeployUtils is Script {
 
         FeeParams memory feeParams = getFeeParams();
 
+        require(stateTransition.verifier != address(0), "verifier is zero");
+
         return
             DiamondInitializeDataNewChain({
                 verifier: IVerifier(stateTransition.verifier),
@@ -344,43 +304,53 @@ abstract contract DeployUtils is Script {
                 l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
                 l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
                 priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-                feeParams: feeParams,
-                blobVersionedHashRetriever: stateTransition.isOnGateway
-                    ? ADDRESS_ONE
-                    : addresses.blobVersionedHashRetriever
+                feeParams: feeParams
             });
     }
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function deploySimpleContract(string memory contractName) internal returns (address contractAddress) {
+    function deploySimpleContract(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal returns (address contractAddress) {
         contractAddress = deployViaCreate2AndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
-            contractName
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
+            contractName,
+            isZKBytecode
         );
     }
 
     function deployWithCreate2AndOwner(
         string memory contractName,
-        address owner
+        address owner,
+        bool isZKBytecode
     ) internal returns (address contractAddress) {
         contractAddress = deployWithOwnerAndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
             owner,
             contractName,
-            string.concat(contractName, " Implementation")
+            string.concat(contractName, " Implementation"),
+            isZKBytecode
         );
     }
 
     function deployTuppWithContract(
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal virtual returns (address implementation, address proxy);
 
-    function getCreationCode(string memory contractName) internal view virtual returns (bytes memory);
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual returns (bytes memory);
 
-    function getCreationCalldata(string memory contractName) internal view virtual returns (bytes memory) {
+    function getCreationCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Bridgehub")) {
@@ -395,6 +365,15 @@ abstract contract DeployUtils is Script {
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridgehub.interopCenterProxy,
                     addresses.bridges.l1AssetRouterProxy
+                );
+        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+            return
+                abi.encode(
+                    config.l1ChainId,
+                    config.ownerAddress,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridgehub.messageRootProxy
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return
@@ -433,8 +412,6 @@ abstract contract DeployUtils is Script {
             return abi.encode();
         } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
             return abi.encode(addresses.bridges.bridgedStandardERC20Implementation);
-        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
-            return abi.encode();
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
@@ -488,7 +465,7 @@ abstract contract DeployUtils is Script {
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {
-            return abi.encode(true);
+            return abi.encode();
         } else if (compareStrings(contractName, "DiamondInit")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AssetTracker")) {
@@ -506,125 +483,6 @@ abstract contract DeployUtils is Script {
     }
 
     function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory);
-
-    function getDeployedContractName(string memory contractName) internal view virtual returns (string memory) {
-        if (compareStrings(contractName, "BridgedTokenBeacon")) {
-            return "UpgradeableBeacon";
-        } else {
-            return contractName;
-        }
-    }
-
-    ////////////////////////////// Create2 utils /////////////////////////////////
-
-    function deployViaCreate2AndNotify(
-        bytes memory _creationCode,
-        bytes memory _constructorParamsEncoded,
-        string memory contractName
-    ) internal returns (address deployedAddress) {
-        deployedAddress = deployViaCreate2AndNotify(
-            _creationCode,
-            _constructorParamsEncoded,
-            contractName,
-            contractName
-        );
-    }
-
-    function deployViaCreate2AndNotify(
-        bytes memory _creationCode,
-        bytes memory _constructorParamsEncoded,
-        string memory contractName,
-        string memory displayName
-    ) internal returns (address deployedAddress) {
-        bytes memory bytecode = abi.encodePacked(_creationCode, _constructorParamsEncoded);
-
-        deployedAddress = deployViaCreate2(bytecode);
-        notifyAboutDeployment(deployedAddress, contractName, _constructorParamsEncoded, displayName);
-    }
-
-    function deployWithOwnerAndNotify(
-        bytes memory initCode,
-        bytes memory constructorParams,
-        address owner,
-        string memory contractName,
-        string memory displayName
-    ) internal returns (address contractAddress) {
-        contractAddress = create2WithDeterministicOwner(abi.encodePacked(initCode, constructorParams), owner);
-        notifyAboutDeployment(contractAddress, contractName, constructorParams, displayName);
-    }
-
-    function create2WithDeterministicOwner(bytes memory initCode, address owner) internal returns (address) {
-        bytes memory creatorInitCode = abi.encodePacked(
-            type(Create2AndTransfer).creationCode,
-            abi.encode(initCode, config.contracts.create2FactorySalt, owner)
-        );
-
-        address deployerAddr = deployViaCreate2(creatorInitCode);
-
-        return Create2AndTransfer(deployerAddr).deployedAddress();
-    }
-
-    function deployViaCreate2(bytes memory _bytecode) internal returns (address) {
-        return Utils.deployViaCreate2(_bytecode, config.contracts.create2FactorySalt, addresses.create2Factory);
-    }
-
-    function deployViaCreate2(
-        bytes memory creationCode,
-        bytes memory constructorArgs
-    ) internal virtual returns (address) {
-        return
-            Utils.deployViaCreate2(
-                abi.encodePacked(creationCode, constructorArgs),
-                config.contracts.create2FactorySalt,
-                addresses.create2Factory
-            );
-    }
-
-    ////////////////////////////// Misc utils /////////////////////////////////
-
-    function notifyAboutDeployment(
-        address contractAddr,
-        string memory contractName,
-        bytes memory constructorParams
-    ) internal {
-        notifyAboutDeployment(contractAddr, contractName, constructorParams, contractName);
-    }
-
-    function notifyAboutDeployment(
-        address contractAddr,
-        string memory contractName,
-        bytes memory constructorParams,
-        string memory displayName
-    ) internal {
-        string memory basicMessage = string.concat(displayName, " has been deployed at ", vm.toString(contractAddr));
-        console.log(basicMessage);
-
-        string memory forgeMessage;
-        string memory deployedContractName = getDeployedContractName(contractName);
-        if (constructorParams.length == 0) {
-            forgeMessage = string.concat(
-                "forge verify-contract ",
-                vm.toString(contractAddr),
-                " ",
-                deployedContractName
-            );
-        } else {
-            forgeMessage = string.concat(
-                "forge verify-contract ",
-                vm.toString(contractAddr),
-                " ",
-                deployedContractName,
-                " --constructor-args ",
-                vm.toString(constructorParams)
-            );
-        }
-
-        console.log(forgeMessage);
-    }
-
-    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
-        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
-    }
 
     function test() internal virtual {}
 }

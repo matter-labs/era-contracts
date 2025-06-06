@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
 import {BaseZkSyncUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {ProtocolVersionTooSmall, ProtocolVersionDeltaTooLarge, PreviousUpgradeNotFinalized, PreviousUpgradeBatchNotCleared, ProtocolMajorVersionNotZero} from "./ZkSyncUpgradeErrors.sol";
+import {GenesisUpgradeExpectedOnSettlementLayer, PreviousUpgradeBatchNotCleared, PreviousUpgradeNotFinalized, ProtocolMajorVersionNotZero, ProtocolVersionDeltaTooLarge, ProtocolVersionTooSmall} from "./ZkSyncUpgradeErrors.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
@@ -16,7 +16,8 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
     function _setNewProtocolVersion(
-        uint256 _newProtocolVersion
+        uint256 _newProtocolVersion,
+        bool _isOnSettlementLayer
     ) internal override returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         if (
@@ -51,6 +52,10 @@ abstract contract BaseZkSyncUpgradeGenesis is BaseZkSyncUpgrade {
         // While this is implicitly enforced by other checks above, we still double check just in case
         if (minorDelta > MAX_ALLOWED_MINOR_VERSION_DELTA) {
             revert ProtocolVersionDeltaTooLarge(minorDelta, MAX_ALLOWED_MINOR_VERSION_DELTA);
+        }
+
+        if (!_isOnSettlementLayer) {
+            revert GenesisUpgradeExpectedOnSettlementLayer();
         }
 
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.

@@ -3,10 +3,10 @@
 pragma solidity 0.8.28;
 
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
-import {L2Message, L2Log, L2CanonicalTransaction, MessageInclusionProof} from "contracts/common/Messaging.sol";
+import {L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof} from "contracts/common/Messaging.sol";
 import "forge-std/Test.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L1_GAS_PER_PUBDATA_BYTE, L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L1_GAS_PER_PUBDATA_BYTE, L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/common/Config.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {BatchNotExecuted, HashedLogIsDefault} from "contracts/common/L1ContractErrors.sol";
 import {MurkyBase} from "murky/common/MurkyBase.sol";
@@ -15,7 +15,7 @@ import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
-import {MessageHashing, ProofVerificationResult} from "contracts/common/libraries/MessageHashing.sol";
+import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
@@ -393,7 +393,7 @@ contract MailboxL2LogsProve is MailboxTest {
         // for (uint256 i = 0; i < paymasterInclusionProof.proof.length; i++) {
         //     console.logBytes32(paymasterInclusionProof.proof[i]);
         // }
-        ProofVerificationResult memory result = this.getMessageHash(
+        ProofData memory result = this.getMessageHash(
             paymasterInclusionProof.chainId,
             paymasterInclusionProof.l1BatchNumber,
             paymasterInclusionProof.l2MessageIndex,
@@ -410,7 +410,7 @@ contract MailboxL2LogsProve is MailboxTest {
         uint256 _l2MessageIndex,
         L2Message calldata _message,
         bytes32[] calldata _proof
-    ) public returns (ProofVerificationResult memory) {
+    ) public returns (ProofData memory) {
         L2Log memory _log = _L2MessageToLog(_message);
         // console.log("Log l2");
         // console.log(_log.sender);
@@ -421,7 +421,7 @@ contract MailboxL2LogsProve is MailboxTest {
             // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
         );
-        return MessageHashing.hashProof(_chainId, _l1BatchNumber, _l2MessageIndex, hashedLog, _proof);
+        return MessageHashing.getProofData(_chainId, _l1BatchNumber, _l2MessageIndex, hashedLog, _proof);
     }
 
     /// @dev Convert arbitrary-length message to the raw l2 log

@@ -77,17 +77,6 @@
      testing_assertEq(getGasPrice(6, 5), baseFee, "Invalid gas price")
  }
 
-function TEST_getGasPrice_maxPriorityFeeGreaterThenMaxFee() {
-    testing_testWillFailWith(13)
-    getGasPrice(5, 6)
-}
-
-function TEST_getGasPrice_baseFeeGreaterThenMaxFee() {
-    testing_testWillFailWith("Base fee greater than max fee")
-    let baseFee := basefee()
-    getGasPrice(baseFee, baseFee)
-}
-
 function TEST_getOperatorRefundForTx() {
     let transactionIndex := 10
 
@@ -126,19 +115,19 @@ function TEST_checkOffset_success() {
 function TEST_checkOffset_callDataEncodingTooBig() {
     testing_testWillFailWith("calldataEncoding too big")
 
-    checkOffset(8534625)
+    checkOffset(8534623135)
 }
 
 function TEST_validateOperatorProvidedPrices1() {
     testing_testWillFailWith("Fair pubdata price too high")
 
-    validateOperatorProvidedPrices(10000000000000, 1000000000000001)
+    validateOperatorProvidedPrices(10000000000000, 18446744073709551616)
 }
 
 function TEST_validateOperatorProvidedPrices2() {
     testing_testWillFailWith("L2 fair gas price too high")
 
-    validateOperatorProvidedPrices(10000000000001, 100000000000000)
+    validateOperatorProvidedPrices(18446744073709551616, 100000000000000)
 }
 
 function TEST_validateOperatorProvidedPrices3() {
@@ -187,10 +176,9 @@ function TEST_getFeeParams_LowPubdataPrice() {
      let chainedPriorityTxnHashLogKey := chainedPriorityTxnHashLogKey()
      let numberOfLayer1TxsLogKey := numberOfLayer1TxsLogKey()
      let protocolUpgradeTxHashKey := protocolUpgradeTxHashKey()
-
-     testing_assertEq(chainedPriorityTxnHashLogKey, 5, "Invalid priority txn hash log key")
-     testing_assertEq(numberOfLayer1TxsLogKey, 6, "Invalid num layer 1 txns log key")
-     testing_assertEq(protocolUpgradeTxHashKey, 13, "Invalid protocol upgrade txn hash log key")
+     testing_assertEq(chainedPriorityTxnHashLogKey, 2, "Invalid priority txn hash log key")
+     testing_assertEq(numberOfLayer1TxsLogKey, 3, "Invalid num layer 1 txns log key")
+     testing_assertEq(protocolUpgradeTxHashKey, 8, "Invalid protocol upgrade txn hash log key")
  }
 
 function TEST_safeAdd() {

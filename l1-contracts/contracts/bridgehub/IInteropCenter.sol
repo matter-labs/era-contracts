@@ -2,18 +2,17 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
-import {InteropCallStarter, InteropCall, BundleMetadata, InteropBundle, InteropTrigger, GasFields, InteropCallRequest} from "../common/Messaging.sol";
+import {BundleMetadata, GasFields, InteropBundle, InteropCall, InteropCallRequest, InteropCallStarter, InteropTrigger, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "./IBridgehub.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-import {IBridgehub} from "./IBridgehub.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
-    event InteropBundleSent(bytes32 interopBundleHash, InteropBundle interopBundle);
-    event InteropTriggerSent(InteropTrigger _interopTrigger);
+    event InteropBundleSent(bytes32 l2l1TxHash, bytes32 interopBundleHash, InteropBundle interopBundle);
+    event InteropTriggerSent(bytes32 l2l11TxHash, InteropTrigger _interopTrigger);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
+
     function assetTracker() external view returns (IAssetTracker);
 
     function setAddresses(address assetRouter, address assetTracker) external;
@@ -77,7 +76,9 @@ interface IInteropCenter {
     ) external;
 
     function startBundle(uint256 _destinationChainId) external returns (bytes32 bundleId);
+
     function addCallToBundle(bytes32 _bundleId, InteropCallRequest memory _interopCallRequest) external;
+
     function finishAndSendBundle(
         bytes32 _bundleId,
         address _executionAddress

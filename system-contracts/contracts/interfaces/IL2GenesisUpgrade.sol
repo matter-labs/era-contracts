@@ -29,6 +29,7 @@ struct FixedForceDeploymentsData {
     bytes32 l2AssetRouterBytecodeHash;
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
+    bytes32 chainAssetHandlerBytecodeHash;
     bytes32 interopCenterBytecodeHash;
     bytes32 assetTrackerBytecodeHash;
     address l2SharedBridgeLegacyImpl;
@@ -39,6 +40,8 @@ struct FixedForceDeploymentsData {
     address dangerousTestOnlyForcedBeacon;
 }
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IL2GenesisUpgrade {
     event UpgradeComplete(uint256 _chainId);
 

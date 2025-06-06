@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {L2Message, L2Log} from "../../../common/Messaging.sol";
+import {L2Log, L2Message} from "../../../common/Messaging.sol";
 import {IMessageVerification} from "../../chain-interfaces/IMessageVerification.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "../../../common/Config.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -10,13 +10,14 @@ import {HashedLogIsDefault} from "../../../common/L1ContractErrors.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @dev This contract is abstract and is inherited by the Mailbox and L2MessageVerification contracts.
+/// @dev All calls go through via the _proveL2LeafInclusion function, which is different on L1 and L2.
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 abstract contract MessageVerification is IMessageVerification {
     /// @inheritdoc IMessageVerification
     function proveL2MessageInclusionShared(
         uint256 _chainId,
-        uint256 _batchNumber,
+        uint256 _blockOrBatchNumber,
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
@@ -24,7 +25,7 @@ abstract contract MessageVerification is IMessageVerification {
         return
             _proveL2LogInclusion({
                 _chainId: _chainId,
-                _batchNumber: _batchNumber,
+                _blockOrBatchNumber: _blockOrBatchNumber,
                 _index: _index,
                 _log: _l2MessageToLog(_message),
                 _proof: _proof
@@ -34,7 +35,7 @@ abstract contract MessageVerification is IMessageVerification {
     /// @inheritdoc IMessageVerification
     function proveL2LeafInclusionShared(
         uint256 _chainId,
-        uint256 _batchNumber,
+        uint256 _blockOrBatchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
@@ -42,7 +43,7 @@ abstract contract MessageVerification is IMessageVerification {
         return
             _proveL2LeafInclusion({
                 _chainId: _chainId,
-                _batchNumber: _batchNumber,
+                _blockOrBatchNumber: _blockOrBatchNumber,
                 _leafProofMask: _leafProofMask,
                 _leaf: _leaf,
                 _proof: _proof
@@ -51,7 +52,7 @@ abstract contract MessageVerification is IMessageVerification {
 
     function _proveL2LeafInclusion(
         uint256 _chainId,
-        uint256 _batchNumber,
+        uint256 _blockOrBatchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
@@ -60,7 +61,7 @@ abstract contract MessageVerification is IMessageVerification {
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
         uint256 _chainId,
-        uint256 _batchNumber,
+        uint256 _blockOrBatchNumber,
         uint256 _index,
         L2Log memory _log,
         bytes32[] calldata _proof
@@ -79,12 +80,12 @@ abstract contract MessageVerification is IMessageVerification {
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
         // equal to the length of other nodes preimages (which are `2 * 32`)
 
-        // We can use `index` as a mask, since the `localMessageRoot` is on the left part of the tree.
+        // We can use `index` as a mask, since the `LocalLogsRoot` is on the left part of the tree.
 
         return
             _proveL2LeafInclusion({
                 _chainId: _chainId,
-                _batchNumber: _batchNumber,
+                _blockOrBatchNumber: _blockOrBatchNumber,
                 _leafProofMask: _index,
                 _leaf: hashedLog,
                 _proof: _proof
@@ -107,7 +108,7 @@ abstract contract MessageVerification is IMessageVerification {
     /// @inheritdoc IMessageVerification
     function proveL2LogInclusionShared(
         uint256 _chainId,
-        uint256 _batchNumber,
+        uint256 _blockOrBatchNumber,
         uint256 _index,
         L2Log calldata _log,
         bytes32[] calldata _proof
@@ -115,7 +116,7 @@ abstract contract MessageVerification is IMessageVerification {
         return
             _proveL2LogInclusion({
                 _chainId: _chainId,
-                _batchNumber: _batchNumber,
+                _blockOrBatchNumber: _blockOrBatchNumber,
                 _index: _index,
                 _log: _log,
                 _proof: _proof

@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
-import {IncorrectTokenAddressFromNTV, UnsupportedEncodingVersion, InvalidNTVBurnData} from "../L1ContractErrors.sol";
+import {IncorrectTokenAddressFromNTV, InvalidNTVBurnData, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
 
 /**
  * @author Matter Labs

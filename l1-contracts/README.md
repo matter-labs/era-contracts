@@ -11,15 +11,26 @@ write smart contracts in C++, Rust and other popular languages.
 
 ### Building
 
-Compile the solidity and yul contracts: `yarn l1 build`
+```shell
+cd era-contracts
+./recompute_hashes.sh
+```
 
 ### Testing
 
-To run unit tests, execute `yarn l1 test`.
+Use the following commands to run tests.
 
-Similarly, to run tests in Foundry execute `yarn l1 test:foundry`.
+```shell
+cd era-contracts
+yarn l1 test:foundry
+yarn l1 test:zkfoundry
+```
 
-To run the fork test, use `yarn l1 test:fork`
+And the following command for the fork tests.
+
+```shell
+yarn l1 test:fork
+```
 
 ### Security Testing and Linting
 
@@ -41,3 +52,17 @@ If you identify a false positive in your code, please make sure to highlight thi
 
 We also utilize `typos` and `codespell` spell checkers to minimize the occurrence of accidental typos.
 If you need to add a word to the databases of these tools please insert it into `../codespell/wordlist.txt` and `../_typos.toml`.
+
+### Verifying contracts on L2
+
+Some of the contracts inside the `l1-contracts` folder are predeployed on all ZK Chains. In order to verify those on explorer, build the contracts via `yarn build:foundry` and then run the following command:
+
+```
+VERIFICATION_URL=<explorer-verification-url> yarn verify-on-l2-explorer
+```
+
+For example, for ZKsync Era testnet environment it would look the following way:
+
+```
+VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-l2-explorer
+```

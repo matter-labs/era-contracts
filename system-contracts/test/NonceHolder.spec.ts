@@ -50,17 +50,6 @@ describe("NonceHolder tests", () => {
       expect(rawNonceAfter).to.equal(rawNonceBefore.add(1));
     });
 
-    it("should stay the same", async () => {
-      const nonceBefore = await nonceHolder.getMinNonce(systemAccount.address);
-      const rawNonceBefore = await nonceHolder.getRawNonce(systemAccount.address);
-      await nonceHolder.connect(systemAccount).increaseMinNonce(0);
-      const nonceAfter = await nonceHolder.getMinNonce(systemAccount.address);
-      const rawNonceAfter = await nonceHolder.getRawNonce(systemAccount.address);
-
-      expect(nonceBefore).to.equal(nonceAfter);
-      expect(rawNonceBefore).to.equal(rawNonceAfter);
-    });
-
     it("should increase account minNonce by many", async () => {
       const nonceBefore = await nonceHolder.getMinNonce(systemAccount.address);
       const rawNonceBefore = await nonceHolder.getRawNonce(systemAccount.address);

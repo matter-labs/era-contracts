@@ -1048,37 +1048,38 @@ object "EvmEmulator" {
             // https://eips.ethereum.org/EIPS/eip-2565
         
             // Expected input layout
-            // [0; 31] (32 bytes)	Bsize	Byte size of B
-            // [32; 63] (32 bytes)	Esize	Byte size of E
-            // [64; 95] (32 bytes)	Msize	Byte size of M
+            // [0; 31] (32 bytes)	bSize	Byte size of B
+            // [32; 63] (32 bytes)	eSize	Byte size of E
+            // [64; 95] (32 bytes)	mSize	Byte size of M
             // [96; ..] input values
         
-            let Bsize := mloadPotentiallyPaddedValue(inputOffset, inputBoundary)
-            let Esize := mloadPotentiallyPaddedValue(add(inputOffset, 0x20), inputBoundary)
-            let Msize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
+            let bSize := mloadPotentiallyPaddedValue(inputOffset, inputBoundary)
+            let eSize := mloadPotentiallyPaddedValue(add(inputOffset, 0x20), inputBoundary)
+            let mSize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
         
             let inputIsTooBig := or(
-                gt(Bsize, MAX_MODEXP_INPUT_FIELD_SIZE()), 
-                or(gt(Esize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(Msize, MAX_MODEXP_INPUT_FIELD_SIZE()))
+                gt(bSize, MAX_MODEXP_INPUT_FIELD_SIZE()), 
+                or(gt(eSize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(mSize, MAX_MODEXP_INPUT_FIELD_SIZE()))
             )
         
             // The limitated size of parameters also prevents overflows during gas calculations.
             // The current value (32 bytes) violates EVM equivalence. This value comes from circuit limitations.
+            // In the future this constant may be replaced with bigger values, up to MAX_UINT64.
         
             switch inputIsTooBig
             case 1 {
                 gasToCharge := MAX_UINT64() // Skip calculation, not supported or unpayable
             }
             default {
-                // 96 + Bsize, offset of the exponent value
-                let expOffset := add(add(inputOffset, 0x60), Bsize)
+                // 96 + bSize, offset of the exponent value
+                let expOffset := add(add(inputOffset, 0x60), bSize)
         
                 // Calculate iteration count
                 let iterationCount
-                switch gt(Esize, 32)
+                switch gt(eSize, 32)
                 case 0 { // if exponent_length <= 32
                     let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
-                    exponent := shr(sub(32, Esize), exponent) // shift to the right if Esize not 32 bytes
+                    exponent := shr(shl(3, sub(32, eSize)), exponent) // shift to the right if eSize not 32 bytes
         
                     // if exponent == 0: iteration_count = 0
                     // else: iteration_count = exponent.bit_length() - 1
@@ -1087,18 +1088,21 @@ object "EvmEmulator" {
                     }
                 }
                 default { // elif exponent_length > 32
+                    // Note: currently this branch is unused (due to MAX_MODEXP_INPUT_FIELD_SIZE restriction). 
+                    // It can be used if more efficient modexp circuits are implemented.
+        
                     // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
         
                     // load last 32 bytes of exponent
-                    let exponentLast32Bytes := mloadPotentiallyPaddedValue(add(expOffset, sub(Esize, 32)), inputBoundary)
-                    iterationCount := add(shl(3, sub(Esize, 32)), msb(exponentLast32Bytes))
+                    let exponentLast32Bytes := mloadPotentiallyPaddedValue(add(expOffset, sub(eSize, 32)), inputBoundary)
+                    iterationCount := add(shl(3, sub(eSize, 32)), msb(exponentLast32Bytes))
                 }
                 if iszero(iterationCount) {
                     iterationCount := 1
                 }
         
-                // mult_complexity(Bsize, Msize), EIP-2565
-                let words := shr(3, add(getMax(Bsize, Msize), 7))
+                // mult_complexity(bSize, mSize), EIP-2565
+                let words := shr(3, add(getMax(bSize, mSize), 7))
                 let multiplicationComplexity := mul(words, words)
         
                 // return max(200, math.floor(multiplication_complexity * iteration_count / 3))
@@ -1111,9 +1115,9 @@ object "EvmEmulator" {
             value := mload(index)
         
             if lt(memoryBound, add(index, 32)) {
-                memoryBound := getMax(index, memoryBound)
-                let shift := sub(add(index, 32), memoryBound)
-                let value := shl(shift, shr(shift, value))
+                memoryBound := getMax(index, memoryBound)  // Note: in bytes
+                let shift := shl(3, sub(add(index, 32), memoryBound)) // Note: in bits
+                value := shl(shift, shr(shift, value))
             }
         }
         
@@ -2130,6 +2134,26 @@ object "EvmEmulator" {
                     sp, stackHead := pushStackItem(sp, _baseFee, stackHead)
                     ip := add(ip, 1)
                 }
+                case 0x49 { // OP_BLOBHASH
+                    evmGasLeft := chargeGas(evmGasLeft, 3)
+            
+                    // "Consume" idx
+                    let _idx := accessStackHead(sp, stackHead)
+            
+                    // We don't fully support BLOBHASH. Just return 0
+                    stackHead := 0
+            
+                    ip := add(ip, 1)
+                }
+                case 0x4A { // OP_BLOBBASEFEE
+                    evmGasLeft := chargeGas(evmGasLeft, 2)
+            
+                    // We don't fully support BLOBBASEFEE. Just return 1 as MIN_BASE_FEE_PER_BLOB_GAS (EIP-4844)
+                    // 1 instead of 0 may prevent some unexpected division by zero in user contracts
+                    sp, stackHead := pushStackItem(sp, 1, stackHead)
+            
+                    ip := add(ip, 1)
+                }
                 case 0x50 { // OP_POP
                     evmGasLeft := chargeGas(evmGasLeft, 2)
             
@@ -2790,12 +2814,6 @@ object "EvmEmulator" {
                     $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x2F { // Unused opcode
-                    $llvm_NoInline_llvm$_invalid()
-                }
-                case 0x49 { // Unused opcode
-                    $llvm_NoInline_llvm$_invalid()
-                }
-                case 0x4A { // Unused opcode
                     $llvm_NoInline_llvm$_invalid()
                 }
                 case 0x4B { // Unused opcode
@@ -4107,37 +4125,38 @@ object "EvmEmulator" {
                 // https://eips.ethereum.org/EIPS/eip-2565
             
                 // Expected input layout
-                // [0; 31] (32 bytes)	Bsize	Byte size of B
-                // [32; 63] (32 bytes)	Esize	Byte size of E
-                // [64; 95] (32 bytes)	Msize	Byte size of M
+                // [0; 31] (32 bytes)	bSize	Byte size of B
+                // [32; 63] (32 bytes)	eSize	Byte size of E
+                // [64; 95] (32 bytes)	mSize	Byte size of M
                 // [96; ..] input values
             
-                let Bsize := mloadPotentiallyPaddedValue(inputOffset, inputBoundary)
-                let Esize := mloadPotentiallyPaddedValue(add(inputOffset, 0x20), inputBoundary)
-                let Msize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
+                let bSize := mloadPotentiallyPaddedValue(inputOffset, inputBoundary)
+                let eSize := mloadPotentiallyPaddedValue(add(inputOffset, 0x20), inputBoundary)
+                let mSize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
             
                 let inputIsTooBig := or(
-                    gt(Bsize, MAX_MODEXP_INPUT_FIELD_SIZE()), 
-                    or(gt(Esize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(Msize, MAX_MODEXP_INPUT_FIELD_SIZE()))
+                    gt(bSize, MAX_MODEXP_INPUT_FIELD_SIZE()), 
+                    or(gt(eSize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(mSize, MAX_MODEXP_INPUT_FIELD_SIZE()))
                 )
             
                 // The limitated size of parameters also prevents overflows during gas calculations.
                 // The current value (32 bytes) violates EVM equivalence. This value comes from circuit limitations.
+                // In the future this constant may be replaced with bigger values, up to MAX_UINT64.
             
                 switch inputIsTooBig
                 case 1 {
                     gasToCharge := MAX_UINT64() // Skip calculation, not supported or unpayable
                 }
                 default {
-                    // 96 + Bsize, offset of the exponent value
-                    let expOffset := add(add(inputOffset, 0x60), Bsize)
+                    // 96 + bSize, offset of the exponent value
+                    let expOffset := add(add(inputOffset, 0x60), bSize)
             
                     // Calculate iteration count
                     let iterationCount
-                    switch gt(Esize, 32)
+                    switch gt(eSize, 32)
                     case 0 { // if exponent_length <= 32
                         let exponent := mloadPotentiallyPaddedValue(expOffset, inputBoundary) // load 32 bytes
-                        exponent := shr(sub(32, Esize), exponent) // shift to the right if Esize not 32 bytes
+                        exponent := shr(shl(3, sub(32, eSize)), exponent) // shift to the right if eSize not 32 bytes
             
                         // if exponent == 0: iteration_count = 0
                         // else: iteration_count = exponent.bit_length() - 1
@@ -4146,18 +4165,21 @@ object "EvmEmulator" {
                         }
                     }
                     default { // elif exponent_length > 32
+                        // Note: currently this branch is unused (due to MAX_MODEXP_INPUT_FIELD_SIZE restriction). 
+                        // It can be used if more efficient modexp circuits are implemented.
+            
                         // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
             
                         // load last 32 bytes of exponent
-                        let exponentLast32Bytes := mloadPotentiallyPaddedValue(add(expOffset, sub(Esize, 32)), inputBoundary)
-                        iterationCount := add(shl(3, sub(Esize, 32)), msb(exponentLast32Bytes))
+                        let exponentLast32Bytes := mloadPotentiallyPaddedValue(add(expOffset, sub(eSize, 32)), inputBoundary)
+                        iterationCount := add(shl(3, sub(eSize, 32)), msb(exponentLast32Bytes))
                     }
                     if iszero(iterationCount) {
                         iterationCount := 1
                     }
             
-                    // mult_complexity(Bsize, Msize), EIP-2565
-                    let words := shr(3, add(getMax(Bsize, Msize), 7))
+                    // mult_complexity(bSize, mSize), EIP-2565
+                    let words := shr(3, add(getMax(bSize, mSize), 7))
                     let multiplicationComplexity := mul(words, words)
             
                     // return max(200, math.floor(multiplication_complexity * iteration_count / 3))
@@ -4170,9 +4192,9 @@ object "EvmEmulator" {
                 value := mload(index)
             
                 if lt(memoryBound, add(index, 32)) {
-                    memoryBound := getMax(index, memoryBound)
-                    let shift := sub(add(index, 32), memoryBound)
-                    let value := shl(shift, shr(shift, value))
+                    memoryBound := getMax(index, memoryBound)  // Note: in bytes
+                    let shift := shl(3, sub(add(index, 32), memoryBound)) // Note: in bits
+                    value := shl(shift, shr(shift, value))
                 }
             }
             
@@ -5177,6 +5199,26 @@ object "EvmEmulator" {
                         sp, stackHead := pushStackItem(sp, _baseFee, stackHead)
                         ip := add(ip, 1)
                     }
+                    case 0x49 { // OP_BLOBHASH
+                        evmGasLeft := chargeGas(evmGasLeft, 3)
+                
+                        // "Consume" idx
+                        let _idx := accessStackHead(sp, stackHead)
+                
+                        // We don't fully support BLOBHASH. Just return 0
+                        stackHead := 0
+                
+                        ip := add(ip, 1)
+                    }
+                    case 0x4A { // OP_BLOBBASEFEE
+                        evmGasLeft := chargeGas(evmGasLeft, 2)
+                
+                        // We don't fully support BLOBBASEFEE. Just return 1 as MIN_BASE_FEE_PER_BLOB_GAS (EIP-4844)
+                        // 1 instead of 0 may prevent some unexpected division by zero in user contracts
+                        sp, stackHead := pushStackItem(sp, 1, stackHead)
+                
+                        ip := add(ip, 1)
+                    }
                     case 0x50 { // OP_POP
                         evmGasLeft := chargeGas(evmGasLeft, 2)
                 
@@ -5837,12 +5879,6 @@ object "EvmEmulator" {
                         $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x2F { // Unused opcode
-                        $llvm_NoInline_llvm$_invalid()
-                    }
-                    case 0x49 { // Unused opcode
-                        $llvm_NoInline_llvm$_invalid()
-                    }
-                    case 0x4A { // Unused opcode
                         $llvm_NoInline_llvm$_invalid()
                     }
                     case 0x4B { // Unused opcode

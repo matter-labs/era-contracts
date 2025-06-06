@@ -22,23 +22,28 @@ export const TEST_L2_ASSET_ROUTER_ADDRESS = "0x000000000000000000000000000000000
 // event writer should be on the original address because event logs are filtered by address
 export const REAL_EVENT_WRITER_CONTRACT_ADDRESS = "0x000000000000000000000000000000000000800d";
 export const REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008006";
+export const REAL_FORCE_DEPLOYER_ADDRESS = "0x0000000000000000000000000000000000008007";
 export const REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008002";
 export const REAL_KECCAK256_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008010";
 export const REAL_P256VERIFY_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000000100";
 export const REAL_CODE_ORACLE_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008011";
+export const REAL_EVM_PREDEPLOYS_MANAGER = "0x0000000000000000000000000000000000008014";
 export const REAL_MSG_VALUE_SYSTEM_CONTRACT_ADDRESS = "0x0000000000000000000000000000000000008009";
 export const REAL_SYSTEM_CONTEXT_ADDRESS = "0x000000000000000000000000000000000000800b";
+export const REAL_COMPLEX_UPGRADER_CONTRACT_ADDRESS = "0x000000000000000000000000000000000000800f";
 
 export const REAL_BRIDGEHUB_ADDRESS = "0x0000000000000000000000000000000000010002";
 export const REAL_L2_ASSET_ROUTER_ADDRESS = "0x0000000000000000000000000000000000010003";
+export const REAL_L2_NATIVE_TOKEN_VAULT_ADDRESS = "0x0000000000000000000000000000000000010004";
 export const REAL_L2_MESSAGE_ROOT_ADDRESS = "0x0000000000000000000000000000000000010005";
-export const REAL_L2_INTEROP_CENTER_ADDRESS = "0x0000000000000000000000000000000000010008"; // kl todo
-export const REAL_L2_INTEROP_HANDLER_ADDRESS = "0x0000000000000000000000000000000000010009";
-export const REAL_L2_INTEROP_ACCOUNT_ADDRESS = "0x000000000000000000000000000000000001000a"; // kl todo
-export const REAL_L2_MESSAGE_ROOT_STORAGE_ADDRESS = "0x000000000000000000000000000000000001000B"; // kl todo
-export const REAL_L2_MESSAGE_VERIFICATION_ADDRESS = "0x000000000000000000000000000000000001000C"; // kl todo
-export const REAL_L2_STANDARD_TRIGGER_ACCOUNT_ADDRESS = "0x000000000000000000000000000000000001000d"; // kl todo
-export const REAL_L2_ASSET_TRACKER_ADDRESS = "0x000000000000000000000000000000000001000e"; // kl todo
+export const REAL_L2_INTEROP_ROOT_STORAGE_ADDRESS = "0x0000000000000000000000000000000000010008";
+export const REAL_L2_MESSAGE_VERIFICATION_ADDRESS = "0x0000000000000000000000000000000000010009";
+export const REAL_L2_CHAIN_ASSET_HANDLER_ADDRESS = "0x000000000000000000000000000000000001000a";
+export const REAL_L2_INTEROP_CENTER_ADDRESS = "0x000000000000000000000000000000000001000B";
+export const REAL_L2_INTEROP_HANDLER_ADDRESS = "0x000000000000000000000000000000000001000C";
+export const REAL_L2_ASSET_TRACKER_ADDRESS = "0x000000000000000000000000000000000001000d";
+export const REAL_L2_INTEROP_ACCOUNT_ADDRESS = "0x000000000000000000000000000000000001000e";
+export const REAL_L2_STANDARD_TRIGGER_ACCOUNT_ADDRESS = "0x000000000000000000000000000000000001000F";
 
 export const EMPTY_STRING_KECCAK = "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470";
 export const TWO_IN_256 = 2n ** 256n;
@@ -46,21 +51,30 @@ export const ONE_BYTES32_HEX = "0x0000000000000000000000000000000000000000000000
 
 export const ADDRESS_ONE = "0x0000000000000000000000000000000000000001";
 
-export const BRIDGEHUB_L2_CANONICAL_TRANSACTION_ABI =
-  "tuple(uint256 txType, uint256 from, uint256 to, uint256 gasLimit, uint256 gasPerPubdataByteLimit, uint256 maxFeePerGas, uint256 maxPriorityFeePerGas, uint256 paymaster, uint256 nonce, uint256 value, uint256[4] reserved, bytes data, bytes signature, uint256[] factoryDeps, bytes paymasterInput, bytes reservedDynamic)";
-export const BRIDGEHUB_L2_TRANSACTION_REQUEST_ABI =
-  "tuple(address sender, address contractL2, uint256 mintValue, uint256 l2Value, bytes l2Calldata, uint256 l2GasLimit, uint256 l2GasPerPubdataByteLimit, bytes[] factoryDeps, address refundRecipient)";
-export const L2_LOG_STRING =
-  "tuple(uint8 l2ShardId,bool isService,uint16 txNumberInBatch,address sender,bytes32 key,bytes32 value)";
-export const ARTIFACTS_PATH = "../../../contracts/l1-contracts/out/";
-export const SYSTEM_ARTIFACTS_PATH = "../../../contracts/system-contracts/zkout/";
+export const MODEXP_ADDRESS = "0x0000000000000000000000000000000000000005";
+export const EC_ADD_ADDRESS = "0x0000000000000000000000000000000000000006";
+export const EC_MUL_ADDRESS = "0x0000000000000000000000000000000000000007";
+export const EC_PAIRING_ADDRESS = "0x0000000000000000000000000000000000000008";
 
-export const INTEROP_TRIGGER_ABI =
-  "tuple(uint256 destinationChainId, address from, address recipient,bytes32 feeBundleHash, bytes32 executionBundleHash, tuple(uint256 gasLimit, uint256 gasPerPubdataByteLimit, address refundRecipient, address paymaster, bytes paymasterInput) gasFields)";
+export const SERVICE_CALL_PSEUDO_CALLER = "0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF";
 
-export const INTEROP_CALL_ABI = "tuple(address to, address from, uint256 value, bytes data)";
-export const INTEROP_BUNDLE_ABI =
-  "tuple(uint256 destinationChainId, tuple(address to, address from, uint256 value, bytes data)[] calls, address executionAddress)";
+export const PROXY_ADMIN_SLOT = "0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103";
 
-export const MESSAGE_INCLUSION_PROOF_ABI =
-  "tuple(uint256 chainId, uint256 l1BatchNumber, uint256 l2MessageIndex, tuple(uint16 txNumberInBatch, address sender, bytes data) message, bytes32[] proof)";
+// export const BRIDGEHUB_L2_CANONICAL_TRANSACTION_ABI =
+//   "tuple(uint256 txType, uint256 from, uint256 to, uint256 gasLimit, uint256 gasPerPubdataByteLimit, uint256 maxFeePerGas, uint256 maxPriorityFeePerGas, uint256 paymaster, uint256 nonce, uint256 value, uint256[4] reserved, bytes data, bytes signature, uint256[] factoryDeps, bytes paymasterInput, bytes reservedDynamic)";
+// export const BRIDGEHUB_L2_TRANSACTION_REQUEST_ABI =
+//   "tuple(address sender, address contractL2, uint256 mintValue, uint256 l2Value, bytes l2Calldata, uint256 l2GasLimit, uint256 l2GasPerPubdataByteLimit, bytes[] factoryDeps, address refundRecipient)";
+// export const L2_LOG_STRING =
+//   "tuple(uint8 l2ShardId,bool isService,uint16 txNumberInBatch,address sender,bytes32 key,bytes32 value)";
+// export const ARTIFACTS_PATH = "../../../contracts/l1-contracts/out/";
+// export const SYSTEM_ARTIFACTS_PATH = "../../../contracts/system-contracts/zkout/";
+
+// export const INTEROP_TRIGGER_ABI =
+//   "tuple(uint256 destinationChainId, address from, address recipient,bytes32 feeBundleHash, bytes32 executionBundleHash, tuple(uint256 gasLimit, uint256 gasPerPubdataByteLimit, address refundRecipient, address paymaster, bytes paymasterInput) gasFields)";
+
+// export const INTEROP_CALL_ABI = "tuple(address to, address from, uint256 value, bytes data)";
+// export const INTEROP_BUNDLE_ABI =
+//   "tuple(uint256 destinationChainId, tuple(address to, address from, uint256 value, bytes data)[] calls, address executionAddress)";
+
+// export const MESSAGE_INCLUSION_PROOF_ABI =
+//   "tuple(uint256 chainId, uint256 l1BatchNumber, uint256 l2MessageIndex, tuple(uint16 txNumberInBatch, address sender, bytes data) message, bytes32[] proof)";

@@ -2,8 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../bridgehub/IInteropCenter.sol";
 
 /// @dev The encoding version used for legacy txs.
@@ -52,6 +51,8 @@ interface IAssetRouterBase {
     event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
+
+    function L1_CHAIN_ID() external view returns (uint256);
 
     function INTEROP_CENTER() external view returns (IInteropCenter);
 

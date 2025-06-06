@@ -3,9 +3,10 @@
 pragma solidity ^0.8.20;
 
 import {Vm} from "forge-std/Vm.sol";
+import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_INTEROP_CENTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_ACCOUNT_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -13,10 +14,11 @@ import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
-import {InteropCenter, IInteropCenter} from "contracts/bridgehub/InteropCenter.sol";
-import {InteropHandler, IInteropHandler} from "contracts/bridgehub/InteropHandler.sol";
+import {IInteropCenter, InteropCenter} from "contracts/bridgehub/InteropCenter.sol";
+import {IInteropHandler, InteropHandler} from "contracts/bridgehub/InteropHandler.sol";
 // import {InteropAccount} from "contracts/bridgehub/InteropAccount.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -25,6 +27,8 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
+import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
+import {Utils} from "deploy-scripts/Utils.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -33,47 +37,12 @@ library L2Utils {
     /// rich account on era_test_node
     address internal constant RANDOM_ADDRESS = address(0xBC989fDe9e54cAd2aB4392Af6dF60f04873A033A);
 
-    string internal constant L2_ASSET_ROUTER_PATH = "./zkout/L2AssetRouter.sol/L2AssetRouter.json";
-    string internal constant L2_NATIVE_TOKEN_VAULT_PATH = "./zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json";
-    string internal constant BRIDGEHUB_PATH = "./zkout/Bridgehub.sol/Bridgehub.json";
-
-    function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, artifactPath);
-        string memory json = vm.readFile(path);
-        bytes memory bytecode = vm.parseJsonBytes(json, ".bytecode.object");
-        return bytecode;
-    }
-
-    function readZKFoundryBytecodeL1(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
-    }
-
-    function readZKFoundryBytecodeSystemContracts(
-        string memory fileName,
-        string memory contractName
-    ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../system-contracts/zkout/", fileName, "/", contractName, ".json");
-        bytes memory bytecode = readFoundryBytecode(path);
-        return bytecode;
-    }
-
-    /// @notice Returns the bytecode of a given system contract.
-    function readSystemContractsBytecode(string memory _filename) internal view returns (bytes memory) {
-        return readZKFoundryBytecodeSystemContracts(string.concat(_filename, ".sol"), _filename);
-    }
-
     /**
      * @dev Initializes the system contracts.
      * @dev It is a hack needed to make the tests be able to call system contracts directly.
      */
     function initSystemContracts(SystemContractsArgs memory _args) internal {
-        bytes memory contractDeployerBytecode = readSystemContractsBytecode("ContractDeployer");
+        bytes memory contractDeployerBytecode = Utils.readSystemContractsBytecode("ContractDeployer");
         vm.etch(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, contractDeployerBytecode);
         forceDeploySystemContracts(_args);
     }
@@ -85,12 +54,13 @@ library L2Utils {
         }
         forceDeployMessageRoot(_args);
         forceDeployBridgehub(_args);
+        forceDeployChainAssetHandler(_args);
         forceDeployAssetRouter(_args);
         forceDeployNativeTokenVault(_args);
         forceDeployInteropCenter(_args);
+        // forceDeployInteropHandler(_args);
         // forceDeployInteropAccount(_args);
         // forceDeployStandardTriggerAccount(_args);
-        // forceDeployInteropHandler(_args);
     }
 
     function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
@@ -115,7 +85,30 @@ library L2Utils {
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            L2_CHAIN_ASSET_HANDLER_ADDR,
             L2_INTEROP_CENTER_ADDR
+        );
+    }
+
+    function forceDeployChainAssetHandler(SystemContractsArgs memory _args) internal {
+        new ChainAssetHandler(
+            _args.l1ChainId,
+            _args.aliasedOwner,
+            IBridgehub(L2_BRIDGEHUB_ADDR),
+            L2_ASSET_ROUTER_ADDR,
+            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+        );
+        forceDeployWithConstructor(
+            "ChainAssetHandler",
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encode(
+                _args.l1ChainId,
+                _args.aliasedOwner,
+                L2_BRIDGEHUB_ADDR,
+                L2_ASSET_ROUTER_ADDR,
+                L2_MESSAGE_ROOT_ADDR
+            ),
+            _args.broadcast
         );
     }
 
@@ -160,10 +153,6 @@ library L2Utils {
     }
 
     /// @notice Deploys the L2AssetRouter contract.
-    // / @param _l1ChainId The chain ID of the L1 chain.
-    // / @param _eraChainId The chain ID of the era chain.
-    // / @param _l1AssetRouter The address of the L1 asset router.
-    // / @param _legacySharedBridge The address of the legacy shared bridge.
     function forceDeployAssetRouter(SystemContractsArgs memory _args) internal {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
@@ -194,12 +183,6 @@ library L2Utils {
     }
 
     /// @notice Deploys the L2NativeTokenVault contract.
-    // / @param _l1ChainId The chain ID of the L1 chain.
-    // / @param _aliasedOwner The address of the aliased owner.
-    // / @param _l2TokenProxyBytecodeHash The hash of the L2 token proxy bytecode.
-    // / @param _legacySharedBridge The address of the legacy shared bridge.
-    // / @param _l2TokenBeacon The address of the L2 token beacon.
-    // / @param _contractsDeployedAlready Whether the contracts are deployed already.
     function forceDeployNativeTokenVault(SystemContractsArgs memory _args) internal {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
@@ -239,8 +222,7 @@ library L2Utils {
         bytes memory _constructorArgs,
         bool _broadcast
     ) public {
-        console.log(string.concat("Force deploying ", _contractName, string(abi.encode(_address))));
-        bytes memory bytecode = getCreationCode(_contractName);
+        bytes memory bytecode = Utils.readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
 
@@ -278,21 +260,21 @@ library L2Utils {
         return contractAddress;
     }
 
-    function getCreationCode(string memory _contractName) internal view returns (bytes memory) {
-        if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("L2StandardTriggerAccount"))) {
-            return
-                abi.encodePacked(
-                    readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
-                );
-        } else if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("InteropAccount"))) {
-            return
-                abi.encodePacked(
-                    readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
-                );
-        }
-        bytes memory bytecode = readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
-        return bytecode;
-    }
+    // function getCreationCode(string memory _contractName) internal view returns (bytes memory) {
+    //     if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("L2StandardTriggerAccount"))) {
+    //         return
+    //             abi.encodePacked(
+    //                 readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
+    //             );
+    //     } else if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("InteropAccount"))) {
+    //         return
+    //             abi.encodePacked(
+    //                 readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
+    //             );
+    //     }
+    //     bytes memory bytecode = readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
+    //     return bytecode;
+    // }
 
     function prankOrBroadcast(bool _broadcast, address _from) public {
         if (_broadcast) {

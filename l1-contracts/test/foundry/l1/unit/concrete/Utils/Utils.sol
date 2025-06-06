@@ -13,16 +13,15 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {MessageVerification} from "contracts/state-transition/chain-deps/facets/MessageVerification.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {SystemLogKey} from "contracts/common/Config.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
+import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
-import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
+import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
 address constant L2_SYSTEM_CONTEXT_ADDRESS = 0x000000000000000000000000000000000000800B;
@@ -64,7 +63,7 @@ library Utils {
     }
 
     function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](7);
+        bytes[] memory logs = new bytes[](8);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -106,6 +105,12 @@ library Utils {
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
             bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
+        );
+        logs[7] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.MESSAGE_ROOT_ROLLING_HASH_KEY),
+            bytes32(uint256(uint160(0)))
         );
 
         return logs;
@@ -172,6 +177,7 @@ library Utils {
                 indexRepeatedStorageChanges: 0,
                 numberOfLayer1Txs: 0,
                 priorityOperationsHash: keccak256(""),
+                dependencyRootsRollingHash: bytes32(0),
                 l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
                 timestamp: 0,
                 commitment: bytes32("")
@@ -209,7 +215,10 @@ library Utils {
         return (
             _newBatchesData[0].batchNumber,
             _newBatchesData[_newBatchesData.length - 1].batchNumber,
-            bytes.concat(bytes1(0x00), abi.encode(_lastCommittedBatchData, _newBatchesData))
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+                abi.encode(_lastCommittedBatchData, _newBatchesData)
+            )
         );
     }
 
@@ -221,7 +230,10 @@ library Utils {
         return (
             _committedBatches[0].batchNumber,
             _committedBatches[_committedBatches.length - 1].batchNumber,
-            bytes.concat(bytes1(0x00), abi.encode(_prevBatch, _committedBatches, _proof))
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+                abi.encode(_prevBatch, _committedBatches, _proof)
+            )
         );
     }
 
@@ -229,10 +241,14 @@ library Utils {
         IExecutor.StoredBatchInfo[] memory _batchesData,
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
+        InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
         return (
             _batchesData[0].batchNumber,
             _batchesData[_batchesData.length - 1].batchNumber,
-            bytes.concat(bytes1(0x00), abi.encode(_batchesData, _priorityOpsData))
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+                abi.encode(_batchesData, _priorityOpsData, dependencyRoots)
+            )
         );
     }
 
@@ -414,8 +430,7 @@ library Utils {
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 500000,
-                feeParams: makeFeeParams(),
-                blobVersionedHashRetriever: address(0x23746765237749923040872834)
+                feeParams: makeFeeParams()
             });
     }
 
@@ -430,8 +445,7 @@ library Utils {
                 l2DefaultAccountBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 l2EvmEmulatorBytecodeHash: 0x0100000000000000000000000000000000000000000000000000000000000000,
                 priorityTxMaxGasLimit: 80000000,
-                feeParams: makeFeeParams(),
-                blobVersionedHashRetriever: address(0x23746765237749923040872834)
+                feeParams: makeFeeParams()
             });
     }
 
@@ -602,9 +616,30 @@ library Utils {
     }
 
     function generatePriorityOps(uint256 len) internal pure returns (PriorityOpsBatchInfo[] memory _ops) {
+        return generatePriorityOps(len, 2);
+    }
+
+    function generatePriorityOps(
+        uint256 len,
+        uint256 priorityOpsLength
+    ) internal pure returns (PriorityOpsBatchInfo[] memory _ops) {
         _ops = new PriorityOpsBatchInfo[](len);
         bytes32[] memory empty;
-        PriorityOpsBatchInfo memory info = PriorityOpsBatchInfo({leftPath: empty, rightPath: empty, itemHashes: empty});
+        bytes32[] memory hashes = new bytes32[](priorityOpsLength);
+        for (uint256 i = 0; i < priorityOpsLength; ++i) {
+            hashes[i] = keccak256(abi.encodePacked("hash", i));
+        }
+        bytes32[] memory leftPath = new bytes32[](2);
+        leftPath[0] = keccak256("left1");
+        leftPath[1] = keccak256("left2");
+        bytes32[] memory rightPath = new bytes32[](2);
+        rightPath[0] = keccak256("right1");
+        rightPath[1] = keccak256("right2");
+        PriorityOpsBatchInfo memory info = PriorityOpsBatchInfo({
+            leftPath: leftPath,
+            rightPath: rightPath,
+            itemHashes: hashes
+        });
 
         for (uint256 i = 0; i < len; ++i) {
             _ops[i] = info;
@@ -612,7 +647,7 @@ library Utils {
     }
 
     function deployL1RollupDAValidatorBytecode() internal returns (address) {
-        bytes memory bytecode = DeployUtils.readRollupDAValidatorBytecode();
+        bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("RollupL1DAValidator");
 
         return deployViaCreate(bytecode);
     }

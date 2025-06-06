@@ -4,19 +4,18 @@ pragma solidity 0.8.28;
 import {DiamondCutTest} from "./_DiamondCut_Shared.t.sol";
 
 import {DiamondCutTestContract} from "contracts/dev-contracts/test/DiamondCutTestContract.sol";
-import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
+import {DiamondInit, InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {VerifierParams, FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {FeeParams, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Utils} from "../Utils/Utils.sol";
-import {InitializeData} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DummyChainTypeManager} from "contracts/dev-contracts/test/DummyChainTypeManager.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {DiamondAlreadyFrozen, Unauthorized, DiamondNotFrozen} from "contracts/common/L1ContractErrors.sol";
+import {DiamondAlreadyFrozen, DiamondNotFrozen, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 contract UpgradeLogicTest is DiamondCutTest {
@@ -107,8 +106,7 @@ contract UpgradeLogicTest is DiamondCutTest {
                 maxL2GasPerBatch: 80_000_000,
                 priorityTxMaxPubdata: 99_000,
                 minimalL2GasPrice: 250_000_000
-            }),
-            blobVersionedHashRetriever: makeAddr("blobVersionedHashRetriver")
+            })
         });
 
         bytes memory diamondInitCalldata = abi.encodeWithSelector(diamondInit.initialize.selector, params);

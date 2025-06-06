@@ -11,25 +11,23 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
-import {PriorityQueue, PriorityOperation} from "../../libraries/PriorityQueue.sol";
+import {PriorityOperation, PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
-import {WritePriorityOpParams, L2CanonicalTransaction, L2Message, L2Log, TxStatus, BridgehubL2TransactionRequest} from "../../../common/Messaging.sol";
-import {MessageHashing, ProofVerificationResult} from "../../../common/libraries/MessageHashing.sol";
+import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
+import {MessageHashing, ProofData} from "../../../common/libraries/MessageHashing.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA, L1_GAS_PER_PUBDATA_BYTE, PRIORITY_OPERATION_L2_TX_TYPE, PRIORITY_EXPIRATION, MAX_NEW_FACTORY_DEPS, SETTLEMENT_LAYER_RELAY_SENDER, SERVICE_TRANSACTION_SENDER} from "../../../common/Config.sol";
+import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, PRIORITY_OPERATION_L2_TX_TYPE, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../../bridgehub/IInteropCenter.sol";
 
-import {OnlyEraSupported, BatchNotExecuted, BaseTokenGasPriceDenominatorNotSet, TransactionNotAllowed, GasPerPubdataMismatch, TooManyFactoryDeps, MsgValueTooLow} from "../../../common/L1ContractErrors.sol";
-import {NotL1, LocalRootIsZero, LocalRootMustBeZero, NotSettlementLayer, NotHyperchain} from "../../L1StateTransitionErrors.sol";
+import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
+import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -82,8 +80,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) public view returns (bool) {
         return
             _proveL2LogInclusion({
-                _chainId: 0,
-                _batchNumber: _batchNumber,
+                _chainId: s.chainId,
+                _blockOrBatchNumber: _batchNumber,
                 _index: _index,
                 _log: _l2MessageToLog(_message),
                 _proof: _proof
@@ -98,7 +96,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _proof
     ) external view returns (bool) {
         return
-            _proveL2LogInclusion({_chainId: 0, _batchNumber: _batchNumber, _index: _index, _log: _log, _proof: _proof});
+            _proveL2LogInclusion({
+                _chainId: s.chainId,
+                _blockOrBatchNumber: _batchNumber,
+                _index: _index,
+                _log: _log,
+                _proof: _proof
+            });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -130,8 +134,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         });
         return
             _proveL2LogInclusion({
-                _chainId: 0,
-                _batchNumber: _l2BatchNumber,
+                _chainId: s.chainId,
+                _blockOrBatchNumber: _l2BatchNumber,
                 _index: _l2MessageIndex,
                 _log: l2Log,
                 _proof: _merkleProof
@@ -147,7 +151,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) external view returns (bool) {
         return
             _proveL2LeafInclusion({
-                _chainId: uint256(0),
+                _chainId: s.chainId,
                 _batchNumber: _batchNumber,
                 _leafProofMask: _leafProofMask,
                 _leaf: _leaf,
@@ -156,15 +160,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     function _proveL2LeafInclusion(
-        // solhint-disable-next-line no-unused-vars
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
-        ProofVerificationResult memory proofVerificationResult = MessageHashing.hashProof({
-            _chainId: s.chainId,
+        ProofData memory proofData = MessageHashing.getProofData({
+            _chainId: _chainId,
             _batchNumber: _batchNumber,
             _leafProofMask: _leafProofMask,
             _leaf: _leaf,
@@ -173,7 +176,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         // If the `finalProofNode` is true, then we assume that this is L1 contract of the top-level
         // in the aggregation, i.e. the batch root is stored here on L1.
-        if (proofVerificationResult.finalProofNode) {
+        if (proofData.finalProofNode) {
             // Double checking that the batch has been executed.
             if (_batchNumber > s.totalBatchesExecuted) {
                 revert BatchNotExecuted(_batchNumber);
@@ -183,7 +186,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             if (correctBatchRoot == bytes32(0)) {
                 revert LocalRootIsZero();
             }
-            return correctBatchRoot == proofVerificationResult.batchSettlementRoot;
+            return correctBatchRoot == proofData.batchSettlementRoot;
         }
 
         if (s.l2LogsRootHashes[_batchNumber] != bytes32(0)) {
@@ -193,19 +196,17 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // to a chain's message root only if the chain has indeed executed its batch on top of it.
         //
         // We trust all chains whitelisted by the Bridgehub governance.
-        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofVerificationResult.settlementLayerChainId)) {
+        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
             revert NotSettlementLayer();
         }
-        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(
-            proofVerificationResult.settlementLayerChainId
-        );
+        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
 
         return
             IMailbox(settlementLayerAddress).proveL2LeafInclusion(
-                proofVerificationResult.settlementLayerBatchNumber,
-                proofVerificationResult.settlementLayerBatchRootMask,
-                proofVerificationResult.chainIdLeaf,
-                MessageHashing.extractSliceUntilEnd(_proof, proofVerificationResult.ptr)
+                proofData.settlementLayerBatchNumber,
+                proofData.settlementLayerBatchRootMask,
+                proofData.chainIdLeaf,
+                MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
             );
     }
 

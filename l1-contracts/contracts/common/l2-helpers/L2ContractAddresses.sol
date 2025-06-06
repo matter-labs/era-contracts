@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
-import {IL2MessageRootStorage} from "../interfaces/IL2MessageRootStorage.sol";
+import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
 import {IAccountCodeStorage} from "./IAccountCodeStorage.sol";
@@ -40,6 +40,7 @@ IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(address(
 /// `diamond-initializers` contracts.
 address constant L2_FORCE_DEPLOYER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x07);
 
+/// @dev The address of the L2ToL1Messenger system contract
 address constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x08);
 /// @dev The address of the special smart contract that can send arbitrary length message as an L2 log
 IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
@@ -62,8 +63,14 @@ address constant L2_PUBDATA_CHUNK_PUBLISHER_ADDR = address(SYSTEM_CONTRACTS_OFFS
 /// @dev The address used to execute complex upgragedes, also used for the genesis upgrade
 address constant L2_COMPLEX_UPGRADER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0f);
 
+/// @dev The address of the create2 factory contract
+address constant L2_CREATE2_FACTORY_ADDR = address(USER_CONTRACTS_OFFSET + 0x00);
+
 /// @dev The address used to execute the genesis upgrade
 address constant L2_GENESIS_UPGRADE_ADDR = address(USER_CONTRACTS_OFFSET + 0x01);
+
+/// @dev The genesis upgrade address is reused for all version specific upgrades
+address constant L2_VERSION_SPECIFIC_UPGRADER_ADDR = L2_GENESIS_UPGRADE_ADDR;
 
 /// @dev The address of the L2 bridge hub system contract, used to start L1->L2 transactions
 address constant L2_BRIDGEHUB_ADDR = address(USER_CONTRACTS_OFFSET + 0x02);
@@ -79,21 +86,32 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
 
-IL2MessageRootStorage constant L2_MESSAGE_ROOT_STORAGE = IL2MessageRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
+/// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
+address constant SLOAD_CONTRACT_ADDR = address(USER_CONTRACTS_OFFSET + 0x06);
 
+/// @dev The address of the WETH implementation contract
+address constant L2_WETH_IMPL_ADDR = address(USER_CONTRACTS_OFFSET + 0x07);
+
+/// @dev The address of the L2 interop root storage system contract
+IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
+
+/// @dev The address of the L2 message verification system contract
 IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
 
+/// @dev The address of the L2 chain handler system contract
+address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
+
 /// @dev the address of the L2 interop center
-address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
+address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
 
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
-
-/// @dev the address of the L2 interop account
-address constant L2_INTEROP_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
-
-/// @dev the address of the L2 standard trigger account
-address constant L2_STANDARD_TRIGGER_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
+address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
 
 /// @dev the address of the L2 asset tracker
-address constant L2_ASSET_TRACKER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0e);
+address constant L2_ASSET_TRACKER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
+
+/// @dev the address of the L2 interop account
+address constant L2_INTEROP_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0e);
+
+/// @dev the address of the L2 standard trigger account
+address constant L2_STANDARD_TRIGGER_ACCOUNT_ADDR = address(USER_CONTRACTS_OFFSET + 0x0f);
