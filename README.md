@@ -26,8 +26,8 @@ See [LICENSE-MIT](LICENSE-MIT) for details.
 - [Website](https://zksync.io/)
 - [GitHub](https://github.com/matter-labs)
 - [ZK Credo](https://github.com/zksync/credo)
-- [Twitter](https://twitter.com/zksync)
-- [Twitter for Devs](https://twitter.com/zkSyncDevs)
+- [X (formerly Twitter)](https://x.com/zksync)
+- [X (formerly Twitter) for Devs](https://x.com/zkSyncDevs)
 - [Discord](https://join.zksync.dev/)
 - [Mirror](https://zksync.mirror.xyz/)
 
