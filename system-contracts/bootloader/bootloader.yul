@@ -4400,6 +4400,11 @@ object "Bootloader" {
             // At start we explicitly reset the rolling hash
             mstore(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE(), 0)
 
+            // At start we explicitly reset interop roots
+            mstore(LAST_PROCESSED_BLOCK_NUMBER_BYTE(), 0)
+            mstore(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE(), 0)
+            mstore(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE(), 0)
+
             // Iterating through transaction descriptions
             let transactionIndex := 0
             for {
