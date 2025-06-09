@@ -406,8 +406,7 @@ object "Bootloader" {
             /// @dev The size of each of the interop roots.
             function INTEROP_ROOT_SLOT_SIZE() -> ret {
                 // We will have to increase this to add merkle proofs. 
-                ret := 6
-
+                ret := 5
             }
 
             /// @dev The maximum L2 block number. used for dummy interop roots.
