@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
+import {IL2ToL1Messenger} from "../../../common/l2-helpers/IL2ToL1Messenger.sol";
 import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, PACKED_L2_PRECOMMITMENT_LENGTH} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
@@ -132,7 +133,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // The full preimage of `passThroughDataHash` consists of the state root as well as the `indexRepeatedStorageChanges`. All
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            IL2ToL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT).sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
             );
         }
@@ -193,8 +194,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId();
         }
-        if(_newBatch.l2DaValidator != s.l2DAValidator) {
-//            revert MismatchL2DAValidator();
+        if (_newBatch.l2DaValidator != s.l2DAValidator) {
+            //            revert MismatchL2DAValidator();
         }
 
         // Create batch output for PI
@@ -240,7 +241,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
             // TODO: change RELAYED_EXECUTOR_VERSION?
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
+            IL2ToL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo)
             );
         }
@@ -479,8 +480,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidProtocolVersion();
         }
         if (s.boojumOS) {
-            (StoredBatchInfo memory lastCommittedBatchData, CommitBoojumOSBatchInfo[] memory newBatchesData) = BatchDecoder
-                .decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
+            (
+                StoredBatchInfo memory lastCommittedBatchData,
+                CommitBoojumOSBatchInfo[] memory newBatchesData
+            ) = BatchDecoder.decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
             // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
             // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
             // and so the range checked in the `decodeAndCheckCommitData` is enough.
@@ -801,9 +804,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
             bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
             if (s.boojumOS) {
-                proofPublicInput[i] = uint256(
-                    keccak256(abi.encodePacked(prevBatchStateCommitment, currentBatchStateCommitment, currentBatchCommitment))
-                ) >> PUBLIC_INPUT_SHIFT;
+                proofPublicInput[i] =
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(
+                                prevBatchStateCommitment,
+                                currentBatchStateCommitment,
+                                currentBatchCommitment
+                            )
+                        )
+                    ) >>
+                    PUBLIC_INPUT_SHIFT;
             } else {
                 proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
             }

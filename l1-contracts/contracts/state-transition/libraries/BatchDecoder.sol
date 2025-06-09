@@ -60,7 +60,7 @@ library BatchDecoder {
             revert UnsupportedCommitBatchEncoding(encodingVersion);
         }
     }
-    
+
     function _decodeBoojumOSCommitData(
         bytes calldata _commitData
     )
@@ -131,12 +131,12 @@ library BatchDecoder {
         uint256 _processBatchFrom,
         uint256 _processBatchTo
     )
-    internal
-    pure
-    returns (
-        IExecutor.StoredBatchInfo memory lastCommittedBatchData,
-        IExecutor.CommitBoojumOSBatchInfo[] memory newBatchesData
-    )
+        internal
+        pure
+        returns (
+            IExecutor.StoredBatchInfo memory lastCommittedBatchData,
+            IExecutor.CommitBoojumOSBatchInfo[] memory newBatchesData
+        )
     {
         (lastCommittedBatchData, newBatchesData) = _decodeBoojumOSCommitData(_commitData);
 

@@ -91,7 +91,7 @@ interface IExecutor is IZKChainBase {
         bytes32 priorityOperationsHash;
         bytes32 l2LogsTreeRoot;
         uint256 timestamp; // For Boojum OS not used, 0
-        bytes32 commitment;// For Boojum OS batches we'll store batch output hash here
+        bytes32 commitment; // For Boojum OS batches we'll store batch output hash here
     }
 
     /// @notice Data needed to commit new batch
@@ -151,6 +151,7 @@ interface IExecutor is IZKChainBase {
         // info about processed l1 txs, l2 to l1 logs and DA
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
         address l2DaValidator; // TODO: already saved in the storage, can just add from there to PI
         bytes32 daCommitment;
