@@ -1161,11 +1161,11 @@
   },
   {
     "contractName": "l1-contracts/L2MessageVerification",
-    "zkBytecodeHash": "0x010001595798c3158d76ae3c7630c8f9780b9e1193b756ca0da1dcb0dc759ae5",
+    "zkBytecodeHash": "0x01000159bc9500bcdbf9dcd0d72c189250eafd901af9101675d46c20bacd632d",
     "zkBytecodePath": "/l1-contracts/zkout/L2MessageVerification.sol/L2MessageVerification.json",
-    "evmBytecodeHash": "0xd1d811c42aad37b7d488e2d39778c1fa7fe1161cd5f68deb4d359e427c5b5454",
+    "evmBytecodeHash": "0x2595f129f55a6b6b618c2f1582ea46a8c682f908949cc3588895c53bbea50efe",
     "evmBytecodePath": "/l1-contracts/out/L2MessageVerification.sol/L2MessageVerification.json",
-    "evmDeployedBytecodeHash": "0xacc287fe6b7e5b8b3ecc6a18f67084587e68a3b67890cd1aeec326283ed142bc"
+    "evmDeployedBytecodeHash": "0x9717767fc0ef088a606204c1c9e1c165d565fd6fd0a03789ba224726c7eb563f"
   },
   {
     "contractName": "l1-contracts/L2NativeTokenVault",
