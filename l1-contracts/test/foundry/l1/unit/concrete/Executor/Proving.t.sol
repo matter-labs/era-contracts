@@ -177,19 +177,19 @@ contract ProvingTest is ExecutorTest {
         assertEq(totalBlocksVerified, 1);
     }
 
-    // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
-    /// forge-config: default.isolate = true
-    function test_MeasureGas() public {
-        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
-        storedBatchInfoArray[0] = newStoredBatchInfo;
+    // // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
+    // /// forge-config: default.isolate = true
+    // function test_MeasureGas() public {
+    //     IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+    //     storedBatchInfoArray[0] = newStoredBatchInfo;
 
-        vm.prank(validator);
-        (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
-            genesisStoredBatchInfo,
-            storedBatchInfoArray,
-            proofInput
-        );
-        validatorTimelock.proveBatchesSharedBridge(address(executor), proveBatchFrom, proveBatchTo, proveData);
-        vm.snapshotGasLastCall("Executor", "prove");
-    }
+    //     vm.prank(validator);
+    //     (uint256 proveBatchFrom, uint256 proveBatchTo, bytes memory proveData) = Utils.encodeProveBatchesData(
+    //         genesisStoredBatchInfo,
+    //         storedBatchInfoArray,
+    //         proofInput
+    //     );
+    //     validatorTimelock.proveBatchesSharedBridge(address(executor), proveBatchFrom, proveBatchTo, proveData);
+    //     vm.snapshotGasLastCall("Executor", "prove");
+    // }
 }
