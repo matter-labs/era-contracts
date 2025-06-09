@@ -37,13 +37,13 @@ struct LogProcessingOutput {
 /// @dev Maximal value that SystemLogKey variable can have.
 uint256 constant MAX_LOG_KEY = uint256(type(SystemLogKey).max);
 
-/// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
+/// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
 
-/// @dev Offset used to pull Key From Log. Equal to 4 (bytes for isService) + 20 (bytes for address)
+/// @dev Offset used to pull Key From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch) + 20 (bytes for address)
 uint256 constant L2_LOG_KEY_OFFSET = 24;
 
-/// @dev Offset used to pull Value From Log. Equal to 4 (bytes for isService) + 20 (bytes for address) + 32 (bytes for key)
+/// @dev Offset used to pull Value From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
 
 /// @dev Max number of blobs currently supported
@@ -74,7 +74,7 @@ interface IExecutor is IZKChainBase {
         uint64 indexRepeatedStorageChanges;
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
-        bytes32 dependencyRootsRollingHash; // kl todo we might have to include a new and old version of this struct for migration
+        bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
         uint256 timestamp;
         bytes32 commitment;

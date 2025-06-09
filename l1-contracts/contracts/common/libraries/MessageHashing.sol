@@ -95,7 +95,7 @@ library MessageHashing {
         }
     }
 
-    /// @notice Hashes the proof.
+    /// @notice Parses and processes the proof and returns the resulting data.
     /// @param _chainId The chain id of the L2 where the leaf comes from.
     /// @param _batchNumber The batch number.
     /// @param _leafProofMask The leaf proof mask.
