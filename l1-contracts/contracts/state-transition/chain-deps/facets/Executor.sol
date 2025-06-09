@@ -144,12 +144,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
         });
 
-        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > _newBatch.firstBlockTimestamp) {
-            revert TimeNotReached(_newBatch.firstBlockTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
-        }
-        if (_newBatch.lastBlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
-            revert L2TimestampTooBig();
-        }
+//        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > _newBatch.firstBlockTimestamp) {
+//            revert TimeNotReached(_newBatch.firstBlockTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
+//        }
+//        if (_newBatch.lastBlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
+//            revert L2TimestampTooBig();
+//        }
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId();
         }
