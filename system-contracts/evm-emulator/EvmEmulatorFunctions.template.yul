@@ -360,6 +360,10 @@ function getRawCodeHash(addr) -> hash {
     hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
 }
 
+function is7702Delegated(rawCodeHash) -> isDelegated {
+    isDelegated := eq(shr(240, rawCodeHash), 0x0202)
+}
+
 function getEvmExtcodehash(versionedBytecodeHash) -> evmCodeHash {
     // function getEvmCodeHash(bytes32 versionedBytecodeHash) external view returns(bytes32)
     mstore(0, 0x5F8F27B000000000000000000000000000000000000000000000000000000000)
@@ -368,9 +372,23 @@ function getEvmExtcodehash(versionedBytecodeHash) -> evmCodeHash {
 }
 
 function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
-    let version := shr(248, rawCodeHash)
-    let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
-    isConstructedEVM := and(eq(version, 2), isConstructedFlag)
+    let hashPrefix := shr(240, rawCodeHash)
+    switch hashPrefix
+        case 0x0200 {
+            // 0 means that account is constructed
+            isConstructedEVM := 1
+        }
+        case 0x0202 {
+            // 2 means that account is delegated
+            let delegationAddress := and(rawCodeHash, 0xffffffffffffffffffffffffffffffffffffffff)
+            let delegationHash := getRawCodeHash(delegationAddress)
+            // We don't allow recursion here, since delegation loops are forbidden
+            isConstructedEVM := eq(shr(240, delegationHash), 0x0200) // EVM contract, constructed
+        }
+        default {
+            // This is not a constructed EVM contract
+            isConstructedEVM := 0
+        }
 }
 
 // Basically performs an extcodecopy, while returning the length of the copied bytecode.
@@ -409,6 +427,10 @@ function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
 
 function fetchBytecode(addr) -> success, rawCodeHash {
     rawCodeHash := getRawCodeHash(addr)
+    success := $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash)
+}
+
+function $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash) -> success {
     mstore(0, rawCodeHash)
     
     success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
@@ -764,6 +786,7 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
             if iszero(isCallToEmptyContract) {
                 isCallToEmptyContract := iszero(and(shr(224, rawCodeHash), 0xffff)) // is codelen zero?
             }
+            // TODO: do we need to handle 7702 delegation here?
 
             if isCallToEmptyContract {
                 // In case of a call to the EVM contract that is currently being constructed, 

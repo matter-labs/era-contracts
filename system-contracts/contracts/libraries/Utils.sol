@@ -88,6 +88,13 @@ library Utils {
         return _bytecodeHash[1] == 0x01;
     }
 
+    /// @notice Denotes whether bytecode hash corresponds to an EIP-7702 delegation
+    function isContract7702Delegation(bytes32 _bytecodeHash) internal pure returns (bool) {
+        bool isEmpty = _bytecodeHash == bytes32(0);
+        bool is7702Delegation = _bytecodeHash[0] == 0x02 && _bytecodeHash[1] == 0x02;
+        return (isEmpty || is7702Delegation);
+    }
+
     /// @notice Sets "isConstructor" flag to TRUE for the bytecode hash
     /// @param _bytecodeHash The bytecode hash for which it is needed to set the constructing flag
     /// @return The bytecode hash with "isConstructor" flag set to TRUE

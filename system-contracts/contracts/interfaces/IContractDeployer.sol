@@ -208,4 +208,7 @@ interface IContractDeployer {
     /// @notice Changes what types of bytecodes are allowed to be deployed on the chain.
     /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
     function setAllowedBytecodeTypesToDeploy(AllowedBytecodeTypes newAllowedBytecodeTypes) external;
+
+    /// @notice Returns the address of EIP7702 delegation for given contract.
+    function getAccountDelegation(address _addr) external view returns (address);
 }

@@ -418,6 +418,10 @@ object "EvmEmulator" {
             hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
         }
         
+        function is7702Delegated(rawCodeHash) -> isDelegated {
+            isDelegated := eq(shr(240, rawCodeHash), 0x0202)
+        }
+        
         function getEvmExtcodehash(versionedBytecodeHash) -> evmCodeHash {
             // function getEvmCodeHash(bytes32 versionedBytecodeHash) external view returns(bytes32)
             mstore(0, 0x5F8F27B000000000000000000000000000000000000000000000000000000000)
@@ -426,9 +430,23 @@ object "EvmEmulator" {
         }
         
         function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
-            let version := shr(248, rawCodeHash)
-            let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
-            isConstructedEVM := and(eq(version, 2), isConstructedFlag)
+            let hashPrefix := shr(240, rawCodeHash)
+            switch hashPrefix
+                case 0x0200 {
+                    // 0 means that account is constructed
+                    isConstructedEVM := 1
+                }
+                case 0x0202 {
+                    // 2 means that account is delegated
+                    let delegationAddress := and(rawCodeHash, 0xffffffffffffffffffffffffffffffffffffffff)
+                    let delegationHash := getRawCodeHash(delegationAddress)
+                    // We don't allow recursion here, since delegation loops are forbidden
+                    isConstructedEVM := eq(shr(240, delegationHash), 0x0200) // EVM contract, constructed
+                }
+                default {
+                    // This is not a constructed EVM contract
+                    isConstructedEVM := 0
+                }
         }
         
         // Basically performs an extcodecopy, while returning the length of the copied bytecode.
@@ -467,6 +485,10 @@ object "EvmEmulator" {
         
         function fetchBytecode(addr) -> success, rawCodeHash {
             rawCodeHash := getRawCodeHash(addr)
+            success := $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash)
+        }
+        
+        function $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash) -> success {
             mstore(0, rawCodeHash)
             
             success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
@@ -822,6 +844,7 @@ object "EvmEmulator" {
                     if iszero(isCallToEmptyContract) {
                         isCallToEmptyContract := iszero(and(shr(224, rawCodeHash), 0xffff)) // is codelen zero?
                     }
+                    // TODO: do we need to handle 7702 delegation here?
         
                     if isCallToEmptyContract {
                         // In case of a call to the EVM contract that is currently being constructed, 
@@ -1454,6 +1477,7 @@ object "EvmEmulator" {
                 offset := add(rawOffset, MEM_OFFSET())
             }
         }
+        
 
         function $llvm_AlwaysInline_llvm$_calldatasize() -> size {
             size := 0
@@ -2030,7 +2054,11 @@ object "EvmEmulator" {
                     }
             
                     let rawCodeHash := getRawCodeHash(addr)
-                    switch isHashOfConstructedEvmContract(rawCodeHash)
+                    let shouldUseEvmHash := or(
+                        is7702Delegated(rawCodeHash),
+                        isHashOfConstructedEvmContract(rawCodeHash)
+                    )
+                    switch shouldUseEvmHash
                     case 0 {
                         let codeLen := and(shr(224, rawCodeHash), 0xffff)
             
@@ -3110,8 +3138,8 @@ object "EvmEmulator" {
                 max := MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
             }
 
-            function getDeployedBytecode() {
-                let success, rawCodeHash := fetchBytecode(getCodeAddress())
+            function getDeployedBytecode(rawCodeHash) {
+                let success := $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash)
                 let codeLen := and(shr(224, rawCodeHash), 0xffff)
                 
                 loadReturndataIntoActivePtr()
@@ -3481,6 +3509,10 @@ object "EvmEmulator" {
                 hash := fetchFromSystemContract(ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 36)
             }
             
+            function is7702Delegated(rawCodeHash) -> isDelegated {
+                isDelegated := eq(shr(240, rawCodeHash), 0x0202)
+            }
+            
             function getEvmExtcodehash(versionedBytecodeHash) -> evmCodeHash {
                 // function getEvmCodeHash(bytes32 versionedBytecodeHash) external view returns(bytes32)
                 mstore(0, 0x5F8F27B000000000000000000000000000000000000000000000000000000000)
@@ -3489,9 +3521,23 @@ object "EvmEmulator" {
             }
             
             function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
-                let version := shr(248, rawCodeHash)
-                let isConstructedFlag := xor(shr(240, rawCodeHash), 1)
-                isConstructedEVM := and(eq(version, 2), isConstructedFlag)
+                let hashPrefix := shr(240, rawCodeHash)
+                switch hashPrefix
+                    case 0x0200 {
+                        // 0 means that account is constructed
+                        isConstructedEVM := 1
+                    }
+                    case 0x0202 {
+                        // 2 means that account is delegated
+                        let delegationAddress := and(rawCodeHash, 0xffffffffffffffffffffffffffffffffffffffff)
+                        let delegationHash := getRawCodeHash(delegationAddress)
+                        // We don't allow recursion here, since delegation loops are forbidden
+                        isConstructedEVM := eq(shr(240, delegationHash), 0x0200) // EVM contract, constructed
+                    }
+                    default {
+                        // This is not a constructed EVM contract
+                        isConstructedEVM := 0
+                    }
             }
             
             // Basically performs an extcodecopy, while returning the length of the copied bytecode.
@@ -3530,6 +3576,10 @@ object "EvmEmulator" {
             
             function fetchBytecode(addr) -> success, rawCodeHash {
                 rawCodeHash := getRawCodeHash(addr)
+                success := $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash)
+            }
+            
+            function $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash) -> success {
                 mstore(0, rawCodeHash)
                 
                 success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
@@ -3885,6 +3935,7 @@ object "EvmEmulator" {
                         if iszero(isCallToEmptyContract) {
                             isCallToEmptyContract := iszero(and(shr(224, rawCodeHash), 0xffff)) // is codelen zero?
                         }
+                        // TODO: do we need to handle 7702 delegation here?
             
                         if isCallToEmptyContract {
                             // In case of a call to the EVM contract that is currently being constructed, 
@@ -4517,6 +4568,7 @@ object "EvmEmulator" {
                     offset := add(rawOffset, MEM_OFFSET())
                 }
             }
+            
 
             function simulate(
                 isCallerEVM,
@@ -5081,7 +5133,11 @@ object "EvmEmulator" {
                         }
                 
                         let rawCodeHash := getRawCodeHash(addr)
-                        switch isHashOfConstructedEvmContract(rawCodeHash)
+                        let shouldUseEvmHash := or(
+                            is7702Delegated(rawCodeHash),
+                            isHashOfConstructedEvmContract(rawCodeHash)
+                        )
+                        switch shouldUseEvmHash
                         case 0 {
                             let codeLen := and(shr(224, rawCodeHash), 0xffff)
                 
@@ -6148,9 +6204,40 @@ object "EvmEmulator" {
                 }
             }
 
+            function $llvm_Cold_llvm$_delegate7702(
+                delegationAddress,
+            ) -> success, returnOffset, returnLen {
+                returnOffset := MEM_OFFSET()
+                let calldataSize := calldatasize()
+                calldatacopy(0, 0, calldataSize)
+                success := delegatecall(gas(), delegationAddress, 0, calldataSize, 0, 0)
+                // TODO: do we need to handle failure here?
+                
+                returnLen := returndatasize()
+                returndatacopy(returnOffset, 0, returnLen)
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
+
+            let rawCodeHash := getRawCodeHash(getCodeAddress())
+            if is7702Delegated(rawCodeHash) {
+                // We process 7702 delegation before opening an EVM frame,
+                // since we don't actually perform simulation here.
+                // If this code is invoked from EVM interpreter, caller will
+                // know how to handle the result, we're only acting as a proxy.
+                let success, returnOffset, returnLen := $llvm_Cold_llvm$_delegate7702(
+                    and(rawCodeHash, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+                )
+                switch success 
+                    case 1 {
+                        return(returnOffset, returnLen)
+                    }
+                    default {
+                        revert(returnOffset, returnLen)
+                    }
+            }
 
             let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
@@ -6161,7 +6248,7 @@ object "EvmEmulator" {
 
             // First, copy the contract's bytecode to be executed into the `BYTECODE_OFFSET`
             // segment of memory.
-            getDeployedBytecode()
+            getDeployedBytecode(rawCodeHash)
 
             let returnOffset, returnLen := simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)

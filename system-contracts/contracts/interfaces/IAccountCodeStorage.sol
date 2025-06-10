@@ -9,6 +9,8 @@ interface IAccountCodeStorage {
 
     function storeAccountConstructedCodeHash(address _address, bytes32 _hash) external;
 
+    function storeAccount7702DelegationCodeHash(address _address, bytes32 _hash) external;
+
     function markAccountCodeHashAsConstructed(address _address) external;
 
     function getRawCodeHash(address _address) external view returns (bytes32 codeHash);
@@ -18,6 +20,4 @@ interface IAccountCodeStorage {
     function getCodeSize(uint256 _input) external view returns (uint256 codeSize);
 
     function isAccountEVM(address _addr) external view returns (bool);
-
-    function getAccountDelegation(address _addr) external view returns (address);
 }

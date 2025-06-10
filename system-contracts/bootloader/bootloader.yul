@@ -694,8 +694,6 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
-            
-
             /// @notice Overrides the "raw" code hash of the address. "Raw" means that it must use exactly the value
             /// that is stored in the AccountCodeStorage system contract for that address, without applying any
             /// additional transformations.
@@ -747,7 +745,7 @@ object "Bootloader" {
                 mstore(4, addr)
                 let success := staticcall(
                     gas(),
-                    ACCOUNT_CODE_STORAGE_ADDR(),
+                    CONTRACT_DEPLOYER_ADDR(),
                     0,
                     36,
                     0,
@@ -795,7 +793,7 @@ object "Bootloader" {
                     let calldataLength := add(length, 4)
                     let success := call(
                         gas(),
-                        ACCOUNT_CODE_STORAGE_ADDR(),
+                        CONTRACT_DEPLOYER_ADDR(),
                         0,
                         calldataOffset,
                         calldataLength,
@@ -2085,15 +2083,6 @@ object "Bootloader" {
                 debugLog("from: ", from)
                 debugLog("to: ", to)
 
-                let delegation := getDelegationAddress(from)
-                debugLog("delegation: ", delegation)
-
-                if gt(delegation, 0) {
-                    // If the delegation is not zero, we need to invoke the delegation
-                    // target instead of the original `to` field.
-                    to := delegation
-                }
-
                 switch isEOA(from)
                 case true {
                     setTxOrigin(from)
@@ -2345,16 +2334,7 @@ object "Bootloader" {
 
             /// @dev Calls the `payForTransaction` method of an account
             function accountPayForTx(account, txDataOffset) -> success {
-                let delegation := getDelegationAddress(account)
-                let rawCodeHash := 0
-                if gt(delegation, 0) {
-                    rawCodeHash := getRawCodeHash(delegation, true)
-                    setRawCodeHash(account, 0, true)
-                }
                 success := callAccountMethod({{PAY_FOR_TX_SELECTOR}}, account, txDataOffset)
-                if gt(delegation, 0) {
-                    setRawCodeHash(account, rawCodeHash, true)
-                }
             }
 
             /// @dev Calls the `prepareForPaymaster` method of an account
@@ -2593,6 +2573,10 @@ object "Bootloader" {
                 }
             }
 
+            function DELEGATION_BYTECODE_MARKER() -> ret {
+                ret := 0x0202FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
+            }
+
             /// @dev Validates the transaction against the senders' account.
             /// Besides ensuring that the contract agrees to a transaction,
             /// this method also enforces that the nonce has been marked as used.
@@ -2611,20 +2595,8 @@ object "Bootloader" {
                 debugLog("pre-validate",0)
                 debugLog("pre-validate",from)
 
-                // Override bytecode hash for validation if required.
-                // TODO: It should be safe, since delegation is only allowed for EOAs in the first place.
-                let delegation := getDelegationAddress(from)
-                let rawCodeHash := 0
-                if gt(delegation, 0) {
-                    rawCodeHash := getRawCodeHash(delegation, true)
-                    setRawCodeHash(from, 0, true)
-                }
-
                 let success := callAccountMethod({{VALIDATE_TX_SELECTOR}}, from, txDataOffset)
                 
-                if gt(delegation, 0) {
-                    setRawCodeHash(from, rawCodeHash, true)
-                }
                 setHook(VM_HOOK_NO_VALIDATION_ENTERED())
 
                 if iszero(success) {
@@ -2756,20 +2728,7 @@ object "Bootloader" {
             /// @dev Function responsible for the execution of the L2 transaction
             /// @dev Returns `true` or `false` depending on whether or not the tx has reverted.
             function executeL2Tx(txDataOffset, from) -> ret {
-                let delegation := getDelegationAddress(from)
-
-                switch delegation
-                    case 0 {
-                        // Account not delegated: invoke the `execute` method
-                        ret := callAccountMethod({{EXECUTE_TX_SELECTOR}}, from, txDataOffset)
-                    }
-                    default {
-                        // Account is delegated: invoke through mimicall using calldata provided
-                        let innerTxDataOffset := add(txDataOffset, 32)
-                        let calldataPtr := getDataPtr(innerTxDataOffset)
-                        let value := getValue(innerTxDataOffset)
-                        ret := msgValueSimulatorMimicCall(from, from, value, calldataPtr)
-                    }                
+                ret := callAccountMethod({{EXECUTE_TX_SELECTOR}}, from, txDataOffset)
 
                 if iszero(ret) {
                     debugReturndata()

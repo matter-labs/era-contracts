@@ -109,8 +109,8 @@ object "EvmEmulator" {
                 max := MAX_POSSIBLE_DEPLOYED_BYTECODE_LEN()
             }
 
-            function getDeployedBytecode() {
-                let success, rawCodeHash := fetchBytecode(getCodeAddress())
+            function getDeployedBytecode(rawCodeHash) {
+                let success := $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash)
                 let codeLen := and(shr(224, rawCodeHash), 0xffff)
                 
                 loadReturndataIntoActivePtr()
@@ -143,9 +143,40 @@ object "EvmEmulator" {
                 }
             }
 
+            function $llvm_Cold_llvm$_delegate7702(
+                delegationAddress,
+            ) -> success, returnOffset, returnLen {
+                returnOffset := MEM_OFFSET()
+                let calldataSize := calldatasize()
+                calldatacopy(0, 0, calldataSize)
+                success := delegatecall(gas(), delegationAddress, 0, calldataSize, 0, 0)
+                // TODO: do we need to handle failure here?
+                
+                returnLen := returndatasize()
+                returndatacopy(returnOffset, 0, returnLen)
+            }
+
             ////////////////////////////////////////////////////////////////
             //                      FALLBACK
             ////////////////////////////////////////////////////////////////
+
+            let rawCodeHash := getRawCodeHash(getCodeAddress())
+            if is7702Delegated(rawCodeHash) {
+                // We process 7702 delegation before opening an EVM frame,
+                // since we don't actually perform simulation here.
+                // If this code is invoked from EVM interpreter, caller will
+                // know how to handle the result, we're only acting as a proxy.
+                let success, returnOffset, returnLen := $llvm_Cold_llvm$_delegate7702(
+                    and(rawCodeHash, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+                )
+                switch success 
+                    case 1 {
+                        return(returnOffset, returnLen)
+                    }
+                    default {
+                        revert(returnOffset, returnLen)
+                    }
+            }
 
             let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
@@ -156,7 +187,7 @@ object "EvmEmulator" {
 
             // First, copy the contract's bytecode to be executed into the `BYTECODE_OFFSET`
             // segment of memory.
-            getDeployedBytecode()
+            getDeployedBytecode(rawCodeHash)
 
             let returnOffset, returnLen := simulate(isCallerEVM, evmGasLeft, isStatic)
             return(returnOffset, returnLen)

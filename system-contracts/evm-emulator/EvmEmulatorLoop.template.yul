@@ -552,7 +552,11 @@ for { } true { } {
         }
 
         let rawCodeHash := getRawCodeHash(addr)
-        switch isHashOfConstructedEvmContract(rawCodeHash)
+        let shouldUseEvmHash := or(
+            is7702Delegated(rawCodeHash),
+            isHashOfConstructedEvmContract(rawCodeHash)
+        )
+        switch shouldUseEvmHash
         case 0 {
             let codeLen := and(shr(224, rawCodeHash), 0xffff)
 

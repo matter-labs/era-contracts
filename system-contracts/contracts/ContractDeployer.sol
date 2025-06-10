@@ -7,6 +7,8 @@ import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer
 import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SERVICE_CALL_PSEUDO_CALLER, EVM_PREDEPLOYS_MANAGER, EVM_HASHES_STORAGE} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
+import {AuthorizationListItem} from "./libraries/TransactionHelper.sol";
+import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
@@ -29,6 +31,19 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
     /// @notice What types of bytecode are allowed to be deployed on this chain.
     AllowedBytecodeTypes public allowedBytecodeTypesToDeploy;
+
+    /// @dev Bytecode mask for delegated accounts:
+    /// - Byte 0 (0x02) means the the account is processed through the EVM interpreter
+    /// - Byte 1 (0x02) means that the account is delegated.
+    /// - Bytes 2-3 (0x0017) means that the length of the bytecode is 23 bytes.
+    /// - Bytes 4-17 have no meaning.
+    /// - Bytes 9-11 (0xEF0100) are prefix for the 7702 bytecode of the contract (EF01000 || address).
+    /// The rest is left empty for address masking.
+    bytes32 private constant DELEGATION_BYTECODE_MASK =
+        0x020200170000000000EF01000000000000000000000000000000000000000000;
+    /// @dev Mask to extract the delegation address from the bytecode hash.
+    bytes32 private constant DELEGATION_ADDRESS_MASK =
+        0x000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
     /// @dev Restricts `msg.sender` to be this contract itself.
     modifier onlySelf() {
@@ -58,7 +73,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         // It is an EOA, it is still an account.
         bool notSystem = _address > address(MAX_SYSTEM_CONTRACT_ADDRESS);
         bool noCodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0;
-        bool delegated = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getAccountDelegation(_address) != address(0);
+        bool delegated = this.getAccountDelegation(_address) != address(0);
         if (notSystem && (noCodeHash || delegated)) {
             return AccountAbstractionVersion.Version1;
         }
@@ -168,6 +183,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     function createEVM(bytes calldata _initCode) external payable override onlySystemCall returns (uint256, address) {
         uint256 senderNonce;
         // If the account is an EOA, use the min nonce. If it's a contract, use deployment nonce
+        // TODO: EOA check must be fixed
         if (msg.sender == tx.origin) {
             // Subtract 1 for EOA since the nonce has already been incremented for this transaction
             senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getMinNonce(msg.sender) - 1;
@@ -383,6 +399,122 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
             emit AllowedBytecodeTypesModeUpdated(newAllowedBytecodeTypes);
         }
+    }
+
+    /// @notice Returns the address of the account that is delegated to execute transactions on behalf of the given
+    /// address.
+    /// @notice Returns the zero address if no delegation is set.
+    function getAccountDelegation(address _addr) external view override returns (address) {
+        bytes32 codeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_addr);
+        if (codeHash[0] == 0x02 && codeHash[1] == 0x02) {
+            // The first two bytes of the code hash are 0x0202, which means that the account is delegated.
+            // The delegation address is stored in the last 20 bytes of the code hash.
+            return address(uint160(uint256(codeHash & DELEGATION_ADDRESS_MASK)));
+        } else {
+            // The account is not delegated.
+            return address(0);
+        }
+    }
+
+    function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
+        for (uint256 i = 0; i < authorizationList.length; i++) {
+            // Per EIP7702 rules, if any check for the tuple item fails,
+            // we must move on to the next item in the list.
+            AuthorizationListItem calldata item = authorizationList[i];
+
+            // Verify the chain ID is 0 or the ID of the current chain.
+            if (item.chainId != 0 && item.chainId != block.chainid) {
+                continue;
+            }
+
+            // Verify the nonce is less than 2**64 - 1.
+            if (item.nonce >= 0xFFFFFFFFFFFFFFFF) {
+                continue;
+            }
+
+            // Calculate EIP7702 magic:
+            // msg = keccak(MAGIC || rlp([chain_id, address, nonce]))
+            bytes memory chainIdEncoded = RLPEncoder.encodeUint256(item.chainId);
+            bytes memory addressEncoded = RLPEncoder.encodeAddress(item.addr);
+            bytes memory nonceEncoded = RLPEncoder.encodeUint256(item.nonce);
+            bytes memory listLenEncoded = RLPEncoder.encodeListLen(
+                uint64(chainIdEncoded.length + addressEncoded.length + nonceEncoded.length)
+            );
+            bytes32 message = keccak256(
+                bytes.concat(bytes1(0x05), listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
+            );
+
+            // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+            // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
+            // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
+            // signatures from current libraries generate a unique signature with an s-value in the lower half order.
+            //
+            // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
+            // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
+            // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
+            // these malleable signatures as well.
+            if (uint256(item.s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+                continue;
+            }
+
+            address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
+
+            // ZKsync has native account abstraction, so we only allow delegation for EOAs.
+            if (
+                ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(authority) != 0x00 &&
+                this.getAccountDelegation(authority) == address(0)
+            ) {
+                continue;
+            }
+
+            bool nonceIncremented = this._performRawMimicCall(
+                uint32(gasleft()),
+                authority,
+                address(NONCE_HOLDER_SYSTEM_CONTRACT),
+                abi.encodeCall(NONCE_HOLDER_SYSTEM_CONTRACT.incrementMinNonceIfEquals, (item.nonce)),
+                true
+            );
+            if (!nonceIncremented) {
+                continue;
+            }
+            if (item.addr == address(0)) {
+                bytes32 currentBytecodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(authority);
+                ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccount7702DelegationCodeHash(authority, 0x00);
+                EVM_HASHES_STORAGE.storeEvmCodeHash(currentBytecodeHash, bytes32(0x0));
+            } else {
+                // Otherwise, store the delegation.
+                // TODO: Do we need any security checks here, e.g. non-default code hash or non-system contract?
+                bytes32 delegationCodeMarker = DELEGATION_BYTECODE_MASK | bytes32(uint256(uint160(item.addr)));
+                ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccount7702DelegationCodeHash(
+                    authority,
+                    delegationCodeMarker
+                );
+                bytes32 evmBytecodeHash = _hash7702Delegation(delegationCodeMarker);
+                EVM_HASHES_STORAGE.storeEvmCodeHash(delegationCodeMarker, evmBytecodeHash);
+            }
+        }
+    }
+
+    function _hash7702Delegation(bytes32 input) internal pure returns (bytes32 hash) {
+        // Hash bytes 9-32 (that have the contract code) without allocating an array.
+        assembly {
+            // Point to free memory and store 23 bytes starting at byte offset 9 of input
+            let ptr := mload(0x40)
+            mstore(ptr, shl(72, input)) // Shift left to remove first 9 bytes (9 * 8 = 72 bits)
+            hash := keccak256(ptr, 23)
+        }
+    }
+
+    // Needed to convert `memory` to `calldata`
+    // TODO: (partial) duplication with EntryPointV01; probably need to be moved somewhere.
+    function _performRawMimicCall(
+        uint32 _gas,
+        address _whoToMimic,
+        address _to,
+        bytes calldata _data,
+        bool isSystem
+    ) external onlyCallFrom(address(this)) returns (bool success) {
+        return EfficientCall.rawMimicCall(_gas, _to, _data, _whoToMimic, false, isSystem);
     }
 
     /// @notice Deploys a bytecode on the specified address.

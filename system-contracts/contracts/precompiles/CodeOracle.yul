@@ -130,6 +130,14 @@ object "CodeOracle" {
 
             let versionedCodeHash := calldataload(0)
 
+            if eq(shr(240, versionedCodeHash), 0x0202) {
+                // 7702 delegation; the bytecode is stored in the hash
+                // It is guaranteed to be 23 bytes long.
+                let bytecode := shl(72, versionedCodeHash)
+                mstore(0, bytecode)
+                return (0, 23)
+            } 
+
             // Can not decommit unknown code
             if iszero(isCodeHashKnown(versionedCodeHash)) {
                 revert(0, 0)

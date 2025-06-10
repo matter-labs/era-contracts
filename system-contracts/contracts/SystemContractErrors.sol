@@ -203,7 +203,8 @@ error InvalidNonceKey(uint192 nonceKey);
 
 enum CodeHashReason {
     NotContractOnConstructor,
-    NotConstructedContract
+    NotConstructedContract,
+    Not7702Delegation
 }
 
 enum SigField {

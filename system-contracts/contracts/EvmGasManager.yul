@@ -55,10 +55,10 @@ object "EvmGasManager" {
                 res := verbatim_1i_1o("active_ptr_data_load", pos)
             }
 
-            function $llvm_AlwaysInline_llvm$__getRawSenderCodeHash() -> hash {
+            function $llvm_AlwaysInline_llvm$__getRawCodeHash(addr) -> hash {
                 // function getRawCodeHash(address _address)
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
-                mstore(4, caller())
+                mstore(4, addr)
             
                 let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
             
@@ -85,8 +85,21 @@ object "EvmGasManager" {
                 let transientSlot := or(IS_ACCOUNT_EVM_PREFIX(), caller())
                 let isEVM := tload(transientSlot)
                 if iszero(isEVM) {
-                    let versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawSenderCodeHash()
+                    let versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(caller())
                     isEVM := eq(shr(248, versionedCodeHash), 2)
+
+                    // For 7702 delegations, we need to make sure that the delegation address is an EVM contract.
+                    let isAccountDelegated := eq(and(0xFF, shr(240, versionedCodeHash)), 2)
+                    if and(isEVM, isAccountDelegated) {
+                        let delegationAddress := and(ADDRESS_MASK(), versionedCodeHash)
+                        versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(delegationAddress)
+                        // We need to protect against delegation loops, so disallow `0x0202` as
+                        // delegation address.
+                        isEVM := or(
+                            eq(shr(240, versionedCodeHash), 0x0200),
+                            eq(shr(240, versionedCodeHash), 0x0201)
+                        )
+                    }
 
                     if iszero(isEVM) {
                         // error CallerMustBeEvmContract()

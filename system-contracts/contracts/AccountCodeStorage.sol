@@ -6,14 +6,10 @@ import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
-import {Transaction, AuthorizationListItem} from "./libraries/TransactionHelper.sol";
-import {RLPEncoder} from "./libraries/RLPEncoder.sol";
+import {Transaction} from "./libraries/TransactionHelper.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS, EVM_HASHES_STORAGE, INonceHolder} from "./Constants.sol";
 import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
-
-event AccountDelegated(address indexed authority, address indexed delegationAddress);
-event AccountDelegationRemoved(address indexed authority);
 
 /**
  * @author Matter Labs
@@ -30,10 +26,6 @@ event AccountDelegationRemoved(address indexed authority);
  */
 contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
     bytes32 private constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
-
-    /// @notice Information about EIP-7702 delegated EOAs.
-    /// @dev Delegated EOAs.
-    mapping(address => address) private delegatedEOAs;
 
     modifier onlyDeployer() {
         if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {
@@ -64,6 +56,18 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
         // Check that code hash corresponds to the deploying smart contract
         if (!Utils.isContractConstructed(_hash)) {
             revert InvalidCodeHash(CodeHashReason.NotConstructedContract);
+        }
+        _storeCodeHash(_address, _hash);
+    }
+
+    /// @notice Sets the bytecodeHash of address to indicate EIP-7702 delegation.
+    /// @param _address The address of the account to set the codehash to.
+    /// @param _hash Bytecode hash with encoded EIP-7702 delegation data.
+    /// @dev This method trusts the ContractDeployer to make sure that the hash is well-formed.
+    function storeAccount7702DelegationCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
+        // Check that code hash corresponds to the deploying smart contract
+        if (!Utils.isContract7702Delegation(_hash)) {
+            revert InvalidCodeHash(CodeHashReason.Not7702Delegation);
         }
         _storeCodeHash(_address, _hash);
     }
@@ -166,103 +170,9 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
         return Utils.isCodeHashEVM(bytecodeHash);
     }
 
-    /// @notice Returns the address of the account that is delegated to execute transactions on behalf of the given
-    /// address.
-    /// @notice Returns the zero address if no delegation is set.
-    function getAccountDelegation(address _addr) external view override returns (address) {
-        return delegatedEOAs[_addr];
-    }
-
     /// @notice Allows the bootloader to override bytecode hash of account.
     /// TODO: can we avoid it and do it in bootloader? Having it as a public interface feels very unsafe.
     function setRawCodeHash(address addr, bytes32 rawBytecodeHash) external onlyCallFromBootloader {
         _storeCodeHash(addr, rawBytecodeHash);
-    }
-
-    function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
-        for (uint256 i = 0; i < authorizationList.length; i++) {
-            // Per EIP7702 rules, if any check for the tuple item fails,
-            // we must move on to the next item in the list.
-            AuthorizationListItem calldata item = authorizationList[i];
-
-            // Verify the chain ID is 0 or the ID of the current chain.
-            if (item.chainId != 0 && item.chainId != block.chainid) {
-                continue;
-            }
-
-            // Verify the nonce is less than 2**64 - 1.
-            if (item.nonce >= 0xFFFFFFFFFFFFFFFF) {
-                continue;
-            }
-
-            // Calculate EIP7702 magic:
-            // msg = keccak(MAGIC || rlp([chain_id, address, nonce]))
-            bytes memory chainIdEncoded = RLPEncoder.encodeUint256(item.chainId);
-            bytes memory addressEncoded = RLPEncoder.encodeAddress(item.addr);
-            bytes memory nonceEncoded = RLPEncoder.encodeUint256(item.nonce);
-            bytes memory listLenEncoded = RLPEncoder.encodeListLen(
-                uint64(chainIdEncoded.length + addressEncoded.length + nonceEncoded.length)
-            );
-            bytes32 message = keccak256(
-                bytes.concat(bytes1(0x05), listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
-            );
-
-            // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
-            // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
-            // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
-            // signatures from current libraries generate a unique signature with an s-value in the lower half order.
-            //
-            // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
-            // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
-            // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
-            // these malleable signatures as well.
-            if (uint256(item.s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
-                continue;
-            }
-
-            address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
-
-            // ZKsync has native account abstraction, so we only allow delegation for EOAs.
-            if (this.getRawCodeHash(authority) != 0x00 && this.getAccountDelegation(authority) == address(0)) {
-                continue;
-            }
-
-            bool nonceIncremented = this._performRawMimicCall(
-                uint32(gasleft()),
-                authority,
-                address(NONCE_HOLDER_SYSTEM_CONTRACT),
-                abi.encodeCall(INonceHolder.incrementMinNonceIfEquals, (item.nonce)),
-                true
-            );
-            if (!nonceIncremented) {
-                continue;
-            }
-            if (item.addr == address(0)) {
-                // If the delegation address is 0, we need to remove the delegation.
-                delete delegatedEOAs[authority];
-                _storeCodeHash(authority, 0x00);
-                emit AccountDelegationRemoved(authority);
-            } else {
-                // Otherwise, store the delegation.
-                // TODO: Do we need any security checks here, e.g. non-default code hash or non-system contract?
-                delegatedEOAs[authority] = item.addr;
-
-                bytes32 codeHash = getRawCodeHash(item.addr);
-                _storeCodeHash(authority, codeHash); // TODO: Do we need additional checks here?
-                emit AccountDelegated(authority, item.addr);
-            }
-        }
-    }
-
-    // Needed to convert `memory` to `calldata`
-    // TODO: (partial) duplication with EntryPointV01; probably need to be moved somewhere.
-    function _performRawMimicCall(
-        uint32 _gas,
-        address _whoToMimic,
-        address _to,
-        bytes calldata _data,
-        bool isSystem
-    ) external onlyCallFrom(address(this)) returns (bool success) {
-        return EfficientCall.rawMimicCall(_gas, _to, _data, _whoToMimic, false, isSystem);
     }
 }
