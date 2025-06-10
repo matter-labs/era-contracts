@@ -4507,8 +4507,6 @@ object "Bootloader" {
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
             sendToL1Native(true, txsStatusRollingHashKey(), mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE()))
             
-            /// setting all remaining interop roots, even the ones in the fictive block.
-            setInteropRootForBlock(MAXIMUM_L2_BLOCK_NUMBER())
             sendInteropRootRollingHashToL1()
 
             l1MessengerPublishingCall()
