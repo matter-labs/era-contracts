@@ -26,6 +26,14 @@ interface IERC7786GatewaySource {
         bytes[] calldata attributes
     ) external payable returns (bytes32 outboxId);
 
+    /// kl todo decide how to merge this and sendMessage, i.e. CAIP. Also put value in an attribute.
+    function sendCall(
+        uint256 destinationChain,
+        address destinationAddress,
+        bytes calldata data,
+        uint256 value
+    ) external payable returns (bytes32 outboxId);
+
     function quoteRelay(
         string calldata destinationChain,
         string calldata receiver,

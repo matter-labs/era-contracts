@@ -67,6 +67,7 @@ contract ChainRegistrationSender is
         chainRegisteredOnChain[chainToBeRegistered][chainRegisteredOn] = true;
 
         IMailbox chainRegisteredOnAddress = IMailbox(BRIDGE_HUB.getZKChain(chainToBeRegistered));
+        // slither-disable-next-line unused-return
         chainRegisteredOnAddress.requestL2ServiceTransaction(
             address(L2_BRIDGEHUB_ADDR),
             _getL2TxCalldata(chainToBeRegistered)

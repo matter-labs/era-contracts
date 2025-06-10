@@ -32,6 +32,7 @@ import {SystemContractsArgs} from "./Utils.sol";
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
@@ -165,5 +166,45 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes(""))
         );
         l2InteropCenter.sendBundle(271, calls);
+    }
+
+    function test_requestSendCall() public {
+        address l2TokenAddress = initializeTokenByDeposit();
+        bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
+        vm.deal(address(this), 1000 ether);
+
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
+        );
+
+        InteropCallStarter[] memory calls = new InteropCallStarter[](1);
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
+        calls[0] = InteropCallStarter({
+            nextContract: L2_ASSET_ROUTER_ADDR,
+            data: secondBridgeCalldata,
+            attributes: attributes,
+            requestedInteropCallValue: 0
+        });
+
+        uint256 destinationChainId = 271;
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
+            abi.encode(bytes(""))
+        );
+        IERC7786GatewaySource(address(l2InteropCenter)).sendCall(271, calls[0].nextContract, calls[0].data, calls[0].requestedInteropCallValue);
     }
 }

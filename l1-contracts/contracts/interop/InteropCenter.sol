@@ -47,20 +47,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @notice The number of total sent bundles, used for bundle id generation and uniqueness.
     mapping(address sender => uint256 bundleCount) public bundleCount;
 
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    modifier onlyAssetRouter() {
-        if (msg.sender != assetRouter) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert Unauthorized(msg.sender);
@@ -68,15 +54,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         _;
     }
 
-    modifier onlyL2() {
-        if (L1_CHAIN_ID == block.chainid) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     modifier onlyL2NotToL1(uint256 _destinationChainId) {
-        if (_destinationChainId == L1_CHAIN_ID) {
+        if (L1_CHAIN_ID == block.chainid || _destinationChainId == L1_CHAIN_ID) {
             revert Unauthorized(msg.sender);
         }
         _;
