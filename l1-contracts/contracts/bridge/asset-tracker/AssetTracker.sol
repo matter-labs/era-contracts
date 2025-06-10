@@ -170,6 +170,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
                 (, , , uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
                 // slither-disable-next-line unused-return
                 (uint256 tokenOriginChainId, , , ) = this.parseTokenData(erc20Metadata);
+                isMinterChain[tokenOriginChainId][assetId] = true;
 
                 // if (!isMinterChain[fromChainId][assetId]) {
                 if (tokenOriginChainId != fromChainId) {

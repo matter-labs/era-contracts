@@ -76,6 +76,7 @@ contract ChainRegistrationSender is
     /// @inheritdoc IL1CrossChainSender
     /// @notice Registers a chain on the L2 via a normal deposit.
     /// @notice this is can be called by anyone (via the bridgehub), but baseTokens need to be provided.
+    // slither-disable-next-line locked-ether
     function bridgehubDeposit(
         uint256,
         address,

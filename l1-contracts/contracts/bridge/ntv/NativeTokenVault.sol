@@ -316,6 +316,7 @@ abstract contract NativeTokenVault is
             erc20Metadata = getERC20Getters(_tokenAddress, originChainId);
         }
         address originToken;
+        /// Note L2->L2 asset transfers will accrue a fee in some form in later versions.
         {
             originToken = IBridgedStandardToken(_tokenAddress).originToken();
             if (originToken == address(0)) {
@@ -370,6 +371,7 @@ abstract contract NativeTokenVault is
             // empty deposit amount
             revert EmptyDeposit();
         }
+        /// Note L2->L2 asset transfers will accrue a fee in some form in later versions.
 
         bytes memory erc20Metadata;
         {
