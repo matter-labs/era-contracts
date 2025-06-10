@@ -48,6 +48,8 @@ error L2DAValidatorAddressIsZero();
 error LocalRootIsZero();
 // 0xbdaf7d42
 error LocalRootMustBeZero();
+// 0xe8d7dd28
+error MessageRootIsZero();
 // 0x2237c426
 error MismatchL2DAValidator();
 // 0x2c01a4af
