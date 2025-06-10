@@ -3152,6 +3152,11 @@ object "Bootloader" {
                 debugLog("Setting interop roots 1", nextInteropRootNumber)
                 let finalInteropRootNumber := add(nextInteropRootNumber, sub(numberOfRoots, 1))
                 for {let i := nextInteropRootNumber} lt(i, finalInteropRootNumber) {i := add(i, 1)} {
+                    if gt(i, MAX_INTEROP_ROOTS_IN_BATCH()) {
+                        debugLog("Processed all interop roots for this batch", 1)
+                        break
+                    }
+
                     debugLog("Setting interop roots 2", i)
                     let interopRootStartSlot := getInteropRootByte(i)
                     let currentBlockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET()))
