@@ -260,12 +260,6 @@ library SystemContractsProcessing {
             lang: Language.Solidity,
             isPrecompile: false
         });
-        systemContracts[31] = SystemContract({
-            addr: 0x0000000000000000000000000000000000008016,
-            codeName: "EntryPoint",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
 
         return systemContracts;
     }
