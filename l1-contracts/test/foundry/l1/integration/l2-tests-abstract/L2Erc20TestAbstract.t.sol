@@ -205,6 +205,11 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
             abi.encode(bytes(""))
         );
-        IERC7786GatewaySource(address(l2InteropCenter)).sendCall(271, calls[0].nextContract, calls[0].data, calls[0].requestedInteropCallValue);
+        IERC7786GatewaySource(address(l2InteropCenter)).sendCall(
+            271,
+            calls[0].nextContract,
+            calls[0].data,
+            calls[0].requestedInteropCallValue
+        );
     }
 }
