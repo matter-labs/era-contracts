@@ -47,6 +47,7 @@ struct FixedForceDeploymentsData {
     bytes32 assetTrackerBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
+    address aliasedChainRegistrationSender;
     // The forced beacon address. It is needed only for internal testing.
     // MUST be equal to 0 in production.
     // It will be the job of the governance to ensure that this value is set correctly.

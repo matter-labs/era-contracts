@@ -33,6 +33,11 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData
         );
+        // Decode the fixed and additional force deployments data.
+        FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
+            _fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
 
         // Force deploy the contracts on specified addresses.
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(forceDeployments);
@@ -52,7 +57,8 @@ library L2GenesisForceDeploymentsHelper {
                 _ctmDeployer,
                 address(L2_MESSAGE_ROOT),
                 address(L2_CHAIN_ASSET_HANDLER),
-                address(L2_INTEROP_CENTER)
+                address(L2_INTEROP_CENTER),
+                fixedForceDeploymentsData.aliasedChainRegistrationSender
             )
         );
 

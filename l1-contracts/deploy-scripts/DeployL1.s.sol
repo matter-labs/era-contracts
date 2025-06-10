@@ -408,6 +408,13 @@ contract DeployL1Script is Script, DeployUtils {
             "ctm_deployment_tracker_implementation_addr",
             addresses.bridgehub.ctmDeploymentTrackerImplementation
         );
+        vm.serializeAddress("bridgehub", "chain_registration_sender_proxy_addr", addresses.bridgehub.chainRegistrationSenderProxy);
+        vm.serializeAddress("bridgehub", "chain_registration_sender_implementation_addr", addresses.bridgehub.chainRegistrationSenderImplementation);
+        vm.serializeAddress("bridgehub", "interop_center_proxy_addr", addresses.bridgehub.interopCenterProxy);
+        vm.serializeAddress("bridgehub", "interop_center_implementation_addr", addresses.bridgehub.interopCenterImplementation);
+        vm.serializeAddress("bridgehub", "asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
+        vm.serializeAddress("bridgehub", "asset_tracker_implementation_addr", addresses.bridgehub.assetTrackerImplementation);
+
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
@@ -616,6 +623,7 @@ contract DeployL1Script is Script, DeployUtils {
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
+            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(addresses.bridgehub.chainRegistrationSenderProxy),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
         });
 

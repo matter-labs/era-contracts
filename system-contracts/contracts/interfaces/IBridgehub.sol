@@ -10,7 +10,8 @@ interface IBridgehub {
         address _ctmDeployer,
         address _messageRoot,
         address _chainAssetHandler,
-        address _interopCenter
+        address _interopCenter,
+        address _chainRegistrationSender
     ) external;
 
     function owner() external view returns (address);

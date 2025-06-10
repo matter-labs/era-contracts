@@ -71,6 +71,7 @@ describe("L2GenesisUpgrade tests", function () {
         REAL_L2_MESSAGE_ROOT_ADDRESS,
         REAL_L2_CHAIN_ASSET_HANDLER_ADDRESS,
         REAL_L2_INTEROP_CENTER_ADDRESS,
+        ADDRESS_ONE,
       ],
       {
         failure: false,
@@ -119,7 +120,7 @@ describe("L2GenesisUpgrade tests", function () {
 
     fixedForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
       [
-        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash,  bytes32 chainAssetHandlerBytecodeHash, bytes32 interopCenterBytecodeHash, bytes32 assetTrackerBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address dangerousTestOnlyForcedBeacon)",
+        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash,  bytes32 chainAssetHandlerBytecodeHash, bytes32 interopCenterBytecodeHash, bytes32 assetTrackerBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address aliasedChainRegistrationSender, address dangerousTestOnlyForcedBeacon)",
       ],
       [
         {
@@ -139,6 +140,7 @@ describe("L2GenesisUpgrade tests", function () {
           // For genesis upgrade these values will always be zero
           l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
           l2BridgedStandardERC20Impl: ethers.constants.AddressZero,
+          aliasedChainRegistrationSender: ADDRESS_ONE,
           dangerousTestOnlyForcedBeacon: ethers.constants.AddressZero,
         },
       ]
