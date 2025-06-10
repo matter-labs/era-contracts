@@ -10,21 +10,14 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
@@ -44,23 +37,24 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {InteropCenter} from "contracts/interop/InteropCenter.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {ChainRegistrationSender, IChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
+import {InteropCenter, IInteropCenter} from "contracts/interop/InteropCenter.sol";
+import {MessageRoot, IMessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {CTMDeploymentTracker, ICTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {L1NativeTokenVault, IL1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ChainTypeManager, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
+import {IL1ERC20Bridge, L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -184,6 +178,10 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridgehub.chainAssetHandlerImplementation,
             addresses.bridgehub.chainAssetHandlerProxy
         ) = deployTuppWithContract("ChainAssetHandler", false);
+        (
+            addresses.bridgehub.chainRegistrationSenderImplementation,
+            addresses.bridgehub.chainRegistrationSenderProxy
+        ) = deployTuppWithContract("ChainRegistrationSender", false);
         setBridgehubParams();
 
         initializeGeneratedData();
@@ -331,7 +329,8 @@ contract DeployL1Script is Script, DeployUtils {
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy),
             addresses.bridgehub.chainAssetHandlerProxy,
-            addresses.bridgehub.interopCenterProxy
+            addresses.bridgehub.interopCenterProxy,
+            addresses.bridgehub.chainRegistrationSenderProxy
         );
         interopCenter.setAddresses(addresses.bridges.l1AssetRouterProxy, addresses.bridgehub.assetTrackerProxy);
         messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
@@ -742,6 +741,8 @@ contract DeployL1Script is Script, DeployUtils {
                 return type(Bridgehub).creationCode;
             } else if (compareStrings(contractName, "ChainAssetHandler")) {
                 return type(ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+                return type(ChainRegistrationSender).creationCode;
             } else if (compareStrings(contractName, "MessageRoot")) {
                 return type(MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -831,6 +832,8 @@ contract DeployL1Script is Script, DeployUtils {
             return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "InteropCenter")) {
             return abi.encodeCall(InteropCenter.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+            return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "MessageRoot")) {
             return abi.encodeCall(MessageRoot.initialize, ());
         } else if (compareStrings(contractName, "ChainAssetHandler")) {

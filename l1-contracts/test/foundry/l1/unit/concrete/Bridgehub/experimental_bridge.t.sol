@@ -257,7 +257,8 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(address(0)),
             messageRoot,
             address(0),
-            address(interopCenter)
+            address(interopCenter),
+            address(0x000000000000000000000000000000000002000a)
         );
         interopCenter.setAddresses(sharedBridgeAddress, address(assetTracker));
         vm.stopPrank();
@@ -466,7 +467,8 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(address(0)),
             IMessageRoot(address(0)),
             address(0),
-            address(interopCenter)
+            address(interopCenter),
+            address(0x000000000000000000000000000000000002000a)
         );
         vm.stopPrank();
 
@@ -506,7 +508,8 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(address(0)),
             IMessageRoot(address(0)),
             address(0),
-            address(interopCenter)
+            address(interopCenter),
+            address(0x000000000000000000000000000000000002000a)
         );
         vm.stopPrank();
 
@@ -547,7 +550,8 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(randomCTMDeployer),
             IMessageRoot(randomMessageRoot),
             address(0),
-            address(interopCenter)
+            address(interopCenter),
+            address(0x000000000000000000000000000000000002000a)
         );
 
         assertTrue(bridgehub.assetRouter() == randomAssetRouter, "Shared bridge is already there");
@@ -573,7 +577,8 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(randomCTMDeployer),
             IMessageRoot(randomMessageRoot),
             address(0),
-            address(interopCenter)
+            address(interopCenter),
+            address(0x000000000000000000000000000000000002000a)
         );
 
         assertTrue(bridgehub.assetRouter() == address(0), "Shared bridge is already there");

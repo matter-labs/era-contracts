@@ -157,6 +157,20 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     /*//////////////////////////////////////////////////////////////
+                            INITIATTE DEPOSIT Functions
+    //////////////////////////////////////////////////////////////*/
+
+    /// @inheritdoc IAssetRouterBase
+    function bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyBridgehub {
+        _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
+    }
+
+    /*//////////////////////////////////////////////////////////////
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 

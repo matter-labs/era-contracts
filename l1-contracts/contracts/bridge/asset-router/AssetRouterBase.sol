@@ -17,7 +17,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
-import {AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
+import {AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion, AssetHandlerDoesNotExist} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
@@ -58,6 +58,14 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
      */
     uint256[48] private __gap;
 
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyBridgehub() {
+        if (msg.sender != address(BRIDGE_HUB)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub, IInteropCenter _interopCenter) {
@@ -92,6 +100,37 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /*//////////////////////////////////////////////////////////////
                             INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
+
+    function bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) public payable virtual;
+
+    function _bridgehubDepositBaseToken(
+        uint256 _chainId,
+        bytes32 _assetId,
+        address _originalCaller,
+        uint256 _amount
+    ) public payable virtual {
+        address assetHandler = assetHandlerAddress[_assetId];
+        if (assetHandler == address(0)) {
+            revert AssetHandlerDoesNotExist(_assetId);
+        }
+
+        // slither-disable-next-line unused-return
+        IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
+            _chainId: _chainId,
+            _msgValue: 0,
+            _assetId: _assetId,
+            _originalCaller: _originalCaller,
+            _data: DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0))
+        });
+
+        // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
+        emit BridgehubDepositBaseTokenInitiated(_chainId, _originalCaller, _assetId, _amount);
+    }
 
     function _bridgehubDeposit(
         uint256 _chainId,

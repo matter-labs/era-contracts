@@ -6,7 +6,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -125,7 +124,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         InteropCallStarter memory _interopCallStarter,
         address _sender,
         uint256 _index
-    ) internal {
+    ) internal pure {
         InteropCall memory interopCall = InteropCall({
             shadowAccount: false,
             to: _interopCallStarter.nextContract,
@@ -178,7 +177,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         if (tokenAssetId == BRIDGE_HUB.baseTokenAssetId(block.chainid)) {
             L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalValue}();
         } else {
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken(
+            IL2AssetRouter(assetRouter).bridgehubDepositBaseToken(
                 _destinationChainId,
                 tokenAssetId,
                 msg.sender,

@@ -18,12 +18,12 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
-import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE, SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {AlreadyCurrentSL, ChainIdAlreadyPresent, ChainNotLegacy, ChainNotPresentInCTM, NotChainAssetHandler, NotInGatewayMode, NotL1, NotRelayedSender, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotL1, NotRelayedSender, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdAlreadyExists, ChainIdCantBeCurrentChain, ChainIdMismatch, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, IncorrectBridgeHubAddress, MigrationPaused, MsgValueMismatch, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, WrongMagicValue, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -108,6 +108,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice interopCenter used for L1<>L2 communication
     IInteropCenter public override interopCenter;
 
+    /// @notice the chain registration sender used for chain registration.
+    /// @notice the chainRegistrationSender is only deployed on L1.
+    /// @dev If the Bridgehub is on L1 it is the address just the chainRegistrationSender address.
+    /// @dev If the Bridgehub is on L2 the address is aliased.
+    address public chainRegistrationSender;
+
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
             revert Unauthorized(msg.sender);
@@ -140,6 +146,16 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     modifier onlyChainAssetHandler() {
         if (msg.sender != chainAssetHandler) {
             revert NotChainAssetHandler(msg.sender, chainAssetHandler);
+        }
+        _;
+    }
+
+    modifier onlyChainRegistrationSender() {
+        if (
+            msg.sender != AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender) &&
+            msg.sender != SERVICE_TRANSACTION_SENDER
+        ) {
+            revert Unauthorized(msg.sender);
         }
         _;
     }
@@ -219,47 +235,15 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
         address _chainAssetHandler,
-        address _interopCenter
+        address _interopCenter,
+        address _chainRegistrationSender
     ) external onlyOwner {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
         interopCenter = IInteropCenter(_interopCenter);
-    }
-
-    /// @notice Used to set the legacy chain data for the upgrade.
-    /// @param _chainId The chainId of the legacy chain we are migrating.
-    function registerLegacyChain(uint256 _chainId) external override onlyL1 {
-        address ctm = chainTypeManager[_chainId];
-        if (ctm == address(0)) {
-            revert ChainNotLegacy();
-        }
-        if (zkChainMap.contains(_chainId)) {
-            revert ChainIdAlreadyPresent();
-        }
-
-        // From now on, since `zkChainMap` did not contain the chain, we assume
-        // that the chain is a legacy chain in the process of migration, i.e.
-        // its stored `baseTokenAssetId`, etc.
-
-        address token = __DEPRECATED_baseToken[_chainId];
-        if (token == address(0)) {
-            revert ChainNotLegacy();
-        }
-
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, token);
-
-        baseTokenAssetId[_chainId] = assetId;
-        assetIdIsRegistered[assetId] = true;
-
-        address chainAddress = IChainTypeManager(ctm).getZKChainLegacy(_chainId);
-        if (chainAddress == address(0)) {
-            revert ChainNotPresentInCTM();
-        }
-        _registerNewZKChain(_chainId, chainAddress, false);
-        messageRoot.addNewChain(_chainId);
-        settlementLayer[_chainId] = block.chainid;
+        chainRegistrationSender = _chainRegistrationSender;
     }
 
     //// Registry
@@ -390,6 +374,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
         emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;
+    }
+
+    /// @notice used to register chains on L2 for the purpose of interop.
+    /// @param _chainId the chainId of the chain to be registered.
+    /// @param _baseTokenAssetId the base token asset id of the chain.
+    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
+        baseTokenAssetId[_chainId] = _baseTokenAssetId;
+        // kl todo: should we add ctm asset id here?
     }
 
     /// @notice This function is used to register a new zkChain in the system.

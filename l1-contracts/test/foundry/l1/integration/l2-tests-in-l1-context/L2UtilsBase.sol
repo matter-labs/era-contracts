@@ -99,12 +99,14 @@ library L2UtilsBase {
         Bridgehub(L2_INTEROP_CENTER_ADDR).initialize(_args.aliasedOwner);
         vm.chainId(prevChainId);
         vm.prank(_args.aliasedOwner);
+        address aliasedL1ChainRegistrationSender = address(0x000000000000000000000000000000000002000a);
         Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            L2_INTEROP_CENTER_ADDR
+            L2_INTEROP_CENTER_ADDR,
+            aliasedL1ChainRegistrationSender
         );
         {
             address l2messageVerification = address(new L2MessageVerification());

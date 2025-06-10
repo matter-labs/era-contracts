@@ -98,29 +98,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertEq(protocolVersion, 120259084288);
     }
 
-    function test_bridgehubSetter() public {
-        uint256 chainId = zkChainIds[0];
-        uint256 randomChainId = 123456;
-
-        vm.mockCall(
-            address(addresses.chainTypeManager),
-            abi.encodeWithSelector(IChainTypeManager.getZKChainLegacy.selector, randomChainId),
-            abi.encode(address(0x01))
-        );
-        vm.store(address(addresses.bridgehub), keccak256(abi.encode(randomChainId, 205)), bytes32(uint256(uint160(1))));
-        vm.store(
-            address(addresses.bridgehub),
-            keccak256(abi.encode(randomChainId, 204)),
-            bytes32(uint256(uint160(address(addresses.chainTypeManager))))
-        );
-        addresses.bridgehub.registerLegacyChain(randomChainId);
-
-        assertEq(addresses.bridgehub.settlementLayer(randomChainId), block.chainid);
-
-        address messageRoot = address(addresses.bridgehub.messageRoot());
-        assertTrue(MessageRoot(messageRoot).chainIndex(randomChainId) != 0);
-    }
-
     function test_registerAlreadyDeployedZKChain() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
 

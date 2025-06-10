@@ -59,6 +59,8 @@ struct BridgehubDeployedAddresses {
     address interopCenterProxy;
     address assetTrackerImplementation;
     address assetTrackerProxy;
+    address chainRegistrationSenderImplementation;
+    address chainRegistrationSenderProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -355,6 +357,8 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "Bridgehub")) {
             return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
+        } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "InteropCenter")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.ownerAddress);
         } else if (compareStrings(contractName, "MessageRoot")) {

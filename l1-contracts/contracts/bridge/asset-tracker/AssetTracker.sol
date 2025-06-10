@@ -10,21 +10,19 @@ import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, NotCurrentSettlementLayer, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
-import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {SLNotWhitelisted} from "../../bridgehub/L1BridgehubErrors.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
 
 error AlreadyMigrated();
 
-contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, AssetHandlerModifiers {
+contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerModifiers {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
     uint256 public immutable L1_CHAIN_ID;
@@ -200,92 +198,92 @@ contract AssetTracker is IAssetTracker, IAssetHandler, Ownable2StepUpgradeable, 
                             AssetHandler Functions
     //////////////////////////////////////////////////////////////*/
 
-    // slither-disable-next-line locked-ether
-    function bridgeMint(
-        uint256 _originSettlementChainId,
-        bytes32 _assetId,
-        bytes calldata _data
-    ) external payable requireZeroValue(msg.value) onlyAssetRouter {
-        (
-            uint256 chainId,
-            bytes32 assetId,
-            uint256 amount,
-            bool migratingChainIsMinter,
-            bool isSLStillMinter,
-            uint256 newSLBalance
-        ) = DataEncoding.decodeAssetTrackerData(_data);
-        chainBalance[chainId][assetId] += amount;
-        isMinterChain[chainId][assetId] = migratingChainIsMinter;
-        numberOfSettlingMintingChains[assetId] += migratingChainIsMinter ? 1 : 0;
-        if (migratingChainIsMinter && block.chainid == L1_CHAIN_ID) {
-            if (!isSLStillMinter) {
-                isMinterChain[_originSettlementChainId][_assetId] = false;
-                chainBalance[_originSettlementChainId][_assetId] = newSLBalance;
-            }
-        }
-    }
+    // // slither-disable-next-line locked-ether
+    // function bridgeMint(
+    //     uint256 _originSettlementChainId,
+    //     bytes32 _assetId,
+    //     bytes calldata _data
+    // ) external payable requireZeroValue(msg.value) onlyAssetRouter {
+    //     (
+    //         uint256 chainId,
+    //         bytes32 assetId,
+    //         uint256 amount,
+    //         bool migratingChainIsMinter,
+    //         bool isSLStillMinter,
+    //         uint256 newSLBalance
+    //     ) = DataEncoding.decodeAssetTrackerData(_data);
+    //     chainBalance[chainId][assetId] += amount;
+    //     isMinterChain[chainId][assetId] = migratingChainIsMinter;
+    //     numberOfSettlingMintingChains[assetId] += migratingChainIsMinter ? 1 : 0;
+    //     if (migratingChainIsMinter && block.chainid == L1_CHAIN_ID) {
+    //         if (!isSLStillMinter) {
+    //             isMinterChain[_originSettlementChainId][_assetId] = false;
+    //             chainBalance[_originSettlementChainId][_assetId] = newSLBalance;
+    //         }
+    //     }
+    // }
 
-    // slither-disable-next-line locked-ether
-    function bridgeBurn(
-        uint256 _settlementChainId,
-        uint256,
-        bytes32, // _assetId todo add check on it.
-        address,
-        bytes calldata _data
-    ) external payable requireZeroValue(msg.value) onlyAssetRouter returns (bytes memory _bridgeMintData) {
-        if (!BRIDGE_HUB.whitelistedSettlementLayers(_settlementChainId)) {
-            revert SLNotWhitelisted();
-        }
-        (uint256 chainId, bytes32 assetId) = abi.decode(_data, (uint256, bytes32));
-        // kl todo add assetId check.
-        // if (_assetId != ) {
-        //     revert IncorrectChainAssetId(_assetId, (chainId));
-        // }
-        if (BRIDGE_HUB.settlementLayer(chainId) != _settlementChainId) {
-            revert NotCurrentSettlementLayer();
-        }
-        bool migratingChainIsMinter = isMinterChain[chainId][assetId];
-        uint256 amount = chainBalance[chainId][assetId];
-        if (amount == 0 && !migratingChainIsMinter) {
-            // we already migrated or there is nothing to migrate
-            revert AlreadyMigrated();
-        }
-        chainBalance[chainId][assetId] = 0;
-        isMinterChain[chainId][assetId] = false;
-        uint256 newSLBalance = 0;
+    // // slither-disable-next-line locked-ether
+    // function bridgeBurn(
+    //     uint256 _settlementChainId,
+    //     uint256,
+    //     bytes32, // _assetId todo add check on it.
+    //     address,
+    //     bytes calldata _data
+    // ) external payable requireZeroValue(msg.value) onlyAssetRouter returns (bytes memory _bridgeMintData) {
+    //     if (!BRIDGE_HUB.whitelistedSettlementLayers(_settlementChainId)) {
+    //         revert SLNotWhitelisted();
+    //     }
+    //     (uint256 chainId, bytes32 assetId) = abi.decode(_data, (uint256, bytes32));
+    //     // kl todo add assetId check.
+    //     // if (_assetId != ) {
+    //     //     revert IncorrectChainAssetId(_assetId, (chainId));
+    //     // }
+    //     if (BRIDGE_HUB.settlementLayer(chainId) != _settlementChainId) {
+    //         revert NotCurrentSettlementLayer();
+    //     }
+    //     bool migratingChainIsMinter = isMinterChain[chainId][assetId];
+    //     uint256 amount = chainBalance[chainId][assetId];
+    //     if (amount == 0 && !migratingChainIsMinter) {
+    //         // we already migrated or there is nothing to migrate
+    //         revert AlreadyMigrated();
+    //     }
+    //     chainBalance[chainId][assetId] = 0;
+    //     isMinterChain[chainId][assetId] = false;
+    //     uint256 newSLBalance = 0;
 
-        if (migratingChainIsMinter) {
-            --numberOfSettlingMintingChains[assetId];
-            if (block.chainid == L1_CHAIN_ID) {
-                isMinterChain[_settlementChainId][assetId] = true;
-            } else {
-                if (numberOfSettlingMintingChains[assetId] == 0) {
-                    // we need to calculate the current balance of this chain, the sum of all the balances on it.
-                    uint256[] memory zkChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
-                    uint256 zkChainIdsLength = zkChainIds.length;
-                    for (uint256 i = 0; i < zkChainIdsLength; ++i) {
-                        if (BRIDGE_HUB.settlementLayer(zkChainIds[i]) == block.chainid) {
-                            newSLBalance += chainBalance[zkChainIds[i]][assetId];
-                        }
-                    }
-                }
-            }
-        } else if (!isMinterChain[_settlementChainId][assetId] && block.chainid == L1_CHAIN_ID) {
-            // We only care about the chainBalance if the SL is not a minter.
-            // On GW we don't care about the L1 chainBalance.
-            chainBalance[_settlementChainId][assetId] += amount;
-        }
+    //     if (migratingChainIsMinter) {
+    //         --numberOfSettlingMintingChains[assetId];
+    //         if (block.chainid == L1_CHAIN_ID) {
+    //             isMinterChain[_settlementChainId][assetId] = true;
+    //         } else {
+    //             if (numberOfSettlingMintingChains[assetId] == 0) {
+    //                 // we need to calculate the current balance of this chain, the sum of all the balances on it.
+    //                 uint256[] memory zkChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
+    //                 uint256 zkChainIdsLength = zkChainIds.length;
+    //                 for (uint256 i = 0; i < zkChainIdsLength; ++i) {
+    //                     if (BRIDGE_HUB.settlementLayer(zkChainIds[i]) == block.chainid) {
+    //                         newSLBalance += chainBalance[zkChainIds[i]][assetId];
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     } else if (!isMinterChain[_settlementChainId][assetId] && block.chainid == L1_CHAIN_ID) {
+    //         // We only care about the chainBalance if the SL is not a minter.
+    //         // On GW we don't care about the L1 chainBalance.
+    //         chainBalance[_settlementChainId][assetId] += amount;
+    //     }
 
-        return
-            DataEncoding.encodeAssetTrackerData({
-                _chainId: chainId,
-                _assetId: assetId,
-                _amount: amount,
-                _migratingChainIsMinter: migratingChainIsMinter,
-                _hasSettlingMintingChains: numberOfSettlingMintingChains[assetId] > 0,
-                _newSLBalance: newSLBalance
-            });
-    }
+    //     return
+    //         DataEncoding.encodeAssetTrackerData({
+    //             _chainId: chainId,
+    //             _assetId: assetId,
+    //             _amount: amount,
+    //             _migratingChainIsMinter: migratingChainIsMinter,
+    //             _hasSettlingMintingChains: numberOfSettlingMintingChains[assetId] > 0,
+    //             _newSLBalance: newSLBalance
+    //         });
+    // }
     /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/

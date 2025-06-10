@@ -109,6 +109,8 @@ interface IBridgehub {
 
     function assetRouter() external view returns (address);
 
+    function chainRegistrationSender() external view returns (address);
+
     /// Mailbox forwarder
 
     function proveL2MessageInclusion(
@@ -175,7 +177,8 @@ interface IBridgehub {
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
         address _chainAssetHandler,
-        address _interopCenter
+        address _interopCenter,
+        address _chainRegistrationSender
     ) external;
 
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
@@ -218,8 +221,6 @@ interface IBridgehub {
 
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
 
-    function registerLegacyChain(uint256 _chainId) external;
-
     function pauseMigration() external;
 
     function unpauseMigration() external;
@@ -244,4 +245,6 @@ interface IBridgehub {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;
+
+    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external;
 }

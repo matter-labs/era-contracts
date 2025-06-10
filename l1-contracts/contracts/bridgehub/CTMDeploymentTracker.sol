@@ -6,6 +6,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
+import {IL1CrossChainSender} from "../bridge/asset-router/IL1CrossChainSender.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
@@ -19,7 +20,7 @@ bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Contract to be deployed on L1, can link together other contracts based on AssetInfo.
-contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable {
+contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Ownable2StepUpgradeable {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -88,7 +89,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         address _originalCaller,
         uint256,
         bytes calldata _data
-    ) external payable onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) external payable override onlyBridgehub returns (L2TransactionRequestTwoBridgesInner memory request) {
         if (msg.value != 0) {
             revert NoEthAllowed();
         }
@@ -111,7 +112,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         uint256 _chainId,
         bytes32 _txDataHash,
         bytes32 _txHash
-    ) external onlyBridgehub {}
+    ) external override onlyBridgehub {}
 
     /// @notice Used to register the ctm asset in L2 AssetRouter.
     /// @param _originalCaller the address that called the Router

@@ -12,7 +12,6 @@ import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
-import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
@@ -22,7 +21,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {AddressAlreadySet, AssetHandlerDoesNotExist, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {AddressAlreadySet, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
@@ -66,14 +65,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
         if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -209,29 +200,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             INITIATTE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IL1AssetRouter
+    /// @inheritdoc IAssetRouterBase
     function bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual override onlyBridgehubOrEra(_chainId) whenNotPaused {
-        address assetHandler = assetHandlerAddress[_assetId];
-        if (assetHandler == address(0)) {
-            revert AssetHandlerDoesNotExist(_assetId);
-        }
-
-        // slither-disable-next-line unused-return
-        IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
-            _chainId: _chainId,
-            _msgValue: 0,
-            _assetId: _assetId,
-            _originalCaller: _originalCaller,
-            _data: DataEncoding.encodeBridgeBurnData(_amount, address(0), address(0))
-        });
-
-        // Note that we don't save the deposited amount, as this is for the base token, which gets sent to the refundRecipient if the tx fails
-        emit BridgehubDepositBaseTokenInitiated(_chainId, _originalCaller, _assetId, _amount);
+    ) public payable virtual override(AssetRouterBase, IAssetRouterBase) onlyBridgehubOrEra(_chainId) whenNotPaused {
+        _bridgehubDepositBaseToken(_chainId, _assetId, _originalCaller, _amount);
     }
 
     /// @inheritdoc IL1AssetRouter

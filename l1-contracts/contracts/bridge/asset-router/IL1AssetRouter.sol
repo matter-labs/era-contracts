@@ -11,6 +11,7 @@ import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
+/// @notice This contract implement IL1CrossChainSender interface. We do not import it here to decrease inheritance.
 /// @custom:security-contact security@matterlabs.dev
 interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
     event BridgehubMintData(bytes bridgeMintData);
@@ -164,19 +165,6 @@ interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
         uint256 _value,
         bytes calldata _data
     ) external payable returns (L2TransactionRequestTwoBridgesInner memory request);
-
-    /// @notice Allows bridgehub to acquire mintValue for L1->L2 transactions.
-    /// @dev If the corresponding L2 transaction fails, refunds are issued to a refund recipient on L2.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
-    /// @param _assetId The deposited asset ID.
-    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
-    /// @param _amount The total amount of tokens to be bridged.
-    function bridgehubDepositBaseToken(
-        uint256 _chainId,
-        bytes32 _assetId,
-        address _originalCaller,
-        uint256 _amount
-    ) external payable;
 
     /// @notice Routes the confirmation to nullifier for backward compatibility.
     /// @notice Confirms the acceptance of a transaction by the Mailbox, as part of the L2 transaction process within Bridgehub.
