@@ -373,11 +373,6 @@ object "Bootloader" {
                 ret := mul(add(INTEROP_ROOT_BEGIN_SLOT(), mul(i, INTEROP_ROOT_SLOT_SIZE())), 32)
             }
 
-            /// @dev Returns the byte offset of the next interop root to process.
-            function getNextInteropRootByte() -> ret {
-                ret := getInteropRootByte(mload(CURRENT_INTEROP_ROOT_BYTE()))
-            }
-
             /// @dev Returns the byte offset of the processed block number within an interop root entry.
             function INTEROP_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET() -> ret {
                 ret := 0
@@ -3135,7 +3130,6 @@ object "Bootloader" {
 
             function setInteropRootForBlock(setForBlockNumber) {
                 let nextInteropRootNumber := mload(CURRENT_INTEROP_ROOT_BYTE())
-                let interopRootStartSlot := getNextInteropRootByte()
                 let numberOfRoots := getNumberOfInteropRootInCurrentBlock()
                 
                 debugLog("numberOfRoots", numberOfRoots)
