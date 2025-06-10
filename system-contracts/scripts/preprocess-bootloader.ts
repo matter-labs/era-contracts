@@ -70,7 +70,6 @@ const params = {
   RIGHT_PADDED_GET_ACCOUNT_DELEGATION_SELECTOR: getPaddedSelector("ContractDeployer", "getAccountDelegation"),
   PROCESS_DELEGATIONS_SELECTOR: getSelector("ContractDeployer", "processDelegations"),
   RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR: getPaddedSelector("AccountCodeStorage", "getRawCodeHash"),
-  RIGHT_PADDED_SET_RAW_CODE_HASH_SELECTOR: getPaddedSelector("AccountCodeStorage", "setRawCodeHash"),
   PAY_FOR_TX_SELECTOR: getSelector("DefaultAccount", "payForTransaction"),
   PRE_PAYMASTER_SELECTOR: getSelector("DefaultAccount", "prepareForPaymaster"),
   VALIDATE_AND_PAY_PAYMASTER: getSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),

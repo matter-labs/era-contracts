@@ -694,48 +694,6 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
-            /// @notice Overrides the "raw" code hash of the address. "Raw" means that it must use exactly the value
-            /// that is stored in the AccountCodeStorage system contract for that address, without applying any
-            /// additional transformations.
-            /// This method is very unsafe and it shouldn't be used to do long-term modifications.
-            /// Right now it's only used to override the bytecode hash of delegated accounts to perform
-            /// transaction validation & payment.
-            /// @param addr The address of the account to set the code hash of.
-            /// @param codeHash The code hash to be set.
-            /// @param assertSuccess Whether to revert the bootloader if the call to the AccountCodeStorage fails. If `false`, only
-            /// `nearCallPanic` will be issued in case of failure, which is helpful for cases, when the reason for failure is user providing not
-            /// enough gas.
-            function setRawCodeHash(addr, codeHash, assertSuccess) -> ret {
-                mstore(0, {{RIGHT_PADDED_SET_RAW_CODE_HASH_SELECTOR}})
-                mstore(4, addr)
-                mstore(36, codeHash)
-                let success := call(
-                    gas(),
-                    ACCOUNT_CODE_STORAGE_ADDR(),
-                    0,
-                    0,
-                    68,
-                    0,
-                    32
-                )
-
-                // In case the call to the account code storage fails,
-                // it most likely means that the caller did not provide enough gas for
-                // the call.
-                // In case the caller is certain that the amount of gas provided is enough, i.e.
-                // (`assertSuccess` = true), then we should panic.
-                if iszero(success) {
-                    if assertSuccess {
-                        // The call must've succeeded, but it didn't. So we revert the bootloader.
-                        assertionError("setRawCodeHash failed")
-                    }
-
-                    // Most likely not enough gas provided, revert the current frame.
-                    nearCallPanic()
-                }
-
-                ret := mload(0)
-            }
 
             /// @notice Returns the address of EIP-7702 delegation for the account (or zero, if account
             /// is not delegated).
@@ -2031,39 +1989,6 @@ object "Bootloader" {
 
 
             <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
-            function ethCallEvmConsturction(
-                from,
-                dataPtr
-            ) -> success {
-                // Set fake address
-                let to := 0xF234567890123456789012345678901234567890
-                // Set raw code hash to the constructing EVM contract
-                // so that we can get deployment bytecode as return value.
-                setRawCodeHash(to, 0x0201000000000000000000000000000000000000000000000000000000000000, true)
-
-                // TODO: transfer value
-
-                success := mimicCallOnlyResult(
-                    to,
-                    from,
-                    dataPtr,
-                    1, // Constructor
-                    0, // Not a mimic call
-                    0,
-                    0,
-                    0,
-                )
-
-                // Returned data bytes have structure: paddedBytecode.evmBytecodeLen.constructorReturnEvmGas
-                // So we need to load the 2nd from last word to get the bytecode length
-                if success {
-                    let returnSize := returndatasize()
-                    returndatacopy(0,0,returnSize)
-                    let bytecodeSize := mload(sub(returnSize, 0x40))
-                    return(0,bytecodeSize)
-                }
-            }
-
             function ZKSYNC_NEAR_CALL_ethCall(
                 abi,
                 txDataOffset,
@@ -2078,7 +2003,6 @@ object "Bootloader" {
                 let innerTxDataOffset := add(txDataOffset, 32)
                 let to := getTo(innerTxDataOffset)
                 let from := getFrom(innerTxDataOffset)
-                let isEvmConstruction := getReserved1(innerTxDataOffset)
 
                 debugLog("from: ", from)
                 debugLog("to: ", to)
@@ -2096,22 +2020,12 @@ object "Bootloader" {
 
                 let value := getValue(innerTxDataOffset)
 
-                let success := 0
-                switch isEvmConstruction
-                case 0 {
-                    success := msgValueSimulatorMimicCall(
-                        to,
-                        from,
-                        value,
-                        dataPtr
-                    )
-                }
-                default {
-                    success := ethCallEvmConsturction(
-                        from,
-                        dataPtr
-                    )
-                }
+                let success := msgValueSimulatorMimicCall(
+                    to,
+                    from,
+                    value,
+                    dataPtr
+                )
 
                 if iszero(success) {
                     // If success is 0, we need to revert
