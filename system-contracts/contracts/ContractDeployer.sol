@@ -417,7 +417,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     }
 
     function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
-        for (uint256 i = 0; i < authorizationList.length; i++) {
+        uint256 listLength = authorizationList.length;
+        for (uint256 i = 0; i < listLength; ++i) {
             // Per EIP7702 rules, if any check for the tuple item fails,
             // we must move on to the next item in the list.
             AuthorizationListItem calldata item = authorizationList[i];
@@ -440,8 +441,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             bytes memory listLenEncoded = RLPEncoder.encodeListLen(
                 uint64(chainIdEncoded.length + addressEncoded.length + nonceEncoded.length)
             );
+            bytes1 magic = bytes1(0x05);
             bytes32 message = keccak256(
-                bytes.concat(bytes1(0x05), listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
+                bytes.concat(magic, listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
             );
 
             // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature

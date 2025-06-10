@@ -400,7 +400,8 @@ contract BootloaderUtilities is IBootloaderUtilities {
         AuthorizationListItem[] memory authList = abi.decode(_transaction.reservedDynamic, (AuthorizationListItem[]));
         bytes memory encodedAuthList = new bytes(0);
         unchecked {
-            for (uint i = 0; i < authList.length; i++) {
+            uint256 listLength = authList.length;
+            for (uint256 i = 0; i < listLength; ++i) {
                 bytes memory encodedChainId = RLPEncoder.encodeUint256(authList[i].chainId);
                 bytes memory encodedNonce = RLPEncoder.encodeUint256(authList[i].nonce);
                 bytes memory encodedAddress = RLPEncoder.encodeAddress(authList[i].addr);

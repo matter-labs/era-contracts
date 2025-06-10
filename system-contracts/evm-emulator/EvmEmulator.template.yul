@@ -147,10 +147,10 @@ object "EvmEmulator" {
                 delegationAddress,
             ) -> success, returnOffset, returnLen {
                 returnOffset := MEM_OFFSET()
+                // TODO: use delegatecall by reference to avoid copying calldata
                 let calldataSize := calldatasize()
                 calldatacopy(0, 0, calldataSize)
                 success := delegatecall(gas(), delegationAddress, 0, calldataSize, 0, 0)
-                // TODO: do we need to handle failure here?
                 
                 returnLen := returndatasize()
                 returndatacopy(returnOffset, 0, returnLen)

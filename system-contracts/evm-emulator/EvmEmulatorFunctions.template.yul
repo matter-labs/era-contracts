@@ -786,7 +786,6 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
             if iszero(isCallToEmptyContract) {
                 isCallToEmptyContract := iszero(and(shr(224, rawCodeHash), 0xffff)) // is codelen zero?
             }
-            // TODO: do we need to handle 7702 delegation here?
 
             if isCallToEmptyContract {
                 // In case of a call to the EVM contract that is currently being constructed, 
