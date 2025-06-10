@@ -6,12 +6,6 @@ pragma solidity ^0.8.21;
 error AlreadyCurrentSL(uint256 blockChainId);
 // 0x65e8a019
 error ChainExists();
-// 0xff514c10
-error ChainIdAlreadyPresent();
-// 0x5de72107
-error ChainNotLegacy();
-// 0x4bd4ae07
-error ChainNotPresentInCTM();
 // 0xeab895aa
 error HyperchainNotRegistered();
 // 0x48857c1d
