@@ -164,7 +164,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
-        ProofData memory proofData = MessageHashing.getProofData({
+        ProofData memory proofData = MessageHashing._getProofData({
             _chainId: _chainId,
             _batchNumber: _batchNumber,
             _leafProofMask: _leafProofMask,
