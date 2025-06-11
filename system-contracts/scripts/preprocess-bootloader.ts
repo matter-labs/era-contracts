@@ -67,7 +67,7 @@ const params = {
   VALIDATE_TX_SELECTOR: getSelector("IAccount", "validateTransaction"),
   EXECUTE_TX_SELECTOR: getSelector("DefaultAccount", "executeTransaction"),
   RIGHT_PADDED_GET_ACCOUNT_VERSION_SELECTOR: getPaddedSelector("ContractDeployer", "extendedAccountVersion"),
-  RIGHT_PADDED_GET_ACCOUNT_DELEGATION_SELECTOR: getPaddedSelector("ContractDeployer", "getAccountDelegation"),
+  RIGHT_PADDED_IS_ACCOUNT_EOA_SELECTOR: getPaddedSelector("ContractDeployer", "isAccountEOA"),
   PROCESS_DELEGATIONS_SELECTOR: getSelector("ContractDeployer", "processDelegations"),
   RIGHT_PADDED_GET_RAW_CODE_HASH_SELECTOR: getPaddedSelector("AccountCodeStorage", "getRawCodeHash"),
   PAY_FOR_TX_SELECTOR: getSelector("DefaultAccount", "payForTransaction"),

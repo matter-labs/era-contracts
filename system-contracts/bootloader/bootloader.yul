@@ -694,35 +694,6 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
-
-            /// @notice Returns the address of EIP-7702 delegation for the account (or zero, if account
-            /// is not delegated).
-            /// @param addr The address of the account to check.
-            function getDelegationAddress(addr) -> ret {
-                mstore(0, {{RIGHT_PADDED_GET_ACCOUNT_DELEGATION_SELECTOR}})
-                mstore(4, addr)
-                let success := staticcall(
-                    gas(),
-                    CONTRACT_DEPLOYER_ADDR(),
-                    0,
-                    36,
-                    0,
-                    32
-                )
-
-                // In case the call to the account code storage fails,
-                // it most likely means that the caller did not provide enough gas for
-                // the call.
-                // In case the caller is certain that the amount of gas provided is enough, i.e.
-                // (`assertSuccess` = true), then we should panic.
-                if iszero(success) {
-                    // Most likely not enough gas provided, revert the current frame.
-                    nearCallPanic()
-                }
-
-                ret := mload(0)
-            }
-
             /// @notice invokes the `processDelegations` method of the `AccountCodeStorage` contract.
             /// @dev this method expects `reservedDynamic` to contain ABI-encoded `AuthorizationList`
             /// @dev this method internally overwrites transaction data and restores it after the call.
@@ -2235,14 +2206,30 @@ object "Bootloader" {
             /// @param addr The address to check
             function isEOA(addr) -> ret {
                 ret := 0
-                let delegation := getDelegationAddress(addr)
 
-                // TODO: This logic is duplicated in several places, we should create a dedicated method.
                 if gt(addr, MAX_SYSTEM_CONTRACT_ADDR()) {
-                    ret := or(
-                        iszero(getRawCodeHash(addr, false)),
-                        gt(delegation, 0)
+                    mstore(0, {{RIGHT_PADDED_IS_ACCOUNT_EOA_SELECTOR}})
+                    mstore(4, addr)
+                    let success := staticcall(
+                        gas(),
+                        CONTRACT_DEPLOYER_ADDR(),
+                        0,
+                        36,
+                        0,
+                        32
                     )
+
+                    // In case the call to the account code storage fails,
+                    // it most likely means that the caller did not provide enough gas for
+                    // the call.
+                    // In case the caller is certain that the amount of gas provided is enough, i.e.
+                    // (`assertSuccess` = true), then we should panic.
+                    if iszero(success) {
+                        // Most likely not enough gas provided, revert the current frame.
+                        nearCallPanic()
+                    }
+
+                    ret := mload(0)
                 }
             }
 

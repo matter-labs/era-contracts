@@ -60,6 +60,25 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         return accountInfo[_address];
     }
 
+    /// @notice Returns `true` if account is an EOA (including 7702-delegated ones).
+    /// This function will return `false` for _both_ smart contracts and smart accounts.
+    /// @param _address The address of the account.
+    /// @return `true` if the account is an EOA, `false` otherwise.
+    function isAccountEOA(address _address) external view returns (bool) {
+        bool systemContract = _address <= address(MAX_SYSTEM_CONTRACT_ADDRESS);
+        if (systemContract) {
+            return false;
+        }
+
+        bool noCodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0;
+        if (noCodeHash) {
+            return true;
+        }
+
+        bool delegated = this.getAccountDelegation(_address) != address(0);
+        return delegated;
+    }
+
     /// @notice Returns the account abstraction version if `_address` is a deployed contract.
     /// Returns the latest supported account abstraction version if `_address` is an EOA.
     /// @param _address The address of the account.
@@ -71,10 +90,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
 
         // It is an EOA, it is still an account.
-        bool notSystem = _address > address(MAX_SYSTEM_CONTRACT_ADDRESS);
-        bool noCodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0;
-        bool delegated = this.getAccountDelegation(_address) != address(0);
-        if (notSystem && (noCodeHash || delegated)) {
+        if (this.isAccountEOA(_address)) {
             return AccountAbstractionVersion.Version1;
         }
 
@@ -183,7 +199,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     function createEVM(bytes calldata _initCode) external payable override onlySystemCall returns (uint256, address) {
         uint256 senderNonce;
         // If the account is an EOA, use the min nonce. If it's a contract, use deployment nonce
-        // TODO: EOA check must be fixed
         if (msg.sender == tx.origin) {
             // Subtract 1 for EOA since the nonce has already been incremented for this transaction
             senderNonce = NONCE_HOLDER_SYSTEM_CONTRACT.getMinNonce(msg.sender) - 1;
@@ -416,6 +431,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
     }
 
+    /// @notice Method called by bootloader during processing of EIP7702 authorization lists.
+    /// @notice Each item is processed independently, so if any check fails for an item,
+    /// it is skipped and the next item is processed.
     function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
         uint256 listLength = authorizationList.length;
         for (uint256 i = 0; i < listLength; ++i) {
@@ -469,12 +487,13 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
                 continue;
             }
 
-            bool nonceIncremented = this._performRawMimicCall(
-                uint32(gasleft()),
-                authority,
-                address(NONCE_HOLDER_SYSTEM_CONTRACT),
-                abi.encodeCall(NONCE_HOLDER_SYSTEM_CONTRACT.incrementMinNonceIfEquals, (item.nonce)),
-                true
+            // Avoid reverting if the nonce is not incremented.
+            (bool nonceIncremented, ) = address(NONCE_HOLDER_SYSTEM_CONTRACT).call(
+                abi.encodeWithSelector(
+                    NONCE_HOLDER_SYSTEM_CONTRACT.incrementMinNonceIfEqualsFor.selector,
+                    authority,
+                    item.nonce
+                )
             );
             if (!nonceIncremented) {
                 continue;
@@ -497,6 +516,11 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
     }
 
+    /// @notice Hashes the code part extracted from EIP-7702 delegation contract bytecode hash
+    /// without copying data to memory.
+    /// @dev This method does not check whether the input is a valid EIP-7702 delegation code hash.
+    /// @param input The EIP-7702 delegation code hash.
+    /// @return hash The keccak256 hash of the code part of the EIP-7702 delegation code hash.
     function _hash7702Delegation(bytes32 input) internal pure returns (bytes32 hash) {
         // Hash bytes 9-32 (that have the contract code) without allocating an array.
         assembly {
@@ -505,18 +529,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             mstore(ptr, shl(72, input)) // Shift left to remove first 9 bytes (9 * 8 = 72 bits)
             hash := keccak256(ptr, 23)
         }
-    }
-
-    // Needed to convert `memory` to `calldata`
-    // TODO: (partial) duplication with EntryPointV01; probably need to be moved somewhere.
-    function _performRawMimicCall(
-        uint32 _gas,
-        address _whoToMimic,
-        address _to,
-        bytes calldata _data,
-        bool isSystem
-    ) external onlyCallFrom(address(this)) returns (bool success) {
-        return EfficientCall.rawMimicCall(_gas, _to, _data, _whoToMimic, false, isSystem);
     }
 
     /// @notice Deploys a bytecode on the specified address.
