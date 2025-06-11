@@ -3297,6 +3297,7 @@ object "Bootloader" {
                         assertEq(getPaymasterInputBytesLength(innerTxDataOffset), 0, "paymasterInput non zero")
 
                         // For EIP7702, we use `reservedDynamic` to pass encoded authorization list data.
+                        // From EIP: "The transaction is considered invalid if the length of authorization_list is zero."
                         assertEq(gt(getReservedDynamicBytesLength(innerTxDataOffset), 0), 1, "reservedDynamic is zero for EIP7702")
                     }
                     case 113 {

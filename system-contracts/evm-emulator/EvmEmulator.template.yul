@@ -161,14 +161,13 @@ object "EvmEmulator" {
             ////////////////////////////////////////////////////////////////
 
             let rawCodeHash := getRawCodeHash(getCodeAddress())
-            if is7702Delegated(rawCodeHash) {
+            let delegationAddr := delegationAddress(rawCodeHash)
+            if gt(delegationAddr, 0) {
                 // We process 7702 delegation before opening an EVM frame,
                 // since we don't actually perform simulation here.
                 // If this code is invoked from EVM interpreter, caller will
                 // know how to handle the result, we're only acting as a proxy.
-                let success, returnOffset, returnLen := $llvm_Cold_llvm$_delegate7702(
-                    and(rawCodeHash, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
-                )
+                let success, returnOffset, returnLen := $llvm_Cold_llvm$_delegate7702(delegationAddr)
                 switch success 
                     case 1 {
                         return(returnOffset, returnLen)

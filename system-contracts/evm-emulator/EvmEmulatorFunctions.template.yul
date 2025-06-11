@@ -364,6 +364,18 @@ function is7702Delegated(rawCodeHash) -> isDelegated {
     isDelegated := eq(shr(240, rawCodeHash), 0x0202)
 }
 
+function delegationAddress(rawCodeHash) -> delegationAddr {
+    delegationAddr := 0
+    if is7702Delegated(rawCodeHash) {
+        // Check that there is no loop.
+        let storedAddr := and(rawCodeHash, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+        let delegationHash := getRawCodeHash(storedAddr)
+        if eq(is7702Delegated(delegationHash), 0) {
+            delegationAddr := storedAddr
+        }
+    }
+}
+
 function getEvmExtcodehash(versionedBytecodeHash) -> evmCodeHash {
     // function getEvmCodeHash(bytes32 versionedBytecodeHash) external view returns(bytes32)
     mstore(0, 0x5F8F27B000000000000000000000000000000000000000000000000000000000)

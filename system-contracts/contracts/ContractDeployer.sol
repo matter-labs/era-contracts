@@ -12,7 +12,7 @@ import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMBytecodeHash, EVMBytecodeHashUnknown, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
+import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMBytecodeHash, EVMBytecodeHashUnknown, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue, EmptyAuthorizationList} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -436,6 +436,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// it is skipped and the next item is processed.
     function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
         uint256 listLength = authorizationList.length;
+        // The transaction is considered invalid if the length of authorization_list is zero.
+        require(listLength > 0, EmptyAuthorizationList());
         for (uint256 i = 0; i < listLength; ++i) {
             // Per EIP7702 rules, if any check for the tuple item fails,
             // we must move on to the next item in the list.
