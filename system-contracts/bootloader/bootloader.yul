@@ -2281,17 +2281,11 @@ object "Bootloader" {
 
             /// @dev Calls the `prepareForPaymaster` method of an account
             function accountPrePaymaster(account, txDataOffset) -> success {
-                // TODO: should we allow delegated accounts to use native paymasters?
-                // TODO: Gut feeling is that the answer is "NO" as we're deprecating EIP-712 txs
-                // TOOD: and native accounts have their own entrypoint.
                 success := callAccountMethod({{PRE_PAYMASTER_SELECTOR}}, account, txDataOffset)
             }
 
             /// @dev Calls the `validateAndPayForPaymasterTransaction` method of a paymaster
             function validateAndPayForPaymasterTransaction(paymaster, txDataOffset) -> success {
-                // TODO: should we allow delegated accounts to use native paymasters?
-                // TODO: Gut feeling is that the answer is "NO" as we're deprecating EIP-712 txs
-                // TOOD: and native accounts have their own entrypoint.
                 success := callAccountMethod({{VALIDATE_AND_PAY_PAYMASTER}}, paymaster, txDataOffset)
             }
 
@@ -2513,10 +2507,6 @@ object "Bootloader" {
                 } {
                     mstore(to, mload(from))
                 }
-            }
-
-            function DELEGATION_BYTECODE_MARKER() -> ret {
-                ret := 0x0202FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF
             }
 
             /// @dev Validates the transaction against the senders' account.
