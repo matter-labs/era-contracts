@@ -481,11 +481,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
 
             address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
 
-            // ZKsync has native account abstraction, so we only allow delegation for EOAs.
-            if (
-                ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(authority) != 0x00 &&
-                this.getAccountDelegation(authority) == address(0)
-            ) {
+            // We only allow delegation for EOAs.
+            if (!this.isAccountEOA(authority)) {
                 continue;
             }
 
@@ -506,7 +503,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
                 EVM_HASHES_STORAGE.storeEvmCodeHash(currentBytecodeHash, bytes32(0x0));
             } else {
                 // Otherwise, store the delegation.
-                // TODO: Do we need any security checks here, e.g. non-default code hash or non-system contract?
                 bytes32 delegationCodeMarker = DELEGATION_BYTECODE_MASK | bytes32(uint256(uint160(item.addr)));
                 ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccount7702DelegationCodeHash(
                     authority,
