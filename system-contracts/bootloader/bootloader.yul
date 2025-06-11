@@ -1505,7 +1505,7 @@ object "Bootloader" {
                 ret := 1
             }
 
-            /// @dev Function responsible for the validation & fee payment step of the transaction.
+            /// @dev Function responsible for processing EIP-7702 authorization list of the transaction.
             /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
             /// @param gasPrice The gasPrice to be used in this transaction.

@@ -36,7 +36,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// - Byte 0 (0x02) means the the account is processed through the EVM interpreter
     /// - Byte 1 (0x02) means that the account is delegated.
     /// - Bytes 2-3 (0x0017) means that the length of the bytecode is 23 bytes.
-    /// - Bytes 4-17 have no meaning.
+    /// - Bytes 4-8 have no meaning.
     /// - Bytes 9-11 (0xEF0100) are prefix for the 7702 bytecode of the contract (EF01000 || address).
     /// The rest is left empty for address masking.
     bytes32 private constant DELEGATION_BYTECODE_MASK =
