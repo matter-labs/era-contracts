@@ -704,8 +704,9 @@ object "Bootloader" {
                 let ptr := getReservedDynamicPtr(innerTxDataOffset)
                 let length := mload(ptr)
 
-                // Delegations are only processed if transaction is EIP7702 and
-                // authorization list is provided
+                // We check the validity of transaction in `validateTypedTxStructure`, but this function
+                // is invoked for every tx. So here we're only checking if we actually need to call
+                // `ContractDeployer::processDelegations`.
                 let isEIP7702 := eq(getTxType(innerTxDataOffset), 4)
                 let isDelegationProvided := gt(length, 0)
                 let shouldProcess := and(isEIP7702, isDelegationProvided)
@@ -1380,6 +1381,26 @@ object "Bootloader" {
                     revertWithReason(TX_VALIDATION_OUT_OF_GAS(), 0)
                 }
 
+                // Processing of EIP-7702 delegations is a part of transaction validation,
+                // since it can update transaction nonces and should not be rolled back
+                // even if transaction execution fails for any reason.
+                let gasBeforeDelegations := gas()
+                let processDelegationsABI := getNearCallABI(gasLeft)
+                debugLog("processDelegationsABI", processDelegationsABI)
+                let delegationsProcessed := ZKSYNC_NEAR_CALL_processDelegations(
+                    processDelegationsABI,
+                    txDataOffset,
+                    gasPrice
+                )
+                debugLog("delegationsProcessed", delegationsProcessed)
+                let gasUsedForDelegations := sub(gasBeforeDelegations, gas())
+                gasLeft := saturatingSub(gasLeft, gasUsedForDelegations)
+                debugLog("gasLeft after delegations", gasLeft)
+
+                if iszero(delegationsProcessed) {
+                    revertWithReason(FAILED_TO_PROCESS_EIP7702_DELEGATIONS_ERR_CODE(), 0)
+                }
+
                 if isNotEnoughGasForPubdata(
                     basePubdataSpent, gasLeft, reservedGas, gasPerPubdata
                 ) {
@@ -1484,6 +1505,28 @@ object "Bootloader" {
                 ret := 1
             }
 
+            /// @dev Function responsible for the validation & fee payment step of the transaction.
+            /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
+            /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
+            /// @param gasPrice The gasPrice to be used in this transaction.
+            function ZKSYNC_NEAR_CALL_processDelegations(
+                abi,
+                txDataOffset,
+                gasPrice
+            ) -> ret {
+                let innerTxDataOffset := add(txDataOffset, 32)
+
+                // For the validation step we always use the bootloader as the tx.origin of the transaction
+                setTxOrigin(BOOTLOADER_FORMAL_ADDR())
+                setGasPrice(gasPrice)
+                
+                debugLog("Starting processing delegations", 0)
+                processDelegations(innerTxDataOffset)
+                debugLog("Processing delegations complete", 1)
+
+                ret := 1
+            }
+
             /// @dev Function responsible for the execution of the L2 transaction.
             /// It includes both the call to the `executeTransaction` method of the account
             /// and the call to postOp of the account.
@@ -1512,8 +1555,6 @@ object "Bootloader" {
                 default {
                     setTxOrigin(BOOTLOADER_FORMAL_ADDR())
                 }
-
-                processDelegations(innerTxDataOffset)
 
                 success := executeL2Tx(txDataOffset, from)
 
@@ -3846,6 +3887,10 @@ object "Bootloader" {
 
             function FAILED_TO_CALL_SYSTEM_CONTEXT_ERR_CODE() -> ret {
                 ret := 29
+            }
+
+            function FAILED_TO_PROCESS_EIP7702_DELEGATIONS_ERR_CODE() -> ret {
+                ret := 30
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes

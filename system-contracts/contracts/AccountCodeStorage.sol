@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {IAccountCodeStorage} from "./interfaces/IAccountCodeStorage.sol";
-import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {Utils} from "./libraries/Utils.sol";
 import {DEPLOYER_SYSTEM_CONTRACT, NONCE_HOLDER_SYSTEM_CONTRACT, CURRENT_MAX_PRECOMPILE_ADDRESS, EVM_HASHES_STORAGE} from "./Constants.sol";
 import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErrors.sol";
@@ -21,7 +20,7 @@ import {Unauthorized, InvalidCodeHash, CodeHashReason} from "./SystemContractErr
  * were published on L1 as calldata. This contract trusts the ContractDeployer and the KnownCodesStorage
  * system contracts to enforce the invariants mentioned above.
  */
-contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
+contract AccountCodeStorage is IAccountCodeStorage {
     bytes32 private constant EMPTY_STRING_KECCAK = 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470;
 
     modifier onlyDeployer() {
@@ -165,11 +164,5 @@ contract AccountCodeStorage is IAccountCodeStorage, SystemContractBase {
     function isAccountEVM(address _addr) external view override returns (bool) {
         bytes32 bytecodeHash = getRawCodeHash(_addr);
         return Utils.isCodeHashEVM(bytecodeHash);
-    }
-
-    /// @notice Allows the bootloader to override bytecode hash of account.
-    /// TODO: can we avoid it and do it in bootloader? Having it as a public interface feels very unsafe.
-    function setRawCodeHash(address addr, bytes32 rawBytecodeHash) external onlyCallFromBootloader {
-        _storeCodeHash(addr, rawBytecodeHash);
     }
 }
