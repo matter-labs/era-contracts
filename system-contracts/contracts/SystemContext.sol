@@ -528,12 +528,13 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @notice Returns the hash of the given batch.
     /// @dev Deprecated in favor of getBatchHash.
     /// @dev Will be completely removed in the next release.
+    // solhint-disable-next-line no-unused-vars
     function blockHash(uint256 _blockNumber) external view returns (bytes32 hash) {
         revert DeprecatedFunction();
     }
 
     /// @notice Returns the hash of the given batch.
-    /// @dev Deprecated to make publicly accesible methods compatible with planned releases.
+    /// @dev Deprecated to make publicly accessible methods compatible with planned releases.
     /// @dev Please use the block function `getBlockHashEVM` if needed.
     /// @dev The function body will be replaced with revert in the next release.
     function getBatchHash(uint256 _batchNumber) external view returns (bytes32 hash) {
@@ -541,7 +542,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     }
 
     /// @notice Returns the current batch's number and timestamp.
-    /// @dev Deprecated for external usage to make publicly accesible methods compatible with planned releases.
+    /// @dev Deprecated for external usage to make publicly accessible methods compatible with planned releases.
     /// @dev Please use the block function `getL2BlockNumberAndTimestamp` if needed.
     /// @dev The function body will be replaced with revert in the next release.
     function getBatchNumberAndTimestamp() public view returns (uint128 batchNumber, uint128 batchTimestamp) {
