@@ -164,12 +164,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external onlyAdmin {
-        if (_l1DAValidator == address(0)) {
-            revert L1DAValidatorAddressIsZero();
-        }
-        if (_l2DAValidator == address(0)) {
-            revert L2DAValidatorAddressIsZero();
-        }
+        // if (_l1DAValidator == address(0)) {
+        //     revert L1DAValidatorAddressIsZero();
+        // }
+        // if (_l2DAValidator == address(0)) {
+        //     revert L2DAValidatorAddressIsZero();
+        // }
 
         if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DAValidator)) {
             revert InvalidDAForPermanentRollup();
@@ -184,10 +184,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert AlreadyPermanentRollup();
         }
 
-        if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
-            // The correct data availability pair should be set beforehand.
-            revert InvalidDAForPermanentRollup();
-        }
+        // if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
+        //     // The correct data availability pair should be set beforehand.
+        //     revert InvalidDAForPermanentRollup();
+        // }
 
         s.isPermanentRollup = true;
     }
