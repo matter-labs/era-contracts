@@ -80,8 +80,8 @@ library ContractsBytecodesLib {
             "ServerNotifier", // ???
             "ValidatorTimelock",
             "ValidiumL1DAValidator", // ???
-            "VerifierFflonk",
-            "VerifierPlonk"
+            "L1VerifierFflonk",
+            "L1VerifierPlonk"
         ];
 
         string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
