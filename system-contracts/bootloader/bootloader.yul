@@ -347,7 +347,7 @@ object "Bootloader" {
 
             /// @dev The slot starting from which the interop roots are stored.
             function INTEROP_ROOT_BEGIN_SLOT() -> ret {
-                ret := add(INTEROP_BLOCKS_BEGIN_SLOT(), 100)
+                ret := add(INTEROP_BLOCKS_BEGIN_SLOT(), MAX_INTEROP_ROOTS_IN_BATCH())
             }
 
             /// @dev The byte starting from which the interop roots are stored.
