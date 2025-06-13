@@ -121,13 +121,13 @@ contract ExecutorProofTest is Test {
         );
         assertEq(
             nextCommitment,
-            0x3ff8bc7791ca3108714b41035ac969df60771753ae6d5b3557eb8b654505eea7,
+            0x9fae89899313dc524150960147a32da2521608231cb39e2741b2ca13435d3f12,
             "nextCommitment computation failed"
         );
 
         bytes32 prevCommitment = 0x8199d18dbc01ea80a635f515d6a12312daa1aa32b5404944477dcd41fd7b2bdf;
         uint256 result = executor.getBatchProofPublicInput(prevCommitment, nextCommitment);
-        assertEq(result, 0xBCBE30EE87E734F02CD5CCEADBBA8A9AF92A6E6514A03F5C10A2EF57, "getBatchProofPublicInput");
+        assertEq(result, 0xC09291737B046C329198E1BEE081240EAFC26B675F0124BFB2A12FA6, "getBatchProofPublicInput");
     }
 
     // add this to be excluded from coverage report

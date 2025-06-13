@@ -192,6 +192,7 @@ object "Bootloader" {
             }
 
             /// @dev The byte from which storing of the current canonical and signed hashes begins
+            /// Note, that the hashes are stored only for L2 transactions, not for the priority ones.
             function CURRENT_L2_TX_HASHES_BEGIN_BYTE() -> ret {
                 ret := mul(CURRENT_L2_TX_HASHES_BEGIN_SLOT(), 32)
             }
@@ -472,9 +473,24 @@ object "Bootloader" {
                 ret := mul(PRIORITY_TXS_L1_DATA_BEGIN_SLOT(), 32)
             }
 
+            /// @dev Number of reserved storage slots for the transaction status rolling‐hash field.
+            function TXS_STATUS_ROLLING_HASH_RESERVED_SLOTS() -> ret {
+                ret := 1
+            }
+            
+            /// @dev Storage slot index where the transaction status rolling‐hash begins.
+            function TXS_STATUS_ROLLING_HASH_BEGIN_SLOT() -> ret {
+                ret := add(PRIORITY_TXS_L1_DATA_BEGIN_SLOT(), PRIORITY_TXS_L1_DATA_RESERVED_SLOTS())
+            }
+
+            /// @dev Byte offset where the transaction status rolling‐hash begins.
+            function TXS_STATUS_ROLLING_HASH_BEGIN_BYTE() -> ret {
+                ret := mul(TXS_STATUS_ROLLING_HASH_BEGIN_SLOT(), 32)
+            }
+
             /// @dev Slot from which storing of the L1 Messenger pubdata begins.
             function OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_BEGIN_SLOT() -> ret {
-                ret := add(PRIORITY_TXS_L1_DATA_BEGIN_SLOT(), PRIORITY_TXS_L1_DATA_RESERVED_SLOTS())
+                ret := add(TXS_STATUS_ROLLING_HASH_BEGIN_SLOT(), TXS_STATUS_ROLLING_HASH_RESERVED_SLOTS())
             }
 
             /// @dev The byte storing of the L1 Messenger pubdata begins.
@@ -787,6 +803,8 @@ object "Bootloader" {
                             }
                         <!-- @endif -->
                     }
+
+                appendTransactionStatus(mload(CURRENT_L2_TX_HASHES_BEGIN_BYTE()), mload(resultPtr))
             }
 
             /// @notice Returns "raw" code hash of the address. "Raw" means that it returns exactly the value
@@ -1171,6 +1189,7 @@ object "Bootloader" {
                 }
 
                 mstore(resultPtr, success)
+                saveL1TxHashToMemory(canonicalL1TxHash)
 
                 debugLog("Send message to L1", success)
 
@@ -2395,6 +2414,13 @@ object "Bootloader" {
                 }
             }
 
+            /// @dev Stores the hash of an L1->L2 transaction (either priority or an upgrade transaction)
+            /// inside the bootloader memory.
+            function saveL1TxHashToMemory(txHash) {
+                mstore(CURRENT_L2_TX_HASHES_BEGIN_BYTE(), txHash)
+                mstore(add(CURRENT_L2_TX_HASHES_BEGIN_BYTE(), 32), txHash)
+            }
+
             /// @dev Encodes and calls the postOp method of the contract.
             /// Note, that it *breaks* the contents of the previous transactions.
             /// @param abi The near call ABI of the call
@@ -3057,6 +3083,30 @@ object "Bootloader" {
                 }
             }
 
+            /// @notice Appends a transaction’s status to the rolling‐hash commitment in storage.
+            /// @param txHash The canonical L2 transaction hash to include.
+            /// @param status The boolean status of the transaction (1 = success, 0 = failure).
+            function appendTransactionStatus(
+                txHash,
+                status
+            ) {
+                debugLog("Appending tx status", txHash)
+                debugLog("Status", status)
+
+                let currentCommitment := mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE())
+
+                // The precommitment for each transaction in the form of "<32 bytes tx hash, 1 byte status>
+                mstore(1, status)
+                mstore(0, txHash)
+                let txStatusCommitment := keccak256(0, 33)
+
+                mstore(0, currentCommitment)
+                mstore(32, txStatusCommitment)
+                let newCommitment := keccak256(0, 64)
+
+                mstore(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE(), newCommitment)
+            }
+            
             /// @notice Sets the interop roots in the L2InteropRootStorage contract.
             /// We store the latest processed interopRoot number in the CURRENT_INTEROP_ROOT_BYTE()
             /// For each txs, we check if the next interopRoot belongs to a block that we should process, if yes we store it and continue to the next.
@@ -3100,7 +3150,8 @@ object "Bootloader" {
                 /// Note, that as mentioned above, we provide bootloader with numberOfRoots equal to the actual value + 1.
                 /// The loop runs for (numberOfRoots - 1) iterations, intentionally skipping the extra +1.
                 debugLog("Setting interop roots 1", nextInteropRootNumber)
-                for {let i := nextInteropRootNumber} lt(i, sub(numberOfRoots, 1)) {i := add(i, 1)} {
+                let finalInteropRootNumber := add(nextInteropRootNumber, sub(numberOfRoots, 1))
+                for {let i := nextInteropRootNumber} lt(i, finalInteropRootNumber) {i := add(i, 1)} {
                     debugLog("Setting interop roots 2", i)
                     let interopRootStartSlot := getInteropRootByte(i)
                     let currentBlockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET()))
@@ -4239,8 +4290,13 @@ object "Bootloader" {
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
-            function protocolUpgradeTxHashKey() -> ret {
+            function txsStatusRollingHashKey() -> ret {
                 ret := 8
+            }
+
+            /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
+            function protocolUpgradeTxHashKey() -> ret {
+                ret := 9
             }
 
             ////////////////////////////////////////////////////////////////////////////
@@ -4340,6 +4396,9 @@ object "Bootloader" {
             // At start storing keccak256("") as `chainedPriorityTxsHash` and 0 as `numberOfLayer1Txs`
             mstore(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), EMPTY_STRING_KECCAK())
             mstore(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32), 0)
+
+            // At start we explicitly reset the rolling hash
+            mstore(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE(), 0)
 
             // Iterating through transaction descriptions
             let transactionIndex := 0
@@ -4446,6 +4505,8 @@ object "Bootloader" {
             // Sending system logs (to be processed on L1)
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
+            sendToL1Native(true, txsStatusRollingHashKey(), mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE()))
+            
             /// setting all remaining interop roots, even the ones in the fictive block.
             setInteropRootForBlock(MAXIMUM_L2_BLOCK_NUMBER())
             sendInteropRootRollingHashToL1()

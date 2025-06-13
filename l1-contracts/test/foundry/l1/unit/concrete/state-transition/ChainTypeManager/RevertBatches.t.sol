@@ -192,7 +192,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
         );
-        executorFacet.commitBatchesSharedBridge(uint256(0), commitBatchFrom, commitBatchTo, commitData);
+        executorFacet.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
 
         Vm.Log[] memory entries = vm.getRecordedLogs();
 
@@ -225,7 +225,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             proofInput
         );
 
-        executorFacet.proveBatchesSharedBridge(uint256(0), proveBatchFrom, proveBatchTo, proveData);
+        executorFacet.proveBatchesSharedBridge(address(0), proveBatchFrom, proveBatchTo, proveData);
 
         // Test batch revert triggered from CTM
         vm.stopPrank();
