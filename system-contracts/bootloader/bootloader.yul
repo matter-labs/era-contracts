@@ -3166,9 +3166,8 @@ object "Bootloader" {
                     debugLog("Set roots blockNumber ", blockNumber)
                     debugLog("Set roots sidesLength ", sidesLength)
 
-                    if lt(setForBlockNumber, currentBlockNumber) {
-                        debugLog("Processed all interop roots for this block", 1)
-                        break
+                    if iszero(eq(setForBlockNumber, currentBlockNumber)) {
+                        revertWithReason(INCORRECT_INTEROP_ROOT_BLOCK_NUMBER(), 0)
                     }
 
                     if iszero(sidesLength) {
@@ -4111,6 +4110,10 @@ object "Bootloader" {
 
             function ZERO_INTEROP_ROOTS() -> ret {
                 ret := 34
+            }
+
+            function INCORRECT_INTEROP_ROOT_BLOCK_NUMBER() -> ret {
+                ret := 35
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes
