@@ -610,7 +610,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),
-            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(addresses.bridgehub.chainRegistrationSenderProxy),
+            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
+                addresses.bridgehub.chainRegistrationSenderProxy
+            ),
             // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0)
         });

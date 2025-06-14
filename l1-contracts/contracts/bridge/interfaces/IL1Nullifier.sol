@@ -6,23 +6,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
-
-/// @param chainId The chain ID of the transaction to check.
-/// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
-/// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-/// @param l2sender The address of the message sender on L2 (base token system contract address or asset handler)
-/// @param l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
-/// @param message The L2 withdraw data, stored in an L2 -> L1 message.
-/// @param merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
-struct FinalizeL1DepositParams {
-    uint256 chainId;
-    uint256 l2BatchNumber;
-    uint256 l2MessageIndex;
-    address l2Sender;
-    uint16 l2TxNumberInBatch;
-    bytes message;
-    bytes32[] merkleProof;
-}
+import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs

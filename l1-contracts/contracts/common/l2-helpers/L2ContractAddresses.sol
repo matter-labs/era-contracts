@@ -7,6 +7,7 @@ import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
+import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
@@ -76,6 +77,7 @@ address constant L2_ASSET_ROUTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x03);
 /// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
 /// if the assetId can be calculated with this address then it is in fact an NTV asset
 address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
+IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
