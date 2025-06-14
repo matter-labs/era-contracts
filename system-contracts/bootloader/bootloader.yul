@@ -3175,14 +3175,13 @@ object "Bootloader" {
                         debugLog("Empty sides, finishing", 0)
                         break
                     }
-                    mstore(CURRENT_INTEROP_ROOT_BYTE(), add(i, 1))
 
                     debugLog("Current interop root updated", add(i, 1))
 
                     callL2InteropRootStorage(chainId, blockNumber, sidesLength, interopRootStartSlot)
                 }
 
-
+                mstore(CURRENT_INTEROP_ROOT_BYTE(), finalInteropRootNumber)
                 mstore(LAST_PROCESSED_BLOCK_NUMBER_BYTE(), setForBlockNumber)
                 debugLog("currentNumberOfRoots", mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()))
                 debugLog("currentNumberOfRoots 2", add(mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()), 1))
