@@ -69,6 +69,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
+
+        assetTracker = addresses.interopCenter.assetTracker();
     }
 
     function setUp() public {
