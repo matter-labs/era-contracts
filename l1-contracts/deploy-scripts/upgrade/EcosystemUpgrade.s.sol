@@ -578,14 +578,18 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode()),
-            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2AssetRouterBytecode()
+            bridgehubBytecodeOrHash: abi.encode(
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode())
             ),
-            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
+            l2AssetRouterBytecodeOrHash: abi.encode(
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2AssetRouterBytecode())
             ),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            l2NtvBytecodeOrHash: abi.encode(
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode())
+            ),
+            messageRootBytecodeOrHash: abi.encode(
+                L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode())
+            ),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),

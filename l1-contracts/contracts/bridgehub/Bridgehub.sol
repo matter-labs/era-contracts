@@ -23,7 +23,7 @@ import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {NotL1, NotRelayedSender, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
 import {NoCTMForAssetId, SettlementLayersMustSettleOnL1, MigrationPaused, AssetIdAlreadyRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
-
+import {L2_COMPLEX_UPGRADER_ADDR} from "../common/L2ContractAddresses.sol";
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 
 /// @author Matter Labs
@@ -111,6 +111,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
+    modifier onlyOwnerOrUpgrader() {
+        if (msg.sender != owner() && msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert NotL1(L1_CHAIN_ID, block.chainid);
@@ -157,7 +164,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice used to initialize the contract
     /// @notice this contract is also deployed on L2 as a system contract there the owner and the related functions will not be used
     /// @param _owner the owner of the contract
-    function initialize(address _owner) external reentrancyGuardInitializer onlyL1 {
+    function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
         _initializeInner();
     }

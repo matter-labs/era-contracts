@@ -6,8 +6,19 @@ import {IL2ContractDeployer} from "../../common/interfaces/IL2ContractDeployer.s
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IComplexUpgrader {
+    struct ZKsyncOSForceDeploymentInfo {
+        bytes deployedBytecode;
+        address newAddress;
+    }
+
     function forceDeployAndUpgrade(
         IL2ContractDeployer.ForceDeployment[] calldata _forceDeployments,
+        address _delegateTo,
+        bytes calldata _calldata
+    ) external payable;
+
+    function forceDeployAndUpgradeZKOS(
+        ZKsyncOSForceDeploymentInfo[] calldata _forceDeployments,
         address _delegateTo,
         bytes calldata _calldata
     ) external payable;

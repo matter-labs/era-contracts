@@ -66,8 +66,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
 
         L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
-        _transferOwnership(_aliasedOwner);
+        _initializeInner(_aliasedOwner, _bridgedTokenBeacon, _l2TokenProxyBytecodeHash, _contractsDeployedAlready);
+    }
 
+    function _initializeInner(
+        address _aliasedOwner,
+        address _bridgedTokenBeacon,
+        bytes32 _l2TokenProxyBytecodeHash,
+        bool _contractsDeployedAlready
+    ) internal {
+        _transferOwnership(_aliasedOwner);
         if (_contractsDeployedAlready) {
             if (_bridgedTokenBeacon == address(0)) {
                 revert EmptyAddress();

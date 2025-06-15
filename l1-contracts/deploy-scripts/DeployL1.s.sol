@@ -87,6 +87,9 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
+
 contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
 
@@ -620,14 +623,10 @@ contract DeployL1Script is Script, DeployUtils {
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode()),
-            l2AssetRouterBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2AssetRouterBytecode()
-            ),
-            l2NtvBytecodeHash: L2ContractHelper.hashL2Bytecode(
-                L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode()
-            ),
-            messageRootBytecodeHash: L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode()),
+            bridgehubBytecodeOrHash: type(Bridgehub).creationCode,
+            l2AssetRouterBytecodeOrHash: type(L2AssetRouter).creationCode,
+            l2NtvBytecodeOrHash: type(L2NativeTokenVaultZKOS).creationCode,
+            messageRootBytecodeOrHash: type(MessageRoot).creationCode,
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),

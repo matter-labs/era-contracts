@@ -91,10 +91,23 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
             revert EmptyAddress();
         }
         L1_ASSET_ROUTER = _l1AssetRouter;
-        _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
-        _disableInitializers();
+        _initializeInner(_baseTokenAssetId, _aliasedOwner);
+    }
+
+    function _initializeInner(
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) internal {
+        _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
         _transferOwnership(_aliasedOwner);
+    }
+
+    function initialize(
+        bytes32 _baseTokenAssetId,
+        address _aliasedOwner
+    ) external initializer reentrancyGuardInitializer {
+        _initializeInner(_baseTokenAssetId, _aliasedOwner);
     }
 
     /// @inheritdoc IL2AssetRouter

@@ -15,7 +15,6 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
-
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     uint256 eraChainId;
@@ -23,10 +22,10 @@ struct FixedForceDeploymentsData {
     bytes32 l2TokenProxyBytecodeHash;
     address aliasedL1Governance;
     uint256 maxNumberOfZKChains;
-    bytes32 bridgehubBytecodeHash;
-    bytes32 l2AssetRouterBytecodeHash;
-    bytes32 l2NtvBytecodeHash;
-    bytes32 messageRootBytecodeHash;
+    bytes bridgehubBytecodeOrHash;
+    bytes l2AssetRouterBytecodeOrHash;
+    bytes l2NtvBytecodeOrHash;
+    bytes messageRootBytecodeOrHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.
