@@ -1,22 +1,25 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IAssetTracker} from "./IAssetTracker.sol";
-import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log, L2Message} from "../../common/Messaging.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, InvalidProof, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
+import {FinalizeL1DepositParams} from "../../bridge/interfaces/IL1Nullifier.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
 
@@ -44,7 +47,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     mapping(uint256 chainId => mapping(bytes32 assetId => bool isMinter)) public isMinterChain;
     mapping(bytes32 assetId => uint256 numberOfSettlingMintingChains) public numberOfSettlingMintingChains;
 
-    // for now
+    // for now, should be replaced by isMinterChain.
     mapping(bytes32 assetId => uint256 originChainId) public originChainId;
 
     constructor(
@@ -196,7 +199,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     }
 
     /*//////////////////////////////////////////////////////////////
-                            AssetHandler Functions
+                            Token balance migration 
     //////////////////////////////////////////////////////////////*/
 
     // // slither-disable-next-line locked-ether
@@ -285,6 +288,101 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     //             _newSLBalance: newSLBalance
     //         });
     // }
+
+    /// @notice Migrates the token balance from L2 to L1.
+    function migrateTokenBalanceFromL2(bytes32 _assetId) external {
+        address tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
+
+        uint256 amount = IERC20(tokenAddress).totalSupply();
+
+        uint256 migrationNumber = 0; // L2_INTEROP_CENTER.migrationNumber();
+
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            _encodeTokenBalanceMigrationData(block.chainid, _assetId, amount, migrationNumber)
+        );
+    }
+
+    function receiveMigrationOnGateway(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
+        _proveMessageInclusion(_finalizeWithdrawalParams);
+
+        // solhint-disable-next-line no-unused-vars
+        (uint256 chainId, bytes32 assetId, uint256 amount, uint256 migrationNumber) = abi.decode(
+            _finalizeWithdrawalParams.message,
+            (uint256, bytes32, uint256, uint256)
+        );
+        /// Add migration number check here.
+        chainBalance[chainId][assetId] += amount;
+
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(_finalizeWithdrawalParams.message);
+    }
+
+    function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
+        _proveMessageInclusion(_finalizeWithdrawalParams);
+
+        (uint256 chainId, bytes32 assetId, uint256 amount, uint256 migrationNumber) = _decodeTokenBalanceMigrationData(
+            _finalizeWithdrawalParams.message
+        );
+        chainBalance[chainId][assetId] -= amount;
+
+        _sendConfirmationToL2(chainId, assetId, amount, migrationNumber);
+    }
+
+    function confirmMigrationOnL2(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _migrationNumber
+    ) external {}
+
+    function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
+        L2Message memory l2ToL1Message = L2Message({
+            txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
+            sender: L2_ASSET_TRACKER_ADDR,
+            data: _finalizeWithdrawalParams.message
+        });
+
+        bool success = BRIDGE_HUB.proveL2MessageInclusion({
+            _chainId: _finalizeWithdrawalParams.chainId,
+            _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
+            _index: _finalizeWithdrawalParams.l2MessageIndex,
+            _message: l2ToL1Message,
+            _proof: _finalizeWithdrawalParams.merkleProof
+        });
+
+        // withdrawal wrong proof
+        if (!success) {
+            revert InvalidProof();
+        }
+    }
+
+    function _sendConfirmationToL2(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _migrationNumber
+    ) internal {
+        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        IMailbox(zkChain).requestL2ServiceTransaction(
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeCall(this.confirmMigrationOnL2, (_chainId, _assetId, _amount, _migrationNumber))
+        );
+    }
+
+    function _encodeTokenBalanceMigrationData(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _migrationNumber
+    ) internal pure returns (bytes memory) {
+        return abi.encode(_chainId, _assetId, _amount, _migrationNumber);
+    }
+
+    function _decodeTokenBalanceMigrationData(
+        bytes calldata _data
+    ) internal pure returns (uint256 chainId, bytes32 assetId, uint256 amount, uint256 migrationNumber) {
+        (chainId, assetId, amount, migrationNumber) = abi.decode(_data, (uint256, bytes32, uint256, uint256));
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/

@@ -18,7 +18,7 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -27,11 +27,14 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
-contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
+
+    IAssetTracker assetTracker;
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
@@ -72,8 +75,60 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         prepare();
     }
 
-    function test_assetTracker() public {
-        IAssetTracker assetTracker = addresses.interopCenter.assetTracker();
+    function test_migration() public {
+        address tokenAddress = tokens[1];
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, tokenAddress);
+
+        uint256 originalChainId = block.chainid;
+
+        vm.chainId(eraZKChainId);
+        vm.mockCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            abi.encodeWithSelector(L2_NATIVE_TOKEN_VAULT.tokenAddress.selector),
+            abi.encode(tokenAddress)
+        );
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes32(0))
+        );
+        assetTracker.migrateTokenBalanceFromL2(assetId);
+
+        // assertEq(assetTracker.chainBalance(1, assetId), 1000000000000000000);
+
+        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
+            chainId: eraZKChainId,
+            l2BatchNumber: 0,
+            l2MessageIndex: 0,
+            l2Sender: address(0),
+            l2TxNumberInBatch: 0,
+            message: abi.encode(eraZKChainId, assetId, 1000000000000000000, 0),
+            merkleProof: new bytes32[](0)
+        });
+
+        uint256 gwChainId = 1;
+        vm.chainId(gwChainId);
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            abi.encode(true)
+        );
+        assetTracker.receiveMigrationOnGateway(finalizeWithdrawalParams);
+
+        vm.chainId(originalChainId);
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            abi.encode(true)
+        );
+        assetTracker.receiveMigrationOnL1(finalizeWithdrawalParams);
+
+        // assertEq(assetTracker.chainBalance(1, assetId), 0);
+
+        assetTracker.confirmMigrationOnL2(1, assetId, 1000000000000000000, 0);
+    }
+
+    function test_processLogsAndMessages() public {
         // Note: get this from real local txs
         address(assetTracker).call(
             bytes.concat(
