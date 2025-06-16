@@ -447,7 +447,7 @@ library TransactionHelper {
         bytes memory encodedAuthList = new bytes(0);
         unchecked {
             uint256 listLength = authList.length;
-            for (uint i = 0; i < listLength; ++i) {
+            for (uint256 i = 0; i < listLength; ++i) {
                 bytes memory encodedChainId = RLPEncoder.encodeUint256(authList[i].chainId);
                 bytes memory encodedAddress = RLPEncoder.encodeAddress(authList[i].addr);
                 bytes memory encodedNonce = RLPEncoder.encodeUint256(authList[i].nonce);

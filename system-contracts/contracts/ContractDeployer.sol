@@ -437,7 +437,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
         uint256 listLength = authorizationList.length;
         // The transaction is considered invalid if the length of authorization_list is zero.
-        require(listLength > 0, EmptyAuthorizationList());
+        if (listLength == 0) {
+            revert EmptyAuthorizationList();
+        }
         for (uint256 i = 0; i < listLength; ++i) {
             // Per EIP7702 rules, if any check for the tuple item fails,
             // we must move on to the next item in the list.
@@ -463,6 +465,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             );
             bytes1 magic = bytes1(0x05);
             bytes32 message = keccak256(
+                // solhint-disable-next-line func-named-parameters
                 bytes.concat(magic, listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
             );
 
