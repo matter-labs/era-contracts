@@ -129,6 +129,7 @@ jobs:
           releaseTag: v0.6.5
           protocolVersion: 28
           evmInterpreter: true
+          logFilePath: anvil_zksync.log
 
       - name: Install dependencies
         run: yarn
