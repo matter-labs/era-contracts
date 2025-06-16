@@ -365,10 +365,9 @@ function is7702Delegated(rawCodeHash) -> isDelegated {
 }
 
 function delegationAddress(rawCodeHash) -> delegationAddr {
-    delegationAddr := 0
     if is7702Delegated(rawCodeHash) {
         // Check that there is no loop.
-        let storedAddr := and(rawCodeHash, 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+        let storedAddr := and(rawCodeHash, ADDRESS_MASK())
         let delegationHash := getRawCodeHash(storedAddr)
         if eq(is7702Delegated(delegationHash), 0) {
             delegationAddr := storedAddr
@@ -392,7 +391,7 @@ function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
         }
         case 0x0202 {
             // 2 means that account is delegated
-            let delegationAddress := and(rawCodeHash, 0xffffffffffffffffffffffffffffffffffffffff)
+            let delegationAddress := and(rawCodeHash, ADDRESS_MASK())
             let delegationHash := getRawCodeHash(delegationAddress)
             // We don't allow recursion here, since delegation loops are forbidden
             isConstructedEVM := eq(shr(240, delegationHash), 0x0200) // EVM contract, constructed
