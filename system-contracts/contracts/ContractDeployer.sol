@@ -448,8 +448,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
                 continue;
             }
 
-            // Verify the nonce is less than 2**64 - 1.
-            if (item.nonce >= 0xFFFFFFFFFFFFFFFF) {
+            // Verify the nonce is less than 2**64.
+            if (item.nonce >= 2 ** 64) {
                 continue;
             }
 

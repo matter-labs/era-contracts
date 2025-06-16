@@ -59,7 +59,8 @@ contract AccountCodeStorage is IAccountCodeStorage {
     /// @notice Sets the bytecodeHash of address to indicate EIP-7702 delegation.
     /// @param _address The address of the account to set the codehash to.
     /// @param _hash Bytecode hash with encoded EIP-7702 delegation data.
-    /// @dev This method trusts the ContractDeployer to make sure that the hash is well-formed.
+    /// @dev This method trusts the ContractDeployer to make sure that the hash is well-formed,
+    /// but checks whether the bytecode has EIP-7702 delegation marker in first two bytes.
     function storeAccount7702DelegationCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
         // Check that code hash corresponds to the deploying smart contract
         if (!Utils.isContract7702Delegation(_hash)) {

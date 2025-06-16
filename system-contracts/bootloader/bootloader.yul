@@ -694,7 +694,7 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
-            /// @notice invokes the `processDelegations` method of the `AccountCodeStorage` contract.
+            /// @notice invokes the `processDelegations` method of the `ContractDeployer` contract.
             /// @dev this method expects `reservedDynamic` to contain ABI-encoded `AuthorizationList`
             /// @dev this method internally overwrites transaction data and restores it after the call.
             /// This is done to avoid copying the data to a new memory location.
@@ -3319,8 +3319,9 @@ object "Bootloader" {
                         <!-- @endif -->
 
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
-                        // reserved1 used as marker that tx doesn't have field "to"
-                        // however, for EIP7702, transactions without "to" are not allowed.
+                        // For other L2 tx types, reserved1 used as marker that tx doesn't have field "to"
+                        // however, for EIP7702, transactions without "to" are not allowed, so this flag
+                        // should never be set.
                         assertEq(getReserved1(innerTxDataOffset), 0, "reserved1 non zero")
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
                         assertEq(getReserved3(innerTxDataOffset), 0, "reserved3 non zero")
