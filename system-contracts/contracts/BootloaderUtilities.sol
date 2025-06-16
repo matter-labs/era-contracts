@@ -359,10 +359,8 @@ contract BootloaderUtilities is IBootloaderUtilities {
             bytes memory encodedMaxPriorityFeePerGas = RLPEncoder.encodeUint256(_transaction.maxPriorityFeePerGas);
             bytes memory encodedMaxFeePerGas = RLPEncoder.encodeUint256(_transaction.maxFeePerGas);
             bytes memory encodedGasLimit = RLPEncoder.encodeUint256(_transaction.gasLimit);
-            // "to" field is empty if it is EVM deploy tx
-            bytes memory encodedTo = _transaction.reserved[1] == 1
-                ? bytes(hex"80")
-                : RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
+            // Unlike with other L2 tx types, "to" field cannot be empty per EIP7702 rules, so we don't need to check if it's empty.
+            bytes memory encodedTo = RLPEncoder.encodeAddress(address(uint160(_transaction.to)));
             bytes memory encodedValue = RLPEncoder.encodeUint256(_transaction.value);
             // solhint-disable-next-line func-named-parameters
             encodedFixedLengthParams = bytes.concat(
