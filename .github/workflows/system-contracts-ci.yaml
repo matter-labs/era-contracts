@@ -126,7 +126,7 @@ jobs:
         uses: dutterbutter/anvil-zksync-action@v1.2.0
         with:
           mode: run
-          releaseTag: v0.6.4
+          releaseTag: v0.6.5
           protocolVersion: 28
           evmInterpreter: true
 
