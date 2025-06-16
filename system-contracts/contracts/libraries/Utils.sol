@@ -90,6 +90,9 @@ library Utils {
 
     /// @notice Denotes whether bytecode hash corresponds to an EIP-7702 delegation
     function isContract7702Delegation(bytes32 _bytecodeHash) internal pure returns (bool) {
+        // Per EIP-7702 rules, the delegation can be both set or reset.
+        // We handle delegation reset as returning the empty bytecode hash, so
+        // two options for bytecode hash are valid.
         bool isEmpty = _bytecodeHash == bytes32(0);
         bool is7702Delegation = _bytecodeHash[0] == 0x02 && _bytecodeHash[1] == 0x02;
         return (isEmpty || is7702Delegation);
