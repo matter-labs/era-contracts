@@ -48,6 +48,11 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     ///         Refer to its documentation for more details.
     IAssetTracker public assetTracker;
 
+    /// @notice This mapping stores a number of interop bundles sent by an individual sender.
+    ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role 
+    ///         is to ensure that each bundle has a unique hash.
+    mapping(address sender => uint256 numberOfBundlesSent) interopBundleNonce;
+
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert Unauthorized(msg.sender);
@@ -80,7 +85,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     /// @notice Used to initialize the contract
-    /// @notice This contract is also deployed on L2 as a system contract. On the L2 owner and its related functions will not be used.
+    ///         This contract is also deployed on L2 as a system contract. 
+    ///         On the L2 owner and its related functions will not be used.
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer onlyL1 {
         _transferOwnership(_owner);
@@ -215,11 +221,15 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         // Form an InteropBundle with given parameters.
         InteropBundle memory bundle = InteropBundle({
             destinationChainId: _destinationChainId,
-            sendingBlockNumber: block.number,
+            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, bytes32(interopBundleNonce[msg.sender]))),
             calls: new InteropCall[](1),
             executionAddress: _executionAddress,
             unbundlerAddress: _unbundlerAddress
         });
+
+        // Update interopBundleNonce for msg.sender
+        interopBundleNonce[msg.sender]++;
+
         _addCallToBundle(
             bundle,
             InteropCallStarter({
@@ -324,11 +334,14 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         // Form an InteropBundle.
         InteropBundle memory bundle = InteropBundle({
             destinationChainId: _destinationChainId,
-            sendingBlockNumber: block.number,
+            interopBundleSalt: keccak256(abi.encodePacked(_sender, interopBundleNonce[_sender])),
             calls: new InteropCall[](_callStarters.length),
             executionAddress: _executionAddress,
             unbundlerAddress: _unbundlerAddress
         });
+        
+        // Update interopBundleNonce for the _sender
+        interopBundleNonce[_sender]++;
         
         // Fill the formed InteropBundle with calls.
         uint256 callStartersLength = _callStarters.length;

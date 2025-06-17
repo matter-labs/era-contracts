@@ -200,7 +200,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         uint256 _l2MessageIndex
     ) internal view returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus) {
         interopBundle = abi.decode(_bundle, (InteropBundle));
-        bundleHash = keccak256(abi.encode(_sourceChainId, interopBundle.sendingBlockNumber, _l2MessageIndex, _bundle));
+        bundleHash = keccak256(abi.encode(_sourceChainId, interopBundle.interopBundleSalt, _l2MessageIndex, _bundle));
         currentStatus = bundleStatus[bundleHash];
     }
 
