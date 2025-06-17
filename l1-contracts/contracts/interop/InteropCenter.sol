@@ -49,9 +49,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     IAssetTracker public assetTracker;
 
     /// @notice This mapping stores a number of interop bundles sent by an individual sender.
-    ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role 
+    ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
     ///         is to ensure that each bundle has a unique hash.
-    mapping(address sender => uint256 numberOfBundlesSent) interopBundleNonce;
+    mapping(address sender => uint256 numberOfBundlesSent) public interopBundleNonce;
 
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
@@ -85,7 +85,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     /// @notice Used to initialize the contract
-    ///         This contract is also deployed on L2 as a system contract. 
+    ///         This contract is also deployed on L2 as a system contract.
     ///         On the L2 owner and its related functions will not be used.
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer onlyL1 {
@@ -183,7 +183,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 revert MsgValueMismatch(0, _receivedMsgValue);
             }
         }
-        
+
         // We burn the value that is passed along the bundle here, on source chain.
         // slither-disable-next-line arbitrary-send-eth
         if (tokenAssetId == BRIDGE_HUB.baseTokenAssetId(block.chainid)) {
@@ -228,7 +228,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         });
 
         // Update interopBundleNonce for msg.sender
-        interopBundleNonce[msg.sender]++;
+        ++interopBundleNonce[msg.sender];
 
         _addCallToBundle(
             bundle,
@@ -339,10 +339,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             executionAddress: _executionAddress,
             unbundlerAddress: _unbundlerAddress
         });
-        
+
         // Update interopBundleNonce for the _sender
-        interopBundleNonce[_sender]++;
-        
+        ++interopBundleNonce[_sender];
+
         // Fill the formed InteropBundle with calls.
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
