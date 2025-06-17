@@ -294,6 +294,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 selector == IERC7786Attributes.indirectCall.selector,
                 IERC7786GatewaySource.UnsupportedAttribute(selector)
             );
+            // slither-disable-next-line unused-return
             (, indirectCallMessageValue) = AttributesDecoder.decodeIndirectCall(_callStarter.attributes[0]);
             directCall = false;
         } else {
