@@ -269,7 +269,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         address diamondProxy = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).getHyperchain(
-            config.eraChainId // vg todo in EcosystemUpgradev28 it's gateway. Why?
+            config.eraChainId
         );
         IZKChain.Facet[] memory facets = IZKChain(diamondProxy).facets();
 
@@ -752,10 +752,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
         vm.serializeAddress(
             "bridges",
-            "l1_shared_bridge_implementation_addr", // vg todo in EcosystemUpgradev28 it's asset router. 
+            "l1_shared_bridge_implementation_addr",
             addresses.bridges.l1AssetRouterImplementation
         );
-        vm.serializeAddress("bridges", "shared_bridge_proxy_addr", addresses.bridges.l1AssetRouterProxy); // vg todo same as L755
+        vm.serializeAddress("bridges", "shared_bridge_proxy_addr", addresses.bridges.l1AssetRouterProxy);
         // TODO: legacy name
         vm.serializeAddress(
             "bridges",

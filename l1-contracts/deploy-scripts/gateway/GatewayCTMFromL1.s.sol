@@ -398,7 +398,7 @@ contract GatewayCTMFromL1 is Script {
         if (config.testnetVerifier) {
             verifier = address(
                 _deployInternal(
-                    ContractsBytecodesLib.getCreationCode("L2TestnetVerifier"),
+                    ContractsBytecodesLib.getCreationCode("TestnetVerifier"),
                     abi.encode(config.l1ChainId)
                 )
             );

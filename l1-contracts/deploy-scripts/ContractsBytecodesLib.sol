@@ -66,7 +66,7 @@ library ContractsBytecodesLib {
             "L2NativeTokenVault",
             "L2SharedBridgeLegacy",
             "L2SharedBridgeLegacyDev",
-            "L2TestnetVerifier",
+            "TestnetVerifier",
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
