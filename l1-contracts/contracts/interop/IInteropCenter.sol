@@ -28,6 +28,8 @@ interface IInteropCenter {
 
     function sendBundle(
         uint256 _destinationChainId,
-        InteropCallStarter[] memory _callStarters
+        address _executionAddress,
+        address _unbundlerAddress,
+        InteropCallStarter[] calldata _callStarters
     ) external payable returns (bytes32);
 }

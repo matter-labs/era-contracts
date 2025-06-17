@@ -165,7 +165,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
             abi.encode(bytes(""))
         );
-        l2InteropCenter.sendBundle(271, calls);
+        l2InteropCenter.sendBundle(271, address(0), address(0), calls);
     }
 
     function test_requestSendCall() public {

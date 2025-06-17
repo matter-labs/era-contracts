@@ -168,20 +168,24 @@ struct FinalizeL1DepositParams {
     bytes32[] merkleProof;
 }
 
-// This is the struct that is passed into the sendBundles function.
+/// @dev Struct used to define parameters for adding a single call in an interop bundle.
+/// @param nextContract Address of the contract to call on the destination chain.
+/// @param data Calldata payload to send to nextContract.
+/// @param requestedInteropCallValue Amount of base token allocated for this call.
+/// @param attributes EIP-7786 Attributes.
 struct InteropCallStarter {
     address nextContract;
     bytes data;
-    // The value that is requested for the interop call.
-    // This has to be known beforehand even for indirect calls, as the funds in the interop call belong to the user,
-    // and are deposited in the base token deposit call separately.
-    // This is because we cannot guarantee atomicity of xL2 txs (just the atomicity of calls on the destination chain)
-    // So contracts cannot send their own value, only stamp the value that belongs to the user.
     uint256 requestedInteropCallValue;
     bytes[] attributes;
 }
 
-// This is an internal struct with
+/// @dev Internal representation of an InteropCallStarter after parsing its parameters.
+/// @param directCall False if a call had an indirectCall EIP-7786 attribute.
+/// @param nextContract Address of the contract to call on the destination chain.
+/// @param data Calldata payload to send.
+/// @param requestedInteropCallValue Amount of base token allocated for this call.
+/// @param indirectCallMessageValue If !directCall, this is the amount of base token to forward into the middle call.
 struct InteropCallStarterInternal {
     bool directCall;
     address nextContract;
@@ -190,6 +194,12 @@ struct InteropCallStarterInternal {
     uint256 indirectCallMessageValue;
 }
 
+/// @dev A single call.
+/// @param shadowAccount If true, execute via a shadow account, otherwise normal. In current release always false.
+/// @param to Destination contract address on the target chain.
+/// @param from Original sender address that initiated the call.
+/// @param value Amount of base token to send with the call.
+/// @param data Calldata payload for the call.
 struct InteropCall {
     bool shadowAccount;
     address to;
@@ -198,16 +208,50 @@ struct InteropCall {
     bytes data;
 }
 
-struct InteropBundle {
-    uint256 destinationChainId;
-    /// This is needed to guarantee uniqueness of the bundleHash.
-    uint256 sendingBlockNumber;
-    InteropCall[] calls;
-    // If not set - anyone can execute it.
-    address executionAddress;
+/// @dev Execution status of an individual call within a bundle.
+/// @notice
+/// - Unprocessed: not yet processed.
+/// - Executed: call was successfully executed.
+/// - Cancelled: call was cancelled during unbundling.
+enum CallStatus {
+    Unprocessed,
+    Executed,
+    Cancelled
 }
 
-/// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message
+/// @dev A set of `InteropCall`s to send to another chain.
+/// @param destinationChainId ChainId of the target chain.
+/// @param sendingBlockNumber Block number at which this bundle was created on source chain.
+/// @param calls Array of InteropCall structs to execute.
+/// @param executionAddress Optional address authorized to execute this bundle; zero-address means permissionless.
+/// @param unbundlerAddress Address authorized to unbundle this bundle.
+struct InteropBundle {
+    uint256 destinationChainId;
+    uint256 sendingBlockNumber;
+    InteropCall[] calls;
+    address executionAddress;
+    address unbundlerAddress;
+}
+
+/// @dev Processing status of an `InteropBundle`.
+/// @notice
+/// - Unreceived: not processed in any way yet.
+/// - Verified: inclusion proof accepted, but not processed.
+/// - FullyExecuted: all calls have been executed atomically via executeBundle.
+/// - Unbundled: processed via unbundling flow.
+enum BundleStatus {
+    Unreceived,
+    Verified,
+    FullyExecuted,
+    Unbundled
+}
+
+/// @dev Inclusion proof for a cross-chain message payload (bundle) coming from L2→L1.
+/// @param chainId Source chain identifier.
+/// @param l1BatchNumber Batch number on L1 where the message root was committed.
+/// @param l2MessageIndex Position in the L2 logs Merkle tree of this message.
+/// @param message The raw L2 message payload (including `BUNDLE_IDENTIFIER` prefix).
+/// @param proof Merkle‐proof for verifying the message inclusion.
 struct MessageInclusionProof {
     uint256 chainId;
     uint256 l1BatchNumber;
@@ -216,6 +260,12 @@ struct MessageInclusionProof {
     bytes32[] proof;
 }
 
+/// @dev Inclusion proof for a single L2 log entry passed to L1.
+/// @param chainId Source chain identifier.
+/// @param l1BatchNumber Batch number on L1 where the message root was committed.
+/// @param l2LogIndex Position in the L2 logs Merkle tree of this log.
+/// @param log The decoded `L2Log` entry.
+/// @param proof Merkle‐proof for verifying the log inclusion.
 struct LogInclusionProof {
     uint256 chainId;
     uint256 l1BatchNumber;
@@ -224,6 +274,12 @@ struct LogInclusionProof {
     bytes32[] proof;
 }
 
+/// @dev Generic inclusion proof for an arbitrary 32‐byte leaf in the L2→L1 Merkle tree.
+/// @param chainId Source chain identifier.
+/// @param l1BatchNumber Batch number on L1 where the message root was committed.
+/// @param l2LeafProofMask Bitmask indicating this leaf’s position, given as integer.
+/// @param leaf The 32-byte leaf whose inclusion is being proven.
+/// @param proof Merkle‐proof for verifying the leaf inclusion.
 struct LeafInclusionProof {
     uint256 chainId;
     uint256 l1BatchNumber;

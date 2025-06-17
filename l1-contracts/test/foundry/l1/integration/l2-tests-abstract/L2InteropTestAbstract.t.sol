@@ -271,7 +271,8 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             destinationChainId: 271,
             sendingBlockNumber: 31,
             calls: calls,
-            executionAddress: address(0)
+            executionAddress: address(0),
+            unbundlerAddress: address(0)
         });
         return interopBundle;
     }
