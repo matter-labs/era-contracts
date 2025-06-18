@@ -64,7 +64,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// This function will return `false` for _both_ smart contracts and smart accounts.
     /// @param _address The address of the account.
     /// @return `true` if the account is an EOA, `false` otherwise.
-    function isAccountEOA(address _address) external view returns (bool) {
+    function isAccountEOA(address _address) public view returns (bool) {
         bool systemContract = _address <= address(MAX_SYSTEM_CONTRACT_ADDRESS);
         if (systemContract) {
             return false;
@@ -75,7 +75,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             return true;
         }
 
-        bool delegated = this.getAccountDelegation(_address) != address(0);
+        bool delegated = getAccountDelegation(_address) != address(0);
         return delegated;
     }
 
@@ -90,7 +90,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
 
         // It is an EOA, it is still an account.
-        if (this.isAccountEOA(_address)) {
+        if (isAccountEOA(_address)) {
             return AccountAbstractionVersion.Version1;
         }
 
@@ -419,7 +419,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Returns the address of the account that is delegated to execute transactions on behalf of the given
     /// address.
     /// @notice Returns the zero address if no delegation is set.
-    function getAccountDelegation(address _addr) external view override returns (address) {
+    function getAccountDelegation(address _addr) public view override returns (address) {
         bytes32 codeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_addr);
         if (codeHash[0] == 0x02 && codeHash[1] == 0x02) {
             // The first two bytes of the code hash are 0x0202, which means that the account is delegated.
@@ -485,7 +485,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
 
             // We only allow delegation for EOAs.
-            if (!this.isAccountEOA(authority)) {
+            if (!isAccountEOA(authority)) {
                 continue;
             }
 
