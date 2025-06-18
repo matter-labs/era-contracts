@@ -77,8 +77,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) public view override returns (bool) {
-        // solhint-disable-next-line gas-custom-errors
-        require(s.chainId == _chainId, InvalidChainId());
+        if (s.chainId != _chainId) {
+            revert InvalidChainId();
+        }
         return
             super.proveL2MessageInclusionShared({
                 _chainId: _chainId,
@@ -114,8 +115,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         L2Log calldata _log,
         bytes32[] calldata _proof
     ) public view override returns (bool) {
-        // solhint-disable-next-line gas-custom-errors
-        require(s.chainId == _chainId, InvalidChainId());
+        if (s.chainId != _chainId) {
+            revert InvalidChainId();
+        }
         return
             super.proveL2LogInclusionShared({
                 _chainId: _chainId,
@@ -188,8 +190,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) public view virtual override returns (bool) {
-        // solhint-disable-next-line gas-custom-errors
-        require(s.chainId == _chainId, InvalidChainId());
+        if (s.chainId != _chainId) {
+            revert InvalidChainId();
+        }
         return
             super.proveL2LeafInclusionShared({
                 _chainId: _chainId,
