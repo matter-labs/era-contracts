@@ -10,7 +10,6 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
-import {PriorityOperation, PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
@@ -37,7 +36,6 @@ import {MessageVerification} from "./MessageVerification.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     using UncheckedMath for uint256;
-    using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
@@ -411,11 +409,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     function _nextPriorityTxId() internal view returns (uint256) {
-        if (_isPriorityQueueActive()) {
-            return s.priorityQueue.getTotalPriorityTxs();
-        } else {
-            return s.priorityTree.getTotalPriorityTxs();
-        }
+        return s.priorityTree.getTotalPriorityTxs();
     }
 
     function _requestL2TransactionFree(
@@ -486,16 +480,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
     }
 
+    // solhint-disable-next-line no-unused-vars
     function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
-        if (_isPriorityQueueActive()) {
-            s.priorityQueue.pushBack(
-                PriorityOperation({
-                    canonicalTxHash: _canonicalTxHash,
-                    expirationTimestamp: _expirationTimestamp,
-                    layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
-                })
-            );
-        }
         s.priorityTree.push(_canonicalTxHash);
     }
 

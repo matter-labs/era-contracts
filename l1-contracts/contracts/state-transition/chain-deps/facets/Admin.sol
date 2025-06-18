@@ -8,12 +8,11 @@ import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
-import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
-import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, PriorityQueueNotReady, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
@@ -26,7 +25,6 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZKChainBase, IAdmin {
     using PriorityTree for PriorityTree.Tree;
-    using PriorityQueue for PriorityQueue.Queue;
 
     /// @inheritdoc IZKChainBase
     string public constant override getName = "AdminFacet";
@@ -391,7 +389,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
         } else {
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         }
-        _forceDeactivateQueue();
 
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
@@ -429,10 +426,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
     /// @return commitment The commitment for the chain.
     function prepareChainCommitment() public view returns (ZKChainCommitment memory commitment) {
-        if (_isPriorityQueueActive()) {
-            revert PriorityQueueNotReady();
-        }
-
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
         commitment.totalBatchesVerified = s.totalBatchesVerified;
         commitment.totalBatchesExecuted = s.totalBatchesExecuted;
