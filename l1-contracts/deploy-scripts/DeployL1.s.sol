@@ -627,10 +627,11 @@ contract DeployL1Script is Script, DeployUtils {
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeOrHash: type(L2Bridgehub).creationCode,
-            l2AssetRouterBytecodeOrHash: type(L2AssetRouter).creationCode,
-            l2NtvBytecodeOrHash: type(L2NativeTokenVaultZKOS).creationCode,
-            messageRootBytecodeOrHash: type(L2MessageRoot).creationCode,
+            // TODO: fix
+            bridgehubBytecodeOrHash: hex"",
+            l2AssetRouterBytecodeOrHash: hex"",
+            l2NtvBytecodeOrHash: hex"",
+            messageRootBytecodeOrHash: hex"",
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -916,7 +917,7 @@ contract DeployL1Script is Script, DeployUtils {
             return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "L1MessageRoot")) {
             return abi.encodeCall(L1MessageRoot.initialize, ());
-        } else if (compareStrings(contractName, "ICTMDeploymentTracker")) {
+        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
