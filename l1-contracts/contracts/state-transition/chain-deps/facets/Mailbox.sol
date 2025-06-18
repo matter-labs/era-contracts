@@ -26,11 +26,11 @@ import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpe
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
 import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
-import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {InvalidChainId, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {MessageVerification} from "./MessageVerification.sol";
+import {MessageVerification, IMessageVerification} from "./MessageVerification.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -69,6 +69,26 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
+    /// @inheritdoc IMessageVerification
+    function proveL2MessageInclusionShared(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _index,
+        L2Message calldata _message,
+        bytes32[] calldata _proof
+    ) public view override returns (bool) {
+        // solhint-disable-next-line gas-custom-errors
+        require(s.chainId == _chainId, InvalidChainId());
+        return
+            super.proveL2MessageInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _index: _index,
+                _message: _message,
+                _proof: _proof
+            });
+    }
+
     /// @inheritdoc IMailboxImpl
     function proveL2MessageInclusion(
         uint256 _batchNumber,
@@ -82,6 +102,26 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 _blockOrBatchNumber: _batchNumber,
                 _index: _index,
                 _log: _l2MessageToLog(_message),
+                _proof: _proof
+            });
+    }
+
+    /// @inheritdoc IMessageVerification
+    function proveL2LogInclusionShared(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _index,
+        L2Log calldata _log,
+        bytes32[] calldata _proof
+    ) public view override returns (bool) {
+        // solhint-disable-next-line gas-custom-errors
+        require(s.chainId == _chainId, InvalidChainId());
+        return
+            super.proveL2LogInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _index: _index,
+                _log: _log,
                 _proof: _proof
             });
     }
@@ -137,6 +177,26 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 _index: _l2MessageIndex,
                 _log: l2Log,
                 _proof: _merkleProof
+            });
+    }
+
+    /// @inheritdoc IMessageVerification
+    function proveL2LeafInclusionShared(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) public view virtual override returns (bool) {
+        // solhint-disable-next-line gas-custom-errors
+        require(s.chainId == _chainId, InvalidChainId());
+        return
+            super.proveL2LeafInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof
             });
     }
 
