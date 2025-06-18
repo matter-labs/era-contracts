@@ -91,6 +91,18 @@ contract ZKChainBase is ReentrancyGuard {
         return s.__DEPRECATED_priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex;
     }
 
+    /// @notice Ensures that the queue is deactivated. Should be invoked
+    /// whenever the chain migrates to another settlement layer.
+    function _forceDeactivateQueue() internal {
+        // We double check whether it is still active mainly to prevent
+        // overriding `tail`/`head` on L1 deployment.
+        if (_isPriorityQueueActive()) {
+            uint256 startIndex = s.priorityTree.startIndex;
+            s.__DEPRECATED_priorityQueue.head = startIndex;
+            s.__DEPRECATED_priorityQueue.tail = startIndex;
+        }
+    }
+
     function _getTotalPriorityTxs() internal view returns (uint256) {
         return s.priorityTree.getTotalPriorityTxs();
     }

@@ -8,6 +8,7 @@ import {Diamond} from "../../libraries/Diamond.sol";
 import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
+import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
@@ -25,6 +26,7 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract AdminFacet is ZKChainBase, IAdmin {
     using PriorityTree for PriorityTree.Tree;
+    using PriorityQueue for PriorityQueue.Queue;
 
     /// @inheritdoc IZKChainBase
     string public constant override getName = "AdminFacet";
@@ -389,6 +391,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         } else {
             s.priorityTree.initFromCommitment(_commitment.priorityTree);
         }
+        _forceDeactivateQueue();
 
         s.l2SystemContractsUpgradeTxHash = _commitment.l2SystemContractsUpgradeTxHash;
         s.l2SystemContractsUpgradeBatchNumber = _commitment.l2SystemContractsUpgradeBatchNumber;
