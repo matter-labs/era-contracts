@@ -7,7 +7,6 @@ import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 
-
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
@@ -44,7 +43,7 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     /// @param _wethToken Address of WETH on deployed chain
-    constructor(
+    function initL2(
         uint256 _l1ChainId,
         address _aliasedOwner,
         address _legacySharedBridge,
@@ -52,8 +51,9 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
         bool _contractsDeployedAlready,
         address _wethToken,
         bytes32 _baseTokenAssetId
-    ) L2NativeTokenVault(_l1ChainId, _aliasedOwner, bytes32(0), _legacySharedBridge, _bridgedTokenBeacon, _contractsDeployedAlready, _wethToken, _baseTokenAssetId) {}
-
+    ) public {
+        super.initL2(_l1ChainId, _aliasedOwner, bytes32(0), _legacySharedBridge, _bridgedTokenBeacon, _contractsDeployedAlready, _wethToken, _baseTokenAssetId);
+    }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
@@ -67,7 +67,7 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
     ) internal virtual override returns (BeaconProxy proxy) {
         // For all zkOS-first chains, `L2_LEGACY_SHARED_BRIDGE` is zero and so L2NativeTokenVault
         // is the sole deployer of all bridged tokens.
-        
+
         // TODO: is it okay that the bytecode of the proxy changes with the implementation
         // of the l2 native token vault?
         proxy = new BeaconProxy{salt: _salt}(address(bridgedTokenBeacon), "");
@@ -81,11 +81,11 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
         uint256 _tokenOriginChainId,
         address _nonNativeToken
     ) public view virtual override returns (address) {
-        bytes memory bytecode = abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(address(bridgedTokenBeacon), ""));
-        return Create2.computeAddress(
-            _getCreate2Salt(_tokenOriginChainId, _nonNativeToken),
-            keccak256(bytecode)
+        bytes memory bytecode = abi.encodePacked(
+            type(BeaconProxy).creationCode,
+            abi.encode(address(bridgedTokenBeacon), "")
         );
+        return Create2.computeAddress(_getCreate2Salt(_tokenOriginChainId, _nonNativeToken), keccak256(bytecode));
     }
 
     function initialize(
@@ -95,5 +95,4 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
     ) external initializer {
         _initializeInner(_aliasedOwner, _bridgedTokenBeacon, bytes32(0), _contractsDeployedAlready);
     }
-
 }

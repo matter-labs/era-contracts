@@ -25,7 +25,7 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-contract MessageRoot is IMessageRoot, Initializable {
+abstract contract MessageRootBase is IMessageRoot, Initializable {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
@@ -34,9 +34,6 @@ contract MessageRoot is IMessageRoot, Initializable {
     event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 batchRoot);
 
     event Preimage(bytes32 one, bytes32 two);
-
-    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IBridgehub public immutable override BRIDGE_HUB;
 
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
@@ -55,8 +52,8 @@ contract MessageRoot is IMessageRoot, Initializable {
 
     /// @notice only the bridgehub can call
     modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
-            revert OnlyBridgehub(msg.sender, address(BRIDGE_HUB));
+        if (msg.sender != address(_bridgehub())) {
+            revert OnlyBridgehub(msg.sender, address(_bridgehub()));
         }
         _;
     }
@@ -64,24 +61,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @notice only the bridgehub can call
     /// @param _chainId the chainId of the chain
     modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+        if (msg.sender != _bridgehub().getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
         }
         _;
-    }
-
-    /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
-    /// This means we call the _initialize in both the constructor and the initialize functions.
-    /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub) {
-        BRIDGE_HUB = _bridgehub;
-        _initialize();
-        _disableInitializers();
-    }
-
-    /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
-    function initialize() external initializer {
-        _initialize();
     }
 
     function addNewChain(uint256 _chainId) external onlyBridgehub {
@@ -165,4 +148,6 @@ contract MessageRoot is IMessageRoot, Initializable {
 
         emit AddedChain(_chainId, cachedChainCount);
     }
+
+    function _bridgehub() internal virtual view returns (IBridgehub);
 }

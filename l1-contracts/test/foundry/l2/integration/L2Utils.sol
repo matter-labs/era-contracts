@@ -12,8 +12,9 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
@@ -31,7 +32,7 @@ library L2Utils {
 
     string internal constant L2_ASSET_ROUTER_PATH = "./zkout/L2AssetRouter.sol/L2AssetRouter.json";
     string internal constant L2_NATIVE_TOKEN_VAULT_PATH = "./zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json";
-    string internal constant BRIDGEHUB_PATH = "./zkout/Bridgehub.sol/Bridgehub.json";
+    string internal constant BRIDGEHUB_PATH = "./zkout/L2Bridgehub.sol/L2Bridgehub.json";
 
     function readFoundryBytecode(string memory artifactPath) internal view returns (bytes memory) {
         string memory root = vm.projectRoot();
@@ -102,8 +103,8 @@ library L2Utils {
     }
 
     function forceDeployMessageRoot() internal {
-        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR));
-        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR));
+        new L2MessageRoot();
+        forceDeployWithConstructor("L2MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR));
     }
 
     function forceDeployBridgehub(
@@ -114,9 +115,9 @@ library L2Utils {
         address _legacySharedBridge,
         address _l1CtmDeployer
     ) internal {
-        new Bridgehub(_l1ChainId, _aliasedOwner, 100);
-        forceDeployWithConstructor("Bridgehub", L2_BRIDGEHUB_ADDR, abi.encode(_l1ChainId, _aliasedOwner, 100));
-        Bridgehub bridgehub = Bridgehub(L2_BRIDGEHUB_ADDR);
+        new L2Bridgehub();
+        forceDeployWithConstructor("L2Bridgehub", L2_BRIDGEHUB_ADDR, abi.encode(_l1ChainId, _aliasedOwner, 100));
+        L2Bridgehub bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
         vm.prank(_aliasedOwner);
         bridgehub.setAddresses(
             L2_ASSET_ROUTER_ADDR,
@@ -140,7 +141,7 @@ library L2Utils {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
         {
-            new L2AssetRouter(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, ethAssetId, _aliasedOwner);
+            new L2AssetRouter();
         }
         forceDeployWithConstructor(
             "L2AssetRouter",
@@ -167,16 +168,7 @@ library L2Utils {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
         {
-            new L2NativeTokenVault({
-                _l1ChainId: _l1ChainId,
-                _aliasedOwner: _aliasedOwner,
-                _l2TokenProxyBytecodeHash: _l2TokenProxyBytecodeHash,
-                _legacySharedBridge: _legacySharedBridge,
-                _bridgedTokenBeacon: _l2TokenBeacon,
-                _contractsDeployedAlready: _contractsDeployedAlready,
-                _wethToken: address(0),
-                _baseTokenAssetId: ethAssetId
-            });
+            new L2NativeTokenVault();
         }
         forceDeployWithConstructor(
             "L2NativeTokenVault",

@@ -25,17 +25,32 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
+import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
+/// @dev Important: L2 contracts are not allowed to have any immutable variables. This is needed for compatibility with ZKsyncOS.
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     using SafeERC20 for IERC20;
 
-    IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
+    /// @dev The address of the WETH token.
+    address public override WETH_TOKEN;
+
+    /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
+    IAssetRouterBase public override ASSET_ROUTER;
+
+    /// @dev The assetId of the base token.
+    bytes32 public BASE_TOKEN_ASSET_ID;
+
+    /// @dev Chain ID of L1 for bridging reasons.
+    uint256 public override L1_CHAIN_ID;
+
+    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal immutable L2_TOKEN_PROXY_BYTECODE_HASH;
+    bytes32 internal L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
     /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
@@ -46,7 +61,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
     /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     /// @param _wethToken Address of WETH on deployed chain
-    constructor(
+    /// TODO: explain why we need to initL2 and updateL2
+    function initL2(
         uint256 _l1ChainId,
         address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
@@ -55,7 +71,34 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _contractsDeployedAlready,
         address _wethToken,
         bytes32 _baseTokenAssetId
-    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId, _l1ChainId) {
+    ) public {
+        updateL2(
+            _l1ChainId,
+            _aliasedOwner,
+            _l2TokenProxyBytecodeHash,
+            _legacySharedBridge,
+            _bridgedTokenBeacon,
+            _contractsDeployedAlready,
+            _wethToken,
+            _baseTokenAssetId
+        );
+    }
+
+    function updateL2(
+        uint256 _l1ChainId,
+        address _aliasedOwner,
+        bytes32 _l2TokenProxyBytecodeHash,
+        address _legacySharedBridge,
+        address _bridgedTokenBeacon,
+        bool _contractsDeployedAlready,
+        address _wethToken,
+        bytes32 _baseTokenAssetId
+    ) public {
+        WETH_TOKEN = _wethToken;
+        // TODO: remove the storage variable and use the L2_ASSET_ROUTER_ADDR directly
+        ASSET_ROUTER = IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+        L1_CHAIN_ID = _l1ChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
@@ -311,7 +354,23 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _l1Token The address of token on L1.
     /// @return expectedToken The address of token on L2.
     function l2TokenAddress(address _l1Token) public view returns (address expectedToken) {
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId(), _l1Token);
         expectedToken = tokenAddress[expectedAssetId];
+    }
+
+    function _wethToken() internal view override returns (address) {
+        return WETH_TOKEN;
+    }
+
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
+        return ASSET_ROUTER;
+    }
+
+    function _baseTokenAssetId() internal view override returns (bytes32) {
+        return BASE_TOKEN_ASSET_ID;
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
     }
 }

@@ -153,8 +153,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId();
         }
-        if(_newBatch.l2DaValidator != s.l2DAValidator) {
-//            revert MismatchL2DAValidator();
+        if (_newBatch.l2DaValidator != s.l2DAValidator) {
+            //            revert MismatchL2DAValidator();
         }
 
         // Create batch output for PI
@@ -199,9 +199,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
             // TODO: change RELAYED_EXECUTOR_VERSION?
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
-                abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo)
-            );
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo));
         }
     }
 
@@ -359,8 +357,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidProtocolVersion();
         }
         if (s.boojumOS) {
-            (StoredBatchInfo memory lastCommittedBatchData, CommitBoojumOSBatchInfo[] memory newBatchesData) = BatchDecoder
-                .decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
+            (
+                StoredBatchInfo memory lastCommittedBatchData,
+                CommitBoojumOSBatchInfo[] memory newBatchesData
+            ) = BatchDecoder.decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
             // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
             // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
             // and so the range checked in the `decodeAndCheckCommitData` is enough.
@@ -674,9 +674,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
             bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
             if (s.boojumOS) {
-                proofPublicInput[i] = uint256(
-                    keccak256(abi.encodePacked(prevBatchStateCommitment, currentBatchStateCommitment, currentBatchCommitment))
-                ) >> PUBLIC_INPUT_SHIFT;
+                proofPublicInput[i] =
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(
+                                prevBatchStateCommitment,
+                                currentBatchStateCommitment,
+                                currentBatchCommitment
+                            )
+                        )
+                    ) >>
+                    PUBLIC_INPUT_SHIFT;
             } else {
                 proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
             }

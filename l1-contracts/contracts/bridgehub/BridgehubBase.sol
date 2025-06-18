@@ -33,19 +33,8 @@ import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
-contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable, AssetHandlerModifiers {
+abstract contract BridgehubBase is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable, AssetHandlerModifiers {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
-
-    /// @notice the asset id of Eth. This is only used on L1.
-    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
-
-    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
-    uint256 public immutable L1_CHAIN_ID;
-
-    /// @notice The total number of ZK chains can be created/connected to this CTM.
-    /// This is the temporary security measure.
-    uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
     address public assetRouter;
@@ -119,8 +108,8 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     }
 
     modifier onlyL1() {
-        if (L1_CHAIN_ID != block.chainid) {
-            revert NotL1(L1_CHAIN_ID, block.chainid);
+        if (_l1ChainId() != block.chainid) {
+            revert NotL1(_l1ChainId(), block.chainid);
         }
         _;
     }
@@ -147,37 +136,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         _;
     }
 
-    /// @notice to avoid parity hack
-    constructor(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
-        _disableInitializers();
-        L1_CHAIN_ID = _l1ChainId;
-        MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
-
-        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
-        // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
-        // We will change this with interop.
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-        _transferOwnership(_owner);
-        _initializeInner();
-    }
-
-    /// @notice used to initialize the contract
-    /// @notice this contract is also deployed on L2 as a system contract there the owner and the related functions will not be used
-    /// @param _owner the owner of the contract
-    function initialize(address _owner) external reentrancyGuardInitializer {
-        _transferOwnership(_owner);
-        _initializeInner();
-    }
-
-    /// @notice Used to initialize the contract on L1
-    function initializeV2() external initializer onlyL1 {
-        _initializeInner();
-    }
-
     /// @notice Initializes the contract
     function _initializeInner() internal {
-        assetIdIsRegistered[ETH_TOKEN_ASSET_ID] = true;
-        whitelistedSettlementLayers[L1_CHAIN_ID] = true;
+        assetIdIsRegistered[_ethTokenAssetId()] = true;
+        whitelistedSettlementLayers[_l1ChainId()] = true;
     }
 
     //// Initialization and registration
@@ -322,7 +284,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @param _assetAddress the asset handler address
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external {
         // It is a simplified version of the logic used by the AssetRouter to manage asset handlers.
-        // CTM's assetId is `keccak256(abi.encode(L1_CHAIN_ID, l1CtmDeployer, ctmAddress))`.
+        // CTM's assetId is `keccak256(abi.encode(_l1ChainId(), l1CtmDeployer, ctmAddress))`.
         // And the l1CtmDeployer is considered the deployment tracker for the CTM asset.
         //
         // The l1CtmDeployer will call this method to set the asset handler address for the assetId.
@@ -332,7 +294,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // it is double checked that `assetId` is indeed derived from the `l1CtmDeployer`.
         // TODO(EVM-703): This logic should be revised once interchain communication is implemented.
 
-        address sender = L1_CHAIN_ID == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
+        address sender = _l1ChainId() == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
         // This method can be accessed by l1CtmDeployer only
         if (sender != address(l1CtmDeployer)) {
             revert Unauthorized(sender);
@@ -341,7 +303,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             revert CTMNotRegistered();
         }
 
-        bytes32 ctmAssetId = DataEncoding.encodeAssetId(L1_CHAIN_ID, _additionalData, sender);
+        bytes32 ctmAssetId = DataEncoding.encodeAssetId(_l1ChainId(), _additionalData, sender);
         ctmAssetIdToAddress[ctmAssetId] = _assetAddress;
         ctmAssetIdFromAddress[_assetAddress] = ctmAssetId;
         emit AssetRegistered(ctmAssetId, _assetAddress, _additionalData, msg.sender);
@@ -403,7 +365,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {
         // slither-disable-next-line unused-return
         zkChainMap.set(_chainId, _zkChain);
-        if (_checkMaxNumberOfZKChains && zkChainMap.length() > MAX_NUMBER_OF_ZK_CHAINS) {
+        if (_checkMaxNumberOfZKChains && zkChainMap.length() > _maxNumberOfZKChains()) {
             revert ZKChainLimitReached();
         }
     }
@@ -472,7 +434,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
+            if (tokenAssetId == _ethTokenAssetId()) {
                 if (msg.value != _request.mintValue) {
                     revert MsgValueMismatch(_request.mintValue, msg.value);
                 }
@@ -529,7 +491,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             uint256 baseTokenMsgValue;
-            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
+            if (tokenAssetId == _ethTokenAssetId()) {
                 if (msg.value != _request.mintValue + _request.secondBridgeValue) {
                     revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
                 }
@@ -612,7 +574,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override onlySettlementLayerRelayedSender {
-        if (L1_CHAIN_ID == block.chainid) {
+        if (_l1ChainId() == block.chainid) {
             revert NotInGatewayMode();
         }
         address zkChain = zkChainMap.get(_chainId);
@@ -692,7 +654,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256 _gasPrice,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
-    ) external view returns (uint256) {
+    ) external view override returns (uint256) {
         address zkChain = zkChainMap.get(_chainId);
         return IZKChain(zkChain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
@@ -751,7 +713,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             bridgehubBurnData.ctmData
         );
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
-            _settlementChainId == L1_CHAIN_ID
+            _settlementChainId == _l1ChainId()
                 ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
                 : zkChainMap.get(_settlementChainId),
             _originalCaller,
@@ -951,4 +913,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     function sharedBridge() public view returns (address) {
         return assetRouter;
     }
+
+    function _ethTokenAssetId() internal virtual view returns (bytes32);
+
+    function _l1ChainId() internal virtual view returns (uint256);
+
+    function _maxNumberOfZKChains() internal virtual view returns (uint256);
 }

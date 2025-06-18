@@ -52,7 +52,10 @@ contract L2ComplexUpgrader is IComplexUpgrader {
         bytes calldata _calldata
     ) external payable onlyForceDeployer {
         for (uint256 i = 0; i < _forceDeployments.length; i++) {
-            IZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).setDeployedCodeEVM(_forceDeployments[i].newAddress, _forceDeployments[i].deployedBytecode);
+            IZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).setDeployedCodeEVM(
+                _forceDeployments[i].newAddress,
+                _forceDeployments[i].deployedBytecode
+            );
         }
 
         upgrade(_delegateTo, _calldata);

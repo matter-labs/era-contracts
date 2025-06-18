@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -18,7 +18,7 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
 import {L2_MESSAGE_ROOT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/L2ContractAddresses.sol";
 
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
@@ -38,6 +38,7 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1IntegrationScript {
     using stdToml for string;
@@ -48,41 +49,26 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         address wethToken = address(0x1);
         // we deploy the code to get the contract code with immutables which we then vm.etch
-        address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR)));
-        address bridgehub = address(new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100));
+        address messageRoot = address(new L2MessageRoot());
+        address bridgehub = address(new L2Bridgehub());
+        // TODO: maybe init message root and bridgehub, l2 asset router and ntv in the deployer?
         address assetRouter = address(
-            new L2AssetRouter(
-                _args.l1ChainId,
-                _args.eraChainId,
-                _args.l1AssetRouter,
-                _args.legacySharedBridge,
-                baseTokenAssetId,
-                _args.aliasedOwner
-            )
+            new L2AssetRouter()
         );
         address ntv = address(
-            new L2NativeTokenVaultDev(
-                _args.l1ChainId,
-                _args.aliasedOwner,
-                _args.l2TokenProxyBytecodeHash,
-                _args.legacySharedBridge,
-                _args.l2TokenBeacon,
-                _args.contractsDeployedAlready,
-                wethToken,
-                baseTokenAssetId
-            )
+            new L2NativeTokenVaultDev()
         );
 
         vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
-        MessageRoot(L2_MESSAGE_ROOT_ADDR).initialize();
+        // L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initialize();
 
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         uint256 prevChainId = block.chainid;
         vm.chainId(_args.l1ChainId);
-        Bridgehub(L2_BRIDGEHUB_ADDR).initialize(_args.aliasedOwner);
+        L1Bridgehub(L2_BRIDGEHUB_ADDR).initialize(_args.aliasedOwner);
         vm.chainId(prevChainId);
         vm.prank(_args.aliasedOwner);
-        Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
+        L1Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR)

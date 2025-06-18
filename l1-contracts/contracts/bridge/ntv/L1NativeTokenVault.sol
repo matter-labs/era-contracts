@@ -17,6 +17,7 @@ import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
+import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/L2ContractAddresses.sol";
@@ -31,6 +32,20 @@ import {ClaimFailedDepositFailed, ZeroAmountToTransfer, WrongAmountTransferred, 
 /// @dev Designed for use with a proxy for upgradability.
 contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVault {
     using SafeERC20 for IERC20;
+
+    /// @dev The address of the WETH token.
+    address public immutable override WETH_TOKEN;
+
+    // TODO: maybe use L1AssetRouter instead of IAssetRouterBase?
+    /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
+    IAssetRouterBase public immutable override ASSET_ROUTER;
+
+    /// @dev The assetId of the base token.
+    bytes32 public immutable BASE_TOKEN_ASSET_ID;
+
+    /// @dev Chain ID of L1 for bridging reasons.
+    uint256 public immutable L1_CHAIN_ID;
+
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
@@ -49,14 +64,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _l1WethAddress,
         address _l1AssetRouter,
         IL1Nullifier _l1Nullifier
-    )
-        NativeTokenVault(
-            _l1WethAddress,
-            _l1AssetRouter,
-            DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
-            block.chainid
-        )
-    {
+    ) {
+        WETH_TOKEN = _l1WethAddress;
+        ASSET_ROUTER = IAssetRouterBase(_l1AssetRouter);
+        BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        L1_CHAIN_ID = block.chainid;
         L1_NULLIFIER = _l1Nullifier;
     }
 
@@ -313,5 +325,21 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @return Whether The chain `_chainId` has infinite balance of the token
     function _hasInfiniteBalance(bool _isNative, bytes32 _assetId, uint256 _chainId) private view returns (bool) {
         return !_isNative && originChainId[_assetId] == _chainId;
+    }
+
+    function _wethToken() internal view override returns (address) {
+        return WETH_TOKEN;
+    }
+
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
+        return ASSET_ROUTER;
+    }
+
+    function _baseTokenAssetId() internal view override returns (bytes32) {
+        return BASE_TOKEN_ASSET_ID;
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
     }
 }

@@ -8,7 +8,7 @@ pragma solidity 0.8.28;
 contract L2ZKOSGenesisUpgrade {
     // just for testing
     uint256 public x;
-    
+
     /// @notice The function that is delegateCalled from the complex upgrader.
     /// @dev It is used to set the chainId and to deploy the force deployments.
     /// @param _chainId the chain id

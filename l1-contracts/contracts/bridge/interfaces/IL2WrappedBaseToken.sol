@@ -28,5 +28,4 @@ interface IL2WrappedBaseToken {
         address _l1Address,
         bytes32 _baseTokenAssetId
     ) external;
-
 }

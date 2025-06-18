@@ -12,13 +12,15 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {IZKOSContractDeployer} from "./IZKOSContractDeployer.sol";
 
-import {MessageRoot} from "../bridgehub/MessageRoot.sol";
-import {Bridgehub} from "../bridgehub/Bridgehub.sol";
+import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
+import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
 import {ICTMDeploymentTracker} from "../bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
+
+import {MessageRootBase} from "../bridgehub/MessageRootBase.sol";
 
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -38,7 +40,6 @@ struct FixedForceDeploymentsData {
     // It will be the job of the governance to ensure that this value is set correctly.
     address dangerousTestOnlyForcedBeacon;
 }
-
 
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
@@ -77,11 +78,8 @@ library L2GenesisForceDeploymentsHelper {
         // 1. Deploy the bytecode onto a random address with the expected input (to ensure that immutables are set correctly).
         // 2. Clone the bytecode into memory + force deploy bytecode.
         // 3. Call the initializer with the expected data.
-        
-        bytes memory bytecodeWithConstructor = abi.encodePacked(
-            _bytecode,
-            _initializerData
-        );
+
+        bytes memory bytecodeWithConstructor = abi.encodePacked(_bytecode, _initializerData);
 
         address randomAddress;
         assembly {
@@ -95,10 +93,7 @@ library L2GenesisForceDeploymentsHelper {
         }
 
         // 2. Clone the bytecode into memory + force deploy bytecode.
-        IZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).setDeployedCodeEVM(
-            _newAddress,
-            randomAddress.code
-        );
+        IZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).setDeployedCodeEVM(_newAddress, randomAddress.code);
 
         (bool success, bytes memory returnData) = _newAddress.call(_initializerData);
 
@@ -136,7 +131,9 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.messageRootBytecodeOrHash,
                 address(L2_MESSAGE_ROOT_ADDR),
                 abi.encode(address(L2_BRIDGEHUB_ADDR)),
-                abi.encodeCall(MessageRoot.initialize, ())
+                // TODO
+                hex""
+                // abi.encodeCall(L1MessageRoot.initialize, ())
             );
         } else {
             _forceDeployEra(
@@ -157,7 +154,9 @@ library L2GenesisForceDeploymentsHelper {
                     fixedForceDeploymentsData.aliasedL1Governance,
                     fixedForceDeploymentsData.maxNumberOfZKChains
                 ),
-                abi.encodeCall(Bridgehub.initialize, (fixedForceDeploymentsData.aliasedL1Governance))
+                hex""
+                // TODO
+                // abi.encodeCall(L2Bridgehub.initL2, (fixedForceDeploymentsData.aliasedL1Governance))
             );
         } else {
             _forceDeployEra(
@@ -185,7 +184,11 @@ library L2GenesisForceDeploymentsHelper {
                     additionalForceDeploymentsData.baseTokenAssetId,
                     fixedForceDeploymentsData.aliasedL1Governance
                 ),
-                abi.encodeCall(L2AssetRouter.initialize, (additionalForceDeploymentsData.baseTokenAssetId, fixedForceDeploymentsData.aliasedL1Governance))
+                hex""
+                // abi.encodeCall(
+                //     L2AssetRouter.initialize,
+                //     (additionalForceDeploymentsData.baseTokenAssetId, fixedForceDeploymentsData.aliasedL1Governance)
+                // )
             );
         } else {
             _forceDeployEra(
@@ -243,7 +246,10 @@ library L2GenesisForceDeploymentsHelper {
                     wrappedBaseTokenAddress,
                     additionalForceDeploymentsData.baseTokenAssetId
                 ),
-                abi.encodeCall(L2NativeTokenVaultZKOS.initialize, (fixedForceDeploymentsData.aliasedL1Governance, deployedTokenBeacon, contractsDeployedAlready))
+                abi.encodeCall(
+                    L2NativeTokenVaultZKOS.initialize,
+                    (fixedForceDeploymentsData.aliasedL1Governance, deployedTokenBeacon, contractsDeployedAlready)
+                )
             );
         } else {
             _forceDeployEra(
@@ -267,7 +273,11 @@ library L2GenesisForceDeploymentsHelper {
         // It is expected that either through the force deployments above
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
         // However, there is still some follow-up finalization that needs to be done.
-        Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(L2_ASSET_ROUTER_ADDR, ICTMDeploymentTracker(_ctmDeployer), IMessageRoot(L2_MESSAGE_ROOT_ADDR));
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
+            L2_ASSET_ROUTER_ADDR,
+            ICTMDeploymentTracker(_ctmDeployer),
+            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+        );
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.
@@ -284,7 +294,13 @@ library L2GenesisForceDeploymentsHelper {
     ) internal pure returns (bytes memory initData) {
         initData = abi.encodeCall(
             IL2WrappedBaseToken.initializeV3,
-            (_wrappedBaseTokenName, _wrappedBaseTokenSymbol, L2_ASSET_ROUTER_ADDR, _baseTokenL1Address, _baseTokenAssetId)
+            (
+                _wrappedBaseTokenName,
+                _wrappedBaseTokenSymbol,
+                L2_ASSET_ROUTER_ADDR,
+                _baseTokenL1Address,
+                _baseTokenAssetId
+            )
         );
     }
 

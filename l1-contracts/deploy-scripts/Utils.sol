@@ -24,7 +24,7 @@ import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
@@ -1271,10 +1271,10 @@ library Utils {
         address _bridgehub,
         uint256 _chainId
     ) internal view returns (ChainInfoFromBridgehub memory info) {
-        info.l1AssetRouterProxy = Bridgehub(_bridgehub).assetRouter();
-        info.diamondProxy = Bridgehub(_bridgehub).getZKChain(_chainId);
+        info.l1AssetRouterProxy = L1Bridgehub(_bridgehub).assetRouter();
+        info.diamondProxy = L1Bridgehub(_bridgehub).getZKChain(_chainId);
         info.admin = IGetters(info.diamondProxy).getAdmin();
-        info.ctm = Bridgehub(_bridgehub).chainTypeManager(_chainId);
+        info.ctm = L1Bridgehub(_bridgehub).chainTypeManager(_chainId);
         info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
     }
 
