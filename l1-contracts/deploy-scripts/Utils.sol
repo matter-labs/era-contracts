@@ -1000,6 +1000,14 @@ library Utils {
         return bytecode;
     }
 
+    function blakeHashBytecode(bytes memory bytecode) internal returns (bytes32 hashedBytecode) {
+        string[] memory input = new string[](3);
+        input[0] = "ts-node";
+        input[1] = "./scripts/blake2s256.ts";
+        input[2] = vm.toString(bytecode);
+        hashedBytecode = bytes32(vm.ffi(input));
+    }
+
     function executeUpgrade(
         address _governor,
         bytes32 _salt,
