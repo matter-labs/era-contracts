@@ -127,6 +127,12 @@ library L2UtilsBase {
         {
             address interopHandler = address(new InteropHandler());
             vm.etch(L2_INTEROP_HANDLER_ADDR, interopHandler.code);
+            /// storing the reentrancy guard as the constructor is not called.
+            vm.store(
+                L2_INTEROP_HANDLER_ADDR,
+                bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
+                bytes32(uint256(1))
+            );
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());
             vm.etch(L2_STANDARD_TRIGGER_ACCOUNT_ADDR, l2StandardTriggerAccount.code);
             address l2InteropAccount = address(new DummyL2InteropAccount());

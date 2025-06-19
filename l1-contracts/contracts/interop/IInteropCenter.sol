@@ -10,6 +10,29 @@ import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 interface IInteropCenter {
     event InteropBundleSent(bytes32 l2l1TxHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
+    /// @return interopCallValue Base token value on destination chain to send for interop call.
+    /// @return indirectCallMessageValue Base token value on sending chain to send for indirect call.
+    /// @return directCall True for direct interop, false if routed through bridge.
+    /// @return executionAddress Address allowed to execute on remote side.
+    /// @return unbundlerAddress Address allowed to unbundle.
+    struct ERC7786Attributes {
+        uint256 interopCallValue;
+        uint256 indirectCallMessageValue;
+        bool directCall;
+        address executionAddress;
+        address unbundlerAddress;
+    }
+
+    /// @notice Options for parsing attributes.
+    /// @dev OnlyCallAttributes: Only call attributes are allowed.
+    /// @dev OnlyBundleAttributes: Only bundle attributes are allowed.
+    /// @dev CallAndBundleAttributes: Both call and bundle attributes are allowed.
+    enum AttributeParsingOption {
+        OnlyCallAttributes,
+        OnlyBundleAttributes,
+        CallAndBundleAttributes
+    }
+
     function BRIDGE_HUB() external view returns (IBridgehub);
 
     function assetTracker() external view returns (IAssetTracker);
@@ -28,8 +51,7 @@ interface IInteropCenter {
 
     function sendBundle(
         uint256 _destinationChainId,
-        address _executionAddress,
-        address _unbundlerAddress,
-        InteropCallStarter[] calldata _callStarters
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
     ) external payable returns (bytes32);
 }

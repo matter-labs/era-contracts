@@ -22,6 +22,7 @@ import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
 import {IERC7786Receiver} from "../../interop/IERC7786Receiver.sol";
+import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -210,11 +211,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             _data: _data,
             _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
         });
+        bytes[] memory attributes = new bytes[](1);
+        attributes[0] = abi.encode(IERC7786Attributes.interopCallValue.selector, _value);
         interopCallStarter = InteropCallStarter({
             nextContract: request.l2Contract,
             data: request.l2Calldata,
-            requestedInteropCallValue: _value,
-            attributes: new bytes[](0)
+            attributes: attributes
         });
     }
 

@@ -8,6 +8,9 @@ pragma solidity ^0.8.24;
 interface IERC7786Attributes {
     function indirectCall(uint256 _indirectCallMessageValue) external pure;
 
-    // kl todo, this is not used currently.
     function interopCallValue(uint256 _interopCallValue) external pure;
+
+    function executionAddress(address _executionAddress) external pure;
+
+    function unbundlerAddress(address _unbundlerAddress) external pure;
 }

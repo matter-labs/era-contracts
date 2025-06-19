@@ -171,12 +171,10 @@ struct FinalizeL1DepositParams {
 /// @dev Struct used to define parameters for adding a single call in an interop bundle.
 /// @param nextContract Address of the contract to call on the destination chain.
 /// @param data Calldata payload to send to nextContract.
-/// @param requestedInteropCallValue Amount of base token allocated for this call.
 /// @param attributes EIP-7786 Attributes.
 struct InteropCallStarter {
     address nextContract;
     bytes data;
-    uint256 requestedInteropCallValue;
     bytes[] attributes;
 }
 
