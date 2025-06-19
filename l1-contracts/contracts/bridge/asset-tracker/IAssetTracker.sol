@@ -8,7 +8,13 @@ import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
 interface IAssetTracker {
     function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
 
-    function handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
+    function handleChainBalanceDecrease(
+        uint256 _tokenOriginChainId,
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
 

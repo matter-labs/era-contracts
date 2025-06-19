@@ -96,9 +96,20 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         TransientPrimitivesLib.set(_chainId + 1, 0);
     }
 
-    function handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
+    function handleChainBalanceDecrease(
+        uint256 _tokenOriginChainId,
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool
+    ) external {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         uint256 chainToUpdate = settlementLayer == block.chainid ? _chainId : settlementLayer;
+        if (_tokenOriginChainId == _chainId && !isMinterChain[chainToUpdate][_assetId]) {
+            isMinterChain[chainToUpdate][_assetId] = true;
+            return;
+        }
+
         if (isMinterChain[chainToUpdate][_assetId]) {
             return;
         }
