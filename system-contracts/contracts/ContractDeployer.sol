@@ -526,7 +526,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         assembly {
             // Use scratch space to calculate the hash
             mstore(0x00, input)
-            // We only care about the part starting with 0xEF0100, so we ignore the first 9 bytes
+            // Only the part starting with 0xEF0100 is needed for this hash;
+            // ignore the first 9 bytes.
             hash := keccak256(0x09, 23)
         }
     }
