@@ -525,10 +525,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     function _hash7702Delegation(bytes32 input) internal pure returns (bytes32 hash) {
         // Hash bytes 9-32 (that have the contract code) without allocating an array.
         assembly {
-            // Point to free memory and store 23 bytes starting at byte offset 9 of input
-            let ptr := mload(0x40)
-            mstore(ptr, shl(72, input)) // Shift left to remove first 9 bytes (9 * 8 = 72 bits)
-            hash := keccak256(ptr, 23)
+            // Use scratch space to calculate the hash
+            mstore(0x00, shl(72, input)) // Shift left to remove first 9 bytes (9 * 8 = 72 bits)
+            hash := keccak256(0x00, 23)
         }
     }
 
