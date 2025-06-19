@@ -69,39 +69,37 @@ library L2GenesisForceDeploymentsHelper {
 
     function _forceDeployZKsyncOS(
         bytes memory _bytecode,
-        address _newAddress,
-        bytes memory _input,
-        bytes memory _initializerData
+        address _newAddress
     ) internal {
-        // ZKsyncOS does not allow force deployments with constructor.
-        // So we will do the following:
-        // 1. Deploy the bytecode onto a random address with the expected input (to ensure that immutables are set correctly).
-        // 2. Clone the bytecode into memory + force deploy bytecode.
-        // 3. Call the initializer with the expected data.
+        // // ZKsyncOS does not allow force deployments with constructor.
+        // // So we will do the following:
+        // // 1. Deploy the bytecode onto a random address with the expected input (to ensure that immutables are set correctly).
+        // // 2. Clone the bytecode into memory + force deploy bytecode.
+        // // 3. Call the initializer with the expected data.
 
-        bytes memory bytecodeWithConstructor = abi.encodePacked(_bytecode, _initializerData);
+        // bytes memory bytecodeWithConstructor = abi.encodePacked(_bytecode, _initializerData);
 
-        address randomAddress;
-        assembly {
-            randomAddress := create(0, add(bytecodeWithConstructor, 0x20), mload(bytecodeWithConstructor))
-        }
+        // address randomAddress;
+        // assembly {
+        //     randomAddress := create(0, add(bytecodeWithConstructor, 0x20), mload(bytecodeWithConstructor))
+        // }
 
-        if (randomAddress.code.length == 0) {
-            // Something went wrong, revert.
-            // TODO: use custom errors.
-            revert("Failed to deploy bytecode");
-        }
+        // if (randomAddress.code.length == 0) {
+        //     // Something went wrong, revert.
+        //     // TODO: use custom errors.
+        //     revert("Failed to deploy bytecode");
+        // }
 
-        // 2. Clone the bytecode into memory + force deploy bytecode.
-        IZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).setDeployedCodeEVM(_newAddress, randomAddress.code);
+        // // 2. Clone the bytecode into memory + force deploy bytecode.
+        // IZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).setDeployedCodeEVM(_newAddress, randomAddress.code);
 
-        (bool success, bytes memory returnData) = _newAddress.call(_initializerData);
+        // (bool success, bytes memory returnData) = _newAddress.call(_initializerData);
 
-        if (!success) {
-            // Something went wrong, revert.
-            // TODO: use custom errors.
-            revert("Failed to call initializer");
-        }
+        // if (!success) {
+        //     // Something went wrong, revert.
+        //     // TODO: use custom errors.
+        //     revert("Failed to call initializer");
+        // }
     }
 
     /// @notice Initializes force-deployed contracts required for the L2 genesis upgrade.
@@ -127,14 +125,17 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         if (_isZKsyncOS) {
-            _forceDeployZKsyncOS(
-                fixedForceDeploymentsData.messageRootBytecodeOrHash,
-                address(L2_MESSAGE_ROOT_ADDR),
-                abi.encode(address(L2_BRIDGEHUB_ADDR)),
-                // TODO
-                hex""
-                // abi.encodeCall(L1MessageRoot.initialize, ())
-            );
+            // TODO: invoke force deployment before init, 
+            // for now we assume that the address is already deployed
+            
+            // _forceDeployZKsyncOS(
+            //     fixedForceDeploymentsData.messageRootBytecodeOrHash,
+            //     address(L2_MESSAGE_ROOT_ADDR),
+            //     abi.encode(address(L2_BRIDGEHUB_ADDR)),
+            //     // TODO
+            //     hex""
+            //     // abi.encodeCall(L1MessageRoot.initialize, ())
+            // );
         } else {
             _forceDeployEra(
                 abi.decode(fixedForceDeploymentsData.messageRootBytecodeOrHash, (bytes32)),
@@ -144,52 +145,66 @@ library L2GenesisForceDeploymentsHelper {
                 abi.encode(address(L2_BRIDGEHUB_ADDR))
             );
         }
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2();
 
         if (_isZKsyncOS) {
-            _forceDeployZKsyncOS(
-                fixedForceDeploymentsData.bridgehubBytecodeOrHash,
-                address(L2_BRIDGEHUB_ADDR),
-                abi.encode(
-                    fixedForceDeploymentsData.l1ChainId,
-                    fixedForceDeploymentsData.aliasedL1Governance,
-                    fixedForceDeploymentsData.maxNumberOfZKChains
-                ),
-                hex""
-                // TODO
-                // abi.encodeCall(L2Bridgehub.initL2, (fixedForceDeploymentsData.aliasedL1Governance))
-            );
+            // TODO: invoke force deployment before init, 
+            // for now we assume that the address is already deployed
+
+            // _forceDeployZKsyncOS(
+            //     fixedForceDeploymentsData.bridgehubBytecodeOrHash,
+            //     address(L2_BRIDGEHUB_ADDR),
+            //     abi.encode(
+            //         fixedForceDeploymentsData.l1ChainId,
+            //         fixedForceDeploymentsData.aliasedL1Governance,
+            //         fixedForceDeploymentsData.maxNumberOfZKChains
+            //     ),
+            //     hex""
+            //     // TODO
+            //     // abi.encodeCall(L2Bridgehub.initL2, (fixedForceDeploymentsData.aliasedL1Governance))
+            // );
+
         } else {
-            _forceDeployEra(
-                abi.decode(fixedForceDeploymentsData.bridgehubBytecodeOrHash, (bytes32)),
-                address(L2_BRIDGEHUB_ADDR),
-                true,
-                0,
-                abi.encode(
-                    fixedForceDeploymentsData.l1ChainId,
-                    fixedForceDeploymentsData.aliasedL1Governance,
-                    fixedForceDeploymentsData.maxNumberOfZKChains
-                )
-            );
+            // FIXME: Era deployments should have no constructor as well
+            // _forceDeployEra(
+            //     abi.decode(fixedForceDeploymentsData.bridgehubBytecodeOrHash, (bytes32)),
+            //     address(L2_BRIDGEHUB_ADDR),
+            //     true,
+            //     0,
+            //     abi.encode(
+            //         fixedForceDeploymentsData.l1ChainId,
+            //         fixedForceDeploymentsData.aliasedL1Governance,
+            //         fixedForceDeploymentsData.maxNumberOfZKChains
+            //     )
+            // );
         }
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
+            fixedForceDeploymentsData.l1ChainId,
+            fixedForceDeploymentsData.aliasedL1Governance,
+            fixedForceDeploymentsData.maxNumberOfZKChains
+        );
 
         if (_isZKsyncOS) {
-            _forceDeployZKsyncOS(
-                fixedForceDeploymentsData.l2AssetRouterBytecodeOrHash,
-                address(L2_ASSET_ROUTER_ADDR),
-                abi.encode(
-                    fixedForceDeploymentsData.l1ChainId,
-                    fixedForceDeploymentsData.eraChainId,
-                    fixedForceDeploymentsData.l1AssetRouter,
-                    additionalForceDeploymentsData.l2LegacySharedBridge,
-                    additionalForceDeploymentsData.baseTokenAssetId,
-                    fixedForceDeploymentsData.aliasedL1Governance
-                ),
-                hex""
-                // abi.encodeCall(
-                //     L2AssetRouter.initialize,
-                //     (additionalForceDeploymentsData.baseTokenAssetId, fixedForceDeploymentsData.aliasedL1Governance)
-                // )
-            );
+            // TODO: invoke force deployment before init, 
+            // for now we assume that the address is already deployed
+
+            // _forceDeployZKsyncOS(
+            //     fixedForceDeploymentsData.l2AssetRouterBytecodeOrHash,
+            //     address(L2_ASSET_ROUTER_ADDR),
+            //     abi.encode(
+            //         fixedForceDeploymentsData.l1ChainId,
+            //         fixedForceDeploymentsData.eraChainId,
+            //         fixedForceDeploymentsData.l1AssetRouter,
+            //         additionalForceDeploymentsData.l2LegacySharedBridge,
+            //         additionalForceDeploymentsData.baseTokenAssetId,
+            //         fixedForceDeploymentsData.aliasedL1Governance
+            //     ),
+            //     hex""
+            //     // abi.encodeCall(
+            //     //     L2AssetRouter.initialize,
+            //     //     (additionalForceDeploymentsData.baseTokenAssetId, fixedForceDeploymentsData.aliasedL1Governance)
+            //     // )
+            // );
         } else {
             _forceDeployEra(
                 abi.decode(fixedForceDeploymentsData.l2AssetRouterBytecodeOrHash, (bytes32)),
@@ -206,6 +221,15 @@ library L2GenesisForceDeploymentsHelper {
                 )
             );
         }
+
+        L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
+            fixedForceDeploymentsData.l1ChainId,
+            fixedForceDeploymentsData.eraChainId,
+            fixedForceDeploymentsData.l1AssetRouter,
+            additionalForceDeploymentsData.l2LegacySharedBridge,
+            additionalForceDeploymentsData.baseTokenAssetId,
+            fixedForceDeploymentsData.aliasedL1Governance
+        );
 
         // Ensure the WETH token is deployed and retrieve its address.
         address wrappedBaseTokenAddress = _ensureWethToken({
@@ -234,23 +258,26 @@ library L2GenesisForceDeploymentsHelper {
         }
 
         if (_isZKsyncOS) {
-            _forceDeployZKsyncOS(
-                fixedForceDeploymentsData.l2NtvBytecodeOrHash,
-                L2_NATIVE_TOKEN_VAULT_ADDR,
-                abi.encode(
-                    fixedForceDeploymentsData.l1ChainId,
-                    fixedForceDeploymentsData.aliasedL1Governance,
-                    additionalForceDeploymentsData.l2LegacySharedBridge,
-                    deployedTokenBeacon,
-                    contractsDeployedAlready,
-                    wrappedBaseTokenAddress,
-                    additionalForceDeploymentsData.baseTokenAssetId
-                ),
-                abi.encodeCall(
-                    L2NativeTokenVaultZKOS.initialize,
-                    (fixedForceDeploymentsData.aliasedL1Governance, deployedTokenBeacon, contractsDeployedAlready)
-                )
-            );
+            // TODO: invoke force deployment before init, 
+            // for now we assume that the address is already deployed
+
+            // _forceDeployZKsyncOS(
+            //     fixedForceDeploymentsData.l2NtvBytecodeOrHash,
+            //     L2_NATIVE_TOKEN_VAULT_ADDR,
+            //     abi.encode(
+            //         fixedForceDeploymentsData.l1ChainId,
+            //         fixedForceDeploymentsData.aliasedL1Governance,
+            //         additionalForceDeploymentsData.l2LegacySharedBridge,
+            //         deployedTokenBeacon,
+            //         contractsDeployedAlready,
+            //         wrappedBaseTokenAddress,
+            //         additionalForceDeploymentsData.baseTokenAssetId
+            //     ),
+            //     abi.encodeCall(
+            //         L2NativeTokenVaultZKOS.initialize,
+            //         (fixedForceDeploymentsData.aliasedL1Governance, deployedTokenBeacon, contractsDeployedAlready)
+            //     )
+            // );
         } else {
             _forceDeployEra(
                 abi.decode(fixedForceDeploymentsData.l2NtvBytecodeOrHash, (bytes32)),
@@ -269,6 +296,17 @@ library L2GenesisForceDeploymentsHelper {
                 )
             );
         }
+
+        L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
+            fixedForceDeploymentsData.l1ChainId,
+            fixedForceDeploymentsData.aliasedL1Governance,
+            fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
+            additionalForceDeploymentsData.l2LegacySharedBridge,
+            deployedTokenBeacon,
+            contractsDeployedAlready,
+            wrappedBaseTokenAddress,
+            additionalForceDeploymentsData.baseTokenAssetId
+        );
 
         // It is expected that either through the force deployments above
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.

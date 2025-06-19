@@ -183,7 +183,7 @@ abstract contract BridgehubBase is IBridgehub, ReentrancyGuard, Ownable2StepUpgr
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot
-    ) external onlyOwner {
+    ) external onlyOwnerOrUpgrader {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
