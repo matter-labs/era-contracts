@@ -88,9 +88,15 @@ object "EvmGasManager" {
                     let versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(caller())
                     isEVM := eq(shr(248, versionedCodeHash), 2)
 
+                    if iszero(isEVM) {
+                        // error CallerMustBeEvmContract()
+                        mstore(0, 0xBE4BF9E400000000000000000000000000000000000000000000000000000000)
+                        revert(0, 4)
+                    }
+
                     // For 7702 delegations, we need to make sure that the delegation address is an EVM contract.
-                    let isAccountDelegated := eq(and(0xFF, shr(240, versionedCodeHash)), 2)
-                    if and(isEVM, isAccountDelegated) {
+                    let isAccountDelegated := eq(shr(240, versionedCodeHash), 0x0202)
+                    if isAccountDelegated {
                         let delegationAddress := and(ADDRESS_MASK(), versionedCodeHash)
                         versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(delegationAddress)
                         // We need to protect against delegation loops, so disallow `0x0202` as
@@ -99,12 +105,6 @@ object "EvmGasManager" {
                             eq(shr(240, versionedCodeHash), 0x0200),
                             eq(shr(240, versionedCodeHash), 0x0201)
                         )
-                    }
-
-                    if iszero(isEVM) {
-                        // error CallerMustBeEvmContract()
-                        mstore(0, 0xBE4BF9E400000000000000000000000000000000000000000000000000000000)
-                        revert(0, 4)
                     }
 
                     // we will not cache contract if it is being constructed
