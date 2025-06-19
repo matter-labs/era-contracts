@@ -84,13 +84,13 @@ contract DeployL2Script is Script {
 
     function deploy(bool legacyBridge) public {
         // Note, that it is important that the first transaction is for setting the L2 DA validator
-        deployL2DaValidator();
+        // deployL2DaValidator();
 
-        deployForceDeployer();
-        deployConsensusRegistry();
-        deployConsensusRegistryProxy();
-        deployMulticall3();
-        deployTimestampAsserter();
+        // deployForceDeployer();
+        // deployConsensusRegistry();
+        // deployConsensusRegistryProxy();
+        // deployMulticall3();
+        // deployTimestampAsserter();
 
         saveOutput();
     }

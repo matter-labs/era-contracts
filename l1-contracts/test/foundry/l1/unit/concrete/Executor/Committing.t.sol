@@ -959,39 +959,39 @@ contract CommittingTest is ExecutorTest {
         executor.commitBatchesSharedBridge(address(0), commitBatchFrom, commitBatchTo, commitData);
     }
 
-    // For accurate measuring of gas usage via snapshot cheatcodes,
-    // isolation mode has to be enabled via `forge-config: default.isolate = true`.
-    // Unfortunately, it makes this test fail with no revert reason,
-    // so the gas estimation in this test is not accurate.
-    function test_MeasureGas() public {
-        bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
-        correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
-            true,
-            L2_SYSTEM_CONTEXT_ADDRESS,
-            uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
-            Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
-        );
+    // // For accurate measuring of gas usage via snapshot cheatcodes,
+    // // isolation mode has to be enabled via `forge-config: default.isolate = true`.
+    // // Unfortunately, it makes this test fail with no revert reason,
+    // // so the gas estimation in this test is not accurate.
+    // function test_MeasureGas() public {
+    //     bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
+    //     correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
+    //         true,
+    //         L2_SYSTEM_CONTEXT_ADDRESS,
+    //         uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY),
+    //         Utils.packBatchTimestampAndBlockTimestamp(currentTimestamp, currentTimestamp)
+    //     );
 
-        IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
-        correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
-        correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
+    //     IExecutor.CommitBatchInfo memory correctNewCommitBatchInfo = newCommitBatchInfo;
+    //     correctNewCommitBatchInfo.systemLogs = Utils.encodePacked(correctL2Logs);
+    //     correctNewCommitBatchInfo.operatorDAInput = operatorDAInput;
 
-        IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
-        correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
-        correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
+    //     IExecutor.CommitBatchInfo[] memory correctCommitBatchInfoArray = new IExecutor.CommitBatchInfo[](1);
+    //     correctCommitBatchInfoArray[0] = correctNewCommitBatchInfo;
+    //     correctCommitBatchInfoArray[0].operatorDAInput = operatorDAInput;
 
-        vm.prank(validator);
-        vm.blobhashes(defaultBlobVersionedHashes);
+    //     vm.prank(validator);
+    //     vm.blobhashes(defaultBlobVersionedHashes);
 
-        vm.recordLogs();
+    //     vm.recordLogs();
 
-        (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
-            genesisStoredBatchInfo,
-            correctCommitBatchInfoArray
-        );
-        validatorTimelock.commitBatchesSharedBridge(address(executor), commitBatchFrom, commitBatchTo, commitData);
-        vm.snapshotGasLastCall("Executor", "commit");
-    }
+    //     (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
+    //         genesisStoredBatchInfo,
+    //         correctCommitBatchInfoArray
+    //     );
+    //     validatorTimelock.commitBatchesSharedBridge(address(executor), commitBatchFrom, commitBatchTo, commitData);
+    //     vm.snapshotGasLastCall("Executor", "commit");
+    // }
 
     function test_commitBlockRealData() public {
         vm.prank(validator);

@@ -61,6 +61,32 @@ library BatchDecoder {
         }
     }
 
+    function _decodeBoojumOSCommitData(
+        bytes calldata _commitData
+    )
+        private
+        pure
+        returns (
+            IExecutor.StoredBatchInfo memory lastCommittedBatchData,
+            IExecutor.CommitBoojumOSBatchInfo[] memory newBatchesData
+        )
+    {
+        if (_commitData.length == 0) {
+            revert EmptyData();
+        }
+
+        // TODO: different version?
+        uint8 encodingVersion = uint8(_commitData[0]);
+        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
+            (lastCommittedBatchData, newBatchesData) = abi.decode(
+                _commitData[1:],
+                (IExecutor.StoredBatchInfo, IExecutor.CommitBoojumOSBatchInfo[])
+            );
+        } else {
+            revert UnsupportedCommitBatchEncoding(encodingVersion);
+        }
+    }
+
     /// @notice Decodes the commit data and checks that the provided batch bounds are correct.
     /// @dev Note that it only checks that the last and the first batches in the array correspond to the provided bounds.
     /// The fact that the batches inside the array are provided in the correct order should be checked by the caller.
@@ -82,6 +108,37 @@ library BatchDecoder {
         )
     {
         (lastCommittedBatchData, newBatchesData) = _decodeCommitData(_commitData);
+
+        if (newBatchesData.length == 0) {
+            revert EmptyData();
+        }
+
+        if (
+            newBatchesData[0].batchNumber != _processBatchFrom ||
+            newBatchesData[newBatchesData.length - 1].batchNumber != _processBatchTo
+        ) {
+            revert IncorrectBatchBounds(
+                _processBatchFrom,
+                _processBatchTo,
+                newBatchesData[0].batchNumber,
+                newBatchesData[newBatchesData.length - 1].batchNumber
+            );
+        }
+    }
+
+    function decodeAndCheckBoojumOSCommitData(
+        bytes calldata _commitData,
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo
+    )
+        internal
+        pure
+        returns (
+            IExecutor.StoredBatchInfo memory lastCommittedBatchData,
+            IExecutor.CommitBoojumOSBatchInfo[] memory newBatchesData
+        )
+    {
+        (lastCommittedBatchData, newBatchesData) = _decodeBoojumOSCommitData(_commitData);
 
         if (newBatchesData.length == 0) {
             revert EmptyData();

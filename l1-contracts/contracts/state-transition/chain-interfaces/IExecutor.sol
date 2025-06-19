@@ -70,8 +70,8 @@ interface IExecutor is IZKChainBase {
     // solhint-disable-next-line gas-struct-packing
     struct StoredBatchInfo {
         uint64 batchNumber;
-        bytes32 batchHash;
-        uint64 indexRepeatedStorageChanges;
+        bytes32 batchHash; // For Boojum OS batches we'll store here full state commitment
+        uint64 indexRepeatedStorageChanges; // For Boojum OS not used, 0
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
         bytes32 dependencyRootsRollingHash; // kl todo we might have to include a new and old version of this struct for migration
@@ -90,8 +90,8 @@ interface IExecutor is IZKChainBase {
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
         bytes32 l2LogsTreeRoot;
-        uint256 timestamp;
-        bytes32 commitment;
+        uint256 timestamp; // For Boojum OS not used, 0
+        bytes32 commitment; // For Boojum OS batches we'll store batch output hash here
     }
 
     /// @notice Data needed to commit new batch
@@ -141,6 +141,27 @@ interface IExecutor is IZKChainBase {
     /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
     /// @param _precommitData ABI‐encoded transaction status list for the precommit.
     function precommitSharedBridge(address _chainAddress, uint256 _batchNumber, bytes calldata _precommitData) external;
+
+    struct CommitBoojumOSBatchInfo {
+        uint64 batchNumber;
+        // chain state commitment, this preimage is not opened on l1,
+        // it's guaranteed that this commitment commits to any state that needed for execution
+        // (state root, block number, bloch hahes)
+        bytes32 newStateCommitment;
+        // info about processed l1 txs, l2 to l1 logs and DA
+        uint256 numberOfLayer1Txs;
+        bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash;
+        bytes32 l2LogsTreeRoot;
+        address l2DaValidator; // TODO: already saved in the storage, can just add from there to PI
+        bytes32 daCommitment;
+        // sending used batch inputs to validate on the settlement layer
+        uint64 firstBlockTimestamp;
+        uint64 lastBlockTimestamp;
+        uint256 chainId; // TODO: already saved in the storage, can just add from there to PI
+        // extra calldata to pass to da validator
+        bytes operatorDAInput;
+    }
 
     /// @notice Function called by the operator to commit new batches. It is responsible for:
     /// - Verifying the correctness of their timestamps.

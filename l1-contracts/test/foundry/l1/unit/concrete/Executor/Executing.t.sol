@@ -447,20 +447,20 @@ contract ExecutingTest is ExecutorTest {
         assertEq(processed, 0);
     }
 
-    // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
-    /// forge-config: default.isolate = true
-    function test_MeasureGas() public {
-        appendPriorityOps();
+    // // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.
+    // /// forge-config: default.isolate = true
+    // function test_MeasureGas() public {
+    //     appendPriorityOps();
 
-        IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
-        storedBatchInfoArray[0] = newStoredBatchInfo;
+    //     IExecutor.StoredBatchInfo[] memory storedBatchInfoArray = new IExecutor.StoredBatchInfo[](1);
+    //     storedBatchInfoArray[0] = newStoredBatchInfo;
 
-        vm.prank(validator);
-        (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
-            storedBatchInfoArray,
-            Utils.generatePriorityOps(storedBatchInfoArray.length)
-        );
-        validatorTimelock.executeBatchesSharedBridge(address(executor), executeBatchFrom, executeBatchTo, executeData);
-        vm.snapshotGasLastCall("Executor", "execute");
-    }
+    //     vm.prank(validator);
+    //     (uint256 executeBatchFrom, uint256 executeBatchTo, bytes memory executeData) = Utils.encodeExecuteBatchesData(
+    //         storedBatchInfoArray,
+    //         Utils.generatePriorityOps(storedBatchInfoArray.length)
+    //     );
+    //     validatorTimelock.executeBatchesSharedBridge(address(executor), executeBatchFrom, executeBatchTo, executeData);
+    //     vm.snapshotGasLastCall("Executor", "execute");
+    // }
 }

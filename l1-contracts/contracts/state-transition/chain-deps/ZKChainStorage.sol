@@ -177,4 +177,6 @@ struct ZKChainStorage {
     /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
     /// (the value of the constant can be found in Config.sol).
     bytes32 precommitmentForTheLatestBatch;
+    /// @dev Boojum OS flag, if `true` settlement done using Boojum OS state transition, otherwise Era VM
+    bool boojumOS;
 }
