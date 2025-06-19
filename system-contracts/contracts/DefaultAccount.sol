@@ -124,7 +124,7 @@ contract DefaultAccount is IAccount {
         Transaction calldata _transaction
     ) external payable override ignoreNonBootloader ignoreInDelegateCall returns (bytes memory returnData) {
         _execute(_transaction);
-         returnData = bytes("");
+        returnData = bytes("");
         ///
         /// FOUNDRY SUPPORT END
         ///
