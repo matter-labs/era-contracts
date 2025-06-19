@@ -29,7 +29,7 @@ contract L2MessageRoot is MessageRootBase {
         _disableInitializers();
     }
 
-    function _bridgehub() internal override view returns (IBridgehub) {
+    function _bridgehub() internal view override returns (IBridgehub) {
         return IBridgehub(L2_BRIDGEHUB_ADDR);
     }
 

@@ -33,7 +33,13 @@ import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
-abstract contract BridgehubBase is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable, AssetHandlerModifiers {
+abstract contract BridgehubBase is
+    IBridgehub,
+    ReentrancyGuard,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable,
+    AssetHandlerModifiers
+{
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
@@ -914,9 +920,9 @@ abstract contract BridgehubBase is IBridgehub, ReentrancyGuard, Ownable2StepUpgr
         return assetRouter;
     }
 
-    function _ethTokenAssetId() internal virtual view returns (bytes32);
+    function _ethTokenAssetId() internal view virtual returns (bytes32);
 
-    function _l1ChainId() internal virtual view returns (uint256);
+    function _l1ChainId() internal view virtual returns (uint256);
 
-    function _maxNumberOfZKChains() internal virtual view returns (uint256);
+    function _maxNumberOfZKChains() internal view virtual returns (uint256);
 }

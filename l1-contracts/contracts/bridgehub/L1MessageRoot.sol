@@ -35,7 +35,7 @@ contract L1MessageRoot is MessageRootBase {
         _initialize();
     }
 
-    function _bridgehub() internal override view returns (IBridgehub) {
+    function _bridgehub() internal view override returns (IBridgehub) {
         return BRIDGE_HUB;
     }
 }

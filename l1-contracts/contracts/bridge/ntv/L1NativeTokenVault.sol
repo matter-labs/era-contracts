@@ -46,7 +46,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Chain ID of L1 for bridging reasons.
     uint256 public immutable L1_CHAIN_ID;
 
-
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
@@ -60,11 +59,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _l1WethAddress Address of WETH on deployed chain
     /// @param _l1AssetRouter Address of Asset Router on L1.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
-    constructor(
-        address _l1WethAddress,
-        address _l1AssetRouter,
-        IL1Nullifier _l1Nullifier
-    ) {
+    constructor(address _l1WethAddress, address _l1AssetRouter, IL1Nullifier _l1Nullifier) {
         WETH_TOKEN = _l1WethAddress;
         ASSET_ROUTER = IAssetRouterBase(_l1AssetRouter);
         BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);

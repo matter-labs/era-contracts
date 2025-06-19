@@ -67,34 +67,25 @@ library L2GenesisForceDeploymentsHelper {
         IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(forceDeployments);
     }
 
-    function _forceDeployZKsyncOS(
-        bytes memory _bytecode,
-        address _newAddress
-    ) internal {
+    function _forceDeployZKsyncOS(bytes memory _bytecode, address _newAddress) internal {
         // // ZKsyncOS does not allow force deployments with constructor.
         // // So we will do the following:
         // // 1. Deploy the bytecode onto a random address with the expected input (to ensure that immutables are set correctly).
         // // 2. Clone the bytecode into memory + force deploy bytecode.
         // // 3. Call the initializer with the expected data.
-
         // bytes memory bytecodeWithConstructor = abi.encodePacked(_bytecode, _initializerData);
-
         // address randomAddress;
         // assembly {
         //     randomAddress := create(0, add(bytecodeWithConstructor, 0x20), mload(bytecodeWithConstructor))
         // }
-
         // if (randomAddress.code.length == 0) {
         //     // Something went wrong, revert.
         //     // TODO: use custom errors.
         //     revert("Failed to deploy bytecode");
         // }
-
         // // 2. Clone the bytecode into memory + force deploy bytecode.
         // IZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).setDeployedCodeEVM(_newAddress, randomAddress.code);
-
         // (bool success, bytes memory returnData) = _newAddress.call(_initializerData);
-
         // if (!success) {
         //     // Something went wrong, revert.
         //     // TODO: use custom errors.
@@ -125,9 +116,8 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         if (_isZKsyncOS) {
-            // TODO: invoke force deployment before init, 
+            // TODO: invoke force deployment before init,
             // for now we assume that the address is already deployed
-            
             // _forceDeployZKsyncOS(
             //     fixedForceDeploymentsData.messageRootBytecodeOrHash,
             //     address(L2_MESSAGE_ROOT_ADDR),
@@ -148,9 +138,8 @@ library L2GenesisForceDeploymentsHelper {
         L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2();
 
         if (_isZKsyncOS) {
-            // TODO: invoke force deployment before init, 
+            // TODO: invoke force deployment before init,
             // for now we assume that the address is already deployed
-
             // _forceDeployZKsyncOS(
             //     fixedForceDeploymentsData.bridgehubBytecodeOrHash,
             //     address(L2_BRIDGEHUB_ADDR),
@@ -163,7 +152,6 @@ library L2GenesisForceDeploymentsHelper {
             //     // TODO
             //     // abi.encodeCall(L2Bridgehub.initL2, (fixedForceDeploymentsData.aliasedL1Governance))
             // );
-
         } else {
             // FIXME: Era deployments should have no constructor as well
             // _forceDeployEra(
@@ -185,9 +173,8 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         if (_isZKsyncOS) {
-            // TODO: invoke force deployment before init, 
+            // TODO: invoke force deployment before init,
             // for now we assume that the address is already deployed
-
             // _forceDeployZKsyncOS(
             //     fixedForceDeploymentsData.l2AssetRouterBytecodeOrHash,
             //     address(L2_ASSET_ROUTER_ADDR),
@@ -258,9 +245,8 @@ library L2GenesisForceDeploymentsHelper {
         }
 
         if (_isZKsyncOS) {
-            // TODO: invoke force deployment before init, 
+            // TODO: invoke force deployment before init,
             // for now we assume that the address is already deployed
-
             // _forceDeployZKsyncOS(
             //     fixedForceDeploymentsData.l2NtvBytecodeOrHash,
             //     L2_NATIVE_TOKEN_VAULT_ADDR,

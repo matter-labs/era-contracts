@@ -25,7 +25,6 @@ import {TokenNotLegacy, EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
-
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public override BRIDGE_HUB;
     /// @dev Chain ID of L1 for bridging reasons

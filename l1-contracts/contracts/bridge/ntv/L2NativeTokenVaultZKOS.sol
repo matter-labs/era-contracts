@@ -52,7 +52,16 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
         address _wethToken,
         bytes32 _baseTokenAssetId
     ) public {
-        super.initL2(_l1ChainId, _aliasedOwner, bytes32(0), _legacySharedBridge, _bridgedTokenBeacon, _contractsDeployedAlready, _wethToken, _baseTokenAssetId);
+        super.initL2(
+            _l1ChainId,
+            _aliasedOwner,
+            bytes32(0),
+            _legacySharedBridge,
+            _bridgedTokenBeacon,
+            _contractsDeployedAlready,
+            _wethToken,
+            _baseTokenAssetId
+        );
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.

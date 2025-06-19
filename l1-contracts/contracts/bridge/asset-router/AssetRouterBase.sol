@@ -174,9 +174,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         _unpause();
     }
 
-    function _bridgehub() internal virtual view returns (IBridgehub);
+    function _bridgehub() internal view virtual returns (IBridgehub);
 
-    function _l1ChainId() internal virtual view returns (uint256);
+    function _l1ChainId() internal view virtual returns (uint256);
 
-    function _eraChainId() internal virtual view returns (uint256);
+    function _eraChainId() internal view virtual returns (uint256);
 }

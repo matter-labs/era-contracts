@@ -53,23 +53,11 @@ contract L2Bridgehub is BridgehubBase {
     constructor() {}
 
     // TODO: explain why we need to initL2 and updateL2
-    function initL2(
-        uint256 _l1ChainId,
-        address _owner,
-        uint256 _maxNumberOfZKChains
-    ) public {
-        updateL2(
-            _l1ChainId,
-            _owner,
-            _maxNumberOfZKChains
-        );
+    function initL2(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) public {
+        updateL2(_l1ChainId, _owner, _maxNumberOfZKChains);
     }
 
-    function updateL2(
-        uint256 _l1ChainId,
-        address _owner,
-        uint256 _maxNumberOfZKChains
-    ) public {
+    function updateL2(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) public {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
@@ -80,7 +68,6 @@ contract L2Bridgehub is BridgehubBase {
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
         _initializeInner();
-
     }
 
     function _ethTokenAssetId() internal view override returns (bytes32) {

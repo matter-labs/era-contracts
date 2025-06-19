@@ -73,7 +73,6 @@ contract L1Bridgehub is BridgehubBase {
         _initializeInner();
     }
 
-
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
     }

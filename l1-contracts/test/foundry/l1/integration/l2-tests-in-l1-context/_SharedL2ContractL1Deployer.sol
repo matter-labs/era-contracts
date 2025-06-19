@@ -52,12 +52,8 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
         address messageRoot = address(new L2MessageRoot());
         address bridgehub = address(new L2Bridgehub());
         // TODO: maybe init message root and bridgehub, l2 asset router and ntv in the deployer?
-        address assetRouter = address(
-            new L2AssetRouter()
-        );
-        address ntv = address(
-            new L2NativeTokenVaultDev()
-        );
+        address assetRouter = address(new L2AssetRouter());
+        address ntv = address(new L2NativeTokenVaultDev());
 
         vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
         // L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initialize();
