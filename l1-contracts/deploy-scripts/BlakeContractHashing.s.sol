@@ -15,4 +15,10 @@ contract BlakeContractHashing is Script {
 
         console.logBytes32(result);
     }
+
+    function test_Blake2s256Hash() public {
+        bytes32 testHash = Utils.blakeHashBytecode(bytes("hello world"));
+
+        assert(testHash == 0x9aec6806794561107e594b1f6a8a6b0c92a0cba9acf5e5e93cca06f781813b0b);
+    }
 }
