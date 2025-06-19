@@ -517,8 +517,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
     }
 
-    /// @notice Hashes the code part extracted from EIP-7702 delegation contract bytecode hash
-    /// without copying data to memory.
+    /// @notice Hashes the code part extracted from EIP-7702 delegation contract bytecode hash.
     /// @dev This method does not check whether the input is a valid EIP-7702 delegation code hash.
     /// @param input The EIP-7702 delegation code hash.
     /// @return hash The keccak256 hash of the code part of the EIP-7702 delegation code hash.
@@ -526,8 +525,9 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         // Hash bytes 9-32 (that have the contract code) without allocating an array.
         assembly {
             // Use scratch space to calculate the hash
-            mstore(0x00, shl(72, input)) // Shift left to remove first 9 bytes (9 * 8 = 72 bits)
-            hash := keccak256(0x00, 23)
+            mstore(0x00, input)
+            // We only care about the part starting with 0xEF0100, so we ignore the first 9 bytes
+            hash := keccak256(0x09, 23)
         }
     }
 
