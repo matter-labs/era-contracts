@@ -486,7 +486,8 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
                 EVM_HASHES_STORAGE.storeEvmCodeHash(currentBytecodeHash, bytes32(0x0));
             } else {
                 // Otherwise, store the delegation.
-                bytes32 delegationCodeMarker = Utils.EIP_7702_DELEGATION_BYTECODE_MASK | bytes32(uint256(uint160(item.addr)));
+                bytes32 delegationCodeMarker = Utils.EIP_7702_DELEGATION_BYTECODE_MASK |
+                    bytes32(uint256(uint160(item.addr)));
                 ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccount7702DelegationCodeHash(
                     authority,
                     delegationCodeMarker

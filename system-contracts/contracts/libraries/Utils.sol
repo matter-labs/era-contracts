@@ -20,7 +20,7 @@ library Utils {
     /// @dev Bit mask to set the "isConstructor" marker in the bytecode hash
     bytes32 internal constant SET_IS_CONSTRUCTOR_MARKER_BIT_MASK =
         0x0001000000000000000000000000000000000000000000000000000000000000;
-    
+
     /// @dev Bytecode mask for delegated accounts:
     /// - Byte 0 (0x03) means the the account is EIP-7702 delegated.
     /// - Byte 1 (0x02) means that the account is delegated.
@@ -66,8 +66,7 @@ library Utils {
 
     /// @return If this bytecode hash for EIP-7702 delegation or not
     function isCodeHash7702Delegation(bytes32 _bytecodeHash) internal pure returns (bool) {
-        return (_bytecodeHash[0] == EIP_7702_DELEGATION_FLAG[0] &&
-                _bytecodeHash[1] == EIP_7702_DELEGATION_FLAG[1]);
+        return (_bytecodeHash[0] == EIP_7702_DELEGATION_FLAG[0] && _bytecodeHash[1] == EIP_7702_DELEGATION_FLAG[1]);
     }
 
     /// @return Extracts the delegation address from the bytecode hash if it's an EIP-7702 delegation.
