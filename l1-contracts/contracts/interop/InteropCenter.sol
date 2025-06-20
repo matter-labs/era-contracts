@@ -193,12 +193,12 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     ///         Same as above, but more than one call can be given, and they are given in InteropCallStarter format.
     /// @param _destinationChainId Chain ID to send to.
     /// @param _callStarters Array of call descriptors.
-    /// @param _attributes Attributes of the bundle.
+    /// @param _bundleAttributes Attributes of the bundle.
     /// @return bundleHash Hash of the sent bundle.
     function sendBundle(
         uint256 _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
-        bytes[] calldata _attributes
+        bytes[] calldata _bundleAttributes
     ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleHash) {
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
@@ -207,7 +207,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         for (uint256 i = 0; i < callStartersLength; ++i) {
             /// solhint-disable-next-line no-unused-vars
             (CallAttributes memory callAttributes, ) = parseAttributes(
-                _callStarters[i].attributes,
+                _callStarters[i].callAttributes,
                 AttributeParsingRestrictions.OnlyCallAttributes
             );
             callStartersInternal[i] = InteropCallStarterInternal({
@@ -218,7 +218,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         }
         /// solhint-disable-next-line no-unused-vars
         (, BundleAttributes memory bundleAttributes) = parseAttributes(
-            _attributes,
+            _bundleAttributes,
             AttributeParsingRestrictions.OnlyBundleAttributes
         );
         bundleHash = _sendBundle({
@@ -228,7 +228,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         });
     }
 
-    /// @notice Parses an InteropCallStarter struct.
+    /// @notice Parses the attributes of the call or bundle.
     /// @param _attributes Attributes of the call.
     /// @param _restriction Restriction for parsing attributes.
     function parseAttributes(
@@ -348,7 +348,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             /// solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
             (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
-                actualCallStarter.attributes,
+                actualCallStarter.callAttributes,
                 AttributeParsingRestrictions.OnlyInteropCallValue
             );
             require(

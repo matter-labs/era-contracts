@@ -144,7 +144,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         calls[0] = InteropCallStarter({
             nextContract: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
-            attributes: attributes
+            callAttributes: attributes
         });
 
         uint256 destinationChainId = 271;
@@ -183,7 +183,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         calls[0] = InteropCallStarter({
             nextContract: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
-            attributes: attributes
+            callAttributes: attributes
         });
 
         uint256 destinationChainId = 271;
@@ -207,7 +207,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             271,
             calls[0].nextContract,
             calls[0].data,
-            calls[0].attributes
+            calls[0].callAttributes
         );
     }
 }

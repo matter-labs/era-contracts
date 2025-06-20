@@ -66,9 +66,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
-        if (msg.sender != address(ASSET_ROUTER)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(ASSET_ROUTER), Unauthorized(msg.sender));
         _;
     }
 

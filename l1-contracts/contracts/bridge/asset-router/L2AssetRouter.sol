@@ -85,9 +85,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     /// @notice Checks that the message sender is the interopCenter.
     modifier onlyInteropCenter() {
-        if (msg.sender != address(INTEROP_CENTER)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(INTEROP_CENTER), Unauthorized(msg.sender));
         _;
     }
 
@@ -216,7 +214,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         interopCallStarter = InteropCallStarter({
             nextContract: request.l2Contract,
             data: request.l2Calldata,
-            attributes: attributes
+            callAttributes: attributes
         });
     }
 
