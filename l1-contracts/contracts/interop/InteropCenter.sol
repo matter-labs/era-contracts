@@ -126,10 +126,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
         );
-        interopBundleHash = InteropDataEncoding.encodeInteropBundleHash(
-            block.chainid,
-            interopBundleBytes
-        );
+        interopBundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
         // Emit event stating that the bundle was sent out successfully.
         emit InteropBundleSent(canonicalTxHash, interopBundleHash, _bundle);
@@ -138,10 +135,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @notice Ensures the received base token value matches expected for the destination chain.
     /// @param _destinationChainId Destination chain ID.
     /// @param _totalValue Sum of requested interop call values.
-    function _ensureCorrectTotalValue(
-        uint256 _destinationChainId,
-        uint256 _totalValue
-    ) internal {
+    function _ensureCorrectTotalValue(uint256 _destinationChainId, uint256 _totalValue) internal {
         bytes32 destinationChainBaseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_destinationChainId);
         // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(block.chainid);
@@ -182,7 +176,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleHash) {
         (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
             _attributes,
-            AttributeParsingOption.CallAndBundleAttributes
+            AttributeParsingRestrictions.CallAndBundleAttributes
         );
 
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
@@ -214,7 +208,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             /// solhint-disable-next-line no-unused-vars
             (CallAttributes memory callAttributes, ) = parseAttributes(
                 _callStarters[i].attributes,
-                AttributeParsingOption.OnlyCallAttributes
+                AttributeParsingRestrictions.OnlyCallAttributes
             );
             callStartersInternal[i] = InteropCallStarterInternal({
                 nextContract: _callStarters[i].nextContract,
@@ -225,7 +219,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         /// solhint-disable-next-line no-unused-vars
         (, BundleAttributes memory bundleAttributes) = parseAttributes(
             _attributes,
-            AttributeParsingOption.OnlyBundleAttributes
+            AttributeParsingRestrictions.OnlyBundleAttributes
         );
         bundleHash = _sendBundle({
             _destinationChainId: _destinationChainId,
@@ -236,10 +230,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     /// @notice Parses an InteropCallStarter struct.
     /// @param _attributes Attributes of the call.
-    /// @param _option Option for parsing attributes.
+    /// @param _restriction Restriction for parsing attributes.
     function parseAttributes(
         bytes[] calldata _attributes,
-        AttributeParsingOption _option
+        AttributeParsingRestrictions _restriction
     ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
         // default value is direct call
         callAttributes.directCall = true;
@@ -267,14 +261,22 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     revert IERC7786GatewaySource.UnsupportedAttribute(selector);
                 }
             }
-            if (_option == AttributeParsingOption.OnlyInteropCallValue) {
+            // checking selectors satisfy the restrictions
+            if (_restriction == AttributeParsingRestrictions.OnlyInteropCallValue) {
                 require(indexInSelectorsArray == 0, AttributeNotForInteropCallValue(selector));
             }
             if (indexInSelectorsArray < 2) {
-                require(_option != AttributeParsingOption.OnlyBundleAttributes, AttributeNotForCall(selector));
+                require(
+                    _restriction != AttributeParsingRestrictions.OnlyBundleAttributes,
+                    AttributeNotForCall(selector)
+                );
             } else {
-                require(_option != AttributeParsingOption.OnlyInteropCallValue, AttributeNotForBundle(selector));
+                require(
+                    _restriction != AttributeParsingRestrictions.OnlyInteropCallValue,
+                    AttributeNotForBundle(selector)
+                );
             }
+            // setting the attributes
             if (indexInSelectorsArray == 0) {
                 callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
             } else if (indexInSelectorsArray == 1) {
@@ -344,9 +346,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 _callStarter.data
             );
             /// solhint-disable-next-line no-unused-vars
+            // slither-disable-next-line unused-return
             (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
                 actualCallStarter.attributes,
-                AttributeParsingOption.OnlyInteropCallValue
+                AttributeParsingRestrictions.OnlyInteropCallValue
             );
             require(
                 _callStarter.callAttributes.interopCallValue == indirectCallAttributes.interopCallValue,

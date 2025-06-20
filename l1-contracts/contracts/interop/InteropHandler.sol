@@ -8,16 +8,7 @@ import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, MessageInclusionProof, Ca
 import {IERC7786Receiver} from "./IERC7786Receiver.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {                MessageNotIncluded,
-    BundleAlreadyProcessed,
-    CanNotUnbundle,
-    CallAlreadyExecuted,
-    CallNotExecutable,
-    WrongCallStatusLength,
-    UnbundlingNotAllowed,
-    ExecutingNotAllowed,
-    BundleVerifiedAlready
-} from "./InteropErrors.sol";
+import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready} from "./InteropErrors.sol";
 import {InvalidSelector} from "../common/L1ContractErrors.sol";
 
 /// @title InteropHandler
@@ -41,8 +32,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
-            _proof.chainId,
-            _proof.l2MessageIndex
+            _proof.chainId
         );
 
         // Verify that the caller has permission to execute the bundle.
@@ -94,7 +84,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @param _proof Inclusion proof for the bundle message. The bundle message itself gets broadcasted by InteropCenter contract whenever a bundle is sent.
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public nonReentrant {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
-        (, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle, _proof.chainId, _proof.l2MessageIndex);
+        (, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle, _proof.chainId);
 
         // If the bundle was already fully executed or unbundled, we revert stating that it was processed already.
         if (status != BundleStatus.Unreceived && status != BundleStatus.Verified) {
@@ -111,20 +101,17 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @notice Function used to unbundle the bundle. It's present to give more flexibility in cancelling and overall processing of bundles.
     ///         Can be invoked multiple times until all calls are processed.
     /// @param _sourceChainId Originating chain ID of the bundle.
-    /// @param _l2MessageIndex Index of the L2 message for this bundle.
     /// @param _bundle ABI-encoded InteropBundle to unbundle.
     /// @param _providedCallStatus Array of desired statuses per call.
     function unbundleBundle(
         uint256 _sourceChainId,
-        uint256 _l2MessageIndex,
         bytes memory _bundle,
         CallStatus[] calldata _providedCallStatus
     ) public nonReentrant {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
-            _sourceChainId,
-            _l2MessageIndex
+            _sourceChainId
         );
 
         // Verify that the caller has permission to unbundle the bundle.
@@ -189,14 +176,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @notice Decode an ABI-encoded bundle, compute its hash, and fetch its current status.
     /// @param _bundle ABI-encoded InteropBundle.
     /// @param _sourceChainId Origin chain ID.
-    /// @param _l2MessageIndex L2 message index.
     /// @return interopBundle The decoded InteropBundle struct.
     /// @return bundleHash Hash corresponding to the bundle that gets decoded.
     /// @return currentStatus The current BundleStatus of the bundle that gets decoded.
     function _getBundleData(
         bytes memory _bundle,
-        uint256 _sourceChainId,
-        uint256 _l2MessageIndex
+        uint256 _sourceChainId
     ) internal view returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus) {
         interopBundle = abi.decode(_bundle, (InteropBundle));
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(_sourceChainId, _bundle);

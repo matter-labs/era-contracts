@@ -68,7 +68,7 @@ contract DefaultAccountNoSecurity is IAccount {
     /// @param _suggestedSignedHash The suggested hash of the transaction to be signed by the user.
     /// This is the hash that is signed by the EOA by default.
     /// @param _transaction The transaction structure itself.
-    /// @dev Besides the params above, it also accepts unused first paramter "_txHash", which
+    /// @dev Besides the params above, it also accepts unused first parameter "_txHash", which
     /// is the unique (canonical) hash of the transaction.
     function validateTransaction(
         bytes32, // _txHash

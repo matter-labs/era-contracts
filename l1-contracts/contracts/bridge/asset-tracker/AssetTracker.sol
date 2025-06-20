@@ -308,6 +308,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
         uint256 migrationNumber = 0; // L2_INTEROP_CENTER.migrationNumber();
 
+        // slither-disable-next-line unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             _encodeTokenBalanceMigrationData(block.chainid, _assetId, amount, migrationNumber)
         );
@@ -324,6 +325,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         /// Add migration number check here.
         chainBalance[chainId][assetId] += amount;
 
+        // slither-disable-next-line unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(_finalizeWithdrawalParams.message);
     }
 
@@ -373,6 +375,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         uint256 _migrationNumber
     ) internal {
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        // slither-disable-next-line unused-return
         IMailbox(zkChain).requestL2ServiceTransaction(
             L2_ASSET_TRACKER_ADDR,
             abi.encodeCall(this.confirmMigrationOnL2, (_chainId, _assetId, _amount, _migrationNumber))

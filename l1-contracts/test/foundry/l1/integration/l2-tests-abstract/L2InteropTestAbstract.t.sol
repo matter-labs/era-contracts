@@ -192,19 +192,9 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         callStatuses2[1] = CallStatus.Cancelled;
         callStatuses2[2] = CallStatus.Unprocessed;
         vm.prank(UNBUNDLER_ADDRESS);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(
-            proof.chainId,
-            proof.l2MessageIndex,
-            bundle,
-            callStatuses1
-        );
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses1);
         vm.prank(UNBUNDLER_ADDRESS);
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(
-            proof.chainId,
-            proof.l2MessageIndex,
-            bundle,
-            callStatuses2
-        );
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses2);
     }
 
     function getInteropBundle(uint256 amount) public returns (InteropBundle memory) {
