@@ -162,7 +162,7 @@ function collectErrorUsages(directories: string[], usedErrors: Set<string>) {
           collectErrorUsages([fullPath], usedErrors);
         } else if (file.endsWith(".sol")) {
           const fileContent = fs.readFileSync(fullPath, "utf8");
-          const revertRegex = /revert\s+([A-Za-z0-9_]+)/g;
+          const revertRegex = /(?:revert\s+|require\s*\([^,]+,\s*)([A-Za-z0-9_]+)/g;
           let match;
           while ((match = revertRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
         }
