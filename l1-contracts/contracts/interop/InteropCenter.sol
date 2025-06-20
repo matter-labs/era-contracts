@@ -15,16 +15,18 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
-import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal, CallAttributes, BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "../common/Messaging.sol";
 import {MsgValueMismatch, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle, IndirectCallValueMismatch, AttributeNotForInteropCallValue} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
+import {InteropDataEncoding} from "./InteropDataEncoding.sol";
+
 /// @title InteropCenter
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -106,49 +108,16 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                         Bundle interface
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Adds a single InteropCall to a bundle at a given index.
-    /// @param _interopBundle Bundle in-memory to update.
-    /// @param _interopCallStarter Structure containing call parameters.
-    /// @param _sender Originating address.
-    /// @param _index Slot within the bundle to populate.
-    function _addCallToBundle(
-        InteropBundle memory _interopBundle,
-        InteropCallStarter memory _interopCallStarter,
-        uint256 _interopCallValue,
-        address _sender,
-        uint256 _index
-    ) internal pure {
-        // Form an InteropCall struct from given parameters.
-        InteropCall memory interopCall = InteropCall({
-            shadowAccount: false,
-            to: _interopCallStarter.nextContract,
-            data: _interopCallStarter.data,
-            value: _interopCallValue,
-            from: _sender
-        });
-
-        // Put it into a given InteropBundle at the specified index.
-        _interopBundle.calls[_index] = interopCall;
-    }
-
     /// @notice Finalizes, serializes, and sends a message corresponding to the bundle via the L2 to L1 messenger.
     /// @param _bundle InteropBundle struct corresponding to the bundle that is being sent.
     /// @param _bundleCallsTotalValue Total base token value for all calls.
-    /// @param _executionAddress Address permitted to execute on remote chain.
-    /// @param _receivedMsgValue ETH value sent with this L1->L2 call.
     /// @return interopBundleHash keccak256 hash of the encoded bundle.
     function _finalizeAndSendBundle(
         InteropBundle memory _bundle,
-        uint256 _bundleCallsTotalValue,
-        address _executionAddress,
-        uint256 _receivedMsgValue
+        uint256 _bundleCallsTotalValue
     ) internal returns (bytes32 interopBundleHash) {
         // Ensure that tokens required for bundle execution were received.
-        _ensureCorrectTotalValue(_bundle.destinationChainId, _bundleCallsTotalValue, _receivedMsgValue);
-
-        // Set the execution address of the bundle. It denotes the address who's able to call executeBundle on destination chain
-        // to finalize this bundle. If it's not set (address(0)), then everyone is able to do so.
-        _bundle.executionAddress = _executionAddress;
+        _ensureCorrectTotalValue(_bundle.destinationChainId, _bundleCallsTotalValue);
 
         bytes memory interopBundleBytes = abi.encode(_bundle);
         // TODO use canonicalTxHash for linking it to the trigger, instead of interopBundleHash
@@ -157,7 +126,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
         );
-        interopBundleHash = keccak256(interopBundleBytes);
+        interopBundleHash = InteropDataEncoding.encodeInteropBundleHash(
+            block.chainid,
+            interopBundleBytes
+        );
 
         // Emit event stating that the bundle was sent out successfully.
         emit InteropBundleSent(canonicalTxHash, interopBundleHash, _bundle);
@@ -166,34 +138,26 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @notice Ensures the received base token value matches expected for the destination chain.
     /// @param _destinationChainId Destination chain ID.
     /// @param _totalValue Sum of requested interop call values.
-    /// @param _receivedMsgValue Base token value attached to the transaction.
     function _ensureCorrectTotalValue(
         uint256 _destinationChainId,
-        uint256 _totalValue,
-        uint256 _receivedMsgValue
+        uint256 _totalValue
     ) internal {
-        bytes32 tokenAssetId = BRIDGE_HUB.baseTokenAssetId(_destinationChainId);
-        if (tokenAssetId == ETH_TOKEN_ASSET_ID || tokenAssetId == bytes32(0)) {
-            // kl todo until we sort out chain registration on L2s we assume the same base token.
-            // ! VG to KL. please resolve before merging: meaning we assume that base token is ETH on both?
-            // ! didn't we figure out chain registration on L2s already? This whole if (L159-L170) looks weird to me, pls verify it yourself one more time.
-            if (_receivedMsgValue != _totalValue) {
-                revert MsgValueMismatch(_totalValue, _receivedMsgValue);
-            }
-        } else {
-            if (_receivedMsgValue != 0) {
-                revert MsgValueMismatch(0, _receivedMsgValue);
-            }
-        }
-
+        bytes32 destinationChainBaseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_destinationChainId);
         // We burn the value that is passed along the bundle here, on source chain.
-        // slither-disable-next-line arbitrary-send-eth
-        if (tokenAssetId == BRIDGE_HUB.baseTokenAssetId(block.chainid)) {
+        bytes32 thisChainBaseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(block.chainid);
+        if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
+            if (msg.value != _totalValue) {
+                revert MsgValueMismatch(_totalValue, msg.value);
+            }
+            // slither-disable-next-line arbitrary-send-eth
             L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalValue}();
         } else {
+            if (msg.value != 0) {
+                revert MsgValueMismatch(0, msg.value);
+            }
             IL2AssetRouter(assetRouter).bridgehubDepositBaseToken(
                 _destinationChainId,
-                tokenAssetId,
+                destinationChainBaseTokenAssetId,
                 msg.sender,
                 _totalValue
             );
@@ -216,41 +180,19 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes calldata _data,
         bytes[] calldata _attributes
     ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleHash) {
-        ERC7786Attributes memory attributes = _parseAttributes(
+        (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
             _attributes,
             AttributeParsingOption.CallAndBundleAttributes
         );
-        // Form an InteropBundle with given parameters.
-        InteropBundle memory bundle = InteropBundle({
-            destinationChainId: _destinationChainId,
-            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, bytes32(interopBundleNonce[msg.sender]))),
-            calls: new InteropCall[](1),
-            executionAddress: attributes.executionAddress,
-            unbundlerAddress: attributes.unbundlerAddress
+
+        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
+        callStartersInternal[0] = InteropCallStarterInternal({
+            nextContract: _destinationAddress,
+            data: _data,
+            callAttributes: callAttributes
         });
 
-        // Update interopBundleNonce for msg.sender
-        ++interopBundleNonce[msg.sender];
-
-        _addCallToBundle({
-            _interopBundle: bundle,
-            _interopCallStarter: InteropCallStarter({
-                nextContract: _destinationAddress,
-                data: _data,
-                attributes: new bytes[](0)
-            }),
-            _interopCallValue: attributes.interopCallValue,
-            _sender: msg.sender,
-            _index: 0
-        });
-
-        // Send the bundle.
-        bundleHash = _finalizeAndSendBundle({
-            _bundle: bundle,
-            _bundleCallsTotalValue: attributes.interopCallValue,
-            _executionAddress: attributes.executionAddress,
-            _receivedMsgValue: msg.value
-        });
+        bundleHash = _sendBundle(_destinationChainId, callStartersInternal, bundleAttributes);
     }
 
     /// @notice Sends an interop bundle.
@@ -269,55 +211,45 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         );
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
-            ERC7786Attributes memory callAttributes = _parseAttributes(
+            /// solhint-disable-next-line no-unused-vars
+            (CallAttributes memory callAttributes, ) = parseAttributes(
                 _callStarters[i].attributes,
                 AttributeParsingOption.OnlyCallAttributes
             );
             callStartersInternal[i] = InteropCallStarterInternal({
                 nextContract: _callStarters[i].nextContract,
                 data: _callStarters[i].data,
-                requestedInteropCallValue: callAttributes.interopCallValue,
-                directCall: callAttributes.directCall,
-                indirectCallMessageValue: callAttributes.indirectCallMessageValue
+                callAttributes: callAttributes
             });
         }
-        ERC7786Attributes memory bundleAttributes = _parseAttributes(
+        /// solhint-disable-next-line no-unused-vars
+        (, BundleAttributes memory bundleAttributes) = parseAttributes(
             _attributes,
             AttributeParsingOption.OnlyBundleAttributes
         );
         bundleHash = _sendBundle({
             _destinationChainId: _destinationChainId,
             _callStarters: callStartersInternal,
-            _msgValue: msg.value,
-            _executionAddress: bundleAttributes.executionAddress,
-            _unbundlerAddress: bundleAttributes.unbundlerAddress,
-            _sender: msg.sender
+            _bundleAttributes: bundleAttributes
         });
     }
 
     /// @notice Parses an InteropCallStarter struct.
     /// @param _attributes Attributes of the call.
     /// @param _option Option for parsing attributes.
-    function _parseAttributes(
+    function parseAttributes(
         bytes[] calldata _attributes,
         AttributeParsingOption _option
-    ) internal pure returns (ERC7786Attributes memory attributesStruct) {
+    ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
         // default value is direct call
-        attributesStruct.directCall = true;
+        callAttributes.directCall = true;
 
-        bytes4[4] memory ATTRIBUTE_SELECTORS = [
-            IERC7786Attributes.interopCallValue.selector,
-            IERC7786Attributes.indirectCall.selector,
-            IERC7786Attributes.executionAddress.selector,
-            IERC7786Attributes.unbundlerAddress.selector
-        ];
+        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // we can only pass each attribute once.
         bool[] memory attributeUsed = new bool[](4);
-        // we store the read values of the attributes in an array.
-        uint256[] memory attributeValues = new uint256[](4);
 
-        uint256 attributeValuesLength = _attributes.length;
-        for (uint256 i = 0; i < attributeValuesLength; ++i) {
+        uint256 attributesLength = _attributes.length;
+        for (uint256 i = 0; i < attributesLength; ++i) {
             bytes4 selector = bytes4(_attributes[i]);
             uint256 indexInSelectorsArray = 0;
             /// Finding the matching attribute selector.
@@ -335,89 +267,112 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     revert IERC7786GatewaySource.UnsupportedAttribute(selector);
                 }
             }
-            if (indexInSelectorsArray < 2) {
-                require(_option != AttributeParsingOption.OnlyBundleAttributes, AttributeNotForBundle(selector));
-                attributeValues[indexInSelectorsArray] = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else {
-                require(_option != AttributeParsingOption.OnlyCallAttributes, AttributeNotForCall(selector));
-                attributeValues[indexInSelectorsArray] = AttributesDecoder.decodeAddress(_attributes[i]);
+            if (_option == AttributeParsingOption.OnlyInteropCallValue) {
+                require(indexInSelectorsArray == 0, AttributeNotForInteropCallValue(selector));
             }
-            if (indexInSelectorsArray == 1) {
-                // we have to overwrite the boolean value manually.
-                attributesStruct.directCall = false;
+            if (indexInSelectorsArray < 2) {
+                require(_option != AttributeParsingOption.OnlyBundleAttributes, AttributeNotForCall(selector));
+            } else {
+                require(_option != AttributeParsingOption.OnlyInteropCallValue, AttributeNotForBundle(selector));
+            }
+            if (indexInSelectorsArray == 0) {
+                callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
+            } else if (indexInSelectorsArray == 1) {
+                callAttributes.directCall = false;
+                callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
+            } else if (indexInSelectorsArray == 2) {
+                bundleAttributes.executionAddress = AttributesDecoder.decodeAddress(_attributes[i]);
+            } else if (indexInSelectorsArray == 3) {
+                bundleAttributes.unbundlerAddress = AttributesDecoder.decodeAddress(_attributes[i]);
             }
         }
-        attributesStruct.interopCallValue = attributeValues[0];
-        attributesStruct.indirectCallMessageValue = attributeValues[1];
-        attributesStruct.executionAddress = address(uint160(attributeValues[2]));
-        attributesStruct.unbundlerAddress = address(uint160(attributeValues[3]));
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            Internal functions
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Constructs and sends an InteropBundle.
     /// @param _destinationChainId Chain ID to send to.
     /// @param _callStarters Array of InteropCallStarterInternal structs, corresponding the the calls in bundle.
-    /// @param _msgValue Total base token value forwarded.
-    /// @param _executionAddress Address allowed to execute on remote side.
-    /// @param _unbundlerAddress Address allowed to unbundle calls.
-    /// @param _sender Origin address.
+    /// @param _bundleAttributes Attributes of the bundle.
     /// @return bundleHash Hash of the sent bundle.
     function _sendBundle(
         uint256 _destinationChainId,
         InteropCallStarterInternal[] memory _callStarters,
-        uint256 _msgValue,
-        address _executionAddress,
-        address _unbundlerAddress,
-        address _sender
+        BundleAttributes memory _bundleAttributes
     ) internal returns (bytes32 bundleHash) {
         // This will calculate how much value does all of the calls use cumulatively.
         uint256 totalCallsValue;
 
         // Form an InteropBundle.
         InteropBundle memory bundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
             destinationChainId: _destinationChainId,
-            interopBundleSalt: keccak256(abi.encodePacked(_sender, interopBundleNonce[_sender])),
+            interopBundleSalt: keccak256(abi.encodePacked(msg.sender, interopBundleNonce[msg.sender])),
             calls: new InteropCall[](_callStarters.length),
-            executionAddress: _executionAddress,
-            unbundlerAddress: _unbundlerAddress
+            bundleAttributes: _bundleAttributes
         });
 
-        // Update interopBundleNonce for the _sender
-        ++interopBundleNonce[_sender];
+        // Update interopBundleNonce for the msg.sender
+        ++interopBundleNonce[msg.sender];
 
         // Fill the formed InteropBundle with calls.
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
-            InteropCallStarterInternal memory callStarter = _callStarters[i];
-            InteropCallStarter memory actualCallStarter;
-            if (!callStarter.directCall) {
-                // slither-disable-next-line arbitrary-send-eth
-                actualCallStarter = IL2AssetRouter(callStarter.nextContract).interopCenterInitiateBridge{
-                    value: callStarter.indirectCallMessageValue
-                }(_destinationChainId, _sender, callStarter.requestedInteropCallValue, callStarter.data);
-            } else {
-                actualCallStarter = InteropCallStarter({
-                    nextContract: callStarter.nextContract,
-                    data: callStarter.data,
-                    attributes: new bytes[](0)
-                });
-            }
-            _addCallToBundle({
-                _interopBundle: bundle,
-                _interopCallStarter: actualCallStarter,
-                _interopCallValue: callStarter.requestedInteropCallValue,
-                _sender: _sender,
-                _index: i
-            });
-            totalCallsValue += callStarter.requestedInteropCallValue;
+            InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, msg.sender);
+            bundle.calls[i] = interopCall;
+            totalCallsValue += _callStarters[i].callAttributes.interopCallValue;
         }
 
         // Send the bundle.
-        bundleHash = _finalizeAndSendBundle({
-            _bundle: bundle,
-            _bundleCallsTotalValue: totalCallsValue,
-            _executionAddress: _executionAddress,
-            _receivedMsgValue: _msgValue
-        });
+        bundleHash = _finalizeAndSendBundle({_bundle: bundle, _bundleCallsTotalValue: totalCallsValue});
+    }
+
+    function _processCallStarter(
+        InteropCallStarterInternal memory _callStarter,
+        uint256 _destinationChainId,
+        address _sender
+    ) internal returns (InteropCall memory interopCall) {
+        if (!_callStarter.callAttributes.directCall) {
+            // slither-disable-next-line arbitrary-send-eth
+            InteropCallStarter memory actualCallStarter = IL2AssetRouter(_callStarter.nextContract)
+                .interopCenterInitiateBridge{value: _callStarter.callAttributes.indirectCallMessageValue}(
+                _destinationChainId,
+                _sender,
+                _callStarter.callAttributes.interopCallValue,
+                _callStarter.data
+            );
+            /// solhint-disable-next-line no-unused-vars
+            (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
+                actualCallStarter.attributes,
+                AttributeParsingOption.OnlyInteropCallValue
+            );
+            require(
+                _callStarter.callAttributes.interopCallValue == indirectCallAttributes.interopCallValue,
+                IndirectCallValueMismatch(
+                    _callStarter.callAttributes.interopCallValue,
+                    indirectCallAttributes.interopCallValue
+                )
+            );
+            interopCall = InteropCall({
+                version: INTEROP_CALL_VERSION,
+                shadowAccount: false,
+                to: actualCallStarter.nextContract,
+                data: actualCallStarter.data,
+                value: _callStarter.callAttributes.interopCallValue,
+                from: _callStarter.nextContract
+            });
+        } else {
+            interopCall = InteropCall({
+                version: INTEROP_CALL_VERSION,
+                shadowAccount: false,
+                to: _callStarter.nextContract,
+                data: _callStarter.data,
+                value: _callStarter.callAttributes.interopCallValue,
+                from: _sender
+            });
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -455,6 +410,35 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         }
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ERC 7786
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Checks if the attribute selector is supported by the InteropCenter.
+    /// @param _attributeSelector The attribute selector to check.
+    /// @return True if the attribute selector is supported, false otherwise.
+    function supportsAttribute(bytes4 _attributeSelector) external pure returns (bool) {
+        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
+        for (uint256 i = 0; i < attributeSelectorsLength; ++i) {
+            if (_attributeSelector == ATTRIBUTE_SELECTORS[i]) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// @notice Returns the attribute selectors supported by the InteropCenter.
+    /// @return The attribute selectors supported by the InteropCenter.
+    function _getERC7786AttributeSelectors() internal pure returns (bytes4[4] memory) {
+        return [
+            IERC7786Attributes.interopCallValue.selector,
+            IERC7786Attributes.indirectCall.selector,
+            IERC7786Attributes.executionAddress.selector,
+            IERC7786Attributes.unbundlerAddress.selector
+        ];
     }
 
     /*//////////////////////////////////////////////////////////////

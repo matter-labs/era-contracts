@@ -7,20 +7,18 @@ import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, MessageInclusionProof, CallStatus, BundleStatus} from "../common/Messaging.sol";
 import {IERC7786Receiver} from "./IERC7786Receiver.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-error MessageNotIncluded();
-error BundleAlreadyProcessed(bytes32 bundleHash);
-error CanNotUnbundle(bytes32 bundleHash);
-error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
-error InvalidSelector(bytes4 selector);
-error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
-error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
-error UnbundlingNotAllowed(bytes32 bundleHash, address callerAddress, address unbundlerAddress);
-error ExecutingNotAllowed(bytes32 bundleHash, address callerAddress, address executionAddress);
-error BundleVerifiedAlready(bytes32 bundleHash);
-event BundleVerified(bytes32 indexed bundleHash);
-event BundleExecuted(bytes32 indexed bundleHash);
-event BundleUnbundled(bytes32 indexed bundleHash);
-event CallProcessed(bytes32 indexed bundleHash, uint256 indexed callIndex, CallStatus status);
+import {InteropDataEncoding} from "./InteropDataEncoding.sol";
+import {                MessageNotIncluded,
+    BundleAlreadyProcessed,
+    CanNotUnbundle,
+    CallAlreadyExecuted,
+    CallNotExecutable,
+    WrongCallStatusLength,
+    UnbundlingNotAllowed,
+    ExecutingNotAllowed,
+    BundleVerifiedAlready
+} from "./InteropErrors.sol";
+import {InvalidSelector} from "../common/L1ContractErrors.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -50,8 +48,9 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // Verify that the caller has permission to execute the bundle.
         // Note, that in case the executionAddress wasn't specified in the bundle then executing is permissionless, as documented in InteropCenter contract.
         require(
-            (interopBundle.executionAddress == address(0) || msg.sender == interopBundle.executionAddress),
-            ExecutingNotAllowed(bundleHash, msg.sender, interopBundle.executionAddress)
+            (interopBundle.bundleAttributes.executionAddress == address(0) ||
+                msg.sender == interopBundle.bundleAttributes.executionAddress),
+            ExecutingNotAllowed(bundleHash, msg.sender, interopBundle.bundleAttributes.executionAddress)
         );
 
         // We shouldn't process bundles which are either fully executed, or were unbundled here.
@@ -130,8 +129,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         // Verify that the caller has permission to unbundle the bundle.
         require(
-            msg.sender == interopBundle.unbundlerAddress,
-            UnbundlingNotAllowed(bundleHash, msg.sender, interopBundle.unbundlerAddress)
+            msg.sender == interopBundle.bundleAttributes.unbundlerAddress,
+            UnbundlingNotAllowed(bundleHash, msg.sender, interopBundle.bundleAttributes.unbundlerAddress)
         );
 
         // Verify that the provided call statuses array has the same length as the number of calls in the bundle.
@@ -200,7 +199,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         uint256 _l2MessageIndex
     ) internal view returns (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus currentStatus) {
         interopBundle = abi.decode(_bundle, (InteropBundle));
-        bundleHash = keccak256(abi.encode(_sourceChainId, interopBundle.interopBundleSalt, _l2MessageIndex, _bundle));
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(_sourceChainId, _bundle);
         currentStatus = bundleStatus[bundleHash];
     }
 

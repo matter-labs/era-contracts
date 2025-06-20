@@ -37,7 +37,7 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "./_SharedL2ContractDeployer.sol";
-import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof, TxStatus} from "contracts/common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof, TxStatus, BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "contracts/common/Messaging.sol";
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 import {IMessageVerification} from "contracts/state-transition/chain-interfaces/IMessageVerification.sol";
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "./Utils.sol";
@@ -214,6 +214,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         InteropCall[] memory calls = new InteropCall[](3);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, token);
         calls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
             shadowAccount: false,
             to: L2_ASSET_ROUTER_ADDR,
             from: L2_ASSET_ROUTER_ADDR,
@@ -234,6 +235,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             )
         });
         calls[1] = InteropCall({
+            version: INTEROP_CALL_VERSION,
             shadowAccount: false,
             to: L2_ASSET_ROUTER_ADDR,
             from: L2_ASSET_ROUTER_ADDR,
@@ -254,6 +256,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             )
         });
         calls[2] = InteropCall({
+            version: INTEROP_CALL_VERSION,
             shadowAccount: false,
             to: L2_ASSET_ROUTER_ADDR,
             from: L2_ASSET_ROUTER_ADDR,
@@ -274,11 +277,14 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             )
         });
         InteropBundle memory interopBundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
             destinationChainId: 271,
             interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,
-            executionAddress: EXECUTION_ADDRESS,
-            unbundlerAddress: UNBUNDLER_ADDRESS
+            bundleAttributes: BundleAttributes({
+                executionAddress: EXECUTION_ADDRESS,
+                unbundlerAddress: UNBUNDLER_ADDRESS
+            })
         });
         return interopBundle;
     }

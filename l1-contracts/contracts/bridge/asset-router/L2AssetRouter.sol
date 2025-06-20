@@ -60,10 +60,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
                 msg.sender != address(this) &&
                 (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(this))
             ) {
-                // revert InvalidCaller(msg.sender);
+                revert InvalidCaller(msg.sender);
             }
         } else {
-            // revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
@@ -71,7 +71,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
         if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
-            // revert InvalidCaller(msg.sender);
+            revert InvalidCaller(msg.sender);
         }
         _;
     }

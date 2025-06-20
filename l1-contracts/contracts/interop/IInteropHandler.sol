@@ -5,8 +5,19 @@ pragma solidity ^0.8.20;
 import {MessageInclusionProof, CallStatus} from "../common/Messaging.sol";
 
 interface IInteropHandler {
+
+    event BundleVerified(bytes32 indexed bundleHash);
+    
+    event BundleExecuted(bytes32 indexed bundleHash);
+    
+    event BundleUnbundled(bytes32 indexed bundleHash);
+    
+    event CallProcessed(bytes32 indexed bundleHash, uint256 indexed callIndex, CallStatus status);
+    
     function executeBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
+    
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) external;
+    
     function unbundleBundle(
         uint256 _sourceChainId,
         uint256 _l2MessageIndex,

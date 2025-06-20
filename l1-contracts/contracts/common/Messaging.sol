@@ -3,6 +3,8 @@
 pragma solidity ^0.8.21;
 
 bytes1 constant BUNDLE_IDENTIFIER = 0x01;
+bytes1 constant INTEROP_BUNDLE_VERSION = 0x01;
+bytes1 constant INTEROP_CALL_VERSION = 0x01;
 
 /// @dev The enum that represents the transaction execution status
 /// @param Failure The transaction execution failed
@@ -185,20 +187,36 @@ struct InteropCallStarter {
 /// @param requestedInteropCallValue Amount of base token allocated for this call.
 /// @param indirectCallMessageValue If !directCall, this is the amount of base token to forward into the middle call.
 struct InteropCallStarterInternal {
-    bool directCall;
     address nextContract;
     bytes data;
-    uint256 requestedInteropCallValue;
+    CallAttributes callAttributes;
+}
+
+/// @return interopCallValue Base token value on destination chain to send for interop call.
+/// @return directCall True for direct interop, false if routed through bridge.
+/// @return indirectCallMessageValue Base token value on sending chain to send for indirect call.
+struct CallAttributes {
+    uint256 interopCallValue;
+    bool directCall;
     uint256 indirectCallMessageValue;
 }
 
+/// @return executionAddress Address allowed to execute on remote side.
+/// @return unbundlerAddress Address allowed to unbundle.
+struct BundleAttributes {
+    address executionAddress;
+    address unbundlerAddress;
+}
+
 /// @dev A single call.
+/// @param version Version of the InteropCall.
 /// @param shadowAccount If true, execute via a shadow account, otherwise normal. In current release always false.
 /// @param to Destination contract address on the target chain.
 /// @param from Original sender address that initiated the call.
 /// @param value Amount of base token to send with the call.
 /// @param data Calldata payload for the call.
 struct InteropCall {
+    bytes1 version;
     bool shadowAccount;
     address to;
     address from;
@@ -218,6 +236,7 @@ enum CallStatus {
 }
 
 /// @dev A set of `InteropCall`s to send to another chain.
+/// @param version Version of the InteropBundle.
 /// @param destinationChainId ChainId of the target chain.
 /// @param interopBundleSalt Salt of the interopBundle. It's required to ensure that all bundles have distinct hashes.
 ///                          It's equal to the keccak256(abi.encodePacked(senderOfTheBundle, NumberOfBundleSentByTheSender))
@@ -225,11 +244,11 @@ enum CallStatus {
 /// @param executionAddress Optional address authorized to execute this bundle; zero-address means permissionless.
 /// @param unbundlerAddress Address authorized to unbundle this bundle.
 struct InteropBundle {
+    bytes1 version;
     uint256 destinationChainId;
     bytes32 interopBundleSalt;
     InteropCall[] calls;
-    address executionAddress;
-    address unbundlerAddress;
+    BundleAttributes bundleAttributes;
 }
 
 /// @dev Processing status of an `InteropBundle`.
