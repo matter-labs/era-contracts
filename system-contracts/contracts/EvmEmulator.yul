@@ -454,10 +454,6 @@ object "EvmEmulator" {
                     // We don't allow recursion here, since delegation loops are forbidden
                     isConstructedEVM := eq(shr(240, delegationHash), 0x0200) // EVM contract, constructed
                 }
-                default {
-                    // This is not a constructed EVM contract
-                    isConstructedEVM := 0
-                }
         }
         
         // Basically performs an extcodecopy, while returning the length of the copied bytecode.
@@ -3557,10 +3553,6 @@ object "EvmEmulator" {
                         let delegationHash := getRawCodeHash(delegationAddress)
                         // We don't allow recursion here, since delegation loops are forbidden
                         isConstructedEVM := eq(shr(240, delegationHash), 0x0200) // EVM contract, constructed
-                    }
-                    default {
-                        // This is not a constructed EVM contract
-                        isConstructedEVM := 0
                     }
             }
             
