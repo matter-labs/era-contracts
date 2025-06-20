@@ -332,7 +332,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // so we know that this value will be non-zero as well.
         s.precommitmentForTheLatestBatch = newPrecommitment;
 
-        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, newPrecommitment);
+        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastL2BlockNumberHint, newPrecommitment);
     }
 
     /// @notice Calculates rolling hash of precommitments received from `_packedTxPrecommitments`.
@@ -351,6 +351,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
             // Caching constant(s) for use in assembly
             uint256 precommitmentLength = PACKED_L2_PRECOMMITMENT_LENGTH;
+            /// @solidity memory-safe-assembly
             assembly {
                 // Storing the current rolling hash in position 0. This way It will be more convenient
                 // to recalculate it.
@@ -379,7 +380,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function commitBatchesSharedBridge(
-        address, // _chainId
+        address, // _chainAddress
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _commitData
@@ -600,7 +601,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function executeBatchesSharedBridge(
-        address, // _chainId
+        address, // _chainAddress
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
@@ -635,7 +636,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function proveBatchesSharedBridge(
-        address, // _chainId
+        address, // _chainAddress
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData

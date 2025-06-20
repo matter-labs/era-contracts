@@ -192,7 +192,6 @@ object "Bootloader" {
             }
 
             /// @dev The byte from which storing of the current canonical and signed hashes begins
-            /// Note, that the hashes are stored only for L2 transactions, not for the priority ones.
             function CURRENT_L2_TX_HASHES_BEGIN_BYTE() -> ret {
                 ret := mul(CURRENT_L2_TX_HASHES_BEGIN_SLOT(), 32)
             }
