@@ -164,6 +164,16 @@ contract AccountCodeStorage is IAccountCodeStorage {
     /// @notice Method for detecting whether an address is an EVM contract
     function isAccountEVM(address _addr) external view override returns (bool) {
         bytes32 bytecodeHash = getRawCodeHash(_addr);
-        return Utils.isCodeHashEVM(bytecodeHash);
+        if (Utils.isCodeHashEVM(bytecodeHash)) {
+            return true;
+        }
+        address delegation = Utils.extractDelegationAddress(bytecodeHash);
+        if (delegation != address(0)) {
+            bytes32 delegationCodeHash = getRawCodeHash(delegation);
+            // For EIP-7702, delegation loops are not allowed, so there is no need for a recursive check.
+            return Utils.isCodeHashEVM(delegationCodeHash);
+        }
+
+        return false;
     }
 }

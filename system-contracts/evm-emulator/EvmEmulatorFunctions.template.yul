@@ -361,7 +361,7 @@ function getRawCodeHash(addr) -> hash {
 }
 
 function is7702Delegated(rawCodeHash) -> isDelegated {
-    isDelegated := eq(shr(240, rawCodeHash), 0x0202)
+    isDelegated := eq(shr(240, rawCodeHash), 0x0302)
 }
 
 function delegationAddress(rawCodeHash) -> delegationAddr {
@@ -389,7 +389,7 @@ function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
             // 0 means that account is constructed
             isConstructedEVM := 1
         }
-        case 0x0202 {
+        case 0x0302 {
             // 2 means that account is delegated
             let delegationAddress := and(rawCodeHash, ADDRESS_MASK())
             let delegationHash := getRawCodeHash(delegationAddress)

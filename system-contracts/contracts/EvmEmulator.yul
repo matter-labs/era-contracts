@@ -419,7 +419,7 @@ object "EvmEmulator" {
         }
         
         function is7702Delegated(rawCodeHash) -> isDelegated {
-            isDelegated := eq(shr(240, rawCodeHash), 0x0202)
+            isDelegated := eq(shr(240, rawCodeHash), 0x0302)
         }
         
         function delegationAddress(rawCodeHash) -> delegationAddr {
@@ -447,14 +447,17 @@ object "EvmEmulator" {
                     // 0 means that account is constructed
                     isConstructedEVM := 1
                 }
-                case 0x0202 {
+                case 0x0302 {
                     // 2 means that account is delegated
                     let delegationAddress := and(rawCodeHash, ADDRESS_MASK())
                     let delegationHash := getRawCodeHash(delegationAddress)
                     // We don't allow recursion here, since delegation loops are forbidden
                     isConstructedEVM := eq(shr(240, delegationHash), 0x0200) // EVM contract, constructed
                 }
-                // Otherwise, this is not a constructed EVM contract
+                default {
+                    // This is not a constructed EVM contract
+                    isConstructedEVM := 0
+                }
         }
         
         // Basically performs an extcodecopy, while returning the length of the copied bytecode.
@@ -1968,6 +1971,9 @@ object "EvmEmulator" {
                         stackHead := extcodesize(addr)
                     }
                     case 2 {
+                        stackHead := and(shr(224, rawCodeHash), 0xffff)
+                    }
+                    case 3 {
                         stackHead := and(shr(224, rawCodeHash), 0xffff)
                     }
                     default {
@@ -3517,7 +3523,7 @@ object "EvmEmulator" {
             }
             
             function is7702Delegated(rawCodeHash) -> isDelegated {
-                isDelegated := eq(shr(240, rawCodeHash), 0x0202)
+                isDelegated := eq(shr(240, rawCodeHash), 0x0302)
             }
             
             function delegationAddress(rawCodeHash) -> delegationAddr {
@@ -3545,7 +3551,7 @@ object "EvmEmulator" {
                         // 0 means that account is constructed
                         isConstructedEVM := 1
                     }
-                    case 0x0202 {
+                    case 0x0302 {
                         // 2 means that account is delegated
                         let delegationAddress := and(rawCodeHash, ADDRESS_MASK())
                         let delegationHash := getRawCodeHash(delegationAddress)
@@ -5057,6 +5063,9 @@ object "EvmEmulator" {
                             stackHead := extcodesize(addr)
                         }
                         case 2 {
+                            stackHead := and(shr(224, rawCodeHash), 0xffff)
+                        }
+                        case 3 {
                             stackHead := and(shr(224, rawCodeHash), 0xffff)
                         }
                         default {

@@ -32,19 +32,6 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice What types of bytecode are allowed to be deployed on this chain.
     AllowedBytecodeTypes public allowedBytecodeTypesToDeploy;
 
-    /// @dev Bytecode mask for delegated accounts:
-    /// - Byte 0 (0x02) means the the account is processed through the EVM interpreter
-    /// - Byte 1 (0x02) means that the account is delegated.
-    /// - Bytes 2-3 (0x0017) means that the length of the bytecode is 23 bytes.
-    /// - Bytes 4-8 have no meaning.
-    /// - Bytes 9-11 (0xEF0100) are prefix for the 7702 bytecode of the contract (EF01000 || address).
-    /// The rest is left empty for address masking.
-    bytes32 private constant DELEGATION_BYTECODE_MASK =
-        0x020200170000000000EF01000000000000000000000000000000000000000000;
-    /// @dev Mask to extract the delegation address from the bytecode hash.
-    bytes32 private constant DELEGATION_ADDRESS_MASK =
-        0x000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
-
     /// @dev Restricts `msg.sender` to be this contract itself.
     modifier onlySelf() {
         if (msg.sender != address(this)) {
@@ -70,12 +57,12 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             return false;
         }
 
-        bool noCodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0;
-        if (noCodeHash) {
+        bytes32 accountCodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address);
+        if (accountCodeHash == 0) {
             return true;
         }
 
-        bool delegated = getAccountDelegation(_address) != address(0);
+        bool delegated = Utils.extractDelegationAddress(accountCodeHash) != address(0);
         return delegated;
     }
 
@@ -421,14 +408,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
     /// @notice Returns the zero address if no delegation is set.
     function getAccountDelegation(address _addr) public view override returns (address) {
         bytes32 codeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_addr);
-        if (codeHash[0] == 0x02 && codeHash[1] == 0x02) {
-            // The first two bytes of the code hash are 0x0202, which means that the account is delegated.
-            // The delegation address is stored in the last 20 bytes of the code hash.
-            return address(uint160(uint256(codeHash & DELEGATION_ADDRESS_MASK)));
-        } else {
-            // The account is not delegated.
-            return address(0);
-        }
+        return Utils.extractDelegationAddress(codeHash);
     }
 
     /// @notice Method called by bootloader during processing of EIP7702 authorization lists.
@@ -506,7 +486,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
                 EVM_HASHES_STORAGE.storeEvmCodeHash(currentBytecodeHash, bytes32(0x0));
             } else {
                 // Otherwise, store the delegation.
-                bytes32 delegationCodeMarker = DELEGATION_BYTECODE_MASK | bytes32(uint256(uint160(item.addr)));
+                bytes32 delegationCodeMarker = Utils.EIP_7702_DELEGATION_BYTECODE_MASK | bytes32(uint256(uint160(item.addr)));
                 ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccount7702DelegationCodeHash(
                     authority,
                     delegationCodeMarker
