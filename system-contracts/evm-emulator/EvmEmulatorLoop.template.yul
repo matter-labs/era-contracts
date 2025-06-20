@@ -461,6 +461,9 @@ for { } true { } {
         case 2 {
             stackHead := and(shr(224, rawCodeHash), 0xffff)
         }
+        case 3 {
+            stackHead := and(shr(224, rawCodeHash), 0xffff)
+        }
         default {
             stackHead := 0
         }

@@ -5,7 +5,7 @@ pragma solidity ^0.8.20;
 import {EfficientCall} from "./EfficientCall.sol";
 import {RLPEncoder} from "./RLPEncoder.sol";
 import {MalformedBytecode, BytecodeError, Overflow} from "../SystemContractErrors.sol";
-import {ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG, CREATE2_EVM_PREFIX} from "../Constants.sol";
+import {ERA_VM_BYTECODE_FLAG, EVM_BYTECODE_FLAG, EIP_7702_DELEGATION_FLAG, CREATE2_EVM_PREFIX} from "../Constants.sol";
 
 /**
  * @author Matter Labs
@@ -20,6 +20,20 @@ library Utils {
     /// @dev Bit mask to set the "isConstructor" marker in the bytecode hash
     bytes32 internal constant SET_IS_CONSTRUCTOR_MARKER_BIT_MASK =
         0x0001000000000000000000000000000000000000000000000000000000000000;
+    
+    /// @dev Bytecode mask for delegated accounts:
+    /// - Byte 0 (0x03) means the the account is EIP-7702 delegated.
+    /// - Byte 1 (0x02) means that the account is delegated.
+    /// - Bytes 2-3 (0x0017) means that the length of the bytecode is 23 bytes.
+    /// - Bytes 4-8 have no meaning.
+    /// - Bytes 9-11 (0xEF0100) are prefix for the 7702 bytecode of the contract (EF01000 || address).
+    /// The rest is left empty for address masking.
+    bytes32 internal constant EIP_7702_DELEGATION_BYTECODE_MASK =
+        0x030200170000000000EF01000000000000000000000000000000000000000000;
+
+    /// @dev Mask to extract the delegation address from the bytecode hash.
+    bytes32 internal constant EIP_7702_DELEGATION_ADDRESS_MASK =
+        0x000000000000000000000000FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF;
 
     function safeCastToU128(uint256 _x) internal pure returns (uint128) {
         if (_x > type(uint128).max) {
@@ -48,6 +62,24 @@ library Utils {
     /// @return If this bytecode hash for EVM contract or not
     function isCodeHashEVM(bytes32 _bytecodeHash) internal pure returns (bool) {
         return (uint8(_bytecodeHash[0]) == EVM_BYTECODE_FLAG);
+    }
+
+    /// @return If this bytecode hash for EIP-7702 delegation or not
+    function isCodeHash7702Delegation(bytes32 _bytecodeHash) internal pure returns (bool) {
+        return (_bytecodeHash[0] == EIP_7702_DELEGATION_FLAG[0] &&
+                _bytecodeHash[1] == EIP_7702_DELEGATION_FLAG[1]);
+    }
+
+    /// @return Extracts the delegation address from the bytecode hash if it's an EIP-7702 delegation.
+    /// If the bytecode hash is not an EIP-7702 delegation, it returns zero address.
+    function extractDelegationAddress(bytes32 _bytecodeHash) internal pure returns (address) {
+        if (isContract7702Delegation(_bytecodeHash)) {
+            // The delegation address is stored in the last 20 bytes of the code hash.
+            return address(uint160(uint256(_bytecodeHash & EIP_7702_DELEGATION_ADDRESS_MASK)));
+        } else {
+            // The account is not delegated.
+            return address(0);
+        }
     }
 
     /// @return codeLengthInBytes The bytecode length in bytes
@@ -94,7 +126,7 @@ library Utils {
         // We handle delegation reset as returning the empty bytecode hash, so
         // two options for bytecode hash are valid.
         bool isEmpty = _bytecodeHash == bytes32(0);
-        bool is7702Delegation = _bytecodeHash[0] == 0x02 && _bytecodeHash[1] == 0x02;
+        bool is7702Delegation = isCodeHash7702Delegation(_bytecodeHash);
         return (isEmpty || is7702Delegation);
     }
 

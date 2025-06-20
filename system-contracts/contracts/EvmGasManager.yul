@@ -70,6 +70,16 @@ object "EvmGasManager" {
                 hash := mloadFromReturndata(0)
             }
 
+            /// @dev Checks that the bytecode hash corresponds to an EVM contract.
+            function isEvmCodeHash(versionedCodeHash) -> isEVM {
+                isEVM := eq(shr(248, versionedCodeHash), 0x02)
+            }
+
+            /// @dev Checks that the bytecode hash corresponds to EIP-7702 delegation.
+            function isEip7702DelegationCodeHash(versionedCodeHash) -> isDelegation {
+                isDelegation := eq(shr(240, versionedCodeHash), 0x0302)
+            }
+
             /// @dev Checks that the call is done by the EVM emulator in system mode.
             function $llvm_AlwaysInline_llvm$_onlyEvmSystemCall() {
                 let callFlags := verbatim_0i_1o("get_global::call_flags")
@@ -86,7 +96,18 @@ object "EvmGasManager" {
                 let isEVM := tload(transientSlot)
                 if iszero(isEVM) {
                     let versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(caller())
-                    isEVM := eq(shr(248, versionedCodeHash), 2)
+                    isEVM := isEvmCodeHash(versionedCodeHash)
+
+                    if iszero(isEVM) {
+                        // Process EIP-7702 delegations.
+                        // For 7702 delegations, we need to make sure that the delegation address is an EVM contract.
+                        if isEip7702DelegationCodeHash(versionedCodeHash) {
+                            let delegationAddress := and(ADDRESS_MASK(), versionedCodeHash)
+                            versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(delegationAddress)
+                            // Delegation loops are not allowed, so no need for recursion.
+                            isEVM := isEvmCodeHash(versionedCodeHash)
+                        }
+                    }
 
                     if iszero(isEVM) {
                         // error CallerMustBeEvmContract()
@@ -94,20 +115,8 @@ object "EvmGasManager" {
                         revert(0, 4)
                     }
 
-                    // For 7702 delegations, we need to make sure that the delegation address is an EVM contract.
-                    let isAccountDelegated := eq(shr(240, versionedCodeHash), 0x0202)
-                    if isAccountDelegated {
-                        let delegationAddress := and(ADDRESS_MASK(), versionedCodeHash)
-                        versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(delegationAddress)
-                        // We need to protect against delegation loops, so disallow `0x0202` as
-                        // delegation address.
-                        isEVM := or(
-                            eq(shr(240, versionedCodeHash), 0x0200),
-                            eq(shr(240, versionedCodeHash), 0x0201)
-                        )
-                    }
-
                     // we will not cache contract if it is being constructed
+                    // note: for delegated accounts, we check the construction of the delegation target
                     let isContractConstructed := iszero(and(0xFF, shr(240, versionedCodeHash)))
                     if isContractConstructed {
                         tstore(transientSlot, 1)
