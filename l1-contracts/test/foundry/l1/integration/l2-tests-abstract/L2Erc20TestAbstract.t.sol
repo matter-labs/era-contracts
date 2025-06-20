@@ -167,6 +167,9 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         l2InteropCenter.sendBundle(271, calls, new bytes[](0));
     }
 
+    address constant UNBUNDLER_ADDRESS = address(0x1);
+    address constant EXECUTION_ADDRESS = address(0x2);
+
     function test_requestSendCall() public {
         address l2TokenAddress = initializeTokenByDeposit();
         bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
@@ -178,8 +181,10 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         );
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
-        bytes[] memory attributes = new bytes[](1);
+        bytes[] memory attributes = new bytes[](3);
         attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
+        attributes[1] = abi.encodeCall(IERC7786Attributes.executionAddress, (EXECUTION_ADDRESS));
+        attributes[2] = abi.encodeCall(IERC7786Attributes.unbundlerAddress, (UNBUNDLER_ADDRESS));
         calls[0] = InteropCallStarter({
             nextContract: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
@@ -208,6 +213,19 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             calls[0].nextContract,
             calls[0].data,
             calls[0].callAttributes
+        );
+    }
+
+    function test_supportsAttributes() public {
+        assertEq(
+            IERC7786GatewaySource(address(l2InteropCenter)).supportsAttribute(IERC7786Attributes.indirectCall.selector),
+            true
+        );
+        assertEq(
+            IERC7786GatewaySource(address(l2InteropCenter)).supportsAttribute(
+                IERC7786GatewaySource.supportsAttribute.selector
+            ),
+            false
         );
     }
 }
