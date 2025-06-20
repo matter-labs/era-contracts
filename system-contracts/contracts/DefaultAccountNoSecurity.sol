@@ -5,11 +5,14 @@
 // ONLY FOR Hardhat / Forge testing.
 pragma solidity ^0.8.0;
 
-import "./interfaces/IAccount.sol";
-import "./libraries/TransactionHelper.sol";
-import "./libraries/SystemContractHelper.sol";
-import "./libraries/EfficientCall.sol";
+import {ACCOUNT_VALIDATION_SUCCESS_MAGIC, IAccount} from "./interfaces/IAccount.sol";
+import {Transaction, TransactionHelper} from "./libraries/TransactionHelper.sol";
+import {SystemContractsCaller} from "./libraries/SystemContractsCaller.sol";
+import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import {EfficientCall} from "./libraries/EfficientCall.sol";
+import {Utils} from "./libraries/Utils.sol";
 import {BOOTLOADER_FORMAL_ADDRESS, NONCE_HOLDER_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, INonceHolder} from "./Constants.sol";
+import {FailedToPayOperator, InsufficientFunds} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -65,7 +68,7 @@ contract DefaultAccountNoSecurity is IAccount {
     /// @param _suggestedSignedHash The suggested hash of the transaction to be signed by the user.
     /// This is the hash that is signed by the EOA by default.
     /// @param _transaction The transaction structure itself.
-    /// @dev Besides the params above, it also accepts unused first paramter "_txHash", which
+    /// @dev Besides the params above, it also accepts unused first parameter "_txHash", which
     /// is the unique (canonical) hash of the transaction.
     function validateTransaction(
         bytes32, // _txHash
@@ -100,7 +103,10 @@ contract DefaultAccountNoSecurity is IAccount {
         // should be checked explicitly to prevent user paying for fee for a
         // transaction that wouldn't be included on Ethereum.
         uint256 totalRequiredBalance = _transaction.totalRequiredBalance();
-        require(totalRequiredBalance <= address(this).balance, "Not enough balance for fee + value");
+        require(
+            totalRequiredBalance <= address(this).balance,
+            InsufficientFunds(totalRequiredBalance, address(this).balance)
+        );
 
         if (_isValidSignature(txHash, _transaction.signature)) {
             magic = ACCOUNT_VALIDATION_SUCCESS_MAGIC;
@@ -169,7 +175,7 @@ contract DefaultAccountNoSecurity is IAccount {
         ///
         /// DEBUG SUPPORT START
         ///
-        returnData = EfficientCall.call(gas, to, value, data, isSystemCall);
+        returnData = EfficientCall.call({_gas: gas, _address: to, _value: value, _data: data, _isSystem: isSystemCall});
         ///
         /// DEBUG SUPPORT END
         ///
@@ -179,6 +185,7 @@ contract DefaultAccountNoSecurity is IAccount {
     /// @param _hash The hash of the transaction to be signed.
     /// @param _signature The signature of the transaction.
     /// @return EIP1271_SUCCESS_RETURN_VALUE Always - as this is TEST only code..
+    // solhint-disable-next-line no-unused-vars
     function _isValidSignature(bytes32 _hash, bytes memory _signature) internal view returns (bool) {
         // WARNING - THIS IS TEST ONLY CODE
         // IT ACCEPTS ANY SIGNATURE AS A 'VALID' one.
@@ -197,7 +204,7 @@ contract DefaultAccountNoSecurity is IAccount {
         Transaction calldata _transaction
     ) external payable ignoreNonBootloader ignoreInDelegateCall {
         bool success = _transaction.payToTheBootloader();
-        require(success, "Failed to pay the fee to the operator");
+        require(success, FailedToPayOperator());
     }
 
     /// @notice Method, where the user should prepare for the transaction to be

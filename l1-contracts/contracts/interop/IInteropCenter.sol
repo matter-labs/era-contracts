@@ -10,6 +10,17 @@ import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 interface IInteropCenter {
     event InteropBundleSent(bytes32 l2l1TxHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
+    /// @notice Restrictions for parsing attributes.
+    /// @dev OnlyCallAttributes: Only call attributes are allowed.
+    /// @dev OnlyBundleAttributes: Only bundle attributes are allowed.
+    /// @dev CallAndBundleAttributes: Both call and bundle attributes are allowed.
+    enum AttributeParsingRestrictions {
+        OnlyInteropCallValue,
+        OnlyCallAttributes,
+        OnlyBundleAttributes,
+        CallAndBundleAttributes
+    }
+
     function BRIDGE_HUB() external view returns (IBridgehub);
 
     function assetTracker() external view returns (IAssetTracker);
@@ -28,6 +39,7 @@ interface IInteropCenter {
 
     function sendBundle(
         uint256 _destinationChainId,
-        InteropCallStarter[] memory _callStarters
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
     ) external payable returns (bytes32);
 }

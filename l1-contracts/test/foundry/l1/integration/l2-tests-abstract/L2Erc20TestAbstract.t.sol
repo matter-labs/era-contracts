@@ -144,8 +144,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         calls[0] = InteropCallStarter({
             nextContract: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
-            attributes: attributes,
-            requestedInteropCallValue: 0
+            callAttributes: attributes
         });
 
         uint256 destinationChainId = 271;
@@ -165,7 +164,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
             abi.encode(bytes(""))
         );
-        l2InteropCenter.sendBundle(271, calls);
+        l2InteropCenter.sendBundle(271, calls, new bytes[](0));
     }
 
     function test_requestSendCall() public {
@@ -184,8 +183,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         calls[0] = InteropCallStarter({
             nextContract: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
-            attributes: attributes,
-            requestedInteropCallValue: 0
+            callAttributes: attributes
         });
 
         uint256 destinationChainId = 271;
@@ -209,7 +207,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             271,
             calls[0].nextContract,
             calls[0].data,
-            calls[0].requestedInteropCallValue
+            calls[0].callAttributes
         );
     }
 }

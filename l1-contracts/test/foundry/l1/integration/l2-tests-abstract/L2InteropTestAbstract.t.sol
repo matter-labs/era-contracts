@@ -37,13 +37,16 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "./_SharedL2ContractDeployer.sol";
-import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof, TxStatus} from "contracts/common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof, TxStatus, BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "contracts/common/Messaging.sol";
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
 import {IMessageVerification} from "contracts/state-transition/chain-interfaces/IMessageVerification.sol";
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "./Utils.sol";
 import {GasFields, InteropTrigger, TRIGGER_IDENTIFIER} from "contracts/dev-contracts/test/Utils.sol";
 
 abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
+    address constant UNBUNDLER_ADDRESS = address(0x1);
+    address constant EXECUTION_ADDRESS = address(0x2);
+
     function test_requestL2TransactionDirectWithCalldata() public {
         // Note: get this from real local txs
         bytes
@@ -152,15 +155,16 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         bytes memory bundle = abi.encode(interopBundle);
         MessageInclusionProof memory proof = getInclusionProof();
         vm.mockCall(
-            address(L2_INTEROP_ROOT_STORAGE),
-            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector, 506, 159),
-            abi.encode(bytes32(0x2b902ead86c984cb3ac0e1ef86c64f8765b0d1565dc3f5ff0a59a2a64678d4c0))
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
         );
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
             abi.encode(bytes(""))
         );
+        vm.prank(EXECUTION_ADDRESS);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).executeBundle(bundle, proof);
     }
 
@@ -169,9 +173,9 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         bytes memory bundle = abi.encode(interopBundle);
         MessageInclusionProof memory proof = getInclusionProof();
         vm.mockCall(
-            address(L2_INTEROP_ROOT_STORAGE),
-            abi.encodeWithSelector(L2_INTEROP_ROOT_STORAGE.interopRoots.selector, 506, 159),
-            abi.encode(bytes32(0xe9c0b373d96a3f9fc7f7143cfe375d2bdd16fe8ab12570fcd0ac76fc004aec23))
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
         );
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
@@ -187,18 +191,10 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         callStatuses2[0] = CallStatus.Executed;
         callStatuses2[1] = CallStatus.Cancelled;
         callStatuses2[2] = CallStatus.Unprocessed;
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(
-            proof.chainId,
-            proof.l2MessageIndex,
-            bundle,
-            callStatuses1
-        );
-        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(
-            proof.chainId,
-            proof.l2MessageIndex,
-            bundle,
-            callStatuses2
-        );
+        vm.prank(UNBUNDLER_ADDRESS);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses1);
+        vm.prank(UNBUNDLER_ADDRESS);
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses2);
     }
 
     function getInteropBundle(uint256 amount) public returns (InteropBundle memory) {
@@ -208,6 +204,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         InteropCall[] memory calls = new InteropCall[](3);
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, token);
         calls[0] = InteropCall({
+            version: INTEROP_CALL_VERSION,
             shadowAccount: false,
             to: L2_ASSET_ROUTER_ADDR,
             from: L2_ASSET_ROUTER_ADDR,
@@ -228,6 +225,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             )
         });
         calls[1] = InteropCall({
+            version: INTEROP_CALL_VERSION,
             shadowAccount: false,
             to: L2_ASSET_ROUTER_ADDR,
             from: L2_ASSET_ROUTER_ADDR,
@@ -248,6 +246,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             )
         });
         calls[2] = InteropCall({
+            version: INTEROP_CALL_VERSION,
             shadowAccount: false,
             to: L2_ASSET_ROUTER_ADDR,
             from: L2_ASSET_ROUTER_ADDR,
@@ -268,10 +267,14 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             )
         });
         InteropBundle memory interopBundle = InteropBundle({
+            version: INTEROP_BUNDLE_VERSION,
             destinationChainId: 271,
-            sendingBlockNumber: 31,
+            interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,
-            executionAddress: address(0)
+            bundleAttributes: BundleAttributes({
+                executionAddress: EXECUTION_ADDRESS,
+                unbundlerAddress: UNBUNDLER_ADDRESS
+            })
         });
         return interopBundle;
     }

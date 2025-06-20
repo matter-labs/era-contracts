@@ -31,7 +31,7 @@ interface IERC7786GatewaySource {
         uint256 destinationChain,
         address destinationAddress,
         bytes calldata data,
-        uint256 value
+        bytes[] calldata attributes
     ) external payable returns (bytes32 outboxId);
 
     function quoteRelay(
