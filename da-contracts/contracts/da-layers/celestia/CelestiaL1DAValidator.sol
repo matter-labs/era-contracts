@@ -36,10 +36,14 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         bytes memory publicValues = input.publicValues;  // get reference to bytes
         bytes32 eqKeccakHash;
         bytes32 eqDataRoot;
+        uint32 eqBatchNumber;
+        uint64 eqChainId;
         assembly {
             let ptr := add(publicValues, 32)  // skip length prefix
             eqKeccakHash := mload(ptr)        // first bytes32
             eqDataRoot := mload(add(ptr, 32)) // second bytes32
+            eqBatchNumber := shr(224, mload(add(ptr, 64))) // third bytes32, but we only want the last 4 bytes (u32)
+            eqChainId := shr(192, mload(add(ptr, 96))) // fourth bytes32, but we only want the last 8 bytes (u64)
         }
 
         // First verify the equivalency proof (im assuming this call reverts if the proof ins invalid, so we move onward from here)
