@@ -36,7 +36,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         );
 
         // Verify that the caller has permission to execute the bundle.
-        // Note, that in case the executionAddress wasn't specified in the bundle then executing is permissionless, as documented in InteropCenter contract.
+        // Note, that in case the executionAddress wasn't specified in the bundle then executing is permissionless, as documented in Messaging.sol
         require(
             (interopBundle.bundleAttributes.executionAddress == address(0) ||
                 msg.sender == interopBundle.bundleAttributes.executionAddress),

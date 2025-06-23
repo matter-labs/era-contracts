@@ -44,8 +44,7 @@ struct L2Message {
     bytes data;
 }
 
-/// @dev Internal structure that contains the parameters for the writePriorityOp
-/// internal function.
+/// @dev Internal structure that contains the parameters for the writePriorityOp internal function.
 /// @param txId The id of the priority transaction.
 /// @param l2GasPrice The gas price for the l2 priority operation.
 /// @param expirationTimestamp The timestamp by which the priority operation must be processed by the operator.
@@ -117,8 +116,8 @@ struct L2CanonicalTransaction {
 }
 
 /// @param sender The sender's address.
-/// @param contractAddressL2 The address of the contract on L2 to call.
-/// @param valueToMint The amount of base token that should be minted on L2 as the result of this transaction.
+/// @param contractL2 The address of the contract on L2 to call.
+/// @param mintValue The amount of base token that should be minted on L2 as the result of this transaction.
 /// @param l2Value The msg.value of the L2 transaction.
 /// @param l2Calldata The calldata for the L2 transaction.
 /// @param l2GasLimit The limit of the L2 gas for the L2 transaction
@@ -181,28 +180,26 @@ struct InteropCallStarter {
 }
 
 /// @dev Internal representation of an InteropCallStarter after parsing its parameters.
-/// @param directCall False if a call had an indirectCall EIP-7786 attribute.
 /// @param nextContract Address of the contract to call on the destination chain.
 /// @param data Calldata payload to send.
-/// @param requestedInteropCallValue Amount of base token allocated for this call.
-/// @param indirectCallMessageValue If !directCall, this is the amount of base token to forward into the middle call.
+/// @param callAttributes EIP-7786 Attributes.
 struct InteropCallStarterInternal {
     address nextContract;
     bytes data;
     CallAttributes callAttributes;
 }
 
-/// @return interopCallValue Base token value on destination chain to send for interop call.
-/// @return directCall True for direct interop, false if routed through bridge.
-/// @return indirectCallMessageValue Base token value on sending chain to send for indirect call.
+/// @param interopCallValue Base token value on destination chain to send for interop call.
+/// @param directCall True for direct interop, false if routed through bridge.
+/// @param indirectCallMessageValue Base token value on sending chain to send for indirect call.
 struct CallAttributes {
     uint256 interopCallValue;
     bool directCall;
     uint256 indirectCallMessageValue;
 }
 
-/// @return executionAddress Address allowed to execute on remote side.
-/// @return unbundlerAddress Address allowed to unbundle.
+/// @param executionAddress Address allowed to execute on remote side. If set to 0 -> execution is permissionless.
+/// @param unbundlerAddress Address allowed to unbundle. Note, that here no permissionless mode is available, unlike above.
 struct BundleAttributes {
     address executionAddress;
     address unbundlerAddress;
@@ -225,10 +222,9 @@ struct InteropCall {
 }
 
 /// @dev Execution status of an individual call within a bundle.
-/// @notice
-/// - Unprocessed: not yet processed.
-/// - Executed: call was successfully executed.
-/// - Cancelled: call was cancelled during unbundling.
+/// @param Unprocessed Call not yet processed.
+/// @param Executed Call was successfully executed.
+/// @param Cancelled Call was cancelled during unbundling.
 enum CallStatus {
     Unprocessed,
     Executed,
@@ -252,11 +248,10 @@ struct InteropBundle {
 }
 
 /// @dev Processing status of an `InteropBundle`.
-/// @notice
-/// - Unreceived: not processed in any way yet.
-/// - Verified: inclusion proof accepted, but not processed.
-/// - FullyExecuted: all calls have been executed atomically via executeBundle.
-/// - Unbundled: processed via unbundling flow.
+/// @param Unreceived Bundle is not processed in any way yet.
+/// @param Verified Bundle inclusion proof accepted, but not processed.
+/// @param FullyExecuted All calls in the bundle have been executed atomically via executeBundle.
+/// @param Unbundled Bundle was processed via unbundling flow.
 enum BundleStatus {
     Unreceived,
     Verified,

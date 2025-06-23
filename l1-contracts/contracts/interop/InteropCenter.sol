@@ -122,7 +122,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes memory interopBundleBytes = abi.encode(_bundle);
         // TODO use canonicalTxHash for linking it to the trigger, instead of interopBundleHash
         // ! VG to KL. before merging pls resolve: why canonicalTxHash? That call returns hash of the message, no? Looks weird on the first glance
-        // ! Send the message corresponding to the relevant InteropBundle to L1.
+        // Send the message corresponding to the relevant InteropBundle to L1.
         bytes32 canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
         );
@@ -205,7 +205,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         );
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
-            /// solhint-disable-next-line no-unused-vars
+            // solhint-disable-next-line no-unused-vars
             (CallAttributes memory callAttributes, ) = parseAttributes(
                 _callStarters[i].callAttributes,
                 AttributeParsingRestrictions.OnlyCallAttributes
@@ -216,7 +216,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 callAttributes: callAttributes
             });
         }
-        /// solhint-disable-next-line no-unused-vars
+        // solhint-disable-next-line no-unused-vars
         (, BundleAttributes memory bundleAttributes) = parseAttributes(
             _bundleAttributes,
             AttributeParsingRestrictions.OnlyBundleAttributes
@@ -229,25 +229,25 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     /// @notice Parses the attributes of the call or bundle.
-    /// @param _attributes Attributes of the call.
+    /// @param _attributes EIP-7786 Attributes of the call.
     /// @param _restriction Restriction for parsing attributes.
     function parseAttributes(
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
     ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
-        // default value is direct call
+        // Default value is direct call.
         callAttributes.directCall = true;
 
         bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
-        // we can only pass each attribute once.
+        // We can only pass each attribute once.
         bool[] memory attributeUsed = new bool[](4);
 
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {
             bytes4 selector = bytes4(_attributes[i]);
-            uint256 indexInSelectorsArray = 0;
             /// Finding the matching attribute selector.
             uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
+            uint256 indexInSelectorsArray = attributeSelectorsLength;
             for (uint256 j = 0; j < attributeSelectorsLength; ++j) {
                 if (selector == ATTRIBUTE_SELECTORS[j]) {
                     /// check if the attribute was already set.
@@ -256,24 +256,24 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     indexInSelectorsArray = j;
                     break;
                 }
-                // the selector does not match any of the known attributes.
-                if (j == attributeSelectorsLength - 1) {
-                    revert IERC7786GatewaySource.UnsupportedAttribute(selector);
-                }
             }
-            // checking selectors satisfy the restrictions
+            // Revert if the selector does not match any of the known attributes.
+            if (indexInSelectorsArray == attributeSelectorsLength) {
+                revert IERC7786GatewaySource.UnsupportedAttribute(selector);
+            }
+            // Checking whether selectors satisfy the restrictions.
             if (_restriction == AttributeParsingRestrictions.OnlyInteropCallValue) {
                 require(indexInSelectorsArray == 0, AttributeNotForInteropCallValue(selector));
             }
             if (indexInSelectorsArray < 2) {
                 require(
                     _restriction != AttributeParsingRestrictions.OnlyBundleAttributes,
-                    AttributeNotForCall(selector)
+                    AttributeNotForBundle(selector)
                 );
             } else {
                 require(
                     _restriction != AttributeParsingRestrictions.OnlyInteropCallValue,
-                    AttributeNotForBundle(selector)
+                    AttributeNotForCall(selector)
                 );
             }
             // setting the attributes
@@ -345,7 +345,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 _callStarter.callAttributes.interopCallValue,
                 _callStarter.data
             );
-            /// solhint-disable-next-line no-unused-vars
+            // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
             (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
                 actualCallStarter.callAttributes,
@@ -447,8 +447,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /*//////////////////////////////////////////////////////////////
                             PAUSE
     //////////////////////////////////////////////////////////////*/
-
-    // ! VG to KL: whenNotPaused not used. Delete, or intended to add somewhere?
 
     /// @notice Pauses all functions marked with the `whenNotPaused` modifier.
     function pause() external onlyOwner {

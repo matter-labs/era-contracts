@@ -11,9 +11,10 @@ interface IInteropCenter {
     event InteropBundleSent(bytes32 l2l1TxHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
     /// @notice Restrictions for parsing attributes.
-    /// @dev OnlyCallAttributes: Only call attributes are allowed.
-    /// @dev OnlyBundleAttributes: Only bundle attributes are allowed.
-    /// @dev CallAndBundleAttributes: Both call and bundle attributes are allowed.
+    /// @param OnlyInteropCallValue: Only attribute for interop call value is allowed.
+    /// @param OnlyCallAttributes: Only call attributes are allowed.
+    /// @param OnlyBundleAttributes: Only bundle attributes are allowed.
+    /// @param CallAndBundleAttributes: Both call and bundle attributes are allowed.
     enum AttributeParsingRestrictions {
         OnlyInteropCallValue,
         OnlyCallAttributes,
