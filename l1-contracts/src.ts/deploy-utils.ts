@@ -8,7 +8,6 @@ import { encodeNTVAssetId, getAddressFromEnv, getNumberFromEnv } from "./utils";
 import { REQUIRED_L2_GAS_PRICE_PER_PUBDATA, DEPLOYER_SYSTEM_CONTRACT_ADDRESS, ADDRESS_ONE } from "./constants";
 import { IBridgehubFactory } from "../typechain/IBridgehubFactory";
 import { IERC20Factory } from "../typechain/IERC20Factory";
-import { IInteropCenterFactory } from "../typechain/IInteropCenterFactory";
 
 export async function deployViaCreate2(
   deployWallet: ethers.Wallet,
@@ -151,14 +150,12 @@ export async function create2DeployFromL1(
 ) {
   bridgehubAddress = bridgehubAddress ?? deployedAddressesFromEnv().Bridgehub.BridgehubProxy;
   const bridgehub = IBridgehubFactory.connect(bridgehubAddress, wallet);
-  const interopCenterAddress = await bridgehub.interopCenter();
-  const interopCenter = IInteropCenterFactory.connect(interopCenterAddress, wallet);
 
   const deployerSystemContracts = new Interface(hardhat.artifacts.readArtifactSync("IContractDeployer").abi);
   const bytecodeHash = hashL2Bytecode(bytecode);
   const calldata = deployerSystemContracts.encodeFunctionData("create2", [create2Salt, bytecodeHash, constructor]);
   gasPrice ??= await bridgehub.provider.getGasPrice();
-  const expectedCost = await interopCenter.l2TransactionBaseCost(
+  const expectedCost = await bridgehub.l2TransactionBaseCost(
     chainId,
     gasPrice,
     l2GasLimit,
@@ -176,7 +173,7 @@ export async function create2DeployFromL1(
   }
   const factoryDeps = extraFactoryDeps ? [bytecode, ...extraFactoryDeps] : [bytecode];
 
-  return await interopCenter.requestL2TransactionDirect(
+  return await bridgehub.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: DEPLOYER_SYSTEM_CONTRACT_ADDRESS,

@@ -7,7 +7,7 @@ pragma solidity ^0.8.24;
 /// https://github.com/ethereum/ERCs/blob/023a7d657666308568d3d1391c578d5972636093/ERCS/erc-7786.md
 interface IERC7786Receiver {
     function executeMessage(
-        // kl todo: change back to strings
+        // kl todo: change back to strings to be CAIP-2 compatible.
         bytes32 messageId, // gateway specific, empty or unique
         uint256 sourceChain, // [CAIP-2] chain identifier
         address sender, // [CAIP-10] account address

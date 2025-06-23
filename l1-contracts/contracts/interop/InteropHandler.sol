@@ -221,9 +221,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
                 payload: interopCall.data,
                 attributes: new bytes[](0)
             }); // attributes are not supported yet
-            if (selector != IERC7786Receiver.executeMessage.selector) {
-                revert InvalidSelector(selector);
-            }
+            require(selector == IERC7786Receiver.executeMessage.selector, InvalidSelector(selector));
         }
     }
 
@@ -244,9 +242,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             _proof: _proof.proof
         });
 
-        if (!isIncluded) {
-            revert MessageNotIncluded();
-        }
+        require(isIncluded, MessageNotIncluded());
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
 

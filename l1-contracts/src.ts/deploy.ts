@@ -801,8 +801,7 @@ export class Deployer {
     printOperation: boolean = false
   ) {
     const bridgehub = this.bridgehubContract(this.deployWallet);
-    const interopCenter = this.interopCenter(this.deployWallet);
-    const value = await interopCenter.l2TransactionBaseCost(
+    const value = await bridgehub.l2TransactionBaseCost(
       chainId,
       gasPrice,
       l2GasLimit,
@@ -819,7 +818,7 @@ export class Deployer {
         baseToken.interface.encodeFunctionData("approve", [this.addresses.Bridges.SharedBridgeProxy, value])
       );
     }
-    const l1Calldata = interopCenter.interface.encodeFunctionData("requestL2TransactionDirect", [
+    const l1Calldata = bridgehub.interface.encodeFunctionData("requestL2TransactionDirect", [
       {
         chainId,
         l2Contract: targetAddress,
@@ -1309,9 +1308,8 @@ export class Deployer {
     const bridgehub = this.bridgehubContract(this.deployWallet);
     // Just some large gas limit that should always be enough
     const l2GasLimit = ethers.BigNumber.from(72_000_000);
-    const interopCenter = this.interopCenter(this.deployWallet);
     const expectedCost = (
-      await interopCenter.l2TransactionBaseCost(gatewayChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
+      await bridgehub.l2TransactionBaseCost(gatewayChainId, gasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA)
     ).mul(5);
 
     // We are creating the new DiamondProxy for our chain, to be deployed on top of sync Layer.
