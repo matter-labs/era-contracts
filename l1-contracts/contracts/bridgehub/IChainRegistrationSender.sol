@@ -6,4 +6,6 @@ pragma solidity ^0.8.21;
 /// @custom:security-contact security@matterlabs.dev
 interface IChainRegistrationSender {
     function initialize(address _owner) external;
+
+    function registerChain(uint256 chainToBeRegistered, uint256 chainRegisteredOn) external;
 }

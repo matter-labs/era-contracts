@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -31,6 +31,7 @@ import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {CHAIN_REGISTRATION_SENDER_ENCODING_VERSION} from "contracts/bridgehub/ChainRegistrationSender.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
+    using stdStorage for StdStorage;
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
@@ -75,6 +76,12 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
     function test_chainRegistrationSender() public {
         address owner = Ownable(address(addresses.bridgehub)).owner();
+        stdstore
+            .target(address(addresses.chainRegistrationSender))
+            .sig(addresses.chainRegistrationSender.chainRegisteredOnChain.selector)
+            .with_key(zkChainIds[0])
+            .with_key(zkChainIds[1])
+            .checked_write(false);
 
         vm.startBroadcast(owner);
         addresses.chainRegistrationSender.registerChain(zkChainIds[0], zkChainIds[1]);
@@ -142,6 +149,12 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
     }
 
     function test_chainRegistrationSenderDeposit() public {
+        stdstore
+            .target(address(addresses.chainRegistrationSender))
+            .sig(addresses.chainRegistrationSender.chainRegisteredOnChain.selector)
+            .with_key(zkChainIds[0])
+            .with_key(zkChainIds[1])
+            .checked_write(false);
         chainRegistrationSenderDeposit(1000000, ETH_TOKEN_ADDRESS);
     }
 

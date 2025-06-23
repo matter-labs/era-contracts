@@ -10,6 +10,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IChainRegistrationSender} from "contracts/bridgehub/IChainRegistrationSender.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -128,6 +129,7 @@ contract RegisterZKChainScript is Script {
         addValidators();
         configureZkSyncStateTransition();
         setPendingAdmin();
+        registerOnOtherChains();
 
         if (config.initializeLegacyBridge) {
             deployLegacySharedBridge();
@@ -449,6 +451,19 @@ contract RegisterZKChainScript is Script {
         zkChain.setPendingAdmin(output.chainAdmin);
         vm.stopBroadcast();
         console.log("Owner for ", output.diamondProxy, "set to", output.chainAdmin);
+    }
+
+    function registerOnOtherChains() internal {
+        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        uint256[] memory chainsToRegisterOn = bridgehub.getAllZKChainChainIDs();
+        IChainRegistrationSender chainRegistrationSender = IChainRegistrationSender(
+            bridgehub.chainRegistrationSender()
+        );
+        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
+            vm.startBroadcast();
+            chainRegistrationSender.registerChain(chainsToRegisterOn[i], config.chainChainId);
+            vm.stopBroadcast();
+        }
     }
 
     function deployChainProxyAddress() internal {
