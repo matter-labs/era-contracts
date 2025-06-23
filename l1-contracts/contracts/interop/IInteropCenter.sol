@@ -8,7 +8,7 @@ import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
-    event InteropBundleSent(bytes32 l2l1TxHash, bytes32 interopBundleHash, InteropBundle interopBundle);
+    event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
     /// @notice Restrictions for parsing attributes.
     /// @param OnlyInteropCallValue: Only attribute for interop call value is allowed.

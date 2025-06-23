@@ -120,16 +120,15 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         _ensureCorrectTotalValue(_bundle.destinationChainId, _bundleCallsTotalValue);
 
         bytes memory interopBundleBytes = abi.encode(_bundle);
-        // TODO use canonicalTxHash for linking it to the trigger, instead of interopBundleHash
-        // ! VG to KL. before merging pls resolve: why canonicalTxHash? That call returns hash of the message, no? Looks weird on the first glance
+
         // Send the message corresponding to the relevant InteropBundle to L1.
-        bytes32 canonicalTxHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+        bytes32 msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
         );
         interopBundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
         // Emit event stating that the bundle was sent out successfully.
-        emit InteropBundleSent(canonicalTxHash, interopBundleHash, _bundle);
+        emit InteropBundleSent(msgHash, interopBundleHash, _bundle);
     }
 
     /// @notice Ensures the received base token value matches expected for the destination chain.
