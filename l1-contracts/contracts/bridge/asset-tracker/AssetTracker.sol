@@ -258,12 +258,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         _sendConfirmationToL2(chainId, assetId, amount, migrationNumber);
     }
 
-    function confirmMigrationOnL2(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        uint256 _migrationNumber
-    ) external {
+    function confirmMigrationOnL2(uint256, bytes32 _assetId, uint256, uint256 _migrationNumber) external {
         migrationNumber[_assetId] = _migrationNumber;
     }
 
