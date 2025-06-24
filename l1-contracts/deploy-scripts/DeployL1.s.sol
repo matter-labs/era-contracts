@@ -634,6 +634,7 @@ contract DeployL1Script is Script, DeployUtils {
             messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
             chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             interopCenterBytecodeHash: getL2BytecodeHash("InteropCenter"),
+            interopHandlerBytecodeHash: getL2BytecodeHash("InteropHandler"),
             assetTrackerBytecodeHash: getL2BytecodeHash("AssetTracker"),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain

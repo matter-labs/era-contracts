@@ -578,6 +578,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
             messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
             chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             interopCenterBytecodeHash: getL2BytecodeHash("InteropCenter"),
+            interopHandlerBytecodeHash: getL2BytecodeHash("InteropHandler"),
             assetTrackerBytecodeHash: getL2BytecodeHash("AssetTracker"),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
