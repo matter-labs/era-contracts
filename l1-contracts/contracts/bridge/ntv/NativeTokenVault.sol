@@ -61,12 +61,18 @@ abstract contract NativeTokenVault is
     /// @dev A mapping tokenAddress => assetId
     mapping(address tokenAddress => bytes32 assetId) public assetId;
 
+    /// @dev The number of bridged tokens.
+    uint256 public bridgedTokenCount;
+
+    /// @dev The mapping of bridged tokens, count => assetId
+    mapping(uint256 count => bytes32 assetId) public bridgedTokens;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[46] private __gap;
+    uint256[44] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
@@ -118,6 +124,20 @@ abstract contract NativeTokenVault is
         } else {
             tokenAssetId = currentAssetId;
         }
+    }
+
+    error TokenNotLegacy();
+
+    /// @notice Adds a legacy token to the bridged tokens list.
+    /// @dev This function is used to add a legacy token to the bridged tokens list.
+    /// @param _token The address of the token to be added to the bridged tokens list.
+    function addLegacyTokenToBridgedTokensList(address _token) external {
+        bytes32 tokenAssetId = assetId[_token];
+        if (tokenAssetId == bytes32(0)) {
+            revert TokenNotLegacy();
+        }
+        bridgedTokens[bridgedTokenCount] = tokenAssetId;
+        bridgedTokenCount++;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -438,6 +458,8 @@ abstract contract NativeTokenVault is
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;
+        bridgedTokens[bridgedTokenCount] = newAssetId;
+        bridgedTokenCount++;
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
@@ -520,6 +542,8 @@ abstract contract NativeTokenVault is
 
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
+        bridgedTokens[bridgedTokenCount] = _assetId;
+        bridgedTokenCount++;
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.

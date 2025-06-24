@@ -129,6 +129,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         tokenAddress[newAssetId] = _l2TokenAddress;
         assetId[_l2TokenAddress] = newAssetId;
         originChainId[newAssetId] = L1_CHAIN_ID;
+        bridgedTokens[bridgedTokenCount] = newAssetId;
+        bridgedTokenCount++;
     }
 
     /// @notice Ensures that the token is deployed.
@@ -183,6 +185,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
         originChainId[_assetId] = L1_CHAIN_ID;
+        bridgedTokens[bridgedTokenCount] = _assetId;
+        bridgedTokenCount++;
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.

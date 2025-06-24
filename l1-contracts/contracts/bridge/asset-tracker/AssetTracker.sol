@@ -45,10 +45,9 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
     mapping(uint256 chainId => mapping(bytes32 assetId => bool isMinter)) public isMinterChain;
-    mapping(bytes32 assetId => uint256 numberOfSettlingMintingChains) public numberOfSettlingMintingChains;
 
-    // for now, should be replaced by isMinterChain.
-    mapping(bytes32 assetId => uint256 originChainId) public originChainId;
+    ///
+    mapping(bytes32 assetId => uint256 migrationNumber) public migrationNumber;
 
     constructor(
         uint256 _l1ChainId,
@@ -73,6 +72,10 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     function initialize() external {
         // TODO: implement
     }
+
+    /*//////////////////////////////////////////////////////////////
+                    Token deposits and withdrawals
+    //////////////////////////////////////////////////////////////*/
 
     function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
@@ -117,6 +120,10 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         }
         chainBalance[chainToUpdate][_assetId] -= _amount;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                    Chain settlement logs processing
+    //////////////////////////////////////////////////////////////*/
 
     /// note we don't process L1 txs here, since we can do that when accepting the tx.
     // kl todo: estimate the txs size, and how much we can handle on GW.
@@ -208,95 +215,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     }
 
     /*//////////////////////////////////////////////////////////////
-                            Token balance migration 
+                    Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
-
-    // // slither-disable-next-line locked-ether
-    // function bridgeMint(
-    //     uint256 _originSettlementChainId,
-    //     bytes32 _assetId,
-    //     bytes calldata _data
-    // ) external payable requireZeroValue(msg.value) onlyAssetRouter {
-    //     (
-    //         uint256 chainId,
-    //         bytes32 assetId,
-    //         uint256 amount,
-    //         bool migratingChainIsMinter,
-    //         bool isSLStillMinter,
-    //         uint256 newSLBalance
-    //     ) = DataEncoding.decodeAssetTrackerData(_data);
-    //     chainBalance[chainId][assetId] += amount;
-    //     isMinterChain[chainId][assetId] = migratingChainIsMinter;
-    //     numberOfSettlingMintingChains[assetId] += migratingChainIsMinter ? 1 : 0;
-    //     if (migratingChainIsMinter && block.chainid == L1_CHAIN_ID) {
-    //         if (!isSLStillMinter) {
-    //             isMinterChain[_originSettlementChainId][_assetId] = false;
-    //             chainBalance[_originSettlementChainId][_assetId] = newSLBalance;
-    //         }
-    //     }
-    // }
-
-    // // slither-disable-next-line locked-ether
-    // function bridgeBurn(
-    //     uint256 _settlementChainId,
-    //     uint256,
-    //     bytes32, // _assetId todo add check on it.
-    //     address,
-    //     bytes calldata _data
-    // ) external payable requireZeroValue(msg.value) onlyAssetRouter returns (bytes memory _bridgeMintData) {
-    //     if (!BRIDGE_HUB.whitelistedSettlementLayers(_settlementChainId)) {
-    //         revert SLNotWhitelisted();
-    //     }
-    //     (uint256 chainId, bytes32 assetId) = abi.decode(_data, (uint256, bytes32));
-    //     // kl todo add assetId check.
-    //     // if (_assetId != ) {
-    //     //     revert IncorrectChainAssetId(_assetId, (chainId));
-    //     // }
-    //     if (BRIDGE_HUB.settlementLayer(chainId) != _settlementChainId) {
-    //         revert NotCurrentSettlementLayer();
-    //     }
-    //     bool migratingChainIsMinter = isMinterChain[chainId][assetId];
-    //     uint256 amount = chainBalance[chainId][assetId];
-    //     if (amount == 0 && !migratingChainIsMinter) {
-    //         // we already migrated or there is nothing to migrate
-    //         revert AlreadyMigrated();
-    //     }
-    //     chainBalance[chainId][assetId] = 0;
-    //     isMinterChain[chainId][assetId] = false;
-    //     uint256 newSLBalance = 0;
-
-    //     if (migratingChainIsMinter) {
-    //         --numberOfSettlingMintingChains[assetId];
-    //         if (block.chainid == L1_CHAIN_ID) {
-    //             isMinterChain[_settlementChainId][assetId] = true;
-    //         } else {
-    //             if (numberOfSettlingMintingChains[assetId] == 0) {
-    //                 // we need to calculate the current balance of this chain, the sum of all the balances on it.
-    //                 uint256[] memory zkChainIds = BRIDGE_HUB.getAllZKChainChainIDs();
-    //                 uint256 zkChainIdsLength = zkChainIds.length;
-    //                 for (uint256 i = 0; i < zkChainIdsLength; ++i) {
-    //                     if (BRIDGE_HUB.settlementLayer(zkChainIds[i]) == block.chainid) {
-    //                         newSLBalance += chainBalance[zkChainIds[i]][assetId];
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //     } else if (!isMinterChain[_settlementChainId][assetId] && block.chainid == L1_CHAIN_ID) {
-    //         // We only care about the chainBalance if the SL is not a minter.
-    //         // On GW we don't care about the L1 chainBalance.
-    //         chainBalance[_settlementChainId][assetId] += amount;
-    //     }
-
-    //     return
-    //         DataEncoding.encodeAssetTrackerData({
-    //             _chainId: chainId,
-    //             _assetId: assetId,
-    //             _amount: amount,
-    //             _migratingChainIsMinter: migratingChainIsMinter,
-    //             _hasSettlingMintingChains: numberOfSettlingMintingChains[assetId] > 0,
-    //             _newSLBalance: newSLBalance
-    //         });
-    // }
 
     /// @notice Migrates the token balance from L2 to L1.
     function migrateTokenBalanceFromL2(bytes32 _assetId) external {
@@ -343,7 +263,9 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         bytes32 _assetId,
         uint256 _amount,
         uint256 _migrationNumber
-    ) external {}
+    ) external {
+        migrationNumber[_assetId] = _migrationNumber;
+    }
 
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
         L2Message memory l2ToL1Message = L2Message({

@@ -464,6 +464,14 @@ contract RegisterZKChainScript is Script {
             chainRegistrationSender.registerChain(chainsToRegisterOn[i], config.chainChainId);
             vm.stopBroadcast();
         }
+        for (uint256 i = 0; i < chainsToRegisterOn.length; i++) {
+            if (chainsToRegisterOn[i] == config.chainChainId) {
+                continue;
+            }
+            vm.startBroadcast();
+            chainRegistrationSender.registerChain(config.chainChainId, chainsToRegisterOn[i]);
+            vm.stopBroadcast();
+        }
     }
 
     function deployChainProxyAddress() internal {
