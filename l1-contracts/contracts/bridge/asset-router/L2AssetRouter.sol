@@ -20,7 +20,7 @@ import {InteropCallStarter} from "../../common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy, InvalidSelector, PayloadTooShort, ExecuteMessageFailed} from "../../common/L1ContractErrors.sol";
 import {IERC7786Receiver} from "../../interop/IERC7786Receiver.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 
@@ -136,10 +136,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // which is located on L1.
         _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
     }
-
-    error L2AssetRouter_InvalidSelector();
-    error L2AssetRouter_PayloadTooShort();
-    error L2AssetRouter_ExecuteMessageFailed();
+    
     function executeMessage(
         // kl todo: change back to strings
         bytes32, // messageId, gateway specific, empty or unique
@@ -148,15 +145,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes calldata payload,
         bytes[] calldata // attributes
     ) external payable returns (bytes4) {
-        require(payload.length > 4, L2AssetRouter_PayloadTooShort());
-        // require(bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector, L2AssetRouter_InvalidSelector());
+        require(payload.length > 4, PayloadTooShort());
+        require(bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector, InvalidSelector(bytes4(payload[0:4])));
         (bool success, ) = address(this).call(payload);
-        require(success, L2AssetRouter_ExecuteMessageFailed());
+        require(success, ExecuteMessageFailed());
         return IERC7786Receiver.executeMessage.selector;
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATTE DEPOSIT Functions
+                            INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetRouterBase
@@ -196,6 +193,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
     }
 
+    /// @inheritdoc IL2AssetRouter
     function interopCenterInitiateBridge(
         uint256 _chainId,
         address _originalCaller,

@@ -38,6 +38,14 @@ interface IL2AssetRouter is IAssetRouterBase {
     /// @param _assetId The assetId of the legacy token.
     function setLegacyTokenAssetHandler(bytes32 _assetId) external;
 
+    /// @notice Function that returns an InteropCallStarter corresponding to the interop call. Effectively this initiates bridging,
+    ///         BH part is processed withing this function via `_bridgehubDeposit` call which also returns the data for an l2 call
+    ///         on the destination chain (which will be processed with the returned InteropCallStarter from this function).
+    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
+    /// @param _value The `msg.value` on the target chain tx.
+    /// @param _data The calldata for the second bridge deposit.
+    /// @return interopCallStarter InteropCallStarter corresponding to the second bridge call.
     function interopCenterInitiateBridge(
         uint256 _chainId,
         address _originalCaller,

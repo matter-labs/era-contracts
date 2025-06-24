@@ -16,7 +16,7 @@ import {IL2AssetRouter} from "./asset-router/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./ntv/IL2NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {AmountMustBeGreaterThanZero, DeployFailed, EmptyBytes32, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, DeployFailed, EmptyBytes32, Unauthorized, ZeroAddress, InvalidCaller} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -125,7 +125,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1Bridge &&
             AddressAliasHelper.undoL1ToL2Alias(msg.sender) != l1SharedBridge
         ) {
-            // revert InvalidCaller(msg.sender);
+            revert InvalidCaller(msg.sender);
         }
 
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDepositLegacyBridge({

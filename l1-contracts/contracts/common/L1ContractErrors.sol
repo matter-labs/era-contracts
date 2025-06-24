@@ -378,6 +378,9 @@ error ZeroAddress();
 error ZeroChainId();
 // 0x601b6882
 error ZKChainLimitReached();
+error PayloadTooShort();
+error ExecuteMessageFailed();
+error BadTransferDataLength();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

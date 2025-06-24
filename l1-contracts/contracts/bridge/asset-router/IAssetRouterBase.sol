@@ -75,7 +75,6 @@ interface IAssetRouterBase {
     function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes memory _transferData) external payable;
 
     /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
-    // / @param _chainId The chain ID of the ZK chain to which deposit.
     /// @param _sender The address of the deposit initiator.
     /// @param _assetId The deposited asset ID.
     /// @param _assetData The encoded data, which is used by the asset handler to determine L2 recipient and amount. Might include extra information.

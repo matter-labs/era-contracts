@@ -8,12 +8,12 @@ import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IL1SharedBridgeLegacy} from "../interfaces/IL1SharedBridgeLegacy.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
+import {IL1CrossChainSender} from "./IL1CrossChainSender.sol";
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
-/// @notice This contract implement IL1CrossChainSender interface. We do not import it here to decrease inheritance.
 /// @custom:security-contact security@matterlabs.dev
-interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy {
+interface IL1AssetRouter is IAssetRouterBase, IL1SharedBridgeLegacy, IL1CrossChainSender {
     event BridgehubMintData(bytes bridgeMintData);
 
     event BridgehubDepositFinalized(

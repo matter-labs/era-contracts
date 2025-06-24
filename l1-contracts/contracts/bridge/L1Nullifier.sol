@@ -40,7 +40,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev InteropCenter smart contract that is used to used to operate with L2 via asynchronous L2 <-> L1 communication.
+    /// @dev InteropCenter smart contract that is used to used as a primary point for communication of chains connected to the interop.
+    /// @dev This is not used but is present for discoverability.
     IInteropCenter internal immutable INTEROP_CENTER;
 
     /// @dev Era's chainID

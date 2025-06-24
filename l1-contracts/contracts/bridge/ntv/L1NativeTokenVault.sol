@@ -35,13 +35,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
+    /// @notice AssetTracker component address on L1. On L2 the address is L2_ASSET_TRACKER_ADDR.
+    ///         It adds one more layer of security on top of cross chain communication.
+    ///         Refer to its documentation for more details.
     IAssetTracker public l1AssetTracker;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
-    /// This serves as a security measure until hyperbridging is implemented.
-    /// NOTE: this function may be removed in the future, don't rely on it!
-    // kl todo deprecate
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
+    /// This mapping was deprecated in favor of AssetTracker component, now it's responsible for tracking chain balances.
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public DEPRECATED_chainBalance;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -86,7 +87,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
     }
 
-    function setAssetTracker(address _l1AssetTracker) external {
+    /// @dev Function used to set AssetTracker component address.
+    ///      Only callable by owner.
+    /// @param _l1AssetTracker The address of the AssetTracker component.
+    function setAssetTracker(address _l1AssetTracker) external onlyOwner {
         l1AssetTracker = IAssetTracker(_l1AssetTracker);
     }
 

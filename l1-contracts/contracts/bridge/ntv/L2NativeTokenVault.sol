@@ -273,7 +273,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _isNative
     ) internal override {
         // on L2s we don't track the balance.
-        // Note GW->L2 txs are not allowed. Even for GW, there
+        // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
+        // so L2NativeTokenVault doesn't have to handle balance changes on GW.
     }
 
     function _handleChainBalanceDecrease(
@@ -284,6 +285,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _isNative
     ) internal override {
         // on L2s we don't track the balance.
+        // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
+        // so L2NativeTokenVault doesn't have to handle balance changes on GW.
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {

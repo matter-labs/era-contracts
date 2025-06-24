@@ -197,7 +197,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATTE DEPOSIT Functions
+                            INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetRouterBase
@@ -241,7 +241,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 );
         } else if (encodingVersion == LEGACY_ENCODING_VERSION) {
             return
-                _bridgehubDepositRealAsset({
+                _bridgehubDepositNonBaseTokenAsset({
                     _chainId: _chainId,
                     _originalCaller: _originalCaller,
                     _value: _value,

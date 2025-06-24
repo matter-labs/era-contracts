@@ -17,7 +17,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
-import {AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion, AssetHandlerDoesNotExist} from "../../common/L1ContractErrors.sol";
+import {AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion, AssetHandlerDoesNotExist, BadTransferDataLength} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
@@ -30,7 +30,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev InteropCenter smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    /// @dev InteropCenter smart contract that is used to used as a primary point for communication of chains connected to the interop.
+    /// @dev This is not used but is present for discoverability.
     IInteropCenter public immutable override INTEROP_CENTER;
 
     /// @dev Chain ID of L1 for bridging reasons
@@ -98,7 +99,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATTE DEPOSIT Functions
+                            INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     function bridgehubDepositBaseToken(
@@ -142,7 +143,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == NEW_ENCODING_VERSION) {
             return
-                _bridgehubDepositRealAsset({
+                _bridgehubDepositNonBaseTokenAsset({
                     _chainId: _chainId,
                     _originalCaller: _originalCaller,
                     _value: _value,
@@ -154,7 +155,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         }
     }
 
-    function _bridgehubDepositRealAsset(
+    function _bridgehubDepositNonBaseTokenAsset(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,
@@ -208,7 +209,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         if (_encodingVersion == NEW_ENCODING_VERSION) {
+            if (_data.length < 33) {
+                // For better error handling.
+                revert BadTransferDataLength();
+            }
             (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
+        } else {
+            revert UnsupportedEncodingVersion();
         }
     }
 
