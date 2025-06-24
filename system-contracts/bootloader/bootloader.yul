@@ -3326,7 +3326,8 @@ object "Bootloader" {
                 /// Note, that as mentioned above, we provide bootloader with numberOfRoots equal to the actual value + 1.
                 /// The loop runs for (numberOfRoots - 1) iterations, intentionally skipping the extra +1.
                 debugLog("Setting interop roots 1", nextInteropRootNumber)
-                for {let i := nextInteropRootNumber} lt(i, sub(numberOfRoots, 1)) {i := add(i, 1)} {
+                let finalInteropRootNumber := add(nextInteropRootNumber, sub(numberOfRoots, 1))
+                for {let i := nextInteropRootNumber} lt(i, finalInteropRootNumber) {i := add(i, 1)} {
                     debugLog("Setting interop roots 2", i)
                     let interopRootStartSlot := getInteropRootByte(i)
                     let currentBlockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET()))
