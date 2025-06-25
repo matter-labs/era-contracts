@@ -57,9 +57,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     mapping(address sender => uint256 numberOfBundlesSent) public interopBundleNonce;
 
     modifier onlyL1() {
-        if (L1_CHAIN_ID != block.chainid) {
-            revert Unauthorized(msg.sender);
-        }
+        require(L1_CHAIN_ID == block.chainid, NotL1(L1_CHAIN_ID, block.chainid));
         _;
     }
 
