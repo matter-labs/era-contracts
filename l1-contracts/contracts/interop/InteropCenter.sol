@@ -30,7 +30,7 @@ import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 /// @title InteropCenter
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @dev This contract serves as the primary entry point for L1<->L2 communication, facilitating interactions between end user and bridges.
+/// @dev This contract serves as the primary entry point for communication between chains connected to the interop, facilitating interactions between end user and bridges.
 contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice The bridgehub, responsible for registering chains.
     IBridgehub public immutable override BRIDGE_HUB;
