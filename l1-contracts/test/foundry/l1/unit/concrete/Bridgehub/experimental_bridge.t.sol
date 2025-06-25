@@ -260,7 +260,8 @@ contract ExperimentalBridgeTest is Test {
             address(interopCenter),
             address(0x000000000000000000000000000000000002000a)
         );
-        interopCenter.setAddresses(sharedBridgeAddress, address(assetTracker));
+        interopCenter.setAssetRouterAddress(sharedBridgeAddress);
+        interopCenter.setAssetTrackerAddress(address(assetTracker));
         vm.stopPrank();
 
         vm.prank(l1Nullifier.owner());

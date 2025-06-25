@@ -93,13 +93,20 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         _transferOwnership(_owner);
     }
 
-    /// @notice To set the addresses of some of the ecosystem contracts, only accessible to owner.
-    ///         Not done in initialize, as the order of deployment is InteropCenter, other contracts, and then we call this.
+    /// @notice Used to set the address of the AssetRouter component. Only accessible to the owner.
+    ///         Not done in initialize, as InteropCenter is deployed before AssetRouter, and then we call this.
     /// @param _assetRouter  Address of the AssetRouter component.
-    /// @param _assetTracker  Address of the AssetTracker component on L1.
-    function setAddresses(address _assetRouter, address _assetTracker) external onlyOwner {
+    function setAssetRouterAddress(address _assetRouter) external onlyOwner {
         assetRouter = _assetRouter;
+        emit AssetRouterSet(_assetRouter);
+    }
+
+    /// @notice Used to set the address of the AssetTracker component. Only accessible to the owner.
+    ///         Not done in initialize, as InteropCenter is deployed before AssetTracker, and then we call this.
+    /// @param _assetTracker  Address of the AssetTracker component on L1.
+    function setAssetTrackerAddress(address _assetTracker) external onlyOwner {
         assetTracker = IAssetTracker(_assetTracker);
+        emit AssetTrackerSet(_assetTracker);
     }
 
     /*//////////////////////////////////////////////////////////////
