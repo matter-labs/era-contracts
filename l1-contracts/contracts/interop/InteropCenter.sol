@@ -62,7 +62,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     modifier onlyL2ToL2(uint256 _destinationChainId) {
-        require(L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID, NotL2ToL2(block.chainid, _destinationChainId));
+        require(
+            L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
+            NotL2ToL2(block.chainid, _destinationChainId)
+        );
         _;
     }
 
@@ -108,7 +111,77 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     /*//////////////////////////////////////////////////////////////
-                        Bundle interface
+                    InteropCenter entry points
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Sends a single call to another chain.
+    /// @param _destinationChainId Chain ID to send to.
+    /// @param _destinationAddress Address on remote chain.
+    /// @param _data Calldata payload to send.
+    /// @param _attributes Attributes of the call.
+    /// @return bundleHash Hash of the sent bundle containing a single call.
+    function sendCall(
+        uint256 _destinationChainId,
+        address _destinationAddress,
+        bytes calldata _data,
+        bytes[] calldata _attributes
+    ) external payable onlyL2ToL2(_destinationChainId) returns (bytes32 bundleHash) {
+        (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
+            _attributes,
+            AttributeParsingRestrictions.CallAndBundleAttributes
+        );
+
+        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
+        callStartersInternal[0] = InteropCallStarterInternal({
+            nextContract: _destinationAddress,
+            data: _data,
+            callAttributes: callAttributes
+        });
+
+        bundleHash = _sendBundle(_destinationChainId, callStartersInternal, bundleAttributes);
+    }
+
+    /// @notice Sends an interop bundle.
+    ///         Same as above, but more than one call can be given, and they are given in InteropCallStarter format.
+    /// @param _destinationChainId Chain ID to send to.
+    /// @param _callStarters Array of call descriptors.
+    /// @param _bundleAttributes Attributes of the bundle.
+    /// @return bundleHash Hash of the sent bundle.
+    function sendBundle(
+        uint256 _destinationChainId,
+        InteropCallStarter[] calldata _callStarters,
+        bytes[] calldata _bundleAttributes
+    ) external payable onlyL2ToL2(_destinationChainId) returns (bytes32 bundleHash) {
+        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
+            _callStarters.length
+        );
+        uint256 callStartersLength = _callStarters.length;
+        for (uint256 i = 0; i < callStartersLength; ++i) {
+            // solhint-disable-next-line no-unused-vars
+            (CallAttributes memory callAttributes, ) = parseAttributes(
+                _callStarters[i].callAttributes,
+                AttributeParsingRestrictions.OnlyCallAttributes
+            );
+            callStartersInternal[i] = InteropCallStarterInternal({
+                nextContract: _callStarters[i].nextContract,
+                data: _callStarters[i].data,
+                callAttributes: callAttributes
+            });
+        }
+        // solhint-disable-next-line no-unused-vars
+        (, BundleAttributes memory bundleAttributes) = parseAttributes(
+            _bundleAttributes,
+            AttributeParsingRestrictions.OnlyBundleAttributes
+        );
+        bundleHash = _sendBundle({
+            _destinationChainId: _destinationChainId,
+            _callStarters: callStartersInternal,
+            _bundleAttributes: bundleAttributes
+        });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Internal functions
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Finalizes, serializes, and sends a message corresponding to the bundle via the L2 to L1 messenger.
@@ -159,142 +232,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             );
         }
     }
-
-    /*//////////////////////////////////////////////////////////////
-                        EOA helpers
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Sends a single call to another chain.
-    /// @param _destinationChainId Chain ID to send to.
-    /// @param _destinationAddress Address on remote chain.
-    /// @param _data Calldata payload to send.
-    /// @param _attributes Attributes of the call.
-    /// @return bundleHash Hash of the sent bundle containing a single call.
-    function sendCall(
-        uint256 _destinationChainId,
-        address _destinationAddress,
-        bytes calldata _data,
-        bytes[] calldata _attributes
-    ) public payable onlyL2ToL2(_destinationChainId) returns (bytes32 bundleHash) {
-        (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
-            _attributes,
-            AttributeParsingRestrictions.CallAndBundleAttributes
-        );
-
-        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
-        callStartersInternal[0] = InteropCallStarterInternal({
-            nextContract: _destinationAddress,
-            data: _data,
-            callAttributes: callAttributes
-        });
-
-        bundleHash = _sendBundle(_destinationChainId, callStartersInternal, bundleAttributes);
-    }
-
-    /// @notice Sends an interop bundle.
-    ///         Same as above, but more than one call can be given, and they are given in InteropCallStarter format.
-    /// @param _destinationChainId Chain ID to send to.
-    /// @param _callStarters Array of call descriptors.
-    /// @param _bundleAttributes Attributes of the bundle.
-    /// @return bundleHash Hash of the sent bundle.
-    function sendBundle(
-        uint256 _destinationChainId,
-        InteropCallStarter[] calldata _callStarters,
-        bytes[] calldata _bundleAttributes
-    ) public payable onlyL2ToL2(_destinationChainId) returns (bytes32 bundleHash) {
-        InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
-            _callStarters.length
-        );
-        uint256 callStartersLength = _callStarters.length;
-        for (uint256 i = 0; i < callStartersLength; ++i) {
-            // solhint-disable-next-line no-unused-vars
-            (CallAttributes memory callAttributes, ) = parseAttributes(
-                _callStarters[i].callAttributes,
-                AttributeParsingRestrictions.OnlyCallAttributes
-            );
-            callStartersInternal[i] = InteropCallStarterInternal({
-                nextContract: _callStarters[i].nextContract,
-                data: _callStarters[i].data,
-                callAttributes: callAttributes
-            });
-        }
-        // solhint-disable-next-line no-unused-vars
-        (, BundleAttributes memory bundleAttributes) = parseAttributes(
-            _bundleAttributes,
-            AttributeParsingRestrictions.OnlyBundleAttributes
-        );
-        bundleHash = _sendBundle({
-            _destinationChainId: _destinationChainId,
-            _callStarters: callStartersInternal,
-            _bundleAttributes: bundleAttributes
-        });
-    }
-
-    /// @notice Parses the attributes of the call or bundle.
-    /// @param _attributes EIP-7786 Attributes of the call.
-    /// @param _restriction Restriction for parsing attributes.
-    function parseAttributes(
-        bytes[] calldata _attributes,
-        AttributeParsingRestrictions _restriction
-    ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
-        // Default value is direct call.
-        callAttributes.directCall = true;
-
-        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
-        // We can only pass each attribute once.
-        bool[] memory attributeUsed = new bool[](4);
-
-        uint256 attributesLength = _attributes.length;
-        for (uint256 i = 0; i < attributesLength; ++i) {
-            bytes4 selector = bytes4(_attributes[i]);
-            /// Finding the matching attribute selector.
-            uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
-            uint256 indexInSelectorsArray = attributeSelectorsLength;
-            for (uint256 j = 0; j < attributeSelectorsLength; ++j) {
-                if (selector == ATTRIBUTE_SELECTORS[j]) {
-                    /// check if the attribute was already set.
-                    require(!attributeUsed[j], AttributeAlreadySet(j));
-                    attributeUsed[j] = true;
-                    indexInSelectorsArray = j;
-                    break;
-                }
-            }
-            // Revert if the selector does not match any of the known attributes.
-            if (indexInSelectorsArray == attributeSelectorsLength) {
-                revert IERC7786GatewaySource.UnsupportedAttribute(selector);
-            }
-            // Checking whether selectors satisfy the restrictions.
-            if (_restriction == AttributeParsingRestrictions.OnlyInteropCallValue) {
-                require(indexInSelectorsArray == 0, AttributeNotForInteropCallValue(selector));
-            }
-            if (indexInSelectorsArray < 2) {
-                require(
-                    _restriction != AttributeParsingRestrictions.OnlyBundleAttributes,
-                    AttributeNotForBundle(selector)
-                );
-            } else {
-                require(
-                    _restriction != AttributeParsingRestrictions.OnlyInteropCallValue,
-                    AttributeNotForCall(selector)
-                );
-            }
-            // setting the attributes
-            if (indexInSelectorsArray == 0) {
-                callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (indexInSelectorsArray == 1) {
-                callAttributes.directCall = false;
-                callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (indexInSelectorsArray == 2) {
-                bundleAttributes.executionAddress = AttributesDecoder.decodeAddress(_attributes[i]);
-            } else if (indexInSelectorsArray == 3) {
-                bundleAttributes.unbundlerAddress = AttributesDecoder.decodeAddress(_attributes[i]);
-            }
-        }
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            Internal functions
-    //////////////////////////////////////////////////////////////*/
 
     /// @notice Constructs and sends an InteropBundle.
     /// @param _destinationChainId Chain ID to send to.
@@ -420,6 +357,68 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /*//////////////////////////////////////////////////////////////
                             ERC 7786
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Parses the attributes of the call or bundle.
+    /// @param _attributes EIP-7786 Attributes of the call.
+    /// @param _restriction Restriction for parsing attributes.
+    function parseAttributes(
+        bytes[] calldata _attributes,
+        AttributeParsingRestrictions _restriction
+    ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
+        // Default value is direct call.
+        callAttributes.directCall = true;
+
+        bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
+        // We can only pass each attribute once.
+        bool[] memory attributeUsed = new bool[](4);
+
+        uint256 attributesLength = _attributes.length;
+        for (uint256 i = 0; i < attributesLength; ++i) {
+            bytes4 selector = bytes4(_attributes[i]);
+            /// Finding the matching attribute selector.
+            uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
+            uint256 indexInSelectorsArray = attributeSelectorsLength;
+            for (uint256 j = 0; j < attributeSelectorsLength; ++j) {
+                if (selector == ATTRIBUTE_SELECTORS[j]) {
+                    /// check if the attribute was already set.
+                    require(!attributeUsed[j], AttributeAlreadySet(j));
+                    attributeUsed[j] = true;
+                    indexInSelectorsArray = j;
+                    break;
+                }
+            }
+            // Revert if the selector does not match any of the known attributes.
+            if (indexInSelectorsArray == attributeSelectorsLength) {
+                revert IERC7786GatewaySource.UnsupportedAttribute(selector);
+            }
+            // Checking whether selectors satisfy the restrictions.
+            if (_restriction == AttributeParsingRestrictions.OnlyInteropCallValue) {
+                require(indexInSelectorsArray == 0, AttributeNotForInteropCallValue(selector));
+            }
+            if (indexInSelectorsArray < 2) {
+                require(
+                    _restriction != AttributeParsingRestrictions.OnlyBundleAttributes,
+                    AttributeNotForBundle(selector)
+                );
+            } else {
+                require(
+                    _restriction != AttributeParsingRestrictions.OnlyInteropCallValue,
+                    AttributeNotForCall(selector)
+                );
+            }
+            // setting the attributes
+            if (indexInSelectorsArray == 0) {
+                callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
+            } else if (indexInSelectorsArray == 1) {
+                callAttributes.directCall = false;
+                callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
+            } else if (indexInSelectorsArray == 2) {
+                bundleAttributes.executionAddress = AttributesDecoder.decodeAddress(_attributes[i]);
+            } else if (indexInSelectorsArray == 3) {
+                bundleAttributes.unbundlerAddress = AttributesDecoder.decodeAddress(_attributes[i]);
+            }
+        }
+    }
 
     /// @notice Checks if the attribute selector is supported by the InteropCenter.
     /// @param _attributeSelector The attribute selector to check.
