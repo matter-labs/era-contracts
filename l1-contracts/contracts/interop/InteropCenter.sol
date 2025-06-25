@@ -16,7 +16,7 @@ import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal, CallAttributes, BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "../common/Messaging.sol";
-import {MsgValueMismatch, Unauthorized, NotL1} from "../common/L1ContractErrors.sol";
+import {MsgValueMismatch, Unauthorized, NotL1, NotL2ToL2} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
@@ -61,10 +61,8 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         _;
     }
 
-    modifier onlyL2NotToL1(uint256 _destinationChainId) {
-        if (L1_CHAIN_ID == block.chainid || _destinationChainId == L1_CHAIN_ID) {
-            revert Unauthorized(msg.sender);
-        }
+    modifier onlyL2ToL2(uint256 _destinationChainId) {
+        require(L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID, NotL2ToL2(block.chainid, _destinationChainId));
         _;
     }
 
@@ -177,7 +175,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _destinationAddress,
         bytes calldata _data,
         bytes[] calldata _attributes
-    ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleHash) {
+    ) public payable onlyL2ToL2(_destinationChainId) returns (bytes32 bundleHash) {
         (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
             _attributes,
             AttributeParsingRestrictions.CallAndBundleAttributes
@@ -203,7 +201,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) public payable onlyL2NotToL1(_destinationChainId) returns (bytes32 bundleHash) {
+    ) public payable onlyL2ToL2(_destinationChainId) returns (bytes32 bundleHash) {
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
         );

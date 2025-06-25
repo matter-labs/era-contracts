@@ -380,6 +380,7 @@ error ZeroChainId();
 error ZKChainLimitReached();
 // 0xecb34449
 error NotL1(uint256 l1ChainId, uint256 blockChainId);
+error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
