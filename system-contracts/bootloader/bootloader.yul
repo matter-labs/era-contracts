@@ -406,8 +406,7 @@ object "Bootloader" {
             /// @dev The size of each of the interop roots.
             function INTEROP_ROOT_SLOT_SIZE() -> ret {
                 // We will have to increase this to add merkle proofs. 
-                ret := 6
-
+                ret := 5
             }
 
             /// @dev The maximum L2 block number. used for dummy interop roots.
@@ -424,6 +423,16 @@ object "Bootloader" {
                 ret := mul(add(MAX_INTEROP_ROOTS_IN_BATCH(), 1), INTEROP_ROOT_SLOT_SIZE())
             }
 
+            /// @dev The slot dedicated for storing the rolling hash of the dependency interop roots to the L1.
+            function INTEROP_ROOT_ROLLING_HASH_SLOT() -> ret {
+                ret := add(INTEROP_ROOT_BEGIN_SLOT(), INTEROP_ROOT_SLOTS())
+            }
+
+            /// @dev The byte starting from which the rolling hash of the dependency interop roots to the L1 is stored.
+            function INTEROP_ROOT_ROLLING_HASH_BYTE() -> ret {
+                ret := mul(INTEROP_ROOT_ROLLING_HASH_SLOT(), 32)
+            }
+
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
             /// Each compressed bytecode is provided in the following format:
             /// - 32 byte formatted bytecode hash
@@ -435,7 +444,7 @@ object "Bootloader" {
             /// At the start of the bootloader, the value stored at the `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT` is equal to
             /// `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT + 32`, where the hash of the first compressed bytecode to publish should be stored.
             function COMPRESSED_BYTECODES_BEGIN_SLOT() -> ret {
-                ret := add(INTEROP_ROOT_BEGIN_SLOT(), INTEROP_ROOT_SLOTS())
+                ret := add(INTEROP_ROOT_ROLLING_HASH_SLOT(), 1)
             }
 
             /// @dev The byte starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -3190,6 +3199,7 @@ object "Bootloader" {
 
             /// @notice Calls L2InteropRootStorage contract to add interop root.
             function callL2InteropRootStorage(chainId, blockNumber, sidesLength, interopRootStartSlot) {
+                /// We have an offset so we can preload the rolling hash into it later for hashing.
                 mstore(0, {{RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR}})
                 mstore(4, chainId)
                 mstore(36, blockNumber)
@@ -3199,19 +3209,20 @@ object "Bootloader" {
                 let sidesLoadingOffset := 132
                 let sidesOffset := add(interopRootStartSlot, INTEROP_ROOT_SIDES_OFFSET_START())
                 for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                /// Ensure we don’t write past the end of the scratch space.
-                /// In this release, `sides` occupies exactly one 32-byte slot, so if
-                /// `sidesLoadingOffset` exceeds
-                ///   (SCRATCH_SPACE_BEGIN_SLOT() + SCRATCH_SPACE_SLOTS() - 1) * 32
-                /// then we’d be writing outside of scratch space and must revert.
-                if gt(sidesLoadingOffset, mul(sub(add(SCRATCH_SPACE_BEGIN_SLOT(), SCRATCH_SPACE_SLOTS()), 1), 32)) {
-                    revertWithReason(TEMPORARY_DATA_OUTSIDE_SCRATCH_SPACE(), 0)
-                }
+                    /// Ensure we don’t write past the end of the scratch space.
+                    /// In this release, `sides` occupies exactly one 32-byte slot, so if
+                    /// `sidesLoadingOffset` exceeds
+                    ///   (SCRATCH_SPACE_BEGIN_SLOT() + SCRATCH_SPACE_SLOTS() - 1) * 32
+                    /// then we’d be writing outside of scratch space and must revert.
+                    if gt(sidesLoadingOffset, mul(sub(add(SCRATCH_SPACE_BEGIN_SLOT(), SCRATCH_SPACE_SLOTS()), 1), 32)) {
+                        revertWithReason(TEMPORARY_DATA_OUTSIDE_SCRATCH_SPACE(), 0)
+                    }
                     mstore(sidesLoadingOffset, mload(sidesOffset))
                     sidesOffset := add(sidesOffset, 32)
                     sidesLoadingOffset := add(sidesLoadingOffset, 32)
                 }
 
+                // Note, that in current release the provided sides length is checked to be 1, in L2InteropRootStorage contract.
                 let success := call(
                     gas(),
                     L2_INTEROP_ROOT_STORAGE(),
@@ -3227,55 +3238,17 @@ object "Bootloader" {
                     revertWithReason(FAILED_TO_SET_INTEROP_ROOT(), 1)
                 }
                 debugLog("InteropRoot set successfully", 2)
-                
-            }
 
-            /// @notice Sends the rolling hash of the dependency interop roots to the L1.
-            function sendInteropRootRollingHashToL1() {
-                debugLog("Sending interop roots to L1", 0)
-                let rollingHashOfProcessedRoots := 0
-                for {let i := 0} true {i := add(i, 1)} {
-                    let interopRootStartSlot := getInteropRootByte(i)
-                    let chainId  := mload(add(interopRootStartSlot, INTEROP_ROOT_CHAIN_ID_OFFSET())) 
-                    /// Note it might be a block or batchNumber. For proof based it is a block number.
-                    let blockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
-                    let sidesLength := mload(add(interopRootStartSlot, INTEROP_ROOT_SIDE_LENGTH_OFFSET()))
-
-                    debugLog("Send roots L1 chainId     ", chainId)
-                    debugLog("Send roots L1 blockNumber ", blockNumber)
-                    debugLog("Send roots L1 sidesLength ", sidesLength)
-
-                    if iszero(sidesLength) {
-                        // There are no more logs, sending hash to L1.
-                        debugLog("InteropRoot hash to L1", rollingHashOfProcessedRoots)
-                        sendToL1Native(true, interopRootRollingHashLogKey(), rollingHashOfProcessedRoots)
-                        break
-                    }
-                    /// We have an offset so we can preload the rolling hash into it later for hashing.
-                    let interopRootOffset := 64 
-                    mstore(add(interopRootOffset, 4), chainId)
-                    mstore(add(interopRootOffset, 36), blockNumber)
-                    let sidesLoadingOffset := add(interopRootOffset, 68)
-                    let sidesOffset := add(interopRootStartSlot, INTEROP_ROOT_SIDES_OFFSET_START())
-                    for {let j := 0} lt(j, sidesLength) {j := add(j, 1)} {
-                        debugLog("Hashing", mload(sidesOffset))
-                        mstore(sidesLoadingOffset, mload(sidesOffset))
-                        sidesOffset := add(sidesOffset, 32)
-                        sidesLoadingOffset := add(sidesLoadingOffset, 32)
-                    }
-
-                    // for single interopRoots that are not really sides, we send them to L1 here.
-                    switch sidesLength 
-                    case 1 {
-                        // Calculate keccak256 of all data
-                        mstore(36, rollingHashOfProcessedRoots) 
-                        rollingHashOfProcessedRoots := keccak256(36, add(32, add(64, mul(sidesLength, 32))))
-                    } 
-                    default {
-                        revertWithReason(FAILED_PRECOMMIT_BASED_INTEROP_NOT_SUPPORTED(), 1)
-                    }
-                    
-                }
+                // After the interopRoot is processed, we update the `rollingHashOfProcessedRoots`.
+                // We have to restructure positioning of data in memory, for the correct placement in hashing.
+                // The rolling hash should accept (rollingHashOfProcessedRoots, chainId, blockNumber, sides[0], ..., sides[x]).
+                // We are storing (sides[0], ... sides[x]) starting at byte 132, so we will just place rollingHashOfProcessedRoots, chainId, blockNumber right before that.
+                let rollingHashOfProcessedRoots := mload(INTEROP_ROOT_ROLLING_HASH_BYTE())
+                mstore(sub(132, 32), blockNumber)
+                mstore(sub(132, 64), chainId)
+                mstore(sub(132, 96), rollingHashOfProcessedRoots)
+                rollingHashOfProcessedRoots := keccak256(36, add(32, add(64, mul(sidesLength, 32))))
+                mstore(INTEROP_ROOT_ROLLING_HASH_BYTE(), rollingHashOfProcessedRoots)
             }
 
             /// @notice Appends the transaction hash to the current L2 block.
@@ -4507,7 +4480,10 @@ object "Bootloader" {
             
             /// setting all remaining interop roots, even the ones in the fictive block.
             setInteropRootForBlock(MAXIMUM_L2_BLOCK_NUMBER())
-            sendInteropRootRollingHashToL1()
+            
+            // After all of the interop roots are processed, sending hash to L1.
+            let rollingHashOfProcessedRoots := mload(INTEROP_ROOT_ROLLING_HASH_BYTE())
+            sendToL1Native(true, interopRootRollingHashLogKey(), rollingHashOfProcessedRoots)
 
             l1MessengerPublishingCall()
         }
