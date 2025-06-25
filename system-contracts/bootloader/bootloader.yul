@@ -700,19 +700,19 @@ object "Bootloader" {
             /// This is done to avoid copying the data to a new memory location.
             function processDelegations(innerTxDataOffset) {
                 debugLog("processDelegations", 0)
-                // 1. Read delegation length
-                let ptr := getReservedDynamicPtr(innerTxDataOffset)
-                let length := mload(ptr)
 
                 // We check the validity of transaction in `validateTypedTxStructure`, but this function
                 // is invoked for every tx. So here we're only checking if we actually need to call
                 // `ContractDeployer::processDelegations`.
                 let isEIP7702 := eq(getTxType(innerTxDataOffset), 4)
-                let isDelegationProvided := gt(length, 0)
-                let shouldProcess := and(isEIP7702, isDelegationProvided)
-                debugLog("shouldProcessDelegations", shouldProcess)
+                debugLog("shouldProcessDelegations", isEIP7702)
 
-                if shouldProcess {
+                if isEIP7702 {
+                    // 1. Read delegation length. We know it's not 0,
+                    // otherwise transaction would be rejected in `validateTypedTxStructure`.
+                    let ptr := getReservedDynamicPtr(innerTxDataOffset)
+                    let length := mload(ptr)
+
                     // 2. Overwrite the delegation length word with right-padded selector
                     // This will work because `reservedDynamic` is `bytes`, so the first word
                     // is the length; but for us the contents are already ABI-encoded data.
@@ -1519,7 +1519,7 @@ object "Bootloader" {
                 // For the validation step we always use the bootloader as the tx.origin of the transaction
                 setTxOrigin(BOOTLOADER_FORMAL_ADDR())
                 setGasPrice(gasPrice)
-                
+
                 debugLog("Starting processing delegations", 0)
                 processDelegations(innerTxDataOffset)
                 debugLog("Processing delegations complete", 1)
@@ -2528,7 +2528,7 @@ object "Bootloader" {
                 debugLog("pre-validate",from)
 
                 let success := callAccountMethod({{VALIDATE_TX_SELECTOR}}, from, txDataOffset)
-                
+
                 setHook(VM_HOOK_NO_VALIDATION_ENTERED())
 
                 if iszero(success) {
@@ -2790,15 +2790,15 @@ object "Bootloader" {
             function l1MessengerPublishingCall() {
                 let ptr := OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_BEGIN_BYTE()
                 debugLog("Publishing batch data to L1", 0)
-                
+
                 setHook(VM_HOOK_PUBDATA_REQUESTED())
 
                 // First slot (only last 4 bytes) -- selector
                 mstore(ptr, {{PUBLISH_PUBDATA_SELECTOR}})
                 // Second slot is occupied by the address of the L2 DA validator.
-                // The operator can provide any one it wants. It will be the responsibility of the 
+                // The operator can provide any one it wants. It will be the responsibility of the
                 // L1Messenger system contract to send the corresponding log to L1.
-                // 
+                //
                 // Third slot -- offset. The correct value must be equal to 64
                 assertEq(mload(add(ptr, 64)), 64, "offset for L1Messenger is not 64")
 

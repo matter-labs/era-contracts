@@ -17,6 +17,10 @@ import {UnsupportedTxType, InvalidSig, SigField} from "./SystemContractErrors.so
 contract BootloaderUtilities is IBootloaderUtilities {
     using TransactionHelper for *;
 
+    bytes private constant EIP2930_TX_MARKER = hex"01";
+    bytes private constant EIP1559_TX_MARKER = hex"02";
+    bytes private constant EIP7702_TX_MARKER = hex"04";
+
     /// @notice Calculates the canonical transaction hash and the recommended transaction hash.
     /// @param _transaction The transaction.
     /// @return txHash and signedTxHash of the transaction, i.e. the transaction hash to be used in the explorer and commits to all
@@ -227,7 +231,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
             keccak256(
                 // solhint-disable-next-line func-named-parameters
                 bytes.concat(
-                    "\x01",
+                    EIP2930_TX_MARKER,
                     encodedListLength,
                     encodedFixedLengthParams,
                     encodedDataLength,
@@ -329,7 +333,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
             keccak256(
                 // solhint-disable-next-line func-named-parameters
                 bytes.concat(
-                    "\x02",
+                    EIP1559_TX_MARKER,
                     encodedListLength,
                     encodedFixedLengthParams,
                     encodedDataLength,
@@ -468,7 +472,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
             keccak256(
                 // solhint-disable-next-line func-named-parameters
                 bytes.concat(
-                    "\x04",
+                    EIP7702_TX_MARKER,
                     encodedListLength,
                     encodedFixedLengthParams,
                     encodedDataLength,
