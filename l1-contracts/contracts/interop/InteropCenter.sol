@@ -16,7 +16,7 @@ import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal, CallAttributes, BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "../common/Messaging.sol";
-import {MsgValueMismatch, Unauthorized} from "../common/L1ContractErrors.sol";
+import {MsgValueMismatch, Unauthorized, NotL1} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
