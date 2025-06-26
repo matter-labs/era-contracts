@@ -627,11 +627,10 @@ contract DeployL1Script is Script, DeployUtils {
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            // TODO: fix
-            bridgehubBytecodeOrHash: hex"",
-            l2AssetRouterBytecodeOrHash: hex"",
-            l2NtvBytecodeOrHash: hex"",
-            messageRootBytecodeOrHash: hex"",
+            bridgehubBytecodeOrInfo: hex"",
+            l2AssetRouterBytecodeOrInfo: hex"",
+            l2NtvBytecodeOrInfo: hex"",
+            messageRootBytecodeOrInfo: hex"",
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),

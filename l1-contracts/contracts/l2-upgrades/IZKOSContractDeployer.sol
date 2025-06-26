@@ -6,5 +6,5 @@ pragma solidity 0.8.28;
 /// @dev Note, that the actual implementation of this interface is implemented in Rust
 /// as a system hook.
 interface IZKOSContractDeployer {
-    function setDeployedCodeEVM(address _addr, bytes calldata _bytecode) external;
+    function setBytecodeDetailsEVM(address _addr, bytes32 _bytecodeHash, uint32 _bytecodeLength, bytes32 _observableBytecodeHash) external;
 }
