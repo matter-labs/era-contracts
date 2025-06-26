@@ -31,6 +31,12 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         bytes calldata operatorDAInput,
         uint256 _maxBlobsSupported
     ) external returns (L1DAValidatorOutput memory output) {
+
+        // _maxBlobsSupported is unused by the Celestia integration
+        // just to be safe, we enforce a maximum to prevent accidental failures due to misconfiguration.
+        // see audit issue N-01
+        if (_maxBlobsSupported > 256) revert("CelestiaL1DAValidator: max blobs supported must be <= 256");
+
         CelestiaZKStackInput memory input = abi.decode(operatorDAInput[32:], (CelestiaZKStackInput));
 
         bytes memory publicValues = input.publicValues;  // get reference to bytes
@@ -89,7 +95,7 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         output.stateDiffHash = bytes32(operatorDAInput[:32]);
 
         if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(output.stateDiffHash, eqKeccakHash)))
-            revert OperatorDAHashMismatch(eqKeccakHash, output.stateDiffHash);
+            revert OperatorDAHashMismatch(l2DAValidatorOutputHash, keccak256(abi.encodePacked(output.stateDiffHash, eqKeccakHash)));
         if (input.attestationProof.tuple.dataRoot != eqDataRoot)
             revert DataRootMismatch(eqDataRoot, input.attestationProof.tuple.dataRoot);
 
