@@ -125,7 +125,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         address _destinationAddress,
         bytes calldata _data,
         bytes[] calldata _attributes
-    ) external payable onlyL2ToL2(_destinationChainId) returns (bytes32 bundleHash) {
+    ) external payable onlyL2ToL2(_destinationChainId) whenNotPaused returns (bytes32 bundleHash) {
         (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
             _attributes,
             AttributeParsingRestrictions.CallAndBundleAttributes
@@ -151,7 +151,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable onlyL2ToL2(_destinationChainId) returns (bytes32 bundleHash) {
+    ) external payable onlyL2ToL2(_destinationChainId) whenNotPaused returns (bytes32 bundleHash) {
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
         );

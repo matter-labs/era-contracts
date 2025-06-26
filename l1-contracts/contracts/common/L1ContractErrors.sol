@@ -250,6 +250,10 @@ error NotAZKChain(address addr);
 error NotCurrentSettlementLayer();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
+// 0xecb34449
+error NotL1(uint256 l1ChainId, uint256 blockChainId);
+// 0xc5441a63
+error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0xf3ed9dfa
@@ -378,9 +382,6 @@ error ZeroAddress();
 error ZeroChainId();
 // 0x601b6882
 error ZKChainLimitReached();
-// 0xecb34449
-error NotL1(uint256 l1ChainId, uint256 blockChainId);
-error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
