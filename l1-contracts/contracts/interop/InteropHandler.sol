@@ -2,13 +2,13 @@
 
 pragma solidity ^0.8.24;
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_MESSAGE_VERIFICATION} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_MESSAGE_VERIFICATION, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, MessageInclusionProof, CallStatus, BundleStatus} from "../common/Messaging.sol";
 import {IERC7786Receiver} from "./IERC7786Receiver.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready} from "./InteropErrors.sol";
+import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready, UnauthorizedMessageSender} from "./InteropErrors.sol";
 import {InvalidSelector} from "../common/L1ContractErrors.sol";
 
 /// @title InteropHandler
@@ -47,7 +47,10 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // If the bundle if fully executed, it's not expected that anything else should be done with the bundle, it's finalized already.
         // If the bundle were unbundled, it's either fully finalized (all calls are cancelled or executed), in which case nothing else could be done, similar to above,
         // or some of the calls are still unprocessed, in this case they should be processed via unbundling.
-        require(status != BundleStatus.FullyExecuted && status != BundleStatus.Unbundled, BundleAlreadyProcessed(bundleHash));
+        require(
+            status != BundleStatus.FullyExecuted && status != BundleStatus.Unbundled,
+            BundleAlreadyProcessed(bundleHash)
+        );
 
         // Verify the bundle inclusion, if not done yet.
         if (status != BundleStatus.Verified) _verifyBundle(_bundle, _proof, bundleHash);
@@ -85,7 +88,10 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle, _proof.chainId);
 
         // If the bundle was already fully executed or unbundled, we revert stating that it was processed already.
-        require(status == BundleStatus.Unreceived || status == BundleStatus.Verified, BundleAlreadyProcessed(bundleHash));
+        require(
+            status == BundleStatus.Unreceived || status == BundleStatus.Verified,
+            BundleAlreadyProcessed(bundleHash)
+        );
 
         // Revert if the bundle was verified already.
         require(status != BundleStatus.Verified, BundleVerifiedAlready(bundleHash));
@@ -225,6 +231,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @param _bundleHash Hash corresponding to the bundle that is to be verified.
     /// That message gets sent to L1 by origin chain in InteropCenter contract, and is picked up and included in receiving chain by sequencer.
     function _verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof, bytes32 _bundleHash) internal {
+        // Verify that the message came from the legitimate InteropCenter
+        require(
+            _proof.message.sender == L2_INTEROP_CENTER_ADDR,
+            UnauthorizedMessageSender(L2_INTEROP_CENTER_ADDR, _proof.message.sender)
+        );
+
         // Substitute provided message data with data corresponding to the bundle currently being verified.
         _proof.message.data = bytes.concat(BUNDLE_IDENTIFIER, _bundle);
 

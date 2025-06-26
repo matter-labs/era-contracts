@@ -376,7 +376,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 }
             }
             // Revert if the selector does not match any of the known attributes.
-            require(indexInSelectorsArray != attributeSelectorsLength, IERC7786GatewaySource.UnsupportedAttribute(selector));
+            require(
+                indexInSelectorsArray != attributeSelectorsLength,
+                IERC7786GatewaySource.UnsupportedAttribute(selector)
+            );
             // Checking whether selectors satisfy the restrictions.
             if (_restriction == AttributeParsingRestrictions.OnlyInteropCallValue) {
                 require(indexInSelectorsArray == 0, AttributeNotForInteropCallValue(selector));
