@@ -133,7 +133,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
         callStartersInternal[0] = InteropCallStarterInternal({
-            nextContract: _destinationAddress,
+            to: _destinationAddress,
             data: _data,
             callAttributes: callAttributes
         });
@@ -163,7 +163,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 AttributeParsingRestrictions.OnlyCallAttributes
             );
             callStartersInternal[i] = InteropCallStarterInternal({
-                nextContract: _callStarters[i].nextContract,
+                to: _callStarters[i].to,
                 data: _callStarters[i].data,
                 callAttributes: callAttributes
             });
@@ -277,13 +277,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     ) internal returns (InteropCall memory interopCall) {
         if (!_callStarter.callAttributes.directCall) {
             // slither-disable-next-line arbitrary-send-eth
-            InteropCallStarter memory actualCallStarter = IL2AssetRouter(_callStarter.nextContract)
-                .interopCenterInitiateBridge{value: _callStarter.callAttributes.indirectCallMessageValue}(
-                _destinationChainId,
-                _sender,
-                _callStarter.callAttributes.interopCallValue,
-                _callStarter.data
-            );
+            InteropCallStarter memory actualCallStarter = IL2AssetRouter(_callStarter.to).interopCenterInitiateBridge{
+                value: _callStarter.callAttributes.indirectCallMessageValue
+            }(_destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
             // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
             (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
@@ -300,16 +296,16 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
                 shadowAccount: false,
-                to: actualCallStarter.nextContract,
+                to: actualCallStarter.to,
                 data: actualCallStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
-                from: _callStarter.nextContract
+                from: _callStarter.to
             });
         } else {
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
                 shadowAccount: false,
-                to: _callStarter.nextContract,
+                to: _callStarter.to,
                 data: _callStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
                 from: _sender

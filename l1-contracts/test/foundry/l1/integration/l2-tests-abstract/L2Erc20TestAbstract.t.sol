@@ -142,7 +142,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
         calls[0] = InteropCallStarter({
-            nextContract: L2_ASSET_ROUTER_ADDR,
+            to: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
             callAttributes: attributes
         });
@@ -186,7 +186,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         attributes[1] = abi.encodeCall(IERC7786Attributes.executionAddress, (EXECUTION_ADDRESS));
         attributes[2] = abi.encodeCall(IERC7786Attributes.unbundlerAddress, (UNBUNDLER_ADDRESS));
         calls[0] = InteropCallStarter({
-            nextContract: L2_ASSET_ROUTER_ADDR,
+            to: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
             callAttributes: attributes
         });
@@ -210,7 +210,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         );
         IERC7786GatewaySource(address(l2InteropCenter)).sendCall(
             271,
-            calls[0].nextContract,
+            calls[0].to,
             calls[0].data,
             calls[0].callAttributes
         );

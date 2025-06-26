@@ -170,21 +170,21 @@ struct FinalizeL1DepositParams {
 }
 
 /// @dev Struct used to define parameters for adding a single call in an interop bundle.
-/// @param nextContract Address of the contract to call on the destination chain.
-/// @param data Calldata payload to send to nextContract.
+/// @param to Address to call on the destination chain.
+/// @param data Calldata payload to send to `to` address on the destination chain.
 /// @param callAttributes EIP-7786 Attributes.
 struct InteropCallStarter {
-    address nextContract;
+    address to;
     bytes data;
     bytes[] callAttributes;
 }
 
 /// @dev Internal representation of an InteropCallStarter after parsing its parameters.
-/// @param nextContract Address of the contract to call on the destination chain.
+/// @param to Address to call on the destination chain.
 /// @param data Calldata payload to send.
 /// @param callAttributes EIP-7786 Attributes.
 struct InteropCallStarterInternal {
-    address nextContract;
+    address to;
     bytes data;
     CallAttributes callAttributes;
 }
