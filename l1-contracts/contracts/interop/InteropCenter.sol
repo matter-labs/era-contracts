@@ -269,7 +269,16 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _destinationChainId,
         address _sender
     ) internal returns (InteropCall memory interopCall) {
-        if (!_callStarter.attributes.directCall) {
+        if (_callStarter.attributes.directCall) {
+            interopCall = InteropCall({
+                version: INTEROP_CALL_VERSION,
+                shadowAccount: false,
+                to: _callStarter.to,
+                data: _callStarter.data,
+                value: _callStarter.attributes.interopCallValue,
+                from: _sender
+            });
+        } else {
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2AssetRouter(_callStarter.to).interopCenterInitiateBridge{
                 value: _callStarter.attributes.indirectCallMessageValue
@@ -294,15 +303,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 data: actualCallStarter.data,
                 value: _callStarter.attributes.interopCallValue,
                 from: _callStarter.to
-            });
-        } else {
-            interopCall = InteropCall({
-                version: INTEROP_CALL_VERSION,
-                shadowAccount: false,
-                to: _callStarter.to,
-                data: _callStarter.data,
-                value: _callStarter.attributes.interopCallValue,
-                from: _sender
             });
         }
     }
