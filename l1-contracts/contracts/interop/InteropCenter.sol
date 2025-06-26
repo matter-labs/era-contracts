@@ -126,7 +126,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes calldata _data,
         bytes[] calldata _attributes
     ) external payable onlyL2ToL2(_destinationChainId) whenNotPaused returns (bytes32 bundleHash) {
-        (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
+        (CallAttributes memory attributes, BundleAttributes memory bundleAttributes) = parseAttributes(
             _attributes,
             AttributeParsingRestrictions.CallAndBundleAttributes
         );
@@ -135,7 +135,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         callStartersInternal[0] = InteropCallStarterInternal({
             to: _destinationAddress,
             data: _data,
-            callAttributes: callAttributes
+            attributes
         });
 
         bundleHash = _sendBundle(_destinationChainId, callStartersInternal, bundleAttributes);
@@ -158,14 +158,14 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
             // solhint-disable-next-line no-unused-vars
-            (CallAttributes memory callAttributes, ) = parseAttributes(
-                _callStarters[i].callAttributes,
+            (CallAttributes memory attributes, ) = parseAttributes(
+                _callStarters[i].attributes,
                 AttributeParsingRestrictions.OnlyCallAttributes
             );
             callStartersInternal[i] = InteropCallStarterInternal({
                 to: _callStarters[i].to,
                 data: _callStarters[i].data,
-                callAttributes: callAttributes
+                attributes
             });
         }
         // solhint-disable-next-line no-unused-vars
@@ -263,7 +263,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         for (uint256 i = 0; i < callStartersLength; ++i) {
             InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, msg.sender);
             bundle.calls[i] = interopCall;
-            totalCallsValue += _callStarters[i].callAttributes.interopCallValue;
+            totalCallsValue += _callStarters[i].attributes.interopCallValue;
         }
 
         // Send the bundle.
@@ -275,21 +275,21 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         uint256 _destinationChainId,
         address _sender
     ) internal returns (InteropCall memory interopCall) {
-        if (!_callStarter.callAttributes.directCall) {
+        if (!_callStarter.attributes.directCall) {
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2AssetRouter(_callStarter.to).interopCenterInitiateBridge{
-                value: _callStarter.callAttributes.indirectCallMessageValue
-            }(_destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
+                value: _callStarter.attributes.indirectCallMessageValue
+            }(_destinationChainId, _sender, _callStarter.attributes.interopCallValue, _callStarter.data);
             // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
             (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
-                actualCallStarter.callAttributes,
+                actualCallStarter.attributes,
                 AttributeParsingRestrictions.OnlyInteropCallValue
             );
             require(
-                _callStarter.callAttributes.interopCallValue == indirectCallAttributes.interopCallValue,
+                _callStarter.attributes.interopCallValue == indirectCallAttributes.interopCallValue,
                 IndirectCallValueMismatch(
-                    _callStarter.callAttributes.interopCallValue,
+                    _callStarter.attributes.interopCallValue,
                     indirectCallAttributes.interopCallValue
                 )
             );
@@ -298,7 +298,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 shadowAccount: false,
                 to: actualCallStarter.to,
                 data: actualCallStarter.data,
-                value: _callStarter.callAttributes.interopCallValue,
+                value: _callStarter.attributes.interopCallValue,
                 from: _callStarter.to
             });
         } else {
@@ -307,7 +307,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 shadowAccount: false,
                 to: _callStarter.to,
                 data: _callStarter.data,
-                value: _callStarter.callAttributes.interopCallValue,
+                value: _callStarter.attributes.interopCallValue,
                 from: _sender
             });
         }
@@ -360,9 +360,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     function parseAttributes(
         bytes[] calldata _attributes,
         AttributeParsingRestrictions _restriction
-    ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
+    ) public pure returns (CallAttributes memory attributes, BundleAttributes memory bundleAttributes) {
         // Default value is direct call.
-        callAttributes.directCall = true;
+        attributes.directCall = true;
 
         bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
@@ -404,10 +404,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             }
             // setting the attributes
             if (indexInSelectorsArray == 0) {
-                callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
+                attributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
             } else if (indexInSelectorsArray == 1) {
-                callAttributes.directCall = false;
-                callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
+                attributes.directCall = false;
+                attributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
             } else if (indexInSelectorsArray == 2) {
                 bundleAttributes.executionAddress = AttributesDecoder.decodeAddress(_attributes[i]);
             } else if (indexInSelectorsArray == 3) {
