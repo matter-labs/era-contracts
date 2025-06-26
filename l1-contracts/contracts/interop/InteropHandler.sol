@@ -47,9 +47,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // If the bundle if fully executed, it's not expected that anything else should be done with the bundle, it's finalized already.
         // If the bundle were unbundled, it's either fully finalized (all calls are cancelled or executed), in which case nothing else could be done, similar to above,
         // or some of the calls are still unprocessed, in this case they should be processed via unbundling.
-        if (status == BundleStatus.FullyExecuted || status == BundleStatus.Unbundled) {
-            revert BundleAlreadyProcessed(bundleHash);
-        }
+        require(status != BundleStatus.FullyExecuted && status != BundleStatus.Unbundled, BundleAlreadyProcessed(bundleHash));
 
         // Verify the bundle inclusion, if not done yet.
         if (status != BundleStatus.Verified) _verifyBundle(_bundle, _proof, bundleHash);
@@ -87,9 +85,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle, _proof.chainId);
 
         // If the bundle was already fully executed or unbundled, we revert stating that it was processed already.
-        if (status != BundleStatus.Unreceived && status != BundleStatus.Verified) {
-            revert BundleAlreadyProcessed(bundleHash);
-        }
+        require(status == BundleStatus.Unreceived || status == BundleStatus.Verified, BundleAlreadyProcessed(bundleHash));
 
         // Revert if the bundle was verified already.
         require(status != BundleStatus.Verified, BundleVerifiedAlready(bundleHash));
@@ -129,9 +125,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         // The bundle status have to be either verified (we know that it's received, but not processed yet), or unbundled.
         // Note, that on the first call to unbundle the status of the bundle should be verified.
-        if (status == BundleStatus.Unreceived || status == BundleStatus.FullyExecuted) {
-            revert CanNotUnbundle(bundleHash);
-        }
+        require(status != BundleStatus.Unreceived && status != BundleStatus.FullyExecuted, CanNotUnbundle(bundleHash));
 
         // Mark the given bundle as unbundled, following CEI pattern.
         bundleStatus[bundleHash] = BundleStatus.Unbundled;

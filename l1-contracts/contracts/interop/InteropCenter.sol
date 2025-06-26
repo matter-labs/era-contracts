@@ -70,9 +70,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     }
 
     modifier onlySettlementLayerRelayedSender() {
-        if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == SETTLEMENT_LAYER_RELAY_SENDER, Unauthorized(msg.sender));
         _;
     }
 
@@ -215,15 +213,11 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(block.chainid);
         if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
-            if (msg.value != _totalValue) {
-                revert MsgValueMismatch(_totalValue, msg.value);
-            }
+            require(msg.value == _totalValue, MsgValueMismatch(_totalValue, msg.value));
             // slither-disable-next-line arbitrary-send-eth
             L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalValue}();
         } else {
-            if (msg.value != 0) {
-                revert MsgValueMismatch(0, msg.value);
-            }
+            require(msg.value == 0, MsgValueMismatch(0, msg.value));
             IL2AssetRouter(assetRouter).bridgehubDepositBaseToken(
                 _destinationChainId,
                 destinationChainBaseTokenAssetId,
@@ -332,9 +326,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         bytes32 _assetId,
         uint256 _amount
     ) external override onlySettlementLayerRelayedSender {
-        if (L1_CHAIN_ID == block.chainid) {
-            revert NotInGatewayMode();
-        }
+        require(L1_CHAIN_ID != block.chainid, NotInGatewayMode());
         if (_baseTokenAmount > 0) {
             IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(
                 _chainId,
@@ -384,9 +376,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 }
             }
             // Revert if the selector does not match any of the known attributes.
-            if (indexInSelectorsArray == attributeSelectorsLength) {
-                revert IERC7786GatewaySource.UnsupportedAttribute(selector);
-            }
+            require(indexInSelectorsArray != attributeSelectorsLength, IERC7786GatewaySource.UnsupportedAttribute(selector));
             // Checking whether selectors satisfy the restrictions.
             if (_restriction == AttributeParsingRestrictions.OnlyInteropCallValue) {
                 require(indexInSelectorsArray == 0, AttributeNotForInteropCallValue(selector));
