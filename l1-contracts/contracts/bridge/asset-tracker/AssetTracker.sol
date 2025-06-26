@@ -222,6 +222,10 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     function migrateTokenBalanceFromL2(bytes32 _assetId) external {
         address tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
 
+        if (tokenAddress == address(0)) {
+            return;
+        }
+
         uint256 amount = IERC20(tokenAddress).totalSupply();
 
         uint256 migrationNumber = 0; // L2_INTEROP_CENTER.migrationNumber();
