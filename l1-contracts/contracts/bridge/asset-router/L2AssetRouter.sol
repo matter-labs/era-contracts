@@ -214,7 +214,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         interopCallStarter = InteropCallStarter({
             to: request.l2Contract,
             data: request.l2Calldata,
-            attributes
+            callAttributes: attributes
         });
     }
 
