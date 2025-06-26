@@ -38,6 +38,8 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         bytes32 eqDataRoot;
         uint32 eqBatchNumber;
         uint64 eqChainId;
+        // The public values must be exactly 4 x 32 bytes for keccak hash, data root, batch number, and chain id
+        require(publicValues.length == 128, "CelestiaL1DAValidator: invalid public values length");
         assembly {
             let ptr := add(publicValues, 32)  // skip length prefix
             eqKeccakHash := mload(ptr)        // first bytes32
@@ -46,8 +48,33 @@ contract CelestiaL1DAValidator is IL1DAValidator {
             eqChainId := shr(192, mload(add(ptr, 96))) // fourth bytes32, but we only want the last 8 bytes (u64)
         }
 
-        // First verify the equivalency proof (im assuming this call reverts if the proof ins invalid, so we move onward from here)
-        ISP1Verifier(SP1_GROTH_16_VERIFIER).verifyProof(eqsVkey, input.publicValues, input.equivalenceProof);
+        // Verify that the batch number and chain ID match the values in the equivalence proof
+        if (batchNumber != eqBatchNumber) revert("CelestiaL1DAValidator: batch number mismatch");
+        if (chainId != eqChainId) revert("CelestiaL1DAValidator: chain ID mismatch");
+
+
+        // First verify the equivalency proof using low-level staticcall
+        (bool success, bytes memory returnData) = SP1_GROTH_16_VERIFIER.staticcall(
+            abi.encodeWithSelector(
+                ISP1Verifier.verifyProof.selector,
+                eqsVkey,
+                input.publicValues,
+                input.equivalenceProof
+            )
+        );
+        
+        // Check if the call was successful and didn't revert
+        if (!success) {
+            // If returnData is empty, it means the call reverted
+            if (returnData.length == 0) {
+                revert InvalidProof();
+            }
+            // If returnData is not empty, it contains the revert reason
+            assembly {
+                let returndata_size := mload(returnData)
+                revert(add(32, returnData), returndata_size)
+            }
+        }
 
         // lastly we verify the data root is inside of blobstream
         bool valid = IDAOracle(BLOBSTREAM).verifyAttestation(
