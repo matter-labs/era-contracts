@@ -44,6 +44,13 @@ interface IInteropCenter {
         uint256 _amount
     ) external;
 
+    function sendCall(
+        uint256 _destinationChainId,
+        address _destinationAddress,
+        bytes calldata _data,
+        bytes[] calldata _attributes
+    ) external payable returns (bytes32);
+
     function sendBundle(
         uint256 _destinationChainId,
         InteropCallStarter[] calldata _callStarters,

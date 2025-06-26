@@ -155,7 +155,7 @@ struct InteropRoot {
 /// @param chainId The chain ID of the transaction to check.
 /// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
 /// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-/// @param l2sender The address of the message sender on L2 (base token system contract address or asset handler)
+/// @param l2Sender The address of the message sender on L2 (base token system contract address or asset handler)
 /// @param l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
 /// @param message The L2 withdraw data, stored in an L2 -> L1 message.
 /// @param merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
@@ -237,8 +237,7 @@ enum CallStatus {
 /// @param interopBundleSalt Salt of the interopBundle. It's required to ensure that all bundles have distinct hashes.
 ///                          It's equal to the keccak256(abi.encodePacked(senderOfTheBundle, NumberOfBundleSentByTheSender))
 /// @param calls Array of InteropCall structs to execute.
-/// @param executionAddress Optional address authorized to execute this bundle; zero-address means permissionless.
-/// @param unbundlerAddress Address authorized to unbundle this bundle.
+/// @param bundleAttributes Bundle execution and unbundling attributes.
 struct InteropBundle {
     bytes1 version;
     uint256 destinationChainId;

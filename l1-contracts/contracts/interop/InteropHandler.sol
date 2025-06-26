@@ -142,7 +142,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             CallStatus recordedCallStatus = callStatus[bundleHash][i];
             CallStatus requestedCallStatus = _providedCallStatus[i];
             if (requestedCallStatus == CallStatus.Executed) {
-                // We can only executed unprocessed calls.
+                // We can only execute unprocessed calls.
                 require(recordedCallStatus == CallStatus.Unprocessed, CallNotExecutable(bundleHash, i));
                 callStatus[bundleHash][i] = CallStatus.Executed;
                 emit CallProcessed(bundleHash, i, CallStatus.Executed);

@@ -42,7 +42,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @notice The asset ID of ETH on L1.
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
-    /// @notice All of the ETH and ERC20 tokens are held by NativeVaultToken managed by this AssetRouter.
+    /// @notice All of the ETH and ERC20 tokens are held by NativeTokenVault managed by this AssetRouter.
     address public assetRouter;
 
     /// @notice AssetTracker component address on L1. On L2 the address is L2_ASSET_TRACKER_ADDR.
@@ -235,7 +235,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
 
     /// @notice Constructs and sends an InteropBundle.
     /// @param _destinationChainId Chain ID to send to.
-    /// @param _callStarters Array of InteropCallStarterInternal structs, corresponding the the calls in bundle.
+    /// @param _callStarters Array of InteropCallStarterInternal structs, corresponding to the calls in bundle.
     /// @param _bundleAttributes Attributes of the bundle.
     /// @return bundleHash Hash of the sent bundle.
     function _sendBundle(
@@ -355,7 +355,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Parses the attributes of the call or bundle.
-    /// @param _attributes EIP-7786 Attributes of the call.
+    /// @param _attributes EIP-7786 Attributes of the call or bundle.
     /// @param _restriction Restriction for parsing attributes.
     function parseAttributes(
         bytes[] calldata _attributes,
