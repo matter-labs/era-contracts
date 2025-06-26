@@ -179,21 +179,17 @@ contract MessageRoot is IMessageRoot, Initializable {
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
         bytes32 sharedTreeRoot = sharedTree.root();
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = sharedTreeRoot;
-        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+        _emitRoot(sharedTreeRoot);
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
     /// @notice emit a new message root when committing a new batch
-    function emitMessageRoot(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
+    function _emitRoot(
+        bytes32 _root
+    ) internal {
         bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = _chainBatchRoot;
-        emit NewInteropRoot(_chainId, _batchNumber, 0, _sides);
+        _sides[0] = _root;
+        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
     }
 
     /// @notice Gets the aggregated root of all chains.
@@ -219,9 +215,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         // slither-disable-next-line unused-return
         sharedTree.updateAllLeaves(newLeaves);
         bytes32 newRoot = sharedTree.root();
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = newRoot;
-        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+        _emitRoot(newRoot);
         historicalRoot[block.number] = newRoot;
     }
 
