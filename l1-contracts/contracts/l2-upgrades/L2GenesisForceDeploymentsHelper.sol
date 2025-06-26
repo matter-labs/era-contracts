@@ -49,7 +49,7 @@ struct FixedForceDeploymentsData {
 library L2GenesisForceDeploymentsHelper {
     function _forceDeployEra(
         bytes memory _bytecodeInfo,
-        address _newAddress,
+        address _newAddress
     ) internal {
         bytes32 bytecodeHash = abi.decode(_bytecodeInfo, (bytes32));
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = new IL2ContractDeployer.ForceDeployment[](1);
@@ -70,7 +70,7 @@ library L2GenesisForceDeploymentsHelper {
             bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash
         ) = abi.decode(_bytecodeInfo, (bytes32, uint32, bytes32));
 
-        bytes data = abi.encodeCall(
+        bytes memory data = abi.encodeCall(
             IZKOSContractDeployer.setBytecodeDetailsEVM,
             (_newAddress, bytecodeHash, bytecodeLength, observableBytecodeHash)
         );
@@ -112,7 +112,7 @@ library L2GenesisForceDeploymentsHelper {
         } else {
             _forceDeployEra(
                 fixedForceDeploymentsData.messageRootBytecodeOrInfo,
-                address(L2_MESSAGE_ROOT_ADDR),
+                address(L2_MESSAGE_ROOT_ADDR)
             );
         }
         L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2();
@@ -125,7 +125,7 @@ library L2GenesisForceDeploymentsHelper {
         } else {
             _forceDeployEra(
                 fixedForceDeploymentsData.bridgehubBytecodeOrInfo,
-                address(L2_BRIDGEHUB_ADDR),
+                address(L2_BRIDGEHUB_ADDR)
             );
         }
         L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
@@ -142,7 +142,7 @@ library L2GenesisForceDeploymentsHelper {
         } else {
             _forceDeployEra(
                 fixedForceDeploymentsData.l2AssetRouterBytecodeOrInfo,
-                address(L2_ASSET_ROUTER_ADDR),
+                address(L2_ASSET_ROUTER_ADDR)
             );
         }
 
@@ -184,12 +184,12 @@ library L2GenesisForceDeploymentsHelper {
         if (_isZKsyncOS) {
             _forceDeployZKsyncOS(
                 fixedForceDeploymentsData.l2NtvBytecodeOrInfo,
-                L2_NATIVE_TOKEN_VAULT_ADDR,
+                L2_NATIVE_TOKEN_VAULT_ADDR
             );
         } else {
             _forceDeployEra(
-                abi.decode(fixedForceDeploymentsData.l2NtvBytecodeOrInfo, (bytes32)),
-                L2_NATIVE_TOKEN_VAULT_ADDR,
+                fixedForceDeploymentsData.l2NtvBytecodeOrInfo,
+                L2_NATIVE_TOKEN_VAULT_ADDR
             );
         }
 

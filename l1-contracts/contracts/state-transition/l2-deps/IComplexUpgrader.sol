@@ -7,7 +7,7 @@ import {IL2ContractDeployer} from "../../common/interfaces/IL2ContractDeployer.s
 /// @custom:security-contact security@matterlabs.dev
 interface IComplexUpgrader {
     struct ZKsyncOSForceDeploymentInfo {
-        bytes deployedBytecode;
+        bytes deployedBytecodeInfo;
         address newAddress;
     }
 

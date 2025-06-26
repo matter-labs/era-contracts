@@ -578,16 +578,16 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             ),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeOrHash: abi.encode(
+            bridgehubBytecodeOrInfo: abi.encode(
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readBridgehubBytecode())
             ),
-            l2AssetRouterBytecodeOrHash: abi.encode(
+            l2AssetRouterBytecodeOrInfo: abi.encode(
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2AssetRouterBytecode())
             ),
-            l2NtvBytecodeOrHash: abi.encode(
+            l2NtvBytecodeOrInfo: abi.encode(
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readL2NativeTokenVaultBytecode())
             ),
-            messageRootBytecodeOrHash: abi.encode(
+            messageRootBytecodeOrInfo: abi.encode(
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode())
             ),
             l2SharedBridgeLegacyImpl: address(0),

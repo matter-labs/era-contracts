@@ -971,6 +971,15 @@ library Utils {
         return bytecode;
     }
 
+    function readZKFoundryDeployedBytecodeL1(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryDeployedBytecode(path);
+        return bytecode;
+    }
+
     function readZKFoundryBytecodeL2(
         string memory fileName,
         string memory contractName
@@ -1296,6 +1305,20 @@ library Utils {
 
     function readDummyAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
         bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
+    }
+
+    function getZKOSBytecodeInfo(bytes memory bytecode) internal pure returns (bytes memory bytecodeInfo) {
+        bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
+        bytes32 observableBytecodeBlakeHash = keccak256(bytecode);
+        bytecodeInfo = abi.encode(bytecodeBlakeHash, bytecode.length, observableBytecodeBlakeHash);
+    }
+
+    function getZKOSBytecodeInfoForContract(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory bytecodeInfo) {
+        bytes memory bytecode = readZKFoundryDeployedBytecodeL1(fileName, contractName);
+        bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
