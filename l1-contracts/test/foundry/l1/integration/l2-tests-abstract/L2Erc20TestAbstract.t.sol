@@ -141,7 +141,11 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
-        calls[0] = InteropCallStarter({to: L2_ASSET_ROUTER_ADDR, data: secondBridgeCalldata, attributes: attributes});
+        calls[0] = InteropCallStarter({
+            to: L2_ASSET_ROUTER_ADDR,
+            data: secondBridgeCalldata,
+            callAttributes: attributes
+        });
 
         uint256 destinationChainId = 271;
         vm.mockCall(
@@ -181,7 +185,11 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
         attributes[1] = abi.encodeCall(IERC7786Attributes.executionAddress, (EXECUTION_ADDRESS));
         attributes[2] = abi.encodeCall(IERC7786Attributes.unbundlerAddress, (UNBUNDLER_ADDRESS));
-        calls[0] = InteropCallStarter({to: L2_ASSET_ROUTER_ADDR, data: secondBridgeCalldata, attributes: attributes});
+        calls[0] = InteropCallStarter({
+            to: L2_ASSET_ROUTER_ADDR,
+            data: secondBridgeCalldata,
+            callAttributes: attributes
+        });
 
         uint256 destinationChainId = 271;
         vm.mockCall(
@@ -200,7 +208,12 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
             abi.encode(bytes(""))
         );
-        IERC7786GatewaySource(address(l2InteropCenter)).sendCall(271, calls[0].to, calls[0].data, calls[0].attributes);
+        IERC7786GatewaySource(address(l2InteropCenter)).sendCall(
+            271,
+            calls[0].to,
+            calls[0].data,
+            calls[0].callAttributes
+        );
     }
 
     function test_supportsAttributes() public {
