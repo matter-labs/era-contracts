@@ -38,24 +38,19 @@ contract L1Bridgehub is BridgehubBase {
     /// @notice the asset id of Eth. This is only used on L1.
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
-    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
-    uint256 public immutable L1_CHAIN_ID;
-
     /// @notice The total number of ZK chains can be created/connected to this CTM.
     /// This is the temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
     /// @notice to avoid parity hack
-    constructor(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
+    constructor(address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
         _disableInitializers();
-        L1_CHAIN_ID = _l1ChainId;
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
         _initializeInner();
     }
@@ -73,12 +68,16 @@ contract L1Bridgehub is BridgehubBase {
         _initializeInner();
     }
 
+    function L1_CHAIN_ID() public view override returns (uint256) {
+        return block.chainid;
+    }
+
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
     }
 
     function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
+        return block.chainid;
     }
 
     function _maxNumberOfZKChains() internal view override returns (uint256) {

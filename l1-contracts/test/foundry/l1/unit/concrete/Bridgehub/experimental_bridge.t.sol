@@ -99,9 +99,8 @@ contract ExperimentalBridgeTest is Test {
     function setUp() public {
         deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         eraChainId = 320;
-        uint256 l1ChainId = block.chainid;
         bridgeOwner = makeAddr("BRIDGE_OWNER");
-        dummyBridgehub = new DummyBridgehubSetter(l1ChainId, bridgeOwner, type(uint256).max);
+        dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
         bridgeHub = L1Bridgehub(address(dummyBridgehub));
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgeHub));

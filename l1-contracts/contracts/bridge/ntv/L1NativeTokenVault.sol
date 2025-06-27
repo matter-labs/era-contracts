@@ -36,15 +36,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev The address of the WETH token.
     address public immutable override WETH_TOKEN;
 
-    // TODO: maybe use L1AssetRouter instead of IAssetRouterBase?
     /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
     IAssetRouterBase public immutable override ASSET_ROUTER;
 
     /// @dev The assetId of the base token.
     bytes32 public immutable BASE_TOKEN_ASSET_ID;
-
-    /// @dev Chain ID of L1 for bridging reasons.
-    uint256 public immutable L1_CHAIN_ID;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
@@ -63,7 +59,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         WETH_TOKEN = _l1WethAddress;
         ASSET_ROUTER = IAssetRouterBase(_l1AssetRouter);
         BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
-        L1_CHAIN_ID = block.chainid;
         L1_NULLIFIER = _l1Nullifier;
     }
 
@@ -322,6 +317,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return !_isNative && originChainId[_assetId] == _chainId;
     }
 
+    function L1_CHAIN_ID() public view override returns (uint256) {
+        return block.chainid;
+    }
+
     function _wethToken() internal view override returns (address) {
         return WETH_TOKEN;
     }
@@ -335,6 +334,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
+        return block.chainid;
     }
 }

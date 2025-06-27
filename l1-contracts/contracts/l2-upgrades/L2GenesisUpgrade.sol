@@ -8,8 +8,7 @@ import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.s
 
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
 
-// TODO: move to a different file.
-error InvalidChainId();
+import {InvalidChainId} from "../common/L1ContractErrors.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs

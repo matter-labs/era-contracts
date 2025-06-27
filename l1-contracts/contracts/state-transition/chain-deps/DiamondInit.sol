@@ -80,6 +80,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
+        // FIXME: split into two files: one with ZK OS and one for Era 
         s.boojumOS = true;
 
         // While this does not provide a protection in the production, it is needed for local testing

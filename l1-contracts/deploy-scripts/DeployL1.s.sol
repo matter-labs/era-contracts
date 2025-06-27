@@ -639,17 +639,8 @@ contract DeployL1Script is Script, DeployUtils {
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
         });
 
-        console.log("Info for l2 bridgehub");
-        console.logBytes(Utils.getZKOSBytecodeInfoForContract("L2Bridgehub.sol", "L2Bridgehub"));
-
         return abi.encode(data);
     }
-
-    // 
-    // 0x
-    // 7961726e2072756e2076312e32322e31390a24202f55736572732f737461732f
-    // 00000000000000000000000000000000000000000000000000000000000057e8
-    // 28e99ccbbae17c58600cde1a595489fdbf7e0e4db6ab7f7e381a5e025b2decd3
 
     function deployTuppWithContract(
         string memory contractName,

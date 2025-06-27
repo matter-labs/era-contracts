@@ -87,6 +87,22 @@ library L2GenesisForceDeploymentsHelper {
         }
     }
 
+    /// @notice Unified function to force deploy contracts based on whether it's ZKSyncOS or Era.
+    /// @param _isZKsyncOS Whether the deployment is for ZKSyncOS or Era.
+    /// @param _bytecodeInfo The bytecode information for deployment.
+    /// @param _newAddress The address where the contract should be deployed.
+    function _forceDeployOnAddress(
+        bool _isZKsyncOS,
+        bytes memory _bytecodeInfo,
+        address _newAddress
+    ) internal {
+        if (_isZKsyncOS) {
+            _forceDeployZKsyncOS(_bytecodeInfo, _newAddress);
+        } else {
+            _forceDeployEra(_bytecodeInfo, _newAddress);
+        }
+    }
+
     /// @notice Initializes force-deployed contracts required for the L2 genesis upgrade.
     /// @param _ctmDeployer Address of the CTM Deployer contract.
     /// @param _fixedForceDeploymentsData Encoded data for forced deployment that
@@ -109,47 +125,29 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        if (_isZKsyncOS) {
-            _forceDeployZKsyncOS(
-                fixedForceDeploymentsData.messageRootBytecodeOrInfo,
-                address(L2_MESSAGE_ROOT_ADDR)
-            );
-        } else {
-            _forceDeployEra(
-                fixedForceDeploymentsData.messageRootBytecodeOrInfo,
-                address(L2_MESSAGE_ROOT_ADDR)
-            );
-        }
+        _forceDeployOnAddress(
+            _isZKsyncOS,
+            fixedForceDeploymentsData.messageRootBytecodeOrInfo,
+            address(L2_MESSAGE_ROOT_ADDR)
+        );
         L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2();
 
-        if (_isZKsyncOS) {
-            _forceDeployZKsyncOS(
-                fixedForceDeploymentsData.bridgehubBytecodeOrInfo,
-                address(L2_BRIDGEHUB_ADDR)
-            );
-        } else {
-            _forceDeployEra(
-                fixedForceDeploymentsData.bridgehubBytecodeOrInfo,
-                address(L2_BRIDGEHUB_ADDR)
-            );
-        }
+        _forceDeployOnAddress(
+            _isZKsyncOS,
+            fixedForceDeploymentsData.bridgehubBytecodeOrInfo,
+            address(L2_BRIDGEHUB_ADDR)
+        );
         L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
             fixedForceDeploymentsData.l1ChainId,
             fixedForceDeploymentsData.aliasedL1Governance,
             fixedForceDeploymentsData.maxNumberOfZKChains
         );
 
-        if (_isZKsyncOS) {
-            _forceDeployZKsyncOS(
-                fixedForceDeploymentsData.l2AssetRouterBytecodeOrInfo,
-                address(L2_ASSET_ROUTER_ADDR)
-            );
-        } else {
-            _forceDeployEra(
-                fixedForceDeploymentsData.l2AssetRouterBytecodeOrInfo,
-                address(L2_ASSET_ROUTER_ADDR)
-            );
-        }
+        _forceDeployOnAddress(
+            _isZKsyncOS,
+            fixedForceDeploymentsData.l2AssetRouterBytecodeOrInfo,
+            address(L2_ASSET_ROUTER_ADDR)
+        );
 
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
             fixedForceDeploymentsData.l1ChainId,
@@ -184,18 +182,11 @@ library L2GenesisForceDeploymentsHelper {
         } else {
             // We need to deploy tbe beacon
 
-            if (_isZKsyncOS) {
-                _forceDeployZKsyncOS(
-                    fixedForceDeploymentsData.beaconDeployerInfo,
-                    L2_NTV_BEACON_DEPLOYER_ADDR
-                );
-
-            } else {
-                _forceDeployEra(
-                    fixedForceDeploymentsData.beaconDeployerInfo,
-                    L2_NTV_BEACON_DEPLOYER_ADDR
-                );
-            }
+            _forceDeployOnAddress(
+                _isZKsyncOS,
+                fixedForceDeploymentsData.beaconDeployerInfo,
+                L2_NTV_BEACON_DEPLOYER_ADDR
+            );
 
             deployedTokenBeacon = UpgradeableBeaconDeployer(L2_NTV_BEACON_DEPLOYER_ADDR).deployUpgradeableBeacon(
                 fixedForceDeploymentsData.aliasedL1Governance
@@ -203,17 +194,11 @@ library L2GenesisForceDeploymentsHelper {
         }
 
         // Now initialiazing the upgradeable token beacon
-        if (_isZKsyncOS) {
-            _forceDeployZKsyncOS(
-                fixedForceDeploymentsData.l2NtvBytecodeOrInfo,
-                L2_NATIVE_TOKEN_VAULT_ADDR
-            );
-        } else {
-            _forceDeployEra(
-                fixedForceDeploymentsData.l2NtvBytecodeOrInfo,
-                L2_NATIVE_TOKEN_VAULT_ADDR
-            );
-        }
+        _forceDeployOnAddress(
+            _isZKsyncOS,
+            fixedForceDeploymentsData.l2NtvBytecodeOrInfo,
+            L2_NATIVE_TOKEN_VAULT_ADDR
+        );
 
         L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
             fixedForceDeploymentsData.l1ChainId,

@@ -99,6 +99,14 @@ abstract contract BridgehubBase is
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[37] private __gap;
+
+
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
             revert Unauthorized(msg.sender);
@@ -113,6 +121,8 @@ abstract contract BridgehubBase is
         _;
     }
 
+    /// FIXME: this modifier is not needed as we can move all the corresponding functions to the L1Bridgehub
+    /// We keep it here until we have a stable base branch to avoid merge conflicts.
     modifier onlyL1() {
         if (_l1ChainId() != block.chainid) {
             revert NotL1(_l1ChainId(), block.chainid);

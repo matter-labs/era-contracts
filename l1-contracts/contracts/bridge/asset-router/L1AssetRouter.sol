@@ -39,9 +39,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev Chain ID of L1 for bridging reasons
-    uint256 public immutable L1_CHAIN_ID;
-
     /// @dev Chain ID of Era for legacy reasons
     uint256 public immutable ERA_CHAIN_ID;
 
@@ -106,7 +103,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = IBridgehub(_bridgehub);
-        L1_CHAIN_ID = block.chainid;
         ERA_CHAIN_ID = _eraChainId;
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
@@ -691,7 +687,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     }
 
     function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
+        return block.chainid;
     }
 
     function _eraChainId() internal view override returns (uint256) {

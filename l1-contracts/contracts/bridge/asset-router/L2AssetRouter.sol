@@ -24,18 +24,36 @@ import {TokenNotLegacy, EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
+/// @dev Important: L2 contracts are not allowed to have any immutable variables. This is needed for compatibility with ZKsyncOS.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     IBridgehub public override BRIDGE_HUB;
-    /// @dev Chain ID of L1 for bridging reasons
+
+    /// @dev Chain ID of L1 for bridging reasons.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     uint256 public L1_CHAIN_ID;
-    /// @dev Chain ID of Era for legacy reasons
+
+    /// @dev Chain ID of Era for legacy reasons.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     uint256 public eraChainId;
+    
     /// @dev The address of the L1 asset router counterpart.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     address public L1_ASSET_ROUTER;
+
     /// @dev The address of the L2 legacy shared bridge.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     address public L2_LEGACY_SHARED_BRIDGE;
+
     /// @dev The asset id of the base token.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     bytes32 public BASE_TOKEN_ASSET_ID;
 
     /// @notice Checks that the message sender is the L1 Asset Router.

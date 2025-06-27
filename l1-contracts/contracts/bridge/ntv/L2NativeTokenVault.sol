@@ -38,9 +38,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @dev The address of the WETH token.
     address public override WETH_TOKEN;
 
-    /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
-    IAssetRouterBase public override ASSET_ROUTER;
-
     /// @dev The assetId of the base token.
     bytes32 public BASE_TOKEN_ASSET_ID;
 
@@ -91,8 +88,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bytes32 _baseTokenAssetId
     ) public {
         WETH_TOKEN = _wethToken;
-        // TODO: remove the storage variable and use the L2_ASSET_ROUTER_ADDR directly
-        ASSET_ROUTER = IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         L1_CHAIN_ID = _l1ChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
@@ -114,22 +109,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bytes32 _l2TokenProxyBytecodeHash
     ) internal {
         _transferOwnership(_aliasedOwner);
-
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
-
-        // if (_contractsDeployedAlready) {
-        //     if (_bridgedTokenBeacon == address(0)) {
-        //         revert EmptyAddress();
-        //     }
-        // } else {
-        //     address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
-
-        //     UpgradeableBeacon tokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
-
-        //     tokenBeacon.transferOwnership(owner());
-        //     bridgedTokenBeacon = IBeacon(address(tokenBeacon));
-        // }
     }
 
     function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
@@ -355,12 +336,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         expectedToken = tokenAddress[expectedAssetId];
     }
 
+    function ASSET_ROUTER() public view override returns (IAssetRouterBase) {
+        return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
+    }
+
     function _wethToken() internal view override returns (address) {
         return WETH_TOKEN;
     }
 
     function _assetRouter() internal view override returns (IAssetRouterBase) {
-        return ASSET_ROUTER;
+        return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
     }
 
     function _baseTokenAssetId() internal view override returns (bytes32) {

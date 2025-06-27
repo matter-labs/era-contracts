@@ -36,8 +36,6 @@ import {BridgehubBase} from "./BridgehubBase.sol";
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev Important: L2 contracts are not allowed to have any immutable variables. This is needed for compatibility with ZKsyncOS.
 contract L2Bridgehub is BridgehubBase {
-    // FIXME: IMPORTANT align storage with the previous one.
-
     /// @notice the asset id of Eth. This is only used on L1.
     bytes32 internal ETH_TOKEN_ASSET_ID;
 
