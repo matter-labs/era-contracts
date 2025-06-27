@@ -20,7 +20,7 @@ import {MsgValueMismatch, Unauthorized, NotL1, NotL2ToL2} from "../common/L1Cont
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle, IndirectCallValueMismatch, AttributeNotForInteropCallValue} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle, IndirectCallValueMismatch, AttributeNotForInteropCallValue, UnbundlerAddressZero} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -129,6 +129,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             AttributeParsingRestrictions.CallAndBundleAttributes
         );
 
+        // Verify that the unbundler address is not set to 0, to verify that sender didn't forget it.
+        // We want it to be set by sender because it's an important safety feature to have an option to unbundle the bundle.
+        require(bundleAttributes.unbundlerAddress != address(0), UnbundlerAddressZero());
+
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
         callStartersInternal[0] = InteropCallStarterInternal({
             to: _destinationAddress,
@@ -171,6 +175,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             _bundleAttributes,
             AttributeParsingRestrictions.OnlyBundleAttributes
         );
+        // Verify that the unbundler address is not set to 0, to verify that sender didn't forget it.
+        // We want it to be set by sender because it's an important safety feature to have an option to unbundle the bundle.
+        require(bundleAttributes.unbundlerAddress != address(0), UnbundlerAddressZero());
         bundleHash = _sendBundle({
             _destinationChainId: _destinationChainId,
             _callStarters: callStartersInternal,
