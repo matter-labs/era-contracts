@@ -189,29 +189,6 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                             Internal functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Finalizes, serializes, and sends a message corresponding to the bundle via the L2 to L1 messenger.
-    /// @param _bundle InteropBundle struct corresponding to the bundle that is being sent.
-    /// @param _bundleCallsTotalValue Total base token value for all calls.
-    /// @return interopBundleHash keccak256 hash of the encoded bundle.
-    function _finalizeAndSendBundle(
-        InteropBundle memory _bundle,
-        uint256 _bundleCallsTotalValue
-    ) internal returns (bytes32 interopBundleHash) {
-        // Ensure that tokens required for bundle execution were received.
-        _ensureCorrectTotalValue(_bundle.destinationChainId, _bundleCallsTotalValue);
-
-        bytes memory interopBundleBytes = abi.encode(_bundle);
-
-        // Send the message corresponding to the relevant InteropBundle to L1.
-        bytes32 msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
-        );
-        interopBundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
-
-        // Emit event stating that the bundle was sent out successfully.
-        emit InteropBundleSent(msgHash, interopBundleHash, _bundle);
-    }
-
     /// @notice Ensures the received base token value matches expected for the destination chain.
     /// @param _destinationChainId Destination chain ID.
     /// @param _totalValue Sum of requested interop call values.
@@ -234,7 +211,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         }
     }
 
-    /// @notice Constructs and sends an InteropBundle.
+    /// @notice Constructs and sends an InteropBundle, that includes sending a message corresponding to the bundle via the L2 to L1 messenger.
     /// @param _destinationChainId Chain ID to send to.
     /// @param _callStarters Array of InteropCallStarterInternal structs, corresponding to the calls in bundle.
     /// @param _bundleAttributes Attributes of the bundle.
@@ -267,8 +244,20 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             totalCallsValue += _callStarters[i].callAttributes.interopCallValue;
         }
 
-        // Send the bundle.
-        bundleHash = _finalizeAndSendBundle({_bundle: bundle, _bundleCallsTotalValue: totalCallsValue});
+        // Ensure that tokens required for bundle execution were received.
+        _ensureCorrectTotalValue(bundle.destinationChainId, totalCallsValue);
+
+        bytes memory interopBundleBytes = abi.encode(bundle);
+
+        // Send the message corresponding to the relevant InteropBundle to L1.
+        bytes32 msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
+        );
+
+        bytes32 interopBundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
+
+        // Emit event stating that the bundle was sent out successfully.
+        emit InteropBundleSent(msgHash, interopBundleHash, bundle);
     }
 
     function _processCallStarter(
