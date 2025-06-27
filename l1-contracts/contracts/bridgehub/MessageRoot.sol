@@ -184,9 +184,7 @@ contract MessageRoot is IMessageRoot, Initializable {
     }
 
     /// @notice emit a new message root when committing a new batch
-    function _emitRoot(
-        bytes32 _root
-    ) internal {
+    function _emitRoot(bytes32 _root) internal {
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = _root;
         emit NewInteropRoot(block.chainid, block.number, 0, _sides);
