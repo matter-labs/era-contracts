@@ -31,3 +31,5 @@ error UnauthorizedMessageSender(address expected, address actual);
 error UnbundlingNotAllowed(bytes32 bundleHash, address callerAddress, address unbundlerAddress);
 // 0x801534e9
 error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
+// 0x4534e972
+error WrongDestinationChainId(bytes32 bundleHash, uint256 expected, uint256 actual);

@@ -8,7 +8,7 @@ import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, MessageInclusionProof, Ca
 import {IERC7786Receiver} from "./IERC7786Receiver.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready, UnauthorizedMessageSender} from "./InteropErrors.sol";
+import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready, UnauthorizedMessageSender, WrongDestinationChainId} from "./InteropErrors.sol";
 import {InvalidSelector} from "../common/L1ContractErrors.sol";
 
 /// @title InteropHandler
@@ -33,6 +33,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
             _proof.chainId
+        );
+
+        // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get executed
+        require(
+            interopBundle.destinationChainId == block.chainid,
+            WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
         );
 
         // Verify that the caller has permission to execute the bundle.
@@ -85,7 +91,16 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @param _proof Inclusion proof for the bundle message. The bundle message itself gets broadcasted by InteropCenter contract whenever a bundle is sent.
     function verifyBundle(bytes memory _bundle, MessageInclusionProof memory _proof) public nonReentrant {
         // Decode the bundle data, calculate its hash and get the current status of the bundle.
-        (, bytes32 bundleHash, BundleStatus status) = _getBundleData(_bundle, _proof.chainId);
+        (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
+            _bundle,
+            _proof.chainId
+        );
+
+        // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get verified
+        require(
+            interopBundle.destinationChainId == block.chainid,
+            WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
+        );
 
         // If the bundle was already fully executed or unbundled, we revert stating that it was processed already.
         require(
@@ -114,6 +129,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
             _sourceChainId
+        );
+
+        // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get unbundled
+        require(
+            interopBundle.destinationChainId == block.chainid,
+            WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
         );
 
         // Verify that the caller has permission to unbundle the bundle.
