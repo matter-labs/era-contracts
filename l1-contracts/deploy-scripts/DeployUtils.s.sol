@@ -26,6 +26,7 @@ struct FixedForceDeploymentsData {
     bytes l2AssetRouterBytecodeOrInfo;
     bytes l2NtvBytecodeOrInfo;
     bytes messageRootBytecodeOrInfo;
+    bytes beaconDeployerInfo;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.

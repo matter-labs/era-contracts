@@ -590,6 +590,11 @@ contract EcosystemUpgrade is Script, DeployL1Script {
             messageRootBytecodeOrInfo: abi.encode(
                 L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readMessageRootBytecode())
             ),
+            beaconDeployerInfo: abi.encode(
+                bytes32(0)
+                // TODO:
+                // L2ContractHelper.hashL2Bytecode(L2ContractsBytecodesLib.readUpgradeableBeaconDeployerBytecode())
+            ),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),

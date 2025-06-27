@@ -41,14 +41,12 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
     /// @param _aliasedOwner The address of the governor contract.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
-    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     /// @param _wethToken Address of WETH on deployed chain
     function initL2(
         uint256 _l1ChainId,
         address _aliasedOwner,
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
-        bool _contractsDeployedAlready,
         address _wethToken,
         bytes32 _baseTokenAssetId
     ) public {
@@ -58,7 +56,6 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
             bytes32(0),
             _legacySharedBridge,
             _bridgedTokenBeacon,
-            _contractsDeployedAlready,
             _wethToken,
             _baseTokenAssetId
         );
@@ -79,7 +76,14 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
 
         // TODO: is it okay that the bytecode of the proxy changes with the implementation
         // of the l2 native token vault?
-        proxy = new BeaconProxy{salt: _salt}(address(bridgedTokenBeacon), "");
+
+        // Use CREATE2 to deploy the BeaconProxy
+        address proxyAddress = Create2.deploy(
+            0,
+            _salt,
+            abi.encodePacked(type(BeaconProxy).creationCode, abi.encode(bridgedTokenBeacon, ""))
+        );
+        return BeaconProxy(payable(proxyAddress));
     }
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
@@ -99,9 +103,8 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
 
     function initialize(
         address _aliasedOwner,
-        address _bridgedTokenBeacon,
-        bool _contractsDeployedAlready
+        address _bridgedTokenBeacon
     ) external initializer {
-        _initializeInner(_aliasedOwner, _bridgedTokenBeacon, bytes32(0), _contractsDeployedAlready);
+        _initializeInner(_aliasedOwner, _bridgedTokenBeacon, bytes32(0));
     }
 }

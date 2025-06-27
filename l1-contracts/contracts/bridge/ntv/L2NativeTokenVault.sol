@@ -59,7 +59,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _aliasedOwner The address of the governor contract.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
-    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
     /// @param _wethToken Address of WETH on deployed chain
     /// TODO: explain why we need to initL2 and updateL2
     function initL2(
@@ -68,7 +67,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
-        bool _contractsDeployedAlready,
         address _wethToken,
         bytes32 _baseTokenAssetId
     ) public {
@@ -78,7 +76,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             _l2TokenProxyBytecodeHash,
             _legacySharedBridge,
             _bridgedTokenBeacon,
-            _contractsDeployedAlready,
             _wethToken,
             _baseTokenAssetId
         );
@@ -90,7 +87,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
-        bool _contractsDeployedAlready,
         address _wethToken,
         bytes32 _baseTokenAssetId
     ) public {
@@ -109,30 +105,31 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
 
         L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
-        _initializeInner(_aliasedOwner, _bridgedTokenBeacon, _l2TokenProxyBytecodeHash, _contractsDeployedAlready);
+        _initializeInner(_aliasedOwner, _bridgedTokenBeacon, _l2TokenProxyBytecodeHash);
     }
 
     function _initializeInner(
         address _aliasedOwner,
         address _bridgedTokenBeacon,
-        bytes32 _l2TokenProxyBytecodeHash,
-        bool _contractsDeployedAlready
+        bytes32 _l2TokenProxyBytecodeHash
     ) internal {
         _transferOwnership(_aliasedOwner);
-        if (_contractsDeployedAlready) {
-            if (_bridgedTokenBeacon == address(0)) {
-                revert EmptyAddress();
-            }
-            bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
-        } else {
-            address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
 
-            UpgradeableBeacon tokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+        bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
+        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
 
-            tokenBeacon.transferOwnership(owner());
-            bridgedTokenBeacon = IBeacon(address(tokenBeacon));
-            emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
-        }
+        // if (_contractsDeployedAlready) {
+        //     if (_bridgedTokenBeacon == address(0)) {
+        //         revert EmptyAddress();
+        //     }
+        // } else {
+        //     address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
+
+        //     UpgradeableBeacon tokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
+
+        //     tokenBeacon.transferOwnership(owner());
+        //     bridgedTokenBeacon = IBeacon(address(tokenBeacon));
+        // }
     }
 
     function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {

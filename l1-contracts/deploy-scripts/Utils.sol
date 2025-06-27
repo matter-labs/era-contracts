@@ -971,11 +971,11 @@ library Utils {
         return bytecode;
     }
 
-    function readZKFoundryDeployedBytecodeL1(
+    function readFoundryDeployedBytecodeL1(
         string memory fileName,
         string memory contractName
     ) internal view returns (bytes memory) {
-        string memory path = string.concat("/../l1-contracts/zkout/", fileName, "/", contractName, ".json");
+        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
         bytes memory bytecode = readFoundryDeployedBytecode(path);
         return bytecode;
     }
@@ -1010,10 +1010,12 @@ library Utils {
     }
 
     function blakeHashBytecode(bytes memory bytecode) internal returns (bytes32 hashedBytecode) {
-        string[] memory input = new string[](3);
-        input[0] = "ts-node";
-        input[1] = "./scripts/blake2s256.ts";
-        input[2] = vm.toString(bytecode);
+        string[] memory input = new string[](5);
+        input[0] = "yarn";
+        input[1] = "--silent";
+        input[2] = "ts-node";
+        input[3] = "./scripts/blake2s256.ts";
+        input[4] = vm.toString(bytecode);
         hashedBytecode = bytes32(vm.ffi(input));
     }
 
@@ -1307,7 +1309,7 @@ library Utils {
         bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
     }
 
-    function getZKOSBytecodeInfo(bytes memory bytecode) internal pure returns (bytes memory bytecodeInfo) {
+    function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
         bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
         bytes32 observableBytecodeBlakeHash = keccak256(bytecode);
         bytecodeInfo = abi.encode(bytecodeBlakeHash, bytecode.length, observableBytecodeBlakeHash);
@@ -1316,8 +1318,8 @@ library Utils {
     function getZKOSBytecodeInfoForContract(
         string memory fileName,
         string memory contractName
-    ) internal view returns (bytes memory bytecodeInfo) {
-        bytes memory bytecode = readZKFoundryDeployedBytecodeL1(fileName, contractName);
+    ) internal returns (bytes memory bytecodeInfo) {
+        bytes memory bytecode = readFoundryDeployedBytecodeL1(fileName, contractName);
         bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 
@@ -1342,3 +1344,10 @@ library Utils {
     // add this to be excluded from coverage report
     function test() internal {}
 }
+
+
+// f6eca0b0
+// 0000000000000000000000000000000000000000000000000000000000010004
+// dab11cdc52cf712e32f05b6ef7b39520ddab71ce9fe53bab46bf603060cbaab0
+// 00000000000000000000000000000000000000000000000000000000000079d6
+// 51073ba0607916109e37e64b56920ba5ce8d38d4035ca89c508d8f709577c6dd

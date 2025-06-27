@@ -22,6 +22,10 @@ import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 
 import {MessageRootBase} from "../bridgehub/MessageRootBase.sol";
 
+import { UpgradeableBeaconDeployer } from "../bridge/ntv/UpgradeableBeaconDeployer.sol";
+
+address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(0x0000000000000000000000000000000000010008);
+
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     uint256 eraChainId;
@@ -33,6 +37,7 @@ struct FixedForceDeploymentsData {
     bytes l2AssetRouterBytecodeOrInfo;
     bytes l2NtvBytecodeOrInfo;
     bytes messageRootBytecodeOrInfo;
+    bytes beaconDeployerInfo;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.
@@ -166,7 +171,6 @@ library L2GenesisForceDeploymentsHelper {
         });
 
         address deployedTokenBeacon;
-        bool contractsDeployedAlready;
         if (additionalForceDeploymentsData.l2LegacySharedBridge != address(0)) {
             // In production, the `fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon` must always
             // be equal to 0. It is only for simplifying testing.
@@ -177,10 +181,28 @@ library L2GenesisForceDeploymentsHelper {
             } else {
                 deployedTokenBeacon = fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
             }
+        } else {
+            // We need to deploy tbe beacon
 
-            contractsDeployedAlready = true;
+            if (_isZKsyncOS) {
+                _forceDeployZKsyncOS(
+                    fixedForceDeploymentsData.beaconDeployerInfo,
+                    L2_NTV_BEACON_DEPLOYER_ADDR
+                );
+
+            } else {
+                _forceDeployEra(
+                    fixedForceDeploymentsData.beaconDeployerInfo,
+                    L2_NTV_BEACON_DEPLOYER_ADDR
+                );
+            }
+
+            deployedTokenBeacon = UpgradeableBeaconDeployer(L2_NTV_BEACON_DEPLOYER_ADDR).deployUpgradeableBeacon(
+                fixedForceDeploymentsData.aliasedL1Governance
+            );
         }
 
+        // Now initialiazing the upgradeable token beacon
         if (_isZKsyncOS) {
             _forceDeployZKsyncOS(
                 fixedForceDeploymentsData.l2NtvBytecodeOrInfo,
@@ -193,13 +215,13 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
+        // FIXME: this function only exists for the NativeTokenVaultZKOS, but not for the NativeTokenVault.
         L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
             fixedForceDeploymentsData.l1ChainId,
             fixedForceDeploymentsData.aliasedL1Governance,
             fixedForceDeploymentsData.l2TokenProxyBytecodeHash,
             additionalForceDeploymentsData.l2LegacySharedBridge,
             deployedTokenBeacon,
-            contractsDeployedAlready,
             wrappedBaseTokenAddress,
             additionalForceDeploymentsData.baseTokenAssetId
         );
