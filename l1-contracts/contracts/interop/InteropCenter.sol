@@ -254,10 +254,10 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
         );
 
-        bytes32 interopBundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
+        bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
 
         // Emit event stating that the bundle was sent out successfully.
-        emit InteropBundleSent(msgHash, interopBundleHash, bundle);
+        emit InteropBundleSent(msgHash, bundleHash, bundle);
     }
 
     function _processCallStarter(
