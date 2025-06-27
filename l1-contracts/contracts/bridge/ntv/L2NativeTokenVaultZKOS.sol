@@ -35,32 +35,6 @@ import {L2NativeTokenVault} from "./L2NativeTokenVault.sol";
 contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
     using SafeERC20 for IERC20;
 
-    /// @notice Initializes the bridge contract for later use.
-    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
-    /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
-    /// @param _aliasedOwner The address of the governor contract.
-    /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
-    /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
-    /// @param _wethToken Address of WETH on deployed chain
-    function initL2(
-        uint256 _l1ChainId,
-        address _aliasedOwner,
-        address _legacySharedBridge,
-        address _bridgedTokenBeacon,
-        address _wethToken,
-        bytes32 _baseTokenAssetId
-    ) public {
-        super.initL2(
-            _l1ChainId,
-            _aliasedOwner,
-            bytes32(0),
-            _legacySharedBridge,
-            _bridgedTokenBeacon,
-            _wethToken,
-            _baseTokenAssetId
-        );
-    }
-
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
     /// for the code of the proxy.

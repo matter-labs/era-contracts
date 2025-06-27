@@ -215,7 +215,6 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
-        // FIXME: this function only exists for the NativeTokenVaultZKOS, but not for the NativeTokenVault.
         L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
             fixedForceDeploymentsData.l1ChainId,
             fixedForceDeploymentsData.aliasedL1Governance,
