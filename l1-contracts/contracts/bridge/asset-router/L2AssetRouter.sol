@@ -140,13 +140,19 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     function executeMessage(
         // kl todo: change back to strings
         bytes32, // messageId, gateway specific, empty or unique
-        uint256, // sourceChain, [CAIP-2] chain identifier
-        address, // [CAIP-10] account address
+        uint256 sourceChain, // [CAIP-2] chain identifier
+        address sender, // [CAIP-10] account address
         bytes calldata payload,
         bytes[] calldata // attributes
     ) external payable returns (bytes4) {
+        // VG TODO: InvalidCaller -> InvalidSender (add error in interop errors file), when interop directory fixes get merged
+        // Validate the sender is either L1 AssetRouter, or L2 AssetRouter (so this is the second bridge in indirect interop call).
+        require((sourceChain == L1_CHAIN_ID && sender == L1_ASSET_ROUTER) || (sourceChain != L1_CHAIN_ID && sender == address(this)), InvalidCaller(sender));
+        
+        // Validate payload
         require(payload.length > 4, PayloadTooShort());
         require(bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector, InvalidSelector(bytes4(payload[0:4])));
+        
         (bool success, ) = address(this).call(payload);
         require(success, ExecuteMessageFailed());
         return IERC7786Receiver.executeMessage.selector;
