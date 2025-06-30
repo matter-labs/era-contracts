@@ -4,8 +4,13 @@ pragma solidity ^0.8.21;
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 interface IAssetTracker {
+    function BRIDGE_HUB() external view returns (IBridgehub);
+
+    function assetSettlementLayer(bytes32 _assetId) external view returns (uint256);
+
     function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
 
     function handleChainBalanceDecrease(
@@ -22,9 +27,9 @@ interface IAssetTracker {
 
     function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
-    function migrateTokenBalanceFromL2(bytes32 _assetId) external;
+    function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external;
 
-    function receiveMigrationOnGateway(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
+    function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external;
 
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
@@ -33,5 +38,12 @@ interface IAssetTracker {
         bytes32 _assetId,
         uint256 _amount,
         uint256 _migrationNumber
+    ) external;
+
+    function confirmMigrationOnGateway(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isL1ToGateway
     ) external;
 }
