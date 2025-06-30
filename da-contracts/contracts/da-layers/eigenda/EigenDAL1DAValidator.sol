@@ -9,11 +9,16 @@ interface IRiscZeroVerifier {
     function verify(bytes calldata seal, bytes32 imageId, bytes32 journalDigest) external view;
 }
 
+struct Journal {
+    bytes32 eigenDAHash; // The hash of the EigenDA data calculated by the Risc0 guest
+    bytes env_commitment; // The abi-encoded steel commitment
+    bytes proof; // The KZG Proof for proof of equivalence
+}
+
 struct EigenDAInclusionData {
     bytes seal;
     bytes32 imageId;
-    bytes32 journalDigest;
-    bytes32 eigenDAHash;
+    bytes journal;
 }
 
 contract EigenDAL1DAValidator is IL1DAValidator {
@@ -36,19 +41,20 @@ contract EigenDAL1DAValidator is IL1DAValidator {
         if (operatorDAInput.length < 32) {
             revert OperatorDAInputTooSmall(operatorDAInput.length, 32);
         }
-        bytes32 stateDiffHash = bytes32(operatorDAInput[:32]);
+        output.stateDiffHash = bytes32(operatorDAInput[:32]);
 
         // Decode the inclusion data from the operatorDAInput
         EigenDAInclusionData memory inclusionData = abi.decode(operatorDAInput[32:], (EigenDAInclusionData));
 
+        // Decode the journal (public outputs)
+        Journal memory journal = abi.decode(inclusionData.journal, (Journal));
+
         // Verify the risczero proof
-        risc0Verifier.verify(inclusionData.seal, inclusionData.imageId, inclusionData.journalDigest);
+        risc0Verifier.verify(inclusionData.seal, inclusionData.imageId, sha256(inclusionData.journal));
 
         // Check that the eigenDAHash from the Inclusion Data (originally calculated on Risc0 guest) is correct
-        if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(stateDiffHash, inclusionData.eigenDAHash)))
+        if (l2DAValidatorOutputHash != keccak256(abi.encodePacked(output.stateDiffHash, journal.eigenDAHash)))
             revert InvalidValidatorOutputHash();
-
-        output.stateDiffHash = stateDiffHash;
 
         output.blobsLinearHashes = new bytes32[](maxBlobsSupported);
         output.blobsOpeningCommitments = new bytes32[](maxBlobsSupported);
