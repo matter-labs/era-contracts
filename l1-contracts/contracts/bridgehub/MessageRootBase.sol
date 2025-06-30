@@ -9,8 +9,10 @@ import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {OnlyBridgehub, OnlyChain, ChainExists, MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
-
+import {InvalidCaller} from "../common/L1ContractErrors.sol";
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
+
+import {L2_COMPLEX_UPGRADER_ADDR} from "../common/L2ContractAddresses.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -63,6 +65,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
     modifier onlyChain(uint256 _chainId) {
         if (msg.sender != _bridgehub().getZKChain(_chainId)) {
             revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
+        }
+        _;
+    }
+
+    /// @notice only the upgrader can call
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert InvalidCaller(msg.sender);
         }
         _;
     }

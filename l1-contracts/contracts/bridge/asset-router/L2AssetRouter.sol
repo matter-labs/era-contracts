@@ -15,7 +15,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/libraries/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TokenNotLegacy, EmptyAddress, InvalidCaller, AmountMustBeGreaterThanZero, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
@@ -97,7 +97,22 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         _;
     }
 
-    // todo; explain why this function is safe
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Initializes the contract
+    /// @dev This function is used to initialize the contract with the initial values.
+    /// @dev This function is called both for new chains.
+    /// @param _l1ChainId The chain id of L1.
+    /// @param _eraChainId The chain id of Era.
+    /// @param _l1AssetRouter The address of the L1 asset router.
+    /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
+    /// @param _baseTokenAssetId The asset id of the base token.
+    /// @param _aliasedOwner The address of the owner of the contract.
     function initL2(
         uint256 _l1ChainId,
         uint256 _eraChainId,
@@ -105,19 +120,28 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _legacySharedBridge,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
-    ) public reentrancyGuardInitializer {
-        updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, _baseTokenAssetId, _aliasedOwner);
+    ) public reentrancyGuardInitializer onlyUpgrader {
+        _disableInitializers();
+        updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, _baseTokenAssetId);
+        _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
+        _transferOwnership(_aliasedOwner);
     }
 
-    // todo; explain why this function is safe
+    /// @notice Updates the contract.
+    /// @dev This function is used to initialize the new implementation of L2AssetRouter on existing chains during
+    /// the upgrade.
+    /// @param _l1ChainId The chain id of L1.
+    /// @param _eraChainId The chain id of Era.
+    /// @param _l1AssetRouter The address of the L1 asset router.
+    /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
+    /// @param _baseTokenAssetId The asset id of the base token.
     function updateL2(
         uint256 _l1ChainId,
         uint256 _eraChainId,
         address _l1AssetRouter,
         address _legacySharedBridge,
-        bytes32 _baseTokenAssetId,
-        address _aliasedOwner
-    ) public initializer {
+        bytes32 _baseTokenAssetId
+    ) public onlyUpgrader {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
@@ -126,8 +150,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         L1_ASSET_ROUTER = _l1AssetRouter;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         eraChainId = _eraChainId;
-        _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
-        _transferOwnership(_aliasedOwner);
     }
 
     /// @inheritdoc IL2AssetRouter

@@ -23,8 +23,7 @@ contract L2MessageRoot is MessageRootBase {
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
-    /// TODO: access control
-    function initL2() public {
+    function initL2() public onlyUpgrader {
         _initialize();
         _disableInitializers();
     }

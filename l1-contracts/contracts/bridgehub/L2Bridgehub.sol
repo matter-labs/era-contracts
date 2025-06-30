@@ -50,13 +50,25 @@ contract L2Bridgehub is BridgehubBase {
     /// @notice to avoid parity hack
     constructor() {}
 
-    // TODO: explain why we need to initL2 and updateL2
-    function initL2(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) public {
-        updateL2(_l1ChainId, _owner, _maxNumberOfZKChains);
+    /// @notice Initializes the contract
+    /// @dev This function is used to initialize the contract with the initial values.
+    /// @dev This function is called both for new chains.
+    /// @param _l1ChainId The chain id of L1.
+    /// @param _owner The owner of the contract.
+    /// @param _maxNumberOfZKChains The maximum number of ZK chains that can be created.
+    function initL2(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) public reentrancyGuardInitializer onlyUpgrader {
+        _disableInitializers();
+        updateL2(_l1ChainId, _maxNumberOfZKChains);
+        _transferOwnership(_owner);
+        _initializeInner();
     }
 
-    function updateL2(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) public {
-        _disableInitializers();
+    /// @notice Updates the contract.
+    /// @dev This function is used to initialize the new implementation of L2Bridgehub on existing chains during
+    /// the upgrade.
+    /// @param _l1ChainId The chain id of L1.
+    /// @param _maxNumberOfZKChains The maximum number of ZK chains that can be created.
+    function updateL2(uint256 _l1ChainId, uint256 _maxNumberOfZKChains) public onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
@@ -64,8 +76,6 @@ contract L2Bridgehub is BridgehubBase {
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-        _transferOwnership(_owner);
-        _initializeInner();
     }
 
     function _ethTokenAssetId() internal view override returns (bytes32) {

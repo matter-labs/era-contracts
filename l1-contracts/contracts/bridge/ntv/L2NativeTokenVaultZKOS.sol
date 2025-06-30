@@ -51,9 +51,6 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
         // For all zkOS-first chains, `L2_LEGACY_SHARED_BRIDGE` is zero and so L2NativeTokenVault
         // is the sole deployer of all bridged tokens.
 
-        // TODO: is it okay that the bytecode of the proxy changes with the implementation
-        // of the l2 native token vault?
-
         // Use CREATE2 to deploy the BeaconProxy
         address proxyAddress = Create2.deploy(
             0,

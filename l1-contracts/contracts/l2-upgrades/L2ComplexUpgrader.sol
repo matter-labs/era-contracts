@@ -10,6 +10,8 @@ import {IZKOSContractDeployer} from "./IZKOSContractDeployer.sol";
 
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 
+import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
@@ -32,6 +34,7 @@ contract L2ComplexUpgrader is IComplexUpgrader {
     /// @dev This function allows only the `FORCE_DEPLOYER` to initiate the upgrade.
     /// If the delegate call fails, the function will revert the transaction, returning the error message
     /// provided by the delegated contract.
+    /// @dev Compatible with Era only.
     /// @param _forceDeployments the list of initial deployments that should be performed before the upgrade.
     /// They would typically, though not necessarily include the deployment of the upgrade implementation itself.
     /// @param _delegateTo the address of the contract to which the calls will be delegated
@@ -46,21 +49,23 @@ contract L2ComplexUpgrader is IComplexUpgrader {
         upgrade(_delegateTo, _calldata);
     }
 
-    function forceDeployAndUpgradeZKOS(
-        ZKsyncOSForceDeploymentInfo[] calldata _forceDeployments,
+    /// @notice Executes an upgrade process by delegating calls to another contract.
+    /// @dev Similar to `forceDeployAndUpgrade`, but allows for universal force deployments, that 
+    /// work for both ZKsyncOS and Era.
+    /// @param _forceDeployments the list of initial deployments that should be performed before the upgrade.
+    /// They would typically, though not necessarily include the deployment of the upgrade implementation itself.
+    /// @param _delegateTo the address of the contract to which the calls will be delegated
+    /// @param _calldata the calldata to be delegate called in the `_delegateTo` contract
+    function forceDeployAndUpgradeUniversal(
+        UniversalForceDeploymentInfo[] calldata _forceDeployments,
         address _delegateTo,
         bytes calldata _calldata
     ) external payable onlyForceDeployer {
         for (uint256 i = 0; i < _forceDeployments.length; i++) {
-            (bytes32 bytecode, uint32 length, bytes32 observableBytecodeHash) = abi.decode(
+            L2GenesisForceDeploymentsHelper.forceDeployOnAddress(
+                _forceDeployments[i].isZKsyncOS,
                 _forceDeployments[i].deployedBytecodeInfo,
-                (bytes32, uint32, bytes32)
-            );
-            IZKOSContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).setBytecodeDetailsEVM(
-                _forceDeployments[i].newAddress,
-                bytecode,
-                length,
-                observableBytecodeHash
+                _forceDeployments[i].newAddress
             );
         }
 

@@ -121,6 +121,13 @@ abstract contract BridgehubBase is
         _;
     }
 
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// FIXME: this modifier is not needed as we can move all the corresponding functions to the L1Bridgehub
     /// We keep it here until we have a stable base branch to avoid merge conflicts.
     modifier onlyL1() {

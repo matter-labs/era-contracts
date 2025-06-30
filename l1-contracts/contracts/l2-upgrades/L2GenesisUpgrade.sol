@@ -41,7 +41,8 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
             _isZKsyncOS,
             _ctmDeployer,
             _fixedForceDeploymentsData,
-            _additionalForceDeploymentsData
+            _additionalForceDeploymentsData,
+            true
         );
 
         emit UpgradeComplete(_chainId);
