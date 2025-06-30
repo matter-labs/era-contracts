@@ -56,7 +56,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     function add(
         address _validatorOwner,
         bool _validatorIsLeader,
-        uint32 _validatorWeight,
+        uint256 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP
     ) external onlyOwner {
@@ -153,7 +153,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit ValidatorLeaderStatusChanged(_validatorOwner, _isLeader);
     }
 
-    function changeValidatorWeight(address _validatorOwner, uint32 _weight) external onlyOwner {
+    function changeValidatorWeight(address _validatorOwner, uint256 _weight) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
