@@ -339,6 +339,73 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    function _commitBatchesSharedBridgeZKOS(
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
+    ) internal {
+        (
+            StoredBatchInfo memory lastCommittedBatchData,
+            CommitBoojumOSBatchInfo[] memory newBatchesData
+        ) = BatchDecoder.decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
+        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
+        // and so the range checked in the `decodeAndCheckCommitData` is enough.
+        if (newBatchesData.length != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
+        // Check that we commit batches after last committed batch
+        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(
+                s.storedBatchHashes[s.totalBatchesCommitted],
+                _hashStoredBatchInfo(lastCommittedBatchData)
+            );
+        }
+
+        // TOOD: handle l2 upgrade
+        _commitBoojumOSBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
+
+        s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+    }
+
+    function _commitBatchesSharedBridgeEra(
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
+    ) internal {
+        (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
+                .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
+        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
+        // and so the range checked in the `decodeAndCheckCommitData` is enough.
+        if (newBatchesData.length != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
+        // Check that we commit batches after last committed batch
+        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(
+                s.storedBatchHashes[s.totalBatchesCommitted],
+                _hashStoredBatchInfo(lastCommittedBatchData)
+            );
+        }
+
+        bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
+        // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
+        if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBatchNumber != 0) {
+            _commitBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
+        } else {
+            _commitBatchesWithSystemContractsUpgrade(
+                lastCommittedBatchData,
+                newBatchesData,
+                systemContractsUpgradeTxHash
+            );
+        }
+
+        s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+    }
+
     /// @inheritdoc IExecutor
     function commitBatchesSharedBridge(
         uint256, // _chainId
@@ -357,60 +424,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidProtocolVersion();
         }
         if (s.boojumOS) {
-            (
-                StoredBatchInfo memory lastCommittedBatchData,
-                CommitBoojumOSBatchInfo[] memory newBatchesData
-            ) = BatchDecoder.decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
-            // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
-            // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
-            // and so the range checked in the `decodeAndCheckCommitData` is enough.
-            if (newBatchesData.length != 1) {
-                revert CanOnlyProcessOneBatch();
-            }
-            // Check that we commit batches after last committed batch
-            if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
-                // incorrect previous batch data
-                revert BatchHashMismatch(
-                    s.storedBatchHashes[s.totalBatchesCommitted],
-                    _hashStoredBatchInfo(lastCommittedBatchData)
-                );
-            }
-
-            // TOOD: handle l2 upgrade
-            _commitBoojumOSBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
-
-            s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+            _commitBatchesSharedBridgeZKOS(_processFrom, _processTo, _commitData);
         } else {
-            (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
-                .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
-            // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
-            // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
-            // and so the range checked in the `decodeAndCheckCommitData` is enough.
-            if (newBatchesData.length != 1) {
-                revert CanOnlyProcessOneBatch();
-            }
-            // Check that we commit batches after last committed batch
-            if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
-                // incorrect previous batch data
-                revert BatchHashMismatch(
-                    s.storedBatchHashes[s.totalBatchesCommitted],
-                    _hashStoredBatchInfo(lastCommittedBatchData)
-                );
-            }
-
-            bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
-            // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
-            if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBatchNumber != 0) {
-                _commitBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
-            } else {
-                _commitBatchesWithSystemContractsUpgrade(
-                    lastCommittedBatchData,
-                    newBatchesData,
-                    systemContractsUpgradeTxHash
-                );
-            }
-
-            s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+            _commitBatchesSharedBridgeEra(_processFrom, _processTo, _commitData);
         }
     }
 

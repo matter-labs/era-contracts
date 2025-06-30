@@ -23,7 +23,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     /// @notice ZK chain diamond contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
-    function initialize(InitializeData calldata _initializeData) external reentrancyGuardInitializer returns (bytes32) {
+    function initialize(InitializeData calldata _initializeData) public virtual reentrancyGuardInitializer returns (bytes32) {
         if (address(_initializeData.verifier) == address(0)) {
             revert ZeroAddress();
         }
