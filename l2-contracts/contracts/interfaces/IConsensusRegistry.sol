@@ -129,7 +129,7 @@ interface IConsensusRegistry {
     function add(
         address _validatorOwner,
         bool _validatorIsLeader,
-        uint32 _validatorWeight,
+        uint256 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP
     ) external;
