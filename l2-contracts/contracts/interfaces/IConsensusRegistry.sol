@@ -33,7 +33,7 @@ interface IConsensusRegistry {
         bool active;
         bool removed;
         bool leader;
-        uint32 weight;
+        uint256 weight;
         BLS12_381PublicKey pubKey;
         BLS12_381Signature proofOfPossession;
     }
@@ -67,7 +67,7 @@ interface IConsensusRegistry {
     /// @param proofOfPossession Validator's Proof-of-possession (a signature over the public key).
     struct CommitteeValidator {
         bool leader;
-        uint32 weight;
+        uint256 weight;
         BLS12_381PublicKey pubKey;
         BLS12_381Signature proofOfPossession;
     }
@@ -104,7 +104,7 @@ interface IConsensusRegistry {
 
     event ValidatorAdded(
         address indexed validatorOwner,
-        uint32 validatorWeight,
+        uint256 validatorWeight,
         BLS12_381PublicKey validatorPubKey,
         BLS12_381Signature validatorPoP
     );
@@ -112,7 +112,7 @@ interface IConsensusRegistry {
     event ValidatorDeleted(address indexed validatorOwner);
     event ValidatorActiveStatusChanged(address indexed validatorOwner, bool isActive);
     event ValidatorLeaderStatusChanged(address indexed validatorOwner, bool isLeader);
-    event ValidatorWeightChanged(address indexed validatorOwner, uint32 newWeight);
+    event ValidatorWeightChanged(address indexed validatorOwner, uint256 newWeight);
     event ValidatorKeyChanged(address indexed validatorOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
     event ValidatorsCommitted(uint32 validatorsCommit, uint256 validatorsCommitBlock);
     event CommitteeActivationDelayChanged(uint256 newDelay);
@@ -129,7 +129,7 @@ interface IConsensusRegistry {
     function add(
         address _validatorOwner,
         bool _validatorIsLeader,
-        uint32 _validatorWeight,
+        uint256 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP
     ) external;
@@ -159,7 +159,7 @@ interface IConsensusRegistry {
     /// @dev Verifies that the validator owner exists in the registry.
     /// @param _validatorOwner The address of the owner of the validator whose weight will be changed.
     /// @param _weight The new validator weight to assign to the validator.
-    function changeValidatorWeight(address _validatorOwner, uint32 _weight) external;
+    function changeValidatorWeight(address _validatorOwner, uint256 _weight) external;
 
     /// @notice Changes the validator's public key and proof-of-possession in the registry.
     /// @dev Only callable by the contract owner or the validator owner.
