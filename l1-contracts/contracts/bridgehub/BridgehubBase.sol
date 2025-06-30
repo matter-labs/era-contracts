@@ -106,7 +106,6 @@ abstract contract BridgehubBase is
      */
     uint256[37] private __gap;
 
-
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
             revert Unauthorized(msg.sender);

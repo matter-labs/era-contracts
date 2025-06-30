@@ -25,7 +25,9 @@ contract DiamondInitZKOS is DiamondInit {
     /// @notice ZK chain diamond contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
-    function initialize(InitializeData calldata _initializeData) public override reentrancyGuardInitializer returns (bytes32) {
+    function initialize(
+        InitializeData calldata _initializeData
+    ) public override reentrancyGuardInitializer returns (bytes32) {
         s.boojumOS = true;
         return super.initialize(_initializeData);
     }

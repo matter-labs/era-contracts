@@ -23,7 +23,7 @@ import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 
 import {MessageRootBase} from "../bridgehub/MessageRootBase.sol";
 
-import { UpgradeableBeaconDeployer } from "../bridge/ntv/UpgradeableBeaconDeployer.sol";
+import {UpgradeableBeaconDeployer} from "../bridge/ntv/UpgradeableBeaconDeployer.sol";
 
 address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(0x0000000000000000000000000000000000010008);
 
@@ -55,10 +55,7 @@ struct FixedForceDeploymentsData {
 /// @notice A helper library for initializing and managing force-deployed contracts during either the L2 gateway upgrade or
 /// the genesis after the gateway protocol upgrade.
 library L2GenesisForceDeploymentsHelper {
-    function forceDeployEra(
-        bytes memory _bytecodeInfo,
-        address _newAddress
-    ) internal {
+    function forceDeployEra(bytes memory _bytecodeInfo, address _newAddress) internal {
         bytes32 bytecodeHash = abi.decode(_bytecodeInfo, (bytes32));
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = new IL2ContractDeployer.ForceDeployment[](1);
         // Configure the MessageRoot deployment.
@@ -74,16 +71,17 @@ library L2GenesisForceDeploymentsHelper {
     }
 
     function forceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
-        (
-            bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash
-        ) = abi.decode(_bytecodeInfo, (bytes32, uint32, bytes32));
+        (bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash) = abi.decode(
+            _bytecodeInfo,
+            (bytes32, uint32, bytes32)
+        );
 
         bytes memory data = abi.encodeCall(
             IZKOSContractDeployer.setBytecodeDetailsEVM,
             (_newAddress, bytecodeHash, bytecodeLength, observableBytecodeHash)
         );
 
-        // Note, that we dont use interface, but raw call to avoid Solidity checking for empty bytecode 
+        // Note, that we dont use interface, but raw call to avoid Solidity checking for empty bytecode
         (bool success, bytes memory returnData) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
         if (!success) {
             revert("Failed to call setBytecodeDetailsEVM");
@@ -94,11 +92,7 @@ library L2GenesisForceDeploymentsHelper {
     /// @param _isZKsyncOS Whether the deployment is for ZKSyncOS or Era.
     /// @param _bytecodeInfo The bytecode information for deployment.
     /// @param _newAddress The address where the contract should be deployed.
-    function forceDeployOnAddress(
-        bool _isZKsyncOS,
-        bytes memory _bytecodeInfo,
-        address _newAddress
-    ) internal {
+    function forceDeployOnAddress(bool _isZKsyncOS, bytes memory _bytecodeInfo, address _newAddress) internal {
         if (_isZKsyncOS) {
             forceDeployZKsyncOS(_bytecodeInfo, _newAddress);
         } else {
@@ -158,9 +152,11 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
-        // For new chains, there is no legacy shared bridge, but the already existing ones, 
+        // For new chains, there is no legacy shared bridge, but the already existing ones,
         // we should be able to query it.
-        address l2LegacySharedBridge = _isGenesisUpgrade ? address(0) : L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE();
+        address l2LegacySharedBridge = _isGenesisUpgrade
+            ? address(0)
+            : L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE();
 
         forceDeployOnAddress(
             _isZKsyncOS,
@@ -186,8 +182,12 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
-        address predeployedL2WethAddress = _isGenesisUpgrade ? address(0) : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
-        bytes32 previousL2TokenProxyBytecodeHash = _isGenesisUpgrade ? bytes32(0) : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L2_TOKEN_PROXY_BYTECODE_HASH();
+        address predeployedL2WethAddress = _isGenesisUpgrade
+            ? address(0)
+            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).WETH_TOKEN();
+        bytes32 previousL2TokenProxyBytecodeHash = _isGenesisUpgrade
+            ? bytes32(0)
+            : L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).L2_TOKEN_PROXY_BYTECODE_HASH();
 
         // Ensure the WETH token is deployed and retrieve its address.
         address wrappedBaseTokenAddress = _ensureWethToken({
@@ -200,11 +200,7 @@ library L2GenesisForceDeploymentsHelper {
         });
 
         // Now initialiazing the upgradeable token beacon
-        forceDeployOnAddress(
-            _isZKsyncOS,
-            fixedForceDeploymentsData.l2NtvBytecodeOrInfo,
-            L2_NATIVE_TOKEN_VAULT_ADDR
-        );
+        forceDeployOnAddress(_isZKsyncOS, fixedForceDeploymentsData.l2NtvBytecodeOrInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
 
         if (_isGenesisUpgrade) {
             address deployedTokenBeacon;

@@ -23,7 +23,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     /// @notice ZK chain diamond contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
     /// initializer
-    function initialize(InitializeData calldata _initializeData) public virtual reentrancyGuardInitializer returns (bytes32) {
+    function initialize(
+        InitializeData calldata _initializeData
+    ) public virtual reentrancyGuardInitializer returns (bytes32) {
         if (address(_initializeData.verifier) == address(0)) {
             revert ZeroAddress();
         }
@@ -80,7 +82,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
-        // FIXME: split into two files: one with ZK OS and one for Era 
+        // FIXME: split into two files: one with ZK OS and one for Era
         s.boojumOS = true;
 
         // While this does not provide a protection in the production, it is needed for local testing

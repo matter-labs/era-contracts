@@ -56,7 +56,11 @@ contract L2Bridgehub is BridgehubBase {
     /// @param _l1ChainId The chain id of L1.
     /// @param _owner The owner of the contract.
     /// @param _maxNumberOfZKChains The maximum number of ZK chains that can be created.
-    function initL2(uint256 _l1ChainId, address _owner, uint256 _maxNumberOfZKChains) public reentrancyGuardInitializer onlyUpgrader {
+    function initL2(
+        uint256 _l1ChainId,
+        address _owner,
+        uint256 _maxNumberOfZKChains
+    ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         updateL2(_l1ChainId, _maxNumberOfZKChains);
         _transferOwnership(_owner);

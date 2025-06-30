@@ -366,7 +366,6 @@ error EmptyProofLength();
 
 error InvalidChainId();
 
-
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

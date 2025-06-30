@@ -34,9 +34,7 @@ import {L2NativeTokenVault} from "./L2NativeTokenVault.sol";
 /// @dev Besides separation of concerns, we need it as a separate contract to ensure that L2NativeTokenVaultZKOS
 /// does not have to include BridgedStandardERC20 and UpgradeableBeacon and so can fit into the code size limit.
 contract UpgradeableBeaconDeployer {
-    function deployUpgradeableBeacon(
-        address _owner
-    ) external returns (address) {
+    function deployUpgradeableBeacon(address _owner) external returns (address) {
         address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
 
         UpgradeableBeacon tokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);

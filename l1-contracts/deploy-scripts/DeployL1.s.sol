@@ -629,9 +629,15 @@ contract DeployL1Script is Script, DeployUtils {
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
             bridgehubBytecodeOrInfo: Utils.getZKOSBytecodeInfoForContract("L2Bridgehub.sol", "L2Bridgehub"),
             l2AssetRouterBytecodeOrInfo: Utils.getZKOSBytecodeInfoForContract("L2AssetRouter.sol", "L2AssetRouter"),
-            l2NtvBytecodeOrInfo: Utils.getZKOSBytecodeInfoForContract("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS"),
+            l2NtvBytecodeOrInfo: Utils.getZKOSBytecodeInfoForContract(
+                "L2NativeTokenVaultZKOS.sol",
+                "L2NativeTokenVaultZKOS"
+            ),
             messageRootBytecodeOrInfo: Utils.getZKOSBytecodeInfoForContract("L2MessageRoot.sol", "L2MessageRoot"),
-            beaconDeployerInfo: Utils.getZKOSBytecodeInfoForContract("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer"),
+            beaconDeployerInfo: Utils.getZKOSBytecodeInfoForContract(
+                "UpgradeableBeaconDeployer.sol",
+                "UpgradeableBeaconDeployer"
+            ),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),

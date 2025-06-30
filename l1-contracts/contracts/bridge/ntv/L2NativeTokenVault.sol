@@ -67,13 +67,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
         _disableInitializers();
-        updateL2(
-            _l1ChainId,
-            _l2TokenProxyBytecodeHash,
-            _legacySharedBridge,
-            _wethToken,
-            _baseTokenAssetId
-        );
+        updateL2(_l1ChainId, _l2TokenProxyBytecodeHash, _legacySharedBridge, _wethToken, _baseTokenAssetId);
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
         }

@@ -13,5 +13,10 @@ interface IZKOSContractDeployer {
     /// @param _bytecodeHash The hash of the bytecode.
     /// @param _bytecodeLength The length of the bytecode.
     /// @param _observableBytecodeHash The hash of the observable bytecode.
-    function setBytecodeDetailsEVM(address _addr, bytes32 _bytecodeHash, uint32 _bytecodeLength, bytes32 _observableBytecodeHash) external;
+    function setBytecodeDetailsEVM(
+        address _addr,
+        bytes32 _bytecodeHash,
+        uint32 _bytecodeLength,
+        bytes32 _observableBytecodeHash
+    ) external;
 }
