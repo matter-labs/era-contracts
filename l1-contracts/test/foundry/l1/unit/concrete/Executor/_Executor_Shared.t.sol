@@ -179,7 +179,7 @@ contract ExecutorTest is Test {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
-        DiamondInit diamondInit = new DiamondInit();
+        DiamondInit diamondInit = new DiamondInit(false);
 
         bytes8 dummyHash = 0x1234567890123456;
 

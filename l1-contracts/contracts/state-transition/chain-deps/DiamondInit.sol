@@ -17,8 +17,12 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
+    bool immutable public IS_ZKSYNC_OS;
+
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
-    constructor() reentrancyGuardInitializer {}
+    constructor(bool _isZKOS) reentrancyGuardInitializer {
+        IS_ZKSYNC_OS = _isZKOS;
+    }
 
     /// @notice ZK chain diamond contract initialization
     /// @return Magic 32 bytes, which indicates that the contract logic is expected to be used as a diamond proxy
@@ -82,8 +86,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.feeParams = _initializeData.feeParams;
         s.blobVersionedHashRetriever = _initializeData.blobVersionedHashRetriever;
         s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
-        // FIXME: split into two files: one with ZK OS and one for Era
-        s.boojumOS = true;
+        s.boojumOS = IS_ZKSYNC_OS;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
