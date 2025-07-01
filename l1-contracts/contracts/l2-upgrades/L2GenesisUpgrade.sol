@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ISystemContext} from "../common/interfaces/ISystemContext.sol";
 import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 

@@ -14,7 +14,7 @@ import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
 import {MessageRootBase} from "./MessageRootBase.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

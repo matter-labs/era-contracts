@@ -196,7 +196,7 @@ contract ChainRegistrar is Ownable2StepUpgradeable {
         address diamondProxy = IChainTypeManager(ctm).getZKChain(_chainId);
         address pendingChainAdmin = IGetters(diamondProxy).getPendingAdmin();
         address chainAdmin = IGetters(diamondProxy).getAdmin();
-        address l2BridgeAddress = IL1SharedBridgeLegacy(bridgehub.sharedBridge()).l2BridgeAddress(_chainId);
+        address l2BridgeAddress = IL1SharedBridgeLegacy(bridgehub.assetRouter()).l2BridgeAddress(_chainId);
         if (l2BridgeAddress == address(0)) {
             revert BridgeIsNotRegistered();
         }
