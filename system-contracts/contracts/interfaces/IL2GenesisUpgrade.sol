@@ -31,6 +31,7 @@ struct FixedForceDeploymentsData {
     bytes32 messageRootBytecodeHash;
     bytes32 chainAssetHandlerBytecodeHash;
     bytes32 interopCenterBytecodeHash;
+    bytes32 interopHandlerBytecodeHash;
     bytes32 assetTrackerBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;

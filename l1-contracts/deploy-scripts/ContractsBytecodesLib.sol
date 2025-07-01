@@ -43,7 +43,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[40] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[41] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "AssetTracker",
             "BeaconProxy",
@@ -62,6 +62,7 @@ library ContractsBytecodesLib {
             "DefaultUpgrade",
             "DualVerifier",
             "InteropCenter",
+            "InteropHandler",
             "L1GenesisUpgrade",
             "L2AdminFactory",
             "L2AssetRouter",

@@ -16,6 +16,8 @@ error BundleAlreadyExecuted(bytes32 bundleHash);
 contract DummyInteropHandler {
     bytes32 public bytecodeHash;
 
+    constructor() {}
+
     /// @notice The balances of the users.
     mapping(bytes32 bundleHash => bool bundleExecuted) public bundleExecuted;
 

@@ -133,7 +133,6 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         // kl todo 1.
         // chainedLogsHash = keccak256(abi.encode(chainedLogsHash, hashedLog));
         logsTree.push(hashedLog);
-        emit NewMessageRoot(block.chainid, block.number, logIdInMerkleTree, logsTree._sides);
         emit L2ToL1LogSent(_l2ToL1Log);
     }
 

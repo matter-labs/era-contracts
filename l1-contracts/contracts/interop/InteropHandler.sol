@@ -22,6 +22,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @notice Tracks the individual call statuses within a bundle.
     mapping(bytes32 bundleHash => mapping(uint256 callIndex => CallStatus callStatus)) public callStatus;
 
+    /// KL todo remove constructors for ZK OS forward compatibility.
     constructor() reentrancyGuardInitializer {}
 
     /// @notice Executes a full bundle atomically.

@@ -130,7 +130,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             daOutput.blobsOpeningCommitments,
             daOutput.blobsLinearHashes
         );
-        _emitMessageRoot(_newBatch.batchNumber, logOutput.l2LogsTreeRoot);
 
         storedBatchInfo = StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
@@ -588,11 +587,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
         _verifyDependencyInteropRoots(_dependencyRoots);
-    }
-
-    function _emitMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
-        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
-        messageRootContract.emitMessageRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
     /// @notice Verifies the dependency message roots that the chain relied on.

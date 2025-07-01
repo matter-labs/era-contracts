@@ -34,7 +34,7 @@ address constant L2_DA_VALIDATOR_ADDRESS = 0x2f3Bc0cB46C9780990afbf86A60bdf6439D
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
-uint256 constant EVENT_INDEX = 1;
+uint256 constant EVENT_INDEX = 0;
 
 library Utils {
     function packBatchTimestampAndBlockTimestamp(

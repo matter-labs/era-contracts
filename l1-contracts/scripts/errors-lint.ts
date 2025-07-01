@@ -10,6 +10,7 @@ const CONTRACTS_DIRECTORIES = {
     "bridge/L1BridgeContractErrors.sol",
     "bridgehub/L1BridgehubErrors.sol",
     "interop/InteropErrors.sol",
+    "bridge/asset-tracker/AssetTrackerErrors.sol",
     "state-transition/L1StateTransitionErrors.sol",
     "upgrades/ZkSyncUpgradeErrors.sol",
   ],

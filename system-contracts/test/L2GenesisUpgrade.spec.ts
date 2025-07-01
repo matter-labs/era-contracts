@@ -103,6 +103,9 @@ describe("L2GenesisUpgrade tests", function () {
     const interopCenterBytecode = (await loadArtifact("DummyInteropCenter")).bytecode;
     const interopCenterBytecodeHash = zksync.utils.hashBytecode(interopCenterBytecode);
 
+    const interopHandlerBytecode = (await loadArtifact("DummyInteropHandler")).bytecode;
+    const interopHandlerBytecodeHash = zksync.utils.hashBytecode(interopHandlerBytecode);
+
     const ntvBytecode = (await loadArtifact("DummyL2NativeTokenVault")).bytecode;
     const ntvBytecodeHash = zksync.utils.hashBytecode(ntvBytecode);
 
@@ -120,7 +123,7 @@ describe("L2GenesisUpgrade tests", function () {
 
     fixedForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
       [
-        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash,  bytes32 chainAssetHandlerBytecodeHash, bytes32 interopCenterBytecodeHash, bytes32 assetTrackerBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address aliasedChainRegistrationSender, address dangerousTestOnlyForcedBeacon)",
+        "tuple(uint256 l1ChainId, uint256 eraChainId, address l1AssetRouter, bytes32 l2TokenProxyBytecodeHash, address aliasedL1Governance, uint256 maxNumberOfZKChains, bytes32 bridgehubBytecodeHash, bytes32 l2AssetRouterBytecodeHash, bytes32 l2NtvBytecodeHash, bytes32 messageRootBytecodeHash,  bytes32 chainAssetHandlerBytecodeHash, bytes32 interopCenterBytecodeHash, bytes32 interopHandlerBytecodeHash, bytes32 assetTrackerBytecodeHash, address l2SharedBridgeLegacyImpl, address l2BridgedStandardERC20Impl, address aliasedChainRegistrationSender, address dangerousTestOnlyForcedBeacon)",
       ],
       [
         {
@@ -136,6 +139,7 @@ describe("L2GenesisUpgrade tests", function () {
           messageRootBytecodeHash: messageRootBytecodeHash,
           chainAssetHandlerBytecodeHash: chainAssetHandlerBytecodeHash,
           interopCenterBytecodeHash: interopCenterBytecodeHash,
+          interopHandlerBytecodeHash: interopHandlerBytecodeHash,
           assetTrackerBytecodeHash: assetTrackerBytecodeHash,
           // For genesis upgrade these values will always be zero
           l2SharedBridgeLegacyImpl: ethers.constants.AddressZero,
