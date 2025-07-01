@@ -335,6 +335,14 @@ object "Bootloader" {
                 ret := mul(CURRENT_INTEROP_ROOT_SLOT(), 32)
             }
 
+            /// @dev Number of slots reserved for `INTEROP_BLOCKS` array in bootloader memory.
+            ///      We've decided to make this number equal to `MAX_TRANSACTIONS_IN_BATCH`. This is due to
+            ///      it having to be equal to the maximal number of blocks per batch, but since we dont enforce
+            ///      that number explicitly, we use the estimation equal to the maximal number of transactions per batch.
+            function INTEROP_BLOCKS_SLOTS() -> ret {
+                ret := MAX_TRANSACTIONS_IN_BATCH()
+            }
+
             /// @dev The slot starting from which the interop roots are stored.
             function INTEROP_BLOCKS_BEGIN_SLOT() -> ret {
                 ret := add(CURRENT_INTEROP_ROOT_SLOT(), 1)
@@ -347,7 +355,7 @@ object "Bootloader" {
 
             /// @dev The slot starting from which the interop roots are stored.
             function INTEROP_ROOT_BEGIN_SLOT() -> ret {
-                ret := add(INTEROP_BLOCKS_BEGIN_SLOT(), MAX_TRANSACTIONS_IN_BATCH())
+                ret := add(INTEROP_BLOCKS_BEGIN_SLOT(), INTEROP_BLOCKS_SLOTS())
             }
 
             /// @dev The byte starting from which the interop roots are stored.
