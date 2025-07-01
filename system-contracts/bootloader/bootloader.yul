@@ -314,20 +314,20 @@ object "Bootloader" {
 
             /// @dev The slot starting from which the interop roots are stored.
             /// The value tells us where we are in the processed number of interop roots array.
-            function NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_SLOT() -> ret {
+            function NUMBER_OF_PROCESSED_BLOCKS_SLOT() -> ret {
                 ret := add(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 1)
             }
 
             /// @dev The byte starting from which the interop roots are stored.
-            function NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_BYTE() -> ret {
-                ret := mul(NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_SLOT(), 32)
+            function NUMBER_OF_PROCESSED_BLOCKS_BYTE() -> ret {
+                ret := mul(NUMBER_OF_PROCESSED_BLOCKS_SLOT(), 32)
             }
             
             /// @dev The slot starting from which the current interop root is contained.
             /// For each txs we check if the interopRoot belongs to a block that we should process, if yes we store it and continue to the next root.
             /// When we process all the necessary roots, we stop.
             function CURRENT_INTEROP_ROOT_SLOT() -> ret {
-                ret := add(NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_SLOT(), 1)
+                ret := add(NUMBER_OF_PROCESSED_BLOCKS_SLOT(), 1)
             }
 
             /// @dev The byte starting from which the current interop root is contained.
@@ -363,9 +363,9 @@ object "Bootloader" {
 
             /// @dev Returns the number of interop roots in the current block.
             function getNumberOfInteropRootInCurrentBlock() -> ret {
-                debugLog("current num roots in b s", NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_SLOT())
-                debugLog("value", mload(NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_BYTE()))
-                ret := getNumberOfInteropRootInBlock(mload(NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_BYTE()))
+                debugLog("current num roots in b s", NUMBER_OF_PROCESSED_BLOCKS_SLOT())
+                debugLog("value", mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()))
+                ret := getNumberOfInteropRootInBlock(mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()))
             }
             
             /// @dev Returns the byte offset of the specified interop root.
@@ -3184,10 +3184,10 @@ object "Bootloader" {
 
 
                 mstore(LAST_PROCESSED_BLOCK_NUMBER_BYTE(), setForBlockNumber)
-                debugLog("currentNumberOfRoots", mload(NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_BYTE()))
-                debugLog("currentNumberOfRoots 2", add(mload(NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_BYTE()), 1))
-                mstore(NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_BYTE(), add(mload(NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_BYTE()), 1))
-                debugLog("currentNumberOfRoots 3", mload(NUMBER_OF_PROCESSED_ROOTS_IN_BLOCK_BYTE()))
+                debugLog("currentNumberOfRoots", mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()))
+                debugLog("currentNumberOfRoots 2", add(mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()), 1))
+                mstore(NUMBER_OF_PROCESSED_BLOCKS_BYTE(), add(mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()), 1))
+                debugLog("currentNumberOfRoots 3", mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()))
             }
 
             /// @notice Calls L2InteropRootStorage contract to add interop root.
