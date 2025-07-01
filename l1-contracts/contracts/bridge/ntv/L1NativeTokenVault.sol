@@ -66,18 +66,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Accepts ether only from the contract that was the shared Bridge.
     receive() external payable {
-        if (address(L1_NULLIFIER) != msg.sender) {
-            revert Unauthorized(msg.sender);
-        }
+        require(address(L1_NULLIFIER) == msg.sender, Unauthorized(msg.sender));
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
     /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
     function initialize(address _owner, address _bridgedTokenBeacon) external initializer {
-        if (_owner == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_owner != address(0), ZeroAddress());
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         _transferOwnership(_owner);
     }
@@ -102,9 +98,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyAssetRouter {
-        if (_assetHandlerAddressOnCounterpart != L2_NATIVE_TOKEN_VAULT_ADDR) {
-            revert WrongCounterpart();
-        }
+        require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, WrongCounterpart());
     }
 
     function _getOriginChainId(bytes32 _assetId) internal view returns (uint256) {
@@ -169,9 +163,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // slither-disable-next-line unused-return
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
         address l1Token = tokenAddress[_assetId];
-        if (_amount == 0) {
-            revert NoFundsTransferred();
-        }
+        require(_amount != 0, NoFundsTransferred());
 
         _handleChainBalanceDecrease({
             _tokenOriginChainId: originChainId[_assetId],
@@ -187,9 +179,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             assembly {
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
-            if (!callSuccess) {
-                revert ClaimFailedDepositFailed();
-            }
+            require(callSuccess, ClaimFailedDepositFailed());
         } else {
             uint256 originChainId = _getOriginChainId(_assetId);
             if (originChainId == block.chainid) {
@@ -233,9 +223,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             assembly {
                 callSuccess := call(gas(), _to, _amount, 0, 0, 0, 0)
             }
-            if (!callSuccess) {
-                revert WithdrawFailed();
-            }
+            require(callSuccess, WithdrawFailed());
         } else {
             // Withdraw funds
             IERC20(_token).safeTransfer(_to, _amount);

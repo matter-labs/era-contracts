@@ -59,18 +59,14 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
                 originToken
             );
         }
-        if (msg.sender != ntv) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == ntv, Unauthorized(msg.sender));
         _;
     }
 
     modifier onlyNextVersion(uint8 _version) {
         // The version should be incremented by 1. Otherwise, the governor risks disabling
         // future reinitialization of the token by providing too large a version.
-        if (_version != _getInitializedVersion() + 1) {
-            revert NonSequentialVersion();
-        }
+        require(_version == _getInitializedVersion() + 1, NonSequentialVersion());
         _;
     }
 
@@ -87,9 +83,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
     /// @param _data The additional data that the L1 bridge provide for initialization.
     /// In this case, it is packed `name`/`symbol`/`decimals` of the L1 token.
     function bridgeInitialize(bytes32 _assetId, address _originToken, bytes calldata _data) external initializer {
-        if (_originToken == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_originToken != address(0), ZeroAddress());
         originToken = _originToken;
         assetId = _assetId;
 
@@ -160,9 +154,7 @@ contract BridgedStandardERC20 is ERC20PermitUpgradeable, IBridgedStandardToken, 
         // It is expected that this token is deployed as a beacon proxy, so we'll
         // allow the governor of the beacon to reinitialize the token.
         address beaconAddress = _getBeacon();
-        if (msg.sender != UpgradeableBeacon(beaconAddress).owner()) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == UpgradeableBeacon(beaconAddress).owner(), Unauthorized(msg.sender));
 
         __ERC20_init_unchained(_newName, _newSymbol);
         __ERC20Permit_init(_newName);

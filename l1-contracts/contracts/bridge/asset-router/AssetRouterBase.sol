@@ -61,9 +61,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(BRIDGE_HUB), Unauthorized(msg.sender));
         _;
     }
 
@@ -90,9 +88,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bool senderIsNTV = msg.sender == _nativeTokenVault;
         address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
-        if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {
-            revert Unauthorized(msg.sender);
-        }
+        require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], Unauthorized(msg.sender));
         _setAssetHandler(assetId, _assetHandlerAddress);
         assetDeploymentTracker[assetId] = msg.sender;
         emit AssetDeploymentTrackerRegistered(assetId, _assetRegistrationData, msg.sender);
@@ -116,9 +112,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 _amount
     ) public payable virtual {
         address assetHandler = assetHandlerAddress[_assetId];
-        if (assetHandler == address(0)) {
-            revert AssetHandlerDoesNotExist(_assetId);
-        }
+        require(assetHandler != address(0), AssetHandlerDoesNotExist(_assetId));
 
         // slither-disable-next-line unused-return
         IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
@@ -165,9 +159,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes1 encodingVersion = _data[0];
 
         (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _originalCaller, _data);
-        if (BRIDGE_HUB.baseTokenAssetId(_chainId) == assetId) {
-            revert AssetIdNotSupported(assetId);
-        }
+        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
@@ -209,10 +201,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         if (_encodingVersion == NEW_ENCODING_VERSION) {
-            if (_data.length < 33) {
-                // For better error handling.
-                revert BadTransferDataLength();
-            }
+            // For better error handling.
+            require(_data.length >= 33, BadTransferDataLength());
             (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
         } else {
             revert UnsupportedEncodingVersion();

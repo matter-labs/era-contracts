@@ -56,33 +56,25 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
-        if (msg.sender != address(L1_NULLIFIER)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(L1_NULLIFIER), Unauthorized(msg.sender));
         _;
     }
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
-        if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY), Unauthorized(msg.sender));
         _;
     }
 
     /// @notice Checks that the message sender is the legacy bridge.
     modifier onlyLegacyBridge() {
-        if (msg.sender != address(legacyBridge)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(legacyBridge), Unauthorized(msg.sender));
         _;
     }
 
     /// @notice Checks that the message sender is the native token vault.
     modifier onlyNativeTokenVault() {
-        if (msg.sender != address(nativeTokenVault)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(nativeTokenVault), Unauthorized(msg.sender));
         _;
     }
 
@@ -111,9 +103,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @param _owner The address which can change L2 token implementation and upgrade the bridge implementation.
     /// The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
     function initialize(address _owner) external reentrancyGuardInitializer initializer {
-        if (_owner == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_owner != address(0), ZeroAddress());
         _transferOwnership(_owner);
     }
 
@@ -121,12 +111,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
     function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external onlyOwner {
-        if (address(nativeTokenVault) != address(0)) {
-            revert NativeTokenVaultAlreadySet();
-        }
-        if (address(_nativeTokenVault) == address(0)) {
-            revert ZeroAddress();
-        }
+        require(address(nativeTokenVault) == address(0), NativeTokenVaultAlreadySet());
+        require(address(_nativeTokenVault) != address(0), ZeroAddress());
         nativeTokenVault = _nativeTokenVault;
         _setAssetHandler(ETH_TOKEN_ASSET_ID, address(_nativeTokenVault));
     }
@@ -135,12 +121,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev Should be called only once by the owner.
     /// @param _legacyBridge The address of the legacy bridge.
     function setL1Erc20Bridge(IL1ERC20Bridge _legacyBridge) external override onlyOwner {
-        if (address(legacyBridge) != address(0)) {
-            revert AddressAlreadySet(address(legacyBridge));
-        }
-        if (address(_legacyBridge) == address(0)) {
-            revert ZeroAddress();
-        }
+        require(address(legacyBridge) == address(0), AddressAlreadySet(address(legacyBridge)));
+        require(address(_legacyBridge) != address(0), ZeroAddress());
         legacyBridge = _legacyBridge;
     }
 
@@ -227,9 +209,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     {
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION) {
-            if (msg.value != 0 || _value != 0) {
-                revert NonEmptyMsgValue();
-            }
+            require(msg.value == 0 && _value == 0, NonEmptyMsgValue());
 
             (bytes32 _assetId, address _assetHandlerAddressOnCounterpart) = abi.decode(_data[1:], (bytes32, address));
             return
@@ -358,9 +338,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
         // We ensure that the legacy data format can not be used for tokens that did not originate from L1.
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
-        if (assetId != expectedAssetId) {
-            revert LegacyEncodingUsedForNonL1Token();
-        }
+        require(assetId == expectedAssetId, LegacyEncodingUsedForNonL1Token());
 
         if (assetId == ETH_TOKEN_ASSET_ID) {
             // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
@@ -412,9 +390,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             l1Token.safeTransferFrom(_originalCaller, address(nativeTokenVault), _amount);
             uint256 balanceAfter = l1Token.balanceOf(address(nativeTokenVault));
 
-            if (balanceAfter - balanceBefore != _amount) {
-                revert TokensWithFeesNotSupported();
-            }
+            require(balanceAfter - balanceBefore == _amount, TokensWithFeesNotSupported());
             return true;
         }
         return false;
@@ -477,9 +453,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
-        if (_l1Token == L1_WETH_TOKEN) {
-            revert TokenNotSupported(L1_WETH_TOKEN);
-        }
+        require(_l1Token != L1_WETH_TOKEN, TokenNotSupported(L1_WETH_TOKEN));
 
         bytes32 _assetId;
         {
@@ -492,9 +466,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
             // Legacy bridge is only expected to use native tokens for L1.
-            if (_assetId != DataEncoding.encodeNTVAssetId(block.chainid, _l1Token)) {
-                revert LegacyBridgeUsesNonNativeToken();
-            }
+            require(_assetId == DataEncoding.encodeNTVAssetId(block.chainid, _l1Token), LegacyBridgeUsesNonNativeToken());
 
             // Note, that starting from here `bridgeData` starts denoting bridgeMintData.
             bridgeData = _burn({

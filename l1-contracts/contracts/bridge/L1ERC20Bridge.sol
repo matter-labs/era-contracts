@@ -131,9 +131,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external nonReentrant {
-        if (isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex]) {
-            revert WithdrawalAlreadyFinalized();
-        }
+        require(!isWithdrawalFinalized[_l2BatchNumber][_l2MessageIndex], WithdrawalAlreadyFinalized());
         // We don't need to set finalizeWithdrawal here, as we set it in the L1 Nullifier
 
         FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
@@ -181,18 +179,12 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) public payable nonReentrant returns (bytes32 l2TxHash) {
-        if (_amount == 0) {
-            // empty deposit amount
-            revert EmptyDeposit();
-        }
-        if (_l1Token == ETH_TOKEN_ADDRESS) {
-            revert ETHDepositNotSupported();
-        }
+        // empty deposit amount
+        require(_amount != 0, EmptyDeposit());
+        require(_l1Token != ETH_TOKEN_ADDRESS, ETHDepositNotSupported());
         uint256 amount = _approveFundsToAssetRouter(msg.sender, IERC20(_l1Token), _amount);
-        if (amount != _amount) {
-            // The token has non-standard transfer logic
-            revert TokensWithFeesNotSupported();
-        }
+        // The token has non-standard transfer logic
+        require(amount == _amount, TokensWithFeesNotSupported());
 
         l2TxHash = L1_ASSET_ROUTER.depositLegacyErc20Bridge{value: msg.value}({
             _originalCaller: msg.sender,
@@ -204,9 +196,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
             _refundRecipient: _refundRecipient
         });
         // Ensuring that all the funds that were locked into this bridge were spent by the asset router / native token vault.
-        if (IERC20(_l1Token).allowance(address(this), address(L1_ASSET_ROUTER)) != 0) {
-            revert AssetRouterAllowanceNotZero();
-        }
+        require(IERC20(_l1Token).allowance(address(this), address(L1_ASSET_ROUTER)) == 0, AssetRouterAllowanceNotZero());
         depositAmount[msg.sender][_l1Token][l2TxHash] = _amount;
         emit DepositInitiated({
             l2DepositTxHash: l2TxHash,
@@ -252,9 +242,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     ) external nonReentrant {
         uint256 amount = depositAmount[_depositSender][_l1Token][_l2TxHash];
         // empty deposit
-        if (amount == 0) {
-            revert EmptyDeposit();
-        }
+        require(amount != 0, EmptyDeposit());
         delete depositAmount[_depositSender][_l1Token][_l2TxHash];
 
         L1_NULLIFIER.claimFailedDepositLegacyErc20Bridge({

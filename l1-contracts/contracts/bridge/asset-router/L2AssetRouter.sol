@@ -42,9 +42,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) {
-                revert InvalidCaller(msg.sender);
-            }
+            require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == L1_ASSET_ROUTER, InvalidCaller(msg.sender));
         } else {
             revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
@@ -70,16 +68,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
-        if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
-            revert InvalidCaller(msg.sender);
-        }
+        require(msg.sender == L2_LEGACY_SHARED_BRIDGE, InvalidCaller(msg.sender));
         _;
     }
 
     modifier onlyNTV() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
-            revert InvalidCaller(msg.sender);
-        }
+        require(msg.sender == L2_NATIVE_TOKEN_VAULT_ADDR, InvalidCaller(msg.sender));
         _;
     }
 
@@ -104,9 +98,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         reentrancyGuardInitializer
     {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
-        if (_l1AssetRouter == address(0)) {
-            revert EmptyAddress();
-        }
+        require(_l1AssetRouter != address(0), EmptyAddress());
         L1_ASSET_ROUTER = _l1AssetRouter;
         _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
@@ -191,9 +183,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         onlyAssetRouterCounterpartOrSelf(_originChainId)
         nonReentrant
     {
-        if (_assetId == BASE_TOKEN_ASSET_ID) {
-            revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
-        }
+        require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
         _finalizeDeposit(_originChainId, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
         emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
@@ -270,9 +260,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             address l1Token = IBridgedStandardToken(
                 IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId)
             ).originToken();
-            if (l1Token == address(0)) {
-                revert AssetIdNotSupported(_assetId);
-            }
+            require(l1Token != address(0), AssetIdNotSupported(_assetId));
             // slither-disable-next-line unused-return
             (uint256 amount, address l1Receiver, ) = DataEncoding.decodeBridgeBurnData(_assetData);
             message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
@@ -366,9 +354,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external nonReentrant {
-        if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
-        }
+        require(_amount != 0, AmountMustBeGreaterThanZero());
         _withdrawLegacy(_l1Receiver, _l2Token, _amount, msg.sender);
     }
 
@@ -389,9 +375,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
         address l1Address = l1TokenAddress(_l2Token);
-        if (l1Address == address(0)) {
-            revert TokenNotLegacy();
-        }
+        require(l1Address != address(0), TokenNotLegacy());
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Address);
         bytes memory data = DataEncoding.encodeBridgeBurnData(_amount, _l1Receiver, _l2Token);
         _withdrawSender(assetId, data, _sender, false);

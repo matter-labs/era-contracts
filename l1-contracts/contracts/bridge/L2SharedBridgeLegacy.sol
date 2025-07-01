@@ -44,16 +44,12 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     address public override l1Bridge;
 
     modifier onlyNTV() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == L2_NATIVE_TOKEN_VAULT_ADDR, Unauthorized(msg.sender));
         _;
     }
 
     modifier onlyAssetRouter() {
-        if (msg.sender != L2_ASSET_ROUTER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == L2_ASSET_ROUTER_ADDR, Unauthorized(msg.sender));
         _;
     }
 
@@ -70,17 +66,11 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         bytes32 _l2TokenProxyBytecodeHash,
         address _aliasedOwner
     ) external reinitializer(2) {
-        if (_l1SharedBridge == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_l1SharedBridge != address(0), ZeroAddress());
 
-        if (_l2TokenProxyBytecodeHash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
+        require(_l2TokenProxyBytecodeHash != bytes32(0), EmptyBytes32());
 
-        if (_aliasedOwner == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_aliasedOwner != address(0), ZeroAddress());
 
         l1SharedBridge = _l1SharedBridge;
 
@@ -101,9 +91,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external override {
-        if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
-        }
+        require(_amount != 0, AmountMustBeGreaterThanZero());
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdrawLegacyBridge(_l1Receiver, _l2Token, _amount, msg.sender);
     }
 
@@ -184,9 +172,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         );
 
         // The deployment should be successful and return the address of the proxy
-        if (!success) {
-            revert DeployFailed();
-        }
+        require(success, DeployFailed());
         proxy = abi.decode(returndata, (address));
     }
 
