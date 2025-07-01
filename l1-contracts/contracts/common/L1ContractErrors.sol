@@ -166,7 +166,7 @@ error InvalidPubdataPricingMode();
 error InvalidSelector(bytes4 func);
 // 0xbe7193d4
 error InvalidSystemLogsLength();
-// 0x0214acb6
+// 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
 error L2TimestampTooBig();
@@ -184,7 +184,7 @@ error LegacyMethodForNonL1Token();
 error LengthIsNotDivisibleBy32(uint256 length);
 // 0x1b6825bb
 error LogAlreadyProcessed(uint8);
-// 0xcea34703
+// 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0xafbb7a4e
 error MerkleIndexOrHeightMismatch();
@@ -298,7 +298,7 @@ error SelectorsMustAllHaveSameFreezability();
 error SettlementLayersMustSettleOnL1();
 // 0x856d5b77
 error SharedBridgeNotSet();
-// 0xd7a6b5e6
+// 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
 // 0xdf3a8fdd
 error SlotOccupied();
