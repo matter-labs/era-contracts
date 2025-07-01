@@ -393,7 +393,7 @@ library TransactionHelper {
     /// @notice Encode hash of the EIP7702 transaction type.
     /// @return keccak256 of the serialized RLP encoded representation of transaction
     function _encodeHashEIP7702Transaction(Transaction calldata _transaction) private view returns (bytes32) {
-        // Signing hash of EIP1559 transactions is encoded the following way:
+        // Signing hash of EIP7702 transactions is encoded the following way:
         // H(0x04 || RLP(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, value, data, access_list, authorization_list))
         //
         // Note, that on ZKsync access lists are not supported and should always be empty.

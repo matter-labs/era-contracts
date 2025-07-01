@@ -349,7 +349,7 @@ contract BootloaderUtilities is IBootloaderUtilities {
     /// @notice Encode hash of the EIP7702 transaction type.
     /// @return txHash The hash of the transaction.
     function encodeEIP7702TransactionHash(Transaction calldata _transaction) internal view returns (bytes32) {
-        // Transaction hash of EIP1559 transactions is encoded the following way:
+        // Transaction hash of EIP7702 transactions is encoded the following way:
         // H(0x04 || RLP(chain_id, nonce, max_priority_fee_per_gas, max_fee_per_gas, gas_limit, destination, value, data, access_list, authorization_list, v, r, s))
         //
         // Note, that on ZKsync access lists are not supported and should always be empty.
