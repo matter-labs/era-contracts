@@ -128,23 +128,53 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // which is located on L1.
         _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
     }
-    
+
+    /// @notice Executes cross-chain interop messages following ERC-7786 standard
+    /// @param messageId Gateway-specific message identifier (currently unused)
+    /// @param sourceChain CAIP-2 chain identifier where the message originated
+    /// @param sender CAIP-10 account address that initiated the cross-chain message
+    /// @param payload Encoded function call data (must be finalizeDeposit)
+    /// @param attributes ERC-7786 message attributes (currently unused)
+    /// @return Function selector confirming successful execution per ERC-7786
     function executeMessage(
         // kl todo: change back to strings
-        bytes32, // messageId, gateway specific, empty or unique
+        // solhint-disable-next-line no-unused-vars
+        bytes32 messageId, // Gateway-specific message identifier
         uint256 sourceChain, // [CAIP-2] chain identifier
         address sender, // [CAIP-10] account address
         bytes calldata payload,
-        bytes[] calldata // attributes
+        // solhint-disable-next-line no-unused-vars
+        bytes[] calldata attributes
     ) external payable returns (bytes4) {
-        // VG TODO: InvalidCaller -> InvalidSender (add error in interop errors file), when interop directory fixes get merged
-        // Validate the sender is either L1 AssetRouter, or L2 AssetRouter (so this is the second bridge in indirect interop call).
-        require((sourceChain == L1_CHAIN_ID && sender == L1_ASSET_ROUTER) || (sourceChain != L1_CHAIN_ID && sender == address(this)), InvalidCaller(sender));
-        
-        // Validate payload
+        // This function serves as the L2AssetRouter's entry point for processing cross-chain bridge operations
+        // initiated through the InteropCenter system. It implements critical security validations:
+        // - L1->L2 calls: Only L1_ASSET_ROUTER can send messages from L1_CHAIN_ID
+        // - L2->L2 calls: Only this contract (L2AssetRouter) can send messages from other L2 chains
+        //
+        // This dual validation prevents attackers from spoofing cross-chain messages by requiring
+        // both correct source chain ID and authorized sender address.
+        //
+        // INDIRECT CALL PATTERN (L2->L2 interop flow):
+        // 1. User calls InteropCenter on source L2
+        // 2. InteropCenter calls interopCenterInitiateBridge() on source chain's L2AssetRouter
+        // 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
+        // 4. Destination L2 validates sender == address(this) for non-L1 sources
+        //    (L2AssetRouter address is equal for all ZKsync chains)
+
+        require(
+            (sourceChain == L1_CHAIN_ID && sender == L1_ASSET_ROUTER) ||
+                (sourceChain != L1_CHAIN_ID && sender == address(this)),
+            InvalidCaller(sender)
+        );
+
+        // The payload must contain a valid finalizeDeposit selector to ensure only legitimate
+        // bridge operations are executed. This prevents arbitrary function calls through the interop system.
         require(payload.length > 4, PayloadTooShort());
-        require(bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector, InvalidSelector(bytes4(payload[0:4])));
-        
+        require(
+            bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector,
+            InvalidSelector(bytes4(payload[0:4]))
+        );
+
         (bool success, ) = address(this).call(payload);
         require(success, ExecuteMessageFailed());
         return IERC7786Receiver.executeMessage.selector;
@@ -196,6 +226,19 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         uint256 _value,
         bytes calldata _data
     ) external payable returns (InteropCallStarter memory interopCallStarter) {
+        // This function is called by the InteropCenter when processing indirect interop calls.
+        // It prepares the bridge operation for cross-chain execution through these steps:
+        // 1. Processing the deposit through the standard bridgehub flow
+        // 2. Encoding the call for interop execution with proper attributes
+        // 3. Returning an InteropCallStarter struct for the InteropCenter to process
+        // COMPLETE L2->L2 BRIDGE FLOW:
+        // - User wants to bridge from L2A to L2B
+        // - L2A InteropCenter calls this function on L2A AssetRouter
+        // - This creates an InteropCallStarter targeting L2B AssetRouter
+        // - InteropCenter sends the call to L2B via the interop messaging system
+        // - L2B AssetRouter receives via executeMessage() with sender=address(this)
+        //   (L2AssetRouter address is equal on all ZKsync chains)
+
         L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
             _chainId: _chainId,
             _originalCaller: _originalCaller,
@@ -203,6 +246,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             _data: _data,
             _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
         });
+
+        // The _value parameter represents the amount being bridged and is encoded
+        // as an ERC-7786 attribute to ensure proper value transfer in the interop call.
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encode(IERC7786Attributes.interopCallValue.selector, _value);
         interopCallStarter = InteropCallStarter({

@@ -62,7 +62,10 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
-        require(msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY), Unauthorized(msg.sender));
+        require(
+            msg.sender == address(BRIDGE_HUB) || (_chainId == ERA_CHAIN_ID && msg.sender == ERA_DIAMOND_PROXY),
+            Unauthorized(msg.sender)
+        );
         _;
     }
 
@@ -466,7 +469,10 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
             // Legacy bridge is only expected to use native tokens for L1.
-            require(_assetId == DataEncoding.encodeNTVAssetId(block.chainid, _l1Token), LegacyBridgeUsesNonNativeToken());
+            require(
+                _assetId == DataEncoding.encodeNTVAssetId(block.chainid, _l1Token),
+                LegacyBridgeUsesNonNativeToken()
+            );
 
             // Note, that starting from here `bridgeData` starts denoting bridgeMintData.
             bridgeData = _burn({
