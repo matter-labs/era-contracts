@@ -9,9 +9,9 @@ import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.so
 /// @custom:security-contact security@matterlabs.dev
 interface IL1CrossChainSender {
     /// @notice Initiates a transfer transaction within Bridgehub, used by `requestL2TransactionTwoBridges`.
-    /// @param _chainId The chain ID of the ZK chain to which deposit.
+    /// @param _chainId Destination chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
-    /// @param _value The `msg.value` on the target chain tx.
+    /// @param _value The `msg.value` to be deposited on the target chain.
     /// @param _data The calldata for the second bridge deposit.
     /// @return request The data used by the bridgehub to create L2 transaction request to specific ZK chain.
     function bridgehubDeposit(

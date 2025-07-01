@@ -29,6 +29,8 @@ error AssetIdMismatch(bytes32 expected, bytes32 supplied);
 error AssetIdNotSupported(bytes32 assetId);
 // 0x11832de8
 error AssetRouterAllowanceNotZero();
+// 0x9b821ed7
+error BadTransferDataLength();
 // 0x6ef9a972
 error BaseTokenGasPriceDenominatorNotSet();
 // 0x55ad3fd3
@@ -107,6 +109,8 @@ error EmptyPrecommitData(uint256 batchNumber);
 error EmptyProofLength();
 // 0x627e0872
 error ETHDepositNotSupported();
+// 0xf4072616
+error ExecuteMessageFailed();
 // 0xac4a3f98
 error FacetExists(bytes4 selector, address);
 // 0xc91cf3b1
@@ -264,6 +268,8 @@ error OperationMustBePending();
 error OperationMustBeReady();
 // 0xb926450e
 error OriginChainIdNotFound();
+// 0x97da9c1c
+error PayloadTooShort();
 // 0x688c63e5
 error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060
@@ -378,9 +384,6 @@ error ZeroAddress();
 error ZeroChainId();
 // 0x601b6882
 error ZKChainLimitReached();
-error PayloadTooShort();
-error ExecuteMessageFailed();
-error BadTransferDataLength();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

@@ -67,9 +67,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyL2InteropCenter() {
-        if (msg.sender != L2_INTEROP_CENTER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == L2_INTEROP_CENTER_ADDR, Unauthorized(msg.sender));
         _;
     }
 

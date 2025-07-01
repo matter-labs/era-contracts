@@ -20,7 +20,7 @@ import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
 import {EmptyToken} from "../L1BridgeContractErrors.sol";
-import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 
 /// @author Matter Labs
@@ -62,7 +62,7 @@ abstract contract NativeTokenVault is
     mapping(address tokenAddress => bytes32 assetId) public assetId;
 
     /// @dev The number of bridged tokens.
-    uint256 public bridgedTokenCount;
+    uint256 public bridgedTokensCount;
 
     /// @dev The mapping of bridged tokens, count => assetId
     mapping(uint256 count => bytes32 assetId) public bridgedTokens;
@@ -118,8 +118,6 @@ abstract contract NativeTokenVault is
         }
     }
 
-    error TokenNotLegacy();
-
     /// @notice Adds a legacy token to the bridged tokens list.
     /// @dev This function is used to add a legacy token to the bridged tokens list.
     /// @param _token The address of the token to be added to the bridged tokens list.
@@ -128,8 +126,8 @@ abstract contract NativeTokenVault is
         if (tokenAssetId == bytes32(0)) {
             revert TokenNotLegacy();
         }
-        bridgedTokens[bridgedTokenCount] = tokenAssetId;
-        ++bridgedTokenCount;
+        bridgedTokens[bridgedTokensCount] = tokenAssetId;
+        ++bridgedTokensCount;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -424,8 +422,8 @@ abstract contract NativeTokenVault is
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;
-        bridgedTokens[bridgedTokenCount] = newAssetId;
-        ++bridgedTokenCount;
+        bridgedTokens[bridgedTokensCount] = newAssetId;
+        ++bridgedTokensCount;
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
@@ -506,8 +504,8 @@ abstract contract NativeTokenVault is
 
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
-        bridgedTokens[bridgedTokenCount] = _assetId;
-        ++bridgedTokenCount;
+        bridgedTokens[bridgedTokensCount] = _assetId;
+        ++bridgedTokensCount;
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
