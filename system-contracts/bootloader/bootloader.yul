@@ -3153,8 +3153,7 @@ object "Bootloader" {
                 let finalInteropRootNumber := add(nextInteropRootNumber, sub(numberOfRoots, 1))
                 for {let i := nextInteropRootNumber} lt(i, finalInteropRootNumber) {i := add(i, 1)} {
                     if gt(i, MAX_INTEROP_ROOTS_IN_BATCH()) {
-                        debugLog("Processed all interop roots for this batch", 1)
-                        break
+                        revertWithReason(OVER_MAX_INTEROP_ROOTS(), 0)
                     }
 
                     debugLog("Setting interop roots 2", i)
@@ -4116,6 +4115,10 @@ object "Bootloader" {
 
             function ZERO_INTEROP_ROOTS() -> ret {
                 ret := 34
+            }
+
+            function OVER_MAX_INTEROP_ROOTS() -> ret {
+                ret := 35
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes
