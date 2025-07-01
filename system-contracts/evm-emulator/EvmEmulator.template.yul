@@ -77,7 +77,7 @@ object "EvmEmulator" {
         ////////////////////////////////////////////////////////////////
         //                      FALLBACK
         ////////////////////////////////////////////////////////////////
-        
+
         let evmGasLeft, isStatic, isCallerEVM := consumeEvmFrame()
 
         if isStatic {
@@ -89,7 +89,7 @@ object "EvmEmulator" {
         if iszero(isCallerEVM) {
             evmGasLeft := getEvmGasFromContext()
             // Charge additional creation cost
-            evmGasLeft := chargeGas(evmGasLeft, 32000) 
+            evmGasLeft := chargeGas(evmGasLeft, 32000)
         }
 
         let offset, len, gasToReturn := simulate(isCallerEVM, evmGasLeft, false)
@@ -112,9 +112,9 @@ object "EvmEmulator" {
             function getDeployedBytecode(rawCodeHash) {
                 let success := $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash)
                 let codeLen := and(shr(224, rawCodeHash), 0xffff)
-                
+
                 loadReturndataIntoActivePtr()
-            
+
                 mstore(BYTECODE_LEN_OFFSET(), codeLen)
             }
 
@@ -147,11 +147,20 @@ object "EvmEmulator" {
                 delegationAddress,
             ) -> success, returnOffset, returnLen {
                 returnOffset := MEM_OFFSET()
-                // TODO: use delegatecall by reference to avoid copying calldata
-                let calldataSize := calldatasize()
-                calldatacopy(0, 0, calldataSize)
-                success := delegatecall(gas(), delegationAddress, 0, calldataSize, 0, 0)
-                
+                // Here fat pointers are used to perform a delegete call by reference,
+                // so that calldata is not copied to memory.
+                loadCalldataIntoActivePtr()
+                // Get far call ABI:
+                // gas = gas()
+                // forwardingMode = 1 (ForwardFatPointer)
+                // isConstructor = 0
+                // isSystem = 0
+                let farCallABI := or(shl(192, gas()), shl(224, 1))
+                // Pack ABI into the pointer, since delegate call does not have
+                // additional parameters for these values
+                ptrPackIntoActive(farCallABI)
+                // Perform the delegate call by reference to the 7702-delegated address
+                success := verbatim_3i_1o("raw_delegate_call_byref", delegationAddress, 0, 0)
                 returnLen := returndatasize()
                 returndatacopy(returnOffset, 0, returnLen)
             }
@@ -168,7 +177,7 @@ object "EvmEmulator" {
                 // If this code is invoked from EVM interpreter, caller will
                 // know how to handle the result, we're only acting as a proxy.
                 let success, returnOffset, returnLen := $llvm_Cold_llvm$_delegate7702(delegationAddr)
-                switch success 
+                switch success
                     case 1 {
                         return(returnOffset, returnLen)
                     }

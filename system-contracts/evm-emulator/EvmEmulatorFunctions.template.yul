@@ -18,11 +18,11 @@ function CODE_ORACLE_SYSTEM_CONTRACT() -> addr {
     addr := 0x0000000000000000000000000000000000008012
 }
 
-function EVM_GAS_MANAGER_CONTRACT() -> addr {   
+function EVM_GAS_MANAGER_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008013
 }
 
-function EVM_HASHES_STORAGE_CONTRACT() -> addr {   
+function EVM_HASHES_STORAGE_CONTRACT() -> addr {
     addr :=  0x0000000000000000000000000000000000008015
 }
 
@@ -196,7 +196,7 @@ function expandMemory(offset, size) -> gasCost {
 function _expandMemoryInternal(newMemsize) -> gasCost {
     if gt(newMemsize, MAX_POSSIBLE_MEM_LEN()) {
         panic()
-    }   
+    }
 
     let oldSizeInWords := mload(MEM_LEN_OFFSET())
 
@@ -238,7 +238,7 @@ function expandMemory2(retOffset, retSize, argsOffset, argsSize) -> gasCost {
     let argsMemsize := _memsizeRequired(argsOffset, argsSize)
 
     if lt(maxNewMemsize, argsMemsize) {
-        maxNewMemsize := argsMemsize  
+        maxNewMemsize := argsMemsize
     }
 
     if maxNewMemsize { // Memory expansion costs 0 if size is 0
@@ -309,6 +309,10 @@ function ptrAddIntoActive(_dest) {
 
 function ptrShrinkIntoActive(_dest) {
     verbatim_1i_0o("active_ptr_shrink_assign", _dest)
+}
+
+function ptrPackIntoActive(_dest) {
+    verbatim_1i_0o("active_ptr_pack_assign", _dest)
 }
 
 function getIsStaticFromCallFlags() -> isStatic {
@@ -414,22 +418,22 @@ function fetchDeployedCode(addr, dstOffset, srcOffset, len) -> copiedLen {
         if gt(len, codeLen) {
             len := codeLen
         }
-    
+
         let _returndatasize := returndatasize()
         if gt(srcOffset, _returndatasize) {
             srcOffset := _returndatasize
         }
-    
+
         if gt(add(len, srcOffset), _returndatasize) {
             len := sub(_returndatasize, srcOffset)
         }
-    
+
         if len {
             returndatacopy(dstOffset, srcOffset, len)
         }
-    
+
         copiedLen := len
-    } 
+    }
 }
 
 function fetchBytecode(addr) -> success, rawCodeHash {
@@ -439,7 +443,7 @@ function fetchBytecode(addr) -> success, rawCodeHash {
 
 function $llvm_AlwaysInline_llvm$_fetchBytecodeByHash(rawCodeHash) -> success {
     mstore(0, rawCodeHash)
-    
+
     success := staticcall(gas(), CODE_ORACLE_SYSTEM_CONTRACT(), 0, 32, 0, 0)
 }
 
@@ -516,7 +520,7 @@ function dupStackItem(sp, evmGas, position, oldStackHead) -> newSp, evmGasLeft, 
     if iszero(lt(sp, MAX_STACK_SLOT_OFFSET())) {
         panic()
     }
-    
+
     let tempSp := sub(sp, mul(0x20, sub(position, 1)))
 
     if lt(tempSp, STACK_OFFSET())  {
@@ -536,7 +540,7 @@ function swapStackItem(sp, evmGas, position, oldStackHead) ->  evmGasLeft, stack
         panic()
     }
 
-    stackHead := mload(tempSp)                    
+    stackHead := mload(tempSp)
     mstore(tempSp, oldStackHead)
 }
 
@@ -652,7 +656,7 @@ function consumeEvmFrame() -> passGas, isStatic, callerEVM {
         mstore(PANIC_RETURNDATASIZE_OFFSET(), 32) // we should return 0 gas after panics
 
         passGas := loadFromReturnDataPointer(0)
-        
+
         isStatic := gt(_returndatasize, 32)
     }
 }
@@ -795,14 +799,14 @@ function performDelegateCall(oldSp, evmGasLeft, isStatic, oldStackHead) -> newGa
             }
 
             if isCallToEmptyContract {
-                // In case of a call to the EVM contract that is currently being constructed, 
+                // In case of a call to the EVM contract that is currently being constructed,
                 // the DefaultAccount bytecode will be used instead. This is implemented at the virtual machine level.
                 success := delegatecall(gas(), addr, argsOffset, argsSize, retOffset, retSize)
-                _saveReturndataAfterZkEVMCall()               
+                _saveReturndataAfterZkEVMCall()
             }
 
             // We forbid delegatecalls to EraVM native contracts
-        } 
+        }
         default {
             // Precompile. Simulate using staticcall, since EraVM behavior differs here
             success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, 0, argsOffset, argsSize, retOffset, retSize, true)
@@ -848,7 +852,7 @@ function _genericCall(addr, gasToPass, value, argsOffset, argsSize, retOffset, r
         case 0 {
             // just smart contract
             success, frameGasLeft := callZkVmNative(addr, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic, rawCodeHash)
-        } 
+        }
         default {
             // precompile
             success, frameGasLeft := callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, argsSize, retOffset, retSize, isStatic)
@@ -884,9 +888,9 @@ function callPrecompile(addr, precompileCost, gasToPass, value, argsOffset, args
         default {
             success := rawStaticcall(zkVmGasToPass, addr, argsOffset, argsSize, retOffset, retSize)
         }
-        
+
         _saveReturndataAfterZkEVMCall()
-    
+
         if success {
             frameGasLeft := sub(gasToPass, precompileCost)
         }
@@ -937,7 +941,7 @@ function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffs
         if iszero(value) {
             zkEvmGasToPass := sub(zkEvmGasToPass, emptyContractExecutionCost)
         }
-    
+
         zkEvmGasUsed := 0 // Calling empty contracts is free from the EVM point of view
     }
 
@@ -950,14 +954,14 @@ function callZkVmNative(addr, evmGasToPass, value, argsOffset, argsSize, retOffs
 function capGasForCall(evmGasLeft, oldGasToPass) -> gasToPass {
     let maxGasToPass := sub(evmGasLeft, shr(6, evmGasLeft)) // evmGasLeft >> 6 == evmGasLeft/64
     gasToPass := oldGasToPass
-    if gt(oldGasToPass, maxGasToPass) { 
+    if gt(oldGasToPass, maxGasToPass) {
         gasToPass := maxGasToPass
     }
 }
 
-// The gas cost mentioned here is purely the cost of the contract, 
-// and does not consider the cost of the call itself nor the instructions 
-// to put the parameters in memory. 
+// The gas cost mentioned here is purely the cost of the contract,
+// and does not consider the cost of the call itself nor the instructions
+// to put the parameters in memory.
 function getGasForPrecompiles(addr, argsOffset, argsSize) -> gasToCharge {
     switch addr
         case 0x01 { // ecRecover
@@ -1029,7 +1033,7 @@ function modexpGasCost(inputOffset, inputSize) -> gasToCharge {
     let mSize := mloadPotentiallyPaddedValue(add(inputOffset, 0x40), inputBoundary)
 
     let inputIsTooBig := or(
-        gt(bSize, MAX_MODEXP_INPUT_FIELD_SIZE()), 
+        gt(bSize, MAX_MODEXP_INPUT_FIELD_SIZE()),
         or(gt(eSize, MAX_MODEXP_INPUT_FIELD_SIZE()), gt(mSize, MAX_MODEXP_INPUT_FIELD_SIZE()))
     )
 
@@ -1059,7 +1063,7 @@ function modexpGasCost(inputOffset, inputSize) -> gasToCharge {
             }
         }
         default { // elif exponent_length > 32
-            // Note: currently this branch is unused (due to MAX_MODEXP_INPUT_FIELD_SIZE restriction). 
+            // Note: currently this branch is unused (due to MAX_MODEXP_INPUT_FIELD_SIZE restriction).
             // It can be used if more efficient modexp circuits are implemented.
 
             // iteration_count = (8 * (exponent_length - 32)) + ((exponent & (2**256 - 1)).bit_length() - 1)
@@ -1152,7 +1156,7 @@ function _saveReturndataAfterEVMCall(_outputOffset, _outputLen) -> _gasLeft {
         default {
             _gasLeft := activePointerLoad(0)
 
-            // We copy as much returndata as possible without going over the 
+            // We copy as much returndata as possible without going over the
             // returndata size.
             switch lt(sub(rtsz, 32), _outputLen)
                 case 0 { returndatacopy(_outputOffset, 32, _outputLen) }
@@ -1265,7 +1269,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
             // check for nonce collision
             if iszero(getRawNonce(addr)) {
                 canBeDeployed := 1
-            }     
+            }
         }
     }
 
@@ -1287,13 +1291,13 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
         mstore(mul(11, 32), mload(sub(offset, 0x60)))
         mstore(mul(12, 32), mload(sub(offset, 0x40)))
         mstore(mul(13, 32), mload(sub(offset, 0x20)))
-    
+
         // selector: function createEvmFromEmulator(address newAddress, bytes calldata _initCode)
         mstore(sub(offset, 0x80), 0xe43cec64)
         mstore(sub(offset, 0x60), addr)
         mstore(sub(offset, 0x40), 0x40) // Where the arg starts (third word)
         mstore(sub(offset, 0x20), size) // Length of the init code
-        
+
         let result := performSystemCallForCreate(value, sub(offset, 0x64), add(size, 0x64))
 
         // move memory slots back
@@ -1301,7 +1305,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
         mstore(sub(offset, 0x60), mload(mul(11, 32)))
         mstore(sub(offset, 0x40), mload(mul(12, 32)))
         mstore(sub(offset, 0x20), mload(mul(13, 32)))
-    
+
         let gasLeft
         switch result
             case 0 {
@@ -1312,7 +1316,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
             default {
                 gasLeft, addr := _saveConstructorReturnGas()
             }
-    
+
         let gasUsed := sub(gasForTheCall, gasLeft)
         evmGasLeft := chargeGas(evmGasLeftOld, gasUsed)
     }
@@ -1320,7 +1324,7 @@ function _executeCreate(offset, size, value, evmGasLeftOld, isCreate2, salt) -> 
 
 function performSystemCallForCreate(value, bytecodeStart, bytecodeLen) -> success {
     // system call, not constructor call (ContractDeployer will call constructor)
-    let farCallAbi := build_farcall_abi(1, gas(), bytecodeStart, bytecodeLen) 
+    let farCallAbi := build_farcall_abi(1, gas(), bytecodeStart, bytecodeLen)
 
     switch iszero(value)
     case 0 {
@@ -1400,7 +1404,7 @@ function $llvm_AlwaysInline_llvm$_memsetToZero(dest, len) {
 }
 
 ////////////////////////////////////////////////////////////////
-//                 LOGS FUNCTIONALITY 
+//                 LOGS FUNCTIONALITY
 ////////////////////////////////////////////////////////////////
 
 function _genericLog(sp, stackHead, evmGasLeft, topicCount, isStatic) -> newEvmGasLeft, offset, size, newSp, newStackHead {
