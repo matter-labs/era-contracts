@@ -205,10 +205,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override {
-        require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID)); else {
-            // Withdraw funds
-            IERC20(_token).safeTransfer(_to, _amount);
-        }
+        require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
+        IERC20(_token).safeTransfer(_to, _amount);
     }
 
     /*//////////////////////////////////////////////////////////////
