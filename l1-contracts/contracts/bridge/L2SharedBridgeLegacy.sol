@@ -85,7 +85,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         }
     }
 
-    /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
+    /// @notice Initiates a withdrawal by burning funds and sending the message to L1
     /// where tokens would be unlocked
     /// @param _l1Receiver The account address that should receive funds on L1
     /// @param _l2Token The L2 token address which is withdrawn
@@ -97,7 +97,7 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
 
     /// @notice Finalize the deposit and mint funds
     /// @param _l1Sender The account address that initiated the deposit on L1
-    /// @param _l2Receiver The account address that would receive minted ether
+    /// @param _l2Receiver The account address that would receive minted tokens
     /// @param _l1Token The address of the token that was locked on the L1
     /// @param _amount Total amount of tokens deposited from L1
     /// @param _data The additional data that user can pass with the deposit
@@ -157,9 +157,11 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         salt = bytes32(uint256(uint160(_l1Token)));
     }
 
-    /// @dev Deploy the beacon proxy for the L2 token, while using ContractDeployer system contract.
+    /// @notice Deploys a beacon proxy for an L2 token using the ContractDeployer system contract.
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `l2TokenProxyBytecodeHash` is used
     /// for the code of the proxy.
+    /// @param salt The salt used for CREATE2 deployment to ensure deterministic addresses.
+    /// @return proxy The address of the deployed beacon proxy contract.
     function deployBeaconProxy(bytes32 salt) external onlyNTV returns (address proxy) {
         (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
             uint32(gasleft()),
@@ -176,6 +178,9 @@ contract L2SharedBridgeLegacy is IL2SharedBridgeLegacy, Initializable {
         proxy = abi.decode(returndata, (address));
     }
 
+    /// @notice Sends a message from to L1.
+    /// @param _message The message data to send to L1.
+    /// @return The hash of the sent message.
     function sendMessageToL1(bytes calldata _message) external override onlyAssetRouter returns (bytes32) {
         // slither-disable-next-line unused-return
         return L2ContractHelper.sendMessageToL1(_message);

@@ -129,7 +129,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         legacyBridge = _legacyBridge;
     }
 
-    /// @notice Used to set the assed deployment tracker address for given asset data.
+    /// @notice Used to set the asset deployment tracker address for given asset data.
     /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
     /// @param _assetDeploymentTracker The whitelisted address of asset deployment tracker for provided asset.
     function setAssetDeploymentTracker(

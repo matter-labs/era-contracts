@@ -68,8 +68,8 @@ contract L2WrappedBaseTokenStore is Ownable2Step {
     }
 
     /// @notice Reinitializes the L2 WBaseToken address for a specific chain ID.
-    /// @dev Can only be called by the owner. It can not be called by the admin second time
-    /// to prevent retroactively damaging existing chains.
+    /// @dev Can only be called by the owner. Unlike initializeChain, this allows overwriting existing addresses.
+    /// @dev It can not be called by the admin to prevent retroactively damaging existing chains.
     /// @param _chainId The ID of the blockchain network.
     /// @param _l2WBaseToken The new address of the L2 WBaseToken token.
     function reinitializeChain(uint256 _chainId, address _l2WBaseToken) external onlyOwner {

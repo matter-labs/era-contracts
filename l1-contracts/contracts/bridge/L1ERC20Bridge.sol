@@ -82,7 +82,7 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
         ERA_CHAIN_ID = _eraChainId;
     }
 
-    /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
+    /// @notice Initializes the reentrancy guard for the proxy implementation.
     function initialize() external reentrancyGuardInitializer {}
 
     /*//////////////////////////////////////////////////////////////
@@ -147,7 +147,6 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
     }
 
     /// @notice Initiates a deposit by locking funds on the contract and sending the request
-    /// @dev Initiates a deposit by locking funds on the contract and sending the request
     /// of processing an L2 transaction where tokens would be minted
     /// @dev If the token is bridged for the first time, the L2 token contract will be deployed. Note however, that the
     /// newly-deployed token does not support any custom logic, i.e. rebase tokens' functionality is not supported.
@@ -216,6 +215,9 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
 
     /// @dev Transfers tokens from the depositor address to this contract and force approves those
     /// to the asset router address.
+    /// @param _from The address to transfer tokens from.
+    /// @param _token The ERC20 token to transfer.
+    /// @param _amount The amount of tokens to transfer.
     /// @return The difference between the contract balance before and after the transferring of funds.
     function _approveFundsToAssetRouter(address _from, IERC20 _token, uint256 _amount) internal returns (uint256) {
         uint256 balanceBefore = _token.balanceOf(address(this));
@@ -265,6 +267,8 @@ contract L1ERC20Bridge is IL1ERC20Bridge, ReentrancyGuard {
                             ERA LEGACY GETTERS
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Calculates the L2 token address for a given L1 token using CREATE2.
+    /// @param _l1Token The L1 token address to calculate the L2 counterpart for.
     /// @return The L2 token address that would be minted for deposit of the given L1 token on ZKsync Era.
     function l2TokenAddress(address _l1Token) external view returns (address) {
         bytes32 constructorInputHash = keccak256(abi.encode(l2TokenBeacon, ""));

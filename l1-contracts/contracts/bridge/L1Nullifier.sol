@@ -477,7 +477,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @notice Verifies the validity of a withdrawal message from L2 and returns withdrawal details.
     /// @param _finalizeWithdrawalParams The structure that holds all necessary data to finalize withdrawal
     /// @return assetId The ID of the bridged asset.
-    /// @return transferData The transfer data used to finalize withdawal.
+    /// @return transferData The transfer data used to finalize withdrawal.
     function _verifyWithdrawal(
         FinalizeL1DepositParams memory _finalizeWithdrawalParams
     ) internal returns (bytes32 assetId, bytes memory transferData) {

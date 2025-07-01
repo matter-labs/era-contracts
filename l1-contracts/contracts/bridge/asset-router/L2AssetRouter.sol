@@ -457,7 +457,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             return currentlyDeployedAddress;
         }
 
-        // For backwards compatibility, the bridge smust return the address of the token even if it
+        // For backwards compatibility, the bridge must return the address of the token even if it
         // has not been deployed yet.
         return l2NativeTokenVault.calculateCreate2TokenAddress(L1_CHAIN_ID, _l1Token);
     }

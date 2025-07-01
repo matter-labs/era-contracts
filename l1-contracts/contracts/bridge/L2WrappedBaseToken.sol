@@ -129,10 +129,14 @@ contract L2WrappedBaseToken is ERC20PermitUpgradeable, IL2WrappedBaseToken, IBri
         require(success, WithdrawFailed());
     }
 
+    /// @notice Returns the L1 address of the original token that this wrapped token represents.
+    /// @return The L1 token address.
     function originToken() external view override returns (address) {
         return l1Address;
     }
 
+    /// @notice Returns the asset ID for this base token.
+    /// @return The base token asset ID.
     function assetId() external view override returns (bytes32) {
         return baseTokenAssetId;
     }
