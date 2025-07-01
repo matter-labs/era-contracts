@@ -26,7 +26,7 @@ import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 /// @dev The ChainAssetHandler contract is used for migrating chains between settlement layers,
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
-contract ChainAssetHandler is
+abstract contract ChainAssetHandlerBase is
     IChainAssetHandler,
     ReentrancyGuard,
     Ownable2StepUpgradeable,
@@ -35,23 +35,23 @@ contract ChainAssetHandler is
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    /// @notice the asset id of Eth. This is only used on L1.
-    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
 
-    uint256 internal immutable L1_CHAIN_ID;
-
-    IBridgehub internal immutable BRIDGEHUB;
-
-    IMessageRoot internal immutable MESSAGE_ROOT;
-
-    address internal immutable ASSET_ROUTER;
+    ///@notice virtual getters standing in for the original immutables
+    function _ethTokenAssetId() internal view virtual returns (bytes32);
+    function _l1ChainId()        internal view virtual returns (uint256);
+    function _bridgehub()          internal view virtual returns (IBridgehub);
+    function _messageRoot()       internal view virtual returns (IMessageRoot);
+    function _assetRouter()       internal view virtual returns (address);
 
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
     modifier onlyAssetRouter() {
-        if (msg.sender != ASSET_ROUTER) {
-            revert NotAssetRouter(msg.sender, ASSET_ROUTER);
+        if (msg.sender != _assetRouter()) {
+            revert NotAssetRouter(msg.sender, _assetRouter());
         }
         _;
     }
@@ -64,30 +64,10 @@ contract ChainAssetHandler is
     }
 
     modifier onlyL1() {
-        if (L1_CHAIN_ID != block.chainid) {
-            revert NotL1(L1_CHAIN_ID, block.chainid);
+        if (_l1ChainId() != block.chainid) {
+            revert NotL1(_l1ChainId(), block.chainid);
         }
         _;
-    }
-
-    /// @notice to avoid parity hack
-    constructor(
-        uint256 _l1ChainId,
-        address _owner,
-        IBridgehub _bridgehub,
-        address _assetRouter,
-        IMessageRoot _messageRoot
-    ) reentrancyGuardInitializer {
-        _disableInitializers();
-        BRIDGEHUB = _bridgehub;
-        L1_CHAIN_ID = _l1ChainId;
-        ASSET_ROUTER = _assetRouter;
-        MESSAGE_ROOT = _messageRoot;
-        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
-        // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
-        // We will change this with interop.
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-        _transferOwnership(_owner);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -116,8 +96,8 @@ contract ChainAssetHandler is
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        if (_assetId != BRIDGEHUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
-            revert IncorrectChainAssetId(_assetId, BRIDGEHUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId));
+        if (_assetId != _bridgehub().ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
+            revert IncorrectChainAssetId(_assetId, _bridgehub().ctmAssetIdFromChainId(bridgehubBurnData.chainId));
         }
 
         address zkChain;
@@ -125,7 +105,7 @@ contract ChainAssetHandler is
         // to avoid stack too deep
         {
             address ctm;
-            (zkChain, ctm) = BRIDGEHUB.forwardedBridgeBurnSetSettlementLayer(
+            (zkChain, ctm) = _bridgehub().forwardedBridgeBurnSetSettlementLayer(
                 bridgehubBurnData.chainId,
                 _settlementChainId
             );
@@ -143,15 +123,15 @@ contract ChainAssetHandler is
             );
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
-            _settlementChainId == L1_CHAIN_ID
+            _settlementChainId == _l1ChainId()
                 ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
-                : BRIDGEHUB.getZKChain(_settlementChainId),
+                : _bridgehub().getZKChain(_settlementChainId),
             _originalCaller,
             bridgehubBurnData.chainData
         );
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
-            baseTokenAssetId: BRIDGEHUB.baseTokenAssetId(bridgehubBurnData.chainId),
+            baseTokenAssetId: _bridgehub().baseTokenAssetId(bridgehubBurnData.chainId),
             ctmData: ctmMintData,
             chainData: chainMintData
         });
@@ -174,7 +154,7 @@ contract ChainAssetHandler is
             (BridgehubMintCTMAssetData)
         );
 
-        (address zkChain, address ctm) = BRIDGEHUB.forwardedBridgeMint(
+        (address zkChain, address ctm) = _bridgehub().forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
             bridgehubMintData.baseTokenAssetId
@@ -187,8 +167,8 @@ contract ChainAssetHandler is
                 revert ChainIdNotRegistered(bridgehubMintData.chainId);
             }
             // We want to allow any chain to be migrated,
-            BRIDGEHUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId);
+            _bridgehub().registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
+            _messageRoot().addNewChain(bridgehubMintData.chainId);
         }
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
@@ -210,7 +190,7 @@ contract ChainAssetHandler is
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        (address zkChain, address ctm) = BRIDGEHUB.forwardedBridgeRecoverFailedTransfer(bridgehubBurnData.chainId);
+        (address zkChain, address ctm) = _bridgehub().forwardedBridgeRecoverFailedTransfer(bridgehubBurnData.chainId);
 
         IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubBurnData.chainId,

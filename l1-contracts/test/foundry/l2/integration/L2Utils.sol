@@ -26,7 +26,7 @@ import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
 import {Utils} from "deploy-scripts/Utils.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -75,15 +75,9 @@ library L2Utils {
     }
 
     function forceDeployChainAssetHandler(SystemContractsArgs memory _args) internal {
-        new ChainAssetHandler(
-            _args.l1ChainId,
-            _args.aliasedOwner,
-            IBridgehub(L2_BRIDGEHUB_ADDR),
-            L2_ASSET_ROUTER_ADDR,
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
-        );
+        new L2ChainAssetHandler();
         forceDeployWithConstructor(
-            "ChainAssetHandler",
+            "L2ChainAssetHandler",
             L2_CHAIN_ASSET_HANDLER_ADDR,
             abi.encode(
                 _args.l1ChainId,

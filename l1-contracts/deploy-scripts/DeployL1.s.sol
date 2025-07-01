@@ -47,7 +47,7 @@ import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -178,7 +178,7 @@ contract DeployL1Script is Script, DeployUtils {
         (
             addresses.bridgehub.chainAssetHandlerImplementation,
             addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
+        ) = deployTuppWithContract("L1ChainAssetHandler", false);
         setBridgehubParams();
 
         initializeGeneratedData();
@@ -603,9 +603,9 @@ contract DeployL1Script is Script, DeployUtils {
                 "UpgradeableBeaconDeployer"
             ) : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
             chainAssetHandlerBytecodeInfo: config.isZKsyncOS ? Utils.getZKOSBytecodeInfoForContract(
-                "ChainAssetHandler.sol",
-                "ChainAssetHandler"
-            ) : abi.encode(getL2BytecodeHash("ChainAssetHandler")),
+                "L2ChainAssetHandler.sol",
+                "L2ChainAssetHandler"
+            ) : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -731,8 +731,8 @@ contract DeployL1Script is Script, DeployUtils {
                 return type(ChainRegistrar).creationCode;
             } else if (compareStrings(contractName, "L1Bridgehub")) {
                 return type(L1Bridgehub).creationCode;
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return type(ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return type(L1ChainAssetHandler).creationCode;
             } else if (compareStrings(contractName, "L1MessageRoot")) {
                 return type(L1MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -820,7 +820,7 @@ contract DeployL1Script is Script, DeployUtils {
             return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "L1MessageRoot")) {
             return abi.encodeCall(L1MessageRoot.initialize, ());
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return abi.encode();
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));

@@ -52,7 +52,7 @@ library ContractsBytecodesLib {
             "BytecodesSupplier", // ???
             "ChainAdmin",
             "ChainAdminOwnable",
-            "ChainAssetHandler",
+            "L1ChainAssetHandler",
             "ChainRegistrar",
             "ChainTypeManager",
             "CTMDeploymentTracker",

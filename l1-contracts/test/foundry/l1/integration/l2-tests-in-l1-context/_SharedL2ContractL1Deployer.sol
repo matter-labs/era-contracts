@@ -19,7 +19,7 @@ import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";

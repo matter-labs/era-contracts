@@ -21,7 +21,7 @@ import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 import {L2NativeTokenVaultDev} from "contracts/dev-contracts/test/L2NativeTokenVaultDev.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
@@ -79,18 +79,13 @@ library L2UtilsBase {
         );
 
         {
+            // FIXME: init
             address l2messageVerification = address(new L2MessageVerification());
             vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
             address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
             vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
             address l2ChainAssetHandler = address(
-                new ChainAssetHandler(
-                    _args.l1ChainId,
-                    _args.aliasedOwner,
-                    IBridgehub(L2_BRIDGEHUB_ADDR),
-                    L2_ASSET_ROUTER_ADDR,
-                    IMessageRoot(L2_MESSAGE_ROOT_ADDR)
-                )
+                new L2ChainAssetHandler()
             );
             vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);
         }
