@@ -7,6 +7,7 @@ import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 event InteropRootAdded(uint256 indexed chainId, uint256 indexed blockNumber, bytes32[] sides);
 error SidesLengthNotOne();
 error InteropRootAlreadyExists();
+error MessageRootIsZero();
 
 /**
  * @author Matter Labs
@@ -35,6 +36,9 @@ contract L2InteropRootStorage is SystemContractBase {
         // In the current code sides should only contain the Interop Root itself, as mentioned above.
         if (sides.length != 1) {
             revert SidesLengthNotOne();
+        }
+        if (sides[0] == bytes32(0)) {
+            revert MessageRootIsZero();
         }
 
         // Make sure that interopRoots for specified chainId and blockOrBatchNumber wasn't set already.
