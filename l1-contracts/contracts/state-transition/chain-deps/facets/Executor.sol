@@ -153,8 +153,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId();
         }
-        if(_newBatch.l2DaValidator != s.l2DAValidator) {
-//            revert MismatchL2DAValidator();
+        if (_newBatch.l2DaValidator != s.l2DAValidator) {
+            //            revert MismatchL2DAValidator();
         }
 
         // Create batch output for PI
@@ -199,9 +199,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
             // TODO: change RELAYED_EXECUTOR_VERSION?
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
-                abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo)
-            );
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo));
         }
     }
 
@@ -359,8 +357,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidProtocolVersion();
         }
         if (s.boojumOS) {
-            (StoredBatchInfo memory lastCommittedBatchData, CommitBoojumOSBatchInfo[] memory newBatchesData) = BatchDecoder
-                .decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
+            (
+                StoredBatchInfo memory lastCommittedBatchData,
+                CommitBoojumOSBatchInfo[] memory newBatchesData
+            ) = BatchDecoder.decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
             // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
             // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
             // and so the range checked in the `decodeAndCheckCommitData` is enough.
@@ -590,12 +590,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
+    // Warning: removed onlyValidator - to make this permisionless.
     function executeBatchesSharedBridge(
         uint256, // _chainId
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
-    ) external nonReentrant onlyValidator onlySettlementLayer {
+    ) external nonReentrant onlySettlementLayer {
         (StoredBatchInfo[] memory batchesData, PriorityOpsBatchInfo[] memory priorityOpsData) = BatchDecoder
             .decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
@@ -636,12 +637,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
+    // Warning: removed onlyValidator to make it permisionless.
     function proveBatchesSharedBridge(
         uint256, // _chainId
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
-    ) external nonReentrant onlyValidator onlySettlementLayer {
+    ) external nonReentrant onlySettlementLayer {
         (
             StoredBatchInfo memory prevBatch,
             StoredBatchInfo[] memory committedBatches,
@@ -674,9 +676,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
             bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
             if (s.boojumOS) {
-                proofPublicInput[i] = uint256(
-                    keccak256(abi.encodePacked(prevBatchStateCommitment, currentBatchStateCommitment, currentBatchCommitment))
-                ) >> PUBLIC_INPUT_SHIFT;
+                proofPublicInput[i] =
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(
+                                prevBatchStateCommitment,
+                                currentBatchStateCommitment,
+                                currentBatchCommitment
+                            )
+                        )
+                    ) >>
+                    PUBLIC_INPUT_SHIFT;
             } else {
                 proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
             }
@@ -696,9 +706,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
         // We can only process 1 batch proof at a time.
-        if (proofPublicInput.length != 1) {
-            revert CanOnlyProcessOneBatch();
-        }
+        // Allow processing multiple proofs at once.
+        //if (proofPublicInput.length != 1) {
+        //    revert CanOnlyProcessOneBatch();
+        //}
 
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {
