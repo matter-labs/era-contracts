@@ -8,6 +8,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -133,6 +134,10 @@ library L2UtilsBase {
                 bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
                 bytes32(uint256(1))
             );
+            address l2AssetTracker = address(new AssetTracker(_args.l1ChainId, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_ROOT_ADDR));
+            vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTracker.code);
+        }
+        {
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());
             vm.etch(L2_STANDARD_TRIGGER_ACCOUNT_ADDR, l2StandardTriggerAccount.code);
             address l2InteropAccount = address(new DummyL2InteropAccount());

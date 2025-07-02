@@ -6,6 +6,15 @@ import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecuto
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
+struct TokenBalanceMigrationData {
+    uint256 chainId;
+    bytes32 assetId;
+    uint256 tokenOriginChainId;
+    uint256 amount;
+    uint256 migrationNumber;
+    bool isL1ToGateway;
+}
+
 interface IAssetTracker {
     function BRIDGE_HUB() external view returns (IBridgehub);
 
@@ -34,16 +43,10 @@ interface IAssetTracker {
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
     function confirmMigrationOnL2(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        uint256 _migrationNumber
+        TokenBalanceMigrationData memory _tokenBalanceMigrationData
     ) external;
 
     function confirmMigrationOnGateway(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isL1ToGateway
+        TokenBalanceMigrationData memory _tokenBalanceMigrationData
     ) external;
 }

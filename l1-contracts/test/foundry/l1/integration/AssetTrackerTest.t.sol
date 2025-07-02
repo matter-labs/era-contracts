@@ -29,7 +29,7 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {IAssetTracker, TokenBalanceMigrationData} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L2_BRIDGEHUB, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
@@ -126,6 +126,14 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         //     abi.encode(bytes32(0))
         // );
         // assetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
+            chainId: eraZKChainId,
+            assetId: assetId,
+            tokenOriginChainId: 0,
+            amount: amount,
+            migrationNumber: 0,
+            isL1ToGateway: true
+        });
 
         FinalizeL1DepositParams memory finalizeWithdrawalParamsL1ToGateway = FinalizeL1DepositParams({
             chainId: eraZKChainId,
@@ -133,7 +141,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             l2MessageIndex: 0,
             l2Sender: L2_ASSET_TRACKER_ADDR,
             l2TxNumberInBatch: 0,
-            message: abi.encode(eraZKChainId, assetId, amount, 0, true),
+            message: abi.encode(data),
             merkleProof: new bytes32[](0)
         });
         vm.chainId(originalChainId);
@@ -167,10 +175,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
 
+
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
-        assetTracker.confirmMigrationOnL2(1, assetId, amount, 0);
+        assetTracker.confirmMigrationOnL2(data);
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
-        assetTracker.confirmMigrationOnGateway(1, assetId, amount, true);
+        assetTracker.confirmMigrationOnGateway(data);
     }
 
     function test_migrationGatewayToL1() public {
@@ -194,13 +203,22 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(address(assetTracker), assetSettlementLayerLocation, bytes32(uint256(gwChainId)));
         assetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);
 
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
+            chainId: eraZKChainId,
+            assetId: assetId,
+            tokenOriginChainId: 0,
+            amount: amount,
+            migrationNumber: 0,
+            isL1ToGateway: false
+        });
+
         FinalizeL1DepositParams memory finalizeWithdrawalParamsGatewayToL1 = FinalizeL1DepositParams({
             chainId: gwChainId,
             l2BatchNumber: 0,
             l2MessageIndex: 0,
             l2Sender: L2_ASSET_TRACKER_ADDR,
             l2TxNumberInBatch: 0,
-            message: abi.encode(eraZKChainId, assetId, amount, 0, false),
+            message: abi.encode(data),
             merkleProof: new bytes32[](0)
         });
 
@@ -238,9 +256,10 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
 
+
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
         vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
-        assetTracker.confirmMigrationOnGateway(eraZKChainId, assetId, amount, false);
+        assetTracker.confirmMigrationOnGateway(data);
     }
 
     function test_processLogsAndMessages() public {

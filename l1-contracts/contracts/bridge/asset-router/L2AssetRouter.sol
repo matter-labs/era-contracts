@@ -63,7 +63,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
                 revert InvalidCaller(msg.sender);
             }
         } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            if (msg.sender != address(this)) {
+                revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            }
         }
         _;
     }

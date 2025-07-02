@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {IAssetTracker} from "./IAssetTracker.sol";
+import {IAssetTracker, TokenBalanceMigrationData} from "./IAssetTracker.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log, L2Message} from "../../common/Messaging.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_BRIDGEHUB} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -100,6 +100,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Called on the L1 when a deposit to the chain happens. 
+    /// @dev As the chain does not update its balance when settling on L1.
     function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
         uint256 chainToUpdate = settlementLayer == block.chainid ? _chainId : settlementLayer;
@@ -112,6 +114,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         }
     }
 
+    /// @notice Called on the L1 by the chain's mailbox when a deposit happens
+    /// @notice Used for deposits via Gateway.
     function getBalanceChange(uint256 _chainId) external returns (bytes32 assetId, uint256 amount) {
         // kl todo add only chainId.
         assetId = bytes32(TransientPrimitivesLib.getUint256(_chainId));
@@ -253,13 +257,15 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         uint256 amount = IERC20(tokenAddress).totalSupply();
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
 
-        _sendMigrationDataToL1({
-            _chainId: block.chainid,
-            _assetId: _assetId,
-            _amount: amount,
-            _migrationNumber: migrationNumber,
-            _isL1ToGateway: true
+        TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
+            chainId: block.chainid,
+            assetId: _assetId,
+            tokenOriginChainId: L2_NATIVE_TOKEN_VAULT.originChainId(_assetId),
+            amount: amount,
+            migrationNumber: migrationNumber,
+            isL1ToGateway: true
         });
+        _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
     /// @notice Migrates the token balance from Gateway to L1.
@@ -273,13 +279,16 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
         require(assetSettlementLayer[_assetId] == block.chainid, InvalidAssetId());
 
-        _sendMigrationDataToL1({
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _amount: chainBalance[_chainId][_assetId],
-            _migrationNumber: _getMigrationNumber(_chainId),
-            _isL1ToGateway: false
+        TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
+            chainId: _chainId,
+            assetId: _assetId,
+            tokenOriginChainId: 0,
+            amount: chainBalance[_chainId][_assetId],
+            migrationNumber: _getMigrationNumber(_chainId),
+            isL1ToGateway: false
         });
+
+        _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
     function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
@@ -293,80 +302,96 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         require(_finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR, InvalidSender());
 
         // solhint-disable-next-line no-unused-vars
-        (
-            uint256 chainId,
-            bytes32 assetId,
-            uint256 amount,
-            uint256 migrationNumber,
-            bool isL1ToGateway
-        ) = _decodeTokenBalanceMigrationData(_finalizeWithdrawalParams.message);
 
-        if (!isL1ToGateway) {
+        TokenBalanceMigrationData memory data 
+            = abi.decode(_finalizeWithdrawalParams.message, (TokenBalanceMigrationData));
+
+        if (!data.isL1ToGateway) {
             // here another settlement layer might frontrun
             require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidChainId());
         }
 
-        uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(chainId);
+        uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(data.chainId);
         // require(_getMigrationNumber(chainId) == migrationNumber, InvalidMigrationNumber());
-        if (isL1ToGateway) {
+        if (data.isL1ToGateway) {
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
-            require(chainId == _finalizeWithdrawalParams.chainId, InvalidChainId());
-            require(assetSettlementLayer[assetId] == block.chainid, InvalidAssetId());
+            require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidChainId());
+            require(assetSettlementLayer[data.assetId] == block.chainid, InvalidAssetId());
 
-            assetSettlementLayer[assetId] = currentSettlementLayer;
+            assetSettlementLayer[data.assetId] = currentSettlementLayer;
 
-            chainBalance[chainId][assetId] -= amount;
-            chainBalance[currentSettlementLayer][assetId] += amount;
+            _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
 
-            _sendConfirmToGateway({
-                _settlementLayer: currentSettlementLayer,
-                _chainId: chainId,
-                _assetId: assetId,
-                _amount: amount,
-                _isL1ToGateway: isL1ToGateway
-            });
-            _sendConfirmToL2(chainId, assetId, amount, migrationNumber);
+            if (isMinterChain[data.chainId][data.assetId] && data.tokenOriginChainId != data.chainId) {
+                chainBalance[data.chainId][data.assetId] -= data.amount;
+                chainBalance[currentSettlementLayer][data.assetId] += data.amount;
+            }
+
+            _sendConfirmToGateway(currentSettlementLayer, data);
+            _sendConfirmToL2(data);
         } else {
             require(currentSettlementLayer == block.chainid, NotMigratedChain());
-            require(assetSettlementLayer[assetId] == _finalizeWithdrawalParams.chainId, InvalidAssetId());
+            require(assetSettlementLayer[data.assetId] == _finalizeWithdrawalParams.chainId, InvalidAssetId());
 
-            _sendConfirmToGateway({
-                _settlementLayer: currentSettlementLayer,
-                _chainId: chainId,
-                _assetId: assetId,
-                _amount: amount,
-                _isL1ToGateway: isL1ToGateway
-            });
+            _sendConfirmToGateway(currentSettlementLayer, data);
 
-            assetSettlementLayer[assetId] = block.chainid;
-            chainBalance[chainId][assetId] += amount;
+            assetSettlementLayer[data.assetId] = block.chainid;
+            chainBalance[data.chainId][data.assetId] += data.amount;
 
-            _sendConfirmToL2(chainId, assetId, amount, migrationNumber);
+            _sendConfirmToL2(data);
         }
     }
 
     function confirmMigrationOnGateway(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isL1ToGateway
+        TokenBalanceMigrationData memory data
     ) external onlyL1AssetTracker {
-        if (_isL1ToGateway) {
+        if (data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
-            chainBalance[_chainId][_assetId] += _amount;
+            chainBalance[data.chainId][data.assetId] += data.amount;
         } else {
-            require(_amount == chainBalance[_chainId][_assetId], InvalidAmount());
-            chainBalance[_chainId][_assetId] = 0;
+            require(data.amount == chainBalance[data.chainId][data.assetId], InvalidAmount());
+            chainBalance[data.chainId][data.assetId] = 0;
         }
     }
 
     function confirmMigrationOnL2(
-        uint256,
-        bytes32 _assetId,
-        uint256,
-        uint256 _migrationNumber
+        TokenBalanceMigrationData memory data
     ) external onlyL1AssetTracker {
-        assetMigrationNumber[_assetId] = _migrationNumber;
+        assetMigrationNumber[data.assetId] = data.migrationNumber;
+    }
+
+    function _sendMigrationDataToL1(
+        TokenBalanceMigrationData memory data
+    ) internal {
+        // slither-disable-next-line unused-return
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encode(data)
+        );
+    }
+
+    function _sendConfirmToL2(
+        TokenBalanceMigrationData memory data
+    ) internal {
+        _sendToChain(
+            data.chainId,
+            abi.encodeCall(this.confirmMigrationOnL2, (data))
+        );
+    }
+
+    function _sendConfirmToGateway(
+        uint256 _settlementLayer,
+        TokenBalanceMigrationData memory data
+    ) internal {
+        _sendToChain(
+            _settlementLayer,
+            abi.encodeCall(this.confirmMigrationOnGateway, (data))
+        );
+    }
+
+    function _sendToChain(uint256 _chainId, bytes memory _data) internal {
+        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        // slither-disable-next-line unused-return
+        IMailbox(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, _data);
     }
 
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
@@ -388,74 +413,6 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         if (!success) {
             revert InvalidProof();
         }
-    }
-
-    function _sendMigrationDataToL1(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        uint256 _migrationNumber,
-        bool _isL1ToGateway
-    ) internal {
-        // slither-disable-next-line unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            _encodeTokenBalanceMigrationData({
-                _chainId: _chainId,
-                _assetId: _assetId,
-                _amount: _amount,
-                _migrationNumber: _migrationNumber,
-                _isL1ToGateway: _isL1ToGateway
-            })
-        );
-    }
-
-    function _sendConfirmToL2(uint256 _chainId, bytes32 _assetId, uint256 _amount, uint256 _migrationNumber) internal {
-        _sendToChain(
-            _chainId,
-            abi.encodeCall(this.confirmMigrationOnL2, (_chainId, _assetId, _amount, _migrationNumber))
-        );
-    }
-
-    function _sendConfirmToGateway(
-        uint256 _settlementLayer,
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isL1ToGateway
-    ) internal {
-        _sendToChain(
-            _settlementLayer,
-            abi.encodeCall(this.confirmMigrationOnGateway, (_chainId, _assetId, _amount, _isL1ToGateway))
-        );
-    }
-
-    function _sendToChain(uint256 _chainId, bytes memory _data) internal {
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
-        // slither-disable-next-line unused-return
-        IMailbox(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, _data);
-    }
-
-    function _encodeTokenBalanceMigrationData(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        uint256 _migrationNumber,
-        bool _isL1ToGateway
-    ) internal pure returns (bytes memory) {
-        return abi.encode(_chainId, _assetId, _amount, _migrationNumber, _isL1ToGateway);
-    }
-
-    function _decodeTokenBalanceMigrationData(
-        bytes calldata _data
-    )
-        internal
-        pure
-        returns (uint256 chainId, bytes32 assetId, uint256 amount, uint256 migrationNumber, bool isL1ToGateway)
-    {
-        (chainId, assetId, amount, migrationNumber, isL1ToGateway) = abi.decode(
-            _data,
-            (uint256, bytes32, uint256, uint256, bool)
-        );
     }
 
     /*//////////////////////////////////////////////////////////////

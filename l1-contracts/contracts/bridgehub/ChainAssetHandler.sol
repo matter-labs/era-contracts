@@ -49,6 +49,9 @@ contract ChainAssetHandler is
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
+    /// @notice used to track the number of times each chain has migrated.
+    mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
+
     modifier onlyAssetRouter() {
         if (msg.sender != ASSET_ROUTER) {
             revert NotAssetRouter(msg.sender, ASSET_ROUTER);
