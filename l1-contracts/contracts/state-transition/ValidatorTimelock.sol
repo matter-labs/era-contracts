@@ -180,7 +180,7 @@ contract ValidatorTimelock is
     }
 
     /// @inheritdoc IValidatorTimelock
-    function hasRoleForChainId(uint256 _chainId, bytes32 _role, address _address) public returns (bool) {
+    function hasRoleForChainId(uint256 _chainId, bytes32 _role, address _address) public view returns (bool) {
         return hasRole(BRIDGE_HUB.getZKChain(_chainId), _role, _address);
     }
 
@@ -204,7 +204,6 @@ contract ValidatorTimelock is
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
             uint32 timestamp = uint32(block.timestamp);
-            // We disable this check because calldata array length is cheap.
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
                 committedBatchTimestamp[_chainAddress].set(i, timestamp);
             }
@@ -215,7 +214,7 @@ contract ValidatorTimelock is
     /// @inheritdoc IValidatorTimelock
     function revertBatchesSharedBridge(
         address _chainAddress,
-        uint256 /*_l2BatchNumber*/
+        uint256 /*_newLastBatch*/
     ) external onlyRole(_chainAddress, REVERTER_ROLE) {
         _propagateToZKChain(_chainAddress);
     }
@@ -239,7 +238,6 @@ contract ValidatorTimelock is
     ) external onlyRole(_chainAddress, EXECUTOR_ROLE) {
         uint256 delay = executionDelay; // uint32
         unchecked {
-            // We disable this check because calldata array length is cheap.
             for (uint256 i = _processBatchFrom; i <= _processBatchTo; ++i) {
                 uint256 commitBatchTimestamp = committedBatchTimestamp[_chainAddress].get(i);
 

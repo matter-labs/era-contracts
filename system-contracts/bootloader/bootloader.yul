@@ -192,7 +192,6 @@ object "Bootloader" {
             }
 
             /// @dev The byte from which storing of the current canonical and signed hashes begins
-            /// Note, that the hashes are stored only for L2 transactions, not for the priority ones.
             function CURRENT_L2_TX_HASHES_BEGIN_BYTE() -> ret {
                 ret := mul(CURRENT_L2_TX_HASHES_BEGIN_SLOT(), 32)
             }
@@ -270,7 +269,7 @@ object "Bootloader" {
                 ret := MAX_TRANSACTIONS_IN_BATCH()
             }
 
-            /// @dev The slot starting from the L2 block information for transactions is stored.
+            /// @dev The slot starting from which the L2 block information for transactions is stored.
             function TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT() -> ret {
                 ret := add(TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT(), TX_OPERATOR_TRUSTED_GAS_LIMIT_SLOTS())
             }
@@ -312,13 +311,13 @@ object "Bootloader" {
                 ret := mul(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 32)
             }
 
-            /// @dev The slot starting from which the interop roots are stored.
+            /// @dev The slot containing the count of blocks processed so far
             /// The value tells us where we are in the processed number of interop roots array.
             function CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT() -> ret {
                 ret := add(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 1)
             }
 
-            /// @dev The byte starting from which the interop roots are stored.
+            /// @dev The byte containing the count of blocks processed so far
             function CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE() -> ret {
                 ret := mul(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT(), 32)
             }
@@ -335,12 +334,12 @@ object "Bootloader" {
                 ret := mul(CURRENT_INTEROP_ROOT_SLOT(), 32)
             }
 
-            /// @dev The slot starting from which the interop roots are stored.
+            /// @dev The slot starting from which the interop root counts per block are stored.
             function INTEROP_BLOCKS_BEGIN_SLOT() -> ret {
                 ret := add(CURRENT_INTEROP_ROOT_SLOT(), 1)
             }
 
-            /// @dev The byte starting from which the interop roots are stored.
+            /// @dev The byte starting from which the interop root counts per block are stored.
             function INTEROP_BLOCKS_BEGIN_BYTE() -> ret {
                 ret := mul(INTEROP_BLOCKS_BEGIN_SLOT(), 32)
             }
@@ -371,11 +370,6 @@ object "Bootloader" {
             /// @dev Returns the byte offset of the specified interop root.
             function getInteropRootByte(i) -> ret {
                 ret := mul(add(INTEROP_ROOT_BEGIN_SLOT(), mul(i, INTEROP_ROOT_SLOT_SIZE())), 32)
-            }
-
-            /// @dev Returns the byte offset of the next interop root to process.
-            function getNextInteropRootByte() -> ret {
-                ret := getInteropRootByte(mload(CURRENT_INTEROP_ROOT_BYTE()))
             }
 
             /// @dev Returns the byte offset of the processed block number within an interop root entry.
@@ -2399,7 +2393,7 @@ object "Bootloader" {
                     calldataPtr, // The pointer to the calldata.
                     fullLen, // The size of the calldata, which is 4 for the selector + the actual length of the struct.
                     CURRENT_L2_TX_HASHES_BEGIN_BYTE(), // The pointer where the returned data will be written.
-                    64 // The output has size of 32 (signed tx hash and explorer tx hash are expected)
+                    64 // The output has size of 64 (signed tx hash and explorer tx hash are expected)
                 )
 
                 if iszero(success) {
@@ -3135,7 +3129,6 @@ object "Bootloader" {
 
             function setInteropRootForBlock(setForBlockNumber) {
                 let nextInteropRootNumber := mload(CURRENT_INTEROP_ROOT_BYTE())
-                let interopRootStartSlot := getNextInteropRootByte()
                 let numberOfRoots := getNumberOfInteropRootInCurrentBlock()
                 
                 debugLog("numberOfRoots", numberOfRoots)
@@ -3166,9 +3159,8 @@ object "Bootloader" {
                     debugLog("Set roots blockNumber ", blockNumber)
                     debugLog("Set roots sidesLength ", sidesLength)
 
-                    if lt(setForBlockNumber, currentBlockNumber) {
-                        debugLog("Processed all interop roots for this block", 1)
-                        break
+                    if iszero(eq(setForBlockNumber, currentBlockNumber)) {
+                        revertWithReason(INCORRECT_INTEROP_ROOT_BLOCK_NUMBER(), 0)
                     }
 
                     if iszero(sidesLength) {
@@ -4113,6 +4105,10 @@ object "Bootloader" {
                 ret := 34
             }
 
+            function INCORRECT_INTEROP_ROOT_BLOCK_NUMBER() -> ret {
+                ret := 35
+            }
+
             /// @dev Accepts a 1-word literal and returns its length in bytes
             /// @param str A string literal
             function getStrLen(str) -> len {
@@ -4512,8 +4508,6 @@ object "Bootloader" {
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
             sendToL1Native(true, txsStatusRollingHashKey(), mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE()))
             
-            /// setting all remaining interop roots, even the ones in the fictive block.
-            setInteropRootForBlock(MAXIMUM_L2_BLOCK_NUMBER())
             sendInteropRootRollingHashToL1()
 
             l1MessengerPublishingCall()
