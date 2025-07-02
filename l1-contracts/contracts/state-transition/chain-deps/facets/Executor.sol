@@ -537,7 +537,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _executedBatchIdx
     ) internal {
         if (_priorityOpsData.itemHashes.length != _storedBatch.numberOfLayer1Txs) {
-            revert MismatchNumberOfLayer1Txs(_priorityOpsData.itemHashes.length, _storedBatch.numberOfLayer1Txs);
+            revert MismatchNumberOfLayer1Txs(_storedBatch.numberOfLayer1Txs, _priorityOpsData.itemHashes.length);
         }
         bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
         bytes32 dependencyRootsRollingHash = _verifyDependencyInteropRoots(_dependencyRoots);

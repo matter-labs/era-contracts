@@ -173,6 +173,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @dev Gets the message root of a single chain.
     /// @param _chainId The ID of the chain whose message root is being queried.
     function getChainRoot(uint256 _chainId) external view returns (bytes32) {
+        // Make sure that chain is registered.
+        if (!chainRegistered(_chainId)) {
+            revert MessageRootNotRegistered();
+        }
         return chainTree[_chainId].root();
     }
 

@@ -74,7 +74,7 @@ error InsufficientFunds(uint256 required, uint256 actual);
 error InvalidCall();
 // 0x7a47c9a2
 error InvalidChainId();
-// 0x8cbd7f8b
+// 0x6a84bc39
 error InvalidCodeHash(CodeHashReason);
 // 0xb4fa3fb3
 error InvalidInput();
@@ -84,7 +84,7 @@ error InvalidNewL2BlockNumber(uint256 l2BlockNumber);
 error InvalidNonceKey(uint192 nonceKey);
 // 0x60b85677
 error InvalidNonceOrderingChange();
-// 0xc6b7f67d
+// 0x90f049c9
 error InvalidSig(SigField, uint256);
 // 0xf4a271b5
 error Keccak256InvalidReturnData();
@@ -104,7 +104,7 @@ error L2BlockAndBatchTimestampMismatch(uint128 l2BlockTimestamp, uint128 current
 error L2BlockNumberZero();
 // 0xd2324131
 error LegacyBridgeNotProxy();
-// 0xcea34703
+// 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0xe90aded4
 error NonceAlreadyUsed(address account, uint256 nonce);
@@ -132,7 +132,7 @@ error PreviousBytecodeUnknown();
 error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expectedPrevL2BlockHash);
 // 0x33cb1485
 error ProvidedBatchNumberIsNotCorrect(uint128 previousBatchNumber, uint128 _expectedNewNumber);
-// 0xe5ec477a
+// 0x7f7b0cf7
 error ReconstructionMismatch(PubdataField, bytes32 expected, bytes32 actual);
 // 0x26772295
 error ReturnedBytecodeDoesNotMatchExpectedHash(bytes32 returnedBytecode, bytes32 expectedBytecodeHash);
