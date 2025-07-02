@@ -15,7 +15,7 @@ contract TestExecutor is ExecutorFacet {
     }
 
     function appendPriorityOp(bytes32 _hash) external {
-        s.priorityQueue.pushBack(
+        s.__DEPRECATED_priorityQueue.pushBack(
             PriorityOperation({canonicalTxHash: _hash, expirationTimestamp: type(uint64).max, layer2Tip: 0})
         );
     }
