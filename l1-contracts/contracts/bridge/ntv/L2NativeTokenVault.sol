@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
@@ -14,7 +13,6 @@ import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
-import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
