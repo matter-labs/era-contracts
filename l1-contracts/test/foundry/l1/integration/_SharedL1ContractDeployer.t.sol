@@ -8,6 +8,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -27,6 +28,7 @@ contract L1ContractDeployer is Test {
         IInteropCenter interopCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
+        AssetTracker l1AssetTracker;
         L1Nullifier l1Nullifier;
         L1NativeTokenVault l1NativeTokenVault;
         IChainTypeManager chainTypeManager;
@@ -73,6 +75,7 @@ contract L1ContractDeployer is Test {
         addresses.l1NativeTokenVault = L1NativeTokenVault(
             payable(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy)
         );
+        addresses.l1AssetTracker = AssetTracker(addresses.ecosystemAddresses.bridgehub.assetTrackerProxy);
         addresses.chainRegistrationSender = ChainRegistrationSender(
             addresses.ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
         );

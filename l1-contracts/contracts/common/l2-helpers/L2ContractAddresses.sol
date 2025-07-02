@@ -9,6 +9,7 @@ import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IAssetTracker} from "../../bridge/asset-tracker/IAssetTracker.sol";
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
@@ -108,3 +109,4 @@ address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c)
 
 /// @dev the address of the L2 asset tracker
 address constant L2_ASSET_TRACKER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
+IAssetTracker constant L2_ASSET_TRACKER = IAssetTracker(L2_ASSET_TRACKER_ADDR);

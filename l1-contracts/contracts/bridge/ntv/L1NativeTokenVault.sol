@@ -70,6 +70,11 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         }
     }
 
+    function _assetTracker() internal view override returns (IAssetTracker) {
+        return l1AssetTracker;
+    }
+
+
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
     /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.

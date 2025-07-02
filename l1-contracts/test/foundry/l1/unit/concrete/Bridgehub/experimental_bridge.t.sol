@@ -123,7 +123,7 @@ contract ExperimentalBridgeTest is Test {
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
 
         // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
-        ntv = _deployNTV(address(mockSharedBridge));
+        ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
         assetTracker = new AssetTracker(
             block.chainid,
             address(bridgehub),
@@ -132,6 +132,7 @@ contract ExperimentalBridgeTest is Test {
             address(0)
         );
         ntv.setAssetTracker(address(assetTracker));
+        ntv.registerEthToken();
 
         mockSecondSharedBridge.setNativeTokenVault(ntv);
 
@@ -210,7 +211,7 @@ contract ExperimentalBridgeTest is Test {
         assertEq(bridgehub.owner(), bridgeOwner);
     }
 
-    function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
+    function _deployNTVWithoutEthToken(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
         L1NativeTokenVault ntvImpl = new L1NativeTokenVault(weth, _sharedBridgeAddr, l1Nullifier);
         TransparentUpgradeableProxy ntvProxy = new TransparentUpgradeableProxy(
             address(ntvImpl),
@@ -218,9 +219,14 @@ contract ExperimentalBridgeTest is Test {
             abi.encodeCall(ntvImpl.initialize, (bridgeOwner, address(0)))
         );
         addr = L1NativeTokenVault(payable(ntvProxy));
-
+    
         vm.prank(bridgeOwner);
         L1AssetRouter(_sharedBridgeAddr).setNativeTokenVault(addr);
+    }
+
+    function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
+        addr = _deployNTVWithoutEthToken(_sharedBridgeAddr);
+        addr.setAssetTracker(address(assetTracker));
 
         addr.registerEthToken();
     }
