@@ -145,8 +145,7 @@ library L2UtilsBase {
         }
 
         vm.prank(_args.aliasedOwner);
-        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAssetRouterAddress(L2_ASSET_ROUTER_ADDR);
-        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAssetTrackerAddress(L2_ASSET_TRACKER_ADDR);
+        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
 
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);

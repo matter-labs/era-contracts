@@ -148,8 +148,7 @@ library L2Utils {
         );
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         prankOrBroadcast(_args.broadcast, _args.aliasedOwner);
-        interopCenter.setAssetRouterAddress(L2_ASSET_ROUTER_ADDR);
-        interopCenter.setAssetTrackerAddress(L2_ASSET_TRACKER_ADDR);
+        interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {

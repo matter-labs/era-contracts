@@ -10,10 +10,6 @@ import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 interface IInteropCenter {
     event InteropBundleSent(bytes32 l2l1MsgHash, bytes32 interopBundleHash, InteropBundle interopBundle);
 
-    event AssetRouterSet(address indexed assetRouter);
-
-    event AssetTrackerSet(address indexed assetTracker);
-
     /// @notice Restrictions for parsing attributes.
     /// @param OnlyInteropCallValue: Only attribute for interop call value is allowed.
     /// @param OnlyCallAttributes: Only call attributes are allowed.
@@ -30,9 +26,7 @@ interface IInteropCenter {
 
     function assetTracker() external view returns (IAssetTracker);
 
-    function setAssetRouterAddress(address _assetRouter) external;
-
-    function setAssetTrackerAddress(address _assetTracker) external;
+    function setAddresses(address assetRouter, address assetTracker) external;
     /// Mailbox forwarder
 
     function forwardTransactionOnGatewayWithBalanceChange(

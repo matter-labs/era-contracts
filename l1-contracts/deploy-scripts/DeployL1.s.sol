@@ -332,8 +332,7 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridgehub.interopCenterProxy,
             addresses.bridgehub.chainRegistrationSenderProxy
         );
-        interopCenter.setAssetRouterAddress(addresses.bridges.l1AssetRouterProxy);
-        interopCenter.setAssetTrackerAddress(addresses.bridgehub.assetTrackerProxy);
+        interopCenter.setAddresses(addresses.bridges.l1AssetRouterProxy, addresses.bridgehub.assetTrackerProxy);
         messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
         vm.stopBroadcast();
         console.log("SharedBridge registered");
