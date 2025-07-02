@@ -202,6 +202,12 @@ abstract contract DeployUtils is Create2FactoryUtils {
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
         }
+        addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy");
+        addresses.bridges.l1AssetRouterProxy = toml.readAddress("$.contracts.l1_asset_router_proxy");
+        addresses.bridges.l1NullifierProxy = toml.readAddress("$.contracts.l1_nullifier_proxy");
+        addresses.bridgehub.ctmDeploymentTrackerProxy = toml.readAddress("$.contracts.stm_deployment_tracker_proxy");
+        addresses.vaults.l1NativeTokenVaultProxy = toml.readAddress("$.contracts.native_token_vault_proxy");
+        addresses.bridges.erc20BridgeProxy = toml.readAddress("$.contracts.erc20_bridge");
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
