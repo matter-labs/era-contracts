@@ -43,7 +43,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This mapping was deprecated in favor of AssetTracker component, now it will be responsible for tracking chain balances.
     /// We have a `chainBalance` function now, which returns the values in this mapping, for backwards compatibility.
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public DEPRECATED_chainBalance;
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 
     /// @dev Returns the value of `DEPRECATED_chainBalance` for backwards compatibility.
     ///      The function body will be replaced with revert in the next release.
