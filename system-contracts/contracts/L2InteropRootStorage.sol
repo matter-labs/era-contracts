@@ -26,7 +26,7 @@ contract L2InteropRootStorage is SystemContractBase {
     /// it represents the batch number. This distinction reflects the implementation requirements  of each interop finality form.
     /// @param chainId The chain ID of the chain that the message root is for.
     /// @param blockOrBatchNumber The block or batch number of the message root. Either of block number or batch number will be used,
-    // depends on finality form of interop, mentioned above.
+    /// depends on finality form of interop, mentioned above.
     /// @param sides The message root sides. Note, that `sides` here are coming from `DynamicIncrementalMerkle` nomenclature.
     function addInteropRoot(
         uint256 chainId,
