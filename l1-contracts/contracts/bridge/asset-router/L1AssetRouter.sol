@@ -690,10 +690,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         return BRIDGE_HUB;
     }
 
-    function _l1ChainId() internal view override returns (uint256) {
-        return block.chainid;
-    }
-
     function _eraChainId() internal view override returns (uint256) {
         return ERA_CHAIN_ID;
     }

@@ -32,7 +32,7 @@ import {L2NativeTokenVault} from "./L2NativeTokenVault.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-/// @dev Important: L2 contracts are not allowed to have any immutable variables. This is needed for compatibility with ZKsyncOS.
+/// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
 /// @dev For the ease of future use of ZKOS, this contract should not have ANY storage variables and all of those should be part of the
 /// parent `L2NativeTokenVault` contract.
 contract L2NativeTokenVaultZKOS is L2NativeTokenVault {

@@ -41,10 +41,10 @@ abstract contract ChainAssetHandlerBase is
 
     ///@notice virtual getters standing in for the original immutables
     function _ethTokenAssetId() internal view virtual returns (bytes32);
-    function _l1ChainId()        internal view virtual returns (uint256);
-    function _bridgehub()          internal view virtual returns (IBridgehub);
-    function _messageRoot()       internal view virtual returns (IMessageRoot);
-    function _assetRouter()       internal view virtual returns (address);
+    function _l1ChainId() internal view virtual returns (uint256);
+    function _bridgehub() internal view virtual returns (IBridgehub);
+    function _messageRoot() internal view virtual returns (IMessageRoot);
+    function _assetRouter() internal view virtual returns (address);
 
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;

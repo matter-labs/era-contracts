@@ -34,7 +34,7 @@ import {BridgehubBase} from "./BridgehubBase.sol";
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
-/// @dev Important: L2 contracts are not allowed to have any immutable variables. This is needed for compatibility with ZKsyncOS.
+/// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
 contract L2Bridgehub is BridgehubBase {
     /// @notice the asset id of Eth. This is only used on L1.
     bytes32 internal ETH_TOKEN_ASSET_ID;

@@ -162,9 +162,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         if (_chainCreationParams.genesisBatchHash == bytes32(0)) {
             revert GenesisBatchHashZero();
         }
-        // if (_chainCreationParams.genesisIndexRepeatedStorageChanges == uint64(0)) {
-        //     revert GenesisIndexStorageZero();
-        // }
+        // Note, that we do not check `genesisIndexRepeatedStorageChanges` for being zero,
+        // as it is allowed to be zero in zksync OS.
         if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
             revert GenesisBatchCommitmentZero();
         }
