@@ -192,7 +192,6 @@ object "Bootloader" {
             }
 
             /// @dev The byte from which storing of the current canonical and signed hashes begins
-            /// Note, that the hashes are stored only for L2 transactions, not for the priority ones.
             function CURRENT_L2_TX_HASHES_BEGIN_BYTE() -> ret {
                 ret := mul(CURRENT_L2_TX_HASHES_BEGIN_SLOT(), 32)
             }
@@ -2399,7 +2398,7 @@ object "Bootloader" {
                     calldataPtr, // The pointer to the calldata.
                     fullLen, // The size of the calldata, which is 4 for the selector + the actual length of the struct.
                     CURRENT_L2_TX_HASHES_BEGIN_BYTE(), // The pointer where the returned data will be written.
-                    64 // The output has size of 32 (signed tx hash and explorer tx hash are expected)
+                    64 // The output has size of 64 (signed tx hash and explorer tx hash are expected)
                 )
 
                 if iszero(success) {
