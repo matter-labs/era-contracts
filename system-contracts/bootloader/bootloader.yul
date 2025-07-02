@@ -269,7 +269,7 @@ object "Bootloader" {
                 ret := MAX_TRANSACTIONS_IN_BATCH()
             }
 
-            /// @dev The slot starting from the L2 block information for transactions is stored.
+            /// @dev The slot starting from which the L2 block information for transactions is stored.
             function TX_OPERATOR_L2_BLOCK_INFO_BEGIN_SLOT() -> ret {
                 ret := add(TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT(), TX_OPERATOR_TRUSTED_GAS_LIMIT_SLOTS())
             }
