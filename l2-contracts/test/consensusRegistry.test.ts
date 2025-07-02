@@ -74,6 +74,7 @@ describe("ConsensusRegistry", function () {
         await registry.add(
           validatorEntries[i].ownerAddr,
           validatorEntries[i].validatorIsLeader,
+          validatorEntries[i].validatorIsActive,
           validatorEntries[i].validatorWeight,
           validatorEntries[i].validatorPubKey,
           validatorEntries[i].validatorPoP
@@ -127,6 +128,7 @@ describe("ConsensusRegistry", function () {
         .add(
           ethers.Wallet.createRandom().address,
           true,
+          true,
           0,
           { a: new Uint8Array(32), b: new Uint8Array(32), c: new Uint8Array(32) },
           { a: new Uint8Array(32), b: new Uint8Array(16) },
@@ -141,6 +143,7 @@ describe("ConsensusRegistry", function () {
       registry.add(
         newEntry.ownerAddr,
         newEntry.validatorIsLeader,
+        newEntry.validatorIsActive,
         newEntry.validatorWeight,
         validatorEntries[0].validatorPubKey,
         newEntry.validatorPoP,
@@ -155,6 +158,7 @@ describe("ConsensusRegistry", function () {
       registry.add(
         validatorEntries[0].ownerAddr, // Using an existing owner address
         newEntry.validatorIsLeader,
+        newEntry.validatorIsActive,
         newEntry.validatorWeight,
         newEntry.validatorPubKey,
         newEntry.validatorPoP,
@@ -318,6 +322,7 @@ describe("ConsensusRegistry", function () {
       await registry.add(
         entry.ownerAddr,
         entry.validatorIsLeader,
+        entry.validatorIsActive,
         entry.validatorWeight,
         entry.validatorPubKey,
         entry.validatorPoP
@@ -498,6 +503,7 @@ describe("ConsensusRegistry", function () {
       await registry.add(
         entry.ownerAddr,
         entry.validatorIsLeader,
+        entry.validatorIsActive,
         entry.validatorWeight,
         entry.validatorPubKey,
         entry.validatorPoP
@@ -589,6 +595,7 @@ describe("ConsensusRegistry", function () {
       ownerAddr: validator.ownerKey.address,
       validatorWeight: weight,
       validatorIsLeader: getRandomBoolean(),
+      validatorIsActive: getRandomBoolean(),
       validatorPubKey: getRandomValidatorPubKey(),
       validatorPoP: getRandomValidatorPoP(),
     };

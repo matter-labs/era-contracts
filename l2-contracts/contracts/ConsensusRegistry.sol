@@ -21,6 +21,9 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     mapping(address => Validator) public validators;
     /// @dev A mapping for enabling efficient lookups when checking whether a given validator public key exists.
     mapping(bytes32 => bool) public validatorPubKeyHashes;
+    /// @dev Counter that keeps track of the number of active leader validators. We use it to check if there's at
+    /// least one active leader validator before we commit the validator committee.
+    uint256 public activeLeaderValidatorsCount;
     /// @dev Counter that increments with each new commit to the validator committee.
     uint32 public validatorsCommit;
     /// @dev Block number when the last commit to the validator committee becomes active.
@@ -56,6 +59,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     function add(
         address _validatorOwner,
         bool _validatorIsLeader,
+        bool _validatorIsActive,
         uint256 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP
@@ -74,7 +78,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         validatorOwners.push(_validatorOwner);
         validators[_validatorOwner] = Validator({
             latest: ValidatorAttr({
-                active: true,
+                active: _validatorIsActive,
                 removed: false,
                 leader: _validatorIsLeader,
                 weight: _validatorWeight,
@@ -103,6 +107,11 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         });
         validatorPubKeyHashes[validatorPubKeyHash] = true;
 
+        // If the validator is a leader and active, increment the active leader validators count.
+        if (_validatorIsLeader && _validatorIsActive) {
+            ++activeLeaderValidatorsCount;
+        }
+
         emit ValidatorAdded({
             validatorOwner: _validatorOwner,
             validatorWeight: _validatorWeight,
@@ -118,8 +127,19 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
+        // If the validator is already removed, do nothing.
+        if (validator.latest.removed) {
+            return;
+        }
+
         _ensureValidatorSnapshot(validator);
+
         validator.latest.removed = true;
+
+        // If the validator was a leader, decrement the active leader validators count.
+        if (validator.latest.leader && validator.latest.active) {
+            --activeLeaderValidatorsCount;
+        }
 
         emit ValidatorRemoved(_validatorOwner);
     }
@@ -134,7 +154,22 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
+        // If we are not changing the active status, do nothing.
+        if (validator.latest.active == _isActive) {
+            return;
+        }
+
         _ensureValidatorSnapshot(validator);
+
+        // If the validator is a leader and not removed, update the active leader validators count.
+        if (validator.latest.leader && !validator.latest.removed) {
+            if (_isActive) {
+                ++activeLeaderValidatorsCount;
+            } else {
+                --activeLeaderValidatorsCount;
+            }
+        }
+
         validator.latest.active = _isActive;
 
         emit ValidatorActiveStatusChanged(_validatorOwner, _isActive);
@@ -147,7 +182,22 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             return;
         }
 
+        // If we are not changing the leader status, do nothing.
+        if (validator.latest.leader == _isLeader) {
+            return;
+        }
+
         _ensureValidatorSnapshot(validator);
+
+        // If the validator is active and not removed, update the active leader validators count.
+        if (validator.latest.active && !validator.latest.removed) {
+            if (_isLeader) {
+                ++activeLeaderValidatorsCount;
+            } else {
+                --activeLeaderValidatorsCount;
+            }
+        }
+
         validator.latest.leader = _isLeader;
 
         emit ValidatorLeaderStatusChanged(_validatorOwner, _isLeader);
@@ -198,20 +248,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         }
 
         // Check if there's at least one active leader validator
-        bool hasActiveLeader = false;
-        uint256 len = validatorOwners.length;
-
-        for (uint256 i = 0; i < len; ++i) {
-            Validator storage validator = validators[validatorOwners[i]];
-            ValidatorAttr memory validatorAttr = validator.latest;
-
-            if (validatorAttr.active && !validatorAttr.removed && validatorAttr.leader) {
-                hasActiveLeader = true;
-                break;
-            }
-        }
-
-        if (!hasActiveLeader) {
+        if (activeLeaderValidatorsCount == 0) {
             revert NoActiveLeader();
         }
 
