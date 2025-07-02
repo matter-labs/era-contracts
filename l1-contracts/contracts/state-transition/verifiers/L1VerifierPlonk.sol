@@ -9,7 +9,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of
 /// Knowledge (PLONK) verifier.
 /// Modifications have been made to optimize the proof system for ZK chain circuits.
-/// @dev Contract was generated from a verification key with a hash of 0xe5c93a295461a634f686a0c20bd847be7e572a973c76ed35d30095c71c33d3f9
+/// @dev Contract was generated from a verification key with a hash of 0x5295a9eef2e9e708cb9d1e840ecd25ca93b6f1a9c83ba44f1cfbec90db7dddbc
 /// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the
 /// constants below.
 /// @dev For a better understanding of the verifier algorithm please refer to the following papers:
@@ -284,8 +284,8 @@ contract L1VerifierPlonk is IVerifier {
     function _loadVerificationKey() internal pure virtual {
         assembly {
             // gate setup commitments
-            mstore(VK_GATE_SETUP_0_X_SLOT, 0x192cf9db07706d7d9d21035c3793e23a386aa6a299327df4966398267ab220f1)
-            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x1a9aced5af712464961e20e484f3375f79c9736d826aa38ffb243322acc0d2d0)
+            mstore(VK_GATE_SETUP_0_X_SLOT, 0x1df2e9aab0409da7801f3c2994683e0effb585c05ba40b802f7dcca02819e0ac)
+            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x02cb63d5efb350f306fe7dcd7972c23907991428acb74674a5986f1c5de1273c)
             mstore(VK_GATE_SETUP_1_X_SLOT, 0x1d77d4ea07c972f1576506abe3b291463fe38958ec53eff7aca0a289a869925c)
             mstore(VK_GATE_SETUP_1_Y_SLOT, 0x073df5ffc2d97bc6ddabea4a175669f79c01628a6649ea9a8dd688fff44daf10)
             mstore(VK_GATE_SETUP_2_X_SLOT, 0x1017e5b25793729d439883929fc91822997be1e55bdde959da1721c0230b9c5c)
@@ -296,8 +296,8 @@ contract L1VerifierPlonk is IVerifier {
             mstore(VK_GATE_SETUP_4_Y_SLOT, 0x0bc696db583d6e7e02e21b1e23898fe5464b7cf73d7d5d3fb3f818fa97406662)
             mstore(VK_GATE_SETUP_5_X_SLOT, 0x2fa117c24873bdb05112f3e6fa1844f574b6c0ea0c1fae91af8ae85eb49fe0c6)
             mstore(VK_GATE_SETUP_5_Y_SLOT, 0x247eb032668c2eb6e7e5f201a3538d3d73b4e35a315d79752e6a75cc85c89660)
-            mstore(VK_GATE_SETUP_6_X_SLOT, 0x21b70aa0ec356598ef2de6936240b789d1de357626b3685ea549ac167cb4515e)
-            mstore(VK_GATE_SETUP_6_Y_SLOT, 0x0e5907ae8dfad28e971bc40155efd77980aaab32a01518fd96ec01c99033581b)
+            mstore(VK_GATE_SETUP_6_X_SLOT, 0x03c66fc3f2c0701445fa2647877a547c1f520dda48e92c6faffa06f9b2801fa8)
+            mstore(VK_GATE_SETUP_6_Y_SLOT, 0x0c4cf424834d8e6940f9e03a20f73cfb160af36bdd3490962f9ebaad54b07c80)
             mstore(VK_GATE_SETUP_7_X_SLOT, 0x1a25a81461ae735ce1965875d211bd5af89117edc5bb61fa5b70ff7e2fe86cf9)
             mstore(VK_GATE_SETUP_7_Y_SLOT, 0x1b7003b716a4eb2878092ebad74ea172f85925d282a54fe45526c7027fad3fb2)
 
