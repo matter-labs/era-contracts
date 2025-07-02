@@ -155,19 +155,22 @@ contract DeployL1Script is Script, DeployUtils {
                 "L1Bridgehub",
                 false
             );
-            (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
-                "L1MessageRoot",
-                false
-            );
+            (
+                addresses.bridgehub.messageRootImplementation,
+                addresses.bridgehub.messageRootProxy
+            ) = deployTuppWithContract("L1MessageRoot", false);
             (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
                 "L1Nullifier",
                 false
             );
-            (addresses.bridges.l1AssetRouterImplementation, addresses.bridges.l1AssetRouterProxy) = deployTuppWithContract(
-                "L1AssetRouter",
+            (
+                addresses.bridges.l1AssetRouterImplementation,
+                addresses.bridges.l1AssetRouterProxy
+            ) = deployTuppWithContract("L1AssetRouter", false);
+            (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract(
+                "BridgedStandardERC20",
                 false
             );
-            (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20", false);
             addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
                 "BridgedTokenBeacon",
                 config.ownerAddress,
@@ -201,7 +204,6 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.stateTransition.serverNotifierImplementation,
             addresses.stateTransition.serverNotifierProxy
         ) = deployServerNotifier();
-
 
         addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever", false);
         deployStateTransitionDiamondFacets();
