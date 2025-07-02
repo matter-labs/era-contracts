@@ -2398,7 +2398,7 @@ object "Bootloader" {
                     calldataPtr, // The pointer to the calldata.
                     fullLen, // The size of the calldata, which is 4 for the selector + the actual length of the struct.
                     CURRENT_L2_TX_HASHES_BEGIN_BYTE(), // The pointer where the returned data will be written.
-                    64 // The output has size of 32 (signed tx hash and explorer tx hash are expected)
+                    64 // The output has size of 64 (signed tx hash and explorer tx hash are expected)
                 )
 
                 if iszero(success) {
