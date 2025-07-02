@@ -28,7 +28,7 @@ import {UpgradeableBeaconDeployer} from "../bridge/ntv/UpgradeableBeaconDeployer
 
 import {FixedForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(0x0000000000000000000000000000000000010008);
+address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(0x000000000000000000000000000000000001000b);
 
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs

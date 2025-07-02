@@ -604,7 +604,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
             l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
             messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
-            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("ChainAssetHandler")),
+            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,

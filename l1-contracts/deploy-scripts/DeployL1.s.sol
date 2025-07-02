@@ -591,7 +591,7 @@ contract DeployL1Script is Script, DeployUtils {
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: config.isZKsyncOS ? Utils.getZKOSBytecodeInfoForContract("L2Bridgehub.sol", "L2Bridgehub") : abi.encode(getL2BytecodeHash("Bridgehub")),
+            bridgehubBytecodeInfo: config.isZKsyncOS ? Utils.getZKOSBytecodeInfoForContract("L2Bridgehub.sol", "L2Bridgehub") : abi.encode(getL2BytecodeHash("L2Bridgehub")),
             l2AssetRouterBytecodeInfo: config.isZKsyncOS ? Utils.getZKOSBytecodeInfoForContract("L2AssetRouter.sol", "L2AssetRouter") : abi.encode(getL2BytecodeHash("L2AssetRouter")),
             l2NtvBytecodeInfo: config.isZKsyncOS ? Utils.getZKOSBytecodeInfoForContract(
                 "L2NativeTokenVaultZKOS.sol",

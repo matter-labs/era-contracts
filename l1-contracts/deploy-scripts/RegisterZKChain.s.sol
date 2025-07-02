@@ -498,7 +498,7 @@ contract RegisterZKChainScript is Script {
         factoryDeps[0] = ContractsBytecodesLib.getCreationCode("BeaconProxy");
         factoryDeps[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         factoryDeps[2] = ContractsBytecodesLib.getCreationCode("UpgradeableBeacon");
-        factoryDeps[3] = ContractsBytecodesLib.getCreationCode("SystemTransparentUpgradeableProxy");
+        factoryDeps[3] = ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy");
         return factoryDeps;
     }
 
