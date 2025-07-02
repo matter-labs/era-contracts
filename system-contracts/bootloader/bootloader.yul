@@ -311,13 +311,13 @@ object "Bootloader" {
                 ret := mul(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 32)
             }
 
-            /// @dev The slot starting from which the interop roots are stored.
+            /// @dev The slot containing the count of blocks processed so far
             /// The value tells us where we are in the processed number of interop roots array.
             function CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT() -> ret {
                 ret := add(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 1)
             }
 
-            /// @dev The byte starting from which the interop roots are stored.
+            /// @dev The byte containing the count of blocks processed so far
             function CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE() -> ret {
                 ret := mul(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT(), 32)
             }
@@ -334,12 +334,12 @@ object "Bootloader" {
                 ret := mul(CURRENT_INTEROP_ROOT_SLOT(), 32)
             }
 
-            /// @dev The slot starting from which the interop roots are stored.
+            /// @dev The slot starting from which the interop root counts per block are stored.
             function INTEROP_BLOCKS_BEGIN_SLOT() -> ret {
                 ret := add(CURRENT_INTEROP_ROOT_SLOT(), 1)
             }
 
-            /// @dev The byte starting from which the interop roots are stored.
+            /// @dev The byte starting from which the interop root counts per block are stored.
             function INTEROP_BLOCKS_BEGIN_BYTE() -> ret {
                 ret := mul(INTEROP_BLOCKS_BEGIN_SLOT(), 32)
             }
