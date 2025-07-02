@@ -3152,7 +3152,7 @@ object "Bootloader" {
                 debugLog("Setting interop roots 1", nextInteropRootNumber)
                 let finalInteropRootNumber := add(nextInteropRootNumber, sub(numberOfRoots, 1))
                 for {let i := nextInteropRootNumber} lt(i, finalInteropRootNumber) {i := add(i, 1)} {
-                    if gt(i, MAX_INTEROP_ROOTS_IN_BATCH()) {
+                    if gte(i, MAX_INTEROP_ROOTS_IN_BATCH()) {
                         revertWithReason(OVER_MAX_INTEROP_ROOTS(), 0)
                     }
 
