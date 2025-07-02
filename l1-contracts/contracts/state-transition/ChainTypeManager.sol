@@ -491,7 +491,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // related to different protocol version support.
         uint256 chainProtocolVersion = IZKChain(getZKChain(_chainId)).getProtocolVersion();
         if (chainProtocolVersion != protocolVersion) {
-            revert OutdatedProtocolVersion(chainProtocolVersion, protocolVersion);
+            revert OutdatedProtocolVersion(protocolVersion, chainProtocolVersion);
         }
 
         return
@@ -518,7 +518,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         if (_protocolVersion != protocolVersion) {
-            revert OutdatedProtocolVersion(_protocolVersion, protocolVersion);
+            revert OutdatedProtocolVersion(protocolVersion, _protocolVersion);
         }
         chainAddress = _deployNewChain({
             _chainId: _chainId,

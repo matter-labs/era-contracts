@@ -19,7 +19,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
-    ) public view returns (bool) {
+    ) public view virtual returns (bool) {
         return
             _proveL2LogInclusion({
                 _chainId: _chainId,
@@ -37,7 +37,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) external view override returns (bool) {
+    ) public view virtual override returns (bool) {
         return
             _proveL2LeafInclusion({
                 _chainId: _chainId,
@@ -105,7 +105,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _index,
         L2Log calldata _log,
         bytes32[] calldata _proof
-    ) external view returns (bool) {
+    ) public view virtual returns (bool) {
         return
             _proveL2LogInclusion({
                 _chainId: _chainId,
