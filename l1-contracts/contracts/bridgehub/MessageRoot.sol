@@ -150,14 +150,12 @@ contract MessageRoot is IMessageRoot, Initializable {
 
         // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
         bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
-        // slither-disable-next-line unused-return
-        sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
+        bytes32 sharedTreeRoot = sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
 
         emit Preimage(chainRoot, cachedChainIdLeafHash);
 
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
-        bytes32 sharedTreeRoot = sharedTree.root();
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = sharedTreeRoot;
         emit NewInteropRoot(block.chainid, block.number, 0, _sides);
@@ -182,11 +180,10 @@ contract MessageRoot is IMessageRoot, Initializable {
         uint256 cachedChainCount = chainCount;
         bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
         for (uint256 i = 0; i < cachedChainCount; ++i) {
-            newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainIndexToId[i]].root(), chainIndexToId[i]);
+            uint256 chainId = chainIndexToId[i];
+            newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainId].root(), chainId);
         }
-        // slither-disable-next-line unused-return
-        sharedTree.updateAllLeaves(newLeaves);
-        bytes32 newRoot = sharedTree.root();
+        bytes32 newRoot = sharedTree.updateAllLeaves(newLeaves);
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = newRoot;
         emit NewInteropRoot(block.chainid, block.number, 0, _sides);

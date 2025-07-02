@@ -128,10 +128,10 @@ interface IExecutor is IZKChainBase {
     /// @notice Container for a list of transaction statuses to precommit.
     /// @param txs A packed array of individual transaction status commitments for the batch. Each is expected to be
     /// of length 33 and have the following format: <32-byte tx hash, 1-byte status>. where status is either 0 (failed) or 1 (success).
-    /// @param untrustedLastMiniblockNumberHint The "hint" for what the last miniblock that these txs represent is.
+    /// @param untrustedLastL2BlockNumberHint The "hint" for what the last L2 block number that these txs represent is.
     struct PrecommitInfo {
         bytes packedTxsCommitments;
-        uint256 untrustedLastMiniblockNumberHint;
+        uint256 untrustedLastL2BlockNumberHint;
     }
 
     /// @notice Precommits the status of all L2 transactions for the next batch on the shared bridge.
@@ -228,12 +228,12 @@ interface IExecutor is IZKChainBase {
 
     /// @notice Emitted when a new precommitment is set for a batch.
     /// @param batchNumber The batch number for which the precommitment was recorded.
-    /// @param untrustedLastMiniblockHint The hint to what miniblock the precommitment should correspond to. Note, that there are no
+    /// @param untrustedLastL2BlockNumberHint The hint to what L2 block number the precommitment should correspond to. Note, that there are no
     /// guarantees on its correctness, it is just a way for the server to make external nodes' indexing simpler.
     /// @param precommitment The resulting rolling hash of all transaction statuses.
     event BatchPrecommitmentSet(
         uint256 indexed batchNumber,
-        uint256 indexed untrustedLastMiniblockHint,
+        uint256 indexed untrustedLastL2BlockNumberHint,
         bytes32 precommitment
     );
 }
