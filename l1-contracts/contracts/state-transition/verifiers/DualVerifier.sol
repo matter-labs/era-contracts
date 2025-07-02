@@ -26,6 +26,8 @@ contract DualVerifier is IVerifier {
     /// @notice Type of verification for PLONK verifier.
     uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
 
+    uint256 internal constant OHBENDER_PLONK_VERIFICATION_TYPE = 2;
+
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
     constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
@@ -53,6 +55,11 @@ contract DualVerifier is IVerifier {
             return FFLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
         } else if (verifierType == PLONK_VERIFICATION_TYPE) {
             return PLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
+        } else if (verifierType == OHBENDER_PLONK_VERIFICATION_TYPE) {
+            uint256[] memory args = new uint256[](1);
+            args[0] = computeOhBenderHash(_proof[1], _publicInputs);
+
+            return PLONK_VERIFIER.verify(args, _extractOhBenderProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -94,5 +101,35 @@ contract DualVerifier is IVerifier {
         assembly {
             calldatacopy(add(result, 0x20), add(_proof.offset, 0x20), mul(resultLength, 0x20))
         }
+    }
+
+    function _extractOhBenderProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
+        uint256 resultLength = _proof.length - 1 - 1;
+
+        // Allocate memory for the new array (_proof.length - 1) since the first element is omitted.
+        result = new uint256[](resultLength);
+
+        // Copy elements starting from index 1 (the second element) of the original array.
+        assembly {
+            calldatacopy(add(result, 0x20), add(_proof.offset, 0x40), mul(resultLength, 0x20))
+        }
+    }
+
+    function computeOhBenderHash(
+        uint256 initialHash,
+        uint256[] calldata _publicInputs
+    ) public pure returns (uint256 result) {
+        if (initialHash == 0) {
+            initialHash = _publicInputs[0];
+            for (uint256 i = 1; i < _publicInputs.length; i++) {
+                initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
+            }
+        } else {
+            for (uint256 i = 0; i < _publicInputs.length; i++) {
+                initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
+            }
+        }
+
+        result = initialHash;
     }
 }
