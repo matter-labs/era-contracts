@@ -469,10 +469,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             // Inner call to encode data to decrease local var numbers
             _assetId = _ensureTokenRegisteredWithNTV(_l1Token);
             // Legacy bridge is only expected to use native tokens for L1.
-            require(
-                _assetId == DataEncoding.encodeNTVAssetId(block.chainid, _l1Token),
-                LegacyBridgeUsesNonNativeToken()
-            );
+            bytes32 encodedAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _l1Token);
+            require(_assetId == encodedAssetId, LegacyBridgeUsesNonNativeToken());
 
             // Note, that starting from here `bridgeData` starts denoting bridgeMintData.
             bridgeData = _burn({
