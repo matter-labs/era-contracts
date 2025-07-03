@@ -26,7 +26,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     uint256 public activeLeaderValidatorsCount;
     /// @dev Counter that increments with each new commit to the validator committee. It is used to track the current
     /// and pending validator committees.
-    uint32 public validatorsCommit;
+    uint64 public validatorsCommit;
     /// @dev Block number when the last commit to the validator committee becomes active.
     uint256 public validatorsCommitBlock;
     /// @dev The delay in blocks before a committee commit becomes active.
@@ -408,7 +408,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
                 }
                 // For pending committee, we don't need to check the previous snapshot.
             } else {
-                uint32 currentActiveCommit = _getActiveCommit();
+                uint64 currentActiveCommit = _getActiveCommit();
                 if (currentActiveCommit > validator.snapshotCommit) {
                     validatorAttr = validator.latest;
                 } else if (currentActiveCommit > validator.previousSnapshotCommit) {
@@ -447,7 +447,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             // For pending committee, we don't need to check the previous snapshot.
         } else {
             // Get currently active leader selection
-            uint32 currentActiveCommit = _getActiveCommit();
+            uint64 currentActiveCommit = _getActiveCommit();
             if (currentActiveCommit > leaderSelection.snapshotCommit) {
                 return leaderSelection.latest;
             } else if (currentActiveCommit > leaderSelection.previousSnapshotCommit) {
@@ -460,7 +460,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     /// @notice Returns the commit number of the currently active validator committee
     /// @dev Helper function to get the appropriate commit number based on the current block number
-    function _getActiveCommit() private view returns (uint32) {
+    function _getActiveCommit() private view returns (uint64) {
         if (block.number >= validatorsCommitBlock) {
             return validatorsCommit;
         } else {
@@ -482,7 +482,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     function _isValidatorPendingDeletion(Validator storage _validator) private view returns (bool) {
-        uint32 currentActiveCommit = _getActiveCommit();
+        uint64 currentActiveCommit = _getActiveCommit();
 
         // Check that any snapshot that is more recent or as recent as the current active commit is marked as removed.
         // Otherwise, the validator might still be used in some committee and can't be deleted.

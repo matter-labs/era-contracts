@@ -21,9 +21,9 @@ interface IConsensusRegistry {
         uint32 ownerIdx;
         ValidatorAttr latest;
         ValidatorAttr snapshot;
-        uint32 snapshotCommit;
+        uint64 snapshotCommit;
         ValidatorAttr previousSnapshot;
-        uint32 previousSnapshotCommit;
+        uint64 previousSnapshotCommit;
     }
 
     /// @dev Represents the attributes of a validator.
@@ -55,9 +55,9 @@ interface IConsensusRegistry {
     struct LeaderSelection {
         LeaderSelectionAttr latest;
         LeaderSelectionAttr snapshot;
-        uint32 snapshotCommit;
+        uint64 snapshotCommit;
         LeaderSelectionAttr previousSnapshot;
-        uint32 previousSnapshotCommit;
+        uint64 previousSnapshotCommit;
     }
 
     /// @dev Attributes for the validator leader selection process.
@@ -123,7 +123,7 @@ interface IConsensusRegistry {
     event ValidatorLeaderStatusChanged(address indexed validatorOwner, bool isLeader);
     event ValidatorWeightChanged(address indexed validatorOwner, uint256 newWeight);
     event ValidatorKeyChanged(address indexed validatorOwner, BLS12_381PublicKey newPubKey);
-    event ValidatorsCommitted(uint32 validatorsCommit, uint256 validatorsCommitBlock);
+    event ValidatorsCommitted(uint64 validatorsCommit, uint256 validatorsCommitBlock);
     event CommitteeActivationDelayChanged(uint256 newDelay);
     event LeaderSelectionChanged(LeaderSelectionAttr newLeaderSelection);
 
