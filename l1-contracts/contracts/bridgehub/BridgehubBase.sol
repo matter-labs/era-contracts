@@ -24,16 +24,12 @@ import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {
     NotL1,
     NotRelayedSender,
-  ,
     ChainIdAlreadyPresent,
     ChainNotPresentInCTM,
     SecondBridgeAddressTooLow,
     NotInGatewayMode,
     SLNotWhitelisted,
-  ,
     NotCurrentSL,
-  ,
-  ,
     AlreadyCurrentSL,
     ChainNotLegacy,
     NotChainAssetHandler

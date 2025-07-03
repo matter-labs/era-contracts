@@ -125,23 +125,29 @@ interface IExecutor is IZKChainBase {
         bytes operatorDAInput;
     }
 
+
+    /// @notice Commit batch info for Boojum OS
+    /// @param batchNumber Number of the committed batch
+    /// @param newStateCommitment State commitment of the new state.
+    /// @dev chain state commitment, this preimage is not opened on l1,
+    /// it's guaranteed that this commitment commits to any state that needed for execution
+    /// (state root, block number, bloch hahes)
+    /// @param numberOfLayer1Txs Number of priority operations to be processed
+    /// @param priorityOperationsHash Hash of all priority operations from this batch
+    /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
+    /// @param l2DaValidator Address of the L2 DA validator
+    /// @param daCommitment Commitment to the DA input
     struct CommitBoojumOSBatchInfo {
         uint64 batchNumber;
-        // chain state commitment, this preimage is not opened on l1,
-        // it's guaranteed that this commitment commits to any state that needed for execution
-        // (state root, block number, bloch hahes)
         bytes32 newStateCommitment;
-        // info about processed l1 txs, l2 to l1 logs and DA
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
         bytes32 l2LogsTreeRoot;
         address l2DaValidator; // TODO: already saved in the storage, can just add from there to PI
         bytes32 daCommitment;
-        // sending used batch inputs to validate on the settlement layer
         uint64 firstBlockTimestamp;
         uint64 lastBlockTimestamp;
         uint256 chainId; // TODO: already saved in the storage, can just add from there to PI
-        // extra calldata to pass to da validator
         bytes operatorDAInput;
     }
 
