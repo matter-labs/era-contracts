@@ -43,16 +43,16 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[38] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[39] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
             "BridgedTokenBeacon",
-            "Bridgehub",
+            "L2Bridgehub",
             "BytecodesSupplier", // ???
             "ChainAdmin",
             "ChainAdminOwnable",
-            "ChainAssetHandler",
+            "L2ChainAssetHandler",
             "ChainRegistrar",
             "ChainTypeManager",
             "CTMDeploymentTracker",
@@ -70,7 +70,7 @@ library ContractsBytecodesLib {
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
-            "MessageRoot",
+            "L2MessageRoot",
             "PermanentRestriction",
             "ProxyAdmin", // ??
             "UpgradeableBeacon",
@@ -81,7 +81,8 @@ library ContractsBytecodesLib {
             "ValidatorTimelock",
             "ValidiumL1DAValidator", // ???
             "VerifierFflonk",
-            "VerifierPlonk"
+            "VerifierPlonk",
+            "UpgradeableBeaconDeployer"
         ];
 
         string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [

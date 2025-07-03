@@ -162,6 +162,8 @@ error InvalidSystemLogsLength();
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
 error L2TimestampTooBig();
+// 0x55bde247
+error IncorrectBatchChainId();
 // 0x97e1359e
 error L2WithdrawalMessageWrongLength(uint256 messageLen);
 // 0x8efef97a
@@ -370,6 +372,8 @@ error DefaultAdminTransferNotAllowed();
 error InvalidPackedPrecommitmentLength(uint256 length);
 // 0xb49df1f2
 error NotAZKChain(address addr);
+
+error InvalidChainId();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
