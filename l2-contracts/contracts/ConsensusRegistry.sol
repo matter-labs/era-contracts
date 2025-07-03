@@ -172,6 +172,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     function remove(address _validatorOwner) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
@@ -199,8 +201,15 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         bool _isActive
     ) external onlyOwnerOrValidatorOwner(_validatorOwner) {
         _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
+            return;
+        }
+
+        // If the validator is removed, do nothing.
+        if (validator.latest.removed) {
             return;
         }
 
@@ -211,8 +220,10 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
         _ensureValidatorSnapshot(validator);
 
-        // If the validator is a leader and not removed, update the active leader validators count.
-        if (validator.latest.leader && !validator.latest.removed) {
+        validator.latest.active = _isActive;
+
+        // If the validator is a leader, update the active leader validators count.
+        if (validator.latest.leader) {
             if (_isActive) {
                 ++activeLeaderValidatorsCount;
             } else {
@@ -220,15 +231,20 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             }
         }
 
-        validator.latest.active = _isActive;
-
         emit ValidatorActiveStatusChanged(_validatorOwner, _isActive);
     }
 
     function changeValidatorLeader(address _validatorOwner, bool _isLeader) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
+            return;
+        }
+
+        // If the validator is removed, do nothing.
+        if (validator.latest.removed) {
             return;
         }
 
@@ -239,8 +255,10 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
         _ensureValidatorSnapshot(validator);
 
-        // If the validator is active and not removed, update the active leader validators count.
-        if (validator.latest.active && !validator.latest.removed) {
+        validator.latest.leader = _isLeader;
+
+        // If the validator is active, update the active leader validators count.
+        if (validator.latest.active) {
             if (_isLeader) {
                 ++activeLeaderValidatorsCount;
             } else {
@@ -248,19 +266,25 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             }
         }
 
-        validator.latest.leader = _isLeader;
-
         emit ValidatorLeaderStatusChanged(_validatorOwner, _isLeader);
     }
 
     function changeValidatorWeight(address _validatorOwner, uint256 _weight) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
+        // If the validator is removed, do nothing.
+        if (validator.latest.removed) {
+            return;
+        }
+
         _ensureValidatorSnapshot(validator);
+
         validator.latest.weight = _weight;
 
         emit ValidatorWeightChanged(_validatorOwner, _weight);
@@ -271,24 +295,43 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         BLS12_381PublicKey calldata _pubKey,
         BLS12_381Signature calldata _pop
     ) external onlyOwnerOrValidatorOwner(_validatorOwner) {
+        _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Verify input.
         _verifyInputBLS12_381PublicKey(_pubKey);
         _verifyInputBLS12_381Signature(_pop);
-        _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
-        bytes32 prevHash = _hashValidatorPubKey(validator.latest.pubKey);
-        delete validatorPubKeyHashes[prevHash];
+        // If the validator is removed, do nothing.
+        if (validator.latest.removed) {
+            return;
+        }
+
+        // Verify new public key doesn't already exist (unless it's the same key)
+        bytes32 oldHash = _hashValidatorPubKey(validator.latest.pubKey);
         bytes32 newHash = _hashValidatorPubKey(_pubKey);
-        _verifyValidatorPubKeyDoesNotExist(newHash);
-        validatorPubKeyHashes[newHash] = true;
+        if (oldHash == newHash) {
+            // If the public key is the same, we do nothing.
+            return;
+        } else {
+            // If the public key is different, we need to verify that it doesn't already exist.
+            _verifyValidatorPubKeyDoesNotExist(newHash);
+            // Remove old public key hash and add new one
+            delete validatorPubKeyHashes[oldHash];
+            validatorPubKeyHashes[newHash] = true;
+        }
+
         _ensureValidatorSnapshot(validator);
+
         validator.latest.pubKey = _pubKey;
         validator.latest.proofOfPossession = _pop;
 
-        emit ValidatorKeyChanged(_validatorOwner, _pubKey, _pop);
+        emit ValidatorKeyChanged(_validatorOwner, _pubKey);
     }
 
     function commitValidatorCommittee() external onlyOwner {
