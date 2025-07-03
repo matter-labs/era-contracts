@@ -24,7 +24,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     /// @dev Counter that keeps track of the number of active leader validators. We use it to check if there's at
     /// least one active leader validator before we commit the validator committee.
     uint256 public activeLeaderValidatorsCount;
-    /// @dev Counter that increments with each new commit to the validator committee.
+    /// @dev Counter that increments with each new commit to the validator committee. It is used to track the current
+    /// and pending validator committees.
     uint32 public validatorsCommit;
     /// @dev Block number when the last commit to the validator committee becomes active.
     uint256 public validatorsCommitBlock;
@@ -69,14 +70,64 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         _verifyInputBLS12_381PublicKey(_validatorPubKey);
         _verifyInputBLS12_381Signature(_validatorPoP);
 
-        // Verify storage.
-        _verifyValidatorOwnerDoesNotExist(_validatorOwner);
+        // Check if validator already exists.
+        if (_isValidatorOwnerExists(_validatorOwner)) {
+            // If it already exists, we only allow re-adding if the validator is currently removed.
+            Validator storage validator = validators[_validatorOwner];
+
+            if (!validator.latest.removed) {
+                revert ValidatorOwnerExists();
+            }
+
+            // Re-add the removed validator by updating its attributes
+            bytes32 oldPubKeyHash = _hashValidatorPubKey(validator.latest.pubKey);
+            bytes32 newPubKeyHash = _hashValidatorPubKey(_validatorPubKey);
+
+            // Verify new public key doesn't already exist (unless it's the same key)
+            if (oldPubKeyHash != newPubKeyHash) {
+                _verifyValidatorPubKeyDoesNotExist(newPubKeyHash);
+                // Remove old public key hash and add new one
+                delete validatorPubKeyHashes[oldPubKeyHash];
+                validatorPubKeyHashes[newPubKeyHash] = true;
+            }
+
+            // Ensure validator snapshot before updating
+            _ensureValidatorSnapshot(validator);
+
+            // Update validator attributes
+            validator.latest.active = _validatorIsActive;
+            validator.latest.removed = false;
+            validator.latest.leader = _validatorIsLeader;
+            validator.latest.weight = _validatorWeight;
+            validator.latest.pubKey = _validatorPubKey;
+            validator.latest.proofOfPossession = _validatorPoP;
+
+            // Update active leader count if necessary
+            if (_validatorIsLeader && _validatorIsActive) {
+                ++activeLeaderValidatorsCount;
+            }
+
+            emit ValidatorAdded({
+                validatorOwner: _validatorOwner,
+                validatorIsActive: _validatorIsActive,
+                validatorIsLeader: _validatorIsLeader,
+                validatorWeight: _validatorWeight,
+                validatorPubKey: _validatorPubKey
+            });
+
+            return;
+        }
+
+        // Normal addition flow (validator doesn't exist or was deleted)
         bytes32 validatorPubKeyHash = _hashValidatorPubKey(_validatorPubKey);
         _verifyValidatorPubKeyDoesNotExist(validatorPubKeyHash);
+        validatorPubKeyHashes[validatorPubKeyHash] = true;
 
         uint32 ownerIdx = uint32(validatorOwners.length);
         validatorOwners.push(_validatorOwner);
+
         validators[_validatorOwner] = Validator({
+            ownerIdx: ownerIdx,
             latest: ValidatorAttr({
                 active: _validatorIsActive,
                 removed: false,
@@ -93,6 +144,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
                 pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
                 proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
             }),
+            snapshotCommit: validatorsCommit,
             previousSnapshot: ValidatorAttr({
                 active: false,
                 removed: false,
@@ -101,11 +153,8 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
                 pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
                 proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
             }),
-            lastSnapshotCommit: validatorsCommit,
-            previousSnapshotCommit: 0,
-            ownerIdx: ownerIdx
+            previousSnapshotCommit: 0
         });
-        validatorPubKeyHashes[validatorPubKeyHash] = true;
 
         // If the validator is a leader and active, increment the active leader validators count.
         if (_validatorIsLeader && _validatorIsActive) {
@@ -114,9 +163,10 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
         emit ValidatorAdded({
             validatorOwner: _validatorOwner,
+            validatorIsActive: _validatorIsActive,
+            validatorIsLeader: _validatorIsLeader,
             validatorWeight: _validatorWeight,
-            validatorPubKey: _validatorPubKey,
-            validatorPoP: _validatorPoP
+            validatorPubKey: _validatorPubKey
         });
     }
 
@@ -394,8 +444,27 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     function _isValidatorPendingDeletion(Validator storage _validator) private view returns (bool) {
-        ValidatorAttr memory attr = _getValidatorAttributes(_validator);
-        return attr.removed;
+        uint32 currentActiveCommit;
+
+        // Get the current active commit.
+        if (block.number >= validatorsCommitBlock) {
+            currentActiveCommit = validatorsCommit;
+        } else {
+            currentActiveCommit = validatorsCommit - 1;
+        }
+
+        // Check that any snapshot that is more recent than the current active commit is not removed.
+        if (_validator.previousSnapshotCommit == currentActiveCommit && !_validator.previousSnapshot.removed) {
+            return false;
+        }
+        if (_validator.lastSnapshotCommit == currentActiveCommit && !_validator.snapshot.removed) {
+            return false;
+        }
+        if (!_validator.latest.removed) {
+            return false;
+        }
+
+        return true;
     }
 
     function _deleteValidator(address _validatorOwner, Validator storage _validator) private {
