@@ -2272,6 +2272,11 @@ object "Bootloader" {
                 ret := or(lt(x,y), eq(x,y))
             }
 
+            /// @dev Returns whether x >= y
+            function gte(x, y) -> ret {
+                ret := or(gt(x, y), eq(x, y))
+            }
+
             /// @dev Checks whether an address is an account
             /// @param addr The address to check
             function ensureAccount(addr) {
@@ -3154,6 +3159,10 @@ object "Bootloader" {
                 debugLog("Setting interop roots 1", nextInteropRootNumber)
                 let finalInteropRootNumber := add(nextInteropRootNumber, sub(numberOfRoots, 1))
                 for {let i := nextInteropRootNumber} lt(i, finalInteropRootNumber) {i := add(i, 1)} {
+                    if gte(i, MAX_INTEROP_ROOTS_IN_BATCH()) {
+                        revertWithReason(OVER_MAX_INTEROP_ROOTS(), 0)
+                    }
+
                     debugLog("Setting interop roots 2", i)
                     let interopRootStartSlot := getInteropRootByte(i)
                     let currentBlockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET()))
@@ -4078,8 +4087,12 @@ object "Bootloader" {
                 ret := 34
             }
 
-            function INCORRECT_INTEROP_ROOT_BLOCK_NUMBER() -> ret {
+            function OVER_MAX_INTEROP_ROOTS() -> ret {
                 ret := 35
+            }
+
+            function INCORRECT_INTEROP_ROOT_BLOCK_NUMBER() -> ret {
+                ret := 36
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes
