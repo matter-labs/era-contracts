@@ -21,7 +21,7 @@ interface IMessageVerification {
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
-    ) external view returns (bool);
+    ) external returns (bool);
 
     /// @notice Prove that a specific L2 log was sent in a specific L2 batch.
     /// @param _chainId The chain id of the L2 where the log comes from.
@@ -36,7 +36,7 @@ interface IMessageVerification {
         uint256 _index,
         L2Log calldata _log,
         bytes32[] calldata _proof
-    ) external view returns (bool);
+    ) external returns (bool);
 
     /// @dev Proves that a certain leaf was included as part of the log merkle tree.
     /// @dev Warning: this function does not enforce any additional checks on the structure
@@ -54,5 +54,5 @@ interface IMessageVerification {
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) external view returns (bool);
+    ) external returns (bool);
 }

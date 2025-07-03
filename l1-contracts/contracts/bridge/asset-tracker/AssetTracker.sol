@@ -133,12 +133,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         uint256 _amount,
         bool
     ) external {
-        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
-        uint256 chainToUpdate = settlementLayer == block.chainid ? _chainId : settlementLayer;
-        if (_tokenOriginChainId == _chainId && !isMinterChain[chainToUpdate][_assetId]) {
-            isMinterChain[chainToUpdate][_assetId] = true;
-            return;
-        }
+        _ensureTokenIsRegistered(_assetId, _tokenOriginChainId);
+        uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
         if (isMinterChain[chainToUpdate][_assetId]) {
             return;
@@ -148,6 +144,24 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
             revert InsufficientChainBalanceAssetTracker(chainToUpdate, _assetId, _amount);
         }
         chainBalance[chainToUpdate][_assetId] -= _amount;
+    }
+
+    function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
+        uint256 settlementLayer = IMailbox(BRIDGE_HUB.getZKChain(_chainId)).getTransientSettlementLayer();
+
+        if (settlementLayer != 0) {
+            bool finalProofNode = IMailbox(BRIDGE_HUB.getZKChain(settlementLayer)).getTransientFinalProofNode();
+            require(finalProofNode, InvalidProof());
+        }
+        chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
+    }
+
+    function _ensureTokenIsRegistered(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
+        isMinterChain[_tokenOriginChainId][_assetId] = true;
+        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_tokenOriginChainId);
+        if (settlementLayer != block.chainid) {
+            isMinterChain[settlementLayer][_assetId] = true;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -379,7 +393,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         IMailbox(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, _data);
     }
 
-    function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
+    function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal {
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
             sender: L2_ASSET_TRACKER_ADDR,

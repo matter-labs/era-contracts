@@ -21,7 +21,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
-    ) public view returns (bool) {
+    ) public returns (bool) {
         return
             _proveL2LogInclusion({
                 _chainId: _chainId,
@@ -39,7 +39,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) external view override returns (bool) {
+    ) external override returns (bool) {
         return
             _proveL2LeafInclusion({
                 _chainId: _chainId,
@@ -56,7 +56,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) internal view virtual returns (bool);
+    ) internal virtual returns (bool);
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
     function _proveL2LogInclusion(
@@ -65,7 +65,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _index,
         L2Log memory _log,
         bytes32[] calldata _proof
-    ) internal view returns (bool) {
+    ) internal returns (bool) {
         bytes32 hashedLog = keccak256(
             // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
@@ -112,7 +112,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _index,
         L2Log calldata _log,
         bytes32[] calldata _proof
-    ) external view returns (bool) {
+    ) external returns (bool) {
         return
             _proveL2LogInclusion({
                 _chainId: _chainId,

@@ -119,7 +119,7 @@ interface IBridgehub {
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
-    ) external view returns (bool);
+    ) external returns (bool);
 
     function proveL2LogInclusion(
         uint256 _chainId,
@@ -127,7 +127,7 @@ interface IBridgehub {
         uint256 _index,
         L2Log memory _log,
         bytes32[] calldata _proof
-    ) external view returns (bool);
+    ) external returns (bool);
 
     function proveL1ToL2TransactionStatus(
         uint256 _chainId,
@@ -137,7 +137,7 @@ interface IBridgehub {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
-    ) external view returns (bool);
+    ) external returns (bool);
 
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request

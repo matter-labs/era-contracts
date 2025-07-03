@@ -20,7 +20,7 @@ interface IMailboxImpl is IZKChainBase {
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
-    ) external view returns (bool);
+    ) external returns (bool);
 
     /// @notice Prove that a specific L2 log was sent in a specific L2 batch.
     /// @param _batchNumber The executed L2 batch number in which the log appeared.
@@ -33,7 +33,7 @@ interface IMailboxImpl is IZKChainBase {
         uint256 _index,
         L2Log calldata _log,
         bytes32[] calldata _proof
-    ) external view returns (bool);
+    ) external returns (bool);
 
     /// @notice Prove that the L1 -> L2 transaction was processed with the specified status.
     /// @param _l2TxHash The L2 canonical transaction hash.
@@ -51,7 +51,7 @@ interface IMailboxImpl is IZKChainBase {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
-    ) external view returns (bool);
+    ) external returns (bool);
 
     /// @notice Finalize the withdrawal and release funds.
     /// @param _l2BatchNumber The L2 batch number where the withdrawal was processed.
@@ -154,7 +154,15 @@ interface IMailboxImpl is IZKChainBase {
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) external view returns (bool);
+    ) external returns (bool);
+
+    /// When verifying recursive proofs, we mark the transient settlement layer.
+    /// Calling this clears the transient settlement layer.
+    function getTransientSettlementLayer() external view returns (uint256);
+
+    /// When verifying recursive proofs, we mark the transient final proof node.
+    /// Calling this clears the transient final proof node.
+    function getTransientFinalProofNode() external view returns (bool);
 
     /// @notice New priority request event. Emitted when a request is placed into the priority queue.
     /// @param txId Serial number of the priority operation.

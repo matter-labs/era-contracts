@@ -19,6 +19,7 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
@@ -293,6 +294,22 @@ contract L1AssetRouterTest is Test {
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
             abi.encode(ETH_TOKEN_ADDRESS)
+        );
+
+        vm.mockCall(
+            eraDiamondProxy,
+            abi.encodeWithSelector(IMailboxImpl.getTransientSettlementLayer.selector),
+            abi.encode(0)
+        );
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector),
+            abi.encode(eraDiamondProxy)
+        );
+        vm.mockCall(
+            eraDiamondProxy,
+            abi.encodeWithSelector(IMailboxImpl.getTransientFinalProofNode.selector),
+            abi.encode(true)
         );
     }
 
