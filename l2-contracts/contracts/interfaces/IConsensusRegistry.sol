@@ -106,6 +106,7 @@ interface IConsensusRegistry {
     error InvalidInputValidatorOwnerAddress();
     error InvalidInputBLS12_381PublicKey();
     error InvalidInputBLS12_381Signature();
+    error ZeroValidatorWeight();
     error NoPendingCommittee();
     error PreviousCommitStillPending();
     error NoActiveLeader();
@@ -115,7 +116,7 @@ interface IConsensusRegistry {
         bool validatorIsActive,
         bool validatorIsLeader,
         uint256 validatorWeight,
-        BLS12_381PublicKey validatorPubKey,
+        BLS12_381PublicKey validatorPubKey
     );
     event ValidatorRemoved(address indexed validatorOwner);
     event ValidatorDeleted(address indexed validatorOwner);

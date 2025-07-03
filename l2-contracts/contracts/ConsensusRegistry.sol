@@ -67,6 +67,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     ) external onlyOwner {
         // Verify input.
         _verifyInputAddress(_validatorOwner);
+        _verifyValidatorWeight(_validatorWeight);
         _verifyInputBLS12_381PublicKey(_validatorPubKey);
         _verifyInputBLS12_381Signature(_validatorPoP);
 
@@ -271,6 +272,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     function changeValidatorWeight(address _validatorOwner, uint256 _weight) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
+        _verifyValidatorWeight(_weight);
 
         // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
@@ -582,6 +584,12 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     function _verifyInputBLS12_381Signature(BLS12_381Signature calldata _pop) private pure {
         if (_isEmptyBLS12_381Signature(_pop)) {
             revert InvalidInputBLS12_381Signature();
+        }
+    }
+
+    function _verifyValidatorWeight(uint256 _weight) private pure {
+        if (_weight == 0) {
+            revert ZeroValidatorWeight();
         }
     }
 
