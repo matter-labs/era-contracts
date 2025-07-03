@@ -17,7 +17,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
-    bool immutable public IS_ZKSYNC_OS;
+    bool public immutable IS_ZKSYNC_OS;
 
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor(bool _isZKOS) reentrancyGuardInitializer {
