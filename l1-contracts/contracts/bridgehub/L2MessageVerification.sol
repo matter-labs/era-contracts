@@ -17,7 +17,7 @@ contract L2MessageVerification is MessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
-        ProofData memory proofData = MessageHashing.getProofData({
+        ProofData memory proofData = MessageHashing._getProofData({
             _chainId: _chainId,
             _batchNumber: _blockOrBatchNumber,
             _leafProofMask: _leafProofMask,
@@ -27,7 +27,7 @@ contract L2MessageVerification is MessageVerification {
         if (proofData.finalProofNode) {
             // For proof based interop this is the SL InteropRoot at block number _blockOrBatchNumber
             bytes32 correctBatchRoot = L2_INTEROP_ROOT_STORAGE.interopRoots(_chainId, _blockOrBatchNumber);
-            return correctBatchRoot == proofData.batchSettlementRoot;
+            return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
 
         return
