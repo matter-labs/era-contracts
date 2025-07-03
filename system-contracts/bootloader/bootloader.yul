@@ -3190,15 +3190,14 @@ object "Bootloader" {
                     }
 
                     if iszero(sidesLength) {
-                        debugLog("Empty sides, finishing", 0)
-                        break
+                        revertWithReason(EMPTY_SIDES_LENGTH(), 0)
                     }
 
                     callL2InteropRootStorage(chainId, blockNumber, sidesLength, interopRootStartByte)
                 }
 
-                mstore(CURRENT_INTEROP_ROOT_BYTE(), i)
-                debugLog("Current interop root updated", i)
+                mstore(CURRENT_INTEROP_ROOT_BYTE(), finalInteropRootNumber)
+                debugLog("Current interop root updated", finalInteropRootNumber)
                 mstore(LAST_PROCESSED_BLOCK_NUMBER_BYTE(), setForBlockNumber)
                 debugLog("currentNumberOfRoots", mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()))
                 debugLog("currentNumberOfRoots 2", add(mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()), 1))
@@ -4099,6 +4098,10 @@ object "Bootloader" {
 
             function INCORRECT_INTEROP_ROOT_BLOCK_NUMBER() -> ret {
                 ret := 36
+            }
+
+            function EMPTY_SIDES_LENGTH() -> ret {
+                ret := 37
             }
 
             /// @dev Accepts a 1-word literal and returns its length in bytes
