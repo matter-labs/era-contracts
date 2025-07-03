@@ -321,7 +321,7 @@
   },
   {
     "contractName": "system-contracts/SystemContext",
-    "zkBytecodeHash": "0x0100016dd8cf2777a35be61581af56bd97aca4c92447c96d52ae191a81beff4a",
+    "zkBytecodeHash": "0x0100016da0d54d11a3559c7436136aac0651838e095ba20c1a390d3e5a15e409",
     "zkBytecodePath": "/system-contracts/zkout/SystemContext.sol/SystemContext.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
