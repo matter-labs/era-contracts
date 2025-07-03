@@ -1169,11 +1169,11 @@
   },
   {
     "contractName": "l1-contracts/L2NativeTokenVault",
-    "zkBytecodeHash": "0x0100084f5c518a2ade8a70df1299af735c8002474897f69bbdcae4e6a55cc79c",
+    "zkBytecodeHash": "0x0100085373a91f364178f3e05c8b78d440d2a5285dbaba3801b8a7a2cdcdc374",
     "zkBytecodePath": "/l1-contracts/zkout/L2NativeTokenVault.sol/L2NativeTokenVault.json",
-    "evmBytecodeHash": "0x8e9b47d782a497e3f90238dcc7d7c88afb674698c19b5f9308091d3e81b28bcf",
+    "evmBytecodeHash": "0xcdacc34cb5b549d888b3f237750df9bcf1a7c4f31ceece28c5ba0b022adaf524",
     "evmBytecodePath": "/l1-contracts/out/L2NativeTokenVault.sol/L2NativeTokenVault.json",
-    "evmDeployedBytecodeHash": "0xeaa9ab33016f94b683846a371bd05337025f031fb33fcafbb2d2e3855712dc9d"
+    "evmDeployedBytecodeHash": "0x58f8ae9f43a971c99eca691929e7caea2926eec1d7019eba35fed1826ba52387"
   },
   {
     "contractName": "l1-contracts/L2ProxyAdminDeployer",
