@@ -42,9 +42,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 chainBatchRoot);
 
     /// @notice Emitted when a new chainTree root is produced and its corresponding leaf in sharedTree is updated.
+    /// @param chainId The ID of the chain whose chainTree root is being updated.
     /// @param chainRoot The updated Merkle root of the chainTree after appending the latest batch root.
-    /// @param preimage  The Merkle leaf value (chainIdLeafHash) computed from `chainRoot` and the chain’s ID, used to update the shared tree.
-    event Preimage(bytes32 chainRoot, bytes32 preimage);
+    /// @param chainIdLeafHash The Merkle leaf value computed from `chainRoot` and the chain’s ID, used to update the shared tree.
+    event NewChainRoot(uint256 indexed chainId, bytes32 chainRoot, bytes32 chainIdLeafHash);
 
     /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
     /// @param chainId The ID of the chain where the sharedTree was updated.
@@ -152,7 +153,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
         bytes32 sharedTreeRoot = sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
 
-        emit Preimage(chainRoot, cachedChainIdLeafHash);
+        emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
 
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
