@@ -334,6 +334,14 @@ object "Bootloader" {
                 ret := mul(CURRENT_INTEROP_ROOT_SLOT(), 32)
             }
 
+            /// @dev Number of slots reserved for `INTEROP_BLOCKS` array in bootloader memory.
+            ///      We've decided to make this number equal to `MAX_TRANSACTIONS_IN_BATCH`. This is due to
+            ///      it having to be equal to the maximal number of blocks per batch, but since we dont enforce
+            ///      that number explicitly, we use the estimation equal to the maximal number of transactions per batch.
+            function INTEROP_BLOCKS_SLOTS() -> ret {
+                ret := MAX_TRANSACTIONS_IN_BATCH()
+            }
+
             /// @dev The slot starting from which the interop root counts per block are stored.
             function INTEROP_ROOTS_PER_BLOCK_BEGIN_SLOT() -> ret {
                 ret := add(CURRENT_INTEROP_ROOT_SLOT(), 1)
@@ -346,7 +354,7 @@ object "Bootloader" {
 
             /// @dev The slot starting from which the interop roots are stored.
             function INTEROP_ROOT_BEGIN_SLOT() -> ret {
-                ret := add(INTEROP_ROOTS_PER_BLOCK_BEGIN_SLOT(), 100)
+                ret := add(INTEROP_ROOTS_PER_BLOCK_BEGIN_SLOT(), INTEROP_BLOCKS_SLOTS())
             }
 
             /// @dev The byte starting from which the interop roots are stored.
@@ -3185,14 +3193,12 @@ object "Bootloader" {
                         debugLog("Empty sides, finishing", 0)
                         break
                     }
-                    mstore(CURRENT_INTEROP_ROOT_BYTE(), add(i, 1))
-
-                    debugLog("Current interop root updated", add(i, 1))
 
                     callL2InteropRootStorage(chainId, blockNumber, sidesLength, interopRootStartByte)
                 }
 
-
+                mstore(CURRENT_INTEROP_ROOT_BYTE(), i)
+                debugLog("Current interop root updated", i)
                 mstore(LAST_PROCESSED_BLOCK_NUMBER_BYTE(), setForBlockNumber)
                 debugLog("currentNumberOfRoots", mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()))
                 debugLog("currentNumberOfRoots 2", add(mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()), 1))
