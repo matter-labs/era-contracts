@@ -49,11 +49,11 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
         // Initialize leaderSelection with default values
         leaderSelection = LeaderSelection({
-            lastSnapshotCommit: 0,
-            previousSnapshotCommit: 0,
             latest: LeaderSelectionAttr({frequency: 1, weighted: false}),
             snapshot: LeaderSelectionAttr({frequency: 1, weighted: false}),
-            previousSnapshot: LeaderSelectionAttr({frequency: 1, weighted: false})
+            snapshotCommit: 0,
+            previousSnapshot: LeaderSelectionAttr({frequency: 1, weighted: false}),
+            previousSnapshotCommit: 0
         });
     }
 
@@ -336,11 +336,13 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     function commitValidatorCommittee() external onlyOwner {
         // If validatorsCommitBlock is still in the future, revert.
+        // Otherwise, we would create a pending committee while another one is still pending.
         if (block.number < validatorsCommitBlock) {
             revert PreviousCommitStillPending();
         }
 
-        // Check if there's at least one active leader validator
+        // Check if there's at least one active leader validator.
+        // Otherwise, we would create a committee with no validator able to produce blocks.
         if (activeLeaderValidatorsCount == 0) {
             revert NoActiveLeader();
         }
@@ -385,10 +387,10 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     /// @notice Internal helper to build committee arrays
-    /// @dev Handles the common logic for getting current or next validator committee
-    /// @param _isNextCommittee Whether to get the next committee instead of the current one
+    /// @dev Handles the common logic for getting current or pending validator committee
+    /// @param _isPendingCommittee Whether to get the pending committee instead of the currently active one
     /// @return committee Array of committee validators
-    function _getCommittee(bool _isNextCommittee) private view returns (CommitteeValidator[] memory) {
+    function _getCommittee(bool _isPendingCommittee) private view returns (CommitteeValidator[] memory) {
         uint256 len = validatorOwners.length;
         CommitteeValidator[] memory committee = new CommitteeValidator[](len);
         uint256 count = 0;
@@ -397,21 +399,29 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             Validator storage validator = validators[validatorOwners[i]];
             ValidatorAttr memory validatorAttr;
 
-            if (_isNextCommittee) {
-                // Get the attributes that will be active in the next committee
-                if (validator.lastSnapshotCommit < validatorsCommit) {
+            if (_isPendingCommittee) {
+                // Get the attributes that are in the pending committee.
+                if (validatorsCommit > validator.snapshotCommit) {
                     validatorAttr = validator.latest;
                 } else {
                     validatorAttr = validator.snapshot;
                 }
+                // For pending committee, we don't need to check the previous snapshot.
             } else {
-                validatorAttr = _getValidatorAttributes(validator);
+                uint32 currentActiveCommit = _getActiveCommit();
+                if (currentActiveCommit > validator.snapshotCommit) {
+                    validatorAttr = validator.latest;
+                } else if (currentActiveCommit > validator.previousSnapshotCommit) {
+                    validatorAttr = validator.snapshot;
+                } else {
+                    validatorAttr = validator.previousSnapshot;
+                }
             }
 
             if (validatorAttr.active && !validatorAttr.removed) {
                 committee[count] = CommitteeValidator({
-                    weight: validatorAttr.weight,
                     leader: validatorAttr.leader,
+                    weight: validatorAttr.weight,
                     pubKey: validatorAttr.pubKey,
                     proofOfPossession: validatorAttr.proofOfPossession
                 });
@@ -426,50 +436,35 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         return committee;
     }
 
-    /// @notice Returns the validator attributes based on current commits and snapshots
-    /// @dev Helper function to get the appropriate validator attributes based on commit state
-    function _getValidatorAttributes(Validator storage validator) private view returns (ValidatorAttr memory) {
-        uint32 currentActiveCommit;
-
-        if (block.number >= validatorsCommitBlock) {
-            currentActiveCommit = validatorsCommit;
-        } else {
-            currentActiveCommit = validatorsCommit - 1;
-        }
-
-        if (currentActiveCommit > validator.lastSnapshotCommit) {
-            return validator.latest;
-        } else if (currentActiveCommit > validator.previousSnapshotCommit) {
-            return validator.snapshot;
-        } else {
-            return validator.previousSnapshot;
-        }
-    }
-
-    function _getLeaderSelectionAttributes(bool _isNextCommittee) private view returns (LeaderSelectionAttr memory) {
-        if (_isNextCommittee) {
-            // Get the leader selection that will be active in the next committee
-            if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+    function _getLeaderSelectionAttributes(bool _isPendingCommittee) private view returns (LeaderSelectionAttr memory) {
+        if (_isPendingCommittee) {
+            // Get the leader selection that is in the pending committee.
+            if (validatorsCommit > leaderSelection.snapshotCommit) {
                 return leaderSelection.latest;
             } else {
                 return leaderSelection.snapshot;
             }
+            // For pending committee, we don't need to check the previous snapshot.
         } else {
             // Get currently active leader selection
-            uint32 currentActiveCommit;
-            if (block.number >= validatorsCommitBlock) {
-                currentActiveCommit = validatorsCommit;
-            } else {
-                currentActiveCommit = validatorsCommit - 1;
-            }
-
-            if (currentActiveCommit > leaderSelection.lastSnapshotCommit) {
+            uint32 currentActiveCommit = _getActiveCommit();
+            if (currentActiveCommit > leaderSelection.snapshotCommit) {
                 return leaderSelection.latest;
             } else if (currentActiveCommit > leaderSelection.previousSnapshotCommit) {
                 return leaderSelection.snapshot;
             } else {
                 return leaderSelection.previousSnapshot;
             }
+        }
+    }
+
+    /// @notice Returns the commit number of the currently active validator committee
+    /// @dev Helper function to get the appropriate commit number based on the current block number
+    function _getActiveCommit() private view returns (uint32) {
+        if (block.number >= validatorsCommitBlock) {
+            return validatorsCommit;
+        } else {
+            return validatorsCommit - 1;
         }
     }
 
@@ -487,27 +482,19 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     function _isValidatorPendingDeletion(Validator storage _validator) private view returns (bool) {
-        uint32 currentActiveCommit;
+        uint32 currentActiveCommit = _getActiveCommit();
 
-        // Get the current active commit.
-        if (block.number >= validatorsCommitBlock) {
-            currentActiveCommit = validatorsCommit;
-        } else {
-            currentActiveCommit = validatorsCommit - 1;
-        }
-
-        // Check that any snapshot that is more recent than the current active commit is not removed.
-        if (_validator.previousSnapshotCommit == currentActiveCommit && !_validator.previousSnapshot.removed) {
+        // Check that any snapshot that is more recent or as recent as the current active commit is marked as removed.
+        // Otherwise, the validator might still be used in some committee and can't be deleted.
+        if (currentActiveCommit <= _validator.previousSnapshotCommit && !_validator.previousSnapshot.removed) {
             return false;
         }
-        if (_validator.lastSnapshotCommit == currentActiveCommit && !_validator.snapshot.removed) {
-            return false;
-        }
-        if (!_validator.latest.removed) {
+        if (currentActiveCommit <= _validator.snapshotCommit && !_validator.snapshot.removed) {
             return false;
         }
 
-        return true;
+        // The latest attribute must also be marked as removed in order to be pending deletion.
+        return _validator.latest.removed;
     }
 
     function _deleteValidator(address _validatorOwner, Validator storage _validator) private {
@@ -515,10 +502,11 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         address lastValidatorOwner = validatorOwners[validatorOwners.length - 1];
         validatorOwners[_validator.ownerIdx] = lastValidatorOwner;
         validatorOwners.pop();
+
         // Update the validator owned by the last validator owner.
         validators[lastValidatorOwner].ownerIdx = _validator.ownerIdx;
 
-        // Delete from the remaining mapping.
+        // Delete from the remaining mappings.
         delete validatorPubKeyHashes[_hashValidatorPubKey(_validator.latest.pubKey)];
         delete validators[_validatorOwner];
 
@@ -526,22 +514,22 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     function _ensureValidatorSnapshot(Validator storage _validator) private {
-        if (_validator.lastSnapshotCommit < validatorsCommit) {
+        if (_validator.snapshotCommit < validatorsCommit) {
             // When creating a snapshot, preserve the previous one
             _validator.previousSnapshot = _validator.snapshot;
-            _validator.previousSnapshotCommit = _validator.lastSnapshotCommit;
+            _validator.previousSnapshotCommit = _validator.snapshotCommit;
             _validator.snapshot = _validator.latest;
-            _validator.lastSnapshotCommit = validatorsCommit;
+            _validator.snapshotCommit = validatorsCommit;
         }
     }
 
     function _ensureLeaderSelectionSnapshot() private {
-        if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+        if (leaderSelection.snapshotCommit < validatorsCommit) {
             // When creating a snapshot, preserve the previous one
             leaderSelection.previousSnapshot = leaderSelection.snapshot;
-            leaderSelection.previousSnapshotCommit = leaderSelection.lastSnapshotCommit;
+            leaderSelection.previousSnapshotCommit = leaderSelection.snapshotCommit;
             leaderSelection.snapshot = leaderSelection.latest;
-            leaderSelection.lastSnapshotCommit = validatorsCommit;
+            leaderSelection.snapshotCommit = validatorsCommit;
         }
     }
 
