@@ -8,23 +8,28 @@ pragma solidity ^0.8.20;
 interface IConsensusRegistry {
     /// @dev Represents a validator in the consensus protocol.
     /// @param ownerIdx Index of the validator owner within the array of validator owners.
-    /// @param lastSnapshotCommit The `validatorsCommit` value when the last snapshot of this validator was made.
-    /// @param previousSnapshotCommit The `validatorsCommit` value when the previous snapshot of this validator was made.
-    /// @param latest Validator attributes to read if `validatorsCommit` > `validator.lastSnapshotCommit`.
-    /// @param snapshot Validator attributes to read if `validatorsCommit` > `validator.previousSnapshot`.
-    /// @param previousSnapshot Validator attributes to read for older commits.
+    /// @param latest The most recent validator attributes. These attributes are valid from the `snapshotCommit`
+    /// (excluding) up to `validatorsCommit` (including).
+    /// @param snapshot The validator attributes at the last snapshot. The snapshot attributes
+    /// are valid from the `previousSnapshotCommit` (excluding) up to `snapshotCommit` (including).
+    /// @param snapshotCommit The `validatorsCommit` value when the last snapshot was made.
+    /// @param previousSnapshot The validator attributes at the previous snapshot. The previous snapshot attributes
+    /// are valid at `previousSnapshotCommit` (they were probably also valid for earlier commits, but we no longer have that data
+    /// and we don't need it).
+    /// @param previousSnapshotCommit The `validatorsCommit` value when the previous snapshot was made.
     struct Validator {
         uint32 ownerIdx;
-        uint32 lastSnapshotCommit;
-        uint32 previousSnapshotCommit;
         ValidatorAttr latest;
         ValidatorAttr snapshot;
+        uint64 snapshotCommit;
         ValidatorAttr previousSnapshot;
+        uint64 previousSnapshotCommit;
     }
 
     /// @dev Represents the attributes of a validator.
-    /// @param active A flag stating if the validator is active.
-    /// @param removed A flag stating if the validator has been removed (and is pending a deletion).
+    /// @param active A flag stating if the validator is active. If it is false, then the validator is not eligible to be part of committees.
+    /// @param removed A flag stating if the validator has been removed. Note that being removed has the same effect as being inactive,
+    /// with the difference that removed validators might eventually be deleted from the registry. This deletion is not immediate or guaranteed.
     /// @param leader A flag stating if the validator is eligible to be a leader.
     /// @param weight Validator's voting weight.
     /// @param pubKey Validator's BLS12-381 public key.
@@ -38,23 +43,26 @@ interface IConsensusRegistry {
         BLS12_381Signature proofOfPossession;
     }
 
-    /// @dev Represents the leader selection process in the consensus protocol.
-    /// @param lastSnapshotCommit The `validatorsCommit` value when the last snapshot was made.
+    /// @dev Represents the leader selection process in the consensus protocol. The params are similar to the Validator struct.
+    /// @param latest The most recent leader selection attributes.
+    /// @param snapshot The leader selection attributes at the last snapshot. The snapshot attributes
+    /// are valid from the `previousSnapshotCommit` (excluding) up to `snapshotCommit` (including).
+    /// @param snapshotCommit The `validatorsCommit` value when the last snapshot was made.
+    /// @param previousSnapshot The leader selection attributes at the previous snapshot. The previous snapshot attributes
+    /// are valid at `previousSnapshotCommit` (they were probably also valid for earlier commits, but we no longer have that data
+    /// and we don't need it).
     /// @param previousSnapshotCommit The `validatorsCommit` value when the previous snapshot was made.
-    /// @param latest LeaderSelectionAttr to read if `validatorsCommit` > `lastSnapshotCommit`.
-    /// @param snapshot LeaderSelectionAttr to read if `validatorsCommit` > `previousSnapshot`.
-    /// @param previousSnapshot LeaderSelectionAttr to read for older commits.
     struct LeaderSelection {
-        uint32 lastSnapshotCommit;
-        uint32 previousSnapshotCommit;
         LeaderSelectionAttr latest;
         LeaderSelectionAttr snapshot;
+        uint64 snapshotCommit;
         LeaderSelectionAttr previousSnapshot;
+        uint64 previousSnapshotCommit;
     }
 
     /// @dev Attributes for the validator leader selection process.
     /// @param frequency The number of views between leader changes. If it is 0 then the leader never rotates.
-    /// @param weighted Whether leaders are selectedproportionally to their weight. If false, then the leader is selected round-robin.
+    /// @param weighted Whether leaders are selected proportionally to their weight. If false, then the leader is selected round-robin.
     struct LeaderSelectionAttr {
         uint64 frequency;
         bool weighted;
@@ -98,23 +106,25 @@ interface IConsensusRegistry {
     error InvalidInputValidatorOwnerAddress();
     error InvalidInputBLS12_381PublicKey();
     error InvalidInputBLS12_381Signature();
+    error ZeroValidatorWeight();
     error NoPendingCommittee();
     error PreviousCommitStillPending();
     error NoActiveLeader();
 
     event ValidatorAdded(
         address indexed validatorOwner,
+        bool validatorIsActive,
+        bool validatorIsLeader,
         uint256 validatorWeight,
-        BLS12_381PublicKey validatorPubKey,
-        BLS12_381Signature validatorPoP
+        BLS12_381PublicKey validatorPubKey
     );
     event ValidatorRemoved(address indexed validatorOwner);
     event ValidatorDeleted(address indexed validatorOwner);
     event ValidatorActiveStatusChanged(address indexed validatorOwner, bool isActive);
     event ValidatorLeaderStatusChanged(address indexed validatorOwner, bool isLeader);
     event ValidatorWeightChanged(address indexed validatorOwner, uint256 newWeight);
-    event ValidatorKeyChanged(address indexed validatorOwner, BLS12_381PublicKey newPubKey, BLS12_381Signature newPoP);
-    event ValidatorsCommitted(uint32 validatorsCommit, uint256 validatorsCommitBlock);
+    event ValidatorKeyChanged(address indexed validatorOwner, BLS12_381PublicKey newPubKey);
+    event ValidatorsCommitted(uint64 validatorsCommit, uint256 validatorsCommitBlock);
     event CommitteeActivationDelayChanged(uint256 newDelay);
     event LeaderSelectionChanged(LeaderSelectionAttr newLeaderSelection);
 
@@ -123,12 +133,14 @@ interface IConsensusRegistry {
     /// @dev Fails if a validator with the same public key already exists.
     /// @param _validatorOwner The address of the validator's owner.
     /// @param _validatorIsLeader Flag indicating if the validator is a leader.
+    /// @param _validatorIsActive Flag indicating if the validator is active.
     /// @param _validatorWeight The voting weight of the validator.
     /// @param _validatorPubKey The BLS12-381 public key of the validator.
     /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
     function add(
         address _validatorOwner,
         bool _validatorIsLeader,
+        bool _validatorIsActive,
         uint256 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP

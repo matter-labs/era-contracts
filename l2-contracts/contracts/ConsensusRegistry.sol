@@ -21,14 +21,25 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     mapping(address => Validator) public validators;
     /// @dev A mapping for enabling efficient lookups when checking whether a given validator public key exists.
     mapping(bytes32 => bool) public validatorPubKeyHashes;
-    /// @dev Counter that increments with each new commit to the validator committee.
-    uint32 public validatorsCommit;
+    /// @dev An array to keep track of removed validators that may be eligible for deletion.
+    address[] public removedValidators;
+    /// @dev Mapping to track the index of each validator in the removedValidators array (stored as index + 1, 0 means not present)
+    mapping(address => uint256) private removedValidatorIndices;
+    /// @dev Counter that keeps track of the number of active leader validators. We use it to check if there's at
+    /// least one active leader validator before we commit the validator committee.
+    uint256 public activeLeaderValidatorsCount;
+    /// @dev Counter that increments with each new commit to the validator committee. It is used to track the current
+    /// and pending validator committees.
+    uint64 public validatorsCommit;
     /// @dev Block number when the last commit to the validator committee becomes active.
     uint256 public validatorsCommitBlock;
     /// @dev The delay in blocks before a committee commit becomes active.
     uint256 public committeeActivationDelay;
     /// @dev Represents the leader selection process configuration.
     LeaderSelection public leaderSelection;
+
+    /// @dev Maximum number of removed validators to attempt deletion in one call
+    uint256 private constant MAX_CLEANUP_BATCH_SIZE = 2;
 
     modifier onlyOwnerOrValidatorOwner(address _validatorOwner) {
         if (owner() != msg.sender && _validatorOwner != msg.sender) {
@@ -45,81 +56,145 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
         // Initialize leaderSelection with default values
         leaderSelection = LeaderSelection({
-            lastSnapshotCommit: 0,
-            previousSnapshotCommit: 0,
             latest: LeaderSelectionAttr({frequency: 1, weighted: false}),
             snapshot: LeaderSelectionAttr({frequency: 1, weighted: false}),
-            previousSnapshot: LeaderSelectionAttr({frequency: 1, weighted: false})
+            snapshotCommit: 0,
+            previousSnapshot: LeaderSelectionAttr({frequency: 1, weighted: false}),
+            previousSnapshotCommit: 0
         });
     }
 
     function add(
         address _validatorOwner,
         bool _validatorIsLeader,
+        bool _validatorIsActive,
         uint256 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP
     ) external onlyOwner {
+        // Try to delete removed validators to free up space
+        _tryDeleteRemovedValidators(MAX_CLEANUP_BATCH_SIZE);
+
         // Verify input.
         _verifyInputAddress(_validatorOwner);
+        _verifyValidatorWeight(_validatorWeight);
         _verifyInputBLS12_381PublicKey(_validatorPubKey);
         _verifyInputBLS12_381Signature(_validatorPoP);
 
-        // Verify storage.
-        _verifyValidatorOwnerDoesNotExist(_validatorOwner);
-        bytes32 validatorPubKeyHash = _hashValidatorPubKey(_validatorPubKey);
-        _verifyValidatorPubKeyDoesNotExist(validatorPubKeyHash);
+        // Check if validator already exists.
+        if (_isValidatorOwnerExists(_validatorOwner)) {
+            // If it already exists, we only allow re-adding if the validator is currently removed.
+            Validator storage validator = validators[_validatorOwner];
 
-        uint32 ownerIdx = uint32(validatorOwners.length);
-        validatorOwners.push(_validatorOwner);
-        validators[_validatorOwner] = Validator({
-            latest: ValidatorAttr({
-                active: true,
-                removed: false,
-                leader: _validatorIsLeader,
-                weight: _validatorWeight,
-                pubKey: _validatorPubKey,
-                proofOfPossession: _validatorPoP
-            }),
-            snapshot: ValidatorAttr({
-                active: false,
-                removed: false,
-                leader: false,
-                weight: 0,
-                pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
-                proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
-            }),
-            previousSnapshot: ValidatorAttr({
-                active: false,
-                removed: false,
-                leader: false,
-                weight: 0,
-                pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
-                proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
-            }),
-            lastSnapshotCommit: validatorsCommit,
-            previousSnapshotCommit: 0,
-            ownerIdx: ownerIdx
-        });
-        validatorPubKeyHashes[validatorPubKeyHash] = true;
+            if (!validator.latest.removed) {
+                revert ValidatorOwnerExists();
+            }
+
+            // Re-add the removed validator by updating its attributes
+            bytes32 oldPubKeyHash = _hashValidatorPubKey(validator.latest.pubKey);
+            bytes32 newPubKeyHash = _hashValidatorPubKey(_validatorPubKey);
+
+            // Verify new public key doesn't already exist (unless it's the same key)
+            if (oldPubKeyHash != newPubKeyHash) {
+                _verifyValidatorPubKeyDoesNotExist(newPubKeyHash);
+                // Remove old public key hash and add new one
+                delete validatorPubKeyHashes[oldPubKeyHash];
+                validatorPubKeyHashes[newPubKeyHash] = true;
+            }
+
+            // Ensure validator snapshot before updating
+            _ensureValidatorSnapshot(validator);
+
+            // Update validator attributes
+            validator.latest.active = _validatorIsActive;
+            validator.latest.removed = false;
+            validator.latest.leader = _validatorIsLeader;
+            validator.latest.weight = _validatorWeight;
+            validator.latest.pubKey = _validatorPubKey;
+            validator.latest.proofOfPossession = _validatorPoP;
+
+            // Remove from removedValidators array since it's being re-added
+            _removeFromRemovedValidators(_validatorOwner);
+        } else {
+            // Normal addition flow (validator doesn't exist or was deleted)
+            bytes32 validatorPubKeyHash = _hashValidatorPubKey(_validatorPubKey);
+            _verifyValidatorPubKeyDoesNotExist(validatorPubKeyHash);
+            validatorPubKeyHashes[validatorPubKeyHash] = true;
+
+            uint32 ownerIdx = uint32(validatorOwners.length);
+            validatorOwners.push(_validatorOwner);
+
+            validators[_validatorOwner] = Validator({
+                ownerIdx: ownerIdx,
+                latest: ValidatorAttr({
+                    active: _validatorIsActive,
+                    removed: false,
+                    leader: _validatorIsLeader,
+                    weight: _validatorWeight,
+                    pubKey: _validatorPubKey,
+                    proofOfPossession: _validatorPoP
+                }),
+                snapshot: ValidatorAttr({
+                    active: false,
+                    removed: false,
+                    leader: false,
+                    weight: 0,
+                    pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
+                    proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
+                }),
+                snapshotCommit: validatorsCommit,
+                previousSnapshot: ValidatorAttr({
+                    active: false,
+                    removed: false,
+                    leader: false,
+                    weight: 0,
+                    pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
+                    proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
+                }),
+                previousSnapshotCommit: 0
+            });
+        }
+
+        // If the validator is a leader and active, increment the active leader validators count.
+        if (_validatorIsLeader && _validatorIsActive) {
+            ++activeLeaderValidatorsCount;
+        }
 
         emit ValidatorAdded({
             validatorOwner: _validatorOwner,
+            validatorIsActive: _validatorIsActive,
+            validatorIsLeader: _validatorIsLeader,
             validatorWeight: _validatorWeight,
-            validatorPubKey: _validatorPubKey,
-            validatorPoP: _validatorPoP
+            validatorPubKey: _validatorPubKey
         });
     }
 
     function remove(address _validatorOwner) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
+        // If the validator is already removed, do nothing.
+        if (validator.latest.removed) {
+            return;
+        }
+
         _ensureValidatorSnapshot(validator);
+
         validator.latest.removed = true;
+
+        // Add to removed validators array for potential cleanup
+        removedValidators.push(_validatorOwner);
+        removedValidatorIndices[_validatorOwner] = removedValidators.length; // Store index + 1
+
+        // If the validator was a leader, decrement the active leader validators count.
+        if (validator.latest.leader && validator.latest.active) {
+            --activeLeaderValidatorsCount;
+        }
 
         emit ValidatorRemoved(_validatorOwner);
     }
@@ -129,38 +204,91 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         bool _isActive
     ) external onlyOwnerOrValidatorOwner(_validatorOwner) {
         _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
+        // If the validator is removed, do nothing.
+        if (validator.latest.removed) {
+            return;
+        }
+
+        // If we are not changing the active status, do nothing.
+        if (validator.latest.active == _isActive) {
+            return;
+        }
+
         _ensureValidatorSnapshot(validator);
+
         validator.latest.active = _isActive;
+
+        // If the validator is a leader, update the active leader validators count.
+        if (validator.latest.leader) {
+            if (_isActive) {
+                ++activeLeaderValidatorsCount;
+            } else {
+                --activeLeaderValidatorsCount;
+            }
+        }
 
         emit ValidatorActiveStatusChanged(_validatorOwner, _isActive);
     }
 
     function changeValidatorLeader(address _validatorOwner, bool _isLeader) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
+        // If the validator is removed, do nothing.
+        if (validator.latest.removed) {
+            return;
+        }
+
+        // If we are not changing the leader status, do nothing.
+        if (validator.latest.leader == _isLeader) {
+            return;
+        }
+
         _ensureValidatorSnapshot(validator);
+
         validator.latest.leader = _isLeader;
+
+        // If the validator is active, update the active leader validators count.
+        if (validator.latest.active) {
+            if (_isLeader) {
+                ++activeLeaderValidatorsCount;
+            } else {
+                --activeLeaderValidatorsCount;
+            }
+        }
 
         emit ValidatorLeaderStatusChanged(_validatorOwner, _isLeader);
     }
 
     function changeValidatorWeight(address _validatorOwner, uint256 _weight) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
+        _verifyValidatorWeight(_weight);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
+        // If the validator is removed, do nothing.
+        if (validator.latest.removed) {
+            return;
+        }
+
         _ensureValidatorSnapshot(validator);
+
         validator.latest.weight = _weight;
 
         emit ValidatorWeightChanged(_validatorOwner, _weight);
@@ -171,47 +299,55 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         BLS12_381PublicKey calldata _pubKey,
         BLS12_381Signature calldata _pop
     ) external onlyOwnerOrValidatorOwner(_validatorOwner) {
+        _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Verify input.
         _verifyInputBLS12_381PublicKey(_pubKey);
         _verifyInputBLS12_381Signature(_pop);
-        _verifyValidatorOwnerExists(_validatorOwner);
+
+        // Get the validator and delete it if it is pending deletion.
         (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
-        bytes32 prevHash = _hashValidatorPubKey(validator.latest.pubKey);
-        delete validatorPubKeyHashes[prevHash];
+        // If the validator is removed, do nothing.
+        if (validator.latest.removed) {
+            return;
+        }
+
+        // Verify new public key doesn't already exist (unless it's the same key)
+        bytes32 oldHash = _hashValidatorPubKey(validator.latest.pubKey);
         bytes32 newHash = _hashValidatorPubKey(_pubKey);
-        _verifyValidatorPubKeyDoesNotExist(newHash);
-        validatorPubKeyHashes[newHash] = true;
+        if (oldHash == newHash) {
+            // If the public key is the same, we do nothing.
+            return;
+        } else {
+            // If the public key is different, we need to verify that it doesn't already exist.
+            _verifyValidatorPubKeyDoesNotExist(newHash);
+            // Remove old public key hash and add new one
+            delete validatorPubKeyHashes[oldHash];
+            validatorPubKeyHashes[newHash] = true;
+        }
+
         _ensureValidatorSnapshot(validator);
+
         validator.latest.pubKey = _pubKey;
         validator.latest.proofOfPossession = _pop;
 
-        emit ValidatorKeyChanged(_validatorOwner, _pubKey, _pop);
+        emit ValidatorKeyChanged(_validatorOwner, _pubKey);
     }
 
     function commitValidatorCommittee() external onlyOwner {
         // If validatorsCommitBlock is still in the future, revert.
+        // Otherwise, we would create a pending committee while another one is still pending.
         if (block.number < validatorsCommitBlock) {
             revert PreviousCommitStillPending();
         }
 
-        // Check if there's at least one active leader validator
-        bool hasActiveLeader = false;
-        uint256 len = validatorOwners.length;
-
-        for (uint256 i = 0; i < len; ++i) {
-            Validator storage validator = validators[validatorOwners[i]];
-            ValidatorAttr memory validatorAttr = validator.latest;
-
-            if (validatorAttr.active && !validatorAttr.removed && validatorAttr.leader) {
-                hasActiveLeader = true;
-                break;
-            }
-        }
-
-        if (!hasActiveLeader) {
+        // Check if there's at least one active leader validator.
+        // Otherwise, we would create a committee with no validator able to produce blocks.
+        if (activeLeaderValidatorsCount == 0) {
             revert NoActiveLeader();
         }
 
@@ -254,11 +390,18 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         emit LeaderSelectionChanged(leaderSelection.latest);
     }
 
+    /// @notice Manually triggers cleanup of removed validators
+    /// @dev Only callable by the contract owner. Useful for batch cleanup without adding new validators.
+    /// @param _maxDeletions Maximum number of validators to attempt deletion for
+    function cleanupRemovedValidators(uint256 _maxDeletions) external onlyOwner {
+        _tryDeleteRemovedValidators(_maxDeletions);
+    }
+
     /// @notice Internal helper to build committee arrays
-    /// @dev Handles the common logic for getting current or next validator committee
-    /// @param _isNextCommittee Whether to get the next committee instead of the current one
+    /// @dev Handles the common logic for getting current or pending validator committee
+    /// @param _isPendingCommittee Whether to get the pending committee instead of the currently active one
     /// @return committee Array of committee validators
-    function _getCommittee(bool _isNextCommittee) private view returns (CommitteeValidator[] memory) {
+    function _getCommittee(bool _isPendingCommittee) private view returns (CommitteeValidator[] memory) {
         uint256 len = validatorOwners.length;
         CommitteeValidator[] memory committee = new CommitteeValidator[](len);
         uint256 count = 0;
@@ -267,21 +410,29 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
             Validator storage validator = validators[validatorOwners[i]];
             ValidatorAttr memory validatorAttr;
 
-            if (_isNextCommittee) {
-                // Get the attributes that will be active in the next committee
-                if (validator.lastSnapshotCommit < validatorsCommit) {
+            if (_isPendingCommittee) {
+                // Get the attributes that are in the pending committee.
+                if (validatorsCommit > validator.snapshotCommit) {
                     validatorAttr = validator.latest;
                 } else {
                     validatorAttr = validator.snapshot;
                 }
+                // For pending committee, we don't need to check the previous snapshot.
             } else {
-                validatorAttr = _getValidatorAttributes(validator);
+                uint64 currentActiveCommit = _getActiveCommit();
+                if (currentActiveCommit > validator.snapshotCommit) {
+                    validatorAttr = validator.latest;
+                } else if (currentActiveCommit > validator.previousSnapshotCommit) {
+                    validatorAttr = validator.snapshot;
+                } else {
+                    validatorAttr = validator.previousSnapshot;
+                }
             }
 
             if (validatorAttr.active && !validatorAttr.removed) {
                 committee[count] = CommitteeValidator({
-                    weight: validatorAttr.weight,
                     leader: validatorAttr.leader,
+                    weight: validatorAttr.weight,
                     pubKey: validatorAttr.pubKey,
                     proofOfPossession: validatorAttr.proofOfPossession
                 });
@@ -296,44 +447,19 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         return committee;
     }
 
-    /// @notice Returns the validator attributes based on current commits and snapshots
-    /// @dev Helper function to get the appropriate validator attributes based on commit state
-    function _getValidatorAttributes(Validator storage validator) private view returns (ValidatorAttr memory) {
-        uint32 currentActiveCommit;
-
-        if (block.number >= validatorsCommitBlock) {
-            currentActiveCommit = validatorsCommit;
-        } else {
-            currentActiveCommit = validatorsCommit - 1;
-        }
-
-        if (currentActiveCommit > validator.lastSnapshotCommit) {
-            return validator.latest;
-        } else if (currentActiveCommit > validator.previousSnapshotCommit) {
-            return validator.snapshot;
-        } else {
-            return validator.previousSnapshot;
-        }
-    }
-
-    function _getLeaderSelectionAttributes(bool _isNextCommittee) private view returns (LeaderSelectionAttr memory) {
-        if (_isNextCommittee) {
-            // Get the leader selection that will be active in the next committee
-            if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+    function _getLeaderSelectionAttributes(bool _isPendingCommittee) private view returns (LeaderSelectionAttr memory) {
+        if (_isPendingCommittee) {
+            // Get the leader selection that is in the pending committee.
+            if (validatorsCommit > leaderSelection.snapshotCommit) {
                 return leaderSelection.latest;
             } else {
                 return leaderSelection.snapshot;
             }
+            // For pending committee, we don't need to check the previous snapshot.
         } else {
             // Get currently active leader selection
-            uint32 currentActiveCommit;
-            if (block.number >= validatorsCommitBlock) {
-                currentActiveCommit = validatorsCommit;
-            } else {
-                currentActiveCommit = validatorsCommit - 1;
-            }
-
-            if (currentActiveCommit > leaderSelection.lastSnapshotCommit) {
+            uint64 currentActiveCommit = _getActiveCommit();
+            if (currentActiveCommit > leaderSelection.snapshotCommit) {
                 return leaderSelection.latest;
             } else if (currentActiveCommit > leaderSelection.previousSnapshotCommit) {
                 return leaderSelection.snapshot;
@@ -343,8 +469,25 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         }
     }
 
+    /// @notice Returns the commit number of the currently active validator committee
+    /// @dev Helper function to get the appropriate commit number based on the current block number
+    function _getActiveCommit() private view returns (uint64) {
+        if (block.number >= validatorsCommitBlock) {
+            return validatorsCommit;
+        } else {
+            return validatorsCommit - 1;
+        }
+    }
+
     function numValidators() public view returns (uint256) {
         return validatorOwners.length;
+    }
+
+    /// @notice Returns the number of removed validators that may be eligible for deletion
+    /// @dev Useful for monitoring the cleanup queue
+    /// @return The number of validators in the removedValidators array
+    function numRemovedValidators() public view returns (uint256) {
+        return removedValidators.length;
     }
 
     function _getValidatorAndDeleteIfRequired(address _validatorOwner) private returns (Validator storage, bool) {
@@ -357,8 +500,19 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     function _isValidatorPendingDeletion(Validator storage _validator) private view returns (bool) {
-        ValidatorAttr memory attr = _getValidatorAttributes(_validator);
-        return attr.removed;
+        uint64 currentActiveCommit = _getActiveCommit();
+
+        // Check that any snapshot that is more recent or as recent as the current active commit is marked as removed.
+        // Otherwise, the validator might still be used in some committee and can't be deleted.
+        if (currentActiveCommit <= _validator.previousSnapshotCommit && !_validator.previousSnapshot.removed) {
+            return false;
+        }
+        if (currentActiveCommit <= _validator.snapshotCommit && !_validator.snapshot.removed) {
+            return false;
+        }
+
+        // The latest attribute must also be marked as removed in order to be pending deletion.
+        return _validator.latest.removed;
     }
 
     function _deleteValidator(address _validatorOwner, Validator storage _validator) private {
@@ -366,10 +520,11 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         address lastValidatorOwner = validatorOwners[validatorOwners.length - 1];
         validatorOwners[_validator.ownerIdx] = lastValidatorOwner;
         validatorOwners.pop();
+
         // Update the validator owned by the last validator owner.
         validators[lastValidatorOwner].ownerIdx = _validator.ownerIdx;
 
-        // Delete from the remaining mapping.
+        // Delete from the remaining mappings.
         delete validatorPubKeyHashes[_hashValidatorPubKey(_validator.latest.pubKey)];
         delete validators[_validatorOwner];
 
@@ -377,22 +532,22 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
     }
 
     function _ensureValidatorSnapshot(Validator storage _validator) private {
-        if (_validator.lastSnapshotCommit < validatorsCommit) {
+        if (_validator.snapshotCommit < validatorsCommit) {
             // When creating a snapshot, preserve the previous one
             _validator.previousSnapshot = _validator.snapshot;
-            _validator.previousSnapshotCommit = _validator.lastSnapshotCommit;
+            _validator.previousSnapshotCommit = _validator.snapshotCommit;
             _validator.snapshot = _validator.latest;
-            _validator.lastSnapshotCommit = validatorsCommit;
+            _validator.snapshotCommit = validatorsCommit;
         }
     }
 
     function _ensureLeaderSelectionSnapshot() private {
-        if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+        if (leaderSelection.snapshotCommit < validatorsCommit) {
             // When creating a snapshot, preserve the previous one
             leaderSelection.previousSnapshot = leaderSelection.snapshot;
-            leaderSelection.previousSnapshotCommit = leaderSelection.lastSnapshotCommit;
+            leaderSelection.previousSnapshotCommit = leaderSelection.snapshotCommit;
             leaderSelection.snapshot = leaderSelection.latest;
-            leaderSelection.lastSnapshotCommit = validatorsCommit;
+            leaderSelection.snapshotCommit = validatorsCommit;
         }
     }
 
@@ -448,11 +603,84 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         }
     }
 
+    function _verifyValidatorWeight(uint256 _weight) private pure {
+        if (_weight == 0) {
+            revert ZeroValidatorWeight();
+        }
+    }
+
     function _isEmptyBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure returns (bool) {
         return _pubKey.a == bytes32(0) && _pubKey.b == bytes32(0) && _pubKey.c == bytes32(0);
     }
 
     function _isEmptyBLS12_381Signature(BLS12_381Signature calldata _pop) private pure returns (bool) {
         return _pop.a == bytes32(0) && _pop.b == bytes16(0);
+    }
+
+    /// @notice Attempts to delete up to a specified number of removed validators that are eligible for deletion
+    /// @dev This method helps maintain the removedValidators array by cleaning up validators that can be safely deleted
+    /// @param _maxDeletions Maximum number of validators to attempt deletion for
+    function _tryDeleteRemovedValidators(uint256 _maxDeletions) private {
+        uint256 deletions = 0;
+        uint256 i = 0;
+
+        // Iterate through removedValidators array, attempting deletions
+        while (i < removedValidators.length && deletions < _maxDeletions) {
+            address validatorOwner = removedValidators[i];
+
+            // Check if this validator exists and is pending deletion
+            if (_isValidatorOwnerExists(validatorOwner)) {
+                Validator storage validator = validators[validatorOwner];
+
+                if (_isValidatorPendingDeletion(validator)) {
+                    // Delete the validator
+                    _deleteValidator(validatorOwner, validator);
+                    // Remove from removedValidators array
+                    _removeFromRemovedValidatorsAtIndex(i);
+                    deletions++;
+                    // Don't increment i since we swapped an element into current position
+                } else {
+                    // Validator is not yet eligible for deletion, move to next
+                    i++;
+                }
+            } else {
+                // Validator no longer exists (already deleted), remove from array
+                _removeFromRemovedValidatorsAtIndex(i);
+                // Don't increment i since we swapped an element into current position
+            }
+        }
+    }
+
+    /// @notice Removes a validator from the removedValidators array at a specific index
+    /// @dev Helper method to efficiently remove an element and maintain the index mapping
+    /// @param _index The index of the validator to remove from the array
+    function _removeFromRemovedValidatorsAtIndex(uint256 _index) private {
+        address validatorOwner = removedValidators[_index];
+        uint256 lastIndex = removedValidators.length - 1;
+
+        if (_index != lastIndex) {
+            // Move the last element to the position being deleted
+            address lastValidator = removedValidators[lastIndex];
+            removedValidators[_index] = lastValidator;
+            // Update the index mapping for the moved validator
+            removedValidatorIndices[lastValidator] = _index + 1;
+        }
+
+        // Remove the last element and clear the mapping
+        removedValidators.pop();
+        delete removedValidatorIndices[validatorOwner];
+    }
+
+    /// @notice Removes a validator from the removedValidators array
+    /// @dev Helper method to clean up the removedValidators array when a validator is re-added
+    /// @param _validatorOwner The validator owner address to remove from the array
+    function _removeFromRemovedValidators(address _validatorOwner) private {
+        uint256 indexPlusOne = removedValidatorIndices[_validatorOwner];
+        if (indexPlusOne == 0) {
+            // Validator not in removedValidators array
+            return;
+        }
+
+        _removeFromRemovedValidatorsAtIndex(indexPlusOne - 1);
     }
 }
