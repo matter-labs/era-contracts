@@ -106,7 +106,7 @@ interface IValidatorTimelock is IExecutor {
     /// @param _chainId The chain Id of the ZK chain.
     /// @param _role The bytes32 ID of the role.
     /// @param _address The address that may have the role.
-    function hasRoleForChainId(uint256 _chainId, bytes32 _role, address _address) external returns (bool);
+    function hasRoleForChainId(uint256 _chainId, bytes32 _role, address _address) external view returns (bool);
 
     // Chain interaction functions
     /// @dev Make a call to the zkChain diamond contract with the same calldata.
@@ -128,9 +128,9 @@ interface IValidatorTimelock is IExecutor {
     /// the batch is known on the commit stage and the proved is not finalized (may be reverted).
     function proveBatchesSharedBridge(
         address _chainAddress,
-        uint256 _prevBatch,
-        uint256 _newBatch,
-        bytes calldata _proof
+        uint256 _processBatchFrom,
+        uint256 _processBatchTo,
+        bytes calldata _proofData
     ) external;
     /// @dev Check that batches were committed at least X time ago and
     /// make a call to the zkChain diamond contract with the same calldata.
