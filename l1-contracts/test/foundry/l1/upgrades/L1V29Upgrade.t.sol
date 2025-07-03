@@ -6,6 +6,7 @@ import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "contracts/common/Config.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {BaseUpgrade} from "./_SharedBaseUpgrade.t.sol";
 import {BaseUpgradeUtils} from "./_SharedBaseUpgradeUtils.t.sol";
@@ -77,6 +78,12 @@ contract L1V29UpgradeTest is BaseUpgrade {
 
         vm.expectEmit(true, true, true, true);
         emit IAdmin.ValidatorStatusUpdate(newValidatorTimelock, true);
+
+        vm.mockCall(
+            address(upgrade),
+            abi.encodeWithSelector(IGetters.isPriorityQueueActive.selector),
+            abi.encode(false)
+        );
 
         // Execute upgrade
         bytes32 result = upgrade.upgrade(proposedUpgrade);

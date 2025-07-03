@@ -21,7 +21,7 @@ contract ServerNotifier is Ownable2Step, ReentrancyGuard, Initializable {
     event MigrateToGateway(uint256 indexed chainId);
 
     /// @notice Emitted to notify the server before a chain migrates from the ZK gateway.
-    /// @param chainId The identifier for the chain initiating migration to the ZK gateway.
+    /// @param chainId The identifier for the chain initiating migration from the ZK gateway.
     event MigrateFromGateway(uint256 indexed chainId);
 
     /// @notice Emitted whenever an upgrade timestamp is set.
