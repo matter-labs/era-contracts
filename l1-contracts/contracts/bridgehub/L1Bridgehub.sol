@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-
-
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";

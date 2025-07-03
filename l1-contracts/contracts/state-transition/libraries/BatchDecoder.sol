@@ -68,7 +68,7 @@ library BatchDecoder {
             );
         }
     }
-    
+
     /// @notice Decodes and validates precommit data for a batch, ensuring the encoding version is supported.
     /// @dev The first byte of `_precommitData` is interpreted as the encoding version and must equal `SUPPORTED_ENCODING_VERSION`.
     ///      If it does, the remainder of the data is decoded into an `IExecutor.PrecommitInfo` struct. Otherwise, this call reverts.

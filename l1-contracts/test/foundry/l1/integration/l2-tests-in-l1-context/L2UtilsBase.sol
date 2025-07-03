@@ -54,12 +54,8 @@ library L2UtilsBase {
         // FIXME: init
         address messageRoot = address(new L2MessageRoot());
         address bridgehub = address(new L2Bridgehub());
-        address assetRouter = address(
-            new L2AssetRouter()
-        );
-        address ntv = address(
-            new L2NativeTokenVaultDev()
-        );
+        address assetRouter = address(new L2AssetRouter());
+        address ntv = address(new L2NativeTokenVaultDev());
 
         vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
         // FIXME: init
@@ -84,9 +80,7 @@ library L2UtilsBase {
             vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
             address l2MessageRootStorage = address(new DummyL2InteropRootStorage());
             vm.etch(address(L2_INTEROP_ROOT_STORAGE), l2MessageRootStorage.code);
-            address l2ChainAssetHandler = address(
-                new L2ChainAssetHandler()
-            );
+            address l2ChainAssetHandler = address(new L2ChainAssetHandler());
             vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);
         }
 

@@ -2,9 +2,7 @@
 
 pragma solidity 0.8.28;
 
-
 import {IBridgehub} from "./IBridgehub.sol";
-
 
 import {MessageRootBase} from "./MessageRootBase.sol";
 

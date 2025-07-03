@@ -21,44 +21,8 @@ import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {
-    NotL1,
-    NotRelayedSender,
-    ChainIdAlreadyPresent,
-    ChainNotPresentInCTM,
-    SecondBridgeAddressTooLow,
-    NotInGatewayMode,
-    SLNotWhitelisted,
-    NotCurrentSL,
-    AlreadyCurrentSL,
-    ChainNotLegacy,
-    NotChainAssetHandler
-} from "./L1BridgehubErrors.sol";
-import {
-    NoCTMForAssetId,
-    SettlementLayersMustSettleOnL1,
-    MigrationPaused,
-    AssetIdAlreadyRegistered,
-    ChainIdNotRegistered,
-    AssetHandlerNotRegistered,
-    ZKChainLimitReached,
-    CTMAlreadyRegistered,
-    CTMNotRegistered,
-    ZeroChainId,
-    ChainIdTooBig,
-    BridgeHubAlreadyRegistered,
-    MsgValueMismatch,
-    ZeroAddress,
-    Unauthorized,
-    SharedBridgeNotSet,
-    WrongMagicValue,
-    ChainIdAlreadyExists,
-    ChainIdMismatch,
-    ChainIdCantBeCurrentChain,
-    EmptyAssetId,
-    AssetIdNotSupported,
-    IncorrectBridgeHubAddress
-} from "../common/L1ContractErrors.sol";
+import {NotL1, NotRelayedSender, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, NotCurrentSL, AlreadyCurrentSL, ChainNotLegacy, NotChainAssetHandler} from "./L1BridgehubErrors.sol";
+import {NoCTMForAssetId, SettlementLayersMustSettleOnL1, MigrationPaused, AssetIdAlreadyRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs

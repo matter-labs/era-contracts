@@ -17,7 +17,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         uint256 _l1ChainId,
         address _owner,
         IBridgehub _bridgehub,
-        address  _assetRouter,
+        address _assetRouter,
         IMessageRoot _messageRoot
     ) external reentrancyGuardInitializer {
         _disableInitializers();
@@ -30,7 +30,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     function updateL2(
         uint256 _l1ChainId,
         IBridgehub _bridgehub,
-        address  _assetRouter,
+        address _assetRouter,
         IMessageRoot _messageRoot
     ) public {
         bridgehub = _bridgehub;
@@ -44,19 +44,19 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _ethTokenAssetId() internal view override returns (bytes32) { 
-        return ethTokenAssetId; 
+    function _ethTokenAssetId() internal view override returns (bytes32) {
+        return ethTokenAssetId;
     }
-    function _l1ChainId() internal view override returns (uint256) { 
-        return l1ChainId;     
+    function _l1ChainId() internal view override returns (uint256) {
+        return l1ChainId;
     }
-    function _bridgehub() internal view override returns (IBridgehub) { 
-        return bridgehub; 
+    function _bridgehub() internal view override returns (IBridgehub) {
+        return bridgehub;
     }
-    function _messageRoot() internal view override returns (IMessageRoot) { 
-        return messageRoot; 
+    function _messageRoot() internal view override returns (IMessageRoot) {
+        return messageRoot;
     }
-    function _assetRouter() internal view override returns (address) { 
-        return assetRouter; 
+    function _assetRouter() internal view override returns (address) {
+        return assetRouter;
     }
 }

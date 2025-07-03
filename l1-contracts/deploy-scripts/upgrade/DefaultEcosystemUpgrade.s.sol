@@ -491,7 +491,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
-        bytes32 newChainAssetId = L1Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(gatewayConfig.chainId);
+        bytes32 newChainAssetId = L1Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(
+            gatewayConfig.chainId
+        );
         result = new Call[](1);
         result[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,

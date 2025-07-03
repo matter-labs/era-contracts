@@ -8,11 +8,6 @@ import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-
-
-
-
-
 import {L2NativeTokenVault} from "./L2NativeTokenVault.sol";
 
 /// @author Matter Labs

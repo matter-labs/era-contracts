@@ -210,7 +210,6 @@ contract ExecutorTest is Test {
         DiamondInit diamondInit = new DiamondInit(false);
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
 
-
         bytes8 dummyHash = 0x1234567890123456;
 
         genesisStoredBatchInfo = IExecutor.StoredBatchInfo({

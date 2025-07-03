@@ -14,47 +14,8 @@ import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {
-    InvalidSystemLogsLength,
-    MissingSystemLogs,
-    BatchNumberMismatch,
-    TimeNotReached,
-    ValueMismatch,
-    HashMismatch,
-    NonIncreasingTimestamp,
-    TimestampError,
-    InvalidLogSender,
-    TxHashMismatch,
-    UnexpectedSystemLog,
-    LogAlreadyProcessed,
-    InvalidProtocolVersion,
-    CanOnlyProcessOneBatch,
-    BatchHashMismatch,
-    UpgradeBatchNumberIsNotZero,
-    NonSequentialBatch,
-    CantExecuteUnprovenBatches,
-    SystemLogsSizeTooBig,
-    InvalidNumberOfBlobs,
-    VerifiedBatchesExceedsCommittedBatches,
-    InvalidProof,
-    RevertedBatchNotAfterNewLastBatch,
-    CantRevertExecutedBatch,
-    L2TimestampTooBig,
-    PriorityOperationsRollingHashMismatch,
-    IncorrectBatchChainId,
-    InvalidMessageRoot,
-    InvalidBatchNumber,
-    EmptyPrecommitData,
-    PrecommitmentMismatch,
-    InvalidPackedPrecommitmentLength
-} from "../../../common/L1ContractErrors.sol";
-import {
-    InvalidBatchesDataLength,
-    MismatchL2DAValidator,
-    MismatchNumberOfLayer1Txs,
-    CommitBasedInteropNotSupported,
-    DependencyRootsRollingHashMismatch
-} from "../../L1StateTransitionErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, IncorrectBatchChainId, InvalidMessageRoot, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
+import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -253,7 +214,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
             // TODO: change RELAYED_EXECUTOR_VERSION?
-            IL2ToL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo));
+            IL2ToL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(
+                abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo)
+            );
         }
     }
 

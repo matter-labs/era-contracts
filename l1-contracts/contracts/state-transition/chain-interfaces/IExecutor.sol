@@ -125,7 +125,6 @@ interface IExecutor is IZKChainBase {
         bytes operatorDAInput;
     }
 
-
     /// @notice Commit batch info for Boojum OS
     /// @param batchNumber Number of the committed batch
     /// @param newStateCommitment State commitment of the new state.
