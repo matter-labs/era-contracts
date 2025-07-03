@@ -131,7 +131,7 @@ contract ExperimentalBridgeTest is Test {
             address(ntv),
             address(0)
         );
-        
+
         vm.prank(bridgeOwner);
         ntv.setAssetTracker(address(assetTracker));
 
@@ -236,7 +236,7 @@ contract ExperimentalBridgeTest is Test {
             address(ntv),
             address(0)
         );
-        
+
         vm.prank(bridgeOwner);
         ntv.setAssetTracker(address(assetTracker));
 
