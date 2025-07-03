@@ -134,7 +134,15 @@ library L2UtilsBase {
                 bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
                 bytes32(uint256(1))
             );
-            address l2AssetTracker = address(new AssetTracker(_args.l1ChainId, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_MESSAGE_ROOT_ADDR));
+            address l2AssetTracker = address(
+                new AssetTracker(
+                    _args.l1ChainId,
+                    L2_BRIDGEHUB_ADDR,
+                    L2_ASSET_ROUTER_ADDR,
+                    L2_NATIVE_TOKEN_VAULT_ADDR,
+                    L2_MESSAGE_ROOT_ADDR
+                )
+            );
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTracker.code);
         }
         {

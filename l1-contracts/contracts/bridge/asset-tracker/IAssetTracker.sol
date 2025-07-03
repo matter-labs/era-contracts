@@ -44,11 +44,7 @@ interface IAssetTracker {
 
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
-    function confirmMigrationOnL2(
-        TokenBalanceMigrationData memory _tokenBalanceMigrationData
-    ) external;
+    function confirmMigrationOnL2(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
-    function confirmMigrationOnGateway(
-        TokenBalanceMigrationData memory _tokenBalanceMigrationData
-    ) external;
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 }

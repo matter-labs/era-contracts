@@ -219,7 +219,7 @@ contract ExperimentalBridgeTest is Test {
             abi.encodeCall(ntvImpl.initialize, (bridgeOwner, address(0)))
         );
         addr = L1NativeTokenVault(payable(ntvProxy));
-    
+
         vm.prank(bridgeOwner);
         L1AssetRouter(_sharedBridgeAddr).setNativeTokenVault(addr);
     }

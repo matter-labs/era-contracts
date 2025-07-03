@@ -100,7 +100,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Called on the L1 when a deposit to the chain happens. 
+    /// @notice Called on the L1 when a deposit to the chain happens.
     /// @dev As the chain does not update its balance when settling on L1.
     function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
@@ -124,6 +124,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         TransientPrimitivesLib.set(_chainId + 1, 0);
     }
 
+    /// @notice Called on the L1 when a withdrawal from the chain happens.
+    /// @dev As the chain does not update its balance when settling on L1.
     function handleChainBalanceDecrease(
         uint256 _tokenOriginChainId,
         uint256 _chainId,
@@ -303,8 +305,10 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
         // solhint-disable-next-line no-unused-vars
 
-        TokenBalanceMigrationData memory data 
-            = abi.decode(_finalizeWithdrawalParams.message, (TokenBalanceMigrationData));
+        TokenBalanceMigrationData memory data = abi.decode(
+            _finalizeWithdrawalParams.message,
+            (TokenBalanceMigrationData)
+        );
 
         if (!data.isL1ToGateway) {
             // here another settlement layer might frontrun
@@ -342,9 +346,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         }
     }
 
-    function confirmMigrationOnGateway(
-        TokenBalanceMigrationData memory data
-    ) external onlyL1AssetTracker {
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata data) external onlyL1AssetTracker {
         if (data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[data.chainId][data.assetId] += data.amount;
@@ -354,38 +356,21 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         }
     }
 
-    function confirmMigrationOnL2(
-        TokenBalanceMigrationData memory data
-    ) external onlyL1AssetTracker {
+    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external onlyL1AssetTracker {
         assetMigrationNumber[data.assetId] = data.migrationNumber;
     }
 
-    function _sendMigrationDataToL1(
-        TokenBalanceMigrationData memory data
-    ) internal {
+    function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {
         // slither-disable-next-line unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encode(data)
-        );
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(abi.encode(data));
     }
 
-    function _sendConfirmToL2(
-        TokenBalanceMigrationData memory data
-    ) internal {
-        _sendToChain(
-            data.chainId,
-            abi.encodeCall(this.confirmMigrationOnL2, (data))
-        );
+    function _sendConfirmToL2(TokenBalanceMigrationData memory data) internal {
+        _sendToChain(data.chainId, abi.encodeCall(this.confirmMigrationOnL2, (data)));
     }
 
-    function _sendConfirmToGateway(
-        uint256 _settlementLayer,
-        TokenBalanceMigrationData memory data
-    ) internal {
-        _sendToChain(
-            _settlementLayer,
-            abi.encodeCall(this.confirmMigrationOnGateway, (data))
-        );
+    function _sendConfirmToGateway(uint256 _settlementLayer, TokenBalanceMigrationData memory data) internal {
+        _sendToChain(_settlementLayer, abi.encodeCall(this.confirmMigrationOnGateway, (data)));
     }
 
     function _sendToChain(uint256 _chainId, bytes memory _data) internal {

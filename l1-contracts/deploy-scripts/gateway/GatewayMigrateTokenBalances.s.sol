@@ -138,7 +138,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         FinalizeL1DepositParams[] memory finalizeL1DepositParams = new FinalizeL1DepositParams[](bridgedTokenCount);
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
-            finalizeL1DepositParams[i] = getFinalizeWithdrawalParams(chainId,l2RpcUrl,  msgHashes[i], 0);
+            finalizeL1DepositParams[i] = getFinalizeWithdrawalParams(chainId, l2RpcUrl, msgHashes[i], 0);
         }
         // console.log("msgHashes");
         // console.log(msgHashes.length);
@@ -146,7 +146,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             // console.logBytes(abi.encodeCall(l1AssetTracker.receiveMigrationOnL1, (finalizeL1DepositParams[i])));
-            bytes32 assetId; 
+            bytes32 assetId;
             (, assetId, , , ) = abi.decode(
                 finalizeL1DepositParams[i].message,
                 (uint256, bytes32, uint256, uint256, bool)

@@ -83,7 +83,6 @@ struct TransactionReceipt {
     uint64 transactionIndex;
 }
 
-
 struct AltTransactionReceipt {
     bytes32 blockHash;
     uint256 blockNumber;

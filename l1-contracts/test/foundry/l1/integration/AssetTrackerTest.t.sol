@@ -175,7 +175,6 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
 
-
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
         assetTracker.confirmMigrationOnL2(data);
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
@@ -255,7 +254,6 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
-
 
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
         vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));

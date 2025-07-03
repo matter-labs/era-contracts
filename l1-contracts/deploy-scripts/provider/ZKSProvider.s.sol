@@ -9,25 +9,24 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
-import {L2ToL1LogProof, Log, TransactionReceipt,AltTransactionReceipt,AltLog, AltL2ToL1Log, L2ToL1Log} from "./ReceipTypes.sol";
+import {L2ToL1LogProof, Log, TransactionReceipt, AltTransactionReceipt, AltLog, AltL2ToL1Log, L2ToL1Log} from "./ReceipTypes.sol";
 
 contract ZKSProvider is Script {
-
     function getWithdrawalLog(
         string memory l2RpcUrl,
         bytes32 withdrawalHash,
         uint256 index
     ) public returns (Log memory log, uint64 l1BatchTxId) {
         require(bytes(l2RpcUrl).length > 0, "L2 RPC URL not set");
-        
+
         // Get transaction receipt
         TransactionReceipt memory receipt = getTransactionReceipt(l2RpcUrl, withdrawalHash);
-        
+
         // Find withdrawal logs (logs from L1_MESSENGER_ADDRESS)
         address L1_MESSENGER_ADDRESS = 0x0000000000000000000000000000000000008008;
         bytes32 L1_MESSAGE_SENT_TOPIC = 0x3a36e47291f4201faf137fab081d92295bce2d53be2c6ca68ba82c7faa9ce241;
         uint256 withdrawalLogCount = 0;
-        
+
         for (uint256 i = 0; i < receipt.logs.length; i++) {
             if (receipt.logs[i].addr == L1_MESSENGER_ADDRESS && receipt.logs[i].topics[0] == L1_MESSAGE_SENT_TOPIC) {
                 // console.log(receipt.logs[i].addr);
@@ -40,7 +39,7 @@ contract ZKSProvider is Script {
                 withdrawalLogCount++;
             }
         }
-        
+
         revert("Withdrawal log not found at specified index");
     }
 
@@ -50,14 +49,14 @@ contract ZKSProvider is Script {
         uint256 index
     ) public returns (uint64 logIndex, L2ToL1Log memory log) {
         require(bytes(l2RpcUrl).length > 0, "L2 RPC URL not set");
-        
+
         // Get transaction receipt
         TransactionReceipt memory receipt = getTransactionReceipt(l2RpcUrl, withdrawalHash);
-        
+
         // Find L2ToL1 logs from L1_MESSENGER_ADDRESS
         address L1_MESSENGER_ADDRESS = 0x0000000000000000000000000000000000008008;
         uint256 withdrawalLogCount = 0;
-        
+
         for (uint256 i = 0; i < receipt.l2ToL1Logs.length; i++) {
             // console.log("l2ToL1Logs");
             // console.log(i, receipt.l2ToL1Logs[i].logIndex);
@@ -70,7 +69,7 @@ contract ZKSProvider is Script {
                 withdrawalLogCount++;
             }
         }
-        
+
         revert("L2ToL1 log not found at specified index");
     }
 
@@ -81,19 +80,19 @@ contract ZKSProvider is Script {
         uint256 index
     ) public returns (FinalizeL1DepositParams memory params) {
         require(bytes(l2RpcUrl).length > 0, "L2 RPC URL not set");
-        
+
         // Get withdrawal log and L2ToL1 log
         (Log memory log, uint64 l1BatchTxId) = getWithdrawalLog(l2RpcUrl, withdrawalHash, index);
         (uint64 l2ToL1LogIndex, L2ToL1Log memory l2ToL1Log) = getWithdrawalL2ToL1Log(l2RpcUrl, withdrawalHash, index);
-        
+
         // Get L2ToL1 log proof
         L2ToL1LogProof memory proof = getL2ToL1LogProof(l2RpcUrl, withdrawalHash, l2ToL1LogIndex);
         // console.log("withdrawalHash");
         // console.logBytes32(withdrawalHash);
-        
+
         // Extract sender and message from log
         (address sender, bytes memory message) = getMessageFromLog(log);
-        
+
         params = FinalizeL1DepositParams({
             chainId: chainId,
             l2BatchNumber: log.l1BatchNumber,
@@ -111,13 +110,16 @@ contract ZKSProvider is Script {
         // console.log(log.topics.length);
         // console.logBytes32(log.topics[0]);
         sender = address(uint160(uint256(log.topics[1])));
-        
+
         // Decode message from log data
         // Assuming the data contains the message directly
         message = abi.decode(abi.decode(log.data, (bytes)), (bytes));
     }
 
-    function getTransactionReceipt(string memory l2RpcUrl, bytes32 txHash) internal returns (TransactionReceipt memory receipt) {
+    function getTransactionReceipt(
+        string memory l2RpcUrl,
+        bytes32 txHash
+    ) internal returns (TransactionReceipt memory receipt) {
         string[] memory args = new string[](9);
         args[0] = "curl";
         args[1] = "--request";
@@ -127,14 +129,22 @@ contract ZKSProvider is Script {
         args[5] = "--header";
         args[6] = "Content-Type: application/json";
         args[7] = "--data";
-        args[8] = string.concat('{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["', vm.toString(txHash), '"],"id":1}');
-        
+        args[8] = string.concat(
+            '{"jsonrpc":"2.0","method":"eth_getTransactionReceipt","params":["',
+            vm.toString(txHash),
+            '"],"id":1}'
+        );
+
         bytes memory result = vm.ffi(args);
-        
+
         receipt = parseTransactionReceipt(result);
     }
 
-    function getL2ToL1LogProof(string memory l2RpcUrl, bytes32 txHash, uint64 logIndex) internal returns (L2ToL1LogProof memory proof) {
+    function getL2ToL1LogProof(
+        string memory l2RpcUrl,
+        bytes32 txHash,
+        uint64 logIndex
+    ) internal returns (L2ToL1LogProof memory proof) {
         string[] memory args = new string[](9);
         args[0] = "curl";
         args[1] = "--request";
@@ -144,11 +154,17 @@ contract ZKSProvider is Script {
         args[5] = "--header";
         args[6] = "Content-Type: application/json";
         args[7] = "--data";
-        args[8] = string.concat('{"jsonrpc":"2.0","id":1,"method":"zks_getL2ToL1LogProof","params":["', vm.toString(txHash), '",', vm.toString(logIndex), ']}'); // todo later: add ,"proof_based_gw" for interop
+        args[8] = string.concat(
+            '{"jsonrpc":"2.0","id":1,"method":"zks_getL2ToL1LogProof","params":["',
+            vm.toString(txHash),
+            '",',
+            vm.toString(logIndex),
+            "]}"
+        ); // todo later: add ,"proof_based_gw" for interop
         // Execute RPC call
 
         bytes memory result = vm.ffi(args);
-        
+
         proof = parseL2ToL1LogProof(result);
     }
 
@@ -181,7 +197,7 @@ contract ZKSProvider is Script {
         // console.log("Transaction Type:", result.txType);
 
         AltLog[] memory altLogs;
-        {       
+        {
             string memory altLogsJson = callParseAltLog(responseStr, "parse-alt-logs.sh");
             // console.log(altLogsJson);
 
@@ -199,7 +215,7 @@ contract ZKSProvider is Script {
             // console.log("transactionIndex", altLogs[0].transactionIndex);
             // console.log("transactionLogIndex", altLogs[0].transactionLogIndex);
         }
- 
+
         bytes[] memory altLogsData = new bytes[](altLogs.length);
         bytes32[][] memory altLogsTopics = new bytes32[][](altLogs.length);
         {
@@ -216,7 +232,6 @@ contract ZKSProvider is Script {
             }
         }
 
-
         // console.log("successful logs");
         // console.log(altLogs.length);
         // console.log(altLogs[0].addr);
@@ -228,7 +243,7 @@ contract ZKSProvider is Script {
         // console.log(vm.toString(altLogs[0].transactionHash));
         // console.log(vm.toString(altLogs[0].transactionIndex));
 
-        string memory altL2ToL1LogsJson =  callParseAltLog(responseStr, "parse-alt-l2-to-l1-logs.sh");
+        string memory altL2ToL1LogsJson = callParseAltLog(responseStr, "parse-alt-l2-to-l1-logs.sh");
         // console.log(altL2ToL1LogsJson);
 
         bytes memory l2ToL1LogsBytes = vm.parseJson(altL2ToL1LogsJson, "$.l2ToL1Logs");
@@ -255,7 +270,7 @@ contract ZKSProvider is Script {
         //     console.log("  value:", vm.toString(l2ToL1Logs[i].value));
         // }
 
-        bool status; 
+        bool status;
         if (result.status == 1) {
             status = true;
         } else {
@@ -284,7 +299,6 @@ contract ZKSProvider is Script {
                 transactionLogIndex: uint64(altLogs[i].transactionLogIndex)
             });
         }
-        
 
         L2ToL1Log[] memory realL2ToL1Logs = new L2ToL1Log[](l2ToL1Logs.length);
 
@@ -320,7 +334,6 @@ contract ZKSProvider is Script {
         });
     }
 
-
     // todo import from Utils
     function compareStrings(string memory a, string memory b) public pure returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
@@ -328,11 +341,11 @@ contract ZKSProvider is Script {
 
     function parseL2ToL1LogProof(bytes memory jsonResponse) internal returns (L2ToL1LogProof memory proof) {
         string memory json = string(jsonResponse);
-        
+
         bytes memory proofIdBytes = vm.parseJson(json, "$.result.id");
         proof.id = abi.decode(proofIdBytes, (uint64));
 
-        string memory proofJson =  callParseAltLog(json, "parse-proof.sh");
+        string memory proofJson = callParseAltLog(json, "parse-proof.sh");
         bytes memory lengthBytes = vm.parseJson(proofJson, "$.length");
         uint256 length = abi.decode(lengthBytes, (uint256));
         proof.proof = new bytes32[](length);
@@ -347,18 +360,25 @@ contract ZKSProvider is Script {
         scriptPath = string.concat("./deploy-scripts/provider/bash-scripts/", scriptName);
     }
 
-    function callParseAltLog(string memory jsonStr, string memory scriptName) internal returns (string memory modifiedJson) {
+    function callParseAltLog(
+        string memory jsonStr,
+        string memory scriptName
+    ) internal returns (string memory modifiedJson) {
         string memory scriptPath = getBashScriptPath(scriptName);
         string[] memory args = new string[](3);
         args[0] = "sh";
         args[1] = scriptPath;
         args[2] = jsonStr;
-        
+
         bytes memory modifiedJsonBytes = vm.ffi(args);
         modifiedJson = string(modifiedJsonBytes);
     }
 
-    function callParseAltLog(string memory jsonStr, string memory scriptName, uint256 index) internal returns (string memory modifiedJson) {
+    function callParseAltLog(
+        string memory jsonStr,
+        string memory scriptName,
+        uint256 index
+    ) internal returns (string memory modifiedJson) {
         string memory scriptPath = getBashScriptPath(scriptName);
         string[] memory args = new string[](4);
         args[0] = "sh";

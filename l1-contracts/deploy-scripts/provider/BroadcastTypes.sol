@@ -97,4 +97,3 @@ struct Library {
     uint256 version;
     // Add library fields if needed based on the JSON structure
 }
-
