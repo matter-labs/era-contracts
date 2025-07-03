@@ -8,7 +8,6 @@ pragma solidity ^0.8.24;
  * responsible for storing the message roots of other chains on the L2.
  */
 interface IL2InteropRootStorage {
-    function addInteropRoot(uint256 chainId, uint256 blockNumber, bytes32 interopRoot) external;
-
-    function interopRoots(uint256 chainId, uint256 blockNumber) external view returns (bytes32);
+    /// @notice Mapping of chain ID to block or batch number to message root.
+    function interopRoots(uint256 chainId, uint256 blockOrBatchNumber) external view returns (bytes32);
 }

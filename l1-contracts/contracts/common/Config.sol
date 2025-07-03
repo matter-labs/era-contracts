@@ -166,10 +166,19 @@ struct ZKChainCommitment {
     PriorityTreeCommitment priorityTree;
     /// @notice Whether a chain is a permanent rollup.
     bool isPermanentRollup;
+    /// @notice The precommitment to the transactions of the latest batch.
+    bytes32 precommitmentForTheLatestBatch;
 }
 
 /// @dev Used as the `msg.sender` for system service transactions.
 address constant SERVICE_TRANSACTION_SENDER = address(uint160(0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF));
+
+/// @dev To avoid higher costs the writes, we avoid making the slot zero.
+/// This ensures that the cost of writes is always 5k and avoids the 20k initial write from the non-zero value.
+bytes32 constant DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH = bytes32(uint256(1));
+
+/// @dev The length of a packed transaction precommitment in bytes. It consists of two parts: 32-byte tx hash and 1-byte status (0 or 1).
+uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
 
 uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
 

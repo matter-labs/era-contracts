@@ -322,8 +322,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev reverts batches on the specified chain
     /// @param _chainId the chainId of the chain
     /// @param _newLastBatch the new last batch
-    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZKChain(getZKChain(_chainId)).revertBatchesSharedBridge(_chainId, _newLastBatch);
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwner {
+        address zkChainAddr = getZKChain(_chainId);
+        IZKChain(zkChainAddr).revertBatchesSharedBridge(zkChainAddr, _newLastBatch);
     }
 
     /// @dev execute predefined upgrade
@@ -495,7 +496,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // related to different protocol version support.
         uint256 chainProtocolVersion = IZKChain(getZKChain(_chainId)).getProtocolVersion();
         if (chainProtocolVersion != protocolVersion) {
-            revert OutdatedProtocolVersion(chainProtocolVersion, protocolVersion);
+            revert OutdatedProtocolVersion(protocolVersion, chainProtocolVersion);
         }
 
         return
@@ -522,7 +523,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         if (_protocolVersion != protocolVersion) {
-            revert OutdatedProtocolVersion(_protocolVersion, protocolVersion);
+            revert OutdatedProtocolVersion(protocolVersion, _protocolVersion);
         }
         chainAddress = _deployNewChain({
             _chainId: _chainId,

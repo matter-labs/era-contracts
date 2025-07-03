@@ -377,6 +377,36 @@ describe("SystemContext tests", () => {
     });
   });
 
+  // One more describe section for `setNewBatch` tests. These tests require at least one `setL2Block` invocation before them.
+  // They should go after `setL2Block` section since tests from there rely on the fact that function `setL2Block` is not called before.
+  describe("setNewBatch after setL2Block", async () => {
+    it("should revert InconsistentNewBatchTimestamp", async () => {
+      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      const blockData = await systemContext.getL2BlockNumberAndTimestamp();
+
+      const newBatchTimestamp = blockData.blockTimestamp.sub(1);
+      const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [2138]));
+
+      await expect(
+        systemContext
+          .connect(bootloaderAccount)
+          .setNewBatch(newBatchHash, newBatchTimestamp, batchData.batchNumber.add(1), 2)
+      ).to.be.revertedWithCustomError(systemContext, "InconsistentNewBatchTimestamp");
+    });
+
+    it("should allow new batch timestamp to be the same as the timestamp of the previous L2 block", async () => {
+      const batchData = await systemContext.getBatchNumberAndTimestamp();
+      const blockData = await systemContext.getL2BlockNumberAndTimestamp();
+
+      const newBatchTimestamp = blockData.blockTimestamp;
+      const newBatchHash = await ethers.utils.keccak256(ethers.utils.solidityPack(["uint32"], [2138]));
+
+      await systemContext
+        .connect(bootloaderAccount)
+        .setNewBatch(newBatchHash, newBatchTimestamp, batchData.batchNumber.add(1), 2);
+    });
+  });
+
   describe("publishTimestampDataToL1", async () => {
     it("should revert The current batch number must be greater than 0", async () => {
       const batchData = await systemContext.getBatchNumberAndTimestamp();

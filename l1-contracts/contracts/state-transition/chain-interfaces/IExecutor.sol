@@ -18,6 +18,7 @@ enum SystemLogKey {
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     USED_L2_DA_VALIDATOR_ADDRESS_KEY,
     MESSAGE_ROOT_ROLLING_HASH_KEY,
+    L2_TXS_STATUS_ROLLING_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 
@@ -30,6 +31,7 @@ struct LogProcessingOutput {
     bytes32 l2LogsTreeRoot;
     uint256 packedBatchAndL2BlockTimestamp;
     bytes32 l2DAValidatorOutputHash;
+    bytes32 l2TxsStatusRollingHash;
     bytes32 dependencyRootsRollingHash;
 }
 
@@ -46,13 +48,13 @@ struct ProcessLogsInput {
     bytes32 messageRoot;
 }
 
-/// @dev Offset used to pull Address From Log. Equal to 4 (bytes for isService)
+/// @dev Offset used to pull Address From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch)
 uint256 constant L2_LOG_ADDRESS_OFFSET = 4;
 
-/// @dev Offset used to pull Key From Log. Equal to 4 (bytes for isService) + 20 (bytes for address)
+/// @dev Offset used to pull Key From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch) + 20 (bytes for address)
 uint256 constant L2_LOG_KEY_OFFSET = 24;
 
-/// @dev Offset used to pull Value From Log. Equal to 4 (bytes for isService) + 20 (bytes for address) + 32 (bytes for key)
+/// @dev Offset used to pull Value From Log. Equal to 4 (bytes for shardId, isService and txNumberInBatch) + 20 (bytes for address) + 32 (bytes for key)
 uint256 constant L2_LOG_VALUE_OFFSET = 56;
 
 /// @dev Max number of blobs currently supported
@@ -83,7 +85,7 @@ interface IExecutor is IZKChainBase {
         uint64 indexRepeatedStorageChanges;
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
-        bytes32 dependencyRootsRollingHash; // kl todo we might have to include a new and old version of this struct for migration
+        bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
         uint256 timestamp;
         bytes32 commitment;
@@ -134,16 +136,35 @@ interface IExecutor is IZKChainBase {
         bytes operatorDAInput;
     }
 
+    /// @notice Container for a list of transaction statuses to precommit.
+    /// @param txs A packed array of individual transaction status commitments for the batch. Each is expected to be
+    /// of length 33 and have the following format: <32-byte tx hash, 1-byte status>. where status is either 0 (failed) or 1 (success).
+    /// @param untrustedLastL2BlockNumberHint The "hint" for what the last L2 block number that these txs represent is.
+    struct PrecommitInfo {
+        bytes packedTxsCommitments;
+        uint256 untrustedLastL2BlockNumberHint;
+    }
+
+    /// @notice Precommits the status of all L2 transactions for the next batch on the shared bridge.
+    /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
+    /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
+    /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
+    /// @param _batchNumber The sequential batch number to precommit (must equal `s.totalBatchesCommitted + 1`).
+    /// @param _precommitData ABI‐encoded transaction status list for the precommit.
+    function precommitSharedBridge(address _chainAddress, uint256 _batchNumber, bytes calldata _precommitData) external;
+
     /// @notice Function called by the operator to commit new batches. It is responsible for:
     /// - Verifying the correctness of their timestamps.
     /// - Processing their L2->L1 logs.
     /// - Storing batch commitments.
-    /// @param _chainId Chain ID of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
+    /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
+    /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processFrom The batch number from which the processing starts.
     /// @param _processTo The batch number at which the processing ends.
     /// @param _commitData The encoded data of the new batches to be committed.
     function commitBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _commitData
@@ -151,12 +172,14 @@ interface IExecutor is IZKChainBase {
 
     /// @notice Batches commitment verification.
     /// @dev Only verifies batch commitments without any other processing.
-    /// @param _chainId Chain ID of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
+    /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
+    /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processBatchFrom The batch number from which the verification starts.
     /// @param _processBatchTo The batch number at which the verification ends.
     /// @param _proofData The encoded data of the new batches to be verified.
     function proveBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
@@ -165,23 +188,27 @@ interface IExecutor is IZKChainBase {
     /// @notice The function called by the operator to finalize (execute) batches. It is responsible for:
     /// - Processing all pending operations (commpleting priority requests).
     /// - Finalizing this batch (i.e. allowing to withdraw funds from the system)
-    /// @param _chainId Chain ID of the chain.
+    /// @param _chainAddress The address of the DiamondProxy of the chain. Note, that it is not used in the implementation,
+    /// because it is expected to be equal to the `address(this)`, but it is kept here to maintain the same interface on both
+    /// `ValidatorTimelock` and `Executor` for easier and cheaper implementation of the timelock.
     /// @param _processFrom The batch number from which the execution starts.
     /// @param _processTo The batch number at which the execution ends.
     /// @param _executeData The encoded data of the new batches to be executed.
     function executeBatchesSharedBridge(
-        uint256 _chainId,
+        address _chainAddress,
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
     ) external;
 
     /// @notice Reverts unexecuted batches
-    /// @param _chainId Chain ID of the chain
+    /// @param _chainAddress The address of the DiamondProxy of the chain.
     /// @param _newLastBatch batch number after which batches should be reverted
+    /// @dev When the _newLastBatch is equal to the number of committed batches,
+    /// only the precommitment is erased.
     /// NOTE: Doesn't delete the stored data about batches, but only decreases
     /// counters that are responsible for the number of batches
-    function revertBatchesSharedBridge(uint256 _chainId, uint256 _newLastBatch) external;
+    function revertBatchesSharedBridge(address _chainAddress, uint256 _newLastBatch) external;
 
     /// @notice Event emitted when a batch is committed
     /// @param batchNumber Number of the batch committed
@@ -209,4 +236,15 @@ interface IExecutor is IZKChainBase {
     /// @param totalBatchesExecuted Total number of executed batches
     /// @dev It has the name "BlocksRevert" and not "BatchesRevert" due to backward compatibility considerations
     event BlocksRevert(uint256 totalBatchesCommitted, uint256 totalBatchesVerified, uint256 totalBatchesExecuted);
+
+    /// @notice Emitted when a new precommitment is set for a batch.
+    /// @param batchNumber The batch number for which the precommitment was recorded.
+    /// @param untrustedLastL2BlockNumberHint The hint to what L2 block number the precommitment should correspond to. Note, that there are no
+    /// guarantees on its correctness, it is just a way for the server to make external nodes' indexing simpler.
+    /// @param precommitment The resulting rolling hash of all transaction statuses.
+    event BatchPrecommitmentSet(
+        uint256 indexed batchNumber,
+        uint256 indexed untrustedLastL2BlockNumberHint,
+        bytes32 precommitment
+    );
 }

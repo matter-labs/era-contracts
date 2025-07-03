@@ -44,7 +44,7 @@
     "path": "^0.12.7",
     "querystring": "^0.2.0",
     "solc": "0.8.17",
-    "solhint": "^3.6.2",
+    "solhint": "^5.1.0",
     "solidity-coverage": "^0.8.5",
     "toml": "^3.0.0",
     "ts-generator": "^0.1.1",

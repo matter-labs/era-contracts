@@ -77,7 +77,7 @@ contract GatewayCTMDeployerTest is Test {
         new TestnetVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
         new DualVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)));
 
-        new ValidatorTimelock(address(0), 0);
+        new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
@@ -178,11 +178,6 @@ library DeployedContractsComparator {
         StateTransitionContracts memory a,
         StateTransitionContracts memory b
     ) internal pure {
-        require(a.chainTypeManagerProxy == b.chainTypeManagerProxy, "chainTypeManagerProxy differs");
-        require(
-            a.chainTypeManagerImplementation == b.chainTypeManagerImplementation,
-            "chainTypeManagerImplementation differs"
-        );
         require(a.verifier == b.verifier, "verifier differs");
         require(a.adminFacet == b.adminFacet, "adminFacet differs");
         require(a.mailboxFacet == b.mailboxFacet, "mailboxFacet differs");
@@ -193,6 +188,11 @@ library DeployedContractsComparator {
         require(a.validatorTimelock == b.validatorTimelock, "validatorTimelock differs");
         require(a.chainTypeManagerProxyAdmin == b.chainTypeManagerProxyAdmin, "chainTypeManagerProxyAdmin differs");
         require(a.serverNotifierProxy == b.serverNotifierProxy, "serverNotifier proxy differs");
+        require(a.chainTypeManagerProxy == b.chainTypeManagerProxy, "chainTypeManagerProxy differs");
+        require(
+            a.chainTypeManagerImplementation == b.chainTypeManagerImplementation,
+            "chainTypeManagerImplementation differs"
+        );
     }
 
     function compareDAContracts(DAContracts memory a, DAContracts memory b) internal pure {
