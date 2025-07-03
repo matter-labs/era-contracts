@@ -317,7 +317,7 @@ object "Bootloader" {
                 ret := add(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 1)
             }
 
-            /// @dev The byte starting from which the interop roots are stored.
+            /// @dev The byte containing the count of blocks processed so far
             function NUMBER_OF_PROCESSED_BLOCKS_BYTE() -> ret {
                 ret := mul(NUMBER_OF_PROCESSED_BLOCKS_SLOT(), 32)
             }
