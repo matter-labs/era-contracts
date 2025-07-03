@@ -31,6 +31,8 @@ contract EigenDAL1DAValidator is IL1DAValidator {
         risc0Verifier = IRiscZeroVerifier(risc0VerifierAddress);
     }
 
+    /// Verifies a zk proof of an eth-call to https://github.com/Layr-Labs/eigenda/blob/805492f803416c258b8aa7dff90c7d5cc4b750bd/contracts/src/periphery/cert/interfaces/IEigenDACertVerifierBase.sol#L8
+    /// It is only compatible with EigenDACertV3 https://github.com/Layr-Labs/eigenda/blob/805492f803416c258b8aa7dff90c7d5cc4b750bd/contracts/src/periphery/cert/EigenDACertTypes.sol#L11
     function checkDA(
         uint256, // _chainId
         uint256, // _batchNumber,
