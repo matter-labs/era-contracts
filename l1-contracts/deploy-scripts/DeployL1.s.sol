@@ -345,7 +345,7 @@ contract DeployL1Script is Script, DeployUtils {
         console.log("SharedBridge updated with ERC20Bridge address");
 
         L1NativeTokenVault ntv = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
-        vm.broadcast(msg.sender);
+        vm.broadcast(config.ownerAddress);
         ntv.setAssetTracker(addresses.bridgehub.assetTrackerProxy);
         console.log("L1NativeTokenVault updated with AssetTracker address");
     }
@@ -377,7 +377,6 @@ contract DeployL1Script is Script, DeployUtils {
 
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         IOwnable(address(sharedBridge)).transferOwnership(addresses.governance);
-        IOwnable(addresses.vaults.l1NativeTokenVaultProxy).transferOwnership(addresses.governance);
 
         IChainTypeManager ctm = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
         IOwnable(address(ctm)).transferOwnership(addresses.governance);
@@ -878,7 +877,7 @@ contract DeployL1Script is Script, DeployUtils {
             return
                 abi.encodeCall(
                     L1NativeTokenVault.initialize,
-                    (config.deployerAddress, addresses.bridges.bridgedTokenBeacon)
+                    (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
                 );
         } else if (compareStrings(contractName, "ChainTypeManager")) {
             return
