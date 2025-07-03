@@ -2269,6 +2269,11 @@ object "Bootloader" {
                 ret := or(lt(x,y), eq(x,y))
             }
 
+            /// @dev Returns whether x >= y
+            function gte(x, y) -> ret {
+                ret := or(gt(x, y), eq(x, y))
+            }
+
             /// @dev Checks whether an address is an account
             /// @param addr The address to check
             function ensureAccount(addr) {
