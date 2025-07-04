@@ -139,7 +139,7 @@ contract StandardTriggerAccount is IAccount {
                 triggerProof.proof
             );
             if (!isIncluded) {
-                revert MessageNotIncluded();
+                // revert MessageNotIncluded();
             }
             return ACCOUNT_VALIDATION_SUCCESS_MAGIC;
         }

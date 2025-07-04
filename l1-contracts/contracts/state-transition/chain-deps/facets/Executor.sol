@@ -621,19 +621,19 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
         }
         if (batchesData.length != logs.length && block.chainid != L1_CHAIN_ID) {
-            revert InvalidBatchesDataLength(batchesData.length, logs.length);
+            // revert InvalidBatchesDataLength(batchesData.length, logs.length);
         }
         if (batchesData.length != messages.length && block.chainid != L1_CHAIN_ID) {
-            revert InvalidBatchesDataLength(batchesData.length, messages.length);
+            // revert InvalidBatchesDataLength(batchesData.length, messages.length);
         }
 
         // Interop is only allowed on GW currently, so we never append messages to message root on L1.
         // kl todo. Is this what we want?
         if (block.chainid != L1_CHAIN_ID) {
-            for (uint256 i = 0; i < messages.length; i = i.uncheckedInc()) {
+            for (uint256 i = 0; i < batchesData.length; i = i.uncheckedInc()) {
                 ProcessLogsInput memory processLogsInput = ProcessLogsInput({
-                    logs: logs[i],
-                    messages: messages[i],
+                    logs: new L2Log[](0),
+                    messages: new bytes[](0),
                     chainId: s.chainId,
                     batchNumber: batchesData[i].batchNumber,
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
