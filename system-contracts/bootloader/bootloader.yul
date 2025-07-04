@@ -317,7 +317,7 @@ object "Bootloader" {
                 ret := add(LAST_PROCESSED_BLOCK_NUMBER_SLOT(), 1)
             }
 
-            /// @dev The byte starting from which the interop roots are stored.
+            /// @dev The byte containing the count of blocks processed so far
             function NUMBER_OF_PROCESSED_BLOCKS_BYTE() -> ret {
                 ret := mul(NUMBER_OF_PROCESSED_BLOCKS_SLOT(), 32)
             }
@@ -3190,15 +3190,14 @@ object "Bootloader" {
                     }
 
                     if iszero(sidesLength) {
-                        debugLog("Empty sides, finishing", 0)
-                        break
+                        revertWithReason(EMPTY_SIDES_LENGTH(), 0)
                     }
 
                     callL2InteropRootStorage(chainId, blockNumber, sidesLength, interopRootStartByte)
                 }
 
-                mstore(CURRENT_INTEROP_ROOT_BYTE(), i)
-                debugLog("Current interop root updated", i)
+                mstore(CURRENT_INTEROP_ROOT_BYTE(), finalInteropRootNumber)
+                debugLog("Current interop root updated", finalInteropRootNumber)
                 mstore(LAST_PROCESSED_BLOCK_NUMBER_BYTE(), setForBlockNumber)
                 debugLog("currentNumberOfRoots", mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()))
                 debugLog("currentNumberOfRoots 2", add(mload(NUMBER_OF_PROCESSED_BLOCKS_BYTE()), 1))
@@ -4101,6 +4100,10 @@ object "Bootloader" {
                 ret := 36
             }
 
+            function EMPTY_SIDES_LENGTH() -> ret {
+                ret := 37
+            }
+
             /// @dev Accepts a 1-word literal and returns its length in bytes
             /// @param str A string literal
             function getStrLen(str) -> len {
@@ -4502,9 +4505,6 @@ object "Bootloader" {
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
             sendToL1Native(true, txsStatusRollingHashKey(), mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE()))
-            
-            /// setting all remaining interop roots, even the ones in the fictive block.
-            setInteropRootForBlock(MAXIMUM_L2_BLOCK_NUMBER())
             
             // After all of the interop roots are processed, sending hash to L1.
             let rollingHashOfProcessedRoots := mload(INTEROP_ROOT_ROLLING_HASH_BYTE())
