@@ -268,7 +268,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         });
         InteropBundle memory interopBundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
-            destinationChainId: 271,
+            destinationChainId: 31337,
             interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,
             bundleAttributes: BundleAttributes({
