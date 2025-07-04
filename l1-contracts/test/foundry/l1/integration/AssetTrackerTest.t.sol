@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
+
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
@@ -11,6 +13,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -28,13 +31,27 @@ import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {L2_BRIDGEHUB, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
+    using stdStorage for StdStorage;
+
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
 
     IAssetTracker assetTracker;
+    address l1AssetTracker = address(0);
+
+    address tokenAddress;
+    bytes32 assetId;
+    uint256 originalChainId;
+    uint256 gwChainId;
+    bytes32 assetSettlementLayerLocation;
+    bytes32 chainBalanceLocation;
+    uint256 amount = 1000000000000000000;
 
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
@@ -74,48 +91,118 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     }
 
     function setUp() public {
+        originalChainId = block.chainid;
+        gwChainId = 1;
         prepare();
+        tokenAddress = tokens[1];
+        assetId = DataEncoding.encodeNTVAssetId(block.chainid, tokenAddress);
+        assetSettlementLayerLocation = keccak256(abi.encodePacked(assetId, uint256(2 + 151)));
+
+        chainBalanceLocation = 0x13b704bded2382d6e555a218f4d57330c8d624337c03a7aa1779d78f557b4126;
+        // the below does not work for some reason:
+        // chainBalanceLocation = (computeNestedMappingSlot(eraZKChainId, assetId, 0 + 151));
     }
 
-    function test_migration() public {
-        address tokenAddress = tokens[1];
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, tokenAddress);
+    function computeNestedMappingSlot(
+        uint256 outerKey,
+        bytes32 innerKey,
+        uint256 baseSlot
+    ) internal pure returns (bytes32) {
+        // Computes keccak256(abi.encode(outerKey, keccak256(abi.encode(innerKey, baseSlot))))
+        bytes32 innerHash = keccak256(abi.encode(innerKey, baseSlot));
+        return keccak256(abi.encode(outerKey, innerHash));
+    }
 
-        uint256 originalChainId = block.chainid;
+    function test_migrationL1ToGateway() public {
+        // vm.chainId(eraZKChainId);
+        // vm.mockCall(
+        //     L2_NATIVE_TOKEN_VAULT_ADDR,
+        //     abi.encodeWithSelector(L2_NATIVE_TOKEN_VAULT.tokenAddress.selector),
+        //     abi.encode(tokenAddress)
+        // );
+        // vm.mockCall(
+        //     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+        //     abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+        //     abi.encode(bytes32(0))
+        // );
+        // assetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
 
-        vm.chainId(eraZKChainId);
+        FinalizeL1DepositParams memory finalizeWithdrawalParamsL1ToGateway = FinalizeL1DepositParams({
+            chainId: eraZKChainId,
+            l2BatchNumber: 0,
+            l2MessageIndex: 0,
+            l2Sender: L2_ASSET_TRACKER_ADDR,
+            l2TxNumberInBatch: 0,
+            message: abi.encode(eraZKChainId, assetId, amount, 0, true),
+            merkleProof: new bytes32[](0)
+        });
+        vm.chainId(originalChainId);
         vm.mockCall(
-            L2_NATIVE_TOKEN_VAULT_ADDR,
-            abi.encodeWithSelector(L2_NATIVE_TOKEN_VAULT.tokenAddress.selector),
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            abi.encode(true)
+        );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.settlementLayer.selector),
+            abi.encode(gwChainId)
+        );
+        bytes[] memory mocks1 = new bytes[](2);
+        bytes32 randomHash = keccak256(abi.encode(assetId));
+        mocks1[0] = abi.encode(randomHash);
+        mocks1[1] = abi.encode(randomHash);
+        vm.mockCalls(
+            address(0x0000000000000000000000000000000000000011),
+            abi.encodeWithSelector(IMailboxImpl.requestL2ServiceTransaction.selector),
+            mocks1
+        );
+        bytes[] memory mocks2 = new bytes[](2);
+        mocks2[0] = abi.encode(0x0000000000000000000000000000000000000011);
+        mocks2[1] = abi.encode(0x0000000000000000000000000000000000000011);
+
+        vm.mockCalls(address(addresses.bridgehub), abi.encodeWithSelector(IBridgehub.getZKChain.selector), mocks2);
+
+        vm.store(address(assetTracker), assetSettlementLayerLocation, bytes32(uint256(originalChainId)));
+        vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
+
+        assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
+
+        vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
+        assetTracker.confirmMigrationOnL2(1, assetId, amount, 0);
+        vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
+        assetTracker.confirmMigrationOnGateway(1, assetId, amount, true);
+    }
+
+    function test_migrationGatewayToL1() public {
+        vm.chainId(gwChainId);
+        vm.mockCall(
+            address(L2_BRIDGEHUB),
+            abi.encodeWithSelector(L2_BRIDGEHUB.getZKChain.selector),
             abi.encode(tokenAddress)
+        );
+        vm.mockCall(
+            address(L2_BRIDGEHUB),
+            abi.encodeWithSelector(L2_BRIDGEHUB.settlementLayer.selector),
+            abi.encode(originalChainId)
         );
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
         );
-        assetTracker.migrateTokenBalanceFromL2(assetId);
 
-        // assertEq(assetTracker.chainBalance(1, assetId), 1000000000000000000);
+        vm.store(address(assetTracker), assetSettlementLayerLocation, bytes32(uint256(gwChainId)));
+        assetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);
 
-        FinalizeL1DepositParams memory finalizeWithdrawalParams = FinalizeL1DepositParams({
-            chainId: eraZKChainId,
+        FinalizeL1DepositParams memory finalizeWithdrawalParamsGatewayToL1 = FinalizeL1DepositParams({
+            chainId: gwChainId,
             l2BatchNumber: 0,
             l2MessageIndex: 0,
-            l2Sender: address(0),
+            l2Sender: L2_ASSET_TRACKER_ADDR,
             l2TxNumberInBatch: 0,
-            message: abi.encode(eraZKChainId, assetId, 1000000000000000000, 0),
+            message: abi.encode(eraZKChainId, assetId, amount, 0, false),
             merkleProof: new bytes32[](0)
         });
-
-        uint256 gwChainId = 1;
-        vm.chainId(gwChainId);
-        vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
-            abi.encode(true)
-        );
-        assetTracker.receiveMigrationOnGateway(finalizeWithdrawalParams);
 
         vm.chainId(originalChainId);
         vm.mockCall(
@@ -123,11 +210,37 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
         );
-        assetTracker.receiveMigrationOnL1(finalizeWithdrawalParams);
+        // vm.mockCall(
+        //     address(addresses.bridgehub),
+        //     abi.encodeWithSelector(IBridgehub.settlementLayer.selector),
+        //     abi.encode(originalChainId)
+        // );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.whitelistedSettlementLayers.selector),
+            abi.encode(true)
+        );
 
-        // assertEq(assetTracker.chainBalance(1, assetId), 0);
+        bytes32 randomHash = keccak256(abi.encode(assetId));
 
-        assetTracker.confirmMigrationOnL2(1, assetId, 1000000000000000000, 0);
+        vm.mockCall(
+            address(0x0000000000000000000000000000000000000011),
+            abi.encodeWithSelector(IMailboxImpl.requestL2ServiceTransaction.selector),
+            abi.encode(randomHash)
+        );
+
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector),
+            abi.encode(0x0000000000000000000000000000000000000011)
+        );
+        vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
+
+        assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
+
+        vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
+        vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
+        assetTracker.confirmMigrationOnGateway(eraZKChainId, assetId, amount, false);
     }
 
     function test_processLogsAndMessages() public {

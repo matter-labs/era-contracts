@@ -8,6 +8,7 @@ import {IMessageVerification} from "../../state-transition/chain-interfaces/IMes
 import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
@@ -69,6 +70,8 @@ address constant L2_VERSION_SPECIFIC_UPGRADER_ADDR = L2_GENESIS_UPGRADE_ADDR;
 
 /// @dev The address of the L2 bridge hub system contract, used to start L1->L2 transactions
 address constant L2_BRIDGEHUB_ADDR = address(USER_CONTRACTS_OFFSET + 0x02);
+
+IBridgehub constant L2_BRIDGEHUB = IBridgehub(L2_BRIDGEHUB_ADDR);
 
 /// @dev the address of the l2 asset router.
 address constant L2_ASSET_ROUTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x03);

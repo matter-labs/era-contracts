@@ -33,6 +33,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, IBridgedStandardToken, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
@@ -90,6 +91,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             .with_key(eraZKChainId)
             .with_key(ETH_TOKEN_ASSET_ID)
             .checked_write(100);
+        vm.prank(Ownable2StepUpgradeable(addresses.l1NativeTokenVault).pendingOwner());
+        Ownable2StepUpgradeable(addresses.l1NativeTokenVault).acceptOwnership();
     }
 
     function depositToL1(address _tokenAddress) public {

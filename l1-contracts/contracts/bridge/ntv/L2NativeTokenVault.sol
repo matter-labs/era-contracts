@@ -58,20 +58,14 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId, _l1ChainId) {
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
-        if (_l2TokenProxyBytecodeHash == bytes32(0)) {
-            revert EmptyBytes32();
-        }
-        if (_aliasedOwner == address(0)) {
-            revert EmptyAddress();
-        }
+        require(_l2TokenProxyBytecodeHash != bytes32(0), EmptyBytes32());
+        require(_aliasedOwner != address(0), EmptyAddress());
 
         L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
         _transferOwnership(_aliasedOwner);
 
         if (_contractsDeployedAlready) {
-            if (_bridgedTokenBeacon == address(0)) {
-                revert EmptyAddress();
-            }
+            require(_bridgedTokenBeacon != address(0), EmptyAddress());
             bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         } else {
             address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
@@ -106,16 +100,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     function setLegacyTokenAssetId(address _l2TokenAddress) public override {
         // some legacy tokens were bridged without setting the originChainId on testnets
         bytes32 assetId = assetId[_l2TokenAddress];
-        if (assetId != bytes32(0) && originChainId[assetId] != 0) {
-            revert AssetIdAlreadyRegistered();
-        }
-        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0)) {
-            revert NoLegacySharedBridge();
-        }
+        require(assetId == bytes32(0) || originChainId[assetId] == 0, AssetIdAlreadyRegistered());
+        require(address(L2_LEGACY_SHARED_BRIDGE) != address(0), NoLegacySharedBridge());
         address l1TokenAddress = L2_LEGACY_SHARED_BRIDGE.l1TokenAddress(_l2TokenAddress);
-        if (l1TokenAddress == address(0)) {
-            revert TokenNotLegacy();
-        }
+        require(l1TokenAddress != address(0), TokenNotLegacy());
 
         _registerLegacyTokenAssetId(_l2TokenAddress, l1TokenAddress);
     }
@@ -129,8 +117,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         tokenAddress[newAssetId] = _l2TokenAddress;
         assetId[_l2TokenAddress] = newAssetId;
         originChainId[newAssetId] = L1_CHAIN_ID;
-        bridgedTokens[bridgedTokenCount] = newAssetId;
-        ++bridgedTokenCount;
+        bridgedTokens[bridgedTokensCount] = newAssetId;
+        ++bridgedTokensCount;
     }
 
     /// @notice Ensures that the token is deployed.
@@ -178,15 +166,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         _assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
 
         /// token is a legacy token, no need to deploy
-        if (_l1LegacyToken != _originToken) {
-            revert AddressMismatch(_originToken, _l1LegacyToken);
-        }
+        require(_l1LegacyToken == _originToken, AddressMismatch(_originToken, _l1LegacyToken));
 
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
         originChainId[_assetId] = L1_CHAIN_ID;
-        bridgedTokens[bridgedTokenCount] = _assetId;
-        ++bridgedTokenCount;
+        bridgedTokens[bridgedTokensCount] = _assetId;
+        ++bridgedTokensCount;
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
@@ -213,9 +199,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             );
 
             // The deployment should be successful and return the address of the proxy
-            if (!success) {
-                revert DeployFailed();
-            }
+            require(success, DeployFailed());
             proxy = BeaconProxy(abi.decode(returndata, (address)));
         } else {
             // Deploy the beacon proxy for the L2 token
@@ -225,12 +209,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override {
-        if (_assetId == BASE_TOKEN_ASSET_ID) {
-            revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
-        } else {
-            // Withdraw funds
-            IERC20(_token).safeTransfer(_to, _amount);
-        }
+        require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
+        IERC20(_token).safeTransfer(_to, _amount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -277,7 +257,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _isNative
     ) internal override {
         // on L2s we don't track the balance.
-        // Note GW->L2 txs are not allowed. Even for GW, there
+        // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
+        // so L2NativeTokenVault doesn't have to handle balance changes on GW.
     }
 
     function _handleChainBalanceDecrease(
@@ -288,6 +269,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bool _isNative
     ) internal override {
         // on L2s we don't track the balance.
+        // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
+        // so L2NativeTokenVault doesn't have to handle balance changes on GW.
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {

@@ -111,6 +111,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
     /// @param _data Calldata payload to send.
     /// @param _attributes Attributes of the call.
     /// @return bundleHash Hash of the sent bundle containing a single call.
+    /// Todo use interoperable addresses using this: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/draft-InteroperableAddress.sol
     function sendCall(
         uint256 _destinationChainId,
         address _destinationAddress,

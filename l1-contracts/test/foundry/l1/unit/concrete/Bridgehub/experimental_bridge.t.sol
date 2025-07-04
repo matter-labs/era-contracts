@@ -131,6 +131,8 @@ contract ExperimentalBridgeTest is Test {
             address(ntv),
             address(0)
         );
+
+        vm.prank(bridgeOwner);
         ntv.setAssetTracker(address(assetTracker));
 
         mockSecondSharedBridge.setNativeTokenVault(ntv);
@@ -214,7 +216,7 @@ contract ExperimentalBridgeTest is Test {
         L1NativeTokenVault ntvImpl = new L1NativeTokenVault(weth, _sharedBridgeAddr, l1Nullifier);
         TransparentUpgradeableProxy ntvProxy = new TransparentUpgradeableProxy(
             address(ntvImpl),
-            address(bridgeOwner),
+            address(deployerAddress),
             abi.encodeCall(ntvImpl.initialize, (bridgeOwner, address(0)))
         );
         addr = L1NativeTokenVault(payable(ntvProxy));
@@ -234,6 +236,8 @@ contract ExperimentalBridgeTest is Test {
             address(ntv),
             address(0)
         );
+
+        vm.prank(bridgeOwner);
         ntv.setAssetTracker(address(assetTracker));
 
         secondBridgeAddress = address(sharedBridge);
