@@ -17,7 +17,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER_ADDR
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
-import {AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion, AssetHandlerDoesNotExist} from "../../common/L1ContractErrors.sol";
+import {AssetIdNotSupported, Unauthorized, UnsupportedEncodingVersion, AssetHandlerDoesNotExist, BadTransferDataLength} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 
 /// @author Matter Labs
@@ -30,7 +30,8 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev InteropCenter smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    /// @dev InteropCenter smart contract that is used to used as a primary point for communication of chains connected to the interop.
+    /// @dev This is not used but is present for discoverability.
     IInteropCenter public immutable override INTEROP_CENTER;
 
     /// @dev Chain ID of L1 for bridging reasons
@@ -60,17 +61,13 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(BRIDGE_HUB), Unauthorized(msg.sender));
         _;
     }
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyL2InteropCenter() {
-        if (msg.sender != L2_INTEROP_CENTER_ADDR) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == L2_INTEROP_CENTER_ADDR, Unauthorized(msg.sender));
         _;
     }
 
@@ -97,16 +94,14 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bool senderIsNTV = msg.sender == _nativeTokenVault;
         address sender = senderIsNTV ? L2_NATIVE_TOKEN_VAULT_ADDR : msg.sender;
         bytes32 assetId = DataEncoding.encodeAssetId(block.chainid, _assetRegistrationData, sender);
-        if (!senderIsNTV && msg.sender != assetDeploymentTracker[assetId]) {
-            revert Unauthorized(msg.sender);
-        }
+        require(senderIsNTV || msg.sender == assetDeploymentTracker[assetId], Unauthorized(msg.sender));
         _setAssetHandler(assetId, _assetHandlerAddress);
         assetDeploymentTracker[assetId] = msg.sender;
         emit AssetDeploymentTrackerRegistered(assetId, _assetRegistrationData, msg.sender);
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATTE DEPOSIT Functions
+                            INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     function bridgehubDepositBaseToken(
@@ -123,9 +118,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 _amount
     ) public payable virtual {
         address assetHandler = assetHandlerAddress[_assetId];
-        if (assetHandler == address(0)) {
-            revert AssetHandlerDoesNotExist(_assetId);
-        }
+        require(assetHandler != address(0), AssetHandlerDoesNotExist(_assetId));
 
         // slither-disable-next-line unused-return
         IAssetHandler(assetHandler).bridgeBurn{value: msg.value}({
@@ -150,7 +143,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == NEW_ENCODING_VERSION) {
             return
-                _bridgehubDepositRealAsset({
+                _bridgehubDepositNonBaseTokenAsset({
                     _chainId: _chainId,
                     _originalCaller: _originalCaller,
                     _value: _value,
@@ -162,7 +155,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         }
     }
 
-    function _bridgehubDepositRealAsset(
+    function _bridgehubDepositNonBaseTokenAsset(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,
@@ -172,9 +165,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes1 encodingVersion = _data[0];
 
         (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _originalCaller, _data);
-        if (BRIDGE_HUB.baseTokenAssetId(_chainId) == assetId) {
-            revert AssetIdNotSupported(assetId);
-        }
+        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,
@@ -216,7 +207,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes calldata _data
     ) internal virtual returns (bytes32 assetId, bytes memory transferData) {
         if (_encodingVersion == NEW_ENCODING_VERSION) {
+            // For better error handling.
+            require(_data.length >= 33, BadTransferDataLength());
             (assetId, transferData) = abi.decode(_data[1:], (bytes32, bytes));
+        } else {
+            revert UnsupportedEncodingVersion();
         }
     }
 
