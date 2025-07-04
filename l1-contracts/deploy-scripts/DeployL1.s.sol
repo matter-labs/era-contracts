@@ -877,7 +877,11 @@ contract DeployL1Script is Script, DeployUtils {
         } else if (compareStrings(contractName, "L1ERC20Bridge")) {
             return abi.encodeCall(L1ERC20Bridge.initialize, ());
         } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-            return abi.encodeCall(L1NativeTokenVault.initialize, (config.deployerAddress, addresses.bridges.bridgedTokenBeacon));
+            return
+                abi.encodeCall(
+                    L1NativeTokenVault.initialize,
+                    (config.deployerAddress, addresses.bridges.bridgedTokenBeacon)
+                );
         } else if (compareStrings(contractName, "ChainTypeManager")) {
             return
                 abi.encodeCall(
