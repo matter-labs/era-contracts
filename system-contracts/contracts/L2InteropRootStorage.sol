@@ -7,6 +7,7 @@ import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 event InteropRootAdded(uint256 indexed chainId, uint256 indexed blockNumber, bytes32[] sides);
 error SidesLengthNotOne();
 error InteropRootAlreadyExists();
+error MessageRootIsZero();
 
 /**
  * @author Matter Labs
@@ -33,7 +34,7 @@ contract L2InteropRootStorage is SystemContractBase {
     /// it represents the batch number. This distinction reflects the implementation requirements  of each interop finality form.
     /// @param chainId The chain ID of the chain that the message root is for.
     /// @param blockOrBatchNumber The block or batch number of the message root. Either of block number or batch number will be used,
-    // depends on finality form of interop, mentioned above.
+    /// depends on finality form of interop, mentioned above.
     /// @param sides The message root sides. Note, that `sides` here are coming from `DynamicIncrementalMerkle` nomenclature.
     function addInteropRoot(
         uint256 chainId,
@@ -43,6 +44,9 @@ contract L2InteropRootStorage is SystemContractBase {
         // In the current code sides should only contain the Interop Root itself, as mentioned above.
         if (sides.length != 1) {
             revert SidesLengthNotOne();
+        }
+        if (sides[0] == bytes32(0)) {
+            revert MessageRootIsZero();
         }
 
         // Make sure that interopRoots for specified chainId and blockOrBatchNumber wasn't set already.

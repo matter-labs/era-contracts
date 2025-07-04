@@ -43,9 +43,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 chainBatchRoot);
 
     /// @notice Emitted when a new chainTree root is produced and its corresponding leaf in sharedTree is updated.
+    /// @param chainId The ID of the chain whose chainTree root is being updated.
     /// @param chainRoot The updated Merkle root of the chainTree after appending the latest batch root.
-    /// @param preimage  The Merkle leaf value (chainIdLeafHash) computed from `chainRoot` and the chain’s ID, used to update the shared tree.
-    event Preimage(bytes32 chainRoot, bytes32 preimage);
+    /// @param chainIdLeafHash The Merkle leaf value computed from `chainRoot` and the chain’s ID, used to update the shared tree.
+    event NewChainRoot(uint256 indexed chainId, bytes32 chainRoot, bytes32 chainIdLeafHash);
 
     /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
     /// @param chainId The ID of the chain where the sharedTree was updated.
@@ -171,14 +172,12 @@ contract MessageRoot is IMessageRoot, Initializable {
 
         // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
         bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
-        // slither-disable-next-line unused-return
-        sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
+        bytes32 sharedTreeRoot = sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
 
-        emit Preimage(chainRoot, cachedChainIdLeafHash);
+        emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
 
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
-        bytes32 sharedTreeRoot = sharedTree.root();
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = sharedTreeRoot;
         emit NewInteropRoot(block.chainid, block.number, 0, _sides);
@@ -207,6 +206,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @dev Gets the message root of a single chain.
     /// @param _chainId The ID of the chain whose message root is being queried.
     function getChainRoot(uint256 _chainId) external view returns (bytes32) {
+        // Make sure that chain is registered.
+        if (!chainRegistered(_chainId)) {
+            revert MessageRootNotRegistered();
+        }
         return chainTree[_chainId].root();
     }
 
@@ -214,11 +217,10 @@ contract MessageRoot is IMessageRoot, Initializable {
         uint256 cachedChainCount = chainCount;
         bytes32[] memory newLeaves = new bytes32[](cachedChainCount);
         for (uint256 i = 0; i < cachedChainCount; ++i) {
-            newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainIndexToId[i]].root(), chainIndexToId[i]);
+            uint256 chainId = chainIndexToId[i];
+            newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainId].root(), chainId);
         }
-        // slither-disable-next-line unused-return
-        sharedTree.updateAllLeaves(newLeaves);
-        bytes32 newRoot = sharedTree.root();
+        bytes32 newRoot = sharedTree.updateAllLeaves(newLeaves);
         bytes32[] memory _sides = new bytes32[](1);
         _sides[0] = newRoot;
         emit NewInteropRoot(block.chainid, block.number, 0, _sides);

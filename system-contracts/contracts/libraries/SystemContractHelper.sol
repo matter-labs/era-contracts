@@ -452,7 +452,7 @@ library SystemContractHelper {
             sloadContractBytecodeHash := extcodehash(sloadContractAddress)
         }
 
-        // Just in case, that the `sloadContractBytecodeHash` is known
+        // Just in case, checking that the `sloadContractBytecodeHash` is known.
         if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(sloadContractBytecodeHash) == 0) {
             revert SloadContractBytecodeUnknown();
         }

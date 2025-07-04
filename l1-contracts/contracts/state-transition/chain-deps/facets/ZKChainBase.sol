@@ -95,7 +95,7 @@ contract ZKChainBase is ReentrancyGuard {
     /// @notice Returns whether the priority queue is still active, i.e.
     /// the chain has not processed all transactions from it
     function _isPriorityQueueActive() internal view returns (bool) {
-        return s.priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex;
+        return s.__DEPRECATED_priorityQueue.getFirstUnprocessedPriorityTx() < s.priorityTree.startIndex;
     }
 
     /// @notice Ensures that the queue is deactivated. Should be invoked
@@ -105,16 +105,12 @@ contract ZKChainBase is ReentrancyGuard {
         // overriding `tail`/`head` on L1 deployment.
         if (_isPriorityQueueActive()) {
             uint256 startIndex = s.priorityTree.startIndex;
-            s.priorityQueue.head = startIndex;
-            s.priorityQueue.tail = startIndex;
+            s.__DEPRECATED_priorityQueue.head = startIndex;
+            s.__DEPRECATED_priorityQueue.tail = startIndex;
         }
     }
 
     function _getTotalPriorityTxs() internal view returns (uint256) {
-        if (_isPriorityQueueActive()) {
-            return s.priorityQueue.getTotalPriorityTxs();
-        } else {
-            return s.priorityTree.getTotalPriorityTxs();
-        }
+        return s.priorityTree.getTotalPriorityTxs();
     }
 }

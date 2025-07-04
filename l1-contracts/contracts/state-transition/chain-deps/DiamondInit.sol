@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
@@ -14,8 +14,8 @@ import {EmptyAssetId, EmptyBytes32, TooMuchGas, ZeroAddress} from "../../common/
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
 contract DiamondInit is ZKChainBase, IDiamondInit {
-    using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
+    using PriorityQueue for PriorityQueue.Queue;
 
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
@@ -79,7 +79,8 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
-        s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
+        s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
+        s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
 
         // While this does not provide a protection in the production, it is needed for local testing
         // Length of the L2Log encoding should not be equal to the length of other L2Logs' tree nodes preimages
