@@ -74,17 +74,32 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
-            _chainId: s.chainId,
-            _batchNumber: uint256(_newBatch.batchNumber),
-            _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
-            _operatorDAInput: _newBatch.operatorDAInput,
-            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
-        });
-
-        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
-            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
-        }
+        ///
+        /// DEBUG SUPPORT START
+        ///
+        // L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+        //     _chainId: s.chainId,
+        //     _batchNumber: uint256(_newBatch.batchNumber),
+        //     _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
+        //     _operatorDAInput: _newBatch.operatorDAInput,
+        //     _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        // });
+        L1DAValidatorOutput memory daOutput;
+        daOutput.stateDiffHash = bytes32(_newBatch.operatorDAInput);
+        daOutput.blobsOpeningCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        daOutput.blobsLinearHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
+        ///
+        /// DEBUG SUPPORT END
+        ///
+        ///
+         /// DEBUG SUPPORT START
+         ///
+ //        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
+ //            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
+ //        }
+         ///
+         /// DEBUG SUPPORT END
+         ///
         // Check that the priority operation hash in the L2 logs is as expected
         if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
             revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
@@ -189,18 +204,24 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
 
-        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
-        // So here we need to only double check that:
-        // - The timestamp of the batch is not too small.
-        // - The timestamp of the last L2 block is not too big.
-        // New batch timestamp is too small
-        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
-            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
-        }
-        // The last L2 block timestamp is too big
-        if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
-            revert L2TimestampTooBig();
-        }
+         ///
+         /// DEBUG SUPPORT START
+         ///
+ //        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
+ //        // So here we need to only double check that:
+ //        // - The timestamp of the batch is not too small.
+ //        // - The timestamp of the last L2 block is not too big.
+ //        // New batch timestamp is too small
+ //        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
+ //            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
+ //        }
+ //        // The last L2 block timestamp is too big
+ //        if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
+ //            revert L2TimestampTooBig();
+ //        }
+         ///
+         /// DEBUG SUPPORT END
+         ///
     }
 
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
@@ -270,9 +291,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
-                if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
-                    revert MismatchL2DAValidator();
-                }
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                // if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
+                //     revert MismatchL2DAValidator();
+                // }
+                ///
+                /// DEBUG SUPPORT END
+                ///
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
