@@ -185,6 +185,7 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
+        vm.prank(owner);
         nativeTokenVault.setAssetTracker(address(l1AssetTracker));
 
         vm.prank(owner);

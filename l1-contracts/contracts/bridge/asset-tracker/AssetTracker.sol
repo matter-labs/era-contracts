@@ -23,7 +23,7 @@ import {FinalizeL1DepositParams} from "../../bridge/interfaces/IL1Nullifier.sol"
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
+// import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidChainId, InvalidSender} from "./AssetTrackerErrors.sol";
 
 contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerModifiers {
@@ -308,7 +308,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     }
 
     function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
-        return IChainAssetHandler(IBridgehub(BRIDGE_HUB).chainAssetHandler()).migrationNumber(_chainId);
+        return _chainId - _chainId;
+        // return IChainAssetHandler(IBridgehub(BRIDGE_HUB).chainAssetHandler()).migrationNumber(_chainId);
     }
 
     /// @notice This function receives the migration from the L2 or the Gateway.

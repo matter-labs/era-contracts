@@ -35,13 +35,23 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
+    /// @notice AssetTracker component address on L1. On L2 the address is L2_ASSET_TRACKER_ADDR.
+    ///         It adds one more layer of security on top of cross chain communication.
+    ///         Refer to its documentation for more details.
     IAssetTracker public l1AssetTracker;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
-    /// This serves as a security measure until hyperbridging is implemented.
-    /// NOTE: this function may be removed in the future, don't rely on it!
-    // kl todo deprecate
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
+    ///      This mapping was deprecated in favor of AssetTracker component, now it will be responsible for tracking chain balances.
+    ///      We have a `chainBalance` function now, which returns the values in this mapping, for backwards compatibility.
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
+
+    /// @dev Returns the value of `DEPRECATED_chainBalance` for backwards compatibility.
+    ///      The function body will be replaced with revert in the next release.
+    /// @param _chainId The ID of the chain for which the chainBalance gets queried.
+    /// @param _assetId Asset, the balance of which is being queried.
+    function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256) {
+        return DEPRECATED_chainBalance[_chainId][_assetId];
+    }
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -65,9 +75,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Accepts ether only from the contract that was the shared Bridge.
     receive() external payable {
-        if (address(L1_NULLIFIER) != msg.sender) {
-            revert Unauthorized(msg.sender);
-        }
+        require(address(L1_NULLIFIER) == msg.sender, Unauthorized(msg.sender));
     }
 
     function _assetTracker() internal view override returns (IAssetTracker) {
@@ -78,9 +86,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _owner Address which can change pause / unpause the NTV
     /// implementation. The owner is the Governor and separate from the ProxyAdmin from now on, so that the Governor can call the bridge.
     function initialize(address _owner, address _bridgedTokenBeacon) external initializer {
-        if (_owner == address(0)) {
-            revert ZeroAddress();
-        }
+        require(_owner != address(0), ZeroAddress());
         bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
         _transferOwnership(_owner);
     }
@@ -90,7 +96,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         _unsafeRegisterNativeToken(ETH_TOKEN_ADDRESS);
     }
 
-    function setAssetTracker(address _l1AssetTracker) external {
+    /// @dev Function used to set AssetTracker component address.
+    ///      Only callable by owner.
+    /// @param _l1AssetTracker The address of the AssetTracker component.
+    function setAssetTracker(address _l1AssetTracker) external onlyOwner {
         l1AssetTracker = IAssetTracker(_l1AssetTracker);
     }
 
@@ -102,9 +111,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyAssetRouter {
-        if (_assetHandlerAddressOnCounterpart != L2_NATIVE_TOKEN_VAULT_ADDR) {
-            revert WrongCounterpart();
-        }
+        require(_assetHandlerAddressOnCounterpart == L2_NATIVE_TOKEN_VAULT_ADDR, WrongCounterpart());
     }
 
     function _getOriginChainId(bytes32 _assetId) internal view returns (uint256) {
@@ -169,9 +176,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         // slither-disable-next-line unused-return
         (uint256 _amount, , ) = DataEncoding.decodeBridgeBurnData(_data);
         address l1Token = tokenAddress[_assetId];
-        if (_amount == 0) {
-            revert NoFundsTransferred();
-        }
+        require(_amount != 0, NoFundsTransferred());
 
         _handleChainBalanceDecrease({
             _tokenOriginChainId: originChainId[_assetId],
@@ -187,9 +192,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             assembly {
                 callSuccess := call(gas(), _depositSender, _amount, 0, 0, 0, 0)
             }
-            if (!callSuccess) {
-                revert ClaimFailedDepositFailed();
-            }
+            require(callSuccess, ClaimFailedDepositFailed());
         } else {
             uint256 originChainId = _getOriginChainId(_assetId);
             if (originChainId == block.chainid) {
@@ -233,9 +236,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
             assembly {
                 callSuccess := call(gas(), _to, _amount, 0, 0, 0, 0)
             }
-            if (!callSuccess) {
-                revert WithdrawFailed();
-            }
+            require(callSuccess, WithdrawFailed());
         } else {
             // Withdraw funds
             IERC20(_token).safeTransfer(_to, _amount);

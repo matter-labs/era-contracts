@@ -21,7 +21,7 @@ import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
 import {EmptyToken} from "../L1BridgeContractErrors.sol";
-import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 
 /// @author Matter Labs
@@ -63,7 +63,7 @@ abstract contract NativeTokenVault is
     mapping(address tokenAddress => bytes32 assetId) public assetId;
 
     /// @dev The number of bridged tokens.
-    uint256 public bridgedTokenCount;
+    uint256 public bridgedTokensCount;
 
     /// @dev The mapping of bridged tokens, count => assetId
     mapping(uint256 count => bytes32 assetId) public bridgedTokens;
@@ -77,9 +77,7 @@ abstract contract NativeTokenVault is
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
-        if (msg.sender != address(ASSET_ROUTER)) {
-            revert Unauthorized(msg.sender);
-        }
+        require(msg.sender == address(ASSET_ROUTER), Unauthorized(msg.sender));
         _;
     }
 
@@ -107,15 +105,9 @@ abstract contract NativeTokenVault is
         // It is needed to allow withdrawing such assets. We restrict all WETH-related
         // operations to deposits from L1 only to be able to upgrade their logic more easily in the
         // future.
-        if (_nativeToken == WETH_TOKEN && block.chainid != L1_CHAIN_ID) {
-            revert TokenNotSupported(WETH_TOKEN);
-        }
-        if (_nativeToken.code.length == 0) {
-            revert EmptyToken();
-        }
-        if (assetId[_nativeToken] != bytes32(0)) {
-            revert AssetIdAlreadyRegistered();
-        }
+        require(_nativeToken != WETH_TOKEN || block.chainid == L1_CHAIN_ID, TokenNotSupported(WETH_TOKEN));
+        require(_nativeToken.code.length > 0, EmptyToken());
+        require(assetId[_nativeToken] == bytes32(0), AssetIdAlreadyRegistered());
         newAssetId = _unsafeRegisterNativeToken(_nativeToken);
     }
 
@@ -130,8 +122,6 @@ abstract contract NativeTokenVault is
         }
     }
 
-    error TokenNotLegacy();
-
     /// @notice Adds a legacy token to the bridged tokens list.
     /// @dev This function is used to add a legacy token to the bridged tokens list.
     /// @param _token The address of the token to be added to the bridged tokens list.
@@ -140,8 +130,8 @@ abstract contract NativeTokenVault is
         if (tokenAssetId == bytes32(0)) {
             revert TokenNotLegacy();
         }
-        bridgedTokens[bridgedTokenCount] = tokenAssetId;
-        ++bridgedTokenCount;
+        bridgedTokens[bridgedTokensCount] = tokenAssetId;
+        ++bridgedTokensCount;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -266,14 +256,10 @@ abstract contract NativeTokenVault is
         // slither-disable-next-line unused-return
         (, , address tokenAddress) = DataEncoding.decodeBridgeBurnData(_burnData);
 
-        if (tokenAddress == address(0)) {
-            revert ZeroAddress();
-        }
+        require(tokenAddress != address(0), ZeroAddress());
 
         bytes32 storedAssetId = assetId[tokenAddress];
-        if (storedAssetId != bytes32(0)) {
-            revert AssetIdAlreadyRegistered();
-        }
+        require(storedAssetId == bytes32(0), AssetIdAlreadyRegistered());
 
         // This token has not been registered within this NTV yet. Usually this means that the
         // token is native to the chain and the user would prefer to get it registered as such.
@@ -288,9 +274,7 @@ abstract contract NativeTokenVault is
             newAssetId = _registerToken(tokenAddress);
         }
 
-        if (newAssetId != _expectedAssetId) {
-            revert AssetIdMismatch(_expectedAssetId, newAssetId);
-        }
+        require(newAssetId == _expectedAssetId, AssetIdMismatch(_expectedAssetId, newAssetId));
     }
 
     function _decodeBurnAndCheckAssetId(
@@ -306,14 +290,10 @@ abstract contract NativeTokenVault is
         }
 
         // If it is still zero, it means that the token has not been registered.
-        if (parsedTokenAddress == address(0)) {
-            revert ZeroAddress();
-        }
+        require(parsedTokenAddress != address(0), ZeroAddress());
 
         bytes32 storedAssetId = assetId[parsedTokenAddress];
-        if (_suppliedAssetId != storedAssetId) {
-            revert AssetIdMismatch(storedAssetId, _suppliedAssetId);
-        }
+        require(_suppliedAssetId == storedAssetId, AssetIdMismatch(storedAssetId, _suppliedAssetId));
     }
 
     function _registerTokenIfBridgedLegacy(address _token) internal virtual returns (bytes32);
@@ -326,10 +306,8 @@ abstract contract NativeTokenVault is
         address _receiver,
         address _tokenAddress
     ) internal requireZeroValue(msg.value) returns (bytes memory _bridgeMintData) {
-        if (_amount == 0) {
-            // "Amount cannot be zero");
-            revert AmountMustBeGreaterThanZero();
-        }
+        // "Amount cannot be zero");
+        require(_amount != 0, AmountMustBeGreaterThanZero());
 
         IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _amount);
         _handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
@@ -346,18 +324,14 @@ abstract contract NativeTokenVault is
             // we set all originChainId for all already bridged tokens with the setLegacyTokenAssetId and updateChainBalancesFromSharedBridge functions.
             // for native tokens the originChainId is set when they register.
             uint256 originChainId = originChainId[_assetId];
-            if (originChainId == 0) {
-                revert ZeroAddress();
-            }
+            require(originChainId != 0, ZeroAddress());
             erc20Metadata = getERC20Getters(_tokenAddress, originChainId);
         }
         address originToken;
         /// Note L2->L2 asset transfers will accrue a fee in some form in later versions.
         {
             originToken = IBridgedStandardToken(_tokenAddress).originToken();
-            if (originToken == address(0)) {
-                revert ZeroAddress();
-            }
+            require(originToken != address(0), ZeroAddress());
         }
 
         _bridgeMintData = DataEncoding.encodeBridgeMintData({
@@ -378,35 +352,25 @@ abstract contract NativeTokenVault is
         address _receiver,
         address _nativeToken
     ) internal virtual returns (bytes memory _bridgeMintData) {
-        if (_nativeToken == WETH_TOKEN) {
-            // This ensures that WETH_TOKEN can never be bridged from chains it is native to.
-            // It can only be withdrawn from the chain where it has already gotten.
-            revert BurningNativeWETHNotSupported();
-        }
+        // This ensures that WETH_TOKEN can never be bridged from chains it is native to.
+        // It can only be withdrawn from the chain where it has already gotten.
+        require(_nativeToken != WETH_TOKEN, BurningNativeWETHNotSupported());
 
         if (_assetId == BASE_TOKEN_ASSET_ID) {
-            if (_depositAmount != msg.value) {
-                revert ValueMismatch(_depositAmount, msg.value);
-            }
+            require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
 
             _handleChainBalanceIncrease(_chainId, _assetId, _depositAmount, true);
         } else {
-            if (msg.value != 0) {
-                revert NonEmptyMsgValue();
-            }
+            require(msg.value == 0, NonEmptyMsgValue());
             _handleChainBalanceIncrease(_chainId, _assetId, _depositAmount, true);
             if (!_depositChecked) {
                 uint256 expectedDepositAmount = _depositFunds(_originalCaller, IERC20(_nativeToken), _depositAmount); // note if _originalCaller is this contract, this will return 0. This does not happen.
                 // The token has non-standard transfer logic
-                if (_depositAmount != expectedDepositAmount) {
-                    revert TokensWithFeesNotSupported();
-                }
+                require(_depositAmount == expectedDepositAmount, TokensWithFeesNotSupported());
             }
         }
-        if (_depositAmount == 0) {
-            // empty deposit amount
-            revert EmptyDeposit();
-        }
+        // empty deposit amount
+        require(_depositAmount != 0, EmptyDeposit());
         /// Note L2->L2 asset transfers will accrue a fee in some form in later versions.
 
         bytes memory erc20Metadata;
@@ -537,9 +501,7 @@ abstract contract NativeTokenVault is
         _assetIdCheck(_tokenOriginChainId, _assetId, _originToken);
 
         address deployedToken = _deployBridgedToken(_tokenOriginChainId, _assetId, _originToken, _erc20Data);
-        if (deployedToken != _expectedToken) {
-            revert AddressMismatch(_expectedToken, deployedToken);
-        }
+        require(deployedToken == _expectedToken, AddressMismatch(_expectedToken, deployedToken));
 
         _setNewTokenStorage(_assetId, _expectedToken);
     }
@@ -547,8 +509,8 @@ abstract contract NativeTokenVault is
     function _setNewTokenStorage(bytes32 _assetId, address _tokenAddress) internal {
         tokenAddress[_assetId] = _tokenAddress;
         assetId[_tokenAddress] = _assetId;
-        bridgedTokens[bridgedTokenCount] = _assetId;
-        ++bridgedTokenCount;
+        bridgedTokens[bridgedTokensCount] = _assetId;
+        ++bridgedTokensCount;
         _assetTracker().registerNewToken(_assetId);
     }
 
@@ -572,9 +534,7 @@ abstract contract NativeTokenVault is
         address _originToken,
         bytes memory _erc20Data
     ) internal returns (address) {
-        if (_tokenOriginChainId == block.chainid) {
-            revert DeployingBridgedTokenForNativeToken();
-        }
+        require(_tokenOriginChainId != block.chainid, DeployingBridgedTokenForNativeToken());
         bytes32 salt = _getCreate2Salt(_tokenOriginChainId, _originToken);
 
         BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);

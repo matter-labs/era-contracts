@@ -20,7 +20,7 @@ import {InteropCallStarter} from "../../common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy, InvalidSelector, PayloadTooShort, ExecuteMessageFailed} from "../../common/L1ContractErrors.sol";
 import {IERC7786Receiver} from "../../interop/IERC7786Receiver.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 
@@ -42,11 +42,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) {
-                // revert InvalidCaller(msg.sender);
-            }
+            require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == L1_ASSET_ROUTER, InvalidCaller(msg.sender));
         } else {
-            // revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
@@ -68,16 +66,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
-        if (msg.sender != L2_LEGACY_SHARED_BRIDGE) {
-            revert InvalidCaller(msg.sender);
-        }
+        require(msg.sender == L2_LEGACY_SHARED_BRIDGE, InvalidCaller(msg.sender));
         _;
     }
 
     modifier onlyNTV() {
-        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
-            revert InvalidCaller(msg.sender);
-        }
+        require(msg.sender == L2_NATIVE_TOKEN_VAULT_ADDR, InvalidCaller(msg.sender));
         _;
     }
 
@@ -102,9 +96,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         reentrancyGuardInitializer
     {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
-        if (_l1AssetRouter == address(0)) {
-            revert EmptyAddress();
-        }
+        require(_l1AssetRouter != address(0), EmptyAddress());
         L1_ASSET_ROUTER = _l1AssetRouter;
         _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
@@ -135,26 +127,59 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _setAssetHandler(_assetId, L2_NATIVE_TOKEN_VAULT_ADDR);
     }
 
-    error L2AssetRouter_InvalidSelector();
-    error L2AssetRouter_PayloadTooShort();
-    error L2AssetRouter_ExecuteMessageFailed();
+    /// @notice Executes cross-chain interop messages following ERC-7786 standard
+    /// @param messageId Gateway-specific message identifier (currently unused)
+    /// @param sourceChain CAIP-2 chain identifier where the message originated
+    /// @param sender CAIP-10 account address that initiated the cross-chain message
+    /// @param payload Encoded function call data (must be finalizeDeposit)
+    /// @param attributes ERC-7786 message attributes (currently unused)
+    /// @return Function selector confirming successful execution per ERC-7786
     function executeMessage(
         // kl todo: change back to strings
-        bytes32, // messageId, gateway specific, empty or unique
-        uint256, // sourceChain, [CAIP-2] chain identifier
-        address, // [CAIP-10] account address
+        // solhint-disable-next-line no-unused-vars
+        bytes32 messageId, // Gateway-specific message identifier
+        uint256 sourceChain, // [CAIP-2] chain identifier
+        address sender, // [CAIP-10] account address
         bytes calldata payload,
-        bytes[] calldata // attributes
+        // solhint-disable-next-line no-unused-vars
+        bytes[] calldata attributes
     ) external payable returns (bytes4) {
-        require(payload.length > 4, L2AssetRouter_PayloadTooShort());
-        // require(bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector, L2AssetRouter_InvalidSelector());
+        // This function serves as the L2AssetRouter's entry point for processing cross-chain bridge operations
+        // initiated through the InteropCenter system. It implements critical security validations:
+        // - L1->L2 calls: Only L1_ASSET_ROUTER can send messages from L1_CHAIN_ID
+        // - L2->L2 calls: Only this contract (L2AssetRouter) can send messages from other L2 chains
+        //
+        // This dual validation prevents attackers from spoofing cross-chain messages by requiring
+        // both correct source chain ID and authorized sender address.
+        //
+        // INDIRECT CALL PATTERN (L2->L2 interop flow):
+        // 1. User calls InteropCenter on source L2
+        // 2. InteropCenter calls interopCenterInitiateBridge() on source chain's L2AssetRouter
+        // 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
+        // 4. Destination L2 validates sender == address(this) for non-L1 sources
+        //    (L2AssetRouter address is equal for all ZKsync chains)
+
+        require(
+            (sourceChain == L1_CHAIN_ID && sender == L1_ASSET_ROUTER) ||
+                (sourceChain != L1_CHAIN_ID && sender == address(this)),
+            InvalidCaller(sender)
+        );
+
+        // The payload must contain a valid finalizeDeposit selector to ensure only legitimate
+        // bridge operations are executed. This prevents arbitrary function calls through the interop system.
+        require(payload.length > 4, PayloadTooShort());
+        require(
+            bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector,
+            InvalidSelector(bytes4(payload[0:4]))
+        );
+
         (bool success, ) = address(this).call(payload);
-        require(success, L2AssetRouter_ExecuteMessageFailed());
+        require(success, ExecuteMessageFailed());
         return IERC7786Receiver.executeMessage.selector;
     }
 
     /*//////////////////////////////////////////////////////////////
-                            INITIATTE DEPOSIT Functions
+                            INITIATE DEPOSIT Functions
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetRouterBase
@@ -186,20 +211,32 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         onlyAssetRouterCounterpartOrSelf(_originChainId)
         nonReentrant
     {
-        if (_assetId == BASE_TOKEN_ASSET_ID) {
-            revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
-        }
+        require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
         _finalizeDeposit(_originChainId, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
         emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
     }
 
+    /// @inheritdoc IL2AssetRouter
     function interopCenterInitiateBridge(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,
         bytes calldata _data
     ) external payable returns (InteropCallStarter memory interopCallStarter) {
+        // This function is called by the InteropCenter when processing indirect interop calls.
+        // It prepares the bridge operation for cross-chain execution through these steps:
+        // 1. Processing the deposit through the standard bridgehub flow
+        // 2. Encoding the call for interop execution with proper attributes
+        // 3. Returning an InteropCallStarter struct for the InteropCenter to process
+        // COMPLETE L2->L2 BRIDGE FLOW:
+        // - User wants to bridge from L2A to L2B
+        // - L2A InteropCenter calls this function on L2A AssetRouter
+        // - This creates an InteropCallStarter targeting L2B AssetRouter
+        // - InteropCenter sends the call to L2B via the interop messaging system
+        // - L2B AssetRouter receives via executeMessage() with sender=address(this)
+        //   (L2AssetRouter address is equal on all ZKsync chains)
+
         L2TransactionRequestTwoBridgesInner memory request = _bridgehubDeposit({
             _chainId: _chainId,
             _originalCaller: _originalCaller,
@@ -207,6 +244,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             _data: _data,
             _nativeTokenVault: L2_NATIVE_TOKEN_VAULT_ADDR
         });
+
+        // The _value parameter represents the amount being bridged and is encoded
+        // as an ERC-7786 attribute to ensure proper value transfer in the interop call.
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encode(IERC7786Attributes.interopCallValue.selector, _value);
         interopCallStarter = InteropCallStarter({
@@ -264,9 +304,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             address l1Token = IBridgedStandardToken(
                 IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).tokenAddress(_assetId)
             ).originToken();
-            if (l1Token == address(0)) {
-                revert AssetIdNotSupported(_assetId);
-            }
+            require(l1Token != address(0), AssetIdNotSupported(_assetId));
             // slither-disable-next-line unused-return
             (uint256 amount, address l1Receiver, ) = DataEncoding.decodeBridgeBurnData(_assetData);
             message = _getSharedBridgeWithdrawMessage(l1Receiver, l1Token, amount);
@@ -314,8 +352,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         address _l1Token,
         uint256 _amount,
         bytes calldata _data
-    ) external payable {
-        // onlyAssetRouterCounterpart(L1_CHAIN_ID) {
+    ) external payable onlyAssetRouterCounterpart(L1_CHAIN_ID) {
         _translateLegacyFinalizeDeposit({
             _l1Sender: _l1Sender,
             _l2Receiver: _l2Receiver,
@@ -361,9 +398,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @param _l2Token The L2 token address which is withdrawn
     /// @param _amount The total amount of tokens to be withdrawn
     function withdraw(address _l1Receiver, address _l2Token, uint256 _amount) external nonReentrant {
-        if (_amount == 0) {
-            revert AmountMustBeGreaterThanZero();
-        }
+        require(_amount != 0, AmountMustBeGreaterThanZero());
         _withdrawLegacy(_l1Receiver, _l2Token, _amount, msg.sender);
     }
 
@@ -384,9 +419,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     function _withdrawLegacy(address _l1Receiver, address _l2Token, uint256 _amount, address _sender) internal {
         address l1Address = l1TokenAddress(_l2Token);
-        if (l1Address == address(0)) {
-            revert TokenNotLegacy();
-        }
+        require(l1Address != address(0), TokenNotLegacy());
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Address);
         bytes memory data = DataEncoding.encodeBridgeBurnData(_amount, _l1Receiver, _l2Token);
         _withdrawSender(assetId, data, _sender, false);
@@ -422,7 +455,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             return currentlyDeployedAddress;
         }
 
-        // For backwards compatibility, the bridge smust return the address of the token even if it
+        // For backwards compatibility, the bridge must return the address of the token even if it
         // has not been deployed yet.
         return l2NativeTokenVault.calculateCreate2TokenAddress(L1_CHAIN_ID, _l1Token);
     }
