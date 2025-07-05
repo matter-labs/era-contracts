@@ -36,7 +36,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         } else {
             actualAmount = 5 ether;
         }
-        uint256 settlmentLayer = IBridgehub(bridgehubAddress).settlementLayer(chainId);
+        uint256 settlementLayer = IBridgehub(bridgehubAddress).settlementLayer(chainId);
         Utils.runL1L2Transaction(
             abi.encode(),
             1000000,
@@ -48,14 +48,14 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             address(0),
             l2Address
         );
-        if (settlmentLayer != block.chainid) {
+        if (settlementLayer != block.chainid) {
             Utils.runL1L2Transaction(
                 abi.encode(),
                 1000000,
                 actualAmount,
                 new bytes[](0),
                 l2Address,
-                settlmentLayer,
+                settlementLayer,
                 bridgehubAddress,
                 address(0),
                 l2Address

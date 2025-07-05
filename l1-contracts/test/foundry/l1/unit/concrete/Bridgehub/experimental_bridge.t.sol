@@ -228,6 +228,7 @@ contract ExperimentalBridgeTest is Test {
 
     function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
         addr = _deployNTVWithoutEthToken(_sharedBridgeAddr);
+        vm.prank(bridgeOwner);
         addr.setAssetTracker(address(assetTracker));
 
         addr.registerEthToken();

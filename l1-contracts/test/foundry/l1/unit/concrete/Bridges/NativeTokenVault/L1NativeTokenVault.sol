@@ -28,6 +28,7 @@ contract L1NativeTokenVaultTest is Test {
 
         ntv = new L1NativeTokenVault(makeAddr("wethToken"), assetRouter, IL1Nullifier(address(0)));
         assetTracker = makeAddr("assetTracker");
+        vm.prank(address(0));
         ntv.setAssetTracker(assetTracker);
 
         token = new SomeToken();
