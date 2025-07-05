@@ -382,6 +382,7 @@ contract RegisterZKChainScript is Script {
 
     function registerZKChain() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        console.log(address(bridgehub));
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
 
         IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
