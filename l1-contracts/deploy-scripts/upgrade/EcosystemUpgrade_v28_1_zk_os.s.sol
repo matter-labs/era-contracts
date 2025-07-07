@@ -83,8 +83,8 @@ import {DeployL1Script} from "../DeployL1.s.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
-import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
-import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
+import {SemVer} from "../../contracts/common/libraries/SemVer.sol";
+
 
 /// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
@@ -92,7 +92,7 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(vm.envString("ZK_OS_V28_1_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("ZK_OS_V28_1_UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
@@ -110,7 +110,16 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
     }
 
-    function getProposedUpgrade() public override returns (ProposedUpgrade memory proposedUpgrade) {
+    function getProposedUpgrade(StateTransitionDeployedAddresses memory stateTransition) public override returns (ProposedUpgrade memory proposedUpgrade) {
+        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        IZKChain diamondProxy = IZKChain(bridgehub.getZKChain(config.eraChainId));
+
+        console.log("Diamond proxy address: %s", address(diamondProxy));
+        (uint32 major, uint32 minor, uint32 patch) = diamondProxy.getSemverProtocolVersion();
+        console.log("Current protocol version: %s.%s.%s", major, minor, patch);
+        uint256 oldVerion = SemVer.packSemVer(major, minor, patch);
+        uint256 newVersion = SemVer.packSemVer(major, minor, patch + 1);
+
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: _composeEmptyUpgradeTx(),
             bootloaderHash: bytes32(0),
