@@ -16,11 +16,13 @@ import {HEADER_LENGTH, SGX_TEE, TDX_TEE} from "automata-network/dcap-attestation
 import {PCCSRouter} from "automata-network/dcap-attestation/evm/contracts/PCCSRouter.sol";
 import {TcbInfoJsonObj} from "@automata-network/on-chain-pccs/helpers/FmspcTcbHelper.sol";
 import {IHashValidator, EmptyArray} from "./interfaces/IHashValidator.sol";
+
 /**
  * @title MatterLabs DCAP Attestation
  * @dev Contract for handling attestation and verification using DCAP
  */
 contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
+    error InvalidP256Verifier();
     error InvalidHashValidator();
     error IncorrectVersion(uint256 version);
     error InvalidSigner(address recoveredSigner);
@@ -30,8 +32,10 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     error VerificationFailed(bytes output);
     error ArrayLengthMismatch();
 
+    uint256 private constant SIGNER_ARRAY_SIZE = 50;
+    uint256 private currentSignerIndex;
     uint256 private totalSigners;
-    mapping(address=>bool) private signers;
+    address[SIGNER_ARRAY_SIZE] private signers;
 
     using ECDSA for bytes32;
 
@@ -45,6 +49,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     uint256 constant TD10_RTMR3_OFFSET = TD10_RTMR2_OFFSET + 48;
     uint256 constant TD10_REPORT_DATA_OFFSET = HEADER_LENGTH + 520;
 
+    address P256_VERIFIER;
     AutomataDaoStorage pccsStorage;
     AutomataPcsDao pcsDao;
     AutomataPckDao pckDao;
@@ -54,13 +59,9 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     PCCSRouter public pccsRouter;
     IHashValidator hashValidator;
 
-    event SignerRegistered(address signer);
-    event SignerDeregistered(address signer);
-
-
     /**
-     * @dev Initializes the contract with the Helpers, DAOs, and Enclave Hash Validator.
-     * @param owner, Owner of the contract
+     * @dev Initializes the contract with the P256 verifier, Helpers, DAOs, and Enclave Hash Validator.
+     * @param _P256_Verifier Address of the P256 Verifier contract.
      * @param _hashValidator Address of the Enclave Hash Validator contract.
      * @param _pccsStorage Address of the pre-deployed AutomataDaoStorage
      * @param _pcsDao Address of the pre-deployed AutomataPcsDao
@@ -70,7 +71,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @param _pccsRouter Address of the pre-deployed PCCSRouter
      */
     constructor(
-        address owner,
+        address _P256_Verifier,
         address _hashValidator,
         address _pccsStorage,
         address _pcsDao,
@@ -78,7 +79,11 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         address _enclaveIdDao,
         address _fmspcTcbDao,
         address _pccsRouter
-    ) AttestationEntrypointBase(owner){
+    ) {
+        require(_P256_Verifier.code.length > 0, InvalidP256Verifier());
+        P256_VERIFIER = _P256_Verifier;
+
+        require(_hashValidator.code.length > 0, InvalidHashValidator());
         hashValidator = IHashValidator(_hashValidator);
         pccsStorage = AutomataDaoStorage(_pccsStorage);
         pcsDao = AutomataPcsDao(_pcsDao);
@@ -86,6 +91,35 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         enclaveIdDao = AutomataEnclaveIdentityDao(_enclaveIdDao);
         fmspcTcbDao = AutomataFmspcTcbDao(_fmspcTcbDao);
         pccsRouter = PCCSRouter(_pccsRouter);
+    }
+
+    /**
+     * @notice Verifies and attests a TEE (Trusted Execution Environment) quote on-chain
+     * @dev Processes quotes from both SGX and TDX TEE types, with different handling based on quote version
+     * @param rawQuote The raw attestation quote data from the TEE
+     * @param digest The message digest that was signed by the enclave
+     * @param signature The signature of the digest created by the enclave signer
+     * @custom:throws InvalidMrEnclave when the enclave measurement doesn't match allowed values
+     * @custom:throws InvalidTD10ReportBodyMrHash when the TD10 report hash is invalid
+     * @custom:throws IncorrectVersion when the quote version is incorrect
+     * @custom:throws InvalidSigner when signature verification fails
+     * @custom:throws VerificationFailed when on-chain attestation verification fails
+     */
+    function verifyAndAttestOnChain(bytes calldata rawQuote, bytes32 digest, bytes calldata signature) external {
+        uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
+        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4:8])));
+        if ((quoteVersion == 3 || quoteVersion == 4) && teeType == SGX_TEE) {
+            _checkMrEnclave(rawQuote);
+            uint256 reportDataOffset = ENCLAVE_REPORT_DATA_OFFSET;
+            _checkSigner(rawQuote, digest, signature, reportDataOffset);
+        } else if (quoteVersion == 4 && teeType == TDX_TEE) {
+            _checkTD10Mr(rawQuote);
+            uint256 reportDataOffset = TD10_REPORT_DATA_OFFSET;
+            _checkSigner(rawQuote, digest, signature, reportDataOffset);
+        }
+
+        (bool success, bytes memory output) = _verifyAndAttestOnChain(rawQuote);
+        require(success, VerificationFailed(output));
     }
 
     /**
@@ -97,10 +131,10 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @custom:throws IncorrectVersion when the quote version is incorrect
      * @custom:throws VerificationFailed when on-chain attestation verification fails
      */
-    function registerSigner(bytes calldata rawQuote) external onlyOwner{
+    function registerSigner(bytes calldata rawQuote) external {
         address signer;
         uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
-        bytes4 teeType = bytes4(rawQuote[4:8]);
+        bytes4 teeType = bytes4(uint32(BELE.leBytesToBeUint(rawQuote[4:8])));
         if ((quoteVersion == 3 || quoteVersion == 4) && teeType == SGX_TEE) {
             _checkMrEnclave(rawQuote);
             uint256 reportDataOffset = ENCLAVE_REPORT_DATA_OFFSET;
@@ -114,25 +148,13 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         (bool success, bytes memory output) = _verifyAndAttestOnChain(rawQuote);
         require(success, VerificationFailed(output));
 
-        if(!signers[signer]){
-            signers[signer] = true; 
+        if (totalSigners < SIGNER_ARRAY_SIZE) {
             totalSigners++;
-            emit SignerRegistered(signer);
         }
-
+        signers[currentSignerIndex] = signer;
+        currentSignerIndex = (currentSignerIndex + 1) % SIGNER_ARRAY_SIZE;
     }
 
-    /**
-     * @notice Deregisters an existing signer
-     * @param signer The signer which needs to be deregistered
-     * @custom:throws InvalidMrEnclave when the enclave measurement doesn't match allowed values
-     */
-    function deregisterSigner(address signer) external onlyOwner {
-        require(signers[signer], "Signer not registered");
-        signers[signer] = false;
-        totalSigners--;
-        emit SignerDeregistered(signer);
-    }
     /**
      * @notice Verifies that a message digest was signed by a registered TEE signer
      * @dev Recovers the signer address from the signature and checks against the list of registered signers
@@ -141,8 +163,24 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @custom:throws InvalidSigner when the signature was not created by a registered signer
      */
     function verifyDigest(bytes32 digest, bytes calldata signature) external view {
-        address signer = digest.recover(signature);
-        require(signers[signer], InvalidSigner(signer));
+        hasSigner(digest.recover(signature));
+    }
+
+    /**
+     * @notice Checks if the provided address is a registered signer
+     * @dev Iterates through the signers array to find a match
+     * @param recovered The address to check against the registered signers
+     * @custom:throws InvalidSigner when the address is not a registered signer
+     */
+    function hasSigner(address recovered) public view {
+        bool signerFound = false;
+        for (uint i = 0; i < totalSigners; i++) {
+            if (recovered == signers[i]) {
+                signerFound = true;
+                break;
+            }
+        }
+        require(signerFound, InvalidSigner(recovered));
     }
 
     function _checkMrEnclave(bytes calldata rawQuote) internal view {
@@ -186,6 +224,10 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         require(recovered == signer, InvalidSigner(recovered));
     }
 
+    function updateP256Verifier(address _P256_VERIFIER) external onlyOwner {
+        require(_P256_VERIFIER.code.length > 0, InvalidP256Verifier());
+        P256_VERIFIER = _P256_VERIFIER;
+    }
 
     function updateHashValidator(address _hashValidator) external onlyOwner {
         require(_hashValidator.code.length > 0, InvalidHashValidator());
@@ -300,10 +342,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         address _fmspcTcbDao,
         address _enclaveIdDao
     ) external onlyOwner {
-        pccsStorage.grantDao(_pcsDao); 
-        pccsStorage.grantDao(_pckDao);
-        pccsStorage.grantDao(_fmspcTcbDao);
-        pccsStorage.grantDao(_enclaveIdDao);
+        pccsStorage.updateDao(_pcsDao, _pckDao, _fmspcTcbDao, _enclaveIdDao);
     }
 
     /**

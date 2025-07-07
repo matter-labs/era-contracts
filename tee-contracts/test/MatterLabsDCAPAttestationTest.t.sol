@@ -12,13 +12,10 @@ import {AutomataEnclaveIdentityDao} from "@automata-network/on-chain-pccs/automa
 import {AutomataFmspcTcbDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataFmspcTcbDao.sol";
 import {PCCSRouter} from "automata-network/dcap-attestation/evm/contracts/PCCSRouter.sol";
 import {CA} from "@automata-network/on-chain-pccs/Common.sol";
-import {CommonBase} from "lib/forge-std/src/Base.sol";
 import {HashValidator} from "../contracts/HashValidator.sol";
 import {MatterLabsDCAPAttestation} from "../contracts/MatterLabsDCAPAttestation.sol";
-import {Script} from "lib/forge-std/src/Script.sol";
 import {V3QuoteVerifier} from "automata-network/dcap-attestation/evm/contracts/verifiers/V3QuoteVerifier.sol";
 import {V4QuoteVerifier} from "automata-network/dcap-attestation/evm/contracts/verifiers/V4QuoteVerifier.sol";
-import {console} from "lib/forge-std/src/console.sol";
 import {EnclaveIdentityJsonObj, EnclaveIdentityHelper, IdentityObj} from "@automata-network/on-chain-pccs/helpers/EnclaveIdentityHelper.sol";
 import {TcbInfoJsonObj, FmspcTcbHelper} from "@automata-network/on-chain-pccs/helpers/FmspcTcbHelper.sol";
 import {PCKHelper} from "@automata-network/on-chain-pccs/helpers/PCKHelper.sol";
@@ -55,93 +52,99 @@ contract MatterLabsDCAPAttestationTest is Test {
         X509CRLHelper x509Crl = new X509CRLHelper();
 
         // Deploy DAO components
-        pccsStorage = new AutomataDaoStorage();
+        pccsStorage = new AutomataDaoStorage(address(this));
 
-        AutomataPcsDao pcsDaoContract = new AutomataPcsDao(
+        AutomataPcsDao pcsDao = new AutomataPcsDao(
             address(pccsStorage),
             P256_VERIFIER,
             address(x509),
             address(x509Crl)
         );
 
-        address pcsDao = address(pcsDaoContract);
-
-        AutomataPckDao pckDaoContract = new AutomataPckDao(
+        AutomataPckDao pckDao = new AutomataPckDao(
             address(pccsStorage),
             P256_VERIFIER,
-            pcsDao,
+            address(pcsDao),
             address(x509),
             address(x509Crl)
         );
 
-        address pckDao = address(pckDaoContract);
-
-        AutomataEnclaveIdentityDao enclaveIdDaoContract = new AutomataEnclaveIdentityDao(
+        AutomataEnclaveIdentityDao enclaveIdDao = new AutomataEnclaveIdentityDao(
             address(pccsStorage),
             P256_VERIFIER,
-            pcsDao,
+            address(pcsDao),
             address(enclaveIdHelper),
-            address(x509)
+            address(x509),
+            address(x509Crl)
+
         );
 
-        address enclaveIdDao = address(enclaveIdDaoContract);
-
-        AutomataFmspcTcbDao fmspcTcbDaoContract = new AutomataFmspcTcbDao(
+        AutomataFmspcTcbDao fmspcTcbDao = new AutomataFmspcTcbDao(
             address(pccsStorage),
             P256_VERIFIER,
-            pcsDao,
+            address(pcsDao),
             address(tcbHelper),
-            address(x509)
+            address(x509),
+            address(x509Crl)
+
         );
-        address fmspcTcbDao = address(fmspcTcbDaoContract);
 
         // Update DAO references in storage
-        pccsStorage.updateDao(pcsDao, pckDao, enclaveIdDao, fmspcTcbDao);
+        pccsStorage.grantDao(address(pcsDao));
+        pccsStorage.grantDao(address(pckDao));
+        pccsStorage.grantDao(address(enclaveIdDao));
+        pccsStorage.grantDao(address(fmspcTcbDao));
 
         // Deploy PCCSRouter
-        PCCSRouter pccsRouterContract = new PCCSRouter(
-            enclaveIdDao,
-            fmspcTcbDao,
-            pcsDao,
-            pckDao,
+        PCCSRouter pccsRouter = new PCCSRouter(
+            address(this),
+            address(enclaveIdDao),
+            address(fmspcTcbDao),
+            address(pcsDao),
+            address(pckDao),
             address(x509),
             address(x509Crl),
             address(tcbHelper)
         );
-        address pccsRouter = address(pccsRouterContract);
 
         // Set authorization for router in storage
-        pccsStorage.setCallerAuthorization(pccsRouter, true);
+        pccsStorage.setCallerAuthorization(address(pccsRouter), true);
 
         // Deploy MatterLabsDCAPAttestation with all components
         attestation = new MatterLabsDCAPAttestation(
-            P256_VERIFIER,
+            address(this),
             address(hashValidator),
             address(pccsStorage),
-            pcsDao,
-            pckDao,
-            enclaveIdDao,
-            fmspcTcbDao,
-            pccsRouter
+            address(pcsDao),
+            address(pckDao),
+            address(enclaveIdDao),
+            address(fmspcTcbDao),
+            address(pccsRouter)
         );
 
         // Deploy a new quote verifier that points to the router
         V3QuoteVerifier quoteVerifierV3 = new V3QuoteVerifier(P256_VERIFIER, address(pccsRouter));
 
-        // Make sure quote verifier is authorized with router
-        pccsStorage.setCallerAuthorization(address(quoteVerifierV3), true);
-
+        // pccsStorage.setCallerAuthorization(address(quoteVerifierV3), true);
+        
         // Register it with the attestation contract
         attestation.setQuoteVerifier(address(quoteVerifierV3));
+        
+        // Make sure quote verifier is authorized with router
+        pccsRouter.setAuthorized(address(quoteVerifierV3), true);
+
 
         // Create and set up the quote verifier with the router address
         V4QuoteVerifier quoteVerifierV4 = new V4QuoteVerifier(P256_VERIFIER, address(pccsRouter));
 
-        // Make sure quote verifier is authorized with router
-        pccsStorage.setCallerAuthorization(address(quoteVerifierV4), true);
+        // pccsStorage.setCallerAuthorization(address(quoteVerifierV4), true);
 
         // Set the verifier in attestation contract
         attestation.setQuoteVerifier(address(quoteVerifierV4));
+        
+        // Make sure quote verifier is authorized with router
+        pccsRouter.setAuthorized(address(quoteVerifierV4), true);
+
 
         vm.warp(1741083457);
 
@@ -170,13 +173,17 @@ contract MatterLabsDCAPAttestationTest is Test {
             memory signature = hex"c516a2afffc3be34b5f01d9164f5ec0503101dd5ff88b00a5e7488797b495dca385b89eefd66977745a0ce7c56f533f0d587e1ac9b505a4bbdccec8fa636a5be1c";
         bytes32 new_root_hash = hex"f55917eb178b9e187178192df60c7928c83d11fc92e81edaf7839c514ed4b85f";
 
+        bytes32[] memory enclaveSigners = new bytes32[](1);
         bytes32[] memory enclaveHashes = new bytes32[](1);
-        enclaveHashes[0] = bytes32(0xc5591a72b8b86e0d8814d6e8750e3efe66aea2d102b8ba2405365559b858697d);
-        hashValidator.addValidEnclaveSigners(enclaveHashes);
 
-        attestation.verifyAndAttestOnChain(rawQuote, new_root_hash, signature);
+        enclaveSigners[0] = bytes32(0xc5591a72b8b86e0d8814d6e8750e3efe66aea2d102b8ba2405365559b858697d);
+        hashValidator.addValidEnclaveSigners(enclaveSigners);
 
-        hashValidator.removeValidEnclaveSigners(enclaveHashes);
+        attestation.registerSigner(rawQuote);
+        attestation.verifyDigest(new_root_hash, signature);
+
+        attestation.deregisterSigner(0x8251CB4E2Da96CDa6CBa43D514Da2718C3f974DD);
+        hashValidator.removeValidEnclaveSigners(enclaveSigners);
 
         enclaveHashes[0] = bytes32(0xa0b1b069b01bdcf3c1517ef8d4543794a27ed4103e464be7c4afdc6136b42d66);
         hashValidator.addValidEnclaveHashes(enclaveHashes);
@@ -211,14 +218,14 @@ contract MatterLabsDCAPAttestationTest is Test {
         );
         hashValidator.addValidTD10ReportBodyMrHashes(tD10ReportBodyMrHashes);
 
-        attestation.verifyAndAttestOnChain(rawQuote, new_root_hash, signature);
+        // attestation.verifyAndAttestOnChain(rawQuote, new_root_hash, signature);
         attestation.registerSigner(rawQuote);
         attestation.verifyDigest(new_root_hash, signature);
     }
 
     function qeIdDaoUpsert(uint256 quoteVersion, string memory path) internal {
         EnclaveIdentityJsonObj memory identityJson = _readIdentityJson(path);
-        IdentityObj memory identity = enclaveIdHelper.parseIdentityString(identityJson.identityStr);
+        (IdentityObj memory identity,) = enclaveIdHelper.parseIdentityString(identityJson.identityStr);
         attestation.upsertEnclaveIdentity(uint256(identity.id), quoteVersion, identityJson);
     }
 
