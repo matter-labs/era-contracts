@@ -360,7 +360,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
-
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
 
         upgradeCutData = Diamond.DiamondCutData({
@@ -377,7 +376,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         }
     }
 
-    function getProposedUpgrade(StateTransitionDeployedAddresses memory stateTransition) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
+    function getProposedUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
         VerifierParams memory verifierParams = getVerifierParams();
 
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing

@@ -85,14 +85,16 @@ import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol"
 
 import {SemVer} from "../../contracts/common/libraries/SemVer.sol";
 
-
 /// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(vm.envString("ZK_OS_V28_1_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("ZK_OS_V28_1_UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(
+            vm.envString("ZK_OS_V28_1_UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("ZK_OS_V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
+        );
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
@@ -110,7 +112,9 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
     }
 
-    function getProposedUpgrade(StateTransitionDeployedAddresses memory stateTransition) public override returns (ProposedUpgrade memory proposedUpgrade) {
+    function getProposedUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public override returns (ProposedUpgrade memory proposedUpgrade) {
         Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
         IZKChain diamondProxy = IZKChain(bridgehub.getZKChain(config.eraChainId));
 
@@ -156,8 +160,8 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
             signature: new bytes(0),
             factoryDeps: new uint256[](0),
             paymasterInput: new bytes(0),
-        // Reserved dynamic type for the future use-case. Using it should be avoided,
-        // But it is still here, just in case we want to enable some additional functionality
+            // Reserved dynamic type for the future use-case. Using it should be avoided,
+            // But it is still here, just in case we want to enable some additional functionality
             reservedDynamic: new bytes(0)
         });
     }
