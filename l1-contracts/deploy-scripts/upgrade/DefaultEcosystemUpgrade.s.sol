@@ -177,12 +177,16 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContracts();
         console.log("Ecosystem contracts are deployed!");
-        // deployNewEcosystemContractsGW();
-        // console.log("Ecosystem contracts for GW are deployed!");
+        deployNewEcosystemContractsGW();
+        console.log("Ecosystem contracts for GW are deployed!");
         publishBytecodes();
         console.log("Bytecodes published!");
         generateUpgradeData();
         console.log("Upgrade data generated!");
+    }
+
+    function deployUsedUpgradeContract() internal virtual returns (address) {
+        return deploySimpleContract("DefaultUpgrade", false);
     }
 
     /// @notice Deploy everything that should be deployed
@@ -193,13 +197,13 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         deployVerifiers();
         deployUpgradeStageValidator();
-        // add custom upgrade deployment here instead of DefaultUpgrade if needed.
 
-        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
+        // Note, that this is the upgrade that will be used, despite the naming of the variable here.
+        // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
+        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
         addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
-        // addresses.b
 
         addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
@@ -211,6 +215,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         deployStateTransitionDiamondFacets();
 
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
+
+        /// for forge verification.
+        deploySimpleContract("DiamondProxy", false);
 
         upgradeConfig.ecosystemContractsDeployed = true;
     }
@@ -353,6 +360,25 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
+        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
+
+        upgradeCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: stateTransition.defaultUpgrade,
+            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
+        });
+
+        if (!stateTransition.isOnGateway) {
+            newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
+            upgradeConfig.upgradeCutPrepared = true;
+        } else {
+            gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
+        }
+    }
+
+    function getProposedUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
         VerifierParams memory verifierParams = getVerifierParams();
 
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
@@ -368,7 +394,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             baseForceDeployments,
             additionalForceDeployments
         );
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
+
+        proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
             bootloaderHash: config.contracts.bootloaderHash,
             defaultAccountHash: config.contracts.defaultAAHash,
@@ -380,19 +407,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             upgradeTimestamp: 0,
             newProtocolVersion: getNewProtocolVersion()
         });
-
-        upgradeCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: stateTransition.defaultUpgrade,
-            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
-        });
-
-        if (!stateTransition.isOnGateway) {
-            newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
-            upgradeConfig.upgradeCutPrepared = true;
-        } else {
-            gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
-        }
     }
 
     function getForceDeployment(
@@ -442,14 +456,15 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
         addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
 
-        // require(
-        addresses.protocolUpgradeHandlerProxy = Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner();
-        // "Incorrect ProtocolUpgradeHandlerProxy"
-        // );
-        config.ownerAddress = Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner();
-        // require(
-        //     "Incorrect owner"
-        // );
+        require(
+            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() ==
+                addresses.protocolUpgradeHandlerProxy,
+            "Incorrect ProtocolUpgradeHandlerProxy"
+        );
+        require(
+            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
+            "Incorrect owner"
+        );
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
@@ -461,25 +476,25 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
 
-        // gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
-        //     "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
-        // );
+        gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
+            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
+        );
 
-        // gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
-        //     "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
-        // );
+        gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
+            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
+        );
 
-        // gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
-        //     "$.gateway.gateway_state_transition.rollup_da_manager"
-        // );
+        gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
+            "$.gateway.gateway_state_transition.rollup_da_manager"
+        );
 
-        // gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
-        //     "$.gateway.gateway_state_transition.rollup_sl_da_validator"
-        // );
+        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
+            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
+        );
 
         gatewayConfig.gatewayStateTransition.isOnGateway = true;
 
-        // gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
+        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
         config.gatewayChainId = gatewayConfig.chainId;
     }
 
@@ -575,13 +590,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
-        bytes[] memory additionalDependencies = new bytes[](4); // Deps after Gateway upgrade
+        string[] memory additionalForceDeployments = getForceDeploymentNames();
+
+        bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
 
-        string[] memory additionalForceDeployments = getForceDeploymentNames();
         for (uint256 i; i < additionalForceDeployments.length; i++) {
             additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
         }
@@ -1064,6 +1080,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         calls = preparePauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
     }
 
+    function deployUsedUpgradeContractGW() internal virtual returns (address) {
+        return deployGWContract("DefaultUpgrade");
+    }
+
     /// @notice Deploy everything that should be deployed for GW
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
@@ -1077,7 +1097,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
         gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract("GettersFacet");
         gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract("DiamondInit");
-        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployGWContract("DefaultUpgrade");
+        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
         gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
@@ -1326,36 +1346,36 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](6);
 
-        // calls[0] = _buildCallProxyUpgrade(
-        //     addresses.stateTransition.chainTypeManagerProxy,
-        //     addresses.stateTransition.chainTypeManagerImplementation
-        // );
+        calls[0] = _buildCallProxyUpgrade(
+            addresses.stateTransition.chainTypeManagerProxy,
+            addresses.stateTransition.chainTypeManagerImplementation
+        );
 
-        // calls[1] = _buildCallProxyUpgrade(
-        //     addresses.bridgehub.bridgehubProxy,
-        //     addresses.bridgehub.bridgehubImplementation
-        // );
+        calls[1] = _buildCallProxyUpgrade(
+            addresses.bridgehub.bridgehubProxy,
+            addresses.bridgehub.bridgehubImplementation
+        );
 
-        // // Note, that we do not need to run the initializer
-        // calls[2] = _buildCallProxyUpgrade(
-        //     addresses.bridges.l1NullifierProxy,
-        //     addresses.bridges.l1NullifierImplementation
-        // );
+        // Note, that we do not need to run the initializer
+        calls[2] = _buildCallProxyUpgrade(
+            addresses.bridges.l1NullifierProxy,
+            addresses.bridges.l1NullifierImplementation
+        );
 
-        // calls[3] = _buildCallProxyUpgrade(
-        //     addresses.bridges.l1AssetRouterProxy,
-        //     addresses.bridges.l1AssetRouterImplementation
-        // );
+        calls[3] = _buildCallProxyUpgrade(
+            addresses.bridges.l1AssetRouterProxy,
+            addresses.bridges.l1AssetRouterImplementation
+        );
 
-        // calls[4] = _buildCallProxyUpgrade(
-        //     addresses.vaults.l1NativeTokenVaultProxy,
-        //     addresses.vaults.l1NativeTokenVaultImplementation
-        // );
+        calls[4] = _buildCallProxyUpgrade(
+            addresses.vaults.l1NativeTokenVaultProxy,
+            addresses.vaults.l1NativeTokenVaultImplementation
+        );
 
-        // calls[5] = _buildCallProxyUpgrade(
-        //     addresses.bridgehub.messageRootProxy,
-        //     addresses.bridgehub.messageRootImplementation
-        // );
+        calls[5] = _buildCallProxyUpgrade(
+            addresses.bridgehub.messageRootProxy,
+            addresses.bridgehub.messageRootImplementation
+        );
     }
 
     function _buildCallProxyUpgrade(
@@ -1414,7 +1434,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "DefaultUpgrade")) {
+            if (compareStrings(contractName, "DiamondProxy")) {
+                return type(DiamondProxy).creationCode;
+            } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "BytecodesSupplier")) {
                 return type(BytecodesSupplier).creationCode;
@@ -1501,6 +1523,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             }
         } else if (compareStrings(contractName, "UpgradeStageValidator")) {
             return abi.encode(addresses.stateTransition.chainTypeManagerProxy, config.contracts.latestProtocolVersion);
+        } else if (compareStrings(contractName, "DiamondProxy")) {
+            Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
+            Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
+                facetCuts: facetCuts,
+                initAddress: address(0),
+                initCalldata: ""
+            });
+            return abi.encode(block.chainid, diamondCut);
         } else {
             return super.getCreationCalldata(contractName, isZKBytecode);
         }

@@ -83,72 +83,86 @@ import {DeployL1Script} from "../DeployL1.s.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
-import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
-import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
+import {SemVer} from "../../contracts/common/libraries/SemVer.sol";
 
 /// @notice Script used for v29 upgrade flow
-contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
+contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(
+            vm.envString("ZK_OS_V28_1_UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("ZK_OS_V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
+        );
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
     }
 
-    function _getL2UpgradeTargetAndData(
-        IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
-    ) internal override returns (address, bytes memory) {
-        bytes32 ethAssetId = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy).ETH_TOKEN_ASSET_ID();
-        bytes memory v29UpgradeCalldata = abi.encodeCall(
-            IL2V29Upgrade.upgrade,
-            (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
-        );
-        return (
-            address(L2_COMPLEX_UPGRADER_ADDR),
-            abi.encodeCall(
-                IComplexUpgrader.forceDeployAndUpgrade,
-                (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
-            )
-        );
+    function deployNewEcosystemContracts() public override {
+        require(upgradeConfig.initialized, "Not initialized");
+
+        instantiateCreate2Factory();
+
+        deployVerifiers();
+        deployUpgradeStageValidator();
+
+        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
+        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
     }
 
-    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2V29Upgrade";
+    function getProposedUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public override returns (ProposedUpgrade memory proposedUpgrade) {
+        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        IZKChain diamondProxy = IZKChain(bridgehub.getZKChain(config.eraChainId));
+
+        console.log("Diamond proxy address: %s", address(diamondProxy));
+        (uint32 major, uint32 minor, uint32 patch) = diamondProxy.getSemverProtocolVersion();
+        console.log("Current protocol version: %s.%s.%s", major, minor, patch);
+        uint256 oldVersion = SemVer.packSemVer(major, minor, patch);
+        uint256 newVersion = SemVer.packSemVer(major, minor, patch + 1);
+
+        proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: _composeEmptyUpgradeTx(),
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
+            verifier: stateTransition.verifier,
+            verifierParams: VerifierParams({
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
+            }),
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: new bytes(0),
+            upgradeTimestamp: 0,
+            newProtocolVersion: newVersion
+        });
     }
 
-    function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
-            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
-        }
-
-        return super.getExpectedL2Address(contractName);
-    }
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode && compareStrings(contractName, "L1V29Upgrade")) {
-            return type(L1V29Upgrade).creationCode;
-        }
-        return super.getCreationCode(contractName, isZKBytecode);
-    }
-
-    function getCreationCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view override returns (bytes memory) {
-        if (compareStrings(contractName, "L1V29Upgrade")) {
-            return abi.encode();
-        }
-        return super.getCreationCalldata(contractName, isZKBytecode);
-    }
-
-    function deployUsedUpgradeContract() internal override returns (address) {
-        return deploySimpleContract("L1V29Upgrade", false);
+    /// @notice Build empty L1 -> L2 upgrade tx
+    function _composeEmptyUpgradeTx() internal virtual returns (L2CanonicalTransaction memory transaction) {
+        transaction = L2CanonicalTransaction({
+            txType: 0,
+            from: uint256(0),
+            to: uint256(0),
+            gasLimit: 0,
+            gasPerPubdataByteLimit: 0,
+            maxFeePerGas: 0,
+            maxPriorityFeePerGas: 0,
+            paymaster: uint256(uint160(address(0))),
+            nonce: 0,
+            value: 0,
+            reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
+            data: new bytes(0),
+            signature: new bytes(0),
+            factoryDeps: new uint256[](0),
+            paymasterInput: new bytes(0),
+            // Reserved dynamic type for the future use-case. Using it should be avoided,
+            // But it is still here, just in case we want to enable some additional functionality
+            reservedDynamic: new bytes(0)
+        });
     }
 }
