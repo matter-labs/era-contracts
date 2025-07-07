@@ -1,0 +1,5 @@
+{
+  "rules": {
+    "import-path-check": "off"
+  }
+}
