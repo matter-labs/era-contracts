@@ -130,6 +130,8 @@ contract AccountCodeStorage is IAccountCodeStorage {
             codeHash = EMPTY_STRING_KECCAK;
         } else if (Utils.isCodeHashEVM(codeHash)) {
             codeHash = EVM_HASHES_STORAGE.getEvmCodeHash(codeHash);
+        } else if (Utils.isCodeHash7702Delegation(codeHash)) {
+            codeHash = _hash7702DelegationMarker(codeHash);
         }
 
         return codeHash;
@@ -175,5 +177,20 @@ contract AccountCodeStorage is IAccountCodeStorage {
         }
 
         return false;
+    }
+
+    /// @notice Hashes the code part extracted from EIP-7702 delegation contract bytecode hash.
+    /// @dev This method does not check whether the input is a valid EIP-7702 delegation code hash.
+    /// @param input The EIP-7702 delegation code hash.
+    /// @return hash The keccak256 hash of the code part of the EIP-7702 delegation code hash.
+    function _hash7702DelegationMarker(bytes32 input) internal pure returns (bytes32 hash) {
+        // Hash bytes 9-32 (that have the contract code) without allocating an array.
+        assembly {
+            // Use scratch space to calculate the hash
+            mstore(0, input)
+            // Only the part starting with 0xEF0100 is needed for this hash;
+            // ignore the first 9 bytes.
+            hash := keccak256(9, 23)
+        }
     }
 }

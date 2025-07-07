@@ -551,16 +551,23 @@ for { } true { } {
         addr := and(addr, ADDRESS_MASK())
 
         if iszero($llvm_AlwaysInline_llvm$_warmAddress(addr)) {
-            evmGasLeft := chargeGas(evmGasLeft, 2500) 
+            evmGasLeft := chargeGas(evmGasLeft, 2500)
         }
 
         let rawCodeHash := getRawCodeHash(addr)
-        let shouldUseEvmHash := or(
-            is7702Delegated(rawCodeHash),
-            isHashOfConstructedEvmContract(rawCodeHash)
-        )
-        switch shouldUseEvmHash
-        case 0 {
+        switch shr(240, rawCodeHash)
+        case 0x0200 {
+            // Constructed EVM contract, get precalculated hash
+            stackHead := getEvmExtcodehash(rawCodeHash)
+        }
+        case 0x0302 {
+            // 7702-delegated contract
+            mstore(0, rawCodeHash)
+            // Only the part starting with 0xEF0100 is needed for this hash;
+            // ignore the first 9 bytes.
+            stackHead := keccak256(9, 23)
+        }
+        default {
             let codeLen := and(shr(224, rawCodeHash), 0xffff)
 
             if codeLen {
@@ -585,11 +592,7 @@ for { } true { } {
                 stackHead := rawCodeHash
             }
         }
-        default {
-            // Get precalculated keccak of EVM code
-            stackHead := getEvmExtcodehash(rawCodeHash)
-        }
-        
+
         ip := add(ip, 1)
     }
     case 0x40 { // OP_BLOCKHASH

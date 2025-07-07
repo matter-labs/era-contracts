@@ -481,9 +481,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
                 continue;
             }
             if (item.addr == address(0)) {
-                bytes32 currentBytecodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(authority);
                 ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccount7702DelegationCodeHash(authority, 0x00);
-                EVM_HASHES_STORAGE.storeEvmCodeHash(currentBytecodeHash, bytes32(0x0));
             } else {
                 // Otherwise, store the delegation.
                 bytes32 delegationCodeMarker = Utils.EIP_7702_DELEGATION_BYTECODE_MASK |
@@ -492,24 +490,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
                     authority,
                     delegationCodeMarker
                 );
-                bytes32 evmBytecodeHash = _hash7702Delegation(delegationCodeMarker);
-                EVM_HASHES_STORAGE.storeEvmCodeHash(delegationCodeMarker, evmBytecodeHash);
             }
-        }
-    }
-
-    /// @notice Hashes the code part extracted from EIP-7702 delegation contract bytecode hash.
-    /// @dev This method does not check whether the input is a valid EIP-7702 delegation code hash.
-    /// @param input The EIP-7702 delegation code hash.
-    /// @return hash The keccak256 hash of the code part of the EIP-7702 delegation code hash.
-    function _hash7702Delegation(bytes32 input) internal pure returns (bytes32 hash) {
-        // Hash bytes 9-32 (that have the contract code) without allocating an array.
-        assembly {
-            // Use scratch space to calculate the hash
-            mstore(0x00, input)
-            // Only the part starting with 0xEF0100 is needed for this hash;
-            // ignore the first 9 bytes.
-            hash := keccak256(0x09, 23)
         }
     }
 

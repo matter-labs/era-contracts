@@ -389,17 +389,17 @@ function getEvmExtcodehash(versionedBytecodeHash) -> evmCodeHash {
 function isHashOfConstructedEvmContract(rawCodeHash) -> isConstructedEVM {
     let hashPrefix := shr(240, rawCodeHash)
     switch hashPrefix
-        case 0x0200 {
-            // 0 means that account is constructed
-            isConstructedEVM := 1
-        }
-        case 0x0302 {
-            // 2 means that account is delegated
-            let delegationAddress := and(rawCodeHash, ADDRESS_MASK())
-            let delegationHash := getRawCodeHash(delegationAddress)
-            // We don't allow recursion here, since delegation loops are forbidden
-            isConstructedEVM := eq(shr(240, delegationHash), 0x0200) // EVM contract, constructed
-        }
+    case 0x0200 {
+        // 0 means that account is constructed
+        isConstructedEVM := 1
+    }
+    case 0x0302 {
+        // 2 means that account is delegated
+        let delegationAddress := and(rawCodeHash, ADDRESS_MASK())
+        let delegationHash := getRawCodeHash(delegationAddress)
+        // We don't allow recursion here, since delegation loops are forbidden
+        isConstructedEVM := eq(shr(240, delegationHash), 0x0200) // EVM contract, constructed
+    }
 }
 
 // Basically performs an extcodecopy, while returning the length of the copied bytecode.
