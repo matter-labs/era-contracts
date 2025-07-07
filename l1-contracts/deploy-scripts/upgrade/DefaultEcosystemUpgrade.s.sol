@@ -216,6 +216,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
 
+        /// for forge verification.
         deploySimpleContract("DiamondProxy", false);
 
         upgradeConfig.ecosystemContractsDeployed = true;
@@ -359,6 +360,25 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
+        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
+
+        upgradeCutData = Diamond.DiamondCutData({
+            facetCuts: facetCuts,
+            initAddress: stateTransition.defaultUpgrade,
+            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
+        });
+
+        if (!stateTransition.isOnGateway) {
+            newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
+            upgradeConfig.upgradeCutPrepared = true;
+        } else {
+            gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
+        }
+    }
+
+    function getProposedUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
         VerifierParams memory verifierParams = getVerifierParams();
 
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
@@ -374,7 +394,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             baseForceDeployments,
             additionalForceDeployments
         );
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
+
+        proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
             bootloaderHash: config.contracts.bootloaderHash,
             defaultAccountHash: config.contracts.defaultAAHash,
@@ -386,19 +407,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             upgradeTimestamp: 0,
             newProtocolVersion: getNewProtocolVersion()
         });
-
-        upgradeCutData = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: stateTransition.defaultUpgrade,
-            initCalldata: abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade))
-        });
-
-        if (!stateTransition.isOnGateway) {
-            newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
-            upgradeConfig.upgradeCutPrepared = true;
-        } else {
-            gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
-        }
     }
 
     function getForceDeployment(
