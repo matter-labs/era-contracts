@@ -7,10 +7,12 @@ import {IContractDeployer, ForceDeployment} from "./interfaces/IContractDeployer
 import {CREATE2_PREFIX, CREATE_PREFIX, NONCE_HOLDER_SYSTEM_CONTRACT, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, FORCE_DEPLOYER, MAX_SYSTEM_CONTRACT_ADDRESS, KNOWN_CODE_STORAGE_CONTRACT, BASE_TOKEN_SYSTEM_CONTRACT, IMMUTABLE_SIMULATOR_SYSTEM_CONTRACT, COMPLEX_UPGRADER_CONTRACT, SERVICE_CALL_PSEUDO_CALLER, EVM_PREDEPLOYS_MANAGER, EVM_HASHES_STORAGE} from "./Constants.sol";
 
 import {Utils} from "./libraries/Utils.sol";
+import {AuthorizationListItem} from "./libraries/TransactionHelper.sol";
+import {RLPEncoder} from "./libraries/RLPEncoder.sol";
 import {EfficientCall} from "./libraries/EfficientCall.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMBytecodeHash, EVMBytecodeHashUnknown, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue} from "./SystemContractErrors.sol";
+import {Unauthorized, InvalidNonceOrderingChange, ValueMismatch, EmptyBytes32, EVMBytecodeHash, EVMBytecodeHashUnknown, EVMEmulationNotSupported, NotAllowedToDeployInKernelSpace, HashIsNonZero, NonEmptyAccount, UnknownCodeHash, NonEmptyMsgValue, EmptyAuthorizationList} from "./SystemContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -45,6 +47,25 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         return accountInfo[_address];
     }
 
+    /// @notice Returns `true` if account is an EOA (including 7702-delegated ones).
+    /// This function will return `false` for _both_ smart contracts and smart accounts.
+    /// @param _address The address of the account.
+    /// @return `true` if the account is an EOA, `false` otherwise.
+    function isAccountEOA(address _address) public view returns (bool) {
+        bool systemContract = _address <= address(MAX_SYSTEM_CONTRACT_ADDRESS);
+        if (systemContract) {
+            return false;
+        }
+
+        bytes32 accountCodeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address);
+        if (accountCodeHash == 0) {
+            return true;
+        }
+
+        bool delegated = Utils.extractDelegationAddress(accountCodeHash) != address(0);
+        return delegated;
+    }
+
     /// @notice Returns the account abstraction version if `_address` is a deployed contract.
     /// Returns the latest supported account abstraction version if `_address` is an EOA.
     /// @param _address The address of the account.
@@ -56,10 +77,7 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
         }
 
         // It is an EOA, it is still an account.
-        if (
-            _address > address(MAX_SYSTEM_CONTRACT_ADDRESS) &&
-            ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_address) == 0
-        ) {
+        if (isAccountEOA(_address)) {
             return AccountAbstractionVersion.Version1;
         }
 
@@ -382,6 +400,97 @@ contract ContractDeployer is IContractDeployer, SystemContractBase {
             allowedBytecodeTypesToDeploy = newAllowedBytecodeTypes;
 
             emit AllowedBytecodeTypesModeUpdated(newAllowedBytecodeTypes);
+        }
+    }
+
+    /// @notice Returns the address of the account that is delegated to execute transactions on behalf of the given
+    /// address.
+    /// @notice Returns the zero address if no delegation is set.
+    function getAccountDelegation(address _addr) public view override returns (address) {
+        bytes32 codeHash = ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.getRawCodeHash(_addr);
+        return Utils.extractDelegationAddress(codeHash);
+    }
+
+    /// @notice Method called by bootloader during processing of EIP7702 authorization lists.
+    /// @notice Each item is processed independently, so if any check fails for an item,
+    /// it is skipped and the next item is processed.
+    function processDelegations(AuthorizationListItem[] calldata authorizationList) external onlyCallFromBootloader {
+        uint256 listLength = authorizationList.length;
+        // The transaction is considered invalid if the length of authorization_list is zero.
+        if (listLength == 0) {
+            revert EmptyAuthorizationList();
+        }
+        for (uint256 i = 0; i < listLength; ++i) {
+            // Per EIP7702 rules, if any check for the tuple item fails,
+            // we must move on to the next item in the list.
+            AuthorizationListItem calldata item = authorizationList[i];
+
+            // Verify the chain ID is 0 or the ID of the current chain.
+            if (item.chainId != 0 && item.chainId != block.chainid) {
+                continue;
+            }
+
+            // Verify the nonce is less than 2 ** 64 - 1.
+            if (item.nonce >= 2 ** 64 - 1) {
+                continue;
+            }
+
+            // Calculate EIP7702 magic:
+            // msg = keccak(MAGIC || rlp([chain_id, address, nonce]))
+            bytes memory chainIdEncoded = RLPEncoder.encodeUint256(item.chainId);
+            bytes memory addressEncoded = RLPEncoder.encodeAddress(item.addr);
+            bytes memory nonceEncoded = RLPEncoder.encodeUint256(item.nonce);
+            bytes memory listLenEncoded = RLPEncoder.encodeListLen(
+                uint64(chainIdEncoded.length + addressEncoded.length + nonceEncoded.length)
+            );
+            bytes1 magic = bytes1(0x05);
+            bytes32 message = keccak256(
+                // solhint-disable-next-line func-named-parameters
+                bytes.concat(magic, listLenEncoded, chainIdEncoded, addressEncoded, nonceEncoded)
+            );
+
+            // EIP-2 still allows signature malleability for ecrecover(). Remove this possibility and make the signature
+            // unique. Appendix F in the Ethereum Yellow paper (https://ethereum.github.io/yellowpaper/paper.pdf), defines
+            // the valid range for s in (301): 0 < s < secp256k1n ÷ 2 + 1, and for v in (302): v ∈ {27, 28}. Most
+            // signatures from current libraries generate a unique signature with an s-value in the lower half order.
+            //
+            // If your library generates malleable signatures, such as s-values in the upper range, calculate a new s-value
+            // with 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141 - s1 and flip v from 27 to 28 or
+            // vice versa. If your library also generates signatures with 0/1 for v instead 27/28, add 27 to v to accept
+            // these malleable signatures as well.
+            if (uint256(item.s) > 0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A0) {
+                continue;
+            }
+
+            address authority = ecrecover(message, uint8(item.yParity + 27), bytes32(item.r), bytes32(item.s));
+
+            // We only allow delegation for EOAs.
+            if (!isAccountEOA(authority)) {
+                continue;
+            }
+
+            // Avoid reverting if the nonce is not incremented.
+            (bool nonceIncremented, ) = address(NONCE_HOLDER_SYSTEM_CONTRACT).call(
+                abi.encodeWithSelector(
+                    NONCE_HOLDER_SYSTEM_CONTRACT.incrementMinNonceIfEqualsFor.selector,
+                    authority,
+                    item.nonce
+                )
+            );
+            if (!nonceIncremented) {
+                continue;
+            }
+            if (item.addr == address(0)) {
+                ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccount7702DelegationCodeHash(authority, 0x00);
+            } else {
+                // Otherwise, store the delegation.
+                bytes32 delegationCodeMarker = Utils.EIP_7702_DELEGATION_BYTECODE_MASK |
+                    bytes32(uint256(uint160(item.addr)));
+                ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT.storeAccount7702DelegationCodeHash(
+                    authority,
+                    delegationCodeMarker
+                );
+            }
         }
     }
 

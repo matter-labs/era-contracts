@@ -208,4 +208,13 @@ interface IContractDeployer {
     /// @notice Changes what types of bytecodes are allowed to be deployed on the chain.
     /// @param newAllowedBytecodeTypes The new allowed bytecode types mode.
     function setAllowedBytecodeTypesToDeploy(AllowedBytecodeTypes newAllowedBytecodeTypes) external;
+
+    /// @notice Returns the address of EIP7702 delegation for given contract.
+    function getAccountDelegation(address _addr) external view returns (address);
+
+    /// @notice Returns `true` if account is an EOA (including 7702-delegated ones).
+    /// This function will return `false` for _both_ smart contracts and smart accounts.
+    /// @param _address The address of the account.
+    /// @return `true` if the account is an EOA, `false` otherwise.
+    function isAccountEOA(address _address) external view returns (bool);
 }

@@ -45,6 +45,10 @@ interface INonceHolder {
     /// @param _expectedNonce The expected minimal nonce for the account.
     function incrementMinNonceIfEquals(uint256 _expectedNonce) external;
 
+    /// @notice Method for `ContractDeployer` to increment the account nonce, e.g.
+    /// during processing of EIP-7702 authorization lists.
+    function incrementMinNonceIfEqualsFor(address _address, uint256 _expectedNonce) external;
+
     /// @notice A convenience method to increment the minimal nonce if it is equal
     /// to the `_expectedNonce`. This is a keyed counterpart to `incrementMinNonceIfEquals`.
     /// @dev Reverts for nonces with nonceKey == 0.

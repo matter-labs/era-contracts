@@ -128,12 +128,28 @@ contract NonceHolder is INonceHolder, SystemContractBase {
     /// unintentionally allowing keyed nonces to be used.
     /// @param _expectedNonce The expected minimal nonce for the account.
     function incrementMinNonceIfEquals(uint256 _expectedNonce) external onlySystemCall {
+        _incrementMinNonceIfEqualsFor(msg.sender, _expectedNonce);
+    }
+
+    /// @notice Method for `ContractDeployer` to increment the account nonce, e.g.
+    /// during processing of EIP-7702 authorization lists.
+    function incrementMinNonceIfEqualsFor(address _address, uint256 _expectedNonce) external onlySystemCall {
+        if (msg.sender != address(DEPLOYER_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
+        _incrementMinNonceIfEqualsFor(_address, _expectedNonce);
+    }
+
+    /// @notice A private method that shares logic for incrementing the minimal nonce
+    /// if it is equal to the `_expectedNonce`. This is used by both `incrementMinNonceIfEquals`
+    /// and `incrementMinNonceIfEqualsFor`.
+    function _incrementMinNonceIfEqualsFor(address _address, uint256 _expectedNonce) private {
         (uint192 nonceKey, uint64 nonceValue) = _splitKeyedNonce(_expectedNonce);
         if (nonceKey != 0) {
             revert InvalidNonceKey(nonceKey);
         }
 
-        uint256 addressAsKey = uint256(uint160(msg.sender));
+        uint256 addressAsKey = uint256(uint160(_address));
         uint256 oldRawNonce = rawNonces[addressAsKey];
 
         (, uint256 oldMinNonce) = _splitRawNonce(oldRawNonce);

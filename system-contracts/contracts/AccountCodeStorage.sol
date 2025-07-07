@@ -56,6 +56,19 @@ contract AccountCodeStorage is IAccountCodeStorage {
         _storeCodeHash(_address, _hash);
     }
 
+    /// @notice Sets the bytecodeHash of address to indicate EIP-7702 delegation.
+    /// @param _address The address of the account to set the codehash to.
+    /// @param _hash Bytecode hash with encoded EIP-7702 delegation data.
+    /// @dev This method trusts the ContractDeployer to make sure that the hash is well-formed,
+    /// but checks whether the bytecode has EIP-7702 delegation marker in first two bytes.
+    function storeAccount7702DelegationCodeHash(address _address, bytes32 _hash) external override onlyDeployer {
+        // Check that code hash corresponds to the deploying smart contract
+        if (!Utils.isContract7702Delegation(_hash)) {
+            revert InvalidCodeHash(CodeHashReason.Not7702Delegation);
+        }
+        _storeCodeHash(_address, _hash);
+    }
+
     /// @notice Marks the account bytecodeHash as constructed.
     /// @param _address The address of the account to mark as constructed
     function markAccountCodeHashAsConstructed(address _address) external override onlyDeployer {
@@ -117,6 +130,8 @@ contract AccountCodeStorage is IAccountCodeStorage {
             codeHash = EMPTY_STRING_KECCAK;
         } else if (Utils.isCodeHashEVM(codeHash)) {
             codeHash = EVM_HASHES_STORAGE.getEvmCodeHash(codeHash);
+        } else if (Utils.isCodeHash7702Delegation(codeHash)) {
+            codeHash = _hash7702DelegationMarker(codeHash);
         }
 
         return codeHash;
@@ -151,6 +166,31 @@ contract AccountCodeStorage is IAccountCodeStorage {
     /// @notice Method for detecting whether an address is an EVM contract
     function isAccountEVM(address _addr) external view override returns (bool) {
         bytes32 bytecodeHash = getRawCodeHash(_addr);
-        return Utils.isCodeHashEVM(bytecodeHash);
+        if (Utils.isCodeHashEVM(bytecodeHash)) {
+            return true;
+        }
+        address delegation = Utils.extractDelegationAddress(bytecodeHash);
+        if (delegation != address(0)) {
+            bytes32 delegationCodeHash = getRawCodeHash(delegation);
+            // For EIP-7702, delegation loops are not allowed, so there is no need for a recursive check.
+            return Utils.isCodeHashEVM(delegationCodeHash);
+        }
+
+        return false;
+    }
+
+    /// @notice Hashes the code part extracted from EIP-7702 delegation contract bytecode hash.
+    /// @dev This method does not check whether the input is a valid EIP-7702 delegation code hash.
+    /// @param input The EIP-7702 delegation code hash.
+    /// @return hash The keccak256 hash of the code part of the EIP-7702 delegation code hash.
+    function _hash7702DelegationMarker(bytes32 input) internal pure returns (bytes32 hash) {
+        // Hash bytes 9-32 (that have the contract code) without allocating an array.
+        assembly {
+            // Use scratch space to calculate the hash
+            mstore(0, input)
+            // Only the part starting with 0xEF0100 is needed for this hash;
+            // ignore the first 9 bytes.
+            hash := keccak256(9, 23)
+        }
     }
 }

@@ -201,9 +201,13 @@ error InvalidNewL2BlockNumber(uint256 l2BlockNumber);
 // 0xe0a0dd23
 error InvalidNonceKey(uint192 nonceKey);
 
+// 0xcb494e84
+error EmptyAuthorizationList();
+
 enum CodeHashReason {
     NotContractOnConstructor,
-    NotConstructedContract
+    NotConstructedContract,
+    Not7702Delegation
 }
 
 enum SigField {

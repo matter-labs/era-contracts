@@ -191,5 +191,8 @@ uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint8 constant ERA_VM_BYTECODE_FLAG = 1;
 /// @dev Marker of EVM bytecode
 uint8 constant EVM_BYTECODE_FLAG = 2;
+/// @dev Marker of EIP-7702 delegation.
+/// @dev Unlike with other bytecodes, EIP-7702 delegation bytecode cannot be constructed, so the second byte is always 0x02.
+bytes2 constant EIP_7702_DELEGATION_FLAG = 0x0302;
 
 address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;

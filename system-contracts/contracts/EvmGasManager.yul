@@ -55,10 +55,10 @@ object "EvmGasManager" {
                 res := verbatim_1i_1o("active_ptr_data_load", pos)
             }
 
-            function $llvm_AlwaysInline_llvm$__getRawSenderCodeHash() -> hash {
+            function $llvm_AlwaysInline_llvm$__getRawCodeHash(addr) -> hash {
                 // function getRawCodeHash(address _address)
                 mstore(0, 0x4DE2E46800000000000000000000000000000000000000000000000000000000)
-                mstore(4, caller())
+                mstore(4, addr)
             
                 let success := staticcall(gas(), ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT(), 0, 36, 0, 0)
             
@@ -68,6 +68,16 @@ object "EvmGasManager" {
                 }
                 
                 hash := mloadFromReturndata(0)
+            }
+
+            /// @dev Checks that the bytecode hash corresponds to an EVM contract.
+            function isEvmCodeHash(versionedCodeHash) -> isEVM {
+                isEVM := eq(shr(248, versionedCodeHash), 0x02)
+            }
+
+            /// @dev Checks that the bytecode hash corresponds to EIP-7702 delegation.
+            function isEip7702DelegationCodeHash(versionedCodeHash) -> isDelegation {
+                isDelegation := eq(shr(240, versionedCodeHash), 0x0302)
             }
 
             /// @dev Checks that the call is done by the EVM emulator in system mode.
@@ -85,8 +95,19 @@ object "EvmGasManager" {
                 let transientSlot := or(IS_ACCOUNT_EVM_PREFIX(), caller())
                 let isEVM := tload(transientSlot)
                 if iszero(isEVM) {
-                    let versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawSenderCodeHash()
-                    isEVM := eq(shr(248, versionedCodeHash), 2)
+                    let versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(caller())
+                    isEVM := isEvmCodeHash(versionedCodeHash)
+
+                    if iszero(isEVM) {
+                        // Process EIP-7702 delegations.
+                        // For 7702 delegations, we need to make sure that the delegation address is an EVM contract.
+                        if isEip7702DelegationCodeHash(versionedCodeHash) {
+                            let delegationAddress := and(ADDRESS_MASK(), versionedCodeHash)
+                            versionedCodeHash := $llvm_AlwaysInline_llvm$__getRawCodeHash(delegationAddress)
+                            // Delegation loops are not allowed, so no need for recursion.
+                            isEVM := isEvmCodeHash(versionedCodeHash)
+                        }
+                    }
 
                     if iszero(isEVM) {
                         // error CallerMustBeEvmContract()
@@ -95,6 +116,7 @@ object "EvmGasManager" {
                     }
 
                     // we will not cache contract if it is being constructed
+                    // note: for delegated accounts, we check the construction of the delegation target
                     let isContractConstructed := iszero(and(0xFF, shr(240, versionedCodeHash)))
                     if isContractConstructed {
                         tstore(transientSlot, 1)
