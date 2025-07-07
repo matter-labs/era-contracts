@@ -216,6 +216,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
 
+        /// for forge verification.
         deploySimpleContract("DiamondProxy", false);
 
         upgradeConfig.ecosystemContractsDeployed = true;
@@ -399,6 +400,21 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         } else {
             gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         }
+    }
+
+    function getProposedUpgrade() public virtual returns (ProposedUpgrade memory proposedUpgrade) {
+        proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
+            bootloaderHash: config.contracts.bootloaderHash,
+            defaultAccountHash: config.contracts.defaultAAHash,
+            evmEmulatorHash: config.contracts.evmEmulatorHash,
+            verifier: stateTransition.verifier,
+            verifierParams: verifierParams,
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: new bytes(0),
+            upgradeTimestamp: 0,
+            newProtocolVersion: getNewProtocolVersion()
+        });
     }
 
     function getForceDeployment(
