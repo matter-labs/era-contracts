@@ -4,9 +4,7 @@ pragma solidity ^0.8.24;
 
 import {L2Log, L2Message} from "../../../common/Messaging.sol";
 import {IMessageVerification} from "../../chain-interfaces/IMessageVerification.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "../../../common/Config.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
-import {HashedLogIsDefault} from "../../../common/L1ContractErrors.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @dev This contract is abstract and is inherited by the Mailbox and L2MessageVerification contracts.
@@ -21,7 +19,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
-    ) public view returns (bool) {
+    ) public view virtual returns (bool) {
         return
             _proveL2LogInclusion({
                 _chainId: _chainId,
@@ -39,7 +37,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) external view override returns (bool) {
+    ) public view virtual override returns (bool) {
         return
             _proveL2LeafInclusion({
                 _chainId: _chainId,
@@ -70,11 +68,6 @@ abstract contract MessageVerification is IMessageVerification {
             // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
         );
-        // Check that hashed log is not the default one,
-        // otherwise it means that the value is out of range of sent L2 -> L1 logs
-        if (hashedLog == L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH) {
-            revert HashedLogIsDefault();
-        }
 
         // It is ok to not check length of `_proof` array, as length
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
@@ -112,7 +105,7 @@ abstract contract MessageVerification is IMessageVerification {
         uint256 _index,
         L2Log calldata _log,
         bytes32[] calldata _proof
-    ) external view returns (bool) {
+    ) public view virtual returns (bool) {
         return
             _proveL2LogInclusion({
                 _chainId: _chainId,

@@ -73,6 +73,8 @@ error CTMAlreadyRegistered();
 error CTMNotRegistered();
 // 0x907f8e51
 error DeadlineNotYetPassed();
+// 0xf2885eb3
+error DefaultAdminTransferNotAllowed();
 // 0xf7a01e4d
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
@@ -99,6 +101,8 @@ error EmptyBytes32();
 error EmptyData();
 // 0x95b66fe9
 error EmptyDeposit();
+// 0x84286507
+error EmptyPrecommitData(uint256 batchNumber);
 // 0x456f8f7a
 error EmptyProofLength();
 // 0x627e0872
@@ -132,6 +136,8 @@ error IncorrectBridgeHubAddress(address bridgehub);
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x826fb11e
 error InsufficientChainBalance();
+// 0x9bf8b9aa
+error InvalidBatchNumber(uint256 provided, uint256 expected);
 // 0xcbd9d2e0
 error InvalidCaller(address);
 // 0x92daded2
@@ -146,6 +152,8 @@ error InvalidMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoo
 error InvalidNTVBurnData();
 // 0xd8e9405c
 error InvalidNumberOfBlobs(uint256 expected, uint256 numCommitments, uint256 numHashes);
+// 0x99f6cc22
+error InvalidPackedPrecommitmentLength(uint256 length);
 // 0x09bde339
 error InvalidProof();
 // 0x48c5fa28
@@ -158,7 +166,7 @@ error InvalidPubdataPricingMode();
 error InvalidSelector(bytes4 func);
 // 0xbe7193d4
 error InvalidSystemLogsLength();
-// 0x0214acb6
+// 0x5f1aa154
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
 error L2TimestampTooBig();
@@ -176,7 +184,7 @@ error LegacyMethodForNonL1Token();
 error LengthIsNotDivisibleBy32(uint256 length);
 // 0x1b6825bb
 error LogAlreadyProcessed(uint8);
-// 0xcea34703
+// 0x43e266b0
 error MalformedBytecode(BytecodeError);
 // 0xafbb7a4e
 error MerkleIndexOrHeightMismatch();
@@ -232,6 +240,8 @@ error NonSequentialVersion();
 error NotAllowed(address addr);
 // 0x64846fe4
 error NotARestriction(address addr);
+// 0xb49df1f2
+error NotAZKChain(address addr);
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
 // 0xdf17e316
@@ -248,6 +258,8 @@ error OperationMustBePending();
 error OperationMustBeReady();
 // 0xb926450e
 error OriginChainIdNotFound();
+// 0x688c63e5
+error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
 // 0x9b48e060
 error PreviousOperationNotExecuted();
 // 0xd5a99014
@@ -278,13 +290,15 @@ error RestrictionWasAlreadyPresent(address restriction);
 error RestrictionWasNotPresent(address restriction);
 // 0x9a67c1cb
 error RevertedBatchNotAfterNewLastBatch();
+// 0xfe0aa4f2
+error RoleAccessDenied(address chainAddress, bytes32 role, address account);
 // 0xd3b6535b
 error SelectorsMustAllHaveSameFreezability();
 // 0x02181a13
 error SettlementLayersMustSettleOnL1();
 // 0x856d5b77
 error SharedBridgeNotSet();
-// 0xd7a6b5e6
+// 0x7774d2f9
 error SharedBridgeValueNotSet(SharedBridgeKey);
 // 0xdf3a8fdd
 error SlotOccupied();
@@ -356,20 +370,6 @@ error ZeroAddress();
 error ZeroChainId();
 // 0x601b6882
 error ZKChainLimitReached();
-// 0x9bf8b9aa
-error InvalidBatchNumber(uint256 provided, uint256 expected);
-// 0x84286507
-error EmptyPrecommitData(uint256 batchNumber);
-// 0x688c63e5
-error PrecommitmentMismatch(uint256 batchNumber, bytes32 expected, bytes32 found);
-// 0xfe0aa4f2
-error RoleAccessDenied(address chainAddress, bytes32 role, address account);
-// 0xf2885eb3
-error DefaultAdminTransferNotAllowed();
-// 0x99f6cc22
-error InvalidPackedPrecommitmentLength(uint256 length);
-// 0xb49df1f2
-error NotAZKChain(address addr);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
