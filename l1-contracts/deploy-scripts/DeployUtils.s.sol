@@ -411,9 +411,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
             return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
-        } else if (compareStrings(contractName, "VerifierFflonk") || compareStrings(contractName, "L1VerifierFflonk")) {
+        } else if (compareStrings(contractName, "VerifierFflonk")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "VerifierPlonk") || compareStrings(contractName, "L1VerifierPlonk")) {
+        } else if (compareStrings(contractName, "VerifierPlonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();

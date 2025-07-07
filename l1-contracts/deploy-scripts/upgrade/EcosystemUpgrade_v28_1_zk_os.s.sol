@@ -121,7 +121,7 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
         console.log("Diamond proxy address: %s", address(diamondProxy));
         (uint32 major, uint32 minor, uint32 patch) = diamondProxy.getSemverProtocolVersion();
         console.log("Current protocol version: %s.%s.%s", major, minor, patch);
-        uint256 oldVerion = SemVer.packSemVer(major, minor, patch);
+        uint256 oldVersion = SemVer.packSemVer(major, minor, patch);
         uint256 newVersion = SemVer.packSemVer(major, minor, patch + 1);
 
         proposedUpgrade = ProposedUpgrade({
