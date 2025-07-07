@@ -360,33 +360,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
-        VerifierParams memory verifierParams = getVerifierParams();
 
-        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
-            .getBaseForceDeployments();
-
-        // Additional force deployments after Gateway
-        IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
-        // add additional force deployments here
-
-        // TODO: do we update *all* fixed force deployments?
-
-        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
-            baseForceDeployments,
-            additionalForceDeployments
-        );
-        ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
-            bootloaderHash: config.contracts.bootloaderHash,
-            defaultAccountHash: config.contracts.defaultAAHash,
-            evmEmulatorHash: config.contracts.evmEmulatorHash,
-            verifier: stateTransition.verifier,
-            verifierParams: verifierParams,
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: getNewProtocolVersion()
-        });
+        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -402,7 +377,23 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         }
     }
 
-    function getProposedUpgrade() public virtual returns (ProposedUpgrade memory proposedUpgrade) {
+    function getProposedUpgrade(StateTransitionDeployedAddresses memory stateTransition) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
+        VerifierParams memory verifierParams = getVerifierParams();
+
+        IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
+            .getBaseForceDeployments();
+
+        // Additional force deployments after Gateway
+        IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
+        // add additional force deployments here
+
+        // TODO: do we update *all* fixed force deployments?
+
+        IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
+            baseForceDeployments,
+            additionalForceDeployments
+        );
+
         proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: _composeUpgradeTx(forceDeployments),
             bootloaderHash: config.contracts.bootloaderHash,
