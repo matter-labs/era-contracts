@@ -72,10 +72,10 @@ abstract contract Create2FactoryUtils is Script {
     function deployViaCreate2(bytes memory bytecode) internal virtual returns (address) {
         return
             Utils.deployViaCreate2(
-                bytecode,
-                create2FactoryParams.factorySalt,
-                create2FactoryState.create2FactoryAddress
-            );
+            bytecode,
+            create2FactoryParams.factorySalt,
+            create2FactoryState.create2FactoryAddress
+        );
     }
 
     /// @notice Deploys a contract via Create2 by concatenating the creation code and constructor arguments.
@@ -88,10 +88,10 @@ abstract contract Create2FactoryUtils is Script {
     ) internal virtual returns (address) {
         return
             Utils.deployViaCreate2(
-                abi.encodePacked(creationCode, constructorArgs),
-                create2FactoryParams.factorySalt,
-                create2FactoryState.create2FactoryAddress
-            );
+            abi.encodePacked(creationCode, constructorArgs),
+            create2FactoryParams.factorySalt,
+            create2FactoryState.create2FactoryAddress
+        );
     }
 
     /// @notice Deploys a contract via Create2 and notifies via console logs.
@@ -195,29 +195,29 @@ abstract contract Create2FactoryUtils is Script {
         console.log(basicMessage);
 
         string memory deployedContractName = getDeployedContractName(contractName);
-        string memory forgeMessage;
-        if (constructorParams.length == 0) {
-            forgeMessage = string.concat(
-                "forge verify-contract ",
-                vm.toString(contractAddr),
-                " ",
-                deployedContractName
-            );
-        } else {
-            forgeMessage = string.concat(
-                "forge verify-contract ",
-                vm.toString(contractAddr),
-                " ",
-                deployedContractName,
-                " --constructor-args ",
-                vm.toString(constructorParams)
-            );
-        }
-
-        if (isZKBytecode) {
-            forgeMessage = string.concat(forgeMessage, " --verifier zksync");
-        }
-        console.log(forgeMessage);
+//        string memory forgeMessage;
+//        if (constructorParams.length == 0) {
+//            forgeMessage = string.concat(
+//                "forge verify-contract ",
+//                vm.toString(contractAddr),
+//                " ",
+//                deployedContractName
+//            );
+//        } else {
+//            forgeMessage = string.concat(
+//                "forge verify-contract ",
+//                vm.toString(contractAddr),
+//                " ",
+//                deployedContractName,
+//                " --constructor-args ",
+//                vm.toString(constructorParams)
+//            );
+//        }
+//
+//        if (isZKBytecode) {
+//            forgeMessage = string.concat(forgeMessage, " --verifier zksync");
+//        }
+//        console.log(forgeMessage);
     }
 
     /// @notice Returns the deployed contract name.
