@@ -516,6 +516,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
             "The new protocol version is already present on the ChainTypeManager"
         );
         addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+        addresses.stateTransition.genesisUpgrade = address(
+            ChainTypeManager(ctm).l1GenesisUpgrade()
+        );
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()

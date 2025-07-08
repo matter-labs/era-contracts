@@ -106,15 +106,10 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
 
         deployVerifiers();
         deployUpgradeStageValidator();
-        deployGenesisUpgrade();
         (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
         upgradeConfig.ecosystemContractsDeployed = true;
 
-    }
-
-    function deployGenesisUpgrade() internal {
-        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", false);
     }
 
     function getFacetCuts(
