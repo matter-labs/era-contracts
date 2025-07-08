@@ -39,7 +39,6 @@ import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, Interop
 import {GasFields, InteropTrigger, TRIGGER_IDENTIFIER} from "contracts/dev-contracts/test/Utils.sol";
 
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
-
     address constant UNBUNDLER_ADDRESS = address(0x1);
     address constant EXECUTION_ADDRESS = address(0x2);
 
