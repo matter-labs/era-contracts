@@ -25,7 +25,7 @@ contract DeployL2Script is Script {
         Rollup,
         NoDA,
         Avail,
-        EigenDA,
+        EigenDA
     }
 
     // solhint-disable-next-line gas-struct-packing
