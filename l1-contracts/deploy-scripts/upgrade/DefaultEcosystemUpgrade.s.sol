@@ -247,10 +247,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         console.log("Generated fixed force deployments data");
         getDiamondCutData(addresses.stateTransition);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        // gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
+        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition);
-        // generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
+        generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
     }
