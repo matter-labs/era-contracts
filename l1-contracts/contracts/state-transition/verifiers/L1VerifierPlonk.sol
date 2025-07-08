@@ -211,9 +211,9 @@ contract L1VerifierPlonk is IVerifier {
     uint256 internal constant PAIRING_BUFFER_POINT_Y_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x20;
 
     uint256 internal constant PAIRING_PAIR_WITH_GENERATOR_X_SLOT =
-    0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x40;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x40;
     uint256 internal constant PAIRING_PAIR_WITH_GENERATOR_Y_SLOT =
-    0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x60;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0xc0 + 0x60;
 
     uint256 internal constant PAIRING_PAIR_WITH_X_X_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0x80;
     uint256 internal constant PAIRING_PAIR_WITH_X_Y_SLOT = 0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xa0;
@@ -223,11 +223,11 @@ contract L1VerifierPlonk is IVerifier {
     //////////////////////////////////////////////////////////////*/
 
     uint256 internal constant COPY_PERMUTATION_FIRST_AGGREGATED_COMMITMENT_COEFF =
-    0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xc0;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xc0;
     uint256 internal constant LOOKUP_GRAND_PRODUCT_FIRST_AGGREGATED_COMMITMENT_COEFF =
-    0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xe0;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0xe0;
     uint256 internal constant LOOKUP_S_FIRST_AGGREGATED_COMMITMENT_COEFF =
-    0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0x100;
+        0x200 + 0x520 + 0x620 + 0x80 + 0x2c0 + 0x100 + 0x100 + 0x100;
 
     /*//////////////////////////////////////////////////////////////
                              Constants
@@ -283,7 +283,7 @@ contract L1VerifierPlonk is IVerifier {
     /// [table_type]                                 - lookup table type commitment
     function _loadVerificationKey() internal pure virtual {
         assembly {
-        // gate setup commitments
+            // gate setup commitments
             mstore(VK_GATE_SETUP_0_X_SLOT, 0x1df2e9aab0409da7801f3c2994683e0effb585c05ba40b802f7dcca02819e0ac)
             mstore(VK_GATE_SETUP_0_Y_SLOT, 0x02cb63d5efb350f306fe7dcd7972c23907991428acb74674a5986f1c5de1273c)
             mstore(VK_GATE_SETUP_1_X_SLOT, 0x1d77d4ea07c972f1576506abe3b291463fe38958ec53eff7aca0a289a869925c)
@@ -301,13 +301,13 @@ contract L1VerifierPlonk is IVerifier {
             mstore(VK_GATE_SETUP_7_X_SLOT, 0x1a25a81461ae735ce1965875d211bd5af89117edc5bb61fa5b70ff7e2fe86cf9)
             mstore(VK_GATE_SETUP_7_Y_SLOT, 0x1b7003b716a4eb2878092ebad74ea172f85925d282a54fe45526c7027fad3fb2)
 
-        // gate selectors commitments
+            // gate selectors commitments
             mstore(VK_GATE_SELECTORS_0_X_SLOT, 0x0ca7054c8f56f9d200624dff1f79190b278303bc9047a0a34dfcc9f9cc41671c)
             mstore(VK_GATE_SELECTORS_0_Y_SLOT, 0x0d410942efb5a571d81d3744873700bb13d8efb96bc8ad219412fb04a65bf938)
             mstore(VK_GATE_SELECTORS_1_X_SLOT, 0x26f0ea3182623f23f3baabc1c947f33a60c272d4547379a265ef9db38833be98)
             mstore(VK_GATE_SELECTORS_1_Y_SLOT, 0x1faf4c48c3e4f1850fe646ad9c83655ec8af256db89d90193d7976cd1bf810a6)
 
-        // permutation commitments
+            // permutation commitments
             mstore(VK_PERMUTATION_0_X_SLOT, 0x21fa04636d4320ee7670f9a059ec58d4db4c197b7362ae5119ed893d0eb35192)
             mstore(VK_PERMUTATION_0_Y_SLOT, 0x1f889fe9ef407aa64058b35f04879b538cdb0fbfcfb88197e2c5f46b7d31fe70)
             mstore(VK_PERMUTATION_1_X_SLOT, 0x1bc34e391503202fbff984b26bfdcd77ca9f6926d2bc936950261db76f876875)
@@ -317,7 +317,7 @@ contract L1VerifierPlonk is IVerifier {
             mstore(VK_PERMUTATION_3_X_SLOT, 0x0983f347047dc3789775b4ef7d86600617504d5035c9e4be1fb7d59d9f3363cb)
             mstore(VK_PERMUTATION_3_Y_SLOT, 0x1374500362beb03a127bcc5363f4713f283bf4b4ea084837dec49e528a8a401e)
 
-        // lookup tables commitments
+            // lookup tables commitments
             mstore(VK_LOOKUP_TABLE_0_X_SLOT, 0x1cec72c7b964a66a1096fbaf04a918e5f52a2591778651a40c75b4d745f1652d)
             mstore(VK_LOOKUP_TABLE_0_Y_SLOT, 0x01c202f2f69868ac9d52a892afc6e759ead849f516a7fd6e498212fd28528aea)
             mstore(VK_LOOKUP_TABLE_1_X_SLOT, 0x018c75924a60f3e1ea03b28687f431326fd50d3a015dc963608e7bb8977a45bd)
@@ -327,15 +327,15 @@ contract L1VerifierPlonk is IVerifier {
             mstore(VK_LOOKUP_TABLE_3_X_SLOT, 0x047164444b55589ea580f47acfaa30b9f09829cfffba57fc746decaa92b21a56)
             mstore(VK_LOOKUP_TABLE_3_Y_SLOT, 0x17f413c0292cd761a73a579064b84f08f542879c41799f0921086aa444a04f12)
 
-        // lookup selector commitment
+            // lookup selector commitment
             mstore(VK_LOOKUP_SELECTOR_X_SLOT, 0x2fb1c20520008a9013c67a8be3fc945d1be4d9e5dd4e54226698a66f01362cc6)
             mstore(VK_LOOKUP_SELECTOR_Y_SLOT, 0x1805d89bd2a63759732764a5170b7843bd82477e6dcc064f44d397c4b63872ba)
 
-        // table type commitment
+            // table type commitment
             mstore(VK_LOOKUP_TABLE_TYPE_X_SLOT, 0x0d2f235e409047ee7c5536c2fb9b862c3b2a1054575894012d09c442c36ac523)
             mstore(VK_LOOKUP_TABLE_TYPE_Y_SLOT, 0x12d98efa2fa2bc5987d622edd1f840824227e21087ff417bad919d1e789a8665)
 
-        // flag for using recursive part
+            // flag for using recursive part
             mstore(VK_RECURSIVE_FLAG_SLOT, 0)
         }
     }
@@ -352,27 +352,27 @@ contract L1VerifierPlonk is IVerifier {
         // Note: We use the custom memory layout, so the return value should be returned from the assembly, not
         // Solidity code.
         assembly {
-        /*//////////////////////////////////////////////////////////////
+            /*//////////////////////////////////////////////////////////////
                                 Utils
         //////////////////////////////////////////////////////////////*/
 
-        /// @dev Reverts execution with a provided revert reason.
-        /// @param len The byte length of the error message string, which is expected to be no more than 32.
-        /// @param reason The 1-word revert reason string, encoded in ASCII.
+            /// @dev Reverts execution with a provided revert reason.
+            /// @param len The byte length of the error message string, which is expected to be no more than 32.
+            /// @param reason The 1-word revert reason string, encoded in ASCII.
             function revertWithMessage(len, reason) {
-            // "Error(string)" signature: bytes32(bytes4(keccak256("Error(string)")))
+                // "Error(string)" signature: bytes32(bytes4(keccak256("Error(string)")))
                 mstore(0x00, 0x08c379a000000000000000000000000000000000000000000000000000000000)
-            // Data offset
+                // Data offset
                 mstore(0x04, 0x0000000000000000000000000000000000000000000000000000000000000020)
-            // Length of revert string
+                // Length of revert string
                 mstore(0x24, len)
-            // Revert reason
+                // Revert reason
                 mstore(0x44, reason)
-            // Revert
+                // Revert
                 revert(0x00, 0x64)
             }
 
-        /// @dev Performs modular exponentiation using the formula (value ^ power) mod R_MOD.
+            /// @dev Performs modular exponentiation using the formula (value ^ power) mod R_MOD.
             function modexp(value, power) -> res {
                 mstore(0x00, 0x20)
                 mstore(0x20, 0x20)
@@ -386,7 +386,7 @@ contract L1VerifierPlonk is IVerifier {
                 res := mload(0x00)
             }
 
-        /// @dev Performs a point multiplication operation and stores the result in a given memory destination.
+            /// @dev Performs a point multiplication operation and stores the result in a given memory destination.
             function pointMulIntoDest(point, s, dest) {
                 mstore(0x00, mload(point))
                 mstore(0x20, mload(add(point, 0x20)))
@@ -396,7 +396,7 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /// @dev Performs a point addition operation and stores the result in a given memory destination.
+            /// @dev Performs a point addition operation and stores the result in a given memory destination.
             function pointAddIntoDest(p1, p2, dest) {
                 mstore(0x00, mload(p1))
                 mstore(0x20, mload(add(p1, 0x20)))
@@ -407,7 +407,7 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /// @dev Performs a point subtraction operation and updates the first point with the result.
+            /// @dev Performs a point subtraction operation and updates the first point with the result.
             function pointSubAssign(p1, p2) {
                 mstore(0x00, mload(p1))
                 mstore(0x20, mload(add(p1, 0x20)))
@@ -418,7 +418,7 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /// @dev Performs a point addition operation and updates the first point with the result.
+            /// @dev Performs a point addition operation and updates the first point with the result.
             function pointAddAssign(p1, p2) {
                 mstore(0x00, mload(p1))
                 mstore(0x20, mload(add(p1, 0x20)))
@@ -429,7 +429,7 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /// @dev Performs a point multiplication operation and then adds the result to the destination point.
+            /// @dev Performs a point multiplication operation and then adds the result to the destination point.
             function pointMulAndAddIntoDest(point, s, dest) {
                 mstore(0x00, mload(point))
                 mstore(0x20, mload(add(point, 0x20)))
@@ -445,7 +445,7 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /// @dev Negates an elliptic curve point by changing the sign of the y-coordinate.
+            /// @dev Negates an elliptic curve point by changing the sign of the y-coordinate.
             function pointNegate(point) {
                 let pY := mload(add(point, 0x20))
                 switch pY
@@ -459,11 +459,11 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /*//////////////////////////////////////////////////////////////
+            /*//////////////////////////////////////////////////////////////
                                 Transcript helpers
         //////////////////////////////////////////////////////////////*/
 
-        /// @dev Updates the transcript state with a new challenge value.
+            /// @dev Updates the transcript state with a new challenge value.
             function updateTranscript(value) {
                 mstore8(TRANSCRIPT_DST_BYTE_SLOT, 0x00)
                 mstore(TRANSCRIPT_CHALLENGE_SLOT, value)
@@ -474,56 +474,56 @@ contract L1VerifierPlonk is IVerifier {
                 mstore(TRANSCRIPT_STATE_0_SLOT, newState0)
             }
 
-        /// @dev Retrieves a transcript challenge.
+            /// @dev Retrieves a transcript challenge.
             function getTranscriptChallenge(numberOfChallenge) -> challenge {
                 mstore8(TRANSCRIPT_DST_BYTE_SLOT, 0x02)
                 mstore(TRANSCRIPT_CHALLENGE_SLOT, shl(224, numberOfChallenge))
                 challenge := and(keccak256(TRANSCRIPT_BEGIN_SLOT, 0x48), FR_MASK)
             }
 
-        /*//////////////////////////////////////////////////////////////
+            /*//////////////////////////////////////////////////////////////
                                 1. Load Proof
         //////////////////////////////////////////////////////////////*/
 
-        /// @dev This function loads a zk-SNARK proof, ensures it's properly formatted, and stores it in memory.
-        /// It ensures the number of inputs and the elliptic curve point's validity.
-        /// Note: It does NOT reject inputs that exceed these module sizes, but rather wraps them within the
-        /// module bounds.
-        /// The proof consists of:
-        /// 1. Public input: (1 field element from F_r)
-        ///
-        /// 2. Polynomial commitments (elliptic curve points over F_q):
-        ///     [a], [b], [c], [d]         - state polynomials commitments
-        ///     [z_perm]                   - copy-permutation grand product commitment
-        ///     [s]                        - polynomial for lookup argument commitment
-        ///     [z_lookup]                 - lookup grand product commitment
-        ///     [t_0], [t_1], [t_2], [t_3] - quotient polynomial parts commitments
-        ///     [W], [W']                  - proof openings commitments
-        ///
-        /// 3. Polynomial evaluations at z and z*omega (field elements from F_r):
-        ///     t(z)                                  - quotient polynomial opening
-        ///     a(z), b(z), c(z), d(z), d(z*omega)    - state polynomials openings
-        ///     main_gate_selector(z)                 - main gate selector opening
-        ///     sigma_0(z), sigma_1(z), sigma_2(z)    - permutation polynomials openings
-        ///     z_perm(z*omega)                       - copy-permutation grand product opening
-        ///     z_lookup(z*omega)                     - lookup grand product opening
-        ///     lookup_selector(z)                    - lookup selector opening
-        ///     s(x*omega), t(z*omega), table_type(z) - lookup argument polynomial openings
-        ///     r(z)                                  - linearisation polynomial opening
-        ///
-        /// 4. Recursive proof (0 or 2 elliptic curve points over F_q)
+            /// @dev This function loads a zk-SNARK proof, ensures it's properly formatted, and stores it in memory.
+            /// It ensures the number of inputs and the elliptic curve point's validity.
+            /// Note: It does NOT reject inputs that exceed these module sizes, but rather wraps them within the
+            /// module bounds.
+            /// The proof consists of:
+            /// 1. Public input: (1 field element from F_r)
+            ///
+            /// 2. Polynomial commitments (elliptic curve points over F_q):
+            ///     [a], [b], [c], [d]         - state polynomials commitments
+            ///     [z_perm]                   - copy-permutation grand product commitment
+            ///     [s]                        - polynomial for lookup argument commitment
+            ///     [z_lookup]                 - lookup grand product commitment
+            ///     [t_0], [t_1], [t_2], [t_3] - quotient polynomial parts commitments
+            ///     [W], [W']                  - proof openings commitments
+            ///
+            /// 3. Polynomial evaluations at z and z*omega (field elements from F_r):
+            ///     t(z)                                  - quotient polynomial opening
+            ///     a(z), b(z), c(z), d(z), d(z*omega)    - state polynomials openings
+            ///     main_gate_selector(z)                 - main gate selector opening
+            ///     sigma_0(z), sigma_1(z), sigma_2(z)    - permutation polynomials openings
+            ///     z_perm(z*omega)                       - copy-permutation grand product opening
+            ///     z_lookup(z*omega)                     - lookup grand product opening
+            ///     lookup_selector(z)                    - lookup selector opening
+            ///     s(x*omega), t(z*omega), table_type(z) - lookup argument polynomial openings
+            ///     r(z)                                  - linearisation polynomial opening
+            ///
+            /// 4. Recursive proof (0 or 2 elliptic curve points over F_q)
             function loadProof() {
-            // 1. Load public input
+                // 1. Load public input
                 let offset := calldataload(0x04)
                 let publicInputLengthInWords := calldataload(add(offset, 0x04))
                 let isValid := eq(publicInputLengthInWords, 1) // We expect only one public input
                 mstore(PROOF_PUBLIC_INPUT, and(calldataload(add(offset, 0x24)), FR_MASK))
 
-            // 2. Load the proof (except for the recursive part)
+                // 2. Load the proof (except for the recursive part)
                 offset := calldataload(0x24)
                 let proofLengthInWords := calldataload(add(offset, 0x04))
 
-            // Check the proof length depending on whether the recursive part is present
+                // Check the proof length depending on whether the recursive part is present
                 let expectedProofLength
                 switch mload(VK_RECURSIVE_FLAG_SLOT)
                 case 0 {
@@ -534,7 +534,7 @@ contract L1VerifierPlonk is IVerifier {
                 }
                 isValid := and(eq(proofLengthInWords, expectedProofLength), isValid)
 
-            // PROOF_STATE_POLYS_0
+                // PROOF_STATE_POLYS_0
                 {
                     let x := mod(calldataload(add(offset, 0x024)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x044)), Q_MOD)
@@ -543,7 +543,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_STATE_POLYS_0_X_SLOT, x)
                     mstore(PROOF_STATE_POLYS_0_Y_SLOT, y)
                 }
-            // PROOF_STATE_POLYS_1
+                // PROOF_STATE_POLYS_1
                 {
                     let x := mod(calldataload(add(offset, 0x064)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x084)), Q_MOD)
@@ -552,7 +552,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_STATE_POLYS_1_X_SLOT, x)
                     mstore(PROOF_STATE_POLYS_1_Y_SLOT, y)
                 }
-            // PROOF_STATE_POLYS_2
+                // PROOF_STATE_POLYS_2
                 {
                     let x := mod(calldataload(add(offset, 0x0a4)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x0c4)), Q_MOD)
@@ -561,7 +561,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_STATE_POLYS_2_X_SLOT, x)
                     mstore(PROOF_STATE_POLYS_2_Y_SLOT, y)
                 }
-            // PROOF_STATE_POLYS_3
+                // PROOF_STATE_POLYS_3
                 {
                     let x := mod(calldataload(add(offset, 0x0e4)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x104)), Q_MOD)
@@ -570,7 +570,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_STATE_POLYS_3_X_SLOT, x)
                     mstore(PROOF_STATE_POLYS_3_Y_SLOT, y)
                 }
-            // PROOF_COPY_PERMUTATION_GRAND_PRODUCT
+                // PROOF_COPY_PERMUTATION_GRAND_PRODUCT
                 {
                     let x := mod(calldataload(add(offset, 0x124)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x144)), Q_MOD)
@@ -579,7 +579,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_COPY_PERMUTATION_GRAND_PRODUCT_X_SLOT, x)
                     mstore(PROOF_COPY_PERMUTATION_GRAND_PRODUCT_Y_SLOT, y)
                 }
-            // PROOF_LOOKUP_S_POLY
+                // PROOF_LOOKUP_S_POLY
                 {
                     let x := mod(calldataload(add(offset, 0x164)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x184)), Q_MOD)
@@ -588,7 +588,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_LOOKUP_S_POLY_X_SLOT, x)
                     mstore(PROOF_LOOKUP_S_POLY_Y_SLOT, y)
                 }
-            // PROOF_LOOKUP_GRAND_PRODUCT
+                // PROOF_LOOKUP_GRAND_PRODUCT
                 {
                     let x := mod(calldataload(add(offset, 0x1a4)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x1c4)), Q_MOD)
@@ -597,7 +597,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_LOOKUP_GRAND_PRODUCT_X_SLOT, x)
                     mstore(PROOF_LOOKUP_GRAND_PRODUCT_Y_SLOT, y)
                 }
-            // PROOF_QUOTIENT_POLY_PARTS_0
+                // PROOF_QUOTIENT_POLY_PARTS_0
                 {
                     let x := mod(calldataload(add(offset, 0x1e4)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x204)), Q_MOD)
@@ -606,7 +606,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_QUOTIENT_POLY_PARTS_0_X_SLOT, x)
                     mstore(PROOF_QUOTIENT_POLY_PARTS_0_Y_SLOT, y)
                 }
-            // PROOF_QUOTIENT_POLY_PARTS_1
+                // PROOF_QUOTIENT_POLY_PARTS_1
                 {
                     let x := mod(calldataload(add(offset, 0x224)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x244)), Q_MOD)
@@ -615,7 +615,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_QUOTIENT_POLY_PARTS_1_X_SLOT, x)
                     mstore(PROOF_QUOTIENT_POLY_PARTS_1_Y_SLOT, y)
                 }
-            // PROOF_QUOTIENT_POLY_PARTS_2
+                // PROOF_QUOTIENT_POLY_PARTS_2
                 {
                     let x := mod(calldataload(add(offset, 0x264)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x284)), Q_MOD)
@@ -624,7 +624,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_QUOTIENT_POLY_PARTS_2_X_SLOT, x)
                     mstore(PROOF_QUOTIENT_POLY_PARTS_2_Y_SLOT, y)
                 }
-            // PROOF_QUOTIENT_POLY_PARTS_3
+                // PROOF_QUOTIENT_POLY_PARTS_3
                 {
                     let x := mod(calldataload(add(offset, 0x2a4)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x2c4)), Q_MOD)
@@ -659,7 +659,7 @@ contract L1VerifierPlonk is IVerifier {
                 mstore(PROOF_QUOTIENT_POLY_OPENING_AT_Z_SLOT, mod(calldataload(add(offset, 0x4e4)), R_MOD))
                 mstore(PROOF_LINEARISATION_POLY_OPENING_AT_Z_SLOT, mod(calldataload(add(offset, 0x504)), R_MOD))
 
-            // PROOF_OPENING_PROOF_AT_Z
+                // PROOF_OPENING_PROOF_AT_Z
                 {
                     let x := mod(calldataload(add(offset, 0x524)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x544)), Q_MOD)
@@ -668,7 +668,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_OPENING_PROOF_AT_Z_X_SLOT, x)
                     mstore(PROOF_OPENING_PROOF_AT_Z_Y_SLOT, y)
                 }
-            // PROOF_OPENING_PROOF_AT_Z_OMEGA
+                // PROOF_OPENING_PROOF_AT_Z_OMEGA
                 {
                     let x := mod(calldataload(add(offset, 0x564)), Q_MOD)
                     let y := mod(calldataload(add(offset, 0x584)), Q_MOD)
@@ -678,11 +678,11 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(PROOF_OPENING_PROOF_AT_Z_OMEGA_Y_SLOT, y)
                 }
 
-            // 3. Load the recursive part of the proof
+                // 3. Load the recursive part of the proof
                 if mload(VK_RECURSIVE_FLAG_SLOT) {
-                // recursive part should be consist of 2 points
+                    // recursive part should be consist of 2 points
 
-                // PROOF_RECURSIVE_PART_P1
+                    // PROOF_RECURSIVE_PART_P1
                     {
                         let x := mod(calldataload(add(offset, 0x5a4)), Q_MOD)
                         let y := mod(calldataload(add(offset, 0x5c4)), Q_MOD)
@@ -691,7 +691,7 @@ contract L1VerifierPlonk is IVerifier {
                         mstore(PROOF_RECURSIVE_PART_P1_X_SLOT, x)
                         mstore(PROOF_RECURSIVE_PART_P1_Y_SLOT, y)
                     }
-                // PROOF_RECURSIVE_PART_P2
+                    // PROOF_RECURSIVE_PART_P2
                     {
                         let x := mod(calldataload(add(offset, 0x5e4)), Q_MOD)
                         let y := mod(calldataload(add(offset, 0x604)), Q_MOD)
@@ -702,40 +702,40 @@ contract L1VerifierPlonk is IVerifier {
                     }
                 }
 
-            // Revert if a proof is not valid
+                // Revert if a proof is not valid
                 if iszero(isValid) {
                     revertWithMessage(27, "loadProof: Proof is invalid")
                 }
             }
 
-        /*//////////////////////////////////////////////////////////////
+            /*//////////////////////////////////////////////////////////////
                                 2. Transcript initialization
         //////////////////////////////////////////////////////////////*/
 
-        /// @notice Recomputes all challenges
-        /// @dev The process is the following:
-        /// Commit:   PI, [a], [b], [c], [d]
-        /// Get:      eta
-        /// Commit:   [s]
-        /// Get:      beta, gamma
-        /// Commit:   [z_perm]
-        /// Get:      beta', gamma'
-        /// Commit:   [z_lookup]
-        /// Get:      alpha
-        /// Commit:   [t_0], [t_1], [t_2], [t_3]
-        /// Get:      z
-        /// Commit:   t(z), a(z), b(z), c(z), d(z), d(z*omega),
-        ///           main_gate_selector(z),
-        ///           sigma_0(z), sigma_1(z), sigma_2(z),
-        ///           z_perm(z*omega),
-        ///           t(z), lookup_selector(z), table_type(z),
-        ///           s(x*omega), z_lookup(z*omega), t(z*omega),
-        ///           r(z)
-        /// Get:      v
-        /// Commit:   [W], [W']
-        /// Get:      u
+            /// @notice Recomputes all challenges
+            /// @dev The process is the following:
+            /// Commit:   PI, [a], [b], [c], [d]
+            /// Get:      eta
+            /// Commit:   [s]
+            /// Get:      beta, gamma
+            /// Commit:   [z_perm]
+            /// Get:      beta', gamma'
+            /// Commit:   [z_lookup]
+            /// Get:      alpha
+            /// Commit:   [t_0], [t_1], [t_2], [t_3]
+            /// Get:      z
+            /// Commit:   t(z), a(z), b(z), c(z), d(z), d(z*omega),
+            ///           main_gate_selector(z),
+            ///           sigma_0(z), sigma_1(z), sigma_2(z),
+            ///           z_perm(z*omega),
+            ///           t(z), lookup_selector(z), table_type(z),
+            ///           s(x*omega), z_lookup(z*omega), t(z*omega),
+            ///           r(z)
+            /// Get:      v
+            /// Commit:   [W], [W']
+            /// Get:      u
             function initializeTranscript() {
-            // Round 1
+                // Round 1
                 updateTranscript(mload(PROOF_PUBLIC_INPUT))
                 updateTranscript(mload(PROOF_STATE_POLYS_0_X_SLOT))
                 updateTranscript(mload(PROOF_STATE_POLYS_0_Y_SLOT))
@@ -748,27 +748,27 @@ contract L1VerifierPlonk is IVerifier {
 
                 mstore(STATE_ETA_SLOT, getTranscriptChallenge(0))
 
-            // Round 1.5
+                // Round 1.5
                 updateTranscript(mload(PROOF_LOOKUP_S_POLY_X_SLOT))
                 updateTranscript(mload(PROOF_LOOKUP_S_POLY_Y_SLOT))
 
                 mstore(STATE_BETA_SLOT, getTranscriptChallenge(1))
                 mstore(STATE_GAMMA_SLOT, getTranscriptChallenge(2))
 
-            // Round 2
+                // Round 2
                 updateTranscript(mload(PROOF_COPY_PERMUTATION_GRAND_PRODUCT_X_SLOT))
                 updateTranscript(mload(PROOF_COPY_PERMUTATION_GRAND_PRODUCT_Y_SLOT))
 
                 mstore(STATE_BETA_LOOKUP_SLOT, getTranscriptChallenge(3))
                 mstore(STATE_GAMMA_LOOKUP_SLOT, getTranscriptChallenge(4))
 
-            // Round 2.5
+                // Round 2.5
                 updateTranscript(mload(PROOF_LOOKUP_GRAND_PRODUCT_X_SLOT))
                 updateTranscript(mload(PROOF_LOOKUP_GRAND_PRODUCT_Y_SLOT))
 
                 mstore(STATE_ALPHA_SLOT, getTranscriptChallenge(5))
 
-            // Round 3
+                // Round 3
                 updateTranscript(mload(PROOF_QUOTIENT_POLY_PARTS_0_X_SLOT))
                 updateTranscript(mload(PROOF_QUOTIENT_POLY_PARTS_0_Y_SLOT))
                 updateTranscript(mload(PROOF_QUOTIENT_POLY_PARTS_1_X_SLOT))
@@ -785,7 +785,7 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(STATE_Z_IN_DOMAIN_SIZE, modexp(z, DOMAIN_SIZE))
                 }
 
-            // Round 4
+                // Round 4
                 updateTranscript(mload(PROOF_QUOTIENT_POLY_OPENING_AT_Z_SLOT))
 
                 updateTranscript(mload(PROOF_STATE_POLYS_0_OPENING_AT_Z_SLOT))
@@ -811,7 +811,7 @@ contract L1VerifierPlonk is IVerifier {
 
                 mstore(STATE_V_SLOT, getTranscriptChallenge(7))
 
-            // Round 5
+                // Round 5
                 updateTranscript(mload(PROOF_OPENING_PROOF_AT_Z_X_SLOT))
                 updateTranscript(mload(PROOF_OPENING_PROOF_AT_Z_Y_SLOT))
                 updateTranscript(mload(PROOF_OPENING_PROOF_AT_Z_OMEGA_X_SLOT))
@@ -820,30 +820,30 @@ contract L1VerifierPlonk is IVerifier {
                 mstore(STATE_U_SLOT, getTranscriptChallenge(8))
             }
 
-        /*//////////////////////////////////////////////////////////////
+            /*//////////////////////////////////////////////////////////////
                                 3. Verifying quotient evaluation
         //////////////////////////////////////////////////////////////*/
 
-        /// @notice Compute linearisation polynomial's constant term: r_0
-        /// @dev To save a verifier scalar multiplication, we split linearisation polynomial
-        /// into its constant and non-constant terms. The constant term is computed with the formula:
-        ///
-        /// r_0 = alpha^0 * L_0(z) * PI * q_{main selector}(z) + r(z)         -- main gate contribution
-        ///
-        ///     - alpha^4 * z_perm(z*omega)(sigma_0(z) * beta + gamma + a(z)) \
-        ///                           (sigma_1(z) * beta + gamma + b(z))      |
-        ///                           (sigma_2(z) * beta + gamma + c(z))      | - permutation contribution
-        ///                           (sigma_3(z) + gamma)                    |
-        ///     - alpha^5 * L_0(z)                                            /
-        ///
-        ///     + alpha^6 * (s(z*omega) * beta' + gamma' (beta' + 1))         \
-        ///               * (z - omega^{n-1}) * z_lookup(z*omega)             | - lookup contribution
-        ///     - alpha^7 * L_0(z)                                            |
-        ///     - alpha^8 * L_{n-1}(z) * (gamma' (beta' + 1))^{n-1}           /
-        ///
-        /// In the end we should check that t(z)*Z_H(z) = r(z) + r_0!
+            /// @notice Compute linearisation polynomial's constant term: r_0
+            /// @dev To save a verifier scalar multiplication, we split linearisation polynomial
+            /// into its constant and non-constant terms. The constant term is computed with the formula:
+            ///
+            /// r_0 = alpha^0 * L_0(z) * PI * q_{main selector}(z) + r(z)         -- main gate contribution
+            ///
+            ///     - alpha^4 * z_perm(z*omega)(sigma_0(z) * beta + gamma + a(z)) \
+            ///                           (sigma_1(z) * beta + gamma + b(z))      |
+            ///                           (sigma_2(z) * beta + gamma + c(z))      | - permutation contribution
+            ///                           (sigma_3(z) + gamma)                    |
+            ///     - alpha^5 * L_0(z)                                            /
+            ///
+            ///     + alpha^6 * (s(z*omega) * beta' + gamma' (beta' + 1))         \
+            ///               * (z - omega^{n-1}) * z_lookup(z*omega)             | - lookup contribution
+            ///     - alpha^7 * L_0(z)                                            |
+            ///     - alpha^8 * L_{n-1}(z) * (gamma' (beta' + 1))^{n-1}           /
+            ///
+            /// In the end we should check that t(z)*Z_H(z) = r(z) + r_0!
             function verifyQuotientEvaluation() {
-            // Compute power of alpha
+                // Compute power of alpha
                 {
                     let alpha := mload(STATE_ALPHA_SLOT)
                     let currentAlpha := mulmod(alpha, alpha, R_MOD)
@@ -862,25 +862,25 @@ contract L1VerifierPlonk is IVerifier {
                     mstore(STATE_POWER_OF_ALPHA_8_SLOT, currentAlpha)
                 }
 
-            // z
+                // z
                 let stateZ := mload(STATE_Z_SLOT)
-            // L_0(z)
+                // L_0(z)
                 mstore(STATE_L_0_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(0, stateZ))
-            // L_{n-1}(z)
+                // L_{n-1}(z)
                 mstore(STATE_L_N_MINUS_ONE_AT_Z_SLOT, evaluateLagrangePolyOutOfDomain(sub(DOMAIN_SIZE, 1), stateZ))
-            // L_0(z) * PI
+                // L_0(z) * PI
                 let stateT := mulmod(mload(STATE_L_0_AT_Z_SLOT), mload(PROOF_PUBLIC_INPUT), R_MOD)
 
-            // Compute main gate contribution
+                // Compute main gate contribution
                 let result := mulmod(stateT, mload(PROOF_GATE_SELECTORS_0_OPENING_AT_Z_SLOT), R_MOD)
 
-            // Compute permutation contribution
+                // Compute permutation contribution
                 result := addmod(result, permutationQuotientContribution(), R_MOD)
 
-            // Compute lookup contribution
+                // Compute lookup contribution
                 result := addmod(result, lookupQuotientContribution(), R_MOD)
 
-            // Check that r(z) + r_0 = t(z) * Z_H(z)
+                // Check that r(z) + r_0 = t(z) * Z_H(z)
                 result := addmod(mload(PROOF_LINEARISATION_POLY_OPENING_AT_Z_SLOT), result, R_MOD)
 
                 let vanishing := addmod(mload(STATE_Z_IN_DOMAIN_SIZE), sub(R_MOD, 1), R_MOD)
@@ -890,9 +890,9 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /// @notice Evaluating L_{polyNum}(at) out of domain
-        /// @dev L_i is a Lagrange polynomial for our domain such that:
-        /// L_i(omega^i) = 1 and L_i(omega^j) = 0 for all j != i
+            /// @notice Evaluating L_{polyNum}(at) out of domain
+            /// @dev L_i is a Lagrange polynomial for our domain such that:
+            /// L_i(omega^i) = 1 and L_i(omega^j) = 0 for all j != i
             function evaluateLagrangePolyOutOfDomain(polyNum, at) -> res {
                 let omegaPower := 1
                 if polyNum {
@@ -901,7 +901,7 @@ contract L1VerifierPlonk is IVerifier {
 
                 res := addmod(modexp(at, DOMAIN_SIZE), sub(R_MOD, 1), R_MOD)
 
-            // Vanishing polynomial can not be zero at point `at`
+                // Vanishing polynomial can not be zero at point `at`
                 if iszero(res) {
                     revertWithMessage(28, "invalid vanishing polynomial")
                 }
@@ -912,9 +912,9 @@ contract L1VerifierPlonk is IVerifier {
                 res := mulmod(res, denominator, R_MOD)
             }
 
-        /// @notice Compute permutation contribution to linearisation polynomial's constant term
+            /// @notice Compute permutation contribution to linearisation polynomial's constant term
             function permutationQuotientContribution() -> res {
-            // res = alpha^4 * z_perm(z*omega)
+                // res = alpha^4 * z_perm(z*omega)
                 res := mulmod(
                     mload(STATE_POWER_OF_ALPHA_4_SLOT),
                     mload(PROOF_COPY_PERMUTATION_GRAND_PRODUCT_OPENING_AT_Z_OMEGA_SLOT),
@@ -927,7 +927,7 @@ contract L1VerifierPlonk is IVerifier {
 
                     let factorMultiplier
                     {
-                    // res *= sigma_0(z) * beta + gamma + a(z)
+                        // res *= sigma_0(z) * beta + gamma + a(z)
                         factorMultiplier := mulmod(mload(PROOF_COPY_PERMUTATION_POLYS_0_OPENING_AT_Z_SLOT), beta, R_MOD)
                         factorMultiplier := addmod(factorMultiplier, gamma, R_MOD)
                         factorMultiplier := addmod(
@@ -938,7 +938,7 @@ contract L1VerifierPlonk is IVerifier {
                         res := mulmod(res, factorMultiplier, R_MOD)
                     }
                     {
-                    // res *= sigma_1(z) * beta + gamma + b(z)
+                        // res *= sigma_1(z) * beta + gamma + b(z)
                         factorMultiplier := mulmod(mload(PROOF_COPY_PERMUTATION_POLYS_1_OPENING_AT_Z_SLOT), beta, R_MOD)
                         factorMultiplier := addmod(factorMultiplier, gamma, R_MOD)
                         factorMultiplier := addmod(
@@ -949,7 +949,7 @@ contract L1VerifierPlonk is IVerifier {
                         res := mulmod(res, factorMultiplier, R_MOD)
                     }
                     {
-                    // res *= sigma_2(z) * beta + gamma + c(z)
+                        // res *= sigma_2(z) * beta + gamma + c(z)
                         factorMultiplier := mulmod(mload(PROOF_COPY_PERMUTATION_POLYS_2_OPENING_AT_Z_SLOT), beta, R_MOD)
                         factorMultiplier := addmod(factorMultiplier, gamma, R_MOD)
                         factorMultiplier := addmod(
@@ -960,20 +960,20 @@ contract L1VerifierPlonk is IVerifier {
                         res := mulmod(res, factorMultiplier, R_MOD)
                     }
 
-                // res *= sigma_3(z) + gamma
+                    // res *= sigma_3(z) + gamma
                     res := mulmod(res, addmod(mload(PROOF_STATE_POLYS_3_OPENING_AT_Z_SLOT), gamma, R_MOD), R_MOD)
                 }
 
-            // res = -res
+                // res = -res
                 res := sub(R_MOD, res)
 
-            // -= L_0(z) * alpha^5
+                // -= L_0(z) * alpha^5
                 let l0AtZ := mload(STATE_L_0_AT_Z_SLOT)
                 l0AtZ := mulmod(l0AtZ, mload(STATE_POWER_OF_ALPHA_5_SLOT), R_MOD)
                 res := addmod(res, sub(R_MOD, l0AtZ), R_MOD)
             }
 
-        /// @notice Compute lookup contribution to linearisation polynomial's constant term
+            /// @notice Compute lookup contribution to linearisation polynomial's constant term
             function lookupQuotientContribution() -> res {
                 let betaLookup := mload(STATE_BETA_LOOKUP_SLOT)
                 let gammaLookup := mload(STATE_GAMMA_LOOKUP_SLOT)
@@ -983,13 +983,13 @@ contract L1VerifierPlonk is IVerifier {
                 mstore(STATE_BETA_PLUS_ONE_SLOT, betaPlusOne)
                 mstore(STATE_BETA_GAMMA_PLUS_GAMMA_SLOT, betaGamma)
 
-            // res =  alpha^6 * (s(z*omega) * beta' + gamma' (beta' + 1)) * z_lookup(z*omega)
+                // res =  alpha^6 * (s(z*omega) * beta' + gamma' (beta' + 1)) * z_lookup(z*omega)
                 res := mulmod(mload(PROOF_LOOKUP_S_POLY_OPENING_AT_Z_OMEGA_SLOT), betaLookup, R_MOD)
                 res := addmod(res, betaGamma, R_MOD)
                 res := mulmod(res, mload(PROOF_LOOKUP_GRAND_PRODUCT_OPENING_AT_Z_OMEGA_SLOT), R_MOD)
                 res := mulmod(res, mload(STATE_POWER_OF_ALPHA_6_SLOT), R_MOD)
 
-            // res *= z - omega^{n-1}
+                // res *= z - omega^{n-1}
                 {
                     let lastOmega := modexp(OMEGA, sub(DOMAIN_SIZE, 1))
                     let zMinusLastOmega := addmod(mload(STATE_Z_SLOT), sub(R_MOD, lastOmega), R_MOD)
@@ -997,7 +997,7 @@ contract L1VerifierPlonk is IVerifier {
                     res := mulmod(res, zMinusLastOmega, R_MOD)
                 }
 
-            // res -= alpha^7 * L_{0}(z)
+                // res -= alpha^7 * L_{0}(z)
                 {
                     let intermediateValue := mulmod(
                         mload(STATE_L_0_AT_Z_SLOT),
@@ -1007,7 +1007,7 @@ contract L1VerifierPlonk is IVerifier {
                     res := addmod(res, sub(R_MOD, intermediateValue), R_MOD)
                 }
 
-            // res -= alpha^8 * L_{n-1}(z) * (gamma' (beta' + 1))^{n-1}
+                // res -= alpha^8 * L_{n-1}(z) * (gamma' (beta' + 1))^{n-1}
                 {
                     let lnMinusOneAtZ := mload(STATE_L_N_MINUS_ONE_AT_Z_SLOT)
                     let betaGammaPowered := modexp(betaGamma, sub(DOMAIN_SIZE, 1))
@@ -1018,86 +1018,86 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /// @notice Compute main gate contribution to linearisation polynomial commitment multiplied by v
+            /// @notice Compute main gate contribution to linearisation polynomial commitment multiplied by v
             function mainGateLinearisationContributionWithV(
-            dest,
-            stateOpening0AtZ,
-            stateOpening1AtZ,
-            stateOpening2AtZ,
-            stateOpening3AtZ
+                dest,
+                stateOpening0AtZ,
+                stateOpening1AtZ,
+                stateOpening2AtZ,
+                stateOpening3AtZ
             ) {
-            // += a(z) * [q_a]
+                // += a(z) * [q_a]
                 pointMulIntoDest(VK_GATE_SETUP_0_X_SLOT, stateOpening0AtZ, dest)
-            // += b(z) * [q_b]
+                // += b(z) * [q_b]
                 pointMulAndAddIntoDest(VK_GATE_SETUP_1_X_SLOT, stateOpening1AtZ, dest)
-            // += c(z) * [q_c]
+                // += c(z) * [q_c]
                 pointMulAndAddIntoDest(VK_GATE_SETUP_2_X_SLOT, stateOpening2AtZ, dest)
-            // += d(z) * [q_d]
+                // += d(z) * [q_d]
                 pointMulAndAddIntoDest(VK_GATE_SETUP_3_X_SLOT, stateOpening3AtZ, dest)
-            // += a(z) * b(z) * [q_ab]
+                // += a(z) * b(z) * [q_ab]
                 pointMulAndAddIntoDest(VK_GATE_SETUP_4_X_SLOT, mulmod(stateOpening0AtZ, stateOpening1AtZ, R_MOD), dest)
-            // += a(z) * c(z) * [q_ac]
+                // += a(z) * c(z) * [q_ac]
                 pointMulAndAddIntoDest(VK_GATE_SETUP_5_X_SLOT, mulmod(stateOpening0AtZ, stateOpening2AtZ, R_MOD), dest)
-            // += [q_const]
+                // += [q_const]
                 pointAddAssign(dest, VK_GATE_SETUP_6_X_SLOT)
-            // += d(z*omega) * [q_{d_next}]
+                // += d(z*omega) * [q_{d_next}]
                 pointMulAndAddIntoDest(VK_GATE_SETUP_7_X_SLOT, mload(PROOF_STATE_POLYS_3_OPENING_AT_Z_OMEGA_SLOT), dest)
 
-            // *= v * main_gate_selector(z)
+                // *= v * main_gate_selector(z)
                 let coeff := mulmod(mload(PROOF_GATE_SELECTORS_0_OPENING_AT_Z_SLOT), mload(STATE_V_SLOT), R_MOD)
                 pointMulIntoDest(dest, coeff, dest)
             }
 
-        /// @notice Compute custom gate contribution to linearisation polynomial commitment multiplied by v
+            /// @notice Compute custom gate contribution to linearisation polynomial commitment multiplied by v
             function addAssignRescueCustomGateLinearisationContributionWithV(
-            dest,
-            stateOpening0AtZ,
-            stateOpening1AtZ,
-            stateOpening2AtZ,
-            stateOpening3AtZ
+                dest,
+                stateOpening0AtZ,
+                stateOpening1AtZ,
+                stateOpening2AtZ,
+                stateOpening3AtZ
             ) {
                 let accumulator
                 let intermediateValue
-            //  = alpha * (a(z)^2 - b(z))
+                //  = alpha * (a(z)^2 - b(z))
                 accumulator := mulmod(stateOpening0AtZ, stateOpening0AtZ, R_MOD)
                 accumulator := addmod(accumulator, sub(R_MOD, stateOpening1AtZ), R_MOD)
                 accumulator := mulmod(accumulator, mload(STATE_ALPHA_SLOT), R_MOD)
-            // += alpha^2 * (b(z)^2 - c(z))
+                // += alpha^2 * (b(z)^2 - c(z))
                 intermediateValue := mulmod(stateOpening1AtZ, stateOpening1AtZ, R_MOD)
                 intermediateValue := addmod(intermediateValue, sub(R_MOD, stateOpening2AtZ), R_MOD)
                 intermediateValue := mulmod(intermediateValue, mload(STATE_POWER_OF_ALPHA_2_SLOT), R_MOD)
                 accumulator := addmod(accumulator, intermediateValue, R_MOD)
-            // += alpha^3 * (c(z) * a(z) - d(z))
+                // += alpha^3 * (c(z) * a(z) - d(z))
                 intermediateValue := mulmod(stateOpening2AtZ, stateOpening0AtZ, R_MOD)
                 intermediateValue := addmod(intermediateValue, sub(R_MOD, stateOpening3AtZ), R_MOD)
                 intermediateValue := mulmod(intermediateValue, mload(STATE_POWER_OF_ALPHA_3_SLOT), R_MOD)
                 accumulator := addmod(accumulator, intermediateValue, R_MOD)
 
-            // *= v * [custom_gate_selector]
+                // *= v * [custom_gate_selector]
                 accumulator := mulmod(accumulator, mload(STATE_V_SLOT), R_MOD)
                 pointMulAndAddIntoDest(VK_GATE_SELECTORS_1_X_SLOT, accumulator, dest)
             }
 
-        /// @notice Compute copy-permutation contribution to linearisation polynomial commitment multiplied by v
+            /// @notice Compute copy-permutation contribution to linearisation polynomial commitment multiplied by v
             function addAssignPermutationLinearisationContributionWithV(
-            dest,
-            stateOpening0AtZ,
-            stateOpening1AtZ,
-            stateOpening2AtZ,
-            stateOpening3AtZ
+                dest,
+                stateOpening0AtZ,
+                stateOpening1AtZ,
+                stateOpening2AtZ,
+                stateOpening3AtZ
             ) {
-            // alpha^4
+                // alpha^4
                 let factor := mload(STATE_POWER_OF_ALPHA_4_SLOT)
-            // Calculate the factor
+                // Calculate the factor
                 {
-                // *= (a(z) + beta * z + gamma)
+                    // *= (a(z) + beta * z + gamma)
                     let zMulBeta := mulmod(mload(STATE_Z_SLOT), mload(STATE_BETA_SLOT), R_MOD)
                     let gamma := mload(STATE_GAMMA_SLOT)
 
                     let intermediateValue := addmod(addmod(zMulBeta, gamma, R_MOD), stateOpening0AtZ, R_MOD)
                     factor := mulmod(factor, intermediateValue, R_MOD)
 
-                // (b(z) + beta * z * k0 + gamma)
+                    // (b(z) + beta * z * k0 + gamma)
                     intermediateValue := addmod(
                         addmod(mulmod(zMulBeta, NON_RESIDUES_0, R_MOD), gamma, R_MOD),
                         stateOpening1AtZ,
@@ -1105,7 +1105,7 @@ contract L1VerifierPlonk is IVerifier {
                     )
                     factor := mulmod(factor, intermediateValue, R_MOD)
 
-                // (c(z) + beta * z * k1 + gamma)
+                    // (c(z) + beta * z * k1 + gamma)
                     intermediateValue := addmod(
                         addmod(mulmod(zMulBeta, NON_RESIDUES_1, R_MOD), gamma, R_MOD),
                         stateOpening2AtZ,
@@ -1113,7 +1113,7 @@ contract L1VerifierPlonk is IVerifier {
                     )
                     factor := mulmod(factor, intermediateValue, R_MOD)
 
-                // (d(z) + beta * z * k2 + gamma)
+                    // (d(z) + beta * z * k2 + gamma)
                     intermediateValue := addmod(
                         addmod(mulmod(zMulBeta, NON_RESIDUES_2, R_MOD), gamma, R_MOD),
                         stateOpening3AtZ,
@@ -1122,21 +1122,21 @@ contract L1VerifierPlonk is IVerifier {
                     factor := mulmod(factor, intermediateValue, R_MOD)
                 }
 
-            // += alpha^5 * L_0(z)
+                // += alpha^5 * L_0(z)
                 let l0AtZ := mload(STATE_L_0_AT_Z_SLOT)
                 factor := addmod(factor, mulmod(l0AtZ, mload(STATE_POWER_OF_ALPHA_5_SLOT), R_MOD), R_MOD)
 
-            // Here we can optimize one scalar multiplication by aggregating coefficients near [z_perm] during
-            // computing [F]
-            // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [z_perm]
+                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_perm] during
+                // computing [F]
+                // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [z_perm]
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
                 mstore(COPY_PERMUTATION_FIRST_AGGREGATED_COMMITMENT_COEFF, factor)
 
-            // alpha^4 * beta * z_perm(z*omega)
+                // alpha^4 * beta * z_perm(z*omega)
                 factor := mulmod(mload(STATE_POWER_OF_ALPHA_4_SLOT), mload(STATE_BETA_SLOT), R_MOD)
                 factor := mulmod(factor, mload(PROOF_COPY_PERMUTATION_GRAND_PRODUCT_OPENING_AT_Z_OMEGA_SLOT), R_MOD)
                 {
-                // *= (a(z) + beta * sigma_0(z) + gamma)
+                    // *= (a(z) + beta * sigma_0(z) + gamma)
                     let beta := mload(STATE_BETA_SLOT)
                     let gamma := mload(STATE_GAMMA_SLOT)
 
@@ -1151,7 +1151,7 @@ contract L1VerifierPlonk is IVerifier {
                     )
                     factor := mulmod(factor, intermediateValue, R_MOD)
 
-                // *= (b(z) + beta * sigma_1(z) + gamma)
+                    // *= (b(z) + beta * sigma_1(z) + gamma)
                     intermediateValue := addmod(
                         addmod(
                             mulmod(mload(PROOF_COPY_PERMUTATION_POLYS_1_OPENING_AT_Z_SLOT), beta, R_MOD),
@@ -1163,7 +1163,7 @@ contract L1VerifierPlonk is IVerifier {
                     )
                     factor := mulmod(factor, intermediateValue, R_MOD)
 
-                // *= (c(z) + beta * sigma_2(z) + gamma)
+                    // *= (c(z) + beta * sigma_2(z) + gamma)
                     intermediateValue := addmod(
                         addmod(
                             mulmod(mload(PROOF_COPY_PERMUTATION_POLYS_2_OPENING_AT_Z_SLOT), beta, R_MOD),
@@ -1176,41 +1176,41 @@ contract L1VerifierPlonk is IVerifier {
                     factor := mulmod(factor, intermediateValue, R_MOD)
                 }
 
-            // *= v * [sigma_3]
+                // *= v * [sigma_3]
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
                 pointMulIntoDest(VK_PERMUTATION_3_X_SLOT, factor, QUERIES_BUFFER_POINT_SLOT)
 
                 pointSubAssign(dest, QUERIES_BUFFER_POINT_SLOT)
             }
 
-        /// @notice Compute lookup contribution to linearisation polynomial commitment multiplied by v
+            /// @notice Compute lookup contribution to linearisation polynomial commitment multiplied by v
             function addAssignLookupLinearisationContributionWithV(
-            dest,
-            stateOpening0AtZ,
-            stateOpening1AtZ,
-            stateOpening2AtZ
+                dest,
+                stateOpening0AtZ,
+                stateOpening1AtZ,
+                stateOpening2AtZ
             ) {
-            // alpha^6 * v * z_lookup(z*omega) * (z - omega^{n-1}) * [s]
+                // alpha^6 * v * z_lookup(z*omega) * (z - omega^{n-1}) * [s]
                 let factor := mload(PROOF_LOOKUP_GRAND_PRODUCT_OPENING_AT_Z_OMEGA_SLOT)
                 factor := mulmod(factor, mload(STATE_POWER_OF_ALPHA_6_SLOT), R_MOD)
                 factor := mulmod(factor, mload(STATE_Z_MINUS_LAST_OMEGA_SLOT), R_MOD)
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
 
-            // Here we can optimize one scalar multiplication by aggregating coefficients near [s] during
-            // computing [F]
-            // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [s]
+                // Here we can optimize one scalar multiplication by aggregating coefficients near [s] during
+                // computing [F]
+                // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [s]
                 mstore(LOOKUP_S_FIRST_AGGREGATED_COMMITMENT_COEFF, factor)
 
-            // gamma(1 + beta) + t(x) + beta * t(x*omega)
+                // gamma(1 + beta) + t(x) + beta * t(x*omega)
                 factor := mload(PROOF_LOOKUP_T_POLY_OPENING_AT_Z_OMEGA_SLOT)
                 factor := mulmod(factor, mload(STATE_BETA_LOOKUP_SLOT), R_MOD)
                 factor := addmod(factor, mload(PROOF_LOOKUP_T_POLY_OPENING_AT_Z_SLOT), R_MOD)
                 factor := addmod(factor, mload(STATE_BETA_GAMMA_PLUS_GAMMA_SLOT), R_MOD)
 
-            // *= (gamma + f(z))
-            // We should use fact that f(x) =
-            // lookup_selector(x) * (a(x) + eta * b(x) + eta^2 * c(x) + eta^3 * table_type(x))
-            // to restore f(z)
+                // *= (gamma + f(z))
+                // We should use fact that f(x) =
+                // lookup_selector(x) * (a(x) + eta * b(x) + eta^2 * c(x) + eta^3 * table_type(x))
+                // to restore f(z)
                 let fReconstructed
                 {
                     fReconstructed := stateOpening0AtZ
@@ -1222,7 +1222,7 @@ contract L1VerifierPlonk is IVerifier {
                     fReconstructed := addmod(fReconstructed, mulmod(currentEta, stateOpening2AtZ, R_MOD), R_MOD)
                     currentEta := mulmod(currentEta, eta, R_MOD)
 
-                // add type of table
+                    // add type of table
                     fReconstructed := addmod(
                         fReconstructed,
                         mulmod(mload(PROOF_LOOKUP_TABLE_TYPE_POLY_OPENING_AT_Z_SLOT), currentEta, R_MOD),
@@ -1231,7 +1231,7 @@ contract L1VerifierPlonk is IVerifier {
                     fReconstructed := mulmod(fReconstructed, mload(PROOF_LOOKUP_SELECTOR_POLY_OPENING_AT_Z_SLOT), R_MOD)
                     fReconstructed := addmod(fReconstructed, mload(STATE_GAMMA_LOOKUP_SLOT), R_MOD)
                 }
-            // *= -alpha^6 * (beta + 1) * (z - omega^{n-1})
+                // *= -alpha^6 * (beta + 1) * (z - omega^{n-1})
                 factor := mulmod(factor, fReconstructed, R_MOD)
                 factor := mulmod(factor, mload(STATE_BETA_PLUS_ONE_SLOT), R_MOD)
                 factor := sub(R_MOD, factor)
@@ -1239,63 +1239,63 @@ contract L1VerifierPlonk is IVerifier {
 
                 factor := mulmod(factor, mload(STATE_Z_MINUS_LAST_OMEGA_SLOT), R_MOD)
 
-            // += alpha^7 * L_0(z)
+                // += alpha^7 * L_0(z)
                 factor := addmod(
                     factor,
                     mulmod(mload(STATE_L_0_AT_Z_SLOT), mload(STATE_POWER_OF_ALPHA_7_SLOT), R_MOD),
                     R_MOD
                 )
 
-            // += alpha^8 * L_{n-1}(z)
+                // += alpha^8 * L_{n-1}(z)
                 factor := addmod(
                     factor,
                     mulmod(mload(STATE_L_N_MINUS_ONE_AT_Z_SLOT), mload(STATE_POWER_OF_ALPHA_8_SLOT), R_MOD),
                     R_MOD
                 )
 
-            // Here we can optimize one scalar multiplication by aggregating coefficients near [z_lookup] during
-            // computing [F]
-            // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [z_lookup]
+                // Here we can optimize one scalar multiplication by aggregating coefficients near [z_lookup] during
+                // computing [F]
+                // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [z_lookup]
                 factor := mulmod(factor, mload(STATE_V_SLOT), R_MOD)
                 mstore(LOOKUP_GRAND_PRODUCT_FIRST_AGGREGATED_COMMITMENT_COEFF, factor)
             }
 
-        /*//////////////////////////////////////////////////////////////
+            /*//////////////////////////////////////////////////////////////
                                 4. Prepare queries
         //////////////////////////////////////////////////////////////*/
 
-        /// @dev Here we compute the first and second parts of batched polynomial commitment
-        /// We use the formula:
-        ///     [D0] = [t_0] + z^n * [t_1] + z^{2n} * [t_2] + z^{3n} * [t_3]
-        /// and
-        ///     [D1] = main_gate_selector(z) * (                                        \
-        ///                a(z) * [q_a] + b(z) * [q_b] + c(z) * [q_c] + d(z) * [q_d] +  | - main gate contribution
-        ///                a(z) * b(z) * [q_ab] + a(z) * c(z) * [q_ac] +                |
-        ///                [q_const] + d(z*omega) * [q_{d_next}])                       /
-        ///
-        ///            + alpha * [custom_gate_selector] * (                             \
-        ///                (a(z)^2 - b(z))              +                               | - custom gate contribution
-        ///                (b(z)^2 - c(z))    * alpha   +                               |
-        ///                (a(z)*c(z) - d(z)) * alpha^2 )                               /
-        ///
-        ///            + alpha^4 * [z_perm] *                                           \
-        ///                (a(z) + beta * z      + gamma) *                             |
-        ///                (b(z) + beta * z * k0 + gamma) *                             |
-        ///                (c(z) + beta * z * k1 + gamma) *                             |
-        ///                (d(z) + beta * z * k2 + gamma)                               | - permutation contribution
-        ///            - alpha^4 * z_perm(z*omega) * beta * [sigma_3] *                 |
-        ///                (a(z) + beta * sigma_0(z) + gamma) *                         |
-        ///                (b(z) + beta * sigma_1(z) + gamma) *                         |
-        ///                (c(z) + beta * sigma_2(z) + gamma) *                         |
-        ///            + alpha^5 * L_0(z) * [z_perm]                                    /
-        ///
-        ///            - alpha^6 * (1 + beta') * (gamma' + f(z)) * (z - omega^{n-1}) *  \
-        ///                (gamma'(1 + beta') + t(z) + beta' * t(z*omega)) * [z_lookup] |
-        ///            + alpha^6 * z_lookup(z*omega) * (z - omega^{n-1}) * [s]          | - lookup contribution
-        ///            + alpha^7 * L_0(z) * [z_lookup]                                  |
-        ///            + alpha^8 * L_{n-1}(z) * [z_lookup]                              /
+            /// @dev Here we compute the first and second parts of batched polynomial commitment
+            /// We use the formula:
+            ///     [D0] = [t_0] + z^n * [t_1] + z^{2n} * [t_2] + z^{3n} * [t_3]
+            /// and
+            ///     [D1] = main_gate_selector(z) * (                                        \
+            ///                a(z) * [q_a] + b(z) * [q_b] + c(z) * [q_c] + d(z) * [q_d] +  | - main gate contribution
+            ///                a(z) * b(z) * [q_ab] + a(z) * c(z) * [q_ac] +                |
+            ///                [q_const] + d(z*omega) * [q_{d_next}])                       /
+            ///
+            ///            + alpha * [custom_gate_selector] * (                             \
+            ///                (a(z)^2 - b(z))              +                               | - custom gate contribution
+            ///                (b(z)^2 - c(z))    * alpha   +                               |
+            ///                (a(z)*c(z) - d(z)) * alpha^2 )                               /
+            ///
+            ///            + alpha^4 * [z_perm] *                                           \
+            ///                (a(z) + beta * z      + gamma) *                             |
+            ///                (b(z) + beta * z * k0 + gamma) *                             |
+            ///                (c(z) + beta * z * k1 + gamma) *                             |
+            ///                (d(z) + beta * z * k2 + gamma)                               | - permutation contribution
+            ///            - alpha^4 * z_perm(z*omega) * beta * [sigma_3] *                 |
+            ///                (a(z) + beta * sigma_0(z) + gamma) *                         |
+            ///                (b(z) + beta * sigma_1(z) + gamma) *                         |
+            ///                (c(z) + beta * sigma_2(z) + gamma) *                         |
+            ///            + alpha^5 * L_0(z) * [z_perm]                                    /
+            ///
+            ///            - alpha^6 * (1 + beta') * (gamma' + f(z)) * (z - omega^{n-1}) *  \
+            ///                (gamma'(1 + beta') + t(z) + beta' * t(z*omega)) * [z_lookup] |
+            ///            + alpha^6 * z_lookup(z*omega) * (z - omega^{n-1}) * [s]          | - lookup contribution
+            ///            + alpha^7 * L_0(z) * [z_lookup]                                  |
+            ///            + alpha^8 * L_{n-1}(z) * [z_lookup]                              /
             function prepareQueries() {
-            // Calculate [D0]
+                // Calculate [D0]
                 {
                     let zInDomainSize := mload(STATE_Z_IN_DOMAIN_SIZE)
                     let currentZ := zInDomainSize
@@ -1312,9 +1312,9 @@ contract L1VerifierPlonk is IVerifier {
                     pointMulAndAddIntoDest(PROOF_QUOTIENT_POLY_PARTS_3_X_SLOT, currentZ, QUERIES_AT_Z_0_X_SLOT)
                 }
 
-            // Calculate v * [D1]
-            // We are going to multiply all the points in the sum by v to save
-            // one scalar multiplication during [F] computation
+                // Calculate v * [D1]
+                // We are going to multiply all the points in the sum by v to save
+                // one scalar multiplication during [F] computation
                 {
                     let stateOpening0AtZ := mload(PROOF_STATE_POLYS_0_OPENING_AT_Z_SLOT)
                     let stateOpening1AtZ := mload(PROOF_STATE_POLYS_1_OPENING_AT_Z_SLOT)
@@ -1353,8 +1353,8 @@ contract L1VerifierPlonk is IVerifier {
                     )
                 }
 
-            // Also we should restore [t] for future computations
-            // [t] = [col_0] + eta*[col_1] + eta^2*[col_2] + eta^3*[col_3]
+                // Also we should restore [t] for future computations
+                // [t] = [col_0] + eta*[col_1] + eta^2*[col_2] + eta^3*[col_3]
                 {
                     mstore(QUERIES_T_POLY_AGGREGATED_X_SLOT, mload(VK_LOOKUP_TABLE_0_X_SLOT))
                     mstore(QUERIES_T_POLY_AGGREGATED_Y_SLOT, mload(VK_LOOKUP_TABLE_0_Y_SLOT))
@@ -1372,32 +1372,32 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /*//////////////////////////////////////////////////////////////
+            /*//////////////////////////////////////////////////////////////
                                 5. Prepare aggregated commitment
         //////////////////////////////////////////////////////////////*/
 
-        /// @dev Here we compute aggregated commitment for the final pairing
-        /// We use the formula:
-        /// [E] = ( t(z) + v * r(z)
-        ///       + v^2*a(z) + v^3*b(z) + v^4*c(z) + v^5*d(z)
-        ///       + v^6*main_gate_selector(z)
-        ///       + v^7*sigma_0(z) + v^8*sigma_1(z) + v^9*sigma_2(z)
-        ///       + v^10*t(z) + v^11*lookup_selector(z) + v^12*table_type(z)
-        ///       + u * (v^13*z_perm(z*omega) + v^14*d(z*omega)
-        ///           + v^15*s(z*omega) + v^16*z_lookup(z*omega) + v^17*t(z*omega)
-        ///       )
-        ///  ) * [1]
-        /// and
-        /// [F] = [D0] + v * [D1]
-        ///       + v^2*[a] + v^3*[b] + v^4*[c] + v^5*[d]
-        ///       + v^6*[main_gate_selector]
-        ///       + v^7*[sigma_0] + v^8*[sigma_1] + v^9*[sigma_2]
-        ///       + v^10*[t] + v^11*[lookup_selector] + v^12*[table_type]
-        ///       + u * ( v^13*[z_perm] + v^14*[d]
-        ///           + v^15*[s] + v^16*[z_lookup] + v^17*[t]
-        ///       )
+            /// @dev Here we compute aggregated commitment for the final pairing
+            /// We use the formula:
+            /// [E] = ( t(z) + v * r(z)
+            ///       + v^2*a(z) + v^3*b(z) + v^4*c(z) + v^5*d(z)
+            ///       + v^6*main_gate_selector(z)
+            ///       + v^7*sigma_0(z) + v^8*sigma_1(z) + v^9*sigma_2(z)
+            ///       + v^10*t(z) + v^11*lookup_selector(z) + v^12*table_type(z)
+            ///       + u * (v^13*z_perm(z*omega) + v^14*d(z*omega)
+            ///           + v^15*s(z*omega) + v^16*z_lookup(z*omega) + v^17*t(z*omega)
+            ///       )
+            ///  ) * [1]
+            /// and
+            /// [F] = [D0] + v * [D1]
+            ///       + v^2*[a] + v^3*[b] + v^4*[c] + v^5*[d]
+            ///       + v^6*[main_gate_selector]
+            ///       + v^7*[sigma_0] + v^8*[sigma_1] + v^9*[sigma_2]
+            ///       + v^10*[t] + v^11*[lookup_selector] + v^12*[table_type]
+            ///       + u * ( v^13*[z_perm] + v^14*[d]
+            ///           + v^15*[s] + v^16*[z_lookup] + v^17*[t]
+            ///       )
             function prepareAggregatedCommitment() {
-            // Here we compute parts of [E] and [F] without u multiplier
+                // Here we compute parts of [E] and [F] without u multiplier
                 let aggregationChallenge := 1
                 let firstDCoeff
                 let firstTCoeff
@@ -1407,10 +1407,10 @@ contract L1VerifierPlonk is IVerifier {
                 let aggregatedOpeningAtZ := mload(PROOF_QUOTIENT_POLY_OPENING_AT_Z_SLOT)
                 {
                     function updateAggregationChallenge(
-                    queriesCommitmentPoint,
-                    valueAtZ,
-                    curAggregationChallenge,
-                    curAggregatedOpeningAtZ
+                        queriesCommitmentPoint,
+                        valueAtZ,
+                        curAggregationChallenge,
+                        curAggregatedOpeningAtZ
                     ) -> newAggregationChallenge, newAggregatedOpeningAtZ {
                         newAggregationChallenge := mulmod(curAggregationChallenge, mload(STATE_V_SLOT), R_MOD)
                         pointMulAndAddIntoDest(queriesCommitmentPoint, newAggregationChallenge, AGGREGATED_AT_Z_X_SLOT)
@@ -1421,7 +1421,7 @@ contract L1VerifierPlonk is IVerifier {
                         )
                     }
 
-                // We don't need to multiply by v, because we have already computed v * [D1]
+                    // We don't need to multiply by v, because we have already computed v * [D1]
                     pointAddIntoDest(AGGREGATED_AT_Z_X_SLOT, QUERIES_AT_Z_1_X_SLOT, AGGREGATED_AT_Z_X_SLOT)
                     aggregationChallenge := mulmod(aggregationChallenge, mload(STATE_V_SLOT), R_MOD)
                     aggregatedOpeningAtZ := addmod(
@@ -1449,8 +1449,8 @@ contract L1VerifierPlonk is IVerifier {
                         aggregatedOpeningAtZ
                     )
 
-                // Here we can optimize one scalar multiplication by aggregating coefficients near [d]
-                // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [d]
+                    // Here we can optimize one scalar multiplication by aggregating coefficients near [d]
+                    // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [d]
                     aggregationChallenge := mulmod(aggregationChallenge, mload(STATE_V_SLOT), R_MOD)
                     firstDCoeff := aggregationChallenge
                     aggregatedOpeningAtZ := addmod(
@@ -1484,8 +1484,8 @@ contract L1VerifierPlonk is IVerifier {
                         aggregatedOpeningAtZ
                     )
 
-                // Here we can optimize one scalar multiplication by aggregating coefficients near [t]
-                // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [t]
+                    // Here we can optimize one scalar multiplication by aggregating coefficients near [t]
+                    // We will sum them and add and make one scalar multiplication: (coeff1 + coeff2) * [t]
                     aggregationChallenge := mulmod(aggregationChallenge, mload(STATE_V_SLOT), R_MOD)
                     firstTCoeff := aggregationChallenge
                     aggregatedOpeningAtZ := addmod(
@@ -1509,7 +1509,7 @@ contract L1VerifierPlonk is IVerifier {
                 }
                 mstore(AGGREGATED_OPENING_AT_Z_SLOT, aggregatedOpeningAtZ)
 
-            // Here we compute parts of [E] and [F] with u multiplier
+                // Here we compute parts of [E] and [F] with u multiplier
                 aggregationChallenge := mulmod(aggregationChallenge, mload(STATE_V_SLOT), R_MOD)
 
                 let copyPermutationCoeff := addmod(
@@ -1531,11 +1531,11 @@ contract L1VerifierPlonk is IVerifier {
 
                 {
                     function updateAggregationChallenge(
-                    queriesCommitmentPoint,
-                    valueAtZ_Omega,
-                    previousCoeff,
-                    curAggregationChallenge,
-                    curAggregatedOpeningAtZ_Omega
+                        queriesCommitmentPoint,
+                        valueAtZ_Omega,
+                        previousCoeff,
+                        curAggregationChallenge,
+                        curAggregatedOpeningAtZ_Omega
                     ) -> newAggregationChallenge, newAggregatedOpeningAtZ_Omega {
                         newAggregationChallenge := mulmod(curAggregationChallenge, mload(STATE_V_SLOT), R_MOD)
                         let finalCoeff := addmod(
@@ -1582,17 +1582,17 @@ contract L1VerifierPlonk is IVerifier {
                 }
                 mstore(AGGREGATED_OPENING_AT_Z_OMEGA_SLOT, aggregatedOpeningAtZOmega)
 
-            // Now we can merge both parts and get [E] and [F]
+                // Now we can merge both parts and get [E] and [F]
                 let u := mload(STATE_U_SLOT)
 
-            // [F]
+                // [F]
                 pointAddIntoDest(
                     AGGREGATED_AT_Z_X_SLOT,
                     AGGREGATED_AT_Z_OMEGA_X_SLOT,
                     PAIRING_PAIR_WITH_GENERATOR_X_SLOT
                 )
 
-            // [E] = (aggregatedOpeningAtZ + u * aggregatedOpeningAtZOmega) * [1]
+                // [E] = (aggregatedOpeningAtZ + u * aggregatedOpeningAtZOmega) * [1]
                 let aggregatedValue := addmod(
                     mulmod(mload(AGGREGATED_OPENING_AT_Z_OMEGA_SLOT), u, R_MOD),
                     mload(AGGREGATED_OPENING_AT_Z_SLOT),
@@ -1604,34 +1604,34 @@ contract L1VerifierPlonk is IVerifier {
                 pointMulIntoDest(PAIRING_BUFFER_POINT_X_SLOT, aggregatedValue, PAIRING_BUFFER_POINT_X_SLOT)
             }
 
-        /*//////////////////////////////////////////////////////////////
+            /*//////////////////////////////////////////////////////////////
                                 5. Pairing
         //////////////////////////////////////////////////////////////*/
 
-        /// @notice Checks the final pairing
-        /// @dev We should check the equation:
-        /// e([W] + u * [W'], [x]_2) = e(z * [W] + u * z * omega * [W'] + [F] - [E], [1]_2),
-        /// where [F] and [E] were computed previously
-        ///
-        /// Also we need to check that e([P1], [x]_2) = e([P2], [1]_2)
-        /// if we have the recursive part of the proof
-        /// where [P1] and [P2] are parts of the recursive proof
-        ///
-        /// We can aggregate both pairings into one for gas optimization:
-        /// e([W] + u * [W'] + u^2 * [P1], [x]_2) =
-        /// e(z * [W] + u * z * omega * [W'] + [F] - [E] + u^2 * [P2], [1]_2)
-        ///
-        /// u is a valid challenge for such aggregation,
-        /// because [P1] and [P2] are used in PI
+            /// @notice Checks the final pairing
+            /// @dev We should check the equation:
+            /// e([W] + u * [W'], [x]_2) = e(z * [W] + u * z * omega * [W'] + [F] - [E], [1]_2),
+            /// where [F] and [E] were computed previously
+            ///
+            /// Also we need to check that e([P1], [x]_2) = e([P2], [1]_2)
+            /// if we have the recursive part of the proof
+            /// where [P1] and [P2] are parts of the recursive proof
+            ///
+            /// We can aggregate both pairings into one for gas optimization:
+            /// e([W] + u * [W'] + u^2 * [P1], [x]_2) =
+            /// e(z * [W] + u * z * omega * [W'] + [F] - [E] + u^2 * [P2], [1]_2)
+            ///
+            /// u is a valid challenge for such aggregation,
+            /// because [P1] and [P2] are used in PI
             function finalPairing() {
                 let u := mload(STATE_U_SLOT)
                 let z := mload(STATE_Z_SLOT)
                 let zOmega := mulmod(mload(STATE_Z_SLOT), OMEGA, R_MOD)
 
-            // [F] - [E]
+                // [F] - [E]
                 pointSubAssign(PAIRING_PAIR_WITH_GENERATOR_X_SLOT, PAIRING_BUFFER_POINT_X_SLOT)
 
-            // +z * [W] + u * z * omega * [W']
+                // +z * [W] + u * z * omega * [W']
                 pointMulAndAddIntoDest(PROOF_OPENING_PROOF_AT_Z_X_SLOT, z, PAIRING_PAIR_WITH_GENERATOR_X_SLOT)
                 pointMulAndAddIntoDest(
                     PROOF_OPENING_PROOF_AT_Z_OMEGA_X_SLOT,
@@ -1639,20 +1639,20 @@ contract L1VerifierPlonk is IVerifier {
                     PAIRING_PAIR_WITH_GENERATOR_X_SLOT
                 )
 
-            // [W] + u * [W']
+                // [W] + u * [W']
                 mstore(PAIRING_PAIR_WITH_X_X_SLOT, mload(PROOF_OPENING_PROOF_AT_Z_X_SLOT))
                 mstore(PAIRING_PAIR_WITH_X_Y_SLOT, mload(PROOF_OPENING_PROOF_AT_Z_Y_SLOT))
                 pointMulAndAddIntoDest(PROOF_OPENING_PROOF_AT_Z_OMEGA_X_SLOT, u, PAIRING_PAIR_WITH_X_X_SLOT)
                 pointNegate(PAIRING_PAIR_WITH_X_X_SLOT)
 
-            // Add recursive proof part if needed
+                // Add recursive proof part if needed
                 if mload(VK_RECURSIVE_FLAG_SLOT) {
                     let uu := mulmod(u, u, R_MOD)
                     pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P1_X_SLOT, uu, PAIRING_PAIR_WITH_GENERATOR_X_SLOT)
                     pointMulAndAddIntoDest(PROOF_RECURSIVE_PART_P2_X_SLOT, uu, PAIRING_PAIR_WITH_X_X_SLOT)
                 }
 
-            // Calculate pairing
+                // Calculate pairing
                 {
                     mstore(0x000, mload(PAIRING_PAIR_WITH_GENERATOR_X_SLOT))
                     mstore(0x020, mload(PAIRING_PAIR_WITH_GENERATOR_Y_SLOT))
@@ -1680,30 +1680,30 @@ contract L1VerifierPlonk is IVerifier {
                 }
             }
 
-        /*//////////////////////////////////////////////////////////////
+            /*//////////////////////////////////////////////////////////////
                                 Verification
         //////////////////////////////////////////////////////////////*/
 
-        // Step 1: Load the proof and check the correctness of its parts
+            // Step 1: Load the proof and check the correctness of its parts
             loadProof()
 
-        // Step 2: Recompute all the challenges with the transcript
+            // Step 2: Recompute all the challenges with the transcript
             initializeTranscript()
 
-        // Step 3: Check the quotient equality
+            // Step 3: Check the quotient equality
             verifyQuotientEvaluation()
 
-        // Step 4: Compute queries [D0] and v * [D1]
+            // Step 4: Compute queries [D0] and v * [D1]
             prepareQueries()
 
-        // Step 5: Compute [E] and [F]
+            // Step 5: Compute [E] and [F]
             prepareAggregatedCommitment()
 
-        // Step 6: Check the final pairing with aggregated recursive proof
+            // Step 6: Check the final pairing with aggregated recursive proof
             finalPairing()
 
             mstore(0, true)
-            return (0, 32)
+            return(0, 32)
         }
     }
 }

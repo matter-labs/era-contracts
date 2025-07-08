@@ -170,6 +170,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
 
         initializeConfig(newConfigPath);
 
+        console.log("Initialized config from %s", newConfigPath);
         upgradeConfig.outputPath = string.concat(root, _outputPath);
         upgradeConfig.initialized = true;
     }
@@ -178,8 +179,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContracts();
         console.log("Ecosystem contracts are deployed!");
-        deployNewEcosystemContractsGW();
-        console.log("Ecosystem contracts for GW are deployed!");
+//        deployNewEcosystemContractsGW();
+//        console.log("Ecosystem contracts for GW are deployed!");
         publishBytecodes();
         console.log("Bytecodes published!");
         generateUpgradeData();
@@ -455,13 +456,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
         addresses.transparentProxyAdmin = address(
             uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
         );
-        addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
+        addresses.protocolUpgradeHandlerProxy = Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner();
 
-        require(
-            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() ==
-                addresses.protocolUpgradeHandlerProxy,
-            "Incorrect ProtocolUpgradeHandlerProxy"
-        );
         require(
             Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
             "Incorrect owner"
@@ -476,27 +472,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
         newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
 
         addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
-
-        gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
-        );
-
-        gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
-        );
-
-        gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_da_manager"
-        );
-
-        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
-        );
-
-        gatewayConfig.gatewayStateTransition.isOnGateway = true;
-
-        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
-        config.gatewayChainId = gatewayConfig.chainId;
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
@@ -1003,11 +978,18 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
         Call[][] memory allCalls = new Call[][](7);
         allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
         allCalls[1] = prepareCheckMigrationsPausedCalls();
+        console.log("prepareStage1GovernanceCalls: prepareUpgradeProxiesCalls");
         allCalls[2] = prepareUpgradeProxiesCalls();
+        console.log("prepareStage1GovernanceCalls: prepareNewChainCreationParamsCall");
         allCalls[3] = prepareNewChainCreationParamsCall();
+        console.log("prepareStage1GovernanceCalls: provideSetNewVersionUpgradeCall");
         allCalls[4] = provideSetNewVersionUpgradeCall();
+        console.log("prepareStage1GovernanceCalls: prepareDAValidatorCall");
         allCalls[5] = prepareDAValidatorCall();
+        console.log("prepareStage1GovernanceCalls: prepareGatewaySpecificStage1GovernanceCalls");
         allCalls[6] = prepareGatewaySpecificStage1GovernanceCalls();
+        console.log("Done prepareStage1GovernanceCalls");
+
         calls = mergeCallsArray(allCalls);
     }
 
@@ -1345,37 +1327,58 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](6);
+        uint currentIndex = 0;
 
-        calls[0] = _buildCallProxyUpgrade(
-            addresses.stateTransition.chainTypeManagerProxy,
-            addresses.stateTransition.chainTypeManagerImplementation
-        );
+        if (addresses.stateTransition.chainTypeManagerImplementation != address(0)) {
+            calls[currentIndex] = _buildCallProxyUpgrade(
+                addresses.stateTransition.chainTypeManagerProxy,
+                addresses.stateTransition.chainTypeManagerImplementation
+            );
+            currentIndex++;
+        }
 
-        calls[1] = _buildCallProxyUpgrade(
-            addresses.bridgehub.bridgehubProxy,
-            addresses.bridgehub.bridgehubImplementation
-        );
+        if (addresses.bridgehub.bridgehubImplementation != address(0)) {
+            calls[currentIndex] = _buildCallProxyUpgrade(
+                addresses.bridgehub.bridgehubProxy,
+                addresses.bridgehub.bridgehubImplementation
+            );
+            currentIndex++;
+        }
 
-        // Note, that we do not need to run the initializer
-        calls[2] = _buildCallProxyUpgrade(
-            addresses.bridges.l1NullifierProxy,
-            addresses.bridges.l1NullifierImplementation
-        );
+        if (addresses.bridges.l1NullifierImplementation != address(0)) {
+            calls[currentIndex] = _buildCallProxyUpgrade(
+                addresses.bridges.l1NullifierProxy,
+                addresses.bridges.l1NullifierImplementation
+            );
+            currentIndex++;
+        }
 
-        calls[3] = _buildCallProxyUpgrade(
-            addresses.bridges.l1AssetRouterProxy,
-            addresses.bridges.l1AssetRouterImplementation
-        );
+        if (addresses.bridges.l1AssetRouterImplementation != address(0)) {
+            // Note, that we do not need to run the initializer
+            calls[currentIndex] = _buildCallProxyUpgrade(
+                addresses.bridges.l1AssetRouterProxy,
+                addresses.bridges.l1AssetRouterImplementation
+            );
+            currentIndex++;
+        }
 
-        calls[4] = _buildCallProxyUpgrade(
-            addresses.vaults.l1NativeTokenVaultProxy,
-            addresses.vaults.l1NativeTokenVaultImplementation
-        );
+        if (addresses.vaults.l1NativeTokenVaultImplementation != address(0)) {
+            // Note, that we do not need to run the initializer
+            calls[currentIndex] = _buildCallProxyUpgrade(
+                addresses.vaults.l1NativeTokenVaultProxy,
+                addresses.vaults.l1NativeTokenVaultImplementation
+            );
+            currentIndex++;
+        }
 
-        calls[5] = _buildCallProxyUpgrade(
-            addresses.bridgehub.messageRootProxy,
-            addresses.bridgehub.messageRootImplementation
-        );
+        if (addresses.bridgehub.messageRootImplementation != address(0)) {
+            // Note, that we do not need to run the initializer
+            calls[currentIndex] = _buildCallProxyUpgrade(
+                addresses.bridgehub.messageRootProxy,
+                addresses.bridgehub.messageRootImplementation
+            );
+            currentIndex++;
+        }
     }
 
     function _buildCallProxyUpgrade(

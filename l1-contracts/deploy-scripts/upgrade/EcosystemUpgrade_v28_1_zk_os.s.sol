@@ -9,7 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {PrepareL1L2TransactionParams, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {PrepareL1L2TransactionParams, StateTransitionDeployedAddresses, Utils, FacetCut} from "../Utils.sol";
 import {IBridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
@@ -106,62 +106,21 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
 
         deployVerifiers();
         deployUpgradeStageValidator();
-
+        deployGenesisUpgrade();
         (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
+        upgradeConfig.ecosystemContractsDeployed = true;
+
     }
 
-    function getProposedUpgrade(
+    function deployGenesisUpgrade() internal {
+        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", false);
+    }
+
+    function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) public override returns (ProposedUpgrade memory proposedUpgrade) {
-        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        IZKChain diamondProxy = IZKChain(bridgehub.getZKChain(config.eraChainId));
-
-        console.log("Diamond proxy address: %s", address(diamondProxy));
-        (uint32 major, uint32 minor, uint32 patch) = diamondProxy.getSemverProtocolVersion();
-        console.log("Current protocol version: %s.%s.%s", major, minor, patch);
-        uint256 oldVersion = SemVer.packSemVer(major, minor, patch);
-        uint256 newVersion = SemVer.packSemVer(major, minor, patch + 1);
-
-        proposedUpgrade = ProposedUpgrade({
-            l2ProtocolUpgradeTx: _composeEmptyUpgradeTx(),
-            bootloaderHash: bytes32(0),
-            defaultAccountHash: bytes32(0),
-            evmEmulatorHash: bytes32(0),
-            verifier: stateTransition.verifier,
-            verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
-            l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
-            upgradeTimestamp: 0,
-            newProtocolVersion: newVersion
-        });
+    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+        facetCuts = new FacetCut[](0);
     }
 
-    /// @notice Build empty L1 -> L2 upgrade tx
-    function _composeEmptyUpgradeTx() internal virtual returns (L2CanonicalTransaction memory transaction) {
-        transaction = L2CanonicalTransaction({
-            txType: 0,
-            from: uint256(0),
-            to: uint256(0),
-            gasLimit: 0,
-            gasPerPubdataByteLimit: 0,
-            maxFeePerGas: 0,
-            maxPriorityFeePerGas: 0,
-            paymaster: uint256(uint160(address(0))),
-            nonce: 0,
-            value: 0,
-            reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
-            data: new bytes(0),
-            signature: new bytes(0),
-            factoryDeps: new uint256[](0),
-            paymasterInput: new bytes(0),
-            // Reserved dynamic type for the future use-case. Using it should be avoided,
-            // But it is still here, just in case we want to enable some additional functionality
-            reservedDynamic: new bytes(0)
-        });
-    }
 }
