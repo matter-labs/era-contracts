@@ -15,7 +15,7 @@ if (!process.env.CHAIN_ETH_NETWORK) {
 export default {
   defaultNetwork: "env",
   solidity: {
-    version: "0.8.24",
+    version: "0.8.28",
     settings: {
       optimizer: {
         enabled: true,

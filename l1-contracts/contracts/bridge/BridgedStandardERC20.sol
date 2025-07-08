@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {ERC20PermitUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ERC1967Upgrade} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Upgrade.sol";
 
 import {IBridgedStandardToken} from "./interfaces/IBridgedStandardToken.sol";
-import {Unauthorized, NonSequentialVersion, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
+import {NonSequentialVersion, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 

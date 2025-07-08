@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.20;
 
-import {MSG_VALUE_SYSTEM_CONTRACT, MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
+import {MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT, MSG_VALUE_SYSTEM_CONTRACT} from "@matterlabs/zksync-contracts/l2/system-contracts/Constants.sol";
 import {Utils} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/Utils.sol";
 
 // Addresses used for the compiler to be replaced with the

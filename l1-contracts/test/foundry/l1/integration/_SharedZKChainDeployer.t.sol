@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
-import {RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
+import {Config as ChainConfig, RegisterZKChainScript} from "deploy-scripts/RegisterZKChain.s.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
@@ -12,8 +12,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IDiamondInit} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-
-import {Config as ChainConfig} from "deploy-scripts/RegisterZKChain.s.sol";
 
 contract ZKChainDeployer is L1ContractDeployer {
     using stdStorage for StdStorage;

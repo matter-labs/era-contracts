@@ -7,6 +7,8 @@ struct ImmutableData {
     bytes32 value;
 }
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
 interface IImmutableSimulator {
     function getImmutable(address _dest, uint256 _index) external view returns (bytes32);
 

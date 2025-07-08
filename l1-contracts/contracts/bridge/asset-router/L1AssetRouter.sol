@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
@@ -20,12 +20,12 @@ import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegac
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-import {TWO_BRIDGES_MAGIC_VALUE, ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
-import {LegacyEncodingUsedForNonL1Token, LegacyBridgeUsesNonNativeToken, NonEmptyMsgValue, UnsupportedEncodingVersion, AssetIdNotSupported, AssetHandlerDoesNotExist, Unauthorized, ZeroAddress, TokenNotSupported, TokensWithFeesNotSupported, AddressAlreadySet} from "../../common/L1ContractErrors.sol";
-import {L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
+import {AddressAlreadySet, AssetHandlerDoesNotExist, AssetIdNotSupported, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, UnsupportedEncodingVersion, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner, L2TransactionRequestDirect} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 

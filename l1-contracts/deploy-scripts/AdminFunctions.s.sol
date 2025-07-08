@@ -13,7 +13,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {Utils, ChainInfoFromBridgehub} from "./Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -24,9 +24,9 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
@@ -182,26 +182,6 @@ contract AdminFunctions is Script {
         );
     }
 
-    function setDAValidatorPair(
-        ChainAdmin chainAdmin,
-        address target,
-        address l1DaValidator,
-        address l2DaValidator
-    ) public {
-        IZKChain adminContract = IZKChain(target);
-
-        Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: target,
-            value: 0,
-            data: abi.encodeCall(adminContract.setDAValidatorPair, (l1DaValidator, l2DaValidator))
-        });
-
-        vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
-        vm.stopBroadcast();
-    }
-
     function makePermanentRollup(ChainAdmin chainAdmin, address target) public {
         IZKChain adminContract = IZKChain(target);
 
@@ -224,9 +204,9 @@ contract AdminFunctions is Script {
         bytes memory data;
         // The interface should be compatible with both the new and the old ValidatorTimelock
         if (addValidator) {
-            data = abi.encodeCall(ValidatorTimelock.addValidator, (chainId, validatorAddress));
+            data = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (chainId, validatorAddress));
         } else {
-            data = abi.encodeCall(ValidatorTimelock.removeValidator, (chainId, validatorAddress));
+            data = abi.encodeCall(ValidatorTimelock.removeValidatorForChainId, (chainId, validatorAddress));
         }
 
         Utils.adminExecute(adminAddr, accessControlRestriction, validatorTimelock, data, 0);
@@ -305,6 +285,67 @@ contract AdminFunctions is Script {
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
 
+    struct UpgradeZKChainOnGatewayParams {
+        uint256 l1GasPrice;
+        uint256 oldProtocolVersion;
+        bytes upgradeCutData;
+        address chainDiamondProxyOnGateway;
+        uint256 gatewayChainId;
+        uint256 chainId;
+        address bridgehub;
+        address l1AssetRouterProxy;
+        address refundRecipient;
+        bool shouldSend;
+    }
+
+    function _prepareUpgradeZKChainOnGatewayInner(UpgradeZKChainOnGatewayParams memory data) private {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(data.bridgehub, data.chainId);
+        Diamond.DiamondCutData memory upgradeCutData = abi.decode(data.upgradeCutData, (Diamond.DiamondCutData));
+
+        Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
+            data.l1GasPrice,
+            abi.encodeCall(IAdmin.upgradeChainFromVersion, (data.oldProtocolVersion, upgradeCutData)),
+            Utils.MAX_PRIORITY_TX_GAS,
+            new bytes[](0),
+            data.chainDiamondProxyOnGateway,
+            0,
+            data.gatewayChainId,
+            data.bridgehub,
+            data.l1AssetRouterProxy,
+            data.refundRecipient
+        );
+
+        saveAndSendAdminTx(chainInfo.admin, calls, data.shouldSend);
+    }
+
+    function prepareUpgradeZKChainOnGateway(
+        uint256 l1GasPrice,
+        uint256 oldProtocolVersion,
+        bytes memory upgradeCutData,
+        address chainDiamondProxyOnGateway,
+        uint256 gatewayChainId,
+        uint256 chainId,
+        address bridgehub,
+        address l1AssetRouterProxy,
+        address refundRecipient,
+        bool shouldSend
+    ) public {
+        _prepareUpgradeZKChainOnGatewayInner(
+            UpgradeZKChainOnGatewayParams({
+                l1GasPrice: l1GasPrice,
+                oldProtocolVersion: oldProtocolVersion,
+                upgradeCutData: upgradeCutData,
+                chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
+                gatewayChainId: gatewayChainId,
+                chainId: chainId,
+                bridgehub: bridgehub,
+                l1AssetRouterProxy: l1AssetRouterProxy,
+                refundRecipient: refundRecipient,
+                shouldSend: shouldSend
+            })
+        );
+    }
+
     function grantGatewayWhitelist(
         address _bridgehub,
         uint256 _chainId,
@@ -363,6 +404,26 @@ contract AdminFunctions is Script {
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
+
+    function setDAValidatorPair(
+        address _bridgehub,
+        uint256 _chainId,
+        address _l1DaValidator,
+        address _l2DaValidator,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
     struct MigrateChainToGatewayParams {
         address bridgehub;
         uint256 l1GasPrice;
@@ -532,7 +593,10 @@ contract AdminFunctions is Script {
             data.bridgehub,
             data.l2ChainId
         );
-        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidator, (data.l2ChainId, data.validatorAddress));
+        bytes memory callData = abi.encodeCall(
+            ValidatorTimelock.addValidatorForChainId,
+            (data.l2ChainId, data.validatorAddress)
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             callData,

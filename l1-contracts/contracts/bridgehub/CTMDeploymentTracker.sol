@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
@@ -9,9 +9,9 @@ import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
-import {L2_BRIDGEHUB_ADDR} from "../common/L2ContractAddresses.sol";
-import {OnlyBridgehub, NotOwnerViaRouter, NoEthAllowed, NotOwner, WrongCounterPart} from "./L1BridgehubErrors.sol";
-import {UnsupportedEncodingVersion, CTMNotRegistered} from "../common/L1ContractErrors.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {NoEthAllowed, NotOwner, NotOwnerViaRouter, OnlyBridgehub, WrongCounterPart} from "./L1BridgehubErrors.sol";
+import {CTMNotRegistered, UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
 
 /// @dev The encoding version of the data.
 bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
@@ -62,7 +62,10 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         if (!BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress)) {
             revert CTMNotRegistered();
         }
-        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_ctmAddress))), address(BRIDGE_HUB));
+        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(
+            bytes32(uint256(uint160(_ctmAddress))),
+            BRIDGE_HUB.chainAssetHandler()
+        );
         BRIDGE_HUB.setCTMAssetAddress(bytes32(uint256(uint160(_ctmAddress))), _ctmAddress);
     }
 
@@ -119,8 +122,8 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         address _originalCaller,
         address _assetHandlerAddressOnCounterpart
     ) external view override onlyOwnerViaRouter(_originalCaller) {
-        if (_assetHandlerAddressOnCounterpart != L2_BRIDGEHUB_ADDR) {
-            revert WrongCounterPart(_assetHandlerAddressOnCounterpart, L2_BRIDGEHUB_ADDR);
+        if (_assetHandlerAddressOnCounterpart != L2_CHAIN_ASSET_HANDLER_ADDR) {
+            revert WrongCounterPart(_assetHandlerAddressOnCounterpart, L2_CHAIN_ASSET_HANDLER_ADDR);
         }
     }
 

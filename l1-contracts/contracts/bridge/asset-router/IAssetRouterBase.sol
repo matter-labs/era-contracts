@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
@@ -50,6 +50,8 @@ interface IAssetRouterBase {
     event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
     function BRIDGE_HUB() external view returns (IBridgehub);
+
+    function L1_CHAIN_ID() external view returns (uint256);
 
     /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
     /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.

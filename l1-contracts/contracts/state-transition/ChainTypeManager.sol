@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
@@ -10,13 +10,13 @@ import {DiamondProxy} from "./chain-deps/DiamondProxy.sol";
 import {IAdmin} from "./chain-interfaces/IAdmin.sol";
 import {IDiamondInit} from "./chain-interfaces/IDiamondInit.sol";
 import {IExecutor} from "./chain-interfaces/IExecutor.sol";
-import {IChainTypeManager, ChainTypeManagerInitializeData, ChainCreationParams} from "./IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "./IChainTypeManager.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
-import {InitialForceDeploymentMismatch, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
-import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
+import {AdminZero, InitialForceDeploymentMismatch, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
+import {ChainAlreadyLive, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisUpgradeZero, HashMismatch, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -100,6 +100,14 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         _;
     }
 
+    /// @notice only the chain asset handler can call
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != IBridgehub(BRIDGE_HUB).chainAssetHandler()) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @return The tuple of (major, minor, patch) protocol version.
     function getSemverProtocolVersion() external view returns (uint32, uint32, uint32) {
         // slither-disable-next-line unused-return
@@ -171,6 +179,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
+            dependencyRootsRollingHash: bytes32(0),
             timestamp: 0,
             commitment: _chainCreationParams.genesisBatchCommitment
         });
@@ -185,7 +194,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             genesisBatchHash: _chainCreationParams.genesisBatchHash,
             genesisIndexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             genesisBatchCommitment: _chainCreationParams.genesisBatchCommitment,
+            newInitialCut: _chainCreationParams.diamondCut,
             newInitialCutHash: newInitialCutHash,
+            forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
             forceDeploymentHash: forceDeploymentHash
         });
     }
@@ -307,8 +318,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev reverts batches on the specified chain
     /// @param _chainId the chainId of the chain
     /// @param _newLastBatch the new last batch
-    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwnerOrAdmin {
-        IZKChain(getZKChain(_chainId)).revertBatchesSharedBridge(_chainId, _newLastBatch);
+    function revertBatches(uint256 _chainId, uint256 _newLastBatch) external onlyOwner {
+        address zkChainAddr = getZKChain(_chainId);
+        IZKChain(zkChainAddr).revertBatchesSharedBridge(zkChainAddr, _newLastBatch);
     }
 
     /// @dev execute predefined upgrade
@@ -467,7 +479,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function forwardedBridgeBurn(
         uint256 _chainId,
         bytes calldata _data
-    ) external view override onlyBridgehub returns (bytes memory ctmForwardedBridgeMintData) {
+    ) external view override onlyChainAssetHandler returns (bytes memory ctmForwardedBridgeMintData) {
         // Note that the `_diamondCut` here is not for the current chain, for the chain where the migration
         // happens. The correctness of it will be checked on the CTM on the new settlement layer.
         (address _newSettlementLayerAdmin, bytes memory _diamondCut) = abi.decode(_data, (address, bytes));
@@ -479,7 +491,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // related to different protocol version support.
         uint256 chainProtocolVersion = IZKChain(getZKChain(_chainId)).getProtocolVersion();
         if (chainProtocolVersion != protocolVersion) {
-            revert OutdatedProtocolVersion(chainProtocolVersion, protocolVersion);
+            revert OutdatedProtocolVersion(protocolVersion, chainProtocolVersion);
         }
 
         return
@@ -497,7 +509,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function forwardedBridgeMint(
         uint256 _chainId,
         bytes calldata _ctmData
-    ) external override onlyBridgehub returns (address chainAddress) {
+    ) external override onlyChainAssetHandler returns (address chainAddress) {
         (bytes32 _baseTokenAssetId, address _admin, uint256 _protocolVersion, bytes memory _diamondCut) = abi.decode(
             _ctmData,
             (bytes32, address, uint256, bytes)
@@ -506,7 +518,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // We ensure that the chain has the latest protocol version to avoid edge cases
         // related to different protocol version support.
         if (_protocolVersion != protocolVersion) {
-            revert OutdatedProtocolVersion(_protocolVersion, protocolVersion);
+            revert OutdatedProtocolVersion(protocolVersion, _protocolVersion);
         }
         chainAddress = _deployNewChain({
             _chainId: _chainId,

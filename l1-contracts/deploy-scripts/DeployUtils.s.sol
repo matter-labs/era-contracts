@@ -5,35 +5,15 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {StateTransitionDeployedAddresses, FacetCut, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS, ADDRESS_ONE} from "./Utils.sol";
-import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {ChainTypeManagerInitializeData, ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
-
-struct FixedForceDeploymentsData {
-    uint256 l1ChainId;
-    uint256 eraChainId;
-    address l1AssetRouter;
-    bytes32 l2TokenProxyBytecodeHash;
-    address aliasedL1Governance;
-    uint256 maxNumberOfZKChains;
-    bytes32 bridgehubBytecodeHash;
-    bytes32 l2AssetRouterBytecodeHash;
-    bytes32 l2NtvBytecodeHash;
-    bytes32 messageRootBytecodeHash;
-    address l2SharedBridgeLegacyImpl;
-    address l2BridgedStandardERC20Impl;
-    // The forced beacon address. It is needed only for internal testing.
-    // MUST be equal to 0 in production.
-    // It will be the job of the governance to ensure that this value is set correctly.
-    address dangerousTestOnlyForcedBeacon;
-}
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -46,7 +26,7 @@ struct DeployedAddresses {
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
-    address blobVersionedHashRetriever;
+    address create2Factory;
     address chainRegistrar;
     address protocolUpgradeHandlerProxy;
 }
@@ -73,6 +53,8 @@ struct BridgehubDeployedAddresses {
     address ctmDeploymentTrackerProxy;
     address messageRootImplementation;
     address messageRootProxy;
+    address chainAssetHandlerImplementation;
+    address chainAssetHandlerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -92,6 +74,7 @@ struct Config {
     uint256 l1ChainId;
     address deployerAddress;
     uint256 eraChainId;
+    uint256 gatewayChainId;
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
@@ -207,15 +190,11 @@ abstract contract DeployUtils is Create2FactoryUtils {
     }
 
     function deployStateTransitionDiamondFacets() internal {
-        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet");
-        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet");
-        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet");
-        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet");
-        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit");
-    }
-
-    function deployBlobVersionedHashRetriever() internal {
-        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever");
+        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet", false);
+        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
+        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
+        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet", false);
+        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
     function getFacetCuts(
@@ -313,10 +292,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
         require(stateTransition.verifier != address(0), "verifier is zero");
 
-        if (!stateTransition.isOnGateway) {
-            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
-        }
-
         return
             DiamondInitializeDataNewChain({
                 verifier: IVerifier(stateTransition.verifier),
@@ -325,43 +300,53 @@ abstract contract DeployUtils is Create2FactoryUtils {
                 l2DefaultAccountBytecodeHash: config.contracts.defaultAAHash,
                 l2EvmEmulatorBytecodeHash: config.contracts.evmEmulatorHash,
                 priorityTxMaxGasLimit: config.contracts.priorityTxMaxGasLimit,
-                feeParams: feeParams,
-                blobVersionedHashRetriever: stateTransition.isOnGateway
-                    ? ADDRESS_ONE
-                    : addresses.blobVersionedHashRetriever
+                feeParams: feeParams
             });
     }
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function deploySimpleContract(string memory contractName) internal returns (address contractAddress) {
+    function deploySimpleContract(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal returns (address contractAddress) {
         contractAddress = deployViaCreate2AndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
-            contractName
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
+            contractName,
+            isZKBytecode
         );
     }
 
     function deployWithCreate2AndOwner(
         string memory contractName,
-        address owner
+        address owner,
+        bool isZKBytecode
     ) internal returns (address contractAddress) {
         contractAddress = deployWithOwnerAndNotify(
-            getCreationCode(contractName),
-            getCreationCalldata(contractName),
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
             owner,
             contractName,
-            string.concat(contractName, " Implementation")
+            string.concat(contractName, " Implementation"),
+            isZKBytecode
         );
     }
 
     function deployTuppWithContract(
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal virtual returns (address implementation, address proxy);
 
-    function getCreationCode(string memory contractName) internal view virtual returns (bytes memory);
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual returns (bytes memory);
 
-    function getCreationCalldata(string memory contractName) internal view virtual returns (bytes memory) {
+    function getCreationCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Bridgehub")) {
@@ -370,6 +355,15 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
+        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+            return
+                abi.encode(
+                    config.l1ChainId,
+                    config.ownerAddress,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridgehub.messageRootProxy
+                );
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return
                 abi.encode(
@@ -405,8 +399,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
             return abi.encode(addresses.bridges.bridgedStandardERC20Implementation);
-        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
-            return abi.encode();
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
@@ -428,8 +420,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
-            return abi.encode(config.deployerAddress, executionDelay);
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {AdminTest} from "./_Admin_Shared.t.sol";
-import {Unauthorized, DenominatorIsZero} from "contracts/common/L1ContractErrors.sol";
+import {DenominatorIsZero, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract SetTokenMultiplierTest is AdminTest {
     event NewBaseTokenMultiplier(
