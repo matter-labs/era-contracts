@@ -10,7 +10,7 @@ import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openze
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {PrepareL1L2TransactionParams, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IBridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
@@ -50,7 +50,7 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
@@ -77,13 +77,14 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
 import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {FixedForceDeploymentsData} from "../DeployUtils.s.sol";
 
 import {DeployL1Script} from "../DeployL1.s.sol";
+import {DeployL1Additional} from "../DeployL1Additional.s.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultEcosystemUpgrade is Script, DeployL1Script {
+contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
     using stdToml for string;
 
     /**
@@ -620,7 +621,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
             l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
             messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
-            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),

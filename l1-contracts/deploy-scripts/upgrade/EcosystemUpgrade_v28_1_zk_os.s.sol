@@ -49,14 +49,13 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
@@ -65,7 +64,7 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 import {SystemContractsProcessing} from "./SystemContractsProcessing.s.sol";
@@ -77,7 +76,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
 import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {FixedForceDeploymentsData} from "../DeployUtils.s.sol";
 
 import {DeployL1Script} from "../DeployL1.s.sol";
 
