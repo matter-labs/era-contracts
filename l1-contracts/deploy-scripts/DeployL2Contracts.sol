@@ -26,7 +26,6 @@ contract DeployL2Script is Script {
         NoDA,
         Avail,
         EigenDA,
-        EigenDAV2Secure
     }
 
     // solhint-disable-next-line gas-struct-packing
@@ -179,8 +178,6 @@ contract DeployL2Script is Script {
         } else if (config.validatorType == DAValidatorType.Avail) {
             bytecode = L2ContractsBytecodesLib.readAvailL2DAValidatorBytecode();
         } else if (config.validatorType == DAValidatorType.EigenDA) {
-            bytecode = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
-        } else if (config.validatorType == DAValidatorType.EigenDAV2Secure) {
             bytecode = L2ContractsBytecodesLib.readEigenDAL2DAValidatorBytecode();
         } else {
             revert("Invalid DA validator type");
