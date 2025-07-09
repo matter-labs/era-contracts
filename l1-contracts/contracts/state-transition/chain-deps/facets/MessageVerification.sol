@@ -5,8 +5,8 @@ pragma solidity ^0.8.24;
 import {L2Log, L2Message} from "../../../common/Messaging.sol";
 import {IMessageVerification} from "../../chain-interfaces/IMessageVerification.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "../../../common/Config.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {HashedLogIsDefault} from "../../../common/L1ContractErrors.sol";
+import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @dev This contract is abstract and is inherited by the Mailbox and L2MessageVerification contracts.
@@ -27,7 +27,7 @@ abstract contract MessageVerification is IMessageVerification {
                 _chainId: _chainId,
                 _blockOrBatchNumber: _blockOrBatchNumber,
                 _index: _index,
-                _log: _l2MessageToLog(_message),
+                _log: MessageHashing._l2MessageToLog(_message),
                 _proof: _proof
             });
     }
@@ -66,10 +66,7 @@ abstract contract MessageVerification is IMessageVerification {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        bytes32 hashedLog = keccak256(
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
-        );
+        bytes32 hashedLog = MessageHashing.getLeafHashFromLog(_log);
         // Check that hashed log is not the default one,
         // otherwise it means that the value is out of range of sent L2 -> L1 logs
         if (hashedLog == L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH) {
@@ -89,19 +86,6 @@ abstract contract MessageVerification is IMessageVerification {
                 _leafProofMask: _index,
                 _leaf: hashedLog,
                 _proof: _proof
-            });
-    }
-
-    /// @dev Convert arbitrary-length message to the raw L2 log
-    function _l2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
-        return
-            L2Log({
-                l2ShardId: 0,
-                isService: true,
-                txNumberInBatch: _message.txNumberInBatch,
-                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                key: bytes32(uint256(uint160(_message.sender))),
-                value: keccak256(_message.data)
             });
     }
 

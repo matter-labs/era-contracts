@@ -18,10 +18,12 @@ import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncr
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {FinalizeL1DepositParams} from "../../bridge/interfaces/IL1Nullifier.sol";
+import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
-import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
+import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 // import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidChainId, InvalidSender} from "./AssetTrackerErrors.sol";
@@ -147,12 +149,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     }
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
-        uint256 settlementLayer = IMailbox(BRIDGE_HUB.getZKChain(_chainId)).getTransientSettlementLayer();
-
-        if (settlementLayer != 0) {
-            bool finalProofNode = IMailbox(BRIDGE_HUB.getZKChain(settlementLayer)).getTransientFinalProofNode();
-            require(finalProofNode, InvalidProof());
-        }
+        uint256 settlementLayer = IL1Nullifier(IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT)).L1_NULLIFIER())
+            .getTransientSettlementLayer();
         chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
     }
 
@@ -394,7 +392,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         IMailbox(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, _data);
     }
 
-    function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal {
+    function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
             sender: L2_ASSET_TRACKER_ADDR,

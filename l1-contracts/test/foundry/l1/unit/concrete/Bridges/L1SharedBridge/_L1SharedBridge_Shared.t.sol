@@ -14,7 +14,7 @@ import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1Nullifier, IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
@@ -26,6 +26,7 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 
 contract L1AssetRouterTest is Test {
     using stdStorage for StdStorage;
@@ -127,13 +128,7 @@ contract L1AssetRouterTest is Test {
         l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
         l2LegacySharedBridgeAddr = makeAddr("l2LegacySharedBridge");
         address messageRootAddress = makeAddr("messageRootAddress");
-        l1AssetTracker = new AssetTracker(
-            block.chainid,
-            bridgehubAddress,
-            address(sharedBridge),
-            address(nativeTokenVault),
-            messageRootAddress
-        );
+
         merkleProof = new bytes32[](1);
         eraPostUpgradeFirstBatch = 1;
 
@@ -185,6 +180,13 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
+        l1AssetTracker = new AssetTracker(
+            block.chainid,
+            bridgehubAddress,
+            address(sharedBridge),
+            address(nativeTokenVault),
+            messageRootAddress
+        );
         vm.prank(owner);
         nativeTokenVault.setAssetTracker(address(l1AssetTracker));
 
@@ -298,19 +300,25 @@ contract L1AssetRouterTest is Test {
         );
 
         vm.mockCall(
-            eraDiamondProxy,
-            abi.encodeWithSelector(IMailboxImpl.getTransientSettlementLayer.selector),
+            l1NullifierAddress,
+            abi.encodeWithSelector(IL1Nullifier.getTransientSettlementLayer.selector),
             abi.encode(0)
         );
         vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector),
-            abi.encode(eraDiamondProxy)
-        );
-        vm.mockCall(
-            eraDiamondProxy,
-            abi.encodeWithSelector(IMailboxImpl.getTransientFinalProofNode.selector),
-            abi.encode(true)
+            address(l1NullifierProxy),
+            abi.encodeWithSelector(IL1Nullifier.getProofData.selector),
+            abi.encode(
+                ProofData({
+                    settlementLayerChainId: 0,
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 0,
+                    batchLeafProofLen: 0,
+                    batchSettlementRoot: 0,
+                    chainIdLeaf: 0,
+                    ptr: 0,
+                    finalProofNode: false
+                })
+            )
         );
     }
 

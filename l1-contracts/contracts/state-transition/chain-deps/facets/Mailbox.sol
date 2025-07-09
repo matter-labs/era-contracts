@@ -22,7 +22,7 @@ import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol"
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, PRIORITY_OPERATION_L2_TX_TYPE, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
@@ -83,7 +83,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 _chainId: s.chainId,
                 _blockOrBatchNumber: _batchNumber,
                 _index: _index,
-                _log: _l2MessageToLog(_message),
+                _log: MessageHashing._l2MessageToLog(_message),
                 _proof: _proof
             });
     }
@@ -114,24 +114,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) public view returns (bool) {
-        // Bootloader sends an L2 -> L1 log only after processing the L1 -> L2 transaction.
-        // Thus, we can verify that the L1 -> L2 transaction was included in the L2 batch with specified status.
-        //
-        // The semantics of such L2 -> L1 log is always:
-        // - sender = L2_BOOTLOADER_ADDRESS
-        // - key = hash(L1ToL2Transaction)
-        // - value = status of the processing transaction (1 - success & 0 - fail)
-        // - isService = true (just a conventional value)
-        // - l2ShardId = 0 (means that L1 -> L2 transaction was processed in a rollup shard, other shards are not available yet anyway)
-        // - txNumberInBatch = number of transaction in the batch
-        L2Log memory l2Log = L2Log({
-            l2ShardId: 0,
-            isService: true,
-            txNumberInBatch: _l2TxNumberInBatch,
-            sender: L2_BOOTLOADER_ADDRESS,
-            key: _l2TxHash,
-            value: bytes32(uint256(_status))
-        });
+        L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(_l2TxNumberInBatch, _l2TxHash, _status);
         return
             _proveL2LogInclusion({
                 _chainId: s.chainId,

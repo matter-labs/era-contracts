@@ -14,7 +14,7 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
-import {FinalizeL1DepositParams, IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "./interfaces/IL1Nullifier.sol";
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
@@ -29,6 +29,8 @@ import {IInteropCenter} from "../interop/IInteropCenter.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {EthTransferFailed, NativeTokenVaultAlreadySet, WrongL2Sender, WrongMsgLength} from "./L1BridgeContractErrors.sol";
+import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
+import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -339,6 +341,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _merkleProof: _merkleProof,
                 _status: TxStatus.Failure
             });
+            // kl todo v30. add failed withdrawals for asset tracking.
             require(proofValid, InvalidProof());
         }
 
@@ -509,8 +512,39 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _message: l2ToL1Message,
             _proof: _finalizeWithdrawalParams.merkleProof
         });
+        bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
+        ProofData memory proofData = this.getProofData({
+            _chainId: _finalizeWithdrawalParams.chainId,
+            _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
+            _leafProofMask: _finalizeWithdrawalParams.l2MessageIndex,
+            _leaf: leaf,
+            _proof: _finalizeWithdrawalParams.merkleProof
+        });
+        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
         // withdrawal wrong proof
         require(success, InvalidProof());
+    }
+
+    function getProofData(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) public pure returns (ProofData memory) {
+        return
+            MessageHashing.getProofData({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof
+            });
+    }
+
+    /// @inheritdoc IL1Nullifier
+    function getTransientSettlementLayer() external view returns (uint256) {
+        return TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT);
     }
 
     /// @notice Parses the withdrawal message and returns withdrawal details.

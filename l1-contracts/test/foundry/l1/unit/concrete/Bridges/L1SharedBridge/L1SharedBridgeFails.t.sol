@@ -71,7 +71,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_registerToken_noCode() public {
         vm.expectRevert(abi.encodeWithSelector(EmptyToken.selector));
-        nativeTokenVault.registerToken(address(0));
+        nativeTokenVault.registerToken(address(0x1111));
     }
 
     function test_setL1Erc20Bridge_alreadySet() public {

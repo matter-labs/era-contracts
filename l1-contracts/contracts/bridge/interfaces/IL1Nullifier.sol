@@ -7,6 +7,9 @@ import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
+import {ProofData} from "../../common/libraries/MessageHashing.sol";
+
+uint256 constant TRANSIENT_SETTLEMENT_LAYER_SLOT = uint256(keccak256("TRANSIENT_SETTLEMENT_LAYER_SLOT")) - 1;
 
 /// @title L1 Bridge contract interface
 /// @author Matter Labs
@@ -115,4 +118,16 @@ interface IL1Nullifier {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external;
+
+    /// When verifying recursive proofs, we mark the transient settlement layer.
+    /// Calling this clears the transient settlement layer.
+    function getTransientSettlementLayer() external view returns (uint256);
+
+    function getProofData(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) external view returns (ProofData memory);
 }
