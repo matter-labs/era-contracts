@@ -243,14 +243,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
             L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
             // slither-disable-next-line arbitrary-send-eth
-            bytes4 selector = IERC7786Receiver(interopCall.to).executeMessage{value: interopCall.value}({
-                messageId: _bundleHash,
-                sourceChain: _sourceChainId,
-                sender: interopCall.from,
-                payload: interopCall.data,
-                attributes: new bytes[](0)
+            bytes4 selector = IERC7786Receiver(interopCall.to).receiveMessage{value: interopCall.value}({
+                receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
+                sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
+                payload: interopCall.data
             }); // attributes are not supported yet
-            require(selector == IERC7786Receiver.executeMessage.selector, InvalidSelector(selector));
+            require(selector == IERC7786Receiver.receiveMessage.selector, InvalidSelector(selector));
         }
     }
 

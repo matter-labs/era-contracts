@@ -32,7 +32,7 @@ import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-I
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev This contract serves as the primary entry point for communication between chains connected to the interop, facilitating interactions between end user and bridges.
-contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     /// @notice The bridgehub, responsible for registering chains.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -106,21 +106,25 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                     InteropCenter entry points
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Sends a single call to another chain.
-    /// @param _destinationChainId Chain ID to send to.
-    /// @param _destinationAddress Address on remote chain.
-    /// @param _data Calldata payload to send.
-    /// @param _attributes Attributes of the call.
-    /// @return bundleHash Hash of the sent bundle containing a single call.
-    /// Todo use interoperable addresses using this: https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/draft-InteroperableAddress.sol
-    function sendCall(
-        uint256 _destinationChainId,
-        address _destinationAddress,
-        bytes calldata _data,
-        bytes[] calldata _attributes
-    ) external payable onlyL2ToL2(_destinationChainId) whenNotPaused returns (bytes32 bundleHash) {
+    /// @notice Sends a single message to another chain.
+    /// @param recipient ERC-7930 address corresponding to the destination of a message. It must be corresponding to an EIP-155 chain.
+    /// @param payload Payload to send.
+    /// @param attributes Attributes of the call.
+    /// @return sendId Hash of the sent bundle containing a single call.
+    function sendMessage(
+        bytes calldata recipient,
+        bytes calldata payload,
+        bytes[] calldata attributes
+    ) external payable whenNotPaused returns (bytes32 sendId) {
+        (uint256 _destinationChainId, address _destinationAddress) = InteroperableAddress.parseEvmV1(payload);
+
+        require(
+            L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
+            NotL2ToL2(block.chainid, _destinationChainId)
+        );
+
         (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
-            _attributes,
+            attributes,
             AttributeParsingRestrictions.CallAndBundleAttributes
         );
 
@@ -135,11 +139,16 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
         callStartersInternal[0] = InteropCallStarterInternal({
             to: _destinationAddress,
-            data: _data,
+            data: payload,
             callAttributes: callAttributes
         });
 
-        bundleHash = _sendBundle(_destinationChainId, callStartersInternal, bundleAttributes);
+        bytes32 bundleHash = _sendBundle(_destinationChainId, callStartersInternal, bundleAttributes);
+
+        // We return the sendId of the only message that was sent in the bundle above. We always send messages in bundles, even if there's only one message being sent.
+        // Note, that bundleHash is unique for every bundle. Each sendId is determined as keccak256 of bundleHash where the message (call) is contained,
+        // and the index of the call inside the bundle.
+        sendId = keccak256(abi.encodePacked(bundleHash, uint256(0)));
     }
 
     /// @notice Sends an interop bundle.
