@@ -143,7 +143,11 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
             callAttributes: callAttributes
         });
 
-        bytes32 bundleHash = _sendBundle(_destinationChainId, callStartersInternal, bundleAttributes);
+        // Prepare original attributes array for the single call
+        bytes[][] memory originalCallAttributes = new bytes[][](1);
+        originalCallAttributes[0] = attributes;
+        
+        bytes32 bundleHash = _sendBundle(_destinationChainId, callStartersInternal, bundleAttributes, originalCallAttributes);
 
         // We return the sendId of the only message that was sent in the bundle above. We always send messages in bundles, even if there's only one message being sent.
         // Note, that bundleHash is unique for every bundle. Each sendId is determined as keccak256 of bundleHash where the message (call) is contained,
@@ -166,7 +170,14 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
             _callStarters.length
         );
         uint256 callStartersLength = _callStarters.length;
+        
+        // Prepare original attributes array for all calls
+        bytes[][] memory originalCallAttributes = new bytes[][](callStartersLength);
+        
         for (uint256 i = 0; i < callStartersLength; ++i) {
+            // Store original attributes for MessageSent event emission
+            originalCallAttributes[i] = _callStarters[i].callAttributes;
+            
             // solhint-disable-next-line no-unused-vars
             (CallAttributes memory callAttributes, ) = parseAttributes(
                 _callStarters[i].callAttributes,
@@ -195,7 +206,8 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
         bundleHash = _sendBundle({
             _destinationChainId: _destinationChainId,
             _callStarters: callStartersInternal,
-            _bundleAttributes: bundleAttributes
+            _bundleAttributes: bundleAttributes,
+            _originalCallAttributes: originalCallAttributes
         });
     }
 
@@ -229,11 +241,13 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
     /// @param _destinationChainId Chain ID to send to.
     /// @param _callStarters Array of InteropCallStarterInternal structs, corresponding to the calls in bundle.
     /// @param _bundleAttributes Attributes of the bundle.
+    /// @param _originalCallAttributes Original ERC-7786 attributes for each call to emit in MessageSent events.
     /// @return bundleHash Hash of the sent bundle.
     function _sendBundle(
         uint256 _destinationChainId,
         InteropCallStarterInternal[] memory _callStarters,
-        BundleAttributes memory _bundleAttributes
+        BundleAttributes memory _bundleAttributes,
+        bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
         // This will calculate how much value does all of the calls use cumulatively.
         uint256 totalCallsValue;
@@ -269,6 +283,19 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
         );
 
         bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
+
+        // Emit ERC-7786 MessageSent event for each call in the bundle
+        for (uint256 i = 0; i < callStartersLength; ++i) {
+            InteropCall memory currentCall = bundle.calls[i];
+            emit MessageSent(
+                keccak256(abi.encodePacked(bundleHash, i)),
+                InteroperableAddress.formatEvmV1(block.chainid, currentCall.from),
+                InteroperableAddress.formatEvmV1(_destinationChainId, currentCall.to),
+                _callStarters[i].data,
+                _callStarters[i].callAttributes.interopCallValue,
+                _originalCallAttributes[i]
+            );
+        }
 
         // Emit event stating that the bundle was sent out successfully.
         emit InteropBundleSent(msgHash, bundleHash, bundle);
