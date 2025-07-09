@@ -4,8 +4,11 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors
 
 import {Script, console2 as console} from "forge-std/Script.sol";
+
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
+
 import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
@@ -64,6 +67,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {SemVer} from "contracts/common/libraries/SemVer.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
@@ -288,6 +292,31 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
         }
     }
 
+    function _emptyUpgradeTx() internal virtual returns (L2CanonicalTransaction memory transaction) {
+        uint256[4] memory reserved;
+        uint256[] memory factoryDeps = new uint256[](1);
+        transaction = L2CanonicalTransaction({
+            txType: 0,
+            from: 0,
+            to: 0,
+            gasLimit: 0,
+            gasPerPubdataByteLimit: 0,
+            maxFeePerGas: 0,
+            maxPriorityFeePerGas: 0,
+            paymaster: 0,
+            nonce: 0,
+            value: 0,
+            reserved: reserved,
+            data: "",
+            signature: "",
+            factoryDeps: factoryDeps,
+            paymasterInput: "",
+            reservedDynamic: ""
+        });
+
+    }
+
+
     /// @notice Build L1 -> L2 upgrade tx
     function _composeUpgradeTx(
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments
@@ -350,19 +379,29 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
         return newConfig.oldProtocolVersion;
     }
 
+    function isPatchUpgrade() public virtual returns (bool) {
+        (uint32 _major, uint32 _minor, uint32 patch) = SemVer.unpackSemVer(SafeCast.toUint96(getNewProtocolVersion()));
+        return patch != 0 ;
+    }
+
     /// @notice Generate upgrade cut data
     function generateUpgradeCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
 
-        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
-        facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
-        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
+        ProposedUpgrade memory proposedUpgrade ;
+        if (isPatchUpgrade()) {
+            proposedUpgrade = getProposedPatchUpgrade(stateTransition);
+        } else {
+            proposedUpgrade = getProposedUpgrade(stateTransition);
+            Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
+            facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
+            facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
+        }
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -410,6 +449,25 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
             newProtocolVersion: getNewProtocolVersion()
         });
     }
+
+    function getProposedPatchUpgrade(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public virtual returns (ProposedUpgrade memory proposedUpgrade) {
+        VerifierParams memory verifierParams = getVerifierParams();
+        proposedUpgrade = ProposedUpgrade({
+            l2ProtocolUpgradeTx: _emptyUpgradeTx(),
+            bootloaderHash: bytes32(0),
+            defaultAccountHash: bytes32(0),
+            evmEmulatorHash: bytes32(0),
+            verifier: stateTransition.verifier,
+            verifierParams: verifierParams,
+            l1ContractsUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: new bytes(0),
+            upgradeTimestamp: 0,
+            newProtocolVersion: getNewProtocolVersion()
+        });
+    }
+
 
     function getForceDeployment(
         string memory contractName

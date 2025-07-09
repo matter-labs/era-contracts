@@ -25,9 +25,9 @@ contract L1VerifierPlonk is IVerifier {
 
     // Memory slots from 0x000 to 0x200 are reserved for intermediate computations and call to precompiles.
 
-    uint256 internal constant VK_GATE_SETUP_0_X_SLOT = 0x200 + 0x001;
-    uint256 internal constant VK_GATE_SETUP_0_Y_SLOT = 0x200 + 0x040;
-    uint256 internal constant VK_GATE_SETUP_1_X_SLOT = 0x200 + 0x050;
+    uint256 internal constant VK_GATE_SETUP_0_X_SLOT = 0x200 + 0x000;
+    uint256 internal constant VK_GATE_SETUP_0_Y_SLOT = 0x200 + 0x020;
+    uint256 internal constant VK_GATE_SETUP_1_X_SLOT = 0x200 + 0x040;
     uint256 internal constant VK_GATE_SETUP_1_Y_SLOT = 0x200 + 0x060;
     uint256 internal constant VK_GATE_SETUP_2_X_SLOT = 0x200 + 0x080;
     uint256 internal constant VK_GATE_SETUP_2_Y_SLOT = 0x200 + 0x0a0;
@@ -353,8 +353,8 @@ contract L1VerifierPlonk is IVerifier {
         // Solidity code.
         assembly {
             /*//////////////////////////////////////////////////////////////
-                                Utils
-        //////////////////////////////////////////////////////////////*/
+                                    Utils
+            //////////////////////////////////////////////////////////////*/
 
             /// @dev Reverts execution with a provided revert reason.
             /// @param len The byte length of the error message string, which is expected to be no more than 32.
@@ -460,8 +460,8 @@ contract L1VerifierPlonk is IVerifier {
             }
 
             /*//////////////////////////////////////////////////////////////
-                                Transcript helpers
-        //////////////////////////////////////////////////////////////*/
+                                    Transcript helpers
+            //////////////////////////////////////////////////////////////*/
 
             /// @dev Updates the transcript state with a new challenge value.
             function updateTranscript(value) {
@@ -482,8 +482,8 @@ contract L1VerifierPlonk is IVerifier {
             }
 
             /*//////////////////////////////////////////////////////////////
-                                1. Load Proof
-        //////////////////////////////////////////////////////////////*/
+                                    1. Load Proof
+            //////////////////////////////////////////////////////////////*/
 
             /// @dev This function loads a zk-SNARK proof, ensures it's properly formatted, and stores it in memory.
             /// It ensures the number of inputs and the elliptic curve point's validity.
@@ -709,8 +709,8 @@ contract L1VerifierPlonk is IVerifier {
             }
 
             /*//////////////////////////////////////////////////////////////
-                                2. Transcript initialization
-        //////////////////////////////////////////////////////////////*/
+                                    2. Transcript initialization
+            //////////////////////////////////////////////////////////////*/
 
             /// @notice Recomputes all challenges
             /// @dev The process is the following:
@@ -821,8 +821,8 @@ contract L1VerifierPlonk is IVerifier {
             }
 
             /*//////////////////////////////////////////////////////////////
-                                3. Verifying quotient evaluation
-        //////////////////////////////////////////////////////////////*/
+                                    3. Verifying quotient evaluation
+            //////////////////////////////////////////////////////////////*/
 
             /// @notice Compute linearisation polynomial's constant term: r_0
             /// @dev To save a verifier scalar multiplication, we split linearisation polynomial
@@ -1261,8 +1261,8 @@ contract L1VerifierPlonk is IVerifier {
             }
 
             /*//////////////////////////////////////////////////////////////
-                                4. Prepare queries
-        //////////////////////////////////////////////////////////////*/
+                                    4. Prepare queries
+            //////////////////////////////////////////////////////////////*/
 
             /// @dev Here we compute the first and second parts of batched polynomial commitment
             /// We use the formula:
@@ -1373,8 +1373,8 @@ contract L1VerifierPlonk is IVerifier {
             }
 
             /*//////////////////////////////////////////////////////////////
-                                5. Prepare aggregated commitment
-        //////////////////////////////////////////////////////////////*/
+                                    5. Prepare aggregated commitment
+            //////////////////////////////////////////////////////////////*/
 
             /// @dev Here we compute aggregated commitment for the final pairing
             /// We use the formula:
@@ -1605,8 +1605,8 @@ contract L1VerifierPlonk is IVerifier {
             }
 
             /*//////////////////////////////////////////////////////////////
-                                5. Pairing
-        //////////////////////////////////////////////////////////////*/
+                                    5. Pairing
+            //////////////////////////////////////////////////////////////*/
 
             /// @notice Checks the final pairing
             /// @dev We should check the equation:
@@ -1681,8 +1681,8 @@ contract L1VerifierPlonk is IVerifier {
             }
 
             /*//////////////////////////////////////////////////////////////
-                                Verification
-        //////////////////////////////////////////////////////////////*/
+                                    Verification
+            //////////////////////////////////////////////////////////////*/
 
             // Step 1: Load the proof and check the correctness of its parts
             loadProof()
