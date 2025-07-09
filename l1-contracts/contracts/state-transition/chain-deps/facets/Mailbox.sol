@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
-import {IMailbox, TRANSIENT_SETTLEMENT_LAYER_SLOT, TRANSIENT_FINAL_PROOF_NODE_SLOT} from "../../chain-interfaces/IMailbox.sol";
+import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
@@ -33,7 +33,6 @@ import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlemen
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {MessageVerification} from "./MessageVerification.sol";
 import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
-import {TransientPrimitivesLib} from "../../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -78,7 +77,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
-    ) public returns (bool) {
+    ) public view returns (bool) {
         return
             _proveL2LogInclusion({
                 _chainId: s.chainId,
@@ -95,7 +94,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 _index,
         L2Log calldata _log,
         bytes32[] calldata _proof
-    ) external returns (bool) {
+    ) external view returns (bool) {
         return
             _proveL2LogInclusion({
                 _chainId: s.chainId,
@@ -114,7 +113,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
-    ) public returns (bool) {
+    ) public view returns (bool) {
         // Bootloader sends an L2 -> L1 log only after processing the L1 -> L2 transaction.
         // Thus, we can verify that the L1 -> L2 transaction was included in the L2 batch with specified status.
         //
@@ -149,7 +148,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) external returns (bool) {
+    ) external view returns (bool) {
         return
             _proveL2LeafInclusion({
                 _chainId: s.chainId,
@@ -166,7 +165,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) internal override returns (bool) {
+    ) internal view override returns (bool) {
         ProofData memory proofData = MessageHashing.getProofData({
             _chainId: _chainId,
             _batchNumber: _batchNumber,
@@ -187,10 +186,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             if (correctBatchRoot == bytes32(0)) {
                 revert LocalRootIsZero();
             }
-            TransientPrimitivesLib.set(
-                TRANSIENT_FINAL_PROOF_NODE_SLOT,
-                correctBatchRoot == proofData.batchSettlementRoot ? 1 : 0
-            );
             return correctBatchRoot == proofData.batchSettlementRoot;
         }
 
@@ -204,8 +199,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
             revert NotSettlementLayer();
         }
-
-        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
         address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
 
         return
@@ -215,15 +208,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 proofData.chainIdLeaf,
                 MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
             );
-    }
-
-    function getTransientFinalProofNode() external view returns (bool) {
-        return TransientPrimitivesLib.getUint256(TRANSIENT_FINAL_PROOF_NODE_SLOT) == 1;
-    }
-
-    /// @inheritdoc IMailboxImpl
-    function getTransientSettlementLayer() external view returns (uint256) {
-        return TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT);
     }
 
     /// @inheritdoc IMailboxImpl

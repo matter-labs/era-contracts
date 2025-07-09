@@ -619,7 +619,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256 _index,
         L2Message calldata _message,
         bytes32[] calldata _proof
-    ) external override returns (bool) {
+    ) external view override returns (bool) {
         address zkChain = zkChainMap.get(_chainId);
         return IZKChain(zkChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
     }
@@ -637,7 +637,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint256 _index,
         L2Log calldata _log,
         bytes32[] calldata _proof
-    ) external override returns (bool) {
+    ) external view override returns (bool) {
         address zkChain = zkChainMap.get(_chainId);
         return IZKChain(zkChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
     }
@@ -660,7 +660,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof,
         TxStatus _status
-    ) external override returns (bool) {
+    ) external view override returns (bool) {
         address zkChain = zkChainMap.get(_chainId);
         return
             IZKChain(zkChain).proveL1ToL2TransactionStatus({
