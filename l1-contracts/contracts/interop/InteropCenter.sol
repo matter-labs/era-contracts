@@ -20,7 +20,7 @@ import {MsgValueMismatch, Unauthorized, NotL1, NotL2ToL2} from "../common/L1Cont
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle, IndirectCallValueMismatch, AttributeNotForInteropCallValue, UnbundlerAddressZero} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle, IndirectCallValueMismatch, AttributeNotForInteropCallValue} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -32,7 +32,13 @@ import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-I
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev This contract serves as the primary entry point for communication between chains connected to the interop, facilitating interactions between end user and bridges.
-contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
+contract InteropCenter is
+    IInteropCenter,
+    IERC7786GatewaySource,
+    ReentrancyGuard,
+    Ownable2StepUpgradeable,
+    PausableUpgradeable
+{
     /// @notice The bridgehub, responsible for registering chains.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -132,7 +138,7 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
         // still possible to unbundle the bundle containing the call. If the original sender is the contract, it'll still
         // be able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `InteropHandler`,
         // with specific payload. Refer to `InteropHandler` for details.
-        if(bundleAttributes.unbundlerAddress.length == 0) {
+        if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
 
@@ -146,8 +152,13 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
         // Prepare original attributes array for the single call
         bytes[][] memory originalCallAttributes = new bytes[][](1);
         originalCallAttributes[0] = attributes;
-        
-        bytes32 bundleHash = _sendBundle(_destinationChainId, callStartersInternal, bundleAttributes, originalCallAttributes);
+
+        bytes32 bundleHash = _sendBundle(
+            _destinationChainId,
+            callStartersInternal,
+            bundleAttributes,
+            originalCallAttributes
+        );
 
         // We return the sendId of the only message that was sent in the bundle above. We always send messages in bundles, even if there's only one message being sent.
         // Note, that bundleHash is unique for every bundle. Each sendId is determined as keccak256 of bundleHash where the message (call) is contained,
@@ -170,14 +181,14 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
             _callStarters.length
         );
         uint256 callStartersLength = _callStarters.length;
-        
+
         // Prepare original attributes array for all calls
         bytes[][] memory originalCallAttributes = new bytes[][](callStartersLength);
-        
+
         for (uint256 i = 0; i < callStartersLength; ++i) {
             // Store original attributes for MessageSent event emission
             originalCallAttributes[i] = _callStarters[i].callAttributes;
-            
+
             // solhint-disable-next-line no-unused-vars
             (CallAttributes memory callAttributes, ) = parseAttributes(
                 _callStarters[i].callAttributes,
@@ -194,12 +205,12 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
             _bundleAttributes,
             AttributeParsingRestrictions.OnlyBundleAttributes
         );
-        
+
         // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
         // that it's still possible to unbundle the bundle. If the original sender is the contract, it'll still be
         // able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `InteropHandler`,
         // with specific payload. Refer to `InteropHandler` for details.
-        if(bundleAttributes.unbundlerAddress.length == 0) {
+        if (bundleAttributes.unbundlerAddress.length == 0) {
             bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
         }
 
@@ -287,14 +298,14 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
         // Emit ERC-7786 MessageSent event for each call in the bundle
         for (uint256 i = 0; i < callStartersLength; ++i) {
             InteropCall memory currentCall = bundle.calls[i];
-            emit MessageSent(
-                keccak256(abi.encodePacked(bundleHash, i)),
-                InteroperableAddress.formatEvmV1(block.chainid, currentCall.from),
-                InteroperableAddress.formatEvmV1(_destinationChainId, currentCall.to),
-                _callStarters[i].data,
-                _callStarters[i].callAttributes.interopCallValue,
-                _originalCallAttributes[i]
-            );
+            emit MessageSent({
+                sendId: keccak256(abi.encodePacked(bundleHash, i)),
+                sender: InteroperableAddress.formatEvmV1(block.chainid, currentCall.from),
+                recipient: InteroperableAddress.formatEvmV1(_destinationChainId, currentCall.to),
+                payload: _callStarters[i].data,
+                value: _callStarters[i].callAttributes.interopCallValue,
+                attributes: _originalCallAttributes[i]
+            });
         }
 
         // Emit event stating that the bundle was sent out successfully.

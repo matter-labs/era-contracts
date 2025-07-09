@@ -8,7 +8,7 @@ pragma solidity ^0.8.24;
 interface IERC7786GatewaySource {
     event MessageSent(
         bytes32 indexed sendId,
-        bytes sender,    // ERC-7930 address
+        bytes sender, // ERC-7930 address
         bytes recipient, // ERC-7930 address
         bytes payload,
         uint256 value,

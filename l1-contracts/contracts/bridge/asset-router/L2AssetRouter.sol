@@ -131,12 +131,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     /// @notice Executes cross-chain interop messages following ERC-7786 standard
-    /// @param receiveId Gateway-specific message identifier (currently unused)
     /// @param sender ERC-7930 Address of the message sender
     /// @param payload Encoded function call data (must be finalizeDeposit)
     /// @return Function selector confirming successful execution per ERC-7786
     function receiveMessage(
-        bytes32 receiveId,     // Unique identifier
+        bytes32 /* receiveId */, // Unique identifier
         bytes calldata sender, // ERC-7930 address
         bytes calldata payload
     ) external payable returns (bytes4) {

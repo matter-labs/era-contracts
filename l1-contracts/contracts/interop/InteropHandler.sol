@@ -10,7 +10,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready, UnauthorizedMessageSender, WrongDestinationChainId} from "./InteropErrors.sol";
-import {InvalidSelector} from "../common/L1ContractErrors.sol";
+import {InvalidCaller, InvalidSelector} from "../common/L1ContractErrors.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -43,15 +43,22 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
         );
 
-        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.executionAddress);
+        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+            interopBundle.bundleAttributes.executionAddress
+        );
 
         // Verify that the caller has permission to execute the bundle.
         // Note, that in case the executionAddress wasn't specified in the bundle then executing is permissionless, as documented in Messaging.sol
         // It's also possible that the caller is InteropHandler itself, in case the execution was initiated through receiveMessage.
         require(
-            (interopBundle.bundleAttributes.executionAddress.length == 0 || msg.sender == address(this) ||
+            (msg.sender == address(this) ||
+                interopBundle.bundleAttributes.executionAddress.length == 0 ||
                 (block.chainid == executionChainId && msg.sender == executionAddress)),
-            ExecutingNotAllowed(bundleHash, InteroperableAddress.formatEvmV1(block.chainid, msg.sender), interopBundle.bundleAttributes.executionAddress)
+            ExecutingNotAllowed(
+                bundleHash,
+                InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
+                interopBundle.bundleAttributes.executionAddress
+            )
         );
 
         // We shouldn't process bundles which are either fully executed, or were unbundled here.
@@ -142,13 +149,19 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
         );
 
-        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.unbundlerAddress);
+        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
+            interopBundle.bundleAttributes.unbundlerAddress
+        );
 
         // Verify that the caller has permission to unbundle the bundle.
         // It's also possible that the caller is InteropHandler itself, in case the unbundling was initiated through receiveMessage.
         require(
             msg.sender == address(this) || (unbundlerChainId == block.chainid && unbundlerAddress == msg.sender),
-            UnbundlingNotAllowed(bundleHash, InteroperableAddress.formatEvmV1(block.chainid, msg.sender), interopBundle.bundleAttributes.unbundlerAddress)
+            UnbundlingNotAllowed(
+                bundleHash,
+                InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
+                interopBundle.bundleAttributes.unbundlerAddress
+            )
         );
 
         // Verify that the provided call statuses array has the same length as the number of calls in the bundle.
@@ -281,5 +294,96 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         // Emit event stating that the bundle was verified.
         emit BundleVerified(_bundleHash);
+    }
+
+    /// @notice Receives cross-chain messages to execute or unbundle interop bundles.
+    /// @dev Implements ERC-7786 recipient interface. The payload must be encoded using abi.encodeCall
+    ///      with one of the following function selectors:
+    ///      - executeBundle: payload = abi.encodeCall(InteropHandler.executeBundle, (bundle, proof))
+    ///      - unbundleBundle: payload = abi.encodeCall(InteropHandler.unbundleBundle, (sourceChainId, bundle, providedCallStatus))
+    ///      The sender must have appropriate permissions (executionAddress or unbundlerAddress) which are
+    ///      validated before calling the respective internal functions. Since this function validates
+    ///      permissions, the called functions (executeBundle/unbundleBundle) will bypass their own
+    ///      permission checks when called from this contract (msg.sender == address(this)).
+    /// @param sender ERC-7930 interoperable address of the message sender.
+    /// @param payload ABI-encoded function call data with selector and parameters.
+    /// @return selector The function selector of this receiveMessage function, as per ERC-7786.
+    function receiveMessage(
+        bytes32 /* receiveId */,
+        bytes calldata sender,
+        bytes calldata payload
+    ) external payable nonReentrant returns (bytes4) {
+        // Verify that call to this function is a result of a call being executed, meaning this message came from a valid bundle.
+        // This is the only way receiveMessage can be invoked on InteropHandler by itself.
+        require(msg.sender == address(this), InvalidCaller(msg.sender));
+
+        bytes4 selector = bytes4(payload[:4]);
+
+        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1(sender);
+
+        if (selector == this.executeBundle.selector) {
+            _handleExecuteBundle(payload, senderChainId, senderAddress, sender);
+        } else if (selector == this.unbundleBundle.selector) {
+            _handleUnbundleBundle(payload, senderChainId, senderAddress, sender);
+        } else {
+            revert InvalidSelector(selector);
+        }
+
+        return IERC7786Recipient.receiveMessage.selector;
+    }
+
+    function _handleExecuteBundle(
+        bytes calldata payload,
+        uint256 senderChainId,
+        address senderAddress,
+        bytes calldata sender
+    ) internal {
+        (bytes memory bundle, MessageInclusionProof memory proof) = abi.decode(
+            payload[4:],
+            (bytes, MessageInclusionProof)
+        );
+
+        // Decode the bundle to get execution permissions
+        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle, proof.chainId);
+
+        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+            interopBundle.bundleAttributes.executionAddress
+        );
+
+        // Verify sender has execution permission
+        require(
+            interopBundle.bundleAttributes.executionAddress.length == 0 ||
+                (senderChainId == executionChainId && senderAddress == executionAddress),
+            ExecutingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.executionAddress)
+        );
+
+        this.executeBundle(bundle, proof);
+    }
+
+    function _handleUnbundleBundle(
+        bytes calldata payload,
+        uint256 senderChainId,
+        address senderAddress,
+        bytes calldata sender
+    ) internal {
+        (uint256 sourceChainId, bytes memory bundle, CallStatus[] memory providedCallStatus) = abi.decode(
+            payload[4:],
+            (uint256, bytes, CallStatus[])
+        );
+
+        // Decode the bundle to get unbundling permissions
+        (InteropBundle memory interopBundle, , ) = _getBundleData(bundle, sourceChainId);
+
+        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(
+            interopBundle.bundleAttributes.unbundlerAddress
+        );
+
+        // Verify sender has unbundling permission
+        require(
+            senderChainId == unbundlerChainId && senderAddress == unbundlerAddress,
+            UnbundlingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.unbundlerAddress)
+        );
+
+        this.unbundleBundle(sourceChainId, bundle, providedCallStatus);
     }
 }
