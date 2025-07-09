@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_MESSAGE_VERIFICATION, L2_INTEROP_CENTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, MessageInclusionProof, CallStatus, BundleStatus} from "../common/Messaging.sol";
-import {IERC7786Receiver} from "./IERC7786Receiver.sol";
+import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
@@ -243,12 +243,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
             L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
             // slither-disable-next-line arbitrary-send-eth
-            bytes4 selector = IERC7786Receiver(interopCall.to).receiveMessage{value: interopCall.value}({
+            bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
                 receiveId: keccak256(abi.encodePacked(_bundleHash, i)),
                 sender: InteroperableAddress.formatEvmV1(_sourceChainId, interopCall.from),
                 payload: interopCall.data
             }); // attributes are not supported yet
-            require(selector == IERC7786Receiver.receiveMessage.selector, InvalidSelector(selector));
+            require(selector == IERC7786Recipient.receiveMessage.selector, InvalidSelector(selector));
         }
     }
 

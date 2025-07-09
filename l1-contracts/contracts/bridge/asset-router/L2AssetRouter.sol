@@ -21,7 +21,7 @@ import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} f
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy, InvalidSelector, PayloadTooShort, ExecuteMessageFailed} from "../../common/L1ContractErrors.sol";
-import {IERC7786Receiver} from "../../interop/IERC7786Receiver.sol";
+import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
@@ -29,7 +29,7 @@ import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-I
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Receiver {
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Recipient {
     /// @dev The address of the L2 legacy shared bridge.
     address public immutable L2_LEGACY_SHARED_BRIDGE;
 
@@ -173,7 +173,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
         (bool success, ) = address(this).call(payload);
         require(success, ExecuteMessageFailed());
-        return IERC7786Receiver.receiveMessage.selector;
+        return IERC7786Recipient.receiveMessage.selector;
     }
 
     /*//////////////////////////////////////////////////////////////

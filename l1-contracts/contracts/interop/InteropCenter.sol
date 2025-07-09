@@ -116,7 +116,7 @@ contract InteropCenter is IInteropCenter, IERC7786GatewaySource, ReentrancyGuard
         bytes calldata payload,
         bytes[] calldata attributes
     ) external payable whenNotPaused returns (bytes32 sendId) {
-        (uint256 _destinationChainId, address _destinationAddress) = InteroperableAddress.parseEvmV1(payload);
+        (uint256 _destinationChainId, address _destinationAddress) = InteroperableAddress.parseEvmV1(recipient);
 
         require(
             L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
