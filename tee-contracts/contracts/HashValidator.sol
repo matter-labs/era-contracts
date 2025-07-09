@@ -13,12 +13,16 @@ contract HashValidator is Ownable, IHashValidator {
     mapping(bytes32 => bool) private validEnclaveSigners;
     mapping(bytes32 => bool) private validTD10ReportBodyMrHashes;
 
+    uint256 public signerTTLExpiry;
+
     event EnclaveSignersUpdated(bytes32[] signers, bool status);
     event EnclaveHashesUpdated(bytes32[] hashes, bool status);
     event TD10ReportBodyMrHashesUpdated(bytes32[] hashes, bool status);
+    event SignerTTLUpdated(uint256 newTTL);
 
-    constructor(address owner) {
+    constructor(address owner, uint256 _signerTTLExpiry) {
         _initializeOwner(owner);
+        signerTTLExpiry = _signerTTLExpiry;
     }
 
     /**
@@ -149,5 +153,16 @@ contract HashValidator is Ownable, IHashValidator {
      */
     function isValidTD10ReportBodyMrHash(bytes32 hash) external view returns (bool isValid) {
         return validTD10ReportBodyMrHashes[hash];
+    }
+
+    /**
+     * @notice Sets a new TTL (time-to-live) after which a signer is considered expired.
+     * @param newSignerTTLExpiry The new TTL in seconds.
+     */
+    function setSignerTTLExpiry(uint256 newSignerTTLExpiry) external onlyOwner{
+        require(newSignerTTLExpiry > 0, "TTL must be > 0");
+        signerTTLExpiry = newSignerTTLExpiry;
+        emit SignerTTLUpdated(newSignerTTLExpiry);
+
     }
 }

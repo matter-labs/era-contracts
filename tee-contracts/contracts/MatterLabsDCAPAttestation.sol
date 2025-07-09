@@ -6,14 +6,12 @@ import {AttestationEntrypointBase} from "automata-network/dcap-attestation/evm/c
 import {AutomataDaoStorage} from "@automata-network/on-chain-pccs/automata_pccs/shared/AutomataDaoStorage.sol";
 import {AutomataEnclaveIdentityDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataEnclaveIdentityDao.sol";
 import {AutomataFmspcTcbDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataFmspcTcbDao.sol";
-import {AutomataPckDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataPckDao.sol";
 import {AutomataPcsDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataPcsDao.sol";
 import {BELE} from "automata-network/dcap-attestation/evm/contracts/utils/BELE.sol";
 import {CA} from "@automata-network/on-chain-pccs/Common.sol";
 import {ECDSA} from "solady/utils/ECDSA.sol";
 import {EnclaveIdentityJsonObj} from "@automata-network/on-chain-pccs/helpers/EnclaveIdentityHelper.sol";
 import {HEADER_LENGTH, SGX_TEE, TDX_TEE} from "automata-network/dcap-attestation/evm/contracts/types/Constants.sol";
-import {PCCSRouter} from "automata-network/dcap-attestation/evm/contracts/PCCSRouter.sol";
 import {TcbInfoJsonObj} from "@automata-network/on-chain-pccs/helpers/FmspcTcbHelper.sol";
 import {IHashValidator, EmptyArray} from "./interfaces/IHashValidator.sol";
 /**
@@ -24,6 +22,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     error InvalidHashValidator();
     error IncorrectVersion(uint256 version);
     error InvalidSigner(address recoveredSigner);
+    error SignerExpired(address signer);
     error InvalidMrEnclave(bytes32 mrEnclave);
     error InvalidMrSigner(bytes32 mrSigner);
     error InvalidTD10ReportBodyMrHash(bytes32 tD10ReportBodyMrHash);
@@ -31,7 +30,12 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     error ArrayLengthMismatch();
 
     uint256 private totalSigners;
-    mapping(address=>bool) private signers;
+    struct SignerInfo{
+        bool isRegistered;
+        uint256 validUntil;
+    }
+
+    mapping(address=>SignerInfo) private signers;
 
     using ECDSA for bytes32;
 
@@ -45,47 +49,38 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     uint256 constant TD10_RTMR3_OFFSET = TD10_RTMR2_OFFSET + 48;
     uint256 constant TD10_REPORT_DATA_OFFSET = HEADER_LENGTH + 520;
 
-    AutomataDaoStorage pccsStorage;
+
+
     AutomataPcsDao pcsDao;
-    AutomataPckDao pckDao;
     AutomataEnclaveIdentityDao enclaveIdDao;
     AutomataFmspcTcbDao fmspcTcbDao;
 
-    PCCSRouter public pccsRouter;
     IHashValidator hashValidator;
 
-    event SignerRegistered(address signer);
-    event SignerDeregistered(address signer);
+    event SignerRegistered(address indexed signer, uint256 TTL);
+    event SignerUpdated(address indexed signer, uint256 newTTL);
+    event SignerDeregistered(address[] signer);
 
 
     /**
      * @dev Initializes the contract with the Helpers, DAOs, and Enclave Hash Validator.
      * @param owner, Owner of the contract
      * @param _hashValidator Address of the Enclave Hash Validator contract.
-     * @param _pccsStorage Address of the pre-deployed AutomataDaoStorage
      * @param _pcsDao Address of the pre-deployed AutomataPcsDao
-     * @param _pckDao Address of the pre-deployed AutomataPckDao
      * @param _enclaveIdDao Address of the pre-deployed AutomataEnclaveIdentityDao
      * @param _fmspcTcbDao Address of the pre-deployed AutomataFmspcTcbDao
-     * @param _pccsRouter Address of the pre-deployed PCCSRouter
      */
     constructor(
-        address owner,
+        address owner, //operator
         address _hashValidator,
-        address _pccsStorage,
         address _pcsDao,
-        address _pckDao,
         address _enclaveIdDao,
-        address _fmspcTcbDao,
-        address _pccsRouter
+        address _fmspcTcbDao
     ) AttestationEntrypointBase(owner){
         hashValidator = IHashValidator(_hashValidator);
-        pccsStorage = AutomataDaoStorage(_pccsStorage);
         pcsDao = AutomataPcsDao(_pcsDao);
-        pckDao = AutomataPckDao(_pckDao);
         enclaveIdDao = AutomataEnclaveIdentityDao(_enclaveIdDao);
         fmspcTcbDao = AutomataFmspcTcbDao(_fmspcTcbDao);
-        pccsRouter = PCCSRouter(_pccsRouter);
     }
 
     /**
@@ -114,24 +109,43 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         (bool success, bytes memory output) = _verifyAndAttestOnChain(rawQuote);
         require(success, VerificationFailed(output));
 
-        if(!signers[signer]){
-            signers[signer] = true; 
+        uint256 signerTTLExpiry = hashValidator.signerTTLExpiry();
+        uint256 validUntil = block.timestamp + signerTTLExpiry;
+        if(!signers[signer].isRegistered){
+            signers[signer] = SignerInfo({
+                isRegistered: true,
+                validUntil: validUntil
+            }); 
             totalSigners++;
-            emit SignerRegistered(signer);
-        }
-
+            emit SignerRegistered(signer, validUntil);
+        } else{
+            signers[signer].validUntil = validUntil;
+            emit SignerUpdated(signer, validUntil);
+        }   
     }
 
     /**
      * @notice Deregisters an existing signer
-     * @param signer The signer which needs to be deregistered
+     * @param _signers The signers which needs to be deregistered
      * @custom:throws InvalidMrEnclave when the enclave measurement doesn't match allowed values
      */
-    function deregisterSigner(address signer) external onlyOwner {
-        require(signers[signer], "Signer not registered");
-        signers[signer] = false;
-        totalSigners--;
-        emit SignerDeregistered(signer);
+    function deregisterSigner(address[] memory _signers) external onlyOwner {
+        uint256 signersLength = _signers.length;
+        for (uint256 i; i<signersLength; ++i){
+            address signer = _signers[i];
+            if(signers[signer].isRegistered){
+                delete signers[signer];
+                totalSigners--;
+            }
+        }
+        emit SignerDeregistered(_signers);
+
+    }
+
+    function isSignerExpired(address _signer) public view returns(bool){
+        SignerInfo memory signer = signers[_signer];
+        require(signer.isRegistered, InvalidSigner(_signer));
+        return signer.validUntil < block.timestamp;
     }
     /**
      * @notice Verifies that a message digest was signed by a registered TEE signer
@@ -140,9 +154,9 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @param signature The signature to verify
      * @custom:throws InvalidSigner when the signature was not created by a registered signer
      */
-    function verifyDigest(bytes32 digest, bytes calldata signature) external view {
+    function verifyDigest(bytes32 digest, bytes calldata signature) external view{
         address signer = digest.recover(signature);
-        require(signers[signer], InvalidSigner(signer));
+        if(isSignerExpired(signer)) revert SignerExpired(signer);
     }
 
     function _checkMrEnclave(bytes calldata rawQuote) internal view {
@@ -250,114 +264,16 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         uint256 id,
         uint256 quoteVersion,
         EnclaveIdentityJsonObj calldata identityJson
-    ) external {
-        enclaveIdDao.upsertEnclaveIdentity(id, quoteVersion, identityJson);
+    ) external returns (bytes32 attestationId) {
+        attestationId = enclaveIdDao.upsertEnclaveIdentity(id, quoteVersion, identityJson);
     }
 
     /**
      * @notice Upserts FMSPC TCB info into the DAO
      * @param tcbInfoJson The TCB info JSON object
      */
-    function upsertFmspcTcb(TcbInfoJsonObj calldata tcbInfoJson) external {
-        fmspcTcbDao.upsertFmspcTcb(tcbInfoJson);
+    function upsertFmspcTcb(TcbInfoJsonObj calldata tcbInfoJson) external returns (bytes32 attestationId){
+        attestationId = fmspcTcbDao.upsertFmspcTcb(tcbInfoJson);
     }
 
-    // ============Resolver Config Functions============
-
-    /**
-     * @notice Sets the caller authorization for the resolver
-     * @param caller The address of the caller
-     * @param authorized Whether the caller is authorized
-     */
-    function setResolverCallerAuthorization(address caller, bool authorized) external onlyOwner {
-        pccsStorage.setCallerAuthorization(caller, authorized);
-    }
-
-    /**
-     * @notice Pauses the resolver caller restriction
-     */
-    function pauseResolverCallerRestriction() external onlyOwner {
-        pccsStorage.pauseCallerRestriction();
-    }
-
-    /**
-     * @notice Unpauses the resolver caller restriction
-     */
-    function unpauseResolverCallerRestriction() external onlyOwner {
-        pccsStorage.unpauseCallerRestriction();
-    }
-
-    /**
-     * @notice Updates the DAO addresses in the resolver
-     * @param _pcsDao The address of the PCS DAO
-     * @param _pckDao The address of the PCK DAO
-     * @param _fmspcTcbDao The address of the FMSPC TCB DAO
-     * @param _enclaveIdDao The address of the enclave ID DAO
-     */
-    function updateResolverDao(
-        address _pcsDao,
-        address _pckDao,
-        address _fmspcTcbDao,
-        address _enclaveIdDao
-    ) external onlyOwner {
-        pccsStorage.grantDao(_pcsDao); 
-        pccsStorage.grantDao(_pckDao);
-        pccsStorage.grantDao(_fmspcTcbDao);
-        pccsStorage.grantDao(_enclaveIdDao);
-    }
-
-    /**
-     * @notice Revokes a DAO in the resolver
-     * @param revoked The address of the DAO to revoke
-     */
-    function revokeResolverDao(address revoked) external onlyOwner {
-        pccsStorage.revokeDao(revoked);
-    }
-
-    // ============Router Config Functions============
-
-    /**
-     * @notice Sets the authorization for the router
-     * @param caller The address of the caller
-     * @param authorized Whether the caller is authorized
-     */
-    function setRouterAuthorization(address caller, bool authorized) external onlyOwner {
-        pccsRouter.setAuthorized(caller, authorized);
-    }
-
-    /**
-     * @notice Enables the caller restriction for the router
-     */
-    function enableRouterCallerRestriction() external onlyOwner {
-        pccsRouter.enableCallerRestriction();
-    }
-
-    /**
-     * @notice Disables the caller restriction for the router
-     */
-    function disableRouterCallerRestriction() external onlyOwner {
-        pccsRouter.disableCallerRestriction();
-    }
-
-    /**
-     * @notice Sets the configuration for the router
-     * @param _qeid The address of the QE ID
-     * @param _fmspcTcb The address of the FMSPC TCB
-     * @param _pcs The address of the PCS
-     * @param _pck The address of the PCK
-     * @param _x509 The address of the X509
-     * @param _x509Crl The address of the X509 CRL
-     * @param _tcbHelper The address of the TCB helper
-     */
-    function setRouterConfig(
-        address _qeid,
-        address _fmspcTcb,
-        address _pcs,
-        address _pck,
-        address _x509,
-        address _x509Crl,
-        address _tcbHelper
-    ) external onlyOwner {
-        pccsRouter.setConfig(_qeid, _fmspcTcb, _pcs, _pck, _x509, _x509Crl, _tcbHelper);
-    }
 }

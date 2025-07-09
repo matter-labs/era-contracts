@@ -35,7 +35,7 @@ contract DeployTeeDCAPScript is Script {
 
         // Deploy HashValidator in a separate transaction
         vm.startBroadcast();
-        HashValidator hashValidator = new HashValidator(msg.sender);
+        HashValidator hashValidator = new HashValidator(msg.sender, 4 weeks);
 
         vm.stopBroadcast();
 
@@ -50,7 +50,7 @@ contract DeployTeeDCAPScript is Script {
         // Deploy the components in sequence
         vm.startBroadcast();
         // 1. Deploy storage - this will make msg.sender the owner
-        AutomataDaoStorage pccsStorage = new AutomataDaoStorage();
+        AutomataDaoStorage pccsStorage = new AutomataDaoStorage(msg.sender);
         address storageAddress = address(pccsStorage);
 
         vm.stopBroadcast();
@@ -89,7 +89,9 @@ contract DeployTeeDCAPScript is Script {
             p256Verifier,
             pcsDao,
             address(enclaveIdHelper),
-            address(x509)
+            address(x509),
+            address(x509Crl)
+
         );
         address enclaveIdDao = address(enclaveIdDaoContract);
 
@@ -102,7 +104,9 @@ contract DeployTeeDCAPScript is Script {
             p256Verifier,
             pcsDao,
             address(tcbHelper),
-            address(x509)
+            address(x509),
+            address(x509Crl)
+
         );
         address fmspcTcbDao = address(fmspcTcbDaoContract);
 
@@ -110,13 +114,17 @@ contract DeployTeeDCAPScript is Script {
 
         // 6. Update DAO references in storage - call as the owner
         vm.startBroadcast();
-        pccsStorage.updateDao(pcsDao, pckDao, enclaveIdDao, fmspcTcbDao);
+        pccsStorage.grantDao((pcsDao));
+        pccsStorage.grantDao((pckDao));
+        pccsStorage.grantDao((enclaveIdDao));
+        pccsStorage.grantDao((fmspcTcbDao));
 
         vm.stopBroadcast();
 
         // 7. Deploy PCCSRouter
         vm.startBroadcast();
         PCCSRouter pccsRouterContract = new PCCSRouter(
+            msg.sender,
             enclaveIdDao,
             fmspcTcbDao,
             pcsDao,
@@ -139,14 +147,11 @@ contract DeployTeeDCAPScript is Script {
         // Deploy MatterLabsDCAPAttestation in a separate transaction
         vm.startBroadcast();
         MatterLabsDCAPAttestation attestation = new MatterLabsDCAPAttestation(
-            p256Verifier,
+            msg.sender,
             address(hashValidator),
-            storageAddress,
             pcsDao,
-            pckDao,
             enclaveIdDao,
-            fmspcTcbDao,
-            pccsRouter
+            fmspcTcbDao
         );
 
         vm.stopBroadcast();
@@ -156,13 +161,13 @@ contract DeployTeeDCAPScript is Script {
         V3QuoteVerifier quoteVerifierV3 = new V3QuoteVerifier(p256Verifier, address(pccsRouter));
 
         // Make sure quote verifier is authorized with router
-        pccsStorage.setCallerAuthorization(address(quoteVerifierV3), true);
+        pccsRouterContract.setAuthorized(address(quoteVerifierV3), true);
 
         // Create and set up the quote verifier with the router address
         V4QuoteVerifier quoteVerifierV4 = new V4QuoteVerifier(p256Verifier, address(pccsRouter));
 
         // Make sure quote verifier is authorized with router
-        pccsStorage.setCallerAuthorization(address(quoteVerifierV4), true);
+        pccsRouterContract.setAuthorized(address(quoteVerifierV4), true);
 
         // Set the verifiers in attestation contract
         attestation.setQuoteVerifier(address(quoteVerifierV3));

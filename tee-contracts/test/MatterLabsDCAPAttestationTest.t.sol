@@ -44,7 +44,8 @@ contract MatterLabsDCAPAttestationTest is Test {
 
     function setUp() public {
         P256_VERIFIER = _deployP256();
-        hashValidator = new HashValidator(address(this));
+        uint256 signerTTLExpiry = 4 weeks;
+        hashValidator = new HashValidator(address(this), signerTTLExpiry);
 
         enclaveIdHelper = new EnclaveIdentityHelper();
         FmspcTcbHelper tcbHelper = new FmspcTcbHelper();
@@ -114,13 +115,10 @@ contract MatterLabsDCAPAttestationTest is Test {
         attestation = new MatterLabsDCAPAttestation(
             address(this),
             address(hashValidator),
-            address(pccsStorage),
             address(pcsDao),
-            address(pckDao),
             address(enclaveIdDao),
-            address(fmspcTcbDao),
-            address(pccsRouter)
-        );
+            address(fmspcTcbDao)
+            );
 
         // Deploy a new quote verifier that points to the router
         V3QuoteVerifier quoteVerifierV3 = new V3QuoteVerifier(P256_VERIFIER, address(pccsRouter));
@@ -182,7 +180,9 @@ contract MatterLabsDCAPAttestationTest is Test {
         attestation.registerSigner(rawQuote);
         attestation.verifyDigest(new_root_hash, signature);
 
-        attestation.deregisterSigner(0x8251CB4E2Da96CDa6CBa43D514Da2718C3f974DD);
+        address[] memory signersToDeregister = new address[](1);
+        signersToDeregister[0] = 0x8251CB4E2Da96CDa6CBa43D514Da2718C3f974DD;
+        attestation.deregisterSigner(signersToDeregister);
         hashValidator.removeValidEnclaveSigners(enclaveSigners);
 
         enclaveHashes[0] = bytes32(0xa0b1b069b01bdcf3c1517ef8d4543794a27ed4103e464be7c4afdc6136b42d66);

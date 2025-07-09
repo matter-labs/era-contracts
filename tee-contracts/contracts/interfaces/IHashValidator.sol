@@ -25,4 +25,6 @@ interface IHashValidator {
     function removeValidTD10ReportBodyMrHashes(bytes32[] calldata hashes) external;
 
     function isValidTD10ReportBodyMrHash(bytes32 hash) external view returns (bool);
+
+    function signerTTLExpiry() external view returns(uint256);
 }
