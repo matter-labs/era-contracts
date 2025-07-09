@@ -20,7 +20,7 @@ error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
 // 0xf729f26d
 error CanNotUnbundle(bytes32 bundleHash);
 // 0x44fe431f
-error ExecutingNotAllowed(bytes32 bundleHash, address callerAddress, address executionAddress);
+error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executionAddress);
 // 0x62d214aa
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0x32c2e156
@@ -30,7 +30,7 @@ error UnauthorizedMessageSender(address expected, address actual);
 // 0xaa09249f
 error UnbundlerAddressZero();
 // 0x924f9fb1
-error UnbundlingNotAllowed(bytes32 bundleHash, address callerAddress, address unbundlerAddress);
+error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbundlerAddress);
 // 0x801534e9
 error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
 // 0x4534e972

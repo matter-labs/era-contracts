@@ -13,4 +13,8 @@ library AttributesDecoder {
     function decodeUint256(bytes calldata _data) internal pure returns (uint256) {
         return (uint256(bytes32(_data[4:36])));
     }
+
+    function decodeInteroperableAddress(bytes calldata x) internal pure returns (bytes calldata) {
+        return x[4:];
+    }
 }

@@ -8,6 +8,7 @@ import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, MessageInclusionProof, Ca
 import {IERC7786Receiver} from "./IERC7786Receiver.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready, UnauthorizedMessageSender, WrongDestinationChainId} from "./InteropErrors.sol";
 import {InvalidSelector} from "../common/L1ContractErrors.sol";
 
@@ -42,12 +43,15 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
         );
 
+        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.executionAddress);
+
         // Verify that the caller has permission to execute the bundle.
         // Note, that in case the executionAddress wasn't specified in the bundle then executing is permissionless, as documented in Messaging.sol
+        // It's also possible that the caller is InteropHandler itself, in case the execution was initiated through receiveMessage.
         require(
-            (interopBundle.bundleAttributes.executionAddress == address(0) ||
-                msg.sender == interopBundle.bundleAttributes.executionAddress),
-            ExecutingNotAllowed(bundleHash, msg.sender, interopBundle.bundleAttributes.executionAddress)
+            (interopBundle.bundleAttributes.executionAddress.length == 0 || msg.sender == address(this) ||
+                (block.chainid == executionChainId && msg.sender == executionAddress)),
+            ExecutingNotAllowed(bundleHash, InteroperableAddress.formatEvmV1(block.chainid, msg.sender), interopBundle.bundleAttributes.executionAddress)
         );
 
         // We shouldn't process bundles which are either fully executed, or were unbundled here.
@@ -138,10 +142,13 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
         );
 
+        (uint256 unbundlerChainId, address unbundlerAddress) = InteroperableAddress.parseEvmV1(interopBundle.bundleAttributes.unbundlerAddress);
+
         // Verify that the caller has permission to unbundle the bundle.
+        // It's also possible that the caller is InteropHandler itself, in case the unbundling was initiated through receiveMessage.
         require(
-            msg.sender == interopBundle.bundleAttributes.unbundlerAddress,
-            UnbundlingNotAllowed(bundleHash, msg.sender, interopBundle.bundleAttributes.unbundlerAddress)
+            msg.sender == address(this) || (unbundlerChainId == block.chainid && unbundlerAddress == msg.sender),
+            UnbundlingNotAllowed(bundleHash, InteroperableAddress.formatEvmV1(block.chainid, msg.sender), interopBundle.bundleAttributes.unbundlerAddress)
         );
 
         // Verify that the provided call statuses array has the same length as the number of calls in the bundle.

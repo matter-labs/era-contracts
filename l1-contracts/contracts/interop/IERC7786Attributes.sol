@@ -10,7 +10,7 @@ interface IERC7786Attributes {
 
     function interopCallValue(uint256 _interopCallValue) external pure;
 
-    function executionAddress(address _executionAddress) external pure;
+    function executionAddress(bytes calldata _executionAddress) external pure;
 
-    function unbundlerAddress(address _unbundlerAddress) external pure;
+    function unbundlerAddress(bytes calldata _unbundlerAddress) external pure;
 }

@@ -26,6 +26,7 @@ import {IERC7786GatewaySource} from "./IERC7786.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
 /// @title InteropCenter
 /// @author Matter Labs
@@ -123,9 +124,13 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             AttributeParsingRestrictions.CallAndBundleAttributes
         );
 
-        // Verify that the unbundler address is not set to 0, to verify that sender didn't forget it.
-        // We want it to be set by sender because it's an important safety feature to have an option to unbundle the bundle.
-        require(bundleAttributes.unbundlerAddress != address(0), UnbundlerAddressZero());
+        // If the unbundler was not set for a call, we set the unbundler to be equal to the original sender, so that it's
+        // still possible to unbundle the bundle containing the call. If the original sender is the contract, it'll still
+        // be able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `InteropHandler`,
+        // with specific payload. Refer to `InteropHandler` for details.
+        if(bundleAttributes.unbundlerAddress.length == 0) {
+            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
+        }
 
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
         callStartersInternal[0] = InteropCallStarterInternal({
@@ -169,9 +174,15 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             _bundleAttributes,
             AttributeParsingRestrictions.OnlyBundleAttributes
         );
-        // Verify that the unbundler address is not set to 0, to verify that sender didn't forget it.
-        // We want it to be set by sender because it's an important safety feature to have an option to unbundle the bundle.
-        require(bundleAttributes.unbundlerAddress != address(0), UnbundlerAddressZero());
+        
+        // If the unbundler was not set for a bundle, we set the unbundler to be equal to the original sender, so
+        // that it's still possible to unbundle the bundle. If the original sender is the contract, it'll still be
+        // able to unbundle the bundle either via direct call to `unbundleBundle`, or via `sendMessage` to `InteropHandler`,
+        // with specific payload. Refer to `InteropHandler` for details.
+        if(bundleAttributes.unbundlerAddress.length == 0) {
+            bundleAttributes.unbundlerAddress = InteroperableAddress.formatEvmV1(block.chainid, msg.sender);
+        }
+
         bundleHash = _sendBundle({
             _destinationChainId: _destinationChainId,
             _callStarters: callStartersInternal,
@@ -392,9 +403,9 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
                 callAttributes.directCall = false;
                 callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
             } else if (indexInSelectorsArray == 2) {
-                bundleAttributes.executionAddress = AttributesDecoder.decodeAddress(_attributes[i]);
+                bundleAttributes.executionAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
             } else if (indexInSelectorsArray == 3) {
-                bundleAttributes.unbundlerAddress = AttributesDecoder.decodeAddress(_attributes[i]);
+                bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
             }
         }
     }

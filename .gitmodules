@@ -15,3 +15,7 @@
 [submodule "lib/@matterlabs/zksync-contracts"]
 	path = lib/@matterlabs/zksync-contracts
 	url = https://github.com/matter-labs/v2-testnet-contracts
+[submodule "lib/openzeppelin-contracts-master"]
+	path = lib/openzeppelin-contracts-master
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+	branch = master
