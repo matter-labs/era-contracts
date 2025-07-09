@@ -32,7 +32,7 @@ import {SystemContractsArgs} from "./Utils.sol";
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {IERC7786GatewaySource} from "contracts/interop/IERC7786.sol";
+import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";

@@ -22,7 +22,7 @@ import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle, IndirectCallValueMismatch, AttributeNotForInteropCallValue, UnbundlerAddressZero} from "./InteropErrors.sol";
 
-import {IERC7786GatewaySource} from "./IERC7786.sol";
+import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
