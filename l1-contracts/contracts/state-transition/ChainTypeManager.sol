@@ -481,11 +481,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         return
             abi.encode(
-            IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
-            _newSettlementLayerAdmin,
-            protocolVersion,
-            _diamondCut
-        );
+                IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
+                _newSettlementLayerAdmin,
+                protocolVersion,
+                _diamondCut
+            );
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
