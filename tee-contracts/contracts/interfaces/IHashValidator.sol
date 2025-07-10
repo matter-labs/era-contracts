@@ -26,5 +26,5 @@ interface IHashValidator {
 
     function isValidTD10ReportBodyMrHash(bytes32 hash) external view returns (bool);
 
-    function signerTTLExpiry() external view returns(uint256);
+    function signerTTLExpiry() external view returns (uint256);
 }

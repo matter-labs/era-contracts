@@ -30,12 +30,13 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     error ArrayLengthMismatch();
 
     uint256 private totalSigners;
-    struct SignerInfo{
+
+    struct SignerInfo {
         bool isRegistered;
         uint256 validUntil;
     }
 
-    mapping(address=>SignerInfo) private signers;
+    mapping(address => SignerInfo) private signers;
 
     using ECDSA for bytes32;
 
@@ -117,17 +118,14 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
 
         uint256 signerTTLExpiry = hashValidator.signerTTLExpiry();
         uint256 validUntil = block.timestamp + signerTTLExpiry;
-        if(!signers[signer].isRegistered){
-            signers[signer] = SignerInfo({
-                isRegistered: true,
-                validUntil: validUntil
-            }); 
+        if (!signers[signer].isRegistered) {
+            signers[signer] = SignerInfo({isRegistered: true, validUntil: validUntil});
             totalSigners++;
             emit SignerRegistered(signer, validUntil);
-        } else{
+        } else {
             signers[signer].validUntil = validUntil;
             emit SignerUpdated(signer, validUntil);
-        }   
+        }
     }
 
     /**
@@ -137,18 +135,17 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      */
     function deregisterSigner(address[] memory _signers) external onlyOwnerOrOperator {
         uint256 signersLength = _signers.length;
-        for (uint256 i; i<signersLength; ++i){
+        for (uint256 i; i < signersLength; ++i) {
             address signer = _signers[i];
-            if(signers[signer].isRegistered){
+            if (signers[signer].isRegistered) {
                 delete signers[signer];
                 totalSigners--;
             }
         }
         emit SignerDeregistered(_signers);
-
     }
 
-    function isSignerExpired(address _signer) public view returns(bool){
+    function isSignerExpired(address _signer) public view returns (bool) {
         SignerInfo memory signer = signers[_signer];
         require(signer.isRegistered, InvalidSigner(_signer));
         return signer.validUntil < block.timestamp;
@@ -160,9 +157,9 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @param signature The signature to verify
      * @custom:throws InvalidSigner when the signature was not created by a registered signer
      */
-    function verifyDigest(bytes32 digest, bytes calldata signature) external view{
+    function verifyDigest(bytes32 digest, bytes calldata signature) external view {
         address signer = digest.recover(signature);
-        if(isSignerExpired(signer)) revert SignerExpired(signer);
+        if (isSignerExpired(signer)) revert SignerExpired(signer);
     }
 
     function _checkMrEnclave(bytes calldata rawQuote) internal view {
@@ -205,7 +202,6 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         address recovered = digest.recover(signature);
         require(recovered == signer, InvalidSigner(recovered));
     }
-
 
     function updateHashValidator(address _hashValidator) external onlyOwner {
         require(_hashValidator.code.length > 0, InvalidHashValidator());
@@ -278,8 +274,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @notice Upserts FMSPC TCB info into the DAO
      * @param tcbInfoJson The TCB info JSON object
      */
-    function upsertFmspcTcb(TcbInfoJsonObj calldata tcbInfoJson) external returns (bytes32 attestationId){
+    function upsertFmspcTcb(TcbInfoJsonObj calldata tcbInfoJson) external returns (bytes32 attestationId) {
         attestationId = fmspcTcbDao.upsertFmspcTcb(tcbInfoJson);
     }
-
 }

@@ -159,10 +159,9 @@ contract HashValidator is Ownable, IHashValidator {
      * @notice Sets a new TTL (time-to-live) after which a signer is considered expired.
      * @param newSignerTTLExpiry The new TTL in seconds.
      */
-    function setSignerTTLExpiry(uint256 newSignerTTLExpiry) external onlyOwner{
+    function setSignerTTLExpiry(uint256 newSignerTTLExpiry) external onlyOwner {
         require(newSignerTTLExpiry > 0, "TTL must be > 0");
         signerTTLExpiry = newSignerTTLExpiry;
         emit SignerTTLUpdated(newSignerTTLExpiry);
-
     }
 }

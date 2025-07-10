@@ -77,7 +77,6 @@ contract MatterLabsDCAPAttestationTest is Test {
             address(enclaveIdHelper),
             address(x509),
             address(x509Crl)
-
         );
 
         AutomataFmspcTcbDao fmspcTcbDao = new AutomataFmspcTcbDao(
@@ -87,7 +86,6 @@ contract MatterLabsDCAPAttestationTest is Test {
             address(tcbHelper),
             address(x509),
             address(x509Crl)
-
         );
 
         // Update DAO references in storage
@@ -125,13 +123,12 @@ contract MatterLabsDCAPAttestationTest is Test {
         V3QuoteVerifier quoteVerifierV3 = new V3QuoteVerifier(P256_VERIFIER, address(pccsRouter));
 
         // pccsStorage.setCallerAuthorization(address(quoteVerifierV3), true);
-        
+
         // Register it with the attestation contract
         attestation.setQuoteVerifier(address(quoteVerifierV3));
-        
+
         // Make sure quote verifier is authorized with router
         pccsRouter.setAuthorized(address(quoteVerifierV3), true);
-
 
         // Create and set up the quote verifier with the router address
         V4QuoteVerifier quoteVerifierV4 = new V4QuoteVerifier(P256_VERIFIER, address(pccsRouter));
@@ -140,10 +137,9 @@ contract MatterLabsDCAPAttestationTest is Test {
 
         // Set the verifier in attestation contract
         attestation.setQuoteVerifier(address(quoteVerifierV4));
-        
+
         // Make sure quote verifier is authorized with router
         pccsRouter.setAuthorized(address(quoteVerifierV4), true);
-
 
         vm.warp(1741083457);
 
@@ -226,7 +222,7 @@ contract MatterLabsDCAPAttestationTest is Test {
 
     function qeIdDaoUpsert(uint256 quoteVersion, string memory path) internal {
         EnclaveIdentityJsonObj memory identityJson = _readIdentityJson(path);
-        (IdentityObj memory identity,) = enclaveIdHelper.parseIdentityString(identityJson.identityStr);
+        (IdentityObj memory identity, ) = enclaveIdHelper.parseIdentityString(identityJson.identityStr);
         attestation.upsertEnclaveIdentity(uint256(identity.id), quoteVersion, identityJson);
     }
 
