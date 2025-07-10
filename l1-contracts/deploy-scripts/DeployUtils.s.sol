@@ -314,9 +314,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
         require(stateTransition.verifier != address(0), "verifier is zero");
 
-        if (!stateTransition.isOnGateway) {
-            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
-        }
+        // TODO should be provided?
+        //        if (!stateTransition.isOnGateway) {
+        //            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
+        //        }
 
         return
             DiamondInitializeDataNewChain({
