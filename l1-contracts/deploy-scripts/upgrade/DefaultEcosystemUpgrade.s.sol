@@ -183,8 +183,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContracts();
         console.log("Ecosystem contracts are deployed!");
-//        deployNewEcosystemContractsGW();
-//        console.log("Ecosystem contracts for GW are deployed!");
+        //        deployNewEcosystemContractsGW();
+        //        console.log("Ecosystem contracts for GW are deployed!");
         publishBytecodes();
         console.log("Bytecodes published!");
         generateUpgradeData();
@@ -313,9 +313,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
             paymasterInput: "",
             reservedDynamic: ""
         });
-
     }
-
 
     /// @notice Build L1 -> L2 upgrade tx
     function _composeUpgradeTx(
@@ -381,7 +379,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
 
     function isPatchUpgrade() public virtual returns (bool) {
         (uint32 _major, uint32 _minor, uint32 patch) = SemVer.unpackSemVer(SafeCast.toUint96(getNewProtocolVersion()));
-        return patch != 0 ;
+        return patch != 0;
     }
 
     /// @notice Generate upgrade cut data
@@ -390,10 +388,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
 
-
         Diamond.FacetCut[] memory facetCuts;
 
-        ProposedUpgrade memory proposedUpgrade ;
+        ProposedUpgrade memory proposedUpgrade;
         if (isPatchUpgrade()) {
             proposedUpgrade = getProposedPatchUpgrade(stateTransition);
         } else {
@@ -467,7 +464,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
             newProtocolVersion: getNewProtocolVersion()
         });
     }
-
 
     function getForceDeployment(
         string memory contractName
@@ -574,9 +570,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
             "The new protocol version is already present on the ChainTypeManager"
         );
         addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
-        addresses.stateTransition.genesisUpgrade = address(
-            ChainTypeManager(ctm).l1GenesisUpgrade()
-        );
+        addresses.stateTransition.genesisUpgrade = address(ChainTypeManager(ctm).l1GenesisUpgrade());
 
         addresses.vaults.l1NativeTokenVaultProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()

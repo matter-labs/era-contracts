@@ -109,7 +109,6 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
         (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
         upgradeConfig.ecosystemContractsDeployed = true;
-
     }
 
     function getFacetCuts(
@@ -117,5 +116,4 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
         facetCuts = new FacetCut[](0);
     }
-
 }
