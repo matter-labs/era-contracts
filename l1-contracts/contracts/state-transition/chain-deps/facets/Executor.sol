@@ -376,7 +376,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 );
             }
 
-            // TOOD: handle l2 upgrade
+            // TODO: handle l2 upgrade
             _commitBoojumOSBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
 
             s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
