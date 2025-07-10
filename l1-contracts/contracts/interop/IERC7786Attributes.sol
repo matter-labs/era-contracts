@@ -10,7 +10,9 @@ interface IERC7786Attributes {
 
     function interopCallValue(uint256 _interopCallValue) external pure;
 
+    // Attribute assumes that _executionAddress is an ERC-7930 address.
     function executionAddress(bytes calldata _executionAddress) external pure;
 
+    // Attribute assumes that _executionAddress is an ERC-7930 address.
     function unbundlerAddress(bytes calldata _unbundlerAddress) external pure;
 }
