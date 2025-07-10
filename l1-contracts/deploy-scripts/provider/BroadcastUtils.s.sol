@@ -50,8 +50,10 @@ contract BroadcastUtils is Script {
     function parseBroadcastFile(string memory path) public {
         string[] memory inputs = new string[](3);
         inputs[0] = "sh";
-        inputs[1] = "scripts/parse-broadcast.sh";
+        inputs[1] = string.concat(vm.projectRoot(), "/deploy-scripts/provider/bash-scripts/parse-broadcast.sh");
         inputs[2] = path;
+
+        console.log("parsing broadcast at path", path);
 
         bytes memory result = vm.ffi(inputs);
         console.log("FFI result:", string(result));

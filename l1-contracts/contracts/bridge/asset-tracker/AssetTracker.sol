@@ -15,7 +15,7 @@ import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMes
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
+import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
@@ -76,6 +76,11 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
     modifier onlyChainAdmin() {
         // require(msg.sender == , Unauthorized(msg.sender));
+        _;
+    }
+
+    modifier onlyServiceTransactionSender() {
+        require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
         _;
     }
 
@@ -359,7 +364,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         }
     }
 
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata data) external onlyL1AssetTracker {
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata data) external { //onlyServiceTransactionSender {
         if (data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[data.chainId][data.assetId] += data.amount;
@@ -369,7 +374,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         }
     }
 
-    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external onlyL1AssetTracker {
+    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external { //onlyServiceTransactionSender {
         assetMigrationNumber[data.assetId] = data.migrationNumber;
     }
 
