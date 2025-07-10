@@ -27,8 +27,6 @@ error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 error MessageNotIncluded();
 // 0x89fd2c76
 error UnauthorizedMessageSender(address expected, address actual);
-// 0xaa09249f
-error UnbundlerAddressZero();
 // 0x0345c281
 error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbundlerAddress);
 // 0x801534e9
