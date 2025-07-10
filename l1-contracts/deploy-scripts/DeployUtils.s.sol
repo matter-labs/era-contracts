@@ -243,9 +243,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         FacetCut[] memory facetCutsUnformatted = getFacetCuts(stateTransition);
         Diamond.FacetCut[] memory facetCuts = formatFacetCuts(facetCutsUnformatted);
 
-        console.log("getDiamondCutData2");
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
-        console.log("getDiamondCutData3");
 
         diamondCut = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -255,7 +253,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
         if (!stateTransition.isOnGateway) {
             config.contracts.diamondCutData = abi.encode(diamondCut);
         }
-        console.log("getDiamondCutData finished");
     }
 
     function getChainCreationParams(
