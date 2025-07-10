@@ -1,32 +1,45 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.27;
 
+import {Vm} from "forge-std/Vm.sol";
+import {stdToml} from "forge-std/StdToml.sol";
+
 import {AutomataDaoStorage} from "@automata-network/on-chain-pccs/automata_pccs/shared/AutomataDaoStorage.sol";
-import {AutomataPcsDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataPcsDao.sol";
-import {AutomataPckDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataPckDao.sol";
 import {AutomataEnclaveIdentityDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataEnclaveIdentityDao.sol";
 import {AutomataFmspcTcbDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataFmspcTcbDao.sol";
-import {PCCSRouter} from "automata-network/dcap-attestation/evm/contracts/PCCSRouter.sol";
+import {AutomataPckDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataPckDao.sol";
+import {AutomataPcsDao} from "@automata-network/on-chain-pccs/automata_pccs/AutomataPcsDao.sol";
 import {CA} from "@automata-network/on-chain-pccs/Common.sol";
+import {EnclaveIdentityHelper} from "@automata-network/on-chain-pccs/helpers/EnclaveIdentityHelper.sol";
 import {HashValidator} from "./contracts/HashValidator.sol";
 import {MatterLabsDCAPAttestation} from "./contracts/MatterLabsDCAPAttestation.sol";
+import {PCCSRouter} from "automata-network/dcap-attestation/evm/contracts/PCCSRouter.sol";
+import {PCKHelper} from "@automata-network/on-chain-pccs/helpers/PCKHelper.sol";
 import {Script} from "lib/forge-std/src/Script.sol";
+import {TcbInfoJsonObj, FmspcTcbHelper} from "@automata-network/on-chain-pccs/helpers/FmspcTcbHelper.sol";
 import {V3QuoteVerifier} from "automata-network/dcap-attestation/evm/contracts/verifiers/V3QuoteVerifier.sol";
 import {V4QuoteVerifier} from "automata-network/dcap-attestation/evm/contracts/verifiers/V4QuoteVerifier.sol";
-import {console} from "lib/forge-std/src/console.sol";
-import {EnclaveIdentityHelper} from "@automata-network/on-chain-pccs/helpers/EnclaveIdentityHelper.sol";
-import {TcbInfoJsonObj, FmspcTcbHelper} from "@automata-network/on-chain-pccs/helpers/FmspcTcbHelper.sol";
-import {PCKHelper} from "@automata-network/on-chain-pccs/helpers/PCKHelper.sol";
 import {X509CRLHelper} from "@automata-network/on-chain-pccs/helpers/X509CRLHelper.sol";
+import {console} from "lib/forge-std/src/console.sol";
+
+struct Config {
+    address ownerAddress;
+}
 
 /**
  * @notice Script to deploy TEE DCAP attestation contracts
  */
 contract DeployTeeDCAPScript is Script {
+    using stdToml for string;
+
     bytes constant rootCaDer =
         hex"3082028f30820234a003020102021422650cd65a9d3489f383b49552bf501b392706ac300a06082a8648ce3d0403023068311a301806035504030c11496e74656c2053475820526f6f74204341311a3018060355040a0c11496e74656c20436f72706f726174696f6e3114301206035504070c0b53616e746120436c617261310b300906035504080c024341310b3009060355040613025553301e170d3138303532313130343531305a170d3439313233313233353935395a3068311a301806035504030c11496e74656c2053475820526f6f74204341311a3018060355040a0c11496e74656c20436f72706f726174696f6e3114301206035504070c0b53616e746120436c617261310b300906035504080c024341310b30090603550406130255533059301306072a8648ce3d020106082a8648ce3d030107034200040ba9c4c0c0c86193a3fe23d6b02cda10a8bbd4e88e48b4458561a36e705525f567918e2edc88e40d860bd0cc4ee26aacc988e505a953558c453f6b0904ae7394a381bb3081b8301f0603551d2304183016801422650cd65a9d3489f383b49552bf501b392706ac30520603551d1f044b30493047a045a043864168747470733a2f2f6365727469666963617465732e7472757374656473657276696365732e696e74656c2e636f6d2f496e74656c534758526f6f7443412e646572301d0603551d0e0416041422650cd65a9d3489f383b49552bf501b392706ac300e0603551d0f0101ff04040302010630120603551d130101ff040830060101ff020101300a06082a8648ce3d0403020349003046022100e5bfe50911f92f428920dc368a302ee3d12ec5867ff622ec6497f78060c13c20022100e09d25ac7a0cb3e5e8e68fec5fa3bd416c47440bd950639d450edcbea4576aa2";
 
+    Config internal config;
+
     function run() external {
+        initializeConfig();
+
         // Deploy P256 Verifier first
         vm.startBroadcast();
         address p256Verifier = deployP256Verifier();
@@ -91,7 +104,6 @@ contract DeployTeeDCAPScript is Script {
             address(enclaveIdHelper),
             address(x509),
             address(x509Crl)
-
         );
         address enclaveIdDao = address(enclaveIdDaoContract);
 
@@ -106,7 +118,6 @@ contract DeployTeeDCAPScript is Script {
             address(tcbHelper),
             address(x509),
             address(x509Crl)
-
         );
         address fmspcTcbDao = address(fmspcTcbDaoContract);
 
@@ -151,7 +162,8 @@ contract DeployTeeDCAPScript is Script {
             address(hashValidator),
             pcsDao,
             enclaveIdDao,
-            fmspcTcbDao
+            fmspcTcbDao,
+            config.ownerAddress
         );
 
         vm.stopBroadcast();
@@ -219,6 +231,14 @@ contract DeployTeeDCAPScript is Script {
 
         // Ensure deployment succeeded
         require(_P256_VERIFIER != address(0), "Failed to deploy P256 verifier");
+    }
+
+    function initializeConfig() internal {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/script-config/config-deploy-tee.toml");
+        string memory toml = vm.readFile(path);
+
+        config.ownerAddress = toml.readAddress("$.owner_address");
     }
 
     function _saveDeployment(address attestationContract, address hashValidator, address p256Verifier) internal {

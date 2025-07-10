@@ -36,6 +36,8 @@ l1-contracts/test/foundry/integration/deploy-scripts/script-out/*
 l1-contracts/test/foundry/l1/integration/upgrade-envs/script-out/*.toml
 l1-contracts/zkout/*
 tee-contracts/broadcast/*
+tee-contracts/script-config/*
+!tee-contracts/script-config/.gitkeep
 tee-contracts/script-out/*
 !tee-contracts/script-out/.gitkeep
 
