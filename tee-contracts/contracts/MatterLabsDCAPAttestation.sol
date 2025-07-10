@@ -49,18 +49,22 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
     uint256 constant TD10_RTMR3_OFFSET = TD10_RTMR2_OFFSET + 48;
     uint256 constant TD10_REPORT_DATA_OFFSET = HEADER_LENGTH + 520;
 
-
-
     AutomataPcsDao pcsDao;
     AutomataEnclaveIdentityDao enclaveIdDao;
     AutomataFmspcTcbDao fmspcTcbDao;
 
     IHashValidator hashValidator;
 
+    address operatorAddress;
+
     event SignerRegistered(address indexed signer, uint256 TTL);
     event SignerUpdated(address indexed signer, uint256 newTTL);
     event SignerDeregistered(address[] signer);
 
+    modifier onlyOwnerOrOperator() {
+        require(msg.sender == owner() || msg.sender == operatorAddress, "Not authorized");
+        _;
+    }
 
     /**
      * @dev Initializes the contract with the Helpers, DAOs, and Enclave Hash Validator.
@@ -75,12 +79,14 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
         address _hashValidator,
         address _pcsDao,
         address _enclaveIdDao,
-        address _fmspcTcbDao
-    ) AttestationEntrypointBase(owner){
+        address _fmspcTcbDao,
+        address _operator_address
+    ) AttestationEntrypointBase(owner) {
         hashValidator = IHashValidator(_hashValidator);
         pcsDao = AutomataPcsDao(_pcsDao);
         enclaveIdDao = AutomataEnclaveIdentityDao(_enclaveIdDao);
         fmspcTcbDao = AutomataFmspcTcbDao(_fmspcTcbDao);
+        operatorAddress = _operator_address;
     }
 
     /**
@@ -92,7 +98,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @custom:throws IncorrectVersion when the quote version is incorrect
      * @custom:throws VerificationFailed when on-chain attestation verification fails
      */
-    function registerSigner(bytes calldata rawQuote) external onlyOwner{
+    function registerSigner(bytes calldata rawQuote) external onlyOwnerOrOperator {
         address signer;
         uint16 quoteVersion = uint16(BELE.leBytesToBeUint(rawQuote[0:2]));
         bytes4 teeType = bytes4(rawQuote[4:8]);
@@ -129,7 +135,7 @@ contract MatterLabsDCAPAttestation is AttestationEntrypointBase {
      * @param _signers The signers which needs to be deregistered
      * @custom:throws InvalidMrEnclave when the enclave measurement doesn't match allowed values
      */
-    function deregisterSigner(address[] memory _signers) external onlyOwner {
+    function deregisterSigner(address[] memory _signers) external onlyOwnerOrOperator {
         uint256 signersLength = _signers.length;
         for (uint256 i; i<signersLength; ++i){
             address signer = _signers[i];

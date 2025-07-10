@@ -117,8 +117,9 @@ contract MatterLabsDCAPAttestationTest is Test {
             address(hashValidator),
             address(pcsDao),
             address(enclaveIdDao),
-            address(fmspcTcbDao)
-            );
+            address(fmspcTcbDao),
+            address(this)
+        );
 
         // Deploy a new quote verifier that points to the router
         V3QuoteVerifier quoteVerifierV3 = new V3QuoteVerifier(P256_VERIFIER, address(pccsRouter));
