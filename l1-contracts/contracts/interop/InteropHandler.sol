@@ -53,7 +53,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         require(
             (msg.sender == address(this) ||
                 interopBundle.bundleAttributes.executionAddress.length == 0 ||
-                (block.chainid == executionChainId && msg.sender == executionAddress)),
+                ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
             ExecutingNotAllowed(
                 bundleHash,
                 InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
@@ -156,7 +156,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // Verify that the caller has permission to unbundle the bundle.
         // It's also possible that the caller is InteropHandler itself, in case the unbundling was initiated through receiveMessage.
         require(
-            msg.sender == address(this) || (unbundlerChainId == block.chainid && unbundlerAddress == msg.sender),
+            msg.sender == address(this) ||
+                ((unbundlerChainId == block.chainid || unbundlerChainId == 0) && unbundlerAddress == msg.sender),
             UnbundlingNotAllowed(
                 bundleHash,
                 InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
@@ -353,7 +354,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // Verify sender has execution permission
         require(
             interopBundle.bundleAttributes.executionAddress.length == 0 ||
-                (senderChainId == executionChainId && senderAddress == executionAddress),
+                ((executionChainId == senderChainId || executionChainId == 0) && executionAddress == senderAddress),
             ExecutingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.executionAddress)
         );
 
@@ -380,7 +381,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         // Verify sender has unbundling permission
         require(
-            senderChainId == unbundlerChainId && senderAddress == unbundlerAddress,
+            (unbundlerChainId == senderChainId || unbundlerChainId == 0) && unbundlerAddress == senderAddress,
             UnbundlingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.unbundlerAddress)
         );
 

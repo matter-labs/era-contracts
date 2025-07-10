@@ -28,6 +28,7 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IInteropHandler, CallStatus} from "contracts/interop/IInteropHandler.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -274,8 +275,8 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,
             bundleAttributes: BundleAttributes({
-                executionAddress: EXECUTION_ADDRESS,
-                unbundlerAddress: UNBUNDLER_ADDRESS
+                executionAddress: InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS),
+                unbundlerAddress: InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS)
             })
         });
         return interopBundle;

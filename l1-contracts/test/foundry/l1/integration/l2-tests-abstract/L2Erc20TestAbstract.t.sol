@@ -33,6 +33,7 @@ import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {IERC7786GatewaySource} from "contracts/interop/IERC7786GatewaySource.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
@@ -170,7 +171,10 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         );
 
         bytes[] memory bundleAttributes = new bytes[](1);
-        bundleAttributes[0] = abi.encodeCall(IERC7786Attributes.unbundlerAddress, (UNBUNDLER_ADDRESS));
+        bundleAttributes[0] = abi.encodeCall(
+            IERC7786Attributes.unbundlerAddress,
+            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+        );
         l2InteropCenter.sendBundle(271, calls, bundleAttributes);
     }
 
@@ -187,8 +191,14 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
         bytes[] memory attributes = new bytes[](3);
         attributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
-        attributes[1] = abi.encodeCall(IERC7786Attributes.executionAddress, (EXECUTION_ADDRESS));
-        attributes[2] = abi.encodeCall(IERC7786Attributes.unbundlerAddress, (UNBUNDLER_ADDRESS));
+        attributes[1] = abi.encodeCall(
+            IERC7786Attributes.executionAddress,
+            (InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS))
+        );
+        attributes[2] = abi.encodeCall(
+            IERC7786Attributes.unbundlerAddress,
+            (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
+        );
         calls[0] = InteropCallStarter({
             to: L2_ASSET_ROUTER_ADDR,
             data: secondBridgeCalldata,
@@ -212,9 +222,8 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
             abi.encode(bytes(""))
         );
-        IERC7786GatewaySource(address(l2InteropCenter)).sendCall(
-            271,
-            calls[0].to,
+        IERC7786GatewaySource(address(l2InteropCenter)).sendMessage(
+            InteroperableAddress.formatEvmV1(271, calls[0].to),
             calls[0].data,
             calls[0].callAttributes
         );
