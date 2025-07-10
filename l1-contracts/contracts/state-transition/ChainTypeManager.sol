@@ -16,7 +16,7 @@ import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
 import {InitialForceDeploymentMismatch, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
-import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisIndexStorageZero, GenesisBatchCommitmentZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
+import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisBatchCommitmentZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
@@ -481,11 +481,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         return
             abi.encode(
-                IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
-                _newSettlementLayerAdmin,
-                protocolVersion,
-                _diamondCut
-            );
+            IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
+            _newSettlementLayerAdmin,
+            protocolVersion,
+            _diamondCut
+        );
     }
 
     /// @notice Called by the bridgehub during the migration of a chain to the current settlement layer.
