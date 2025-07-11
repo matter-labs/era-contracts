@@ -444,7 +444,7 @@ contract ExecutingTest is ExecutorTest {
         assert(isPriorityQueueActive);
 
         uint256 processed = getters.getFirstUnprocessedPriorityTx();
-        assertEq(processed, 0);
+        assertEq(processed, 3);
     }
 
     // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.

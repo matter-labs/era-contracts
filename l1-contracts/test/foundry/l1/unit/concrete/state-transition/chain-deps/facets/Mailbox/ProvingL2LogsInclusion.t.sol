@@ -421,7 +421,7 @@ contract MailboxL2LogsProve is MailboxTest {
             // solhint-disable-next-line func-named-parameters
             abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
         );
-        return MessageHashing.getProofData(_chainId, _l1BatchNumber, _l2MessageIndex, hashedLog, _proof);
+        return MessageHashing._getProofData(_chainId, _l1BatchNumber, _l2MessageIndex, hashedLog, _proof);
     }
 
     /// @dev Convert arbitrary-length message to the raw l2 log

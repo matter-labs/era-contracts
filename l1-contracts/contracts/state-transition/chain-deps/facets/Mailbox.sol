@@ -11,7 +11,6 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
-import {PriorityOperation, PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
@@ -27,11 +26,11 @@ import {L2_BOOTLOADER_ADDRESS, L2_INTEROP_CENTER_ADDR} from "../../../common/l2-
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
 import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
-import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {InvalidChainId, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {MessageVerification} from "./MessageVerification.sol";
+import {MessageVerification, IMessageVerification} from "./MessageVerification.sol";
 import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
@@ -39,7 +38,6 @@ import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
 /// @custom:security-contact security@matterlabs.dev
 contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     using UncheckedMath for uint256;
-    using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
     /// @inheritdoc IZKChainBase
@@ -71,6 +69,27 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         canonicalTxHash = _requestL2TransactionSender(_request);
     }
 
+    /// @inheritdoc IMessageVerification
+    function proveL2MessageInclusionShared(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _index,
+        L2Message calldata _message,
+        bytes32[] calldata _proof
+    ) public view override returns (bool) {
+        if (s.chainId != _chainId) {
+            revert InvalidChainId();
+        }
+        return
+            super.proveL2MessageInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _index: _index,
+                _message: _message,
+                _proof: _proof
+            });
+    }
+
     /// @inheritdoc IMailboxImpl
     function proveL2MessageInclusion(
         uint256 _batchNumber,
@@ -84,6 +103,27 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 _blockOrBatchNumber: _batchNumber,
                 _index: _index,
                 _log: _l2MessageToLog(_message),
+                _proof: _proof
+            });
+    }
+
+    /// @inheritdoc IMessageVerification
+    function proveL2LogInclusionShared(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _index,
+        L2Log calldata _log,
+        bytes32[] calldata _proof
+    ) public view override returns (bool) {
+        if (s.chainId != _chainId) {
+            revert InvalidChainId();
+        }
+        return
+            super.proveL2LogInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _index: _index,
+                _log: _log,
                 _proof: _proof
             });
     }
@@ -142,6 +182,27 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             });
     }
 
+    /// @inheritdoc IMessageVerification
+    function proveL2LeafInclusionShared(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) public view virtual override returns (bool) {
+        if (s.chainId != _chainId) {
+            revert InvalidChainId();
+        }
+        return
+            super.proveL2LeafInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof
+            });
+    }
+
     /// @inheritdoc IMailboxImpl
     function proveL2LeafInclusion(
         uint256 _batchNumber,
@@ -166,7 +227,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) internal view override returns (bool) {
-        ProofData memory proofData = MessageHashing.getProofData({
+        ProofData memory proofData = MessageHashing._getProofData({
             _chainId: _chainId,
             _batchNumber: _batchNumber,
             _leafProofMask: _leafProofMask,
@@ -443,11 +504,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     function _nextPriorityTxId() internal view returns (uint256) {
-        if (_isPriorityQueueActive()) {
-            return s.priorityQueue.getTotalPriorityTxs();
-        } else {
-            return s.priorityTree.getTotalPriorityTxs();
-        }
+        return s.priorityTree.getTotalPriorityTxs();
     }
 
     function _requestL2TransactionFree(
@@ -518,16 +575,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
     }
 
+    // solhint-disable-next-line no-unused-vars
     function _writePriorityOpHash(bytes32 _canonicalTxHash, uint64 _expirationTimestamp) internal {
-        if (_isPriorityQueueActive()) {
-            s.priorityQueue.pushBack(
-                PriorityOperation({
-                    canonicalTxHash: _canonicalTxHash,
-                    expirationTimestamp: _expirationTimestamp,
-                    layer2Tip: uint192(0) // TODO: Restore after fee modeling will be stable. (SMA-1230)
-                })
-            );
-        }
         s.priorityTree.push(_canonicalTxHash);
     }
 
