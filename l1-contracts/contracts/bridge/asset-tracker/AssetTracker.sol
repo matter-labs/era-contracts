@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IAssetTracker, TokenBalanceMigrationData} from "./IAssetTracker.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log, L2Message} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_BRIDGEHUB} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -27,6 +27,8 @@ import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 // import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidChainId, InvalidSender} from "./AssetTrackerErrors.sol";
+
+error InvalidMigrationHash();
 
 contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerModifiers {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -54,7 +56,11 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     mapping(bytes32 assetId => uint256 settlementLayer) public assetSettlementLayer;
 
     /// @dev Maps the migration number for each asset on the L2.
+    /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
     mapping(bytes32 assetId => uint256 migrationNumber) public assetMigrationNumber;
+
+    /// @dev we record asset migrations finalized status to prevent spamming
+    mapping(bytes32 migrationHash => bool isFinalized) public migrationFinalized;
 
     constructor(uint256 _l1ChainId, address _bridgeHub, address, address _nativeTokenVault, address _messageRoot) {
         L1_CHAIN_ID = _l1ChainId;
@@ -95,12 +101,18 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     function registerLegacyToken(bytes32 _assetId) external onlyL1 {
         /// todo migrate balance from ntv here
         assetSettlementLayer[_assetId] = block.chainid;
+        if (block.chainid != L1_CHAIN_ID) {
+            assetMigrationNumber[_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
+        }
     }
 
     function registerNewToken(bytes32 _assetId) external {
         /// todo call from ntv only probably
         /// todo figure out L1 vs L2 differences
         assetSettlementLayer[_assetId] = block.chainid;
+        if (block.chainid != L1_CHAIN_ID) {
+            assetMigrationNumber[_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -323,6 +335,9 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
         // solhint-disable-next-line no-unused-vars
 
+        bytes32 migrationHash = keccak256(abi.encode(_finalizeWithdrawalParams.message));
+        require(!migrationFinalized[migrationHash], InvalidMigrationHash());
+
         TokenBalanceMigrationData memory data = abi.decode(
             _finalizeWithdrawalParams.message,
             (TokenBalanceMigrationData)
@@ -364,7 +379,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         }
     }
 
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata data) external { //onlyServiceTransactionSender {
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata data) external {
+        //onlyServiceTransactionSender {
         if (data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[data.chainId][data.assetId] += data.amount;
@@ -374,7 +390,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         }
     }
 
-    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external { //onlyServiceTransactionSender {
+    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external {
+        //onlyServiceTransactionSender {
         assetMigrationNumber[data.assetId] = data.migrationNumber;
     }
 

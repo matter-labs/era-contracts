@@ -28,6 +28,8 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     using stdJson for string;
 
     string constant gwRpcUrl = "http://localhost:3150";
+    IAssetTracker l2AssetTracker = IAssetTracker(L2_ASSET_TRACKER_ADDR);
+    INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     function fundL2Address(uint256 chainId, address bridgehubAddress, address l2Address, uint256 amount) public {
         uint256 actualAmount;
@@ -65,18 +67,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
     function startTokenMigrationOnL2(uint256 chainId, string memory l2RpcUrl) public {
         // Get the list of tokens from L1NativeTokenVault
-        uint256 bridgedTokenCount;
-        bytes32[] memory assetIds;
-        {
-            INativeTokenVault nativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
-
-            // Get all registered tokens
-            bridgedTokenCount = nativeTokenVault.bridgedTokenCount();
-            assetIds = new bytes32[](bridgedTokenCount);
-            for (uint256 i = 0; i < bridgedTokenCount; i++) {
-                assetIds[i] = nativeTokenVault.bridgedTokens(i);
-            }
-        }
+        (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
 
         // Set the L2 RPC for this chain
         // vm.envString(string.concat("L2_RPC_URL_", vm.toString(chainId)));
@@ -93,11 +84,19 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             // vm.recordLogs();
             vm.broadcast();
             {
-                IAssetTracker l2AssetTracker = IAssetTracker(L2_ASSET_TRACKER_ADDR);
                 l2AssetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
             }
             // Get the logs
             Vm.Log[] memory entries = vm.getRecordedLogs();
+        }
+    }
+
+    function getBridgedTokenAssetIds() public returns (uint256 bridgedTokenCount, bytes32[] memory assetIds) {
+        // Get all registered tokens
+        bridgedTokenCount = l2NativeTokenVault.bridgedTokensCount();
+        assetIds = new bytes32[](bridgedTokenCount);
+        for (uint256 i = 0; i < bridgedTokenCount; i++) {
+            assetIds[i] = l2NativeTokenVault.bridgedTokens(i);
         }
     }
 
@@ -155,6 +154,18 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
                 vm.broadcast();
                 l1AssetTracker.receiveMigrationOnL1(finalizeL1DepositParams[i]);
             }
+        }
+    }
+
+    function checkAllMigrated(uint256 chainId, string memory l2RpcUrl) public {
+        (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
+        for (uint256 i = 0; i < bridgedTokenCount; i++) {
+            bytes32 assetId = assetIds[i];
+            // if (
+            uint256 migrationNumber = l2AssetTracker.assetMigrationNumber(assetId);
+            //  != block.chainid) {
+            console.log("Token", vm.toString(assetId), "migration number", migrationNumber);
+            // }
         }
     }
 
