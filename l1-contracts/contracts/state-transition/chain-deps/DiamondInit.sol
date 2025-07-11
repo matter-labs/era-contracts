@@ -14,8 +14,8 @@ import {EmptyAssetId, EmptyBytes32, TooMuchGas, ZeroAddress} from "../../common/
 /// @dev The contract is used only once to initialize the diamond proxy.
 /// @dev The deployment process takes care of this contract's initialization.
 contract DiamondInit is ZKChainBase, IDiamondInit {
-    using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
+    using PriorityQueue for PriorityQueue.Queue;
 
     /// @dev Initialize the implementation to prevent any possibility of a Parity hack.
     constructor() reentrancyGuardInitializer {}
@@ -79,7 +79,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.l2EvmEmulatorBytecodeHash = _initializeData.l2EvmEmulatorBytecodeHash;
         s.priorityTxMaxGasLimit = _initializeData.priorityTxMaxGasLimit;
         s.feeParams = _initializeData.feeParams;
-        s.priorityTree.setup(s.priorityQueue.getTotalPriorityTxs());
+        s.priorityTree.setup(s.__DEPRECATED_priorityQueue.getTotalPriorityTxs());
         s.precommitmentForTheLatestBatch = DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH;
 
         // While this does not provide a protection in the production, it is needed for local testing
