@@ -517,6 +517,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @dev Deprecated to make publicly accessible methods compatible with planned releases.
     /// @dev Please use the block function `getBlockHashEVM` if needed.
     /// @dev The function will be completely removed in the next release.
+    // solhint-disable-next-line no-unused-vars
     function getBatchHash(uint256 _batchNumber) external view returns (bytes32 hash) {
         revert DeprecatedFunction(this.getBatchHash.selector);
     }
@@ -550,6 +551,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @dev Deprecated to make publicly accessible methods compatible with planned releases.
     /// @dev Please use the block function `getBlockHashEVM` if needed.
     /// @dev The function will be completely removed in the next release.
+    // solhint-disable-next-line no-unused-vars
     function blockHash(uint256 _blockNumber) external view returns (bytes32 hash) {
         revert DeprecatedFunction(this.blockHash.selector);
     }
