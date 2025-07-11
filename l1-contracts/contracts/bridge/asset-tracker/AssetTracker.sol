@@ -172,7 +172,9 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     }
 
     function _ensureTokenIsRegistered(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
-        isMinterChain[_tokenOriginChainId][_assetId] = true;
+        if (!isMinterChain[_tokenOriginChainId][_assetId]) {
+            isMinterChain[_tokenOriginChainId][_assetId] = true;
+        }
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_tokenOriginChainId);
         if (settlementLayer != block.chainid) {
             isMinterChain[settlementLayer][_assetId] = true;

@@ -18,7 +18,7 @@ import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} 
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
-import {L2Message, TxStatus} from "../common/Messaging.sol";
+import {L2Message, TxStatus, L2Log} from "../common/Messaging.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
@@ -341,6 +341,17 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _merkleProof: _merkleProof,
                 _status: TxStatus.Failure
             });
+            L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(_l2TxNumberInBatch, _l2TxHash, TxStatus.Failure);
+
+            bytes32 leaf = MessageHashing.getLeafHashFromLog(l2Log);
+            ProofData memory proofData = this.getProofData({
+                _chainId: _chainId,
+                _batchNumber: _l2BatchNumber,
+                _leafProofMask: _l2MessageIndex,
+                _leaf: leaf,
+                _proof: _merkleProof
+            });
+            TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
             // kl todo v30. add failed withdrawals for asset tracking.
             require(proofValid, InvalidProof());
         }
