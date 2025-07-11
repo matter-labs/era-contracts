@@ -89,7 +89,7 @@ struct ZKChainStorage {
     /// @dev Stored root hashes of L2 -> L1 logs
     mapping(uint256 batchNumber => bytes32 l2LogsRootHash) l2LogsRootHashes;
     /// @dev Container that stores transactions requested from L1
-    PriorityQueue.Queue priorityQueue;
+    PriorityQueue.Queue __DEPRECATED_priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
     address __DEPRECATED_allowList;
     VerifierParams __DEPRECATED_verifierParams;

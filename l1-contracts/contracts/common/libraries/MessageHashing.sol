@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Merkle} from "./Merkle.sol";
-import {SUPPORTED_PROOF_METADATA_VERSION} from "../Config.sol";
+import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SUPPORTED_PROOF_METADATA_VERSION} from "../Config.sol";
 import {MerklePathEmpty} from "../L1ContractErrors.sol";
 import {UncheckedMath} from "./UncheckedMath.sol";
 import {L2Log, L2Message, TxStatus} from "../Messaging.sol";
@@ -11,7 +11,7 @@ import {L2_BOOTLOADER_ADDRESS} from "../l2-helpers/L2ContractAddresses.sol";
 
 import {UnsupportedProofMetadataVersion} from "../../state-transition/L1StateTransitionErrors.sol";
 import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
-import {InvalidProofLengthForFinalNode} from "../../common/L1ContractErrors.sol";
+import {HashedLogIsDefault, InvalidProofLengthForFinalNode} from "../../common/L1ContractErrors.sol";
 
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
@@ -148,14 +148,14 @@ library MessageHashing {
         }
     }
 
-    /// @notice Hashes the proof.
+    /// @notice Parses and processes the proof and returns the resulting data.
     /// @param _chainId The chain id of the L2 where the leaf comes from.
     /// @param _batchNumber The batch number.
     /// @param _leafProofMask The leaf proof mask.
     /// @param _leaf The leaf to be proven.
     /// @param _proof The proof.
     /// @return result The proof verification result.
-    function getProofData(
+    function _getProofData(
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
@@ -164,6 +164,12 @@ library MessageHashing {
     ) internal pure returns (ProofData memory result) {
         if (_proof.length == 0) {
             revert MerklePathEmpty();
+        }
+
+        // Check that hashed log is not the default one,
+        // otherwise it means that the value is out of range of sent L2 -> L1 logs
+        if (_leaf == L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH) {
+            revert HashedLogIsDefault();
         }
 
         ProofMetadata memory proofMetadata = MessageHashing.parseProofMetadata(_proof);

@@ -87,6 +87,15 @@ function sortErrorBlocks(lines: string[]): string[] {
 // Process a file: handle selector insertion, multiline parsing, and sorting
 function processFile(filePath: string, fix: boolean, collectedErrors: Map<string, [string, string]>): boolean {
   const content = fs.readFileSync(filePath, "utf8");
+
+  // Find all enum definitions in the file
+  const enums = new Set<string>();
+  const enumRegex = /enum\s+(\w+)\s*\{/g;
+  let enumMatch;
+  while ((enumMatch = enumRegex.exec(content)) !== null) {
+    enums.add(enumMatch[1]);
+  }
+
   const lines = content.split(/\r?\n/);
   const output: string[] = [];
   let modified = false;
@@ -113,7 +122,8 @@ function processFile(filePath: string, fix: boolean, collectedErrors: Map<string
       const types = params
         .split(",")
         .map((p) => p.trim().split(/\s+/)[0])
-        .filter((t) => t);
+        .filter((t) => t)
+        .map((t) => (enums.has(t) ? "uint8" : t));
       const sig = `${errName}(${types.join(",")})`;
 
       if (collectedErrors.has(sig)) {

@@ -533,7 +533,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _proof
     ) public pure returns (ProofData memory) {
         return
-            MessageHashing.getProofData({
+            MessageHashing._getProofData({
                 _chainId: _chainId,
                 _batchNumber: _batchNumber,
                 _leafProofMask: _leafProofMask,
