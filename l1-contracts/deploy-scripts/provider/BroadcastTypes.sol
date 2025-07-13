@@ -19,7 +19,7 @@ struct Transaction {
     string functionKey;
     bytes32 hash;
     bool isFixedGasLimit;
-    TransactionData transaction;
+    // TransactionData transaction;
     string transactionType;
 }
 

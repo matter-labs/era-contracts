@@ -9,9 +9,70 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
+import {Utils} from "../Utils.sol";
 import {L2ToL1LogProof, Log, TransactionReceipt, AltTransactionReceipt, AltLog, AltL2ToL1Log, L2ToL1Log} from "./ReceipTypes.sol";
 
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {IGetters} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
+
+
 contract ZKSProvider is Script {
+
+    function finalizeWithdrawal(
+        uint256 chainId,
+        address l1Bridgehub,
+        string memory l2RpcUrl,
+        bytes32 withdrawalHash,
+        uint256 index
+    ) public {
+        FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
+
+        IBridgehub bridgehub = IBridgehub(l1Bridgehub);
+        // console.log()
+        IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
+        IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
+
+        waitForBatchToBeExecuted(l1Bridgehub, chainId, params);
+        // console.log("Tx Hash", vm.toString(withdrawalHash));
+        // vm.sleep(20000);
+
+        // Send the transaction
+        vm.startBroadcast();
+        nullifier.finalizeDeposit(params);
+        vm.stopBroadcast();
+    }
+
+
+    function waitForBatchToBeExecuted(address l1Bridgehub, uint256 chainId, FinalizeL1DepositParams memory params) public {
+        IBridgehub bridgehub = IBridgehub(l1Bridgehub);
+        IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
+        IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
+        ProofData memory proofData = nullifier.getProofData(params.chainId, params.l2BatchNumber, params.l2MessageIndex,bytes32(0), params.merkleProof);
+        
+        // console.log("proofData");
+        uint256 actualChainId = chainId;
+        uint256 actualBatchNumber = params.l2BatchNumber;
+        if (proofData.settlementLayerChainId != chainId && proofData.settlementLayerChainId != 0) {
+            actualChainId = proofData.settlementLayerChainId;
+            actualBatchNumber = proofData.settlementLayerBatchNumber;
+        }
+        
+        IGetters getters = IGetters(bridgehub.getZKChain(actualChainId));
+        uint256 totalBatchesExecuted;
+        uint256 loopCount = 0;
+        while (totalBatchesExecuted < actualBatchNumber) {
+            loopCount++;
+            totalBatchesExecuted = getters.getTotalBatchesExecuted();
+            uint256 secondsToWait = 3;
+            vm.sleep(secondsToWait * 1000);
+            console.log("Waiting for batch to be executed", totalBatchesExecuted, actualBatchNumber);
+            console.log("Waited", loopCount * secondsToWait, "seconds");
+        }
+    }
+
     function getWithdrawalLog(
         string memory l2RpcUrl,
         bytes32 withdrawalHash,
@@ -163,7 +224,13 @@ contract ZKSProvider is Script {
         ); // todo later: add ,"proof_based_gw" for interop
         // Execute RPC call
 
-        bytes memory result = vm.ffi(args);
+        bytes memory nullProofBytes = "0x7b226a736f6e727063223a22322e30222c226964223a312c22726573756c74223a6e756c6c7d";
+        string memory nullProofString2 = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":null}";
+        bytes memory result = nullProofBytes;
+        while (compareStrings(string(result), string(nullProofBytes)) || compareStrings(string(result), string(nullProofString2))) {
+            result = vm.ffi(args);
+            vm.sleep(4000);
+        }
 
         proof = parseL2ToL1LogProof(result);
     }

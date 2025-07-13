@@ -325,7 +325,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     }
 
     function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
-        return _chainId - _chainId;
+        return 1 + _chainId - _chainId;
         // return IChainAssetHandler(IBridgehub(BRIDGE_HUB).chainAssetHandler()).migrationNumber(_chainId);
     }
 
@@ -386,9 +386,11 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         if (data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[data.chainId][data.assetId] += data.amount;
+            assetSettlementLayer[data.assetId] = block.chainid;
         } else {
             require(data.amount == chainBalance[data.chainId][data.assetId], InvalidAmount());
             chainBalance[data.chainId][data.assetId] = 0;
+            assetSettlementLayer[data.assetId] = 0;
         }
     }
 

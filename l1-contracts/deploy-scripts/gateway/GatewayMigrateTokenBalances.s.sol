@@ -142,6 +142,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         // console.log("msgHashes");
         // console.log(msgHashes.length);
         // console.log(vm.toString(msgHashes[0]));
+        waitForBatchToBeExecuted(address(bridgehub), chainId, finalizeL1DepositParams[finalizeL1DepositParams.length - 1]);
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             // console.logBytes(abi.encodeCall(l1AssetTracker.receiveMigrationOnL1, (finalizeL1DepositParams[i])));
@@ -166,6 +167,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             //  != block.chainid) {
             console.log("Token", vm.toString(assetId), "migration number", migrationNumber);
             // }
+            // kl todo implement properly, compare agains interopCenter migration number.
         }
     }
 
