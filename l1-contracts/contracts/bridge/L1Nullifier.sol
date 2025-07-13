@@ -341,7 +341,11 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _merkleProof: _merkleProof,
                 _status: TxStatus.Failure
             });
-            L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(_l2TxNumberInBatch, _l2TxHash, TxStatus.Failure);
+            L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(
+                _l2TxNumberInBatch,
+                _l2TxHash,
+                TxStatus.Failure
+            );
 
             bytes32 leaf = MessageHashing.getLeafHashFromLog(l2Log);
             ProofData memory proofData = this.getProofData({
