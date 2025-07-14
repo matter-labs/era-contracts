@@ -29,13 +29,10 @@ contract ZKSProvider is Script {
         FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
 
         IBridgehub bridgehub = IBridgehub(l1Bridgehub);
-        // console.log()
         IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
 
         waitForBatchToBeExecuted(l1Bridgehub, chainId, params);
-        // console.log("Tx Hash", vm.toString(withdrawalHash));
-        // vm.sleep(20000);
 
         // Send the transaction
         vm.startBroadcast();
@@ -43,6 +40,20 @@ contract ZKSProvider is Script {
         vm.stopBroadcast();
     }
 
+    function waitForWithdrawalToBeFinalized(
+        uint256 chainId,
+        address l1Bridgehub,
+        string memory l2RpcUrl,
+        bytes32 withdrawalHash,
+        uint256 index
+    ) public {
+        FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
+        waitForBatchToBeExecuted(l1Bridgehub, chainId, params);
+    }
+
+    /// we might not need this. 
+    /// nullifier.finalizeDeposit simulation probably happens at an earlier blocknumber. 
+    /// It might be enough to wait for the merkle proof from the server.
     function waitForBatchToBeExecuted(
         address l1Bridgehub,
         uint256 chainId,
@@ -70,15 +81,47 @@ contract ZKSProvider is Script {
         IGetters getters = IGetters(bridgehub.getZKChain(actualChainId));
         uint256 totalBatchesExecuted;
         uint256 loopCount = 0;
-        while (totalBatchesExecuted < actualBatchNumber) {
+        // _initCreate2FactoryParams(address(0), bytes32(0));
+        // instantiateCreate2Factory();
+
+        // IteratedReader reader = IteratedReader(deployViaCreate2(abi.encodePacked(type(IteratedReader).creationCode)));
+        // console.log("Reader deployed at", address(reader));
+
+        while (totalBatchesExecuted < actualBatchNumber && loopCount < 30) {
             loopCount++;
-            totalBatchesExecuted = getters.getTotalBatchesExecuted();
-            uint256 secondsToWait = 3;
+            // kl todo create2 a getTotalBatchesExecuted readed that takes an extra var so we can iterate
+            // totalBatchesExecuted = getters.getTotalBatchesExecuted();
+            totalBatchesExecuted = getTotalBatchesExecuted(address(getters));
+            uint256 secondsToWait = 5;
             vm.sleep(secondsToWait * 1000);
             console.log("Waiting for batch to be executed", totalBatchesExecuted, actualBatchNumber);
             console.log("Waited", loopCount * secondsToWait, "seconds");
         }
+        // require(totalBatchesExecuted >= actualBatchNumber, "Batch not executed");
     }
+
+    /// we use this as forge caches the result
+    function getTotalBatchesExecuted(
+        address chainAddress
+    ) public returns (uint256) {
+        string[] memory args = new string[](5);
+        args[0] = "cast";
+        args[1] = "call";
+        args[2] = vm.toString(chainAddress);
+        args[3] = "getTotalBatchesExecuted()(uint256)";
+        args[4] = "--json";
+
+        bytes memory modifiedJsonBytes = vm.ffi(args);
+        string memory modifiedJson = vm.toString(modifiedJsonBytes);
+        string memory json2 = string(modifiedJsonBytes);
+        // console.log("Total batches executed", modifiedJson);
+        // console.log("json2", json2);
+        bytes memory res = vm.parseJson(json2, "$[0]");
+        string memory resString = abi.decode(res, (string));
+        uint256 val = vm.parseUint(resString);
+        return val;
+    }
+
 
     function getWithdrawalLog(
         string memory l2RpcUrl,
@@ -412,7 +455,7 @@ contract ZKSProvider is Script {
     }
 
     // todo import from Utils
-    function compareStrings(string memory a, string memory b) public pure returns (bool) {
+    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 

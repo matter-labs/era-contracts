@@ -120,7 +120,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     //     }
     // }
 
-    function finishMigrationOnL1(IBridgehub bridgehub, uint256 chainId, string memory l2RpcUrl) public {
+    function finishMigrationOnL1(IBridgehub bridgehub, uint256 chainId, string memory l2RpcUrl, bool onlyWaitForFinalization) public {
         IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
         IAssetTracker l1AssetTracker = IAssetTracker(interopCenter.assetTracker());
 
@@ -147,6 +147,9 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             chainId,
             finalizeL1DepositParams[finalizeL1DepositParams.length - 1]
         );
+        if (onlyWaitForFinalization) {
+            return;
+        }
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             // console.logBytes(abi.encodeCall(l1AssetTracker.receiveMigrationOnL1, (finalizeL1DepositParams[i])));
