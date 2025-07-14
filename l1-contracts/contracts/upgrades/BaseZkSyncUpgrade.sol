@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.28;
+pragma solidity 0.8.24;
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
@@ -71,11 +71,6 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @dev This is a virtual function and should be overridden by custom upgrade implementations.
     /// @param _proposedUpgrade The upgrade to be executed.
     /// @return txHash The hash of the L2 system contract upgrade transaction.
-    /// @dev Note, that the logic of the upgrade differs depending on whether the upgrade happens on the settlement layer
-    /// or not. If the upgrade happens on the instance of the diamond proxy that is not on the settlement layer, we
-    /// do not validate any variants about the upgrade transaction or generally don't do anything related to the upgrade transaction.
-    /// Updates on diamond proxy located not on settlement layer are needed to ensure that the logic of the contracts remains compatible with
-    /// the diamond proxy on the settlement layer and so are still needed to update facets, verifiers and so on.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32 txHash) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
@@ -84,13 +79,8 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         if (block.timestamp < _proposedUpgrade.upgradeTimestamp) {
             revert TimeNotReached(_proposedUpgrade.upgradeTimestamp, block.timestamp);
         }
-        // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
-        bool isOnSettlementLayer = s.settlementLayer == address(0);
 
-        (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(
-            _proposedUpgrade.newProtocolVersion,
-            isOnSettlementLayer
-        );
+        (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(_proposedUpgrade.newProtocolVersion);
         _upgradeL1Contract(_proposedUpgrade.l1ContractsUpgradeCalldata);
         _upgradeVerifier(_proposedUpgrade.verifier, _proposedUpgrade.verifierParams);
         _setBaseSystemContracts(
@@ -100,11 +90,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             isPatchOnly
         );
 
-        // The upgrades that happen not on settlement layers are to update the logic of the facets
-        // only and do not include the upgrade transaction.
-        if (isOnSettlementLayer) {
-            txHash = _setL2SystemContractUpgrade(_proposedUpgrade.l2ProtocolUpgradeTx, newMinorVersion, isPatchOnly);
-        }
+        txHash = _setL2SystemContractUpgrade(_proposedUpgrade.l2ProtocolUpgradeTx, newMinorVersion, isPatchOnly);
 
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
@@ -300,10 +286,8 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
     /// @notice Changes the protocol version
     /// @param _newProtocolVersion The new protocol version
-    /// @param _isOnSettlementLayer Whether the chain settles on the current settlement layer.
     function _setNewProtocolVersion(
-        uint256 _newProtocolVersion,
-        bool _isOnSettlementLayer
+        uint256 _newProtocolVersion
     ) internal virtual returns (uint32 newMinorVersion, bool patchOnly) {
         uint256 previousProtocolVersion = s.protocolVersion;
         if (_newProtocolVersion <= previousProtocolVersion) {
@@ -340,9 +324,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         // If the minor version changes also, we need to ensure that the previous upgrade has been finalized.
         // In case the minor version does not change, we permit to keep the old upgrade transaction in the system, but it
         // must be ensured in the other parts of the upgrade that the upgrade transaction is not overridden.
-        // Note, that we check for the presence of the protocol upgrade transaction only when the current diamond proxy
-        // belongs to the settlement layer.
-        if (!patchOnly && _isOnSettlementLayer) {
+        if (!patchOnly) {
             // If the previous upgrade had an L2 system upgrade transaction, we require that it is finalized.
             // Note it is important to keep this check, as otherwise ZK chains might skip upgrades by overwriting
             if (s.l2SystemContractsUpgradeTxHash != bytes32(0)) {

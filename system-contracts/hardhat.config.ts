@@ -7,7 +7,7 @@ import "hardhat-typechain";
 
 export default {
   zksolc: {
-    version: "1.5.11",
+    version: "1.5.7",
     compilerSource: "binary",
     settings: {
       enableEraVMExtensions: true,
@@ -19,7 +19,7 @@ export default {
     ethNetwork: "http://localhost:8545",
   },
   solidity: {
-    version: "0.8.28",
+    version: "0.8.24",
     settings: {
       evmVersion: "cancun",
       optimizer: {

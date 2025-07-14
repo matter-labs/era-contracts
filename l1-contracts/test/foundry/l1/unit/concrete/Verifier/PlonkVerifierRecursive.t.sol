@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.24;
 
 import {PlonkVerifierTestTest} from "./PlonkVerifier.t.sol";
 import {PlonkVerifierRecursiveTest} from "contracts/dev-contracts/test/PlonkVerifierRecursiveTest.sol";

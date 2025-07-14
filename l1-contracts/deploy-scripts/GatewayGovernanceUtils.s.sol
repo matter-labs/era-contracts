@@ -94,7 +94,7 @@ abstract contract GatewayGovernanceUtils is Script {
         address _gatewayValidatorTimelock,
         address _gatewayServerNotifier,
         address _refundRecipient
-    ) internal returns (Call[] memory calls) {
+    ) internal view returns (Call[] memory calls) {
         calls = _getRegisterSettlementLayerCalls();
 
         // Registration of the new chain type manager inside the ZK Gateway chain

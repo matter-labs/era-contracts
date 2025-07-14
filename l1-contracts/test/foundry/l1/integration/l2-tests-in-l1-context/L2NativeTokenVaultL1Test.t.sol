@@ -59,10 +59,9 @@ contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeT
     }
 
     function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
+        string memory contractName
     ) internal view virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
+        return super.getCreationCode(contractName);
     }
 
     function getInitializeCalldata(

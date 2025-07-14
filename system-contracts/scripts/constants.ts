@@ -60,12 +60,6 @@ export const SYSTEM_CONTRACTS: ISystemContracts = {
     lang: Language.Yul,
     path: "precompiles",
   },
-  modexp: {
-    address: "0x0000000000000000000000000000000000000005",
-    codeName: "Modexp",
-    lang: Language.Yul,
-    path: "precompiles",
-  },
   ecAdd: {
     address: "0x0000000000000000000000000000000000000006",
     codeName: "EcAdd",

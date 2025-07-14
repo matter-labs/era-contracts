@@ -11,6 +11,7 @@ import { ethTestConfig } from "./deploy-utils";
 // to running this script.
 async function main() {
   const program = new Command();
+
   program
     .version("0.1.0")
     .name("deploy-force-deploy-upgrader-through-l1")

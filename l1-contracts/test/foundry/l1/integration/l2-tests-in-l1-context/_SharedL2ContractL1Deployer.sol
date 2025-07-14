@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.28;
+pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
@@ -123,24 +123,23 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
-        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
-        addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
-        addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade");
+        addresses.stateTransition.verifier = deploySimpleContract("Verifier");
+        addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock");
         deployStateTransitionDiamondFacets();
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", true);
+        ) = deployTuppWithContract("ChainTypeManager");
     }
 
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployL1IntegrationScript, SharedL2ContractDeployer) {}
 
     function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
+        string memory contractName
     ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
+        return super.getCreationCode(contractName);
     }
 
     function getInitializeCalldata(
