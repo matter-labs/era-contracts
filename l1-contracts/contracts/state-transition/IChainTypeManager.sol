@@ -71,7 +71,9 @@ interface IChainTypeManager {
         bytes32 genesisBatchHash,
         uint64 genesisIndexRepeatedStorageChanges,
         bytes32 genesisBatchCommitment,
+        Diamond.DiamondCutData newInitialCut,
         bytes32 newInitialCutHash,
+        bytes forceDeploymentsData,
         bytes32 forceDeploymentHash
     );
 

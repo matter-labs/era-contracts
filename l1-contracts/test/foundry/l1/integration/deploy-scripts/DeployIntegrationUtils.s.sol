@@ -7,7 +7,7 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {StateTransitionDeployedAddresses, FacetCut, Action} from "deploy-scripts/Utils.sol";
+import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
 abstract contract DeployIntegrationUtils is Script, DeployUtils {
     using stdToml for string;

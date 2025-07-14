@@ -15,7 +15,9 @@ contract MockContract {
 
     constructor() {
         // Clean results if mock was redeployed.
-        delete results;
+        assembly {
+            sstore(results.slot, 0)
+        }
     }
 
     // This function call will not pass to fallback, but this is fine for the tests.
