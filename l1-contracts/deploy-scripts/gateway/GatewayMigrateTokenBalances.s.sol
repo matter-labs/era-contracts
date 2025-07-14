@@ -27,67 +27,22 @@ import {Utils} from "../Utils.sol";
 contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     using stdJson for string;
 
-    string constant gwRpcUrl = "http://localhost:3150";
     IAssetTracker l2AssetTracker = IAssetTracker(L2_ASSET_TRACKER_ADDR);
     INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
-    function fundL2Address(uint256 chainId, address bridgehubAddress, address l2Address, uint256 amount) public {
-        uint256 actualAmount;
-        if (amount > 0) {
-            actualAmount = amount;
-        } else {
-            actualAmount = 5 ether;
-        }
-        uint256 settlementLayer = IBridgehub(bridgehubAddress).settlementLayer(chainId);
-        Utils.runL1L2Transaction(
-            abi.encode(),
-            1000000,
-            actualAmount,
-            new bytes[](0),
-            l2Address,
-            chainId,
-            bridgehubAddress,
-            address(0),
-            l2Address
-        );
-        if (settlementLayer != block.chainid) {
-            Utils.runL1L2Transaction(
-                abi.encode(),
-                1000000,
-                actualAmount,
-                new bytes[](0),
-                l2Address,
-                settlementLayer,
-                bridgehubAddress,
-                address(0),
-                l2Address
-            );
-        }
-    }
 
     function startTokenMigrationOnL2(uint256 chainId, string memory l2RpcUrl) public {
-        // Get the list of tokens from L1NativeTokenVault
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
-
-        // Set the L2 RPC for this chain
-        // vm.envString(string.concat("L2_RPC_URL_", vm.toString(chainId)));
-        string[2][] memory urls = vm.rpcUrls();
-        // console.log("l2RpcUrl", l2RpcUrl);
-        console.log(block.chainid);
 
         // Set L2 RPC for each token and migrate balances
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             bytes32 assetId = assetIds[i];
 
-            // Call migrateTokenBalanceFromL2 on the AssetTracker
             console.log("Migrating token balance for assetId:", uint256(assetId));
-            // vm.recordLogs();
             vm.broadcast();
             {
                 l2AssetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
             }
-            // Get the logs
-            Vm.Log[] memory entries = vm.getRecordedLogs();
         }
     }
 
@@ -100,25 +55,6 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         }
     }
 
-    // function continueMigrationOnGateway(IBridgehub bridgehub, uint256 chainId, string memory l2RpcUrl) public {
-    //     bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile();
-
-    //     uint256 bridgedTokenCount = msgHashes.length;
-    //     FinalizeL1DepositParams[] memory finalizeL1DepositParams = new FinalizeL1DepositParams[](bridgedTokenCount);
-
-    //     for (uint256 i = 0; i < bridgedTokenCount; i++) {
-    //         finalizeL1DepositParams[i] = BroadcastUtils.getL2ToL1LogProof(msgHashes[i], l2RpcUrl);
-    //     }
-
-    //     // Make RPC call to get L2 to L1 message proof
-    //     for (uint256 i = 0; i < bridgedTokenCount; i++) {
-    //         bytes32 gwMsgHash = msgHashes[i];
-
-    //         IAssetTracker l2AssetTracker = IAssetTracker(L2_ASSET_TRACKER_ADDR);
-    //         vm.broadcast();
-    //         l2AssetTracker.receiveMigrationOnGateway(finalizeL1DepositParams[i]);
-    //     }
-    // }
 
     function finishMigrationOnL1(IBridgehub bridgehub, uint256 chainId, string memory l2RpcUrl, bool onlyWaitForFinalization) public {
         IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
