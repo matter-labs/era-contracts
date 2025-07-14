@@ -3,6 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/contracts/system-contracts/libraries/EfficientCall.sol";
+/* solhint-disable-next-line no-unused-import */
 import {ForceDeployment, IContractDeployer} from "@matterlabs/zksync-contracts/contracts/system-contracts/interfaces/IContractDeployer.sol";
 import {BytecodeError, MalformedBytecode} from "./errors/L2ContractErrors.sol";
 
@@ -25,7 +26,6 @@ interface IL1Messenger {
     /// @return Returns the keccak256 hashed value of the message.
     function sendToL1(bytes calldata _message) external returns (bytes32);
 }
-
 
 /**
  * @author Matter Labs
