@@ -43,22 +43,10 @@ Update the system contracts hashes: `yarn sc calculate-hashes:fix`
 
 ### Run tests
 
-The tests of the system contracts utilize the Anvil-ZKsync. In order to run the tests, execute the following commands in the root of the repository:
-
-```
-yarn install-anvil
-```
-
-If you want to run test-node with built-in contracts, run:
+The tests of the system contracts utilize the ZKsync test node. In order to run the tests, execute the following commands in the root of the repository:
 
 ```
 yarn test-node
-```
-
-If you want to run test-node with local contracts for development, run:
-
-```
-yarn test-node-local-contracts
 ```
 
 It will run the test node, and you can see its logs in the output.
@@ -95,10 +83,8 @@ Also, when testing these contracts, some of them should also be deployed on the 
 - [Ecrecover.yul](contracts%2Fprecompiles%2FEcrecover.yul): uses precompile call instruction, which is address-dependent
 - [Keccak256.yul](contracts%2Fprecompiles%2FKeccak256.yul): uses precompile call instruction, which is address-dependent
 - [SHA256.yul](contracts%2Fprecompiles%2FSHA256.yul): uses precompile call instruction, which is address-dependent
-- [Modexp.yul](contracts%2Fprecompiles%2FModexp.yul): uses precompile call instruction, which is address-dependent
-- [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul): uses precompile call instruction, which is address-dependent
-- [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul): uses precompile call instruction, which is address-dependent
-- [EcPairing.yul](contracts%2Fprecompiles%2FEcPairing.yul): uses precompile call instruction, which is address-dependent
+
+However, this is not the case for [EcAdd.yul](contracts%2Fprecompiles%2FEcAdd.yul) and [EcMul.yul](contracts%2Fprecompiles%2FEcMul.yul), so they can be deployed on any addresses, even outside kernel space.
 
 #### Test contracts/features
 

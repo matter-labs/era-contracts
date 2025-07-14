@@ -3,7 +3,7 @@ import type { ZkSyncArtifact } from "@matterlabs/hardhat-zksync-deploy/dist/type
 import { BigNumber } from "ethers";
 import type { BytesLike } from "ethers";
 import * as hre from "hardhat";
-import { ethers, network } from "hardhat";
+import { ethers } from "hardhat";
 import type { Contract } from "zksync-ethers";
 import * as zksync from "zksync-ethers";
 import { Provider, utils, Wallet } from "zksync-ethers";
@@ -13,7 +13,6 @@ import { AccountCodeStorageFactory, ContractDeployerFactory } from "../../typech
 import {
   REAL_ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT_ADDRESS,
   REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-  SERVICE_CALL_PSEUDO_CALLER,
   TWO_IN_256,
 } from "./constants";
 
@@ -36,13 +35,6 @@ const RICH_WALLETS = [
   },
 ];
 
-const fallbackAbi = [
-  {
-    type: "fallback",
-    stateMutability: "payable",
-  },
-];
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const provider = new Provider((hre.network.config as any).url);
 
@@ -50,10 +42,6 @@ const wallet = new Wallet(RICH_WALLETS[0].privateKey, provider);
 // TODO(EVM-392): refactor to avoid `any` here.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const deployer = new Deployer(hre, wallet as any);
-
-export function createPrecompileContractAtAddress(precompileAddress: string) {
-  return new zksync.Contract(precompileAddress, fallbackAbi, wallet);
-}
 
 export async function callFallback(contract: Contract, data: string) {
   // `eth_Call` revert is not parsed by ethers, so we send
@@ -259,28 +247,4 @@ export function compressStateDiffs(enumerationIndexSize: number, stateDiffs: Sta
   return ethers.utils.hexlify(
     ethers.utils.concat([ethers.utils.solidityPack(["uint16"], [numInitial]), ...initial, ...repeated])
   );
-}
-
-const ERAVM_AND_EVM_ALLOWED_TO_DEPLOY = 1;
-export async function enableEvmEmulation() {
-  await network.provider.request({
-    method: "hardhat_setBalance",
-    params: [SERVICE_CALL_PSEUDO_CALLER, "0xfffffffffffffffff"],
-  });
-
-  await network.provider.request({ method: "hardhat_impersonateAccount", params: [SERVICE_CALL_PSEUDO_CALLER] });
-  const serviceTransactionSender = await ethers.provider.getSigner(SERVICE_CALL_PSEUDO_CALLER);
-
-  //const serviceTransactionSender = await ethers.getImpersonatedSigner(SERVICE_CALL_PSEUDO_CALLER);
-  const deployerContract = ContractDeployerFactory.connect(
-    REAL_DEPLOYER_SYSTEM_CONTRACT_ADDRESS,
-    serviceTransactionSender
-  );
-
-  await deployerContract.setAllowedBytecodeTypesToDeploy(ERAVM_AND_EVM_ALLOWED_TO_DEPLOY);
-
-  await network.provider.request({
-    method: "hardhat_stopImpersonatingAccount",
-    params: [SERVICE_CALL_PSEUDO_CALLER],
-  });
 }

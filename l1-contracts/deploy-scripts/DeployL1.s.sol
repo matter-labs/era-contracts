@@ -83,7 +83,6 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {DeployUtils, GeneratedData, Config, DeployedAddresses, FixedForceDeploymentsData} from "./DeployUtils.s.sol";
 
@@ -124,29 +123,27 @@ contract DeployL1Script is Script, DeployUtils {
         instantiateCreate2Factory();
         deployIfNeededMulticall3();
 
-        addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
+        addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier");
 
         deployVerifiers();
 
-        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
-        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade");
+        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade");
         deployDAValidators();
-        (addresses.stateTransition.validatorTimelock) = deploySimpleContract("ValidatorTimelock", false);
+        (addresses.stateTransition.validatorTimelock) = deploySimpleContract("ValidatorTimelock");
 
-        (addresses.governance) = deploySimpleContract("Governance", false);
-        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+        (addresses.governance) = deploySimpleContract("Governance");
+        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable");
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
 
-        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
+        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance);
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
-            "Bridgehub",
-            false
+            "Bridgehub"
         );
         (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
-            "MessageRoot",
-            false
+            "MessageRoot"
         );
 
         (
@@ -155,45 +152,38 @@ contract DeployL1Script is Script, DeployUtils {
         ) = deployServerNotifier();
 
         (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
-            "L1Nullifier",
-            false
+            "L1Nullifier"
         );
         (addresses.bridges.l1AssetRouterImplementation, addresses.bridges.l1AssetRouterProxy) = deployTuppWithContract(
-            "L1AssetRouter",
-            false
+            "L1AssetRouter"
         );
-        (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20", false);
-        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
-            "BridgedTokenBeacon",
-            config.ownerAddress,
-            false
-        );
+        (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20");
+        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner("BridgedTokenBeacon", config.ownerAddress);
         (
             addresses.vaults.l1NativeTokenVaultImplementation,
             addresses.vaults.l1NativeTokenVaultProxy
-        ) = deployTuppWithContract("L1NativeTokenVault", false);
+        ) = deployTuppWithContract("L1NativeTokenVault");
         setL1NativeTokenVaultParams();
 
         (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
-            "L1ERC20Bridge",
-            false
+            "L1ERC20Bridge"
         );
         updateSharedBridge();
         // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
         (
             addresses.bridgehub.ctmDeploymentTrackerImplementation,
             addresses.bridgehub.ctmDeploymentTrackerProxy
-        ) = deployTuppWithContract("CTMDeploymentTracker", false);
+        ) = deployTuppWithContract("CTMDeploymentTracker");
         setBridgehubParams();
 
         initializeGeneratedData();
 
-        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever", false);
+        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever");
         deployStateTransitionDiamondFacets();
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", false);
+        ) = deployTuppWithContract("ChainTypeManager");
         registerChainTypeManager();
         setChainTypeManagerInValidatorTimelock();
         setChainTypeManagerInServerNotifier();
@@ -246,9 +236,9 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployVerifiers() internal {
-        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
-        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
-        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
+        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk");
+        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk");
+        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier");
     }
 
     function setChainTypeManagerInServerNotifier() internal {
@@ -259,17 +249,17 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployDAValidators() internal {
-        addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
+        addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender);
         updateRollupDAManager();
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
-        addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
+        addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator");
 
-        addresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
+        addresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator");
 
         if (config.contracts.availL1DAValidator == address(0)) {
-            addresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge", false);
-            addresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator", false);
+            addresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge");
+            addresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator");
         } else {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
@@ -639,44 +629,36 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function deployTuppWithContract(
-        string memory contractName,
-        bool isZKBytecode
+        string memory contractName
     ) internal virtual override returns (address implementation, address proxy) {
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
-            contractName,
-            addresses.transparentProxyAdmin,
-            isZKBytecode
-        );
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(contractName, addresses.transparentProxyAdmin);
     }
 
     function deployTuppWithContractAndProxyAdmin(
         string memory contractName,
-        address proxyAdmin,
-        bool isZKBytecode
+        address proxyAdmin
     ) internal returns (address implementation, address proxy) {
         implementation = deployViaCreate2AndNotify(
-            getCreationCode(contractName, false),
-            getCreationCalldata(contractName, false),
+            getCreationCode(contractName),
+            getCreationCalldata(contractName),
             contractName,
-            string.concat(contractName, " Implementation"),
-            isZKBytecode
+            string.concat(contractName, " Implementation")
         );
 
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName)),
             contractName,
-            string.concat(contractName, " Proxy"),
-            isZKBytecode
+            string.concat(contractName, " Proxy")
         );
         return (implementation, proxy);
     }
 
     function deployServerNotifier() internal returns (address implementation, address proxy) {
         // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin, false);
+        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin);
 
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin);
     }
 
     function saveDiamondSelectors() public {
@@ -744,167 +726,88 @@ contract DeployL1Script is Script, DeployUtils {
 
     ////////////////////////////// GetContract data  /////////////////////////////////
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "ChainRegistrar")) {
-                return type(ChainRegistrar).creationCode;
-            } else if (compareStrings(contractName, "Bridgehub")) {
-                // Bridgehub is a special case because its bytecode was generated using a low optimizer runs setting.
-                return Utils.readFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return type(MessageRoot).creationCode;
-            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-                return type(CTMDeploymentTracker).creationCode;
-            } else if (compareStrings(contractName, "L1Nullifier")) {
-                if (config.supportL2LegacySharedBridgeTest) {
-                    return type(L1NullifierDev).creationCode;
-                } else {
-                    return type(L1Nullifier).creationCode;
-                }
-            } else if (compareStrings(contractName, "L1AssetRouter")) {
-                return type(L1AssetRouter).creationCode;
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return type(L1ERC20Bridge).creationCode;
-            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-                return type(L1NativeTokenVault).creationCode;
-            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
-                return type(BridgedStandardERC20).creationCode;
-            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
-                return type(UpgradeableBeacon).creationCode;
-            } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
-                return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-            } else if (compareStrings(contractName, "RollupDAManager")) {
-                return type(RollupDAManager).creationCode;
-            } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-                return Utils.readRollupDAValidatorBytecode();
-            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
-                return type(ValidiumL1DAValidator).creationCode;
-            } else if (compareStrings(contractName, "AvailL1DAValidator")) {
-                return Utils.readAvailL1DAValidatorBytecode();
-            } else if (compareStrings(contractName, "DummyAvailBridge")) {
-                return Utils.readDummyAvailBridgeBytecode();
-            } else if (compareStrings(contractName, "Verifier")) {
-                if (config.testnetVerifier) {
-                    return type(TestnetVerifier).creationCode;
-                } else {
-                    return type(DualVerifier).creationCode;
-                }
-            } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return type(L1VerifierFflonk).creationCode;
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return type(L1VerifierPlonk).creationCode;
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return type(DefaultUpgrade).creationCode;
-            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
-                return type(L1GenesisUpgrade).creationCode;
-            } else if (compareStrings(contractName, "ValidatorTimelock")) {
-                return type(ValidatorTimelock).creationCode;
-            } else if (compareStrings(contractName, "Governance")) {
-                return type(Governance).creationCode;
-            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-                return type(ChainAdminOwnable).creationCode;
-            } else if (compareStrings(contractName, "AccessControlRestriction")) {
-                // TODO(EVM-924): this function is unused
-                return type(AccessControlRestriction).creationCode;
-            } else if (compareStrings(contractName, "ChainAdmin")) {
-                return type(ChainAdmin).creationCode;
-            } else if (compareStrings(contractName, "ChainTypeManager")) {
-                return type(ChainTypeManager).creationCode;
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
-                return type(BytecodesSupplier).creationCode;
-            } else if (compareStrings(contractName, "ProxyAdmin")) {
-                return type(ProxyAdmin).creationCode;
-            } else if (compareStrings(contractName, "ExecutorFacet")) {
-                return type(ExecutorFacet).creationCode;
-            } else if (compareStrings(contractName, "AdminFacet")) {
-                return type(AdminFacet).creationCode;
-            } else if (compareStrings(contractName, "MailboxFacet")) {
-                return type(MailboxFacet).creationCode;
-            } else if (compareStrings(contractName, "GettersFacet")) {
-                return type(GettersFacet).creationCode;
-            } else if (compareStrings(contractName, "DiamondInit")) {
-                return type(DiamondInit).creationCode;
-            } else if (compareStrings(contractName, "ServerNotifier")) {
-                return type(ServerNotifier).creationCode;
-            } else if (compareStrings(contractName, "UpgradeStageValidator")) {
-                return type(UpgradeStageValidator).creationCode;
+    function getCreationCode(string memory contractName) internal view virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "ChainRegistrar")) {
+            return type(ChainRegistrar).creationCode;
+        } else if (compareStrings(contractName, "Bridgehub")) {
+            return type(Bridgehub).creationCode;
+        } else if (compareStrings(contractName, "MessageRoot")) {
+            return type(MessageRoot).creationCode;
+        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+            return type(CTMDeploymentTracker).creationCode;
+        } else if (compareStrings(contractName, "L1Nullifier")) {
+            if (config.supportL2LegacySharedBridgeTest) {
+                return type(L1NullifierDev).creationCode;
             } else {
-                revert(string.concat("Contract ", contractName, " creation code not set"));
+                return type(L1Nullifier).creationCode;
             }
+        } else if (compareStrings(contractName, "L1AssetRouter")) {
+            return type(L1AssetRouter).creationCode;
+        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+            return type(L1ERC20Bridge).creationCode;
+        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+            return type(L1NativeTokenVault).creationCode;
+        } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+            return type(BridgedStandardERC20).creationCode;
+        } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+            return type(UpgradeableBeacon).creationCode;
+        } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+            return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+        } else if (compareStrings(contractName, "RollupDAManager")) {
+            return type(RollupDAManager).creationCode;
+        } else if (compareStrings(contractName, "RollupL1DAValidator")) {
+            return Utils.readRollupDAValidatorBytecode();
+        } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+            return type(ValidiumL1DAValidator).creationCode;
+        } else if (compareStrings(contractName, "AvailL1DAValidator")) {
+            return Utils.readAvailL1DAValidatorBytecode();
+        } else if (compareStrings(contractName, "DummyAvailBridge")) {
+            return Utils.readDummyAvailBridgeBytecode();
+        } else if (compareStrings(contractName, "Verifier")) {
+            if (config.testnetVerifier) {
+                return type(TestnetVerifier).creationCode;
+            } else {
+                return type(DualVerifier).creationCode;
+            }
+        } else if (compareStrings(contractName, "VerifierFflonk")) {
+            return type(L1VerifierFflonk).creationCode;
+        } else if (compareStrings(contractName, "VerifierPlonk")) {
+            return type(L1VerifierPlonk).creationCode;
+        } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            return type(DefaultUpgrade).creationCode;
+        } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+            return type(L1GenesisUpgrade).creationCode;
+        } else if (compareStrings(contractName, "ValidatorTimelock")) {
+            return type(ValidatorTimelock).creationCode;
+        } else if (compareStrings(contractName, "Governance")) {
+            return type(Governance).creationCode;
+        } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+            return type(ChainAdminOwnable).creationCode;
+        } else if (compareStrings(contractName, "AccessControlRestriction")) {
+            // TODO(EVM-924): this function is unused
+            return type(AccessControlRestriction).creationCode;
+        } else if (compareStrings(contractName, "ChainAdmin")) {
+            return type(ChainAdmin).creationCode;
+        } else if (compareStrings(contractName, "ChainTypeManager")) {
+            return type(ChainTypeManager).creationCode;
+        } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            return type(BytecodesSupplier).creationCode;
+        } else if (compareStrings(contractName, "ProxyAdmin")) {
+            return type(ProxyAdmin).creationCode;
+        } else if (compareStrings(contractName, "ExecutorFacet")) {
+            return type(ExecutorFacet).creationCode;
+        } else if (compareStrings(contractName, "AdminFacet")) {
+            return type(AdminFacet).creationCode;
+        } else if (compareStrings(contractName, "MailboxFacet")) {
+            return type(MailboxFacet).creationCode;
+        } else if (compareStrings(contractName, "GettersFacet")) {
+            return type(GettersFacet).creationCode;
+        } else if (compareStrings(contractName, "DiamondInit")) {
+            return type(DiamondInit).creationCode;
+        } else if (compareStrings(contractName, "ServerNotifier")) {
+            return type(ServerNotifier).creationCode;
         } else {
-            if (compareStrings(contractName, "ChainRegistrar")) {
-                return Utils.readZKFoundryBytecodeL1("ChainRegistrar.sol", "ChainRegistrar");
-            } else if (compareStrings(contractName, "Bridgehub")) {
-                return Utils.readZKFoundryBytecodeL1("Bridgehub.sol", "Bridgehub");
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return Utils.readZKFoundryBytecodeL1("MessageRoot.sol", "MessageRoot");
-            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-                return Utils.readZKFoundryBytecodeL1("CTMDeploymentTracker.sol", "CTMDeploymentTracker");
-            } else if (compareStrings(contractName, "L2AssetRouter")) {
-                return Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return Utils.readZKFoundryBytecodeL1("L1ERC20Bridge.sol", "L1ERC20Bridge");
-            } else if (compareStrings(contractName, "L2NativeTokenVault")) {
-                return Utils.readZKFoundryBytecodeL1("L2NativeTokenVault.sol", "L2NativeTokenVault");
-            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
-                return Utils.readZKFoundryBytecodeL1("BridgedStandardERC20.sol", "BridgedStandardERC20");
-            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
-                return Utils.readZKFoundryBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
-            } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
-                return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
-            } else if (compareStrings(contractName, "RollupDAManager")) {
-                return Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
-            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
-                return Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
-            } else if (compareStrings(contractName, "Verifier")) {
-                if (config.testnetVerifier) {
-                    return Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
-                } else {
-                    return Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
-                }
-            } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
-            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
-                return Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
-            } else if (compareStrings(contractName, "ValidatorTimelock")) {
-                return Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
-            } else if (compareStrings(contractName, "Governance")) {
-                return Utils.readZKFoundryBytecodeL1("Governance.sol", "Governance");
-            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-                return Utils.readZKFoundryBytecodeL1("ChainAdminOwnable.sol", "ChainAdminOwnable");
-            } else if (compareStrings(contractName, "AccessControlRestriction")) {
-                // TODO(EVM-924): this function is unused
-                return Utils.readZKFoundryBytecodeL1("AccessControlRestriction.sol", "AccessControlRestriction");
-            } else if (compareStrings(contractName, "ChainAdmin")) {
-                return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
-            } else if (compareStrings(contractName, "ChainTypeManager")) {
-                return Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
-                return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
-            } else if (compareStrings(contractName, "ProxyAdmin")) {
-                return Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
-            } else if (compareStrings(contractName, "ExecutorFacet")) {
-                return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
-            } else if (compareStrings(contractName, "AdminFacet")) {
-                return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
-            } else if (compareStrings(contractName, "MailboxFacet")) {
-                return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
-            } else if (compareStrings(contractName, "GettersFacet")) {
-                return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
-            } else if (compareStrings(contractName, "DiamondInit")) {
-                return Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
-            } else if (compareStrings(contractName, "ServerNotifier")) {
-                return Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
-            } else {
-                revert(string.concat("Contract ", contractName, " creation code not set"));
-            }
+            revert(string.concat("Contract ", contractName, " creation code not set"));
         }
     }
 
