@@ -152,7 +152,7 @@ contract DeployL2Script is Script {
         config.eraChainId = toml.readUint("$.era_chain_id");
 
         uint256 validatorTypeUint = toml.readUint("$.da_validator_type");
-        require(validatorTypeUint < 5, "Invalid DA validator type");
+        require(validatorTypeUint < 4, "Invalid DA validator type");
         config.validatorType = DAValidatorType(validatorTypeUint);
     }
 
