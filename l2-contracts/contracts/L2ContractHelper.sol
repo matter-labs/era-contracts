@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+import {EfficientCall} from "@matterlabs/zksync-contracts/contracts/system-contracts/libraries/EfficientCall.sol";
 import {BytecodeError, MalformedBytecode} from "./errors/L2ContractErrors.sol";
 
 /**
