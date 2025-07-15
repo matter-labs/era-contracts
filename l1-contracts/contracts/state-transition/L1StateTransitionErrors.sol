@@ -44,8 +44,6 @@ error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUn
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
 error L1DAValidatorInvalidSender(address msgSender);
-// 0x944bc075
-error L2DAValidatorAddressIsZero();
 // 0xa969e486
 error LocalRootIsZero();
 // 0xbdaf7d42
