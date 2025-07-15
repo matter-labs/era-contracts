@@ -50,7 +50,9 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
@@ -105,8 +107,6 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     }
 
     struct ExpectedL2Addresses {
-        address expectedRollupL2DAValidator;
-        address expectedValidiumL2DAValidator;
         address l2SharedBridgeLegacyImpl;
         address l2BridgedStandardERC20Impl;
     }
@@ -552,11 +552,9 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
-        bytes[] memory additionalDependencies = new bytes[](4); // Deps after Gateway upgrade
+        bytes[] memory additionalDependencies = new bytes[](2); // Deps after Gateway upgrade
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
@@ -784,16 +782,6 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
             config.contracts.recursionNodeLevelVkHash
         );
 
-        vm.serializeAddress(
-            "contracts_newConfig",
-            "expected_rollup_l2_da_validator",
-            getExpectedL2Address("RollupL2DAValidator")
-        );
-        vm.serializeAddress(
-            "contracts_newConfig",
-            "expected_validium_l2_da_validator",
-            getExpectedL2Address("NoDAL2DAValidator")
-        );
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
 
         vm.serializeBytes(
@@ -1346,7 +1334,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
             target: addresses.daAddresses.rollupDAManager,
             data: abi.encodeCall(
                 RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, getExpectedL2Address("RollupL2DAValidator"), true)
+                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true)
             ),
             value: 0
         });
@@ -1358,11 +1346,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (
-                gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
-                getExpectedL2Address("RollupL2DAValidator"),
-                true
-            )
+            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
         calls = _prepareL1ToGatewayCall(
@@ -1390,10 +1374,6 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
                 return type(GovernanceUpgradeTimer).creationCode;
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-            } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             } else {
                 return super.getCreationCode(contractName, isZKBytecode);
             }
@@ -1412,10 +1392,6 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
                 return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
             } else if (compareStrings(contractName, "L2StandardERC20")) {
                 return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-            } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             } else {
                 return super.getCreationCode(contractName, isZKBytecode);
             }
@@ -1441,10 +1417,6 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
         } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L2StandardERC20")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ChainTypeManager")) {
             if (!isZKBytecode) {

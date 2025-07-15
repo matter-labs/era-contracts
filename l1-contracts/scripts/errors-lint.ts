@@ -134,7 +134,7 @@ function processFile(filePath: string, fix: boolean, collectedErrors: Map<string
       const selector = ethers.utils.id(sig).slice(0, 10);
       const comment = `// ${selector}`;
       const prev = output[output.length - 1];
-      if (!prev || prev.trim() !== comment) {
+      if (!prev || (prev.trim() !== comment && !prev.trim().startsWith("// skip-errors-lint"))) {
         if (!fix) throw new Error(`Missing selector above ${filePath}:${start + 1}`);
         if (prev && prev.trim().startsWith("//")) output[output.length - 1] = comment;
         else output.push(comment);
