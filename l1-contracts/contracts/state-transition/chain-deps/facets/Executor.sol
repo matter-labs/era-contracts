@@ -15,7 +15,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_SYSTE
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityTree, PriorityOpsBatchInfo} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch} from "../../../common/L1ContractErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, IncorrectBatchChainId} from "../../../common/L1ContractErrors.sol";
 import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, PriorityOpsDataLeftPathLengthIsNotZero, PriorityOpsDataRightPathLengthIsNotZero, PriorityOpsDataItemHashesLengthIsNotZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -121,6 +121,85 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo, metadataHash, auxiliaryOutputHash)
             );
+        }
+    }
+
+    function _commitOneBoojumOSBatch(
+        StoredBatchInfo memory _previousBatch,
+        CommitBoojumOSBatchInfo memory _newBatch,
+        // TODO: l2 upgrade is not handled
+        bytes32 _expectedSystemContractUpgradeTxHash
+    ) internal returns (StoredBatchInfo memory storedBatchInfo) {
+        // only commit next batch
+        if (_newBatch.batchNumber != _previousBatch.batchNumber + 1) {
+            revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
+        }
+
+        // TODO: should we use daOutput?
+        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+            _chainId: s.chainId,
+            _batchNumber: uint256(_newBatch.batchNumber),
+            _l2DAValidatorOutputHash: _newBatch.daCommitment,
+            _operatorDAInput: _newBatch.operatorDAInput,
+            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        });
+
+        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > _newBatch.firstBlockTimestamp) {
+            revert TimeNotReached(_newBatch.firstBlockTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
+        }
+        if (_newBatch.lastBlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
+            revert L2TimestampTooBig();
+        }
+        if (_newBatch.chainId != s.chainId) {
+            revert IncorrectBatchChainId();
+        }
+        if (_newBatch.l2DaValidator != s.l2DAValidator) {
+            //            revert MismatchL2DAValidator();
+        }
+
+        // Create batch output for PI
+        bytes32 batchOutputsHash = keccak256(
+            abi.encodePacked(
+                _newBatch.chainId,
+                _newBatch.firstBlockTimestamp,
+                _newBatch.lastBlockTimestamp,
+                uint160(_newBatch.l2DaValidator),
+                _newBatch.daCommitment,
+                _newBatch.numberOfLayer1Txs,
+                _newBatch.priorityOperationsHash,
+                _newBatch.l2LogsTreeRoot,
+                bytes32(0) // upgrade tx hash
+            )
+        );
+
+        storedBatchInfo = StoredBatchInfo({
+            batchNumber: _newBatch.batchNumber,
+            batchHash: _newBatch.newStateCommitment,
+            indexRepeatedStorageChanges: 0,
+            numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
+            priorityOperationsHash: _newBatch.priorityOperationsHash,
+            l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
+            timestamp: 0,
+            commitment: batchOutputsHash
+        });
+
+        if (L1_CHAIN_ID != block.chainid) {
+            // If we are settling on top of Gateway, we always relay the data needed to construct
+            // a proof for a new batch (and finalize it) even if the data for Gateway transactions has been fully lost.
+            // This data includes:
+            // - `StoredBatchInfo` that is needed to execute a block on top of the previous one.
+            // But also, we need to ensure that the components of the commitment of the batch are available:
+            // - passThroughDataHash (and its full preimage)
+            // - metadataHash (only the hash)
+            // - auxiliaryOutputHash (only the hash)
+            // The source of the truth for the data from above can be found here:
+            // https://github.com/matter-labs/zksync-protocol/blob/c80fa4ee94fd0f7f05f7aea364291abb8b4d7351/crates/zkevm_circuits/src/scheduler/mod.rs#L1356-L1369
+            //
+            // The full preimage of `passThroughDataHash` consists of the state root as well as the `indexRepeatedStorageChanges`. All
+            // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
+            // slither-disable-next-line unused-return
+            // TODO: change RELAYED_EXECUTOR_VERSION?
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo));
         }
     }
 
@@ -260,23 +339,39 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @inheritdoc IExecutor
-    function commitBatchesSharedBridge(
-        uint256, // _chainId
+    function _commitBatchesSharedBridgeZKOS(
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _commitData
-    ) external nonReentrant onlyValidator onlySettlementLayer {
-        // check that we have the right protocol version
-        // three comments:
-        // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
-        // to solve this we will need to add the feature to create batches with only the protocol upgrade tx, without any other txs.
-        // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
-        // as their protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
-        // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
-        if (!IChainTypeManager(s.chainTypeManager).protocolVersionIsActive(s.protocolVersion)) {
-            revert InvalidProtocolVersion();
+    ) internal {
+        (StoredBatchInfo memory lastCommittedBatchData, CommitBoojumOSBatchInfo[] memory newBatchesData) = BatchDecoder
+            .decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
+        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
+        // and so the range checked in the `decodeAndCheckCommitData` is enough.
+        if (newBatchesData.length != 1) {
+            revert CanOnlyProcessOneBatch();
         }
+        // Check that we commit batches after last committed batch
+        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(
+                s.storedBatchHashes[s.totalBatchesCommitted],
+                _hashStoredBatchInfo(lastCommittedBatchData)
+            );
+        }
+
+        // TOOD: handle l2 upgrade
+        _commitBoojumOSBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
+
+        s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+    }
+
+    function _commitBatchesSharedBridgeEra(
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
+    ) internal {
         (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
             .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
@@ -309,6 +404,30 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
     }
 
+    /// @inheritdoc IExecutor
+    function commitBatchesSharedBridge(
+        uint256, // _chainId
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
+    ) external nonReentrant onlyValidator onlySettlementLayer {
+        // check that we have the right protocol version
+        // three comments:
+        // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
+        // to solve this we will need to add the feature to create batches with only the protocol upgrade tx, without any other txs.
+        // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
+        // as their protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
+        // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
+        if (!IChainTypeManager(s.chainTypeManager).protocolVersionIsActive(s.protocolVersion)) {
+            revert InvalidProtocolVersion();
+        }
+        if (s.boojumOS) {
+            _commitBatchesSharedBridgeZKOS(_processFrom, _processTo, _commitData);
+        } else {
+            _commitBatchesSharedBridgeEra(_processFrom, _processTo, _commitData);
+        }
+    }
+
     /// @dev Commits new batches without any system contracts upgrade.
     /// @param _lastCommittedBatchData The data of the last committed batch.
     /// @param _newBatchesData An array of batch data that needs to be committed.
@@ -320,6 +439,24 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
             _lastCommittedBatchData = _commitOneBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
+
+            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
+            emit BlockCommit(
+                _lastCommittedBatchData.batchNumber,
+                _lastCommittedBatchData.batchHash,
+                _lastCommittedBatchData.commitment
+            );
+        }
+    }
+
+    function _commitBoojumOSBatchesWithoutSystemContractsUpgrade(
+        StoredBatchInfo memory _lastCommittedBatchData,
+        CommitBoojumOSBatchInfo[] memory _newBatchesData
+    ) internal {
+        // We disable this check because calldata array length is cheap.
+        // solhint-disable-next-line gas-length-in-loops
+        for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
+            _lastCommittedBatchData = _commitOneBoojumOSBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
 
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
             emit BlockCommit(
@@ -538,6 +675,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
+        bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
@@ -548,9 +686,25 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
-            proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
+            bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
+            if (s.boojumOS) {
+                proofPublicInput[i] =
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(
+                                prevBatchStateCommitment,
+                                currentBatchStateCommitment,
+                                currentBatchCommitment
+                            )
+                        )
+                    ) >>
+                    PUBLIC_INPUT_SHIFT;
+            } else {
+                proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
+            }
 
             prevBatchCommitment = currentBatchCommitment;
+            prevBatchStateCommitment = currentBatchStateCommitment;
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
             revert VerifiedBatchesExceedsCommittedBatches();
