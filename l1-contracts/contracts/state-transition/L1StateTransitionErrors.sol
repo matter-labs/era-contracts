@@ -52,8 +52,8 @@ error LocalRootIsZero();
 error LocalRootMustBeZero();
 // 0x9b5f85eb
 error MessageRootIsZero();
-// 0x2237c426
-error MismatchL2DAValidator();
+// 0x32fff278
+error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expectedScheme);
 // 0x2c01a4af
 error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);
 // 0xf9ba09d6

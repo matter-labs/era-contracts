@@ -7,9 +7,6 @@ import {Test} from "forge-std/Test.sol";
 import {TestStateDiffComposer} from "./TestStateDiffComposer.sol";
 
 import {L2DAValidatorTester} from "contracts/test-contracts/L2DAValidatorTester.sol";
-import {RollupL2DAValidator} from "contracts/data-availability/RollupL2DAValidator.sol";
-import {STATE_DIFF_ENTRY_SIZE} from "contracts/data-availability/StateDiffL2DAValidator.sol";
-import {PubdataField, ReconstructionMismatch} from "contracts/data-availability/DAErrors.sol";
 
 import {STATE_DIFF_ENTRY_SIZE, COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER, L2DACommitmentScheme} from "contracts/Constants.sol";
 import {ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "contracts/SystemContractErrors.sol";
