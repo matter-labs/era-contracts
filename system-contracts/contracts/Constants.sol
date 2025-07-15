@@ -121,6 +121,8 @@ address constant SLOAD_CONTRACT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x06);
 
 address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
 
+address constant L2_CHAIN_ASSET_HANDLER = address(USER_CONTRACTS_OFFSET + 0x0a);
+
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR
 /// is non-zero, the call will be assumed to be a system one.
 uint256 constant MSG_VALUE_SIMULATOR_IS_SYSTEM_BIT = 1;
@@ -164,6 +166,8 @@ enum SystemLogKey {
     PREV_BATCH_HASH_KEY,
     L2_DA_VALIDATOR_OUTPUT_HASH_KEY,
     USED_L2_DA_VALIDATION_COMMITMENT_SCHEME_KEY,
+    MESSAGE_ROOT_ROLLING_HASH_KEY,
+    L2_TXS_STATUS_ROLLING_HASH_KEY,
     EXPECTED_SYSTEM_CONTRACT_UPGRADE_TX_HASH_KEY
 }
 

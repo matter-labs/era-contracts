@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import {ExecutorFacet} from "../../state-transition/chain-deps/facets/Executor.sol";
-import {PriorityQueue, PriorityOperation} from "../../state-transition/libraries/PriorityQueue.sol";
+import {PriorityOperation, PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 
 pragma solidity 0.8.28;
 
@@ -15,9 +15,13 @@ contract TestExecutor is ExecutorFacet {
     }
 
     function appendPriorityOp(bytes32 _hash) external {
-        s.priorityQueue.pushBack(
+        s.__DEPRECATED_priorityQueue.pushBack(
             PriorityOperation({canonicalTxHash: _hash, expirationTimestamp: type(uint64).max, layer2Tip: 0})
         );
+    }
+
+    function setPriorityTreeHistoricalRoot(bytes32 _root) external {
+        s.priorityTree.historicalRoots[_root] = true;
     }
 
     // add this to be excluded from coverage report

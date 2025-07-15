@@ -12,11 +12,11 @@ import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.s
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {Unauthorized, TooMuchGas, PriorityTxPubdataExceedsMaxPubDataPerBatch, InvalidPubdataPricingMode, ProtocolIdMismatch, HashMismatch, ProtocolIdNotGreater, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, InvalidDAForPermanentRollup, AlreadyPermanentRollup, InvalidL2DACommitmentScheme} from "../../../common/L1ContractErrors.sol";
-import {NotL1, L1DAValidatorAddressIsZero, AlreadyMigrated, NotChainAdmin, ProtocolVersionNotUpToDate, ExecutedIsNotConsistentWithVerified, VerifiedIsNotConsistentWithCommitted, InvalidNumberOfBatchHashes, PriorityQueueNotReady, VerifiedIsNotConsistentWithCommitted, NotAllBatchesExecuted, OutdatedProtocolVersion, NotHistoricalRoot, ContractNotDeployed, NotMigrated} from "../../L1StateTransitionErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, InvalidL2DACommitmentScheme, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/L2ContractAddresses.sol";
-import {IL2ContractDeployer, AllowedBytecodeTypes} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -295,7 +295,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         address _settlementLayer,
         address _originalCaller,
         bytes calldata _data
-    ) external payable override onlyBridgehub returns (bytes memory chainBridgeMintData) {
+    ) external payable override onlyChainAssetHandler returns (bytes memory chainBridgeMintData) {
         if (s.settlementLayer != address(0)) {
             revert AlreadyMigrated();
         }
@@ -327,7 +327,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
     function forwardedBridgeMint(
         bytes calldata _data,
         bool _contractAlreadyDeployed
-    ) external payable override onlyBridgehub {
+    ) external payable override onlyChainAssetHandler {
         ZKChainCommitment memory _commitment = abi.decode(_data, (ZKChainCommitment));
 
         IChainTypeManager ctm = IChainTypeManager(s.chainTypeManager);
@@ -345,6 +345,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         s.totalBatchesVerified = batchesVerified;
         s.totalBatchesExecuted = batchesExecuted;
         s.isPermanentRollup = _commitment.isPermanentRollup;
+        s.precommitmentForTheLatestBatch = _commitment.precommitmentForTheLatestBatch;
 
         // Some consistency checks just in case.
         if (batchesExecuted > batchesVerified) {
@@ -375,7 +376,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
                     _commitment.priorityTree.sides[_commitment.priorityTree.sides.length - 1]
                 )
             ) {
-                revert NotHistoricalRoot();
+                revert NotHistoricalRoot(_commitment.priorityTree.sides[_commitment.priorityTree.sides.length - 1]);
             }
             if (!_contractAlreadyDeployed) {
                 revert ContractNotDeployed();
@@ -412,7 +413,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         bytes32 /* _assetInfo */,
         address /* _depositSender */,
         bytes calldata _chainData
-    ) external payable override onlyBridgehub {
+    ) external payable override onlyChainAssetHandler {
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_chainData, (uint256));
 
@@ -431,10 +432,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @dev Note, that this is a getter method helpful for debugging and should not be relied upon by clients.
     /// @return commitment The commitment for the chain.
     function prepareChainCommitment() public view returns (ZKChainCommitment memory commitment) {
-        if (_isPriorityQueueActive()) {
-            revert PriorityQueueNotReady();
-        }
-
         commitment.totalBatchesCommitted = s.totalBatchesCommitted;
         commitment.totalBatchesVerified = s.totalBatchesVerified;
         commitment.totalBatchesExecuted = s.totalBatchesExecuted;
@@ -442,6 +439,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         commitment.l2SystemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
         commitment.priorityTree = s.priorityTree.getCommitment();
         commitment.isPermanentRollup = s.isPermanentRollup;
+        commitment.precommitmentForTheLatestBatch = s.precommitmentForTheLatestBatch;
 
         // just in case
         if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {

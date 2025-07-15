@@ -6,10 +6,10 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
-import {L2ContractsBytecodesLib} from "./L2ContractsBytecodesLib.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -158,7 +158,7 @@ contract DeployL2Script is Script {
     function deployForceDeployer() internal {
         bytes[] memory factoryDeps = new bytes[](0);
         deployed.forceDeployUpgraderAddress = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readForceDeployUpgraderBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("ForceDeployUpgrader"),
             constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -175,7 +175,7 @@ contract DeployL2Script is Script {
         bytes memory constructorData = "";
 
         deployed.consensusRegistryImplementation = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readConsensusRegistryBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("ConsensusRegistry"),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -191,7 +191,7 @@ contract DeployL2Script is Script {
         bytes memory constructorData = "";
 
         deployed.multicall3 = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readMulticall3Bytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("Multicall3"),
             constructorargs: constructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -204,7 +204,7 @@ contract DeployL2Script is Script {
 
     function deployTimestampAsserter() internal {
         deployed.timestampAsserter = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readTimestampAsserterBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("TimestampAsserter"),
             constructorargs: "",
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
@@ -235,7 +235,7 @@ contract DeployL2Script is Script {
         );
 
         deployed.consensusRegistryProxy = Utils.deployThroughL1({
-            bytecode: L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecode(),
+            bytecode: ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
             constructorargs: consensusRegistryProxyConstructorData,
             create2salt: "",
             l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,

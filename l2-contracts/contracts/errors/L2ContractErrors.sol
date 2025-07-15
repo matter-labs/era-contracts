@@ -8,7 +8,17 @@ error FailedToTransferTokens(address tokenContract, address to, uint256 amount);
 error InsufficientAllowance(uint256 providedAllowance, uint256 requiredAmount);
 // 0xb4fa3fb3
 error InvalidInput();
+// 0x43e266b0
+error MalformedBytecode(BytecodeError);
 // 0x8e4a23d6
 error Unauthorized(address);
 // 0xff15b069
 error UnsupportedPaymasterFlow();
+
+enum BytecodeError {
+    Version,
+    NumberOfWords,
+    Length,
+    WordsMustBeOdd,
+    DictionaryLength
+

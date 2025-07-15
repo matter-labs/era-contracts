@@ -7,7 +7,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 library BytecodePublisher {
     // Cheatcodes address, 0x7109709ECfa91a80626fF3989D68f67F5b1DD12D.
