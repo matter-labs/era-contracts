@@ -7,7 +7,7 @@ import {EfficientCall} from "@matterlabs/zksync-contracts/contracts/system-contr
 /* solhint-disable-next-line no-unused-import */
 import {ForceDeployment, IContractDeployer} from "@matterlabs/zksync-contracts/contracts/system-contracts/interfaces/IContractDeployer.sol";
 /* solhint-disable-next-line no-unused-import */
-import {BytecodeError, MalformedBytecode} from "./errors/L2ContractErrors.sol";
+import {BytecodeError} from "./errors/L2ContractErrors.sol";
 
 /**
  * @author Matter Labs
