@@ -31,8 +31,11 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
 
-    function startTokenMigrationOnL2(uint256 chainId, string memory l2RpcUrl) public {
+    function startTokenMigrationOnL2OrGateway(bool isGateway, uint256 chainId, string memory l2RpcUrl) public {
+        string memory originalRpcUrl = vm.activeRpcUrl();
+        vm.createSelectFork(l2RpcUrl);
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
+        vm.selectFork(originalRpcUrl);
 
         // Set L2 RPC for each token and migrate balances
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
@@ -40,7 +43,9 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
             console.log("Migrating token balance for assetId:", uint256(assetId));
             vm.broadcast();
-            {
+            if (isGateway) {
+                l2AssetTracker.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
+            } else {
                 l2AssetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
             }
         }

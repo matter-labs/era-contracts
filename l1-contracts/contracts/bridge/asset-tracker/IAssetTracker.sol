@@ -18,11 +18,11 @@ struct TokenBalanceMigrationData {
 interface IAssetTracker {
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function assetSettlementLayer(bytes32 _assetId) external view returns (uint256);
-
-    function assetMigrationNumber(bytes32 _assetId) external view returns (uint256);
+    function assetMigrationNumber(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
     function registerNewToken(bytes32 _assetId) external;
+
+    function registerLegacyTokenOnChain(bytes32 _assetId) external;
 
     function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
 

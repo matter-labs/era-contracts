@@ -119,11 +119,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     ) internal returns (bytes32 newAssetId) {
         newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(newAssetId);
-        tokenAddress[newAssetId] = _l2TokenAddress;
-        assetId[_l2TokenAddress] = newAssetId;
-        originChainId[newAssetId] = L1_CHAIN_ID;
-        bridgedTokens[bridgedTokensCount] = newAssetId;
-        ++bridgedTokensCount;
+        _setLegacyTokenData(newAssetId, _l2TokenAddress);
     }
 
     /// @notice Ensures that the token is deployed.
@@ -172,12 +168,16 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
 
         /// token is a legacy token, no need to deploy
         require(_l1LegacyToken == _originToken, AddressMismatch(_originToken, _l1LegacyToken));
+        _setLegacyTokenData(_assetId, _expectedToken);
+    }
 
+    function _setLegacyTokenData(bytes32 _assetId, address _expectedToken) internal {
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
         originChainId[_assetId] = L1_CHAIN_ID;
         bridgedTokens[bridgedTokensCount] = _assetId;
         ++bridgedTokensCount;
+        _assetTracker().registerLegacyTokenOnChain(_assetId);
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
