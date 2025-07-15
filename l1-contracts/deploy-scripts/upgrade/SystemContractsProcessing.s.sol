@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../Utils.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WETH_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WETH_IMPL_ADDR, L2_MESSAGE_VERIFICATION, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -27,7 +27,7 @@ struct SystemContract {
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
 uint256 constant SYSTEM_CONTRACTS_COUNT = 31;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 5;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 7;
 
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
@@ -343,6 +343,8 @@ library SystemContractsProcessing {
         result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
         result[3] = ContractsBytecodesLib.getCreationCode("MessageRoot");
         result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
+        result[5] = ContractsBytecodesLib.getCreationCode("L2MessageVerification");
+        result[6] = ContractsBytecodesLib.getCreationCode("ChainAssetHandler");
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -389,6 +391,26 @@ library SystemContractsProcessing {
             callConstructor: false,
             value: 0,
             input: ""
+        });
+        forceDeployments[5] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[5]),
+            newAddress: address(L2_MESSAGE_VERIFICATION),
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+        forceDeployments[6] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[6]),
+            newAddress: L2_CHAIN_ASSET_HANDLER_ADDR,
+            callConstructor: true,
+            value: 0,
+            input: abi.encode(
+                11155111,
+                address(0x8f08627524aeD610192132A425D6b9C32a1727EF),
+                L2_BRIDGEHUB_ADDR,
+                L2_ASSET_ROUTER_ADDR,
+                L2_MESSAGE_ROOT_ADDR
+            ) // TODO don't use hardcoded values
         });
     }
 
