@@ -2,9 +2,11 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
+/* solhint-disable-next-line no-unused-import */
 import {EfficientCall} from "@matterlabs/zksync-contracts/contracts/system-contracts/libraries/EfficientCall.sol";
 /* solhint-disable-next-line no-unused-import */
 import {ForceDeployment, IContractDeployer} from "@matterlabs/zksync-contracts/contracts/system-contracts/interfaces/IContractDeployer.sol";
+/* solhint-disable-next-line no-unused-import */
 import {BytecodeError, MalformedBytecode} from "./errors/L2ContractErrors.sol";
 
 /**
