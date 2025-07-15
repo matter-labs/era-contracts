@@ -54,6 +54,7 @@ contract ProvingTest is ExecutorTest {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            interopRootsRollingHash: keccak256(""),
             l2LogsTreeRoot: 0,
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]

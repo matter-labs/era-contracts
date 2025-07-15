@@ -127,6 +127,7 @@ contract ExecutingTest is ExecutorTest {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: priorityOpsHashes.length,
             priorityOperationsHash: correctRollingHash,
+            interopRootsRollingHash: keccak256(""),
             l2LogsTreeRoot: 0,
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]

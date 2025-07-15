@@ -64,6 +64,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             indexRepeatedStorageChanges: 0x01,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            interopRootsRollingHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
             commitment: bytes32(uint256(0x01))
@@ -210,6 +211,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            interopRootsRollingHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: currentTimestamp,
             commitment: entries[0].topics[3]

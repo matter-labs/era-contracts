@@ -189,6 +189,7 @@ contract ExecutorTest is Test {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: keccak256(""),
+            interopRootsRollingHash: keccak256(""),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
             commitment: bytes32("")

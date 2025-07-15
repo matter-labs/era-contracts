@@ -98,6 +98,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             indexRepeatedStorageChanges: _newBatch.indexRepeatedStorageChanges,
             numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
             priorityOperationsHash: _newBatch.priorityOperationsHash,
+            interopRootsRollingHash: EMPTY_STRING_KECCAK,
             l2LogsTreeRoot: logOutput.l2LogsTreeRoot,
             timestamp: _newBatch.timestamp,
             commitment: commitment
@@ -178,6 +179,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
             priorityOperationsHash: _newBatch.priorityOperationsHash,
+            interopRootsRollingHash: _newBatch.interopRootsRollingHash,
             l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
             timestamp: 0,
             commitment: batchOutputsHash

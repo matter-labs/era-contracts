@@ -19,6 +19,7 @@ contract AuthorizationTest is ExecutorTest {
             indexRepeatedStorageChanges: 0,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: Utils.randomBytes32("priorityOperationsHash"),
+            interopRootsRollingHash: Utils.randomBytes32("interopRootsRollingHash"),
             l2LogsTreeRoot: Utils.randomBytes32("l2LogsTreeRoot"),
             timestamp: 0,
             commitment: Utils.randomBytes32("commitment")

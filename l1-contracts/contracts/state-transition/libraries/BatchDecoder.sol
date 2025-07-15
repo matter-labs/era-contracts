@@ -13,7 +13,7 @@ import {IncorrectBatchBounds, EmptyData, UnsupportedCommitBatchEncoding, Unsuppo
 ///      It reverts with custom errors when the data is invalid or unsupported encoding is used.
 library BatchDecoder {
     /// @notice The currently supported encoding version.
-    uint8 internal constant SUPPORTED_ENCODING_VERSION = 0;
+    uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.
     /// @param _commitData The calldata byte array containing the data for committing batches.

@@ -170,6 +170,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             indexRepeatedStorageChanges: _chainCreationParams.genesisIndexRepeatedStorageChanges,
             numberOfLayer1Txs: 0,
             priorityOperationsHash: EMPTY_STRING_KECCAK,
+            interopRootsRollingHash: bytes32(0),
             l2LogsTreeRoot: DEFAULT_L2_LOGS_TREE_ROOT_HASH,
             timestamp: 0,
             commitment: _chainCreationParams.genesisBatchCommitment
