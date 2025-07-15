@@ -1414,11 +1414,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (
-                gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
-                getRollupL2DACommitmentScheme(),
-                true
-            )
+            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
         calls = _prepareL1ToGatewayCall(
