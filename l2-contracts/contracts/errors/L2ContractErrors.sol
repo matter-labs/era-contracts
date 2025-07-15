@@ -21,4 +21,5 @@ enum BytecodeError {
     Length,
     WordsMustBeOdd,
     DictionaryLength
+}
 
