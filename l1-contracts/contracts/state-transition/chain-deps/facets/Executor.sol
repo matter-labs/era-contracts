@@ -164,7 +164,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert L2TimestampTooBig();
         }
         if (_newBatch.chainId != s.chainId) {
-            revert IncorrectBatchChainId();
+            revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
         if (_newBatch.l2DaValidator != s.l2DAValidator) {
             //            revert MismatchL2DAValidator();

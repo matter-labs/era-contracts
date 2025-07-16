@@ -141,6 +141,7 @@ interface IExecutor is IZKChainBase {
         bytes32 newStateCommitment;
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
         address l2DaValidator; // TODO: already saved in the storage, can just add from there to PI
         bytes32 daCommitment;

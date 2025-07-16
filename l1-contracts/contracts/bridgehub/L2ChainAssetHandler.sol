@@ -3,6 +3,8 @@
 pragma solidity 0.8.28;
 
 import "./ChainAssetHandlerBase.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 /// @dev L2 version – no immutables; values are stored and set once in `initL2`.
 contract L2ChainAssetHandler is ChainAssetHandlerBase {
