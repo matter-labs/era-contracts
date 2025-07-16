@@ -214,9 +214,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
             // TODO: change RELAYED_EXECUTOR_VERSION?
-            IL2ToL1Messenger(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR).sendToL1(
-                abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo)
-            );
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo));
         }
     }
 
@@ -742,17 +740,15 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
+    // Warning: removed onlyValidator - to make this permisionless.
     function executeBatchesSharedBridge(
         address, // _chainAddress
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
-    ) external nonReentrant onlyValidator onlySettlementLayer {
-        (
-            StoredBatchInfo[] memory batchesData,
-            PriorityOpsBatchInfo[] memory priorityOpsData,
-            InteropRoot[][] memory dependencyRoots
-        ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
+    ) external nonReentrant onlySettlementLayer {
+        (StoredBatchInfo[] memory batchesData, PriorityOpsBatchInfo[] memory priorityOpsData) = BatchDecoder
+            .decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {
             revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
@@ -777,12 +773,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
+    // Warning: removed onlyValidator to make it permisionless.
     function proveBatchesSharedBridge(
         address, // _chainAddress
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
-    ) external nonReentrant onlyValidator onlySettlementLayer {
+    ) external nonReentrant onlySettlementLayer {
         (
             StoredBatchInfo memory prevBatch,
             StoredBatchInfo[] memory committedBatches,
@@ -849,9 +846,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
         // We can only process 1 batch proof at a time.
-        if (proofPublicInput.length != 1) {
-            revert CanOnlyProcessOneBatch();
-        }
+        // Allow processing multiple proofs at once.
+        //if (proofPublicInput.length != 1) {
+        //    revert CanOnlyProcessOneBatch();
+        //}
 
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {

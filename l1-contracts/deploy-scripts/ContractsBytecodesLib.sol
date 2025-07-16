@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./Utils.sol";
+import {Utils as Utils_old} from "./Utils.sol";
+import {BytecodeUtils as Utils} from "./BytecodeUtils.s.sol";
 
 /// @title ContractsBytecodesLib
 /// @notice Library providing functions to read bytecodes of L2 contracts individually.
@@ -24,6 +25,7 @@ library ContractsBytecodesLib {
             return getCreationCodeEVM(contractIdentifier);
         }
     }
+    
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
         string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
 
@@ -43,16 +45,16 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[39] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[36] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
             "BridgedTokenBeacon",
-            "L2Bridgehub",
+            "Bridgehub",
             "BytecodesSupplier", // ???
             "ChainAdmin",
             "ChainAdminOwnable",
-            "L2ChainAssetHandler",
+            "ChainAssetHandler",
             "ChainRegistrar",
             "ChainTypeManager",
             "CTMDeploymentTracker",
@@ -66,11 +68,11 @@ library ContractsBytecodesLib {
             "L2NativeTokenVault",
             "L2SharedBridgeLegacy",
             "L2SharedBridgeLegacyDev",
-            "L2TestnetVerifier",
+            "TestnetVerifier",
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
-            "L2MessageRoot",
+            "MessageRoot",
             "PermanentRestriction",
             "ProxyAdmin", // ??
             "UpgradeableBeacon",
@@ -79,10 +81,7 @@ library ContractsBytecodesLib {
             "TransparentUpgradeableProxy",
             "ServerNotifier", // ???
             "ValidatorTimelock",
-            "ValidiumL1DAValidator", // ???
-            "VerifierFflonk",
-            "VerifierPlonk",
-            "UpgradeableBeaconDeployer"
+            "ValidiumL1DAValidator" // ???
         ];
 
         string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
@@ -115,18 +114,19 @@ library ContractsBytecodesLib {
         if (Utils.compareStrings(contractIdentifier, "AdminFacet")) {
             // Original: Admin.sol
             return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
-        }
-        if (Utils.compareStrings(contractIdentifier, "MailboxFacet")) {
+        } else if (Utils.compareStrings(contractIdentifier, "MailboxFacet")) {
             // Original: Mailbox.sol
             return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
-        }
-        if (Utils.compareStrings(contractIdentifier, "ExecutorFacet")) {
+        } else if (Utils.compareStrings(contractIdentifier, "ExecutorFacet")) {
             // Original: Executor.sol
             return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
-        }
-        if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
+        } else if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
             // Original: Getters.sol
             return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
+        } else if (Utils.compareStrings(contractIdentifier, "VerifierFflonk")) {
+            return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
+        } else if (Utils.compareStrings(contractIdentifier, "VerifierPlonk")) {
+            return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
         }
 
         // --- General Cases ---

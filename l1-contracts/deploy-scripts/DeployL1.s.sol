@@ -813,6 +813,47 @@ contract DeployL1Script is Script, DeployUtils {
                 } else {
                     return getCreationCode("DualVerifier", true);
                 }
+            } else if (compareStrings(contractName, "VerifierFflonk")) {
+                return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
+            } else if (compareStrings(contractName, "VerifierPlonk")) {
+                return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
+            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+                return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
+            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+                return Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+            } else if (compareStrings(contractName, "ValidatorTimelock")) {
+                return Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
+            } else if (compareStrings(contractName, "Governance")) {
+                return Utils.readZKFoundryBytecodeL1("Governance.sol", "Governance");
+            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+                return Utils.readZKFoundryBytecodeL1("ChainAdminOwnable.sol", "ChainAdminOwnable");
+            } else if (compareStrings(contractName, "AccessControlRestriction")) {
+                // TODO(EVM-924): this function is unused
+                return Utils.readZKFoundryBytecodeL1("AccessControlRestriction.sol", "AccessControlRestriction");
+            } else if (compareStrings(contractName, "ChainAdmin")) {
+                return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
+            } else if (compareStrings(contractName, "ChainTypeManager")) {
+                return Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
+            } else if (compareStrings(contractName, "BytecodesSupplier")) {
+                return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
+            } else if (compareStrings(contractName, "ProxyAdmin")) {
+                return Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
+            } else if (compareStrings(contractName, "ExecutorFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
+            } else if (compareStrings(contractName, "AdminFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
+            } else if (compareStrings(contractName, "MailboxFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
+            } else if (compareStrings(contractName, "GettersFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
+            } else if (compareStrings(contractName, "DiamondInit")) {
+                return Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
+            } else if (compareStrings(contractName, "ServerNotifier")) {
+                return Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
+            } else if (compareStrings(contractName, "BeaconProxy")) {
+                return Utils.readZKFoundryBytecodeL1("BeaconProxy.sol", "BeaconProxy");
+            } else {
+                revert(string.concat("Contract ", contractName, " creation code not set"));
             }
         }
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
