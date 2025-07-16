@@ -350,10 +350,10 @@ library SystemContractsProcessing {
     /// Note, that while proper initialization may require multiple steps,
     /// those will be conducted inside a specialized upgrade. We still provide
     /// these force deployments here for the sake of consistency
-    function getOtherBuiltinForceDeployments(uint256 l1ChainId, address owner)
-        internal
-        returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
-    {
+    function getOtherBuiltinForceDeployments(
+        uint256 l1ChainId,
+        address owner
+    ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
         forceDeployments = new IL2ContractDeployer.ForceDeployment[](OTHER_BUILT_IN_CONTRACTS_COUNT);
         bytes[] memory bytecodes = getOtherContractsBytecodes();
 
@@ -404,13 +404,7 @@ library SystemContractsProcessing {
             newAddress: L2_CHAIN_ASSET_HANDLER_ADDR,
             callConstructor: true,
             value: 0,
-            input: abi.encode(
-                l1ChainId,
-                owner,
-                L2_BRIDGEHUB_ADDR,
-                L2_ASSET_ROUTER_ADDR,
-                L2_MESSAGE_ROOT_ADDR
-            )
+            input: abi.encode(l1ChainId, owner, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR)
         });
     }
 
@@ -446,11 +440,24 @@ library SystemContractsProcessing {
         }
     }
 
-    function getBaseForceDeployments(uint256 l1ChainId, address owner)
+    function getBaseForceDeployments()
         internal
-        returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
+        returns (
+            // For purpose of making compilation of earlier upgrade scripts possible.
+            IL2ContractDeployer.ForceDeployment[] memory forceDeployments
+        )
     {
-        IL2ContractDeployer.ForceDeployment[] memory otherForceDeployments = getOtherBuiltinForceDeployments(l1ChainId, owner);
+        getBaseForceDeployments(0, address(0));
+    }
+
+    function getBaseForceDeployments(
+        uint256 l1ChainId,
+        address owner
+    ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
+        IL2ContractDeployer.ForceDeployment[] memory otherForceDeployments = getOtherBuiltinForceDeployments(
+            l1ChainId,
+            owner
+        );
         IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
 
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);
