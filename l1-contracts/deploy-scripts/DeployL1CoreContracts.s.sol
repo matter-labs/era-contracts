@@ -10,9 +10,6 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {StateTransitionDeployedAddresses, Utils, L2_BRIDGEHUB_ADDRESS, L2_ASSET_ROUTER_ADDRESS, L2_NATIVE_TOKEN_VAULT_ADDRESS, L2_MESSAGE_ROOT_ADDRESS} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
-import {Call} from "contracts/governance/Common.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
-
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
@@ -103,17 +100,11 @@ contract DeployL1Script is Script, DeployUtils {
     function run() public virtual {
         console.log("Deploying L1 contracts");
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", address(0));
-    }
-
-    function runWithBridgehub(address bridgehub) public {
-        console.log("Deploying L1 contracts");
-
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", bridgehub);
+        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
     }
 
     function runForTest() public {
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), address(0));
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
 
         // In the production environment, there will be a separate script dedicated to accepting the adminship
         // but for testing purposes we'll have to do it here.
@@ -130,86 +121,69 @@ contract DeployL1Script is Script, DeployUtils {
         return config;
     }
 
-    function runInner(string memory inputPath, string memory outputPath, address bridgehub) internal {
+    function runInner(string memory inputPath, string memory outputPath) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
 
         initializeConfig(inputPath);
+
         instantiateCreate2Factory();
 
-        if (bridgehub == address(0)) {
-            initializeConfigIfEcosystemDeployedLocally(outputPath); // We use the output from previous script run TODO: get the argument passed
-        } else {
-            console.log("Initializing dynamically main contracts");
-            IBridgehub bridgehubProxy = IBridgehub(bridgehub);
-            L1AssetRouter assetRouter = L1AssetRouter(bridgehubProxy.assetRouter());
-            address messageRoot = address(bridgehubProxy.messageRoot());
-            address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
-            address nativeTokenVault = address(assetRouter.nativeTokenVault());
-            address erc20Bridge = address(assetRouter.legacyBridge());
-            address l1Nullifier = address(assetRouter.L1_NULLIFIER());
-
-            addresses.bridgehub.bridgehubProxy = bridgehub;
-            addresses.bridgehub.ctmDeploymentTrackerProxy = l1CtmDeployer;
-            addresses.bridgehub.messageRootProxy = messageRoot;
-
-            // Bridges
-            addresses.bridges.erc20BridgeProxy = erc20Bridge;
-            addresses.bridges.l1NullifierProxy = l1Nullifier;
-            addresses.bridges.l1AssetRouterProxy = address(assetRouter);
-            addresses.vaults.l1NativeTokenVaultProxy = nativeTokenVault;
-
-            addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
-            updateRollupDAManager();
-            addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false); // We could pass it instead, if we want the same validator for ecosystem
-
-            vm.startBroadcast(msg.sender);
-            IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
-            rollupDAManager.updateDAPair(
-                addresses.daAddresses.l1RollupDAValidator,
-                getRollupL2ValidatorAddress(),
-                true
-            );
-            vm.stopBroadcast();
-
-            deployIfNeededMulticall3(); // We can also forward it
-        }
-
-        addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
-
-        deployVerifiers();
-
-        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
-        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
-        (addresses.stateTransition.validatorTimelock) = deploySimpleContract("ValidatorTimelock", false);
-
-        if (bridgehub != address(0)) {
-            (addresses.governance) = deploySimpleContract("Governance", false);
-            (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
-            addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
-        }
-
+        (addresses.governance) = deploySimpleContract("Governance", false);
+        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
 
+        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
+
+        deployIfNeededMulticall3(); // TODO move to ecosystem
+
+        deployDAValidators(); // TODO move to ecosystem
+
+        (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
+            "L1Bridgehub",
+            false
+        );
+        (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
+            "L1MessageRoot",
+            false
+        );
+        (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
+            "L1Nullifier",
+            false
+        );
+        (addresses.bridges.l1AssetRouterImplementation, addresses.bridges.l1AssetRouterProxy) = deployTuppWithContract(
+            "L1AssetRouter",
+            false
+        );
+        (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20", false);
+        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
+            "BridgedTokenBeacon",
+            config.ownerAddress,
+            false
+        );
         (
-            addresses.stateTransition.serverNotifierImplementation,
-            addresses.stateTransition.serverNotifierProxy
-        ) = deployServerNotifier();
+            addresses.vaults.l1NativeTokenVaultImplementation,
+            addresses.vaults.l1NativeTokenVaultProxy
+        ) = deployTuppWithContract("L1NativeTokenVault", false);
+        setL1NativeTokenVaultParams();
+
+        (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
+            "L1ERC20Bridge",
+            false
+        );
+        updateSharedBridge();
+        (
+            addresses.bridgehub.ctmDeploymentTrackerImplementation,
+            addresses.bridgehub.ctmDeploymentTrackerProxy
+        ) = deployTuppWithContract("CTMDeploymentTracker", false);
+        setBridgehubParams();
+
+        // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
 
         initializeGeneratedData();
-
-        addresses.blobVersionedHashRetriever = deploySimpleContract("BlobVersionedHashRetriever", false);
-        deployStateTransitionDiamondFacets();
-        (
-            addresses.stateTransition.chainTypeManagerImplementation,
-            addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", false);
-        // registerChainTypeManager();
-        setChainTypeManagerInValidatorTimelock();
-        setChainTypeManagerInServerNotifier();
 
         updateOwners();
 
@@ -258,19 +232,6 @@ contract DeployL1Script is Script, DeployUtils {
             );
     }
 
-    function deployVerifiers() internal {
-        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
-        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
-        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
-    }
-
-    function setChainTypeManagerInServerNotifier() internal {
-        ServerNotifier serverNotifier = ServerNotifier(addresses.stateTransition.serverNotifierProxy);
-        vm.broadcast(msg.sender);
-        serverNotifier.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
-        console.log("ChainTypeManager set in ServerNotifier");
-    }
-
     function deployDAValidators() internal {
         addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
         updateRollupDAManager();
@@ -302,94 +263,6 @@ contract DeployL1Script is Script, DeployUtils {
                 require(rollupDAManager.owner() == config.ownerAddress, "Ownership was not set correctly");
             }
         }
-    }
-
-    function registerChainTypeManager() internal {
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.startBroadcast(msg.sender);
-        IGovernance governance = IGovernance(addresses.governance); // Owner of BH
-        Call[] memory calls = new Call[](3);
-        calls[0] = Call({
-            target: address(bridgehub),
-            value: 0,
-            data: abi.encodeCall(bridgehub.addChainTypeManager, (addresses.stateTransition.chainTypeManagerProxy))
-        });
-        ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        calls[1] = Call({
-            target: address(sharedBridge),
-            value: 0,
-            data: abi.encodeCall(
-                sharedBridge.setAssetDeploymentTracker,
-                (bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))), address(ctmDT))
-            )
-        });
-        calls[2] = Call({
-            target: address(ctmDT),
-            value: 0,
-            data: abi.encodeCall(ctmDT.registerCTMAssetOnL1, (addresses.stateTransition.chainTypeManagerProxy))
-        });
-
-        IGovernance.Operation memory operation = IGovernance.Operation({
-            calls: calls,
-            predecessor: bytes32(0),
-            salt: bytes32(0)
-        });
-
-        governance.scheduleTransparent(operation, 0);
-        // We assume that the total value is 0
-        governance.execute{value: 0}(operation);
-
-        // bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
-        // console.log("ChainTypeManager registered");
-        // ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        // IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        // sharedBridge.setAssetDeploymentTracker(
-        //     bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
-        //     address(ctmDT)
-        // );
-        console.log("CTM DT whitelisted");
-
-        // ctmDT.registerCTMAssetOnL1(addresses.stateTransition.chainTypeManagerProxy);
-        // vm.stopBroadcast();
-        // console.log("CTM registered in CTMDeploymentTracker");
-
-        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
-        console.log(
-            "CTM in router 1",
-            sharedBridge.assetHandlerAddress(assetId),
-            bridgehub.ctmAssetIdToAddress(assetId)
-        );
-    }
-
-    function setChainTypeManagerInValidatorTimelock() public virtual {
-        IValidatorTimelock validatorTimelock = IValidatorTimelock(addresses.stateTransition.validatorTimelock);
-        if (address(validatorTimelock.chainTypeManager()) != addresses.stateTransition.chainTypeManagerProxy) {
-            vm.broadcast(msg.sender);
-            validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
-        }
-        console.log("ChainTypeManager set in ValidatorTimelock");
-    }
-
-    function deployDiamondProxy() internal {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: addresses.stateTransition.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        });
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: ""
-        });
-        address contractAddress = deployViaCreate2(
-            type(DiamondProxy).creationCode,
-            abi.encode(config.l1ChainId, diamondCut)
-        );
-        console.log("DiamondProxy deployed at:", contractAddress);
-        addresses.stateTransition.diamondProxy = contractAddress;
     }
 
     function setBridgehubParams() internal {
@@ -430,28 +303,19 @@ contract DeployL1Script is Script, DeployUtils {
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
-        IValidatorTimelock validatorTimelock = IValidatorTimelock(addresses.stateTransition.validatorTimelock);
-        validatorTimelock.transferOwnership(config.ownerAddress);
+        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
-        // IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
-        // IOwnable(address(bridgehub)).transferOwnership(addresses.governance);
-        // bridgehub.setPendingAdmin(addresses.chainAdmin);
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        IOwnable(address(bridgehub)).transferOwnership(addresses.governance);
+        bridgehub.setPendingAdmin(addresses.chainAdmin);
 
-        // IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        // IOwnable(address(sharedBridge)).transferOwnership(addresses.governance);
+        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
+        IOwnable(address(sharedBridge)).transferOwnership(addresses.governance);
 
-        IChainTypeManager ctm = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
-        IOwnable(address(ctm)).transferOwnership(addresses.governance);
-        ctm.setPendingAdmin(addresses.chainAdmin);
-
-        // ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
-        //     addresses.bridgehub.ctmDeploymentTrackerProxy
-        // );
-        // IOwnable(address(ctmDeploymentTracker)).transferOwnership(addresses.governance);
-
-        // IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
-
-        IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
+        ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
+            addresses.bridgehub.ctmDeploymentTrackerProxy
+        );
+        IOwnable(address(ctmDeploymentTracker)).transferOwnership(addresses.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -713,43 +577,6 @@ contract DeployL1Script is Script, DeployUtils {
             isZKBytecode
         );
         return (implementation, proxy);
-    }
-
-    function deployServerNotifier() internal returns (address implementation, address proxy) {
-        // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin, false);
-
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
-    }
-
-    function saveDiamondSelectors() public {
-        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
-        GettersFacet gettersFacet = new GettersFacet();
-        MailboxFacet mailboxFacet = new MailboxFacet(1, 1);
-        ExecutorFacet executorFacet = new ExecutorFacet(1);
-        bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
-        bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
-        bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
-        bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
-
-        string memory root = vm.projectRoot();
-        string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
-
-        bytes memory adminFacetSelectorsBytes = abi.encode(adminFacetSelectors);
-        bytes memory gettersFacetSelectorsBytes = abi.encode(gettersFacetSelectors);
-        bytes memory mailboxFacetSelectorsBytes = abi.encode(mailboxFacetSelectors);
-        bytes memory executorFacetSelectorsBytes = abi.encode(executorFacetSelectors);
-
-        vm.serializeBytes("diamond_selectors", "admin_facet_selectors", adminFacetSelectorsBytes);
-        vm.serializeBytes("diamond_selectors", "getters_facet_selectors", gettersFacetSelectorsBytes);
-        vm.serializeBytes("diamond_selectors", "mailbox_facet_selectors", mailboxFacetSelectorsBytes);
-        string memory toml = vm.serializeBytes(
-            "diamond_selectors",
-            "executor_facet_selectors",
-            executorFacetSelectorsBytes
-        );
-
-        vm.writeToml(toml, outputPath);
     }
 
     /// @notice Get new facet cuts
