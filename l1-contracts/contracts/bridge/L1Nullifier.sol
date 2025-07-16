@@ -356,7 +356,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _proof: _merkleProof
             });
             TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
-            // kl todo v30. add failed withdrawals for asset tracking.
             require(proofValid, InvalidProof());
         }
 

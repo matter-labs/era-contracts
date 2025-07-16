@@ -107,7 +107,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         _registerTokenOnL2(_assetId);
     }
 
-    function registerNewToken(bytes32 _assetId) external {
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) external {
+        isMinterChain[_originChainId][_assetId] = true;
         /// todo call from ntv only probably
         /// todo figure out L1 vs L2 differences
         if (block.chainid == L1_CHAIN_ID) {
@@ -132,19 +133,14 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Called on the L1 when a deposit to the chain happens.
+    /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
     function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
         // onlyNativeTokenVaultOrInteropCenter {
 
-
-        // if (msg.sender == L2_INTEROP_CENTER_ADDR) {
-        //     // only called on Gateway
-        //     // kl todo if it already 
-        //     // _registerTokenOnGateway(_assetId);
-        // }
-        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
-        uint256 chainToUpdate = settlementLayer == block.chainid ? _chainId : settlementLayer;
-        if (settlementLayer != block.chainid) {
+        uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
+        uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
+        if (currentSettlementLayer != block.chainid) {
             TransientPrimitivesLib.set(_chainId, uint256(_assetId));
             TransientPrimitivesLib.set(_chainId + 1, _amount);
         }
@@ -163,18 +159,24 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         TransientPrimitivesLib.set(_chainId + 1, 0);
     }
 
-    /// @notice Called on the L1 when a withdrawal from the chain happens.
+    /// @notice Called on the L1 when a withdrawal from the chain happens, or when a failed deposit is undone.
     /// @dev As the chain does not update its balance when settling on L1.
     function handleChainBalanceDecrease(
-        uint256 _tokenOriginChainId,
+        // uint256 _tokenOriginChainId,
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
         bool
     ) external {
         // onlyNativeTokenVault
-        _ensureTokenIsRegistered(_assetId, _tokenOriginChainId);
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
+
+        if (chainToUpdate != _chainId) {
+            uint256 _tokenOriginChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
+            if (chainToUpdate == _tokenOriginChainId) {
+                _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
+            }
+        }
 
         if (isMinterChain[chainToUpdate][_assetId]) {
             return;
@@ -192,16 +194,21 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
     }
 
+    /// we need this funciton to make sure the settlement layer is up to date. 
     function _ensureTokenIsRegistered(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
         if (!isMinterChain[_tokenOriginChainId][_assetId]) {
             isMinterChain[_tokenOriginChainId][_assetId] = true;
         }
+        _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
+    }
+    
+    function _ensureSettlementLayerIsMinter(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_tokenOriginChainId);
         if (settlementLayer != block.chainid && settlementLayer != 0) {
             isMinterChain[settlementLayer][_assetId] = true;
         }
     }
-
+    
     /*//////////////////////////////////////////////////////////////
                     Chain settlement logs processing
     //////////////////////////////////////////////////////////////*/
@@ -373,13 +380,14 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidChainId());
             
             _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
-            if (data.tokenOriginChainId != data.chainId) {
+            // if (data.tokenOriginChainId != data.chainId) {
                 _migrateFunds(data.chainId, currentSettlementLayer, data.assetId, data.amount);
-            }
+            // }
         } else {
             require(currentSettlementLayer == block.chainid, NotMigratedChain());
             require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidChainId());
 
+            _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
             _migrateFunds(_finalizeWithdrawalParams.chainId, data.chainId, data.assetId, data.amount);
         }
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
@@ -388,7 +396,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     }
 
     function _migrateFunds(uint256 _fromChainId, uint256 _toChainId, bytes32 _assetId, uint256 _amount) internal {
-        if (isMinterChain[_fromChainId][_assetId]){ // && data.tokenOriginChainId != _fromChainId) { kl todo can probably remove
+        if (!isMinterChain[_fromChainId][_assetId]){ // && data.tokenOriginChainId != _fromChainId) { kl todo can probably remove
             chainBalance[_fromChainId][_assetId] -= _amount;
             chainBalance[_toChainId][_assetId] += _amount;
         }

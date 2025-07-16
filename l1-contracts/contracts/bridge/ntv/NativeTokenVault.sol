@@ -116,7 +116,7 @@ abstract contract NativeTokenVault is
         bytes32 currentAssetId = assetId[_nativeToken];
         if (currentAssetId == bytes32(0)) {
             tokenAssetId = _registerToken(_nativeToken);
-            _assetTracker().registerNewToken(tokenAssetId);
+            _assetTracker().registerNewToken(tokenAssetId, block.chainid);
         } else {
             tokenAssetId = currentAssetId;
         }
@@ -177,7 +177,7 @@ abstract contract NativeTokenVault is
             token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
         }
         _handleChainBalanceDecrease({
-            _tokenOriginChainId: originChainId[_assetId],
+            // _tokenOriginChainId: originChainId[_assetId],
             _chainId: _chainId,
             _assetId: _assetId,
             _amount: amount,
@@ -196,7 +196,7 @@ abstract contract NativeTokenVault is
         (, receiver, , amount, ) = DataEncoding.decodeBridgeMintData(_data);
 
         _handleChainBalanceDecrease({
-            _tokenOriginChainId: originChainId[_assetId],
+            // _tokenOriginChainId: originChainId[_assetId],
             _chainId: _chainId,
             _assetId: _assetId,
             _amount: amount,
@@ -423,8 +423,7 @@ abstract contract NativeTokenVault is
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal returns (bytes32 newAssetId) {
         newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
-        _setNewTokenStorage(newAssetId, _nativeToken);
-        originChainId[newAssetId] = block.chainid;
+        _setNewTokenStorage(newAssetId, _nativeToken, block.chainid);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
@@ -436,7 +435,7 @@ abstract contract NativeTokenVault is
     ) internal virtual;
 
     function _handleChainBalanceDecrease(
-        uint256 _tokenOriginChainId,
+        // uint256 _tokenOriginChainId,
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
@@ -503,15 +502,16 @@ abstract contract NativeTokenVault is
         address deployedToken = _deployBridgedToken(_tokenOriginChainId, _assetId, _originToken, _erc20Data);
         require(deployedToken == _expectedToken, AddressMismatch(_expectedToken, deployedToken));
 
-        _setNewTokenStorage(_assetId, _expectedToken);
+        _setNewTokenStorage(_assetId, _expectedToken, _tokenOriginChainId);
     }
 
-    function _setNewTokenStorage(bytes32 _assetId, address _tokenAddress) internal {
+    function _setNewTokenStorage(bytes32 _assetId, address _tokenAddress, uint256 _originChainId) internal {
         tokenAddress[_assetId] = _tokenAddress;
         assetId[_tokenAddress] = _assetId;
+        originChainId[_assetId] = _originChainId;
         bridgedTokens[bridgedTokensCount] = _assetId;
         ++bridgedTokensCount;
-        _assetTracker().registerNewToken(_assetId);
+        _assetTracker().registerNewToken(_assetId, _originChainId);
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
@@ -540,7 +540,6 @@ abstract contract NativeTokenVault is
         BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
         BridgedStandardERC20(address(l2Token)).bridgeInitialize(_assetId, _originToken, _erc20Data);
 
-        originChainId[_assetId] = _tokenOriginChainId;
         return address(l2Token);
     }
 

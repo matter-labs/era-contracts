@@ -20,14 +20,14 @@ interface IAssetTracker {
 
     function assetMigrationNumber(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
 
-    function registerNewToken(bytes32 _assetId) external;
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) external;
 
     function registerLegacyTokenOnChain(bytes32 _assetId) external;
 
     function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
 
     function handleChainBalanceDecrease(
-        uint256 _tokenOriginChainId,
+        // uint256 _tokenOriginChainId,
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,

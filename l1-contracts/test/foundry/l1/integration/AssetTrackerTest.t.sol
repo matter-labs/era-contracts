@@ -257,7 +257,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IBridgehub.getZKChain.selector),
             abi.encode(0x0000000000000000000000000000000000000011)
         );
-        vm.store(address(assetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
+        vm.store(address(assetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
         vm.store(address(assetTracker), getAssetMigrationNumberLocation(assetId, eraZKChainId), bytes32(migrationNumber -1 ));
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);

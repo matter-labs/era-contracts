@@ -179,7 +179,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(_amount != 0, NoFundsTransferred());
 
         _handleChainBalanceDecrease({
-            _tokenOriginChainId: originChainId[_assetId],
+            // _tokenOriginChainId: originChainId[_assetId],
             _chainId: _chainId,
             _assetId: _assetId,
             _amount: _amount,
@@ -265,7 +265,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     function _handleChainBalanceDecrease(
-        uint256 _tokenOriginChainId,
+        // uint256 _tokenOriginChainId,
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
@@ -273,7 +273,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) internal override {
         // On L1 the asset tracker is triggered when the user withdraws.
         l1AssetTracker.handleChainBalanceDecrease({
-            _tokenOriginChainId: _tokenOriginChainId,
+            // _tokenOriginChainId: _tokenOriginChainId,
             _chainId: _chainId,
             _assetId: _assetId,
             _amount: _amount,

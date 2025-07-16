@@ -31,19 +31,19 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
 
-    function startTokenMigrationOnL2OrGateway(bool isGateway, uint256 chainId, string memory l2RpcUrl) public {
+    function startTokenMigrationOnL2OrGateway(bool isGateway, uint256 chainId, string memory l2RpcUrl, string memory gwRpcUrl) public {
         // string memory originalRpcUrl = vm.activeRpcUrl();
         vm.createSelectFork(l2RpcUrl);
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
-        vm.createSelectFork("http://localhost:3150");
-
+        
         // Set L2 RPC for each token and migrate balances
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             bytes32 assetId = assetIds[i];
-
+            
             console.log("Migrating token balance for assetId:", uint256(assetId));
             vm.broadcast();
             if (isGateway) {
+                vm.createSelectFork(gwRpcUrl);
                 l2AssetTracker.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
             } else {
                 l2AssetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
@@ -117,7 +117,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         uint256 l2ChainId = 271;
         string memory selector = vm.toString(abi.encodeWithSelector(this.startTokenMigrationOnL2OrGateway.selector));
         // string(bytes4(this.startTokenMigrationOnL2OrGateway.selector))[2:10];
-        string memory actualSelector = "9440013b";
+        string memory actualSelector = "0675d915";
         require(compareStrings(selector, string.concat("0x", actualSelector)), "Selector mismatch");
         string memory startMigrationSelector = string.concat("/", actualSelector , "-");
         return getHashesForChainAndSelector(l2ChainId, startMigrationSelector);
