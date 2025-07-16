@@ -173,7 +173,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
         if (chainToUpdate != _chainId) {
             uint256 _tokenOriginChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
-            if (chainToUpdate == _tokenOriginChainId) {
+            if (_chainId == _tokenOriginChainId && chainToUpdate != _chainId) {
                 _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
             }
         }
@@ -350,6 +350,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
             isL1ToGateway: false
         });
 
+
+        /// do we want to set this? 
         assetMigrationNumber[_chainId][_assetId] = migrationNumber;
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
