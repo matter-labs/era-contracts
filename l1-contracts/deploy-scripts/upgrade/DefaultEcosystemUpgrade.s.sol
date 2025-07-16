@@ -382,7 +382,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         VerifierParams memory verifierParams = getVerifierParams();
 
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
-            .getBaseForceDeployments();
+            .getBaseForceDeployments(config.l1ChainId, config.ownerAddress);
 
         // Additional force deployments after Gateway
         IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();

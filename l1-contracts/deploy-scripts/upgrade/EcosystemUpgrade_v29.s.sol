@@ -92,7 +92,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();

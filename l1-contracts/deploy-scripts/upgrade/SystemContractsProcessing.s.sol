@@ -350,7 +350,7 @@ library SystemContractsProcessing {
     /// Note, that while proper initialization may require multiple steps,
     /// those will be conducted inside a specialized upgrade. We still provide
     /// these force deployments here for the sake of consistency
-    function getOtherBuiltinForceDeployments()
+    function getOtherBuiltinForceDeployments(uint256 l1ChainId, address owner)
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
     {
@@ -405,12 +405,12 @@ library SystemContractsProcessing {
             callConstructor: true,
             value: 0,
             input: abi.encode(
-                11155111,
-                address(0x8f08627524aeD610192132A425D6b9C32a1727EF),
+                l1ChainId,
+                owner,
                 L2_BRIDGEHUB_ADDR,
                 L2_ASSET_ROUTER_ADDR,
                 L2_MESSAGE_ROOT_ADDR
-            ) // TODO don't use hardcoded values
+            )
         });
     }
 
@@ -446,11 +446,11 @@ library SystemContractsProcessing {
         }
     }
 
-    function getBaseForceDeployments()
+    function getBaseForceDeployments(uint256 l1ChainId, address owner)
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
     {
-        IL2ContractDeployer.ForceDeployment[] memory otherForceDeployments = getOtherBuiltinForceDeployments();
+        IL2ContractDeployer.ForceDeployment[] memory otherForceDeployments = getOtherBuiltinForceDeployments(l1ChainId, owner);
         IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
 
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);
