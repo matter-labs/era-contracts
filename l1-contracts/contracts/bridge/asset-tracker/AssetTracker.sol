@@ -332,7 +332,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         require(settlementLayer != block.chainid, NotMigratedChain());
 
         uint256 migrationNumber = _getMigrationNumber(_chainId);
-        require(assetMigrationNumber[_chainId][_assetId] == migrationNumber, InvalidAssetId());
+        require(assetMigrationNumber[_chainId][_assetId] < migrationNumber, InvalidAssetId());
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             chainId: _chainId,
@@ -343,6 +343,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
             isL1ToGateway: false
         });
 
+        assetMigrationNumber[_chainId][_assetId] = migrationNumber;
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
@@ -372,7 +373,9 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidChainId());
             
             _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
-            _migrateFunds(data.chainId, currentSettlementLayer, data.assetId, data.amount);
+            if (data.tokenOriginChainId != data.chainId) {
+                _migrateFunds(data.chainId, currentSettlementLayer, data.assetId, data.amount);
+            }
         } else {
             require(currentSettlementLayer == block.chainid, NotMigratedChain());
             require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidChainId());

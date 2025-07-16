@@ -11,7 +11,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {IAssetTracker, TokenBalanceMigrationData} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
@@ -32,10 +32,10 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
 
     function startTokenMigrationOnL2OrGateway(bool isGateway, uint256 chainId, string memory l2RpcUrl) public {
-        string memory originalRpcUrl = vm.activeRpcUrl();
+        // string memory originalRpcUrl = vm.activeRpcUrl();
         vm.createSelectFork(l2RpcUrl);
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
-        vm.selectFork(originalRpcUrl);
+        vm.createSelectFork("http://localhost:3150");
 
         // Set L2 RPC for each token and migrate balances
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
@@ -66,13 +66,8 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         IAssetTracker l1AssetTracker = IAssetTracker(interopCenter.assetTracker());
 
         uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
-        bytes32[] memory msgHashes;
-        if (settlementLayer != block.chainid) {
-            msgHashes = loadHashesFromL2TokenMigrationFile();
-        } else {
-            require(false, "not implemented");
-            // msgHashes = loadHashesFromGatewayTokenMigrationFile();
-        }
+        bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile();
+
 
         uint256 bridgedTokenCount = msgHashes.length;
         FinalizeL1DepositParams[] memory finalizeL1DepositParams = new FinalizeL1DepositParams[](bridgedTokenCount);
@@ -94,12 +89,11 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             // console.logBytes(abi.encodeCall(l1AssetTracker.receiveMigrationOnL1, (finalizeL1DepositParams[i])));
-            bytes32 assetId;
-            (, assetId, , , ) = abi.decode(
+            TokenBalanceMigrationData memory data = abi.decode(
                 finalizeL1DepositParams[i].message,
-                (uint256, bytes32, uint256, uint256, bool)
+                (TokenBalanceMigrationData)
             );
-            if (l1AssetTracker.assetSettlementLayer(assetId) == block.chainid) {
+            if (l1AssetTracker.assetMigrationNumber(data.chainId,data.assetId) < data.migrationNumber) {
                 vm.broadcast();
                 l1AssetTracker.receiveMigrationOnL1(finalizeL1DepositParams[i]);
             }
@@ -111,7 +105,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             bytes32 assetId = assetIds[i];
             // if (
-            uint256 migrationNumber = l2AssetTracker.assetMigrationNumber(assetId);
+            uint256 migrationNumber = l2AssetTracker.assetMigrationNumber(chainId, assetId);
             //  != block.chainid) {
             console.log("Token", vm.toString(assetId), "migration number", migrationNumber);
             // }
@@ -119,15 +113,13 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         }
     }
 
-    function loadHashesFromL2TokenMigrationFile() public returns (bytes32[] memory) {
+    function loadHashesFromStartTokenMigrationFile() public returns (bytes32[] memory) {
         uint256 l2ChainId = 271;
-        string memory startMigrationSelector = "/77fb1935-";
+        string memory selector = vm.toString(abi.encodeWithSelector(this.startTokenMigrationOnL2OrGateway.selector));
+        // string(bytes4(this.startTokenMigrationOnL2OrGateway.selector))[2:10];
+        string memory actualSelector = "9440013b";
+        require(compareStrings(selector, string.concat("0x", actualSelector)), "Selector mismatch");
+        string memory startMigrationSelector = string.concat("/", actualSelector , "-");
         return getHashesForChainAndSelector(l2ChainId, startMigrationSelector);
-    }
-
-    function loadHashesFromGatewayTokenMigrationFile() public returns (bytes32[] memory) {
-        uint256 gwChainId = 506;
-        string memory continueMigrationSelector = "/77fb1935-";
-        return getHashesForChainAndSelector(gwChainId, continueMigrationSelector);
     }
 }
