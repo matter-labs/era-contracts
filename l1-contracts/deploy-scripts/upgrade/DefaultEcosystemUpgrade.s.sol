@@ -177,8 +177,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function prepareEcosystemUpgrade() public virtual {
         deployNewEcosystemContracts();
         console.log("Ecosystem contracts are deployed!");
-        deployNewEcosystemContractsGW();
-        console.log("Ecosystem contracts for GW are deployed!");
+        // deployNewEcosystemContractsGW();
+        // console.log("Ecosystem contracts for GW are deployed!");
         publishBytecodes();
         console.log("Bytecodes published!");
         generateUpgradeData();
@@ -247,10 +247,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         console.log("Generated fixed force deployments data");
         getDiamondCutData(addresses.stateTransition);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
+        // gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition);
-        generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
+        // generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
     }
@@ -477,26 +477,26 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
 
-        gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
-        );
+        // gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
+        //     "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
+        // );
 
-        gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
-        );
+        // gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
+        //     "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
+        // );
 
-        gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_da_manager"
-        );
+        // gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
+        //     "$.gateway.gateway_state_transition.rollup_da_manager"
+        // );
 
-        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
-        );
+        // gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
+        //     "$.gateway.gateway_state_transition.rollup_sl_da_validator"
+        // );
 
-        gatewayConfig.gatewayStateTransition.isOnGateway = true;
+        // gatewayConfig.gatewayStateTransition.isOnGateway = true;
 
-        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
-        config.gatewayChainId = gatewayConfig.chainId;
+        // gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
+        // config.gatewayChainId = gatewayConfig.chainId;
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
