@@ -5,6 +5,10 @@ pragma solidity ^0.8.21;
 import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
 import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
 import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
+import {IBaseToken} from "./IBaseToken.sol";
+import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
+import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
@@ -20,6 +24,8 @@ address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CON
 
 /// @dev The address of the L2 deployer system contract.
 address constant L2_DEPLOYER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
+
+IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(address(SYSTEM_CONTRACTS_OFFSET + 0x06));
 
 /// @dev The special reserved L2 address. It is located in the system contracts space but doesn't have deployed
 /// bytecode.
@@ -37,8 +43,12 @@ IL2ToL1Messenger constant L2_TO_L1_MESSENGER_SYSTEM_CONTRACT = IL2ToL1Messenger(
     L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR
 );
 
+/// @dev the address of the msg value system contract
+address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
+
 /// @dev The address of the eth token system contract
 address constant L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0a);
+IBaseToken constant L2_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR);
 
 /// @dev The address of the context system contract
 address constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0b);
@@ -48,9 +58,6 @@ address constant L2_PUBDATA_CHUNK_PUBLISHER_ADDR = address(SYSTEM_CONTRACTS_OFFS
 
 /// @dev The address used to execute complex upgragedes, also used for the genesis upgrade
 address constant L2_COMPLEX_UPGRADER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0f);
-
-/// @dev the address of the msg value system contract
-address constant MSG_VALUE_SYSTEM_CONTRACT = address(SYSTEM_CONTRACTS_OFFSET + 0x09);
 
 /// @dev The address of the create2 factory contract
 address constant L2_CREATE2_FACTORY_ADDR = address(USER_CONTRACTS_OFFSET + 0x00);
@@ -64,6 +71,8 @@ address constant L2_VERSION_SPECIFIC_UPGRADER_ADDR = L2_GENESIS_UPGRADE_ADDR;
 /// @dev The address of the L2 bridge hub system contract, used to start L1->L2 transactions
 address constant L2_BRIDGEHUB_ADDR = address(USER_CONTRACTS_OFFSET + 0x02);
 
+IBridgehub constant L2_BRIDGEHUB = IBridgehub(L2_BRIDGEHUB_ADDR);
+
 /// @dev the address of the l2 asset router.
 address constant L2_ASSET_ROUTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x03);
 
@@ -71,6 +80,7 @@ address constant L2_ASSET_ROUTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x03);
 /// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
 /// if the assetId can be calculated with this address then it is in fact an NTV asset
 address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
+IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
@@ -89,3 +99,12 @@ IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(add
 
 /// @dev The address of the L2 chain handler system contract
 address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
+
+/// @dev the address of the L2 interop center
+address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
+
+/// @dev the address of the L2 interop handler
+address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
+
+/// @dev the address of the L2 asset tracker
+address constant L2_ASSET_TRACKER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);

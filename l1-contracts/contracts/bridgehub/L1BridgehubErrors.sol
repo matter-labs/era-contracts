@@ -6,12 +6,6 @@ pragma solidity ^0.8.21;
 error AlreadyCurrentSL(uint256 blockChainId);
 // 0x65e8a019
 error ChainExists();
-// 0xff514c10
-error ChainIdAlreadyPresent();
-// 0x5de72107
-error ChainNotLegacy();
-// 0x4bd4ae07
-error ChainNotPresentInCTM();
 // 0xeab895aa
 error HyperchainNotRegistered();
 // 0x48857c1d
@@ -26,8 +20,8 @@ error NoEthAllowed();
 error NotAssetRouter(address msgSender, address sharedBridge);
 // 0x8beee3a3
 error NotChainAssetHandler(address sender, address chainAssetHandler);
-// 0xc0ca9182
-error NotCurrentSL(uint256 settlementLayerChainId, uint256 blockChainId);
+// 0x88d9dae3
+error NotCurrentSettlementLayer(uint256 currentSettlementLayer, uint256 newSettlementLayer);
 // 0x472477e2
 error NotInGatewayMode();
 // 0xecb34449
@@ -38,10 +32,14 @@ error NotOwner(address sender, address owner);
 error NotOwnerViaRouter(address msgSender, address originalCaller);
 // 0xa2ac02a0
 error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
+// 0x3db511f4
+error OnlyAssetTracker(address, address);
 // 0x527b87c7
 error OnlyBridgehub(address msgSender, address bridgehub);
 // 0x2d396674
 error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
+// 0xde9a2b95
+error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
 // 0xb78dbaa7

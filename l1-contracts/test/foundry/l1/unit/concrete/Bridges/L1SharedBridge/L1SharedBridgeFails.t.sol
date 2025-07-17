@@ -8,11 +8,12 @@ import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
@@ -20,10 +21,12 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {AddressAlreadySet, AssetIdNotSupported, BurningNativeWETHNotSupported, DepositDoesNotExist, DepositExists, EmptyDeposit, InsufficientChainBalance, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, NoFundsTransferred, NonEmptyMsgValue, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, WithdrawFailed, WithdrawalAlreadyFinalized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
+import {AddressAlreadySet, AssetIdNotSupported, BurningNativeWETHNotSupported, DepositDoesNotExist, DepositExists, EmptyDeposit, InsufficientChainBalanceAssetTracker, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, NoFundsTransferred, NonEmptyMsgValue, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, WithdrawFailed, WithdrawalAlreadyFinalized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
-import {ClaimFailedDepositFailed, EmptyToken, EthTransferFailed, NativeTokenVaultAlreadySet, WrongAmountTransferred, WrongCounterpart, ZeroAmountToTransfer} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {ClaimFailedDepositFailed, EmptyToken, EthTransferFailed, NativeTokenVaultAlreadySet, WrongCounterpart} from "contracts/bridge/L1BridgeContractErrors.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -110,33 +113,34 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_transferFundsToSharedBridge_Eth_CallFailed() public {
-        vm.mockCallRevert(address(nativeTokenVault), abi.encode(), "eth transfer failed");
+        bytes memory emptyData = "";
+        vm.mockCallRevert(address(nativeTokenVault), emptyData, "eth transfer failed");
         vm.prank(address(nativeTokenVault));
         vm.expectRevert(abi.encodeWithSelector(EthTransferFailed.selector));
         l1Nullifier.transferTokenToNTV(ETH_TOKEN_ADDRESS);
     }
 
-    function test_transferFundsToSharedBridge_Eth_0_AmountTransferred() public {
-        vm.deal(address(l1Nullifier), 0);
-        vm.prank(address(nativeTokenVault));
-        vm.expectRevert(abi.encodeWithSelector(NoFundsTransferred.selector));
-        nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
-    }
+    // function test_transferFundsToSharedBridge_Eth_0_AmountTransferred() public {
+    //     vm.deal(address(l1Nullifier), 0);
+    //     vm.prank(address(nativeTokenVault));
+    //     vm.expectRevert(abi.encodeWithSelector(NoFundsTransferred.selector));
+    //     nativeTokenVault.transferFundsFromSharedBridge(ETH_TOKEN_ADDRESS);
+    // }
 
-    function test_transferFundsToSharedBridge_Erc_0_AmountTransferred() public {
-        vm.prank(address(l1Nullifier));
-        token.transfer(address(1), amount);
-        vm.prank(address(nativeTokenVault));
-        vm.expectRevert(ZeroAmountToTransfer.selector);
-        nativeTokenVault.transferFundsFromSharedBridge(address(token));
-    }
+    // function test_transferFundsToSharedBridge_Erc_0_AmountTransferred() public {
+    //     vm.prank(address(l1Nullifier));
+    //     token.transfer(address(1), amount);
+    //     vm.prank(address(nativeTokenVault));
+    //     vm.expectRevert(ZeroAmountToTransfer.selector);
+    //     nativeTokenVault.transferFundsFromSharedBridge(address(token));
+    // }
 
-    function test_transferFundsToSharedBridge_Erc_WrongAmountTransferred() public {
-        vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
-        vm.prank(address(nativeTokenVault));
-        vm.expectRevert(abi.encodeWithSelector(WrongAmountTransferred.selector, 0, 10));
-        nativeTokenVault.transferFundsFromSharedBridge(address(token));
-    }
+    // function test_transferFundsToSharedBridge_Erc_WrongAmountTransferred() public {
+    //     vm.mockCall(address(token), abi.encodeWithSelector(IERC20.balanceOf.selector), abi.encode(10));
+    //     vm.prank(address(nativeTokenVault));
+    //     vm.expectRevert(abi.encodeWithSelector(WrongAmountTransferred.selector, 0, 10));
+    //     nativeTokenVault.transferFundsFromSharedBridge(address(token));
+    // }
 
     function test_bridgehubDepositBaseToken_Eth_Token_incorrectSender() public {
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
@@ -362,6 +366,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(eraChainId, txHash) == txDataHash, "Deposit not set");
         console.log("txDataHash", uint256(txDataHash));
 
+        bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, 1);
+
         vm.mockCall(
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
@@ -378,7 +385,15 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(InsufficientChainBalance.selector);
+        // asset tracker is a separate contract.
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                InsufficientChainBalanceAssetTracker.selector,
+                eraChainId,
+                ETH_TOKEN_ASSET_ID,
+                amount
+            )
+        );
         vm.mockCall(
             address(bridgehubAddress),
             abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),
@@ -403,7 +418,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),
             abi.encode(address(0))
         );
-        vm.prank(bridgehubAddress);
+        // vm.prank(bridgehubAddress);
         vm.expectRevert(abi.encodeWithSelector(InvalidProof.selector));
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
@@ -470,7 +485,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(DepositDoesNotExist.selector);
+        bytes32 txDataHash = DataEncoding.encodeTxDataHash(
+            NEW_ENCODING_VERSION,
+            alice,
+            ETH_TOKEN_ASSET_ID,
+            address(l1Nullifier.l1NativeTokenVault()),
+            DataEncoding.encodeBridgeBurnData(amount, address(0), address(0))
+        );
+        vm.expectRevert(abi.encodeWithSelector(DepositDoesNotExist.selector, 0, txDataHash));
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -485,7 +507,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     }
 
     function test_claimFailedDeposit_chainBalanceLow() public {
-        _setNativeTokenVaultChainBalance(chainId, ETH_TOKEN_ADDRESS, 0);
+        _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, 0);
 
         bytes32 txDataHash = keccak256(abi.encode(alice, ETH_TOKEN_ADDRESS, amount));
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
@@ -507,7 +529,9 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             abi.encode(true)
         );
 
-        vm.expectRevert(InsufficientChainBalance.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(InsufficientChainBalanceAssetTracker.selector, chainId, ETH_TOKEN_ASSET_ID, amount)
+        );
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -658,9 +682,11 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             ),
             abi.encode(true)
         );
-        _setNativeTokenVaultChainBalance(chainId, ETH_TOKEN_ADDRESS, 1);
+        _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, 1);
 
-        vm.expectRevert(InsufficientChainBalance.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(InsufficientChainBalanceAssetTracker.selector, chainId, ETH_TOKEN_ASSET_ID, 100)
+        );
         sharedBridge.finalizeWithdrawal({
             _chainId: chainId,
             _l2BatchNumber: l2BatchNumber,

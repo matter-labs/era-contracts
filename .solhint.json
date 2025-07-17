@@ -17,6 +17,7 @@
     "func-name-mixedcase": "off",
     "func-named-parameters": ["error", 4],
     "func-visibility": ["error", { "ignoreConstructors": true }],
+    "import-path-check": "off",
     "imports-on-top": "error",
     "max-states-count": "off",
     "modifier-name-mixedcase": "error",

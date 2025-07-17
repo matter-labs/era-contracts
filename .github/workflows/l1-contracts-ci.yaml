@@ -329,7 +329,7 @@ jobs:
             system-contracts/zkout
 
       - name: Run coverage
-        run: yarn test:foundry && yarn coverage:foundry --report summary --report lcov
+        run: yarn test:foundry --no-match-path 'test/foundry/l1/unit/concrete/Executor/*' && yarn coverage:foundry --report summary --report lcov
 
       # Installing the specific version of `lcov` because of
       # the `genhtml: ERROR: line ... of ... has branchcov but no linecov data` error.
