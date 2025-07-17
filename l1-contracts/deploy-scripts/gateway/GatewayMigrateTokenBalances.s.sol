@@ -30,16 +30,20 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     IAssetTracker l2AssetTracker = IAssetTracker(L2_ASSET_TRACKER_ADDR);
     INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
-
-    function startTokenMigrationOnL2OrGateway(bool isGateway, uint256 chainId, string memory l2RpcUrl, string memory gwRpcUrl) public {
+    function startTokenMigrationOnL2OrGateway(
+        bool isGateway,
+        uint256 chainId,
+        string memory l2RpcUrl,
+        string memory gwRpcUrl
+    ) public {
         // string memory originalRpcUrl = vm.activeRpcUrl();
         vm.createSelectFork(l2RpcUrl);
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
-        
+
         // Set L2 RPC for each token and migrate balances
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             bytes32 assetId = assetIds[i];
-            
+
             console.log("Migrating token balance for assetId:", uint256(assetId));
             vm.broadcast();
             if (isGateway) {
@@ -60,14 +64,17 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         }
     }
 
-
-    function finishMigrationOnL1(IBridgehub bridgehub, uint256 chainId, string memory l2RpcUrl, bool onlyWaitForFinalization) public {
+    function finishMigrationOnL1(
+        IBridgehub bridgehub,
+        uint256 chainId,
+        string memory l2RpcUrl,
+        bool onlyWaitForFinalization
+    ) public {
         IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
         IAssetTracker l1AssetTracker = IAssetTracker(interopCenter.assetTracker());
 
         uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
         bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile();
-
 
         uint256 bridgedTokenCount = msgHashes.length;
         FinalizeL1DepositParams[] memory finalizeL1DepositParams = new FinalizeL1DepositParams[](bridgedTokenCount);
@@ -93,7 +100,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
                 finalizeL1DepositParams[i].message,
                 (TokenBalanceMigrationData)
             );
-            if (l1AssetTracker.assetMigrationNumber(data.chainId,data.assetId) < data.migrationNumber) {
+            if (l1AssetTracker.assetMigrationNumber(data.chainId, data.assetId) < data.migrationNumber) {
                 vm.broadcast();
                 l1AssetTracker.receiveMigrationOnL1(finalizeL1DepositParams[i]);
             }
@@ -119,7 +126,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         // string(bytes4(this.startTokenMigrationOnL2OrGateway.selector))[2:10];
         string memory actualSelector = "0675d915";
         require(compareStrings(selector, string.concat("0x", actualSelector)), "Selector mismatch");
-        string memory startMigrationSelector = string.concat("/", actualSelector , "-");
+        string memory startMigrationSelector = string.concat("/", actualSelector, "-");
         return getHashesForChainAndSelector(l2ChainId, startMigrationSelector);
     }
 }

@@ -51,8 +51,8 @@ contract ZKSProvider is Script {
         waitForBatchToBeExecuted(l1Bridgehub, chainId, params);
     }
 
-    /// we might not need this. 
-    /// nullifier.finalizeDeposit simulation probably happens at an earlier blocknumber. 
+    /// we might not need this.
+    /// nullifier.finalizeDeposit simulation probably happens at an earlier blocknumber.
     /// It might be enough to wait for the merkle proof from the server.
     function waitForBatchToBeExecuted(
         address l1Bridgehub,
@@ -101,9 +101,7 @@ contract ZKSProvider is Script {
     }
 
     /// we use this as forge caches the result
-    function getTotalBatchesExecuted(
-        address chainAddress
-    ) public returns (uint256) {
+    function getTotalBatchesExecuted(address chainAddress) public returns (uint256) {
         string[] memory args = new string[](5);
         args[0] = "cast";
         args[1] = "call";
@@ -121,7 +119,6 @@ contract ZKSProvider is Script {
         uint256 val = vm.parseUint(resString);
         return val;
     }
-
 
     function getWithdrawalLog(
         string memory l2RpcUrl,

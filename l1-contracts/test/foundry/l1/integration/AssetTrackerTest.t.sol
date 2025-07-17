@@ -177,7 +177,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         vm.mockCalls(address(addresses.bridgehub), abi.encodeWithSelector(IBridgehub.getZKChain.selector), mocks2);
 
-        vm.store(address(assetTracker), getAssetMigrationNumberLocation(assetId, eraZKChainId), bytes32(migrationNumber -1));
+        vm.store(
+            address(assetTracker),
+            getAssetMigrationNumberLocation(assetId, eraZKChainId),
+            bytes32(migrationNumber - 1)
+        );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
@@ -258,7 +262,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(0x0000000000000000000000000000000000000011)
         );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
-        vm.store(address(assetTracker), getAssetMigrationNumberLocation(assetId, eraZKChainId), bytes32(migrationNumber -1 ));
+        vm.store(
+            address(assetTracker),
+            getAssetMigrationNumberLocation(assetId, eraZKChainId),
+            bytes32(migrationNumber - 1)
+        );
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
 
