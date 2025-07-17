@@ -214,7 +214,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // these values are already included as part of the `storedBatchInfo`, so we do not need to republish those.
             // slither-disable-next-line unused-return
             // TODO: change RELAYED_EXECUTOR_VERSION?
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR.sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo));
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION, storedBatchInfo));
         }
     }
 
@@ -747,8 +747,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processTo,
         bytes calldata _executeData
     ) external nonReentrant onlySettlementLayer {
-        (StoredBatchInfo[] memory batchesData, PriorityOpsBatchInfo[] memory priorityOpsData) = BatchDecoder
-            .decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
+        (
+            StoredBatchInfo[] memory batchesData,
+            PriorityOpsBatchInfo[] memory priorityOpsData,
+            InteropRoot[][] memory dependencyRoots
+        ) = BatchDecoder.decodeAndCheckExecuteData(_executeData, _processFrom, _processTo);
         uint256 nBatches = batchesData.length;
         if (batchesData.length != priorityOpsData.length) {
             revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);

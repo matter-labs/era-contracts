@@ -25,7 +25,7 @@ library ContractsBytecodesLib {
             return getCreationCodeEVM(contractIdentifier);
         }
     }
-    
+
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
         string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
 
