@@ -13,4 +13,6 @@ interface IBridgehub {
     ) external;
 
     function owner() external view returns (address);
+
+    function l1CtmDeployer() external returns (address);
 }
