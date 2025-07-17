@@ -434,8 +434,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function getForceDeploymentNames() internal virtual returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2GenesisUpgrade";
+        forceDeploymentNames = new string[](0);
     }
 
     function getEcosystemAdmin() external virtual returns (address) {

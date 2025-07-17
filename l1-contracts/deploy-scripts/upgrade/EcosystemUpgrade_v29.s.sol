@@ -115,34 +115,6 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         );
     }
 
-    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2V29Upgrade";
-    }
-
-    function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
-            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
-        }
-        return super.getExpectedL2Address(contractName);
-    }
-
-    function getForceDeployment(
-        string memory contractName
-    ) public override returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
-            return
-                IL2ContractDeployer.ForceDeployment({
-                    bytecodeHash: getL2BytecodeHash(contractName),
-                    newAddress: getExpectedL2Address(contractName),
-                    callConstructor: false,
-                    value: 0,
-                    input: ""
-                });
-        }
-        return super.getForceDeployment(contractName);
-    }
-
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode

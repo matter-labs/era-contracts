@@ -19,10 +19,10 @@ bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8
 /// @author Matter Labs
 /// @title L2V29Upgrade, contains legacy bridge fixes, and other miscellaneous fixes.
 /// @notice Performs governance‑related fixes and the Bridged‑ETH metadata patch on chains
-/// that have the legacy L2 Shared Bridge. It's also inherited from L2GenesisUpgrade, and fulfils it's purpose in upgrade process as well.
+/// that have the legacy L2 Shared Bridge.
 /// @dev This contract is neither predeployed nor a system contract. It resides in this folder to facilitate code reuse.
 /// @dev This contract is called during the forceDeployAndUpgrade function of the ComplexUpgrader system contract.
-contract L2V29Upgrade is L2GenesisUpgrade {
+contract L2V29Upgrade {
     /// @notice Executes the one‑time migration/patch.
     /// @dev Intended to be delegate‑called by the `ComplexUpgrader` contract.
     /// @param _aliasedGovernance The already‑aliased L1 governance address that
