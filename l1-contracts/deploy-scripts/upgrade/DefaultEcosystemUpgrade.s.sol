@@ -219,6 +219,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         /// for forge verification.
         deploySimpleContract("DiamondProxy", false);
 
+        (
+            addresses.bridgehub.chainAssetHandlerImplementation,
+            addresses.bridgehub.chainAssetHandlerProxy
+        ) = deployTuppWithContract("ChainAssetHandler", false);
+
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
@@ -1538,6 +1543,15 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
                 initCalldata: ""
             });
             return abi.encode(block.chainid, diamondCut);
+        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+            return
+                abi.encode(
+                    config.l1ChainId,
+                    config.ownerAddress,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridgehub.messageRootProxy
+                );
         } else {
             return super.getCreationCalldata(contractName, isZKBytecode);
         }
