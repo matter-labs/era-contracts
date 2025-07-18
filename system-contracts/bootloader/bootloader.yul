@@ -321,7 +321,7 @@ object "Bootloader" {
             function CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE() -> ret {
                 ret := mul(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_SLOT(), 32)
             }
-            
+
             /// @dev The slot starting from which the current interop root is contained.
             /// For each txs we check if the interopRoot belongs to a block that we should process, if yes we store it and continue to the next root.
             /// When we process all the necessary roots, we stop.
@@ -353,7 +353,7 @@ object "Bootloader" {
             function INTEROP_ROOT_BEGIN_BYTE() -> ret {
                 ret := mul(INTEROP_ROOT_BEGIN_SLOT(), 32)
             }
-            
+
             /// @dev Returns the number of interop roots in specified block.
             function getNumberOfInteropRootInBlock(i) -> ret {
                 debugLog("slot", add(INTEROP_BLOCKS_BEGIN_SLOT(), i))
@@ -366,7 +366,7 @@ object "Bootloader" {
                 debugLog("value", mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()))
                 ret := getNumberOfInteropRootInBlock(mload(CURRENT_NUMBER_OF_ROOTS_IN_BLOCK_BYTE()))
             }
-            
+
             /// @dev Returns the byte offset of the specified interop root.
             function getInteropRootByte(i) -> ret {
                 ret := mul(add(INTEROP_ROOT_BEGIN_SLOT(), mul(i, INTEROP_ROOT_SLOT_SIZE())), 32)
@@ -396,7 +396,7 @@ object "Bootloader" {
             function INTEROP_ROOT_SIDE_LENGTH_OFFSET() -> ret {
                 ret := 96
             }
-            
+
             /// @dev Returns the byte offset of the sides data within an interop root entry.
             function INTEROP_ROOT_SIDES_OFFSET_START() -> ret {
                 ret := 128
@@ -404,7 +404,7 @@ object "Bootloader" {
 
             /// @dev The size of each of the interop roots.
             function INTEROP_ROOT_SLOT_SIZE() -> ret {
-                // We will have to increase this to add merkle proofs. 
+                // We will have to increase this to add merkle proofs.
                 ret := 6
 
             }
@@ -417,7 +417,7 @@ object "Bootloader" {
 
             /// @dev The number of slots dedicated for the interop roots.
             /// For each interop root we store the containing blockNumber, the chainId, the dependency blockNumber, and the sides.
-            /// The sides are the sides of the L2->L1 logs incremental merkle tree, used for precommit based interop, for proof based and commit based it is a single root. 
+            /// The sides are the sides of the L2->L1 logs incremental merkle tree, used for precommit based interop, for proof based and commit based it is a single root.
             /// Only proof based interop is supported at the moment.
             function INTEROP_ROOT_SLOTS() -> ret {
                 ret := mul(add(MAX_INTEROP_ROOTS_IN_BATCH(), 1), INTEROP_ROOT_SLOT_SIZE())
@@ -535,7 +535,7 @@ object "Bootloader" {
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now.
             function MAX_MEM_SIZE() -> ret {
-                ret := 63800000
+                ret := 76000000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {
@@ -2810,15 +2810,15 @@ object "Bootloader" {
             function l1MessengerPublishingCall() {
                 let ptr := OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_BEGIN_BYTE()
                 debugLog("Publishing batch data to L1", 0)
-                
+
                 setHook(VM_HOOK_PUBDATA_REQUESTED())
 
                 // First slot (only last 4 bytes) -- selector
                 mstore(ptr, {{PUBLISH_PUBDATA_SELECTOR}})
                 // Second slot is occupied by the address of the L2 DA validator.
-                // The operator can provide any one it wants. It will be the responsibility of the 
+                // The operator can provide any one it wants. It will be the responsibility of the
                 // L1Messenger system contract to send the corresponding log to L1.
-                // 
+                //
                 // Third slot -- offset. The correct value must be equal to 64
                 assertEq(mload(add(ptr, 64)), 64, "offset for L1Messenger is not 64")
 
@@ -3087,7 +3087,7 @@ object "Bootloader" {
                 let nextInteropRootNumber := mload(CURRENT_INTEROP_ROOT_BYTE())
                 let interopRootStartSlot := getNextInteropRootByte()
                 let numberOfRoots := getNumberOfInteropRootInCurrentBlock()
-                
+
                 debugLog("numberOfRoots", numberOfRoots)
 
                 /// Note, that we provide bootloader with numberOfRoots equal to the actual value + 1.
@@ -3104,7 +3104,7 @@ object "Bootloader" {
                     debugLog("Setting interop roots 2", i)
                     let interopRootStartSlot := getInteropRootByte(i)
                     let currentBlockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_PROCESSED_BLOCK_NUMBER_OFFSET()))
-                    let chainId  := mload(add(interopRootStartSlot, INTEROP_ROOT_CHAIN_ID_OFFSET())) 
+                    let chainId  := mload(add(interopRootStartSlot, INTEROP_ROOT_CHAIN_ID_OFFSET()))
                     /// Note it might be a block or batchNumber. For proof based interop it is a block number.
                     /// For detailed explanation refer to L2InteropRootStorage contract.
                     let blockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
@@ -3178,7 +3178,7 @@ object "Bootloader" {
                     revertWithReason(FAILED_TO_SET_INTEROP_ROOT(), 1)
                 }
                 debugLog("InteropRoot set successfully", 2)
-                
+
             }
 
             /// @notice Sends the rolling hash of the dependency interop roots to the L1.
@@ -3187,7 +3187,7 @@ object "Bootloader" {
                 let rollingHashOfProcessedRoots := 0
                 for {let i := 0} true {i := add(i, 1)} {
                     let interopRootStartSlot := getInteropRootByte(i)
-                    let chainId  := mload(add(interopRootStartSlot, INTEROP_ROOT_CHAIN_ID_OFFSET())) 
+                    let chainId  := mload(add(interopRootStartSlot, INTEROP_ROOT_CHAIN_ID_OFFSET()))
                     /// Note it might be a block or batchNumber. For proof based it is a block number.
                     let blockNumber := mload(add(interopRootStartSlot, INTEROP_ROOT_DEPENDENCY_BLOCK_NUMBER_OFFSET()))
                     let sidesLength := mload(add(interopRootStartSlot, INTEROP_ROOT_SIDE_LENGTH_OFFSET()))
@@ -3203,7 +3203,7 @@ object "Bootloader" {
                         break
                     }
                     /// We have an offset so we can preload the rolling hash into it later for hashing.
-                    let interopRootOffset := 64 
+                    let interopRootOffset := 64
                     mstore(add(interopRootOffset, 4), chainId)
                     mstore(add(interopRootOffset, 36), blockNumber)
                     let sidesLoadingOffset := add(interopRootOffset, 68)
@@ -3216,16 +3216,16 @@ object "Bootloader" {
                     }
 
                     // for single interopRoots that are not really sides, we send them to L1 here.
-                    switch sidesLength 
+                    switch sidesLength
                     case 1 {
                         // Calculate keccak256 of all data
-                        mstore(36, rollingHashOfProcessedRoots) 
+                        mstore(36, rollingHashOfProcessedRoots)
                         rollingHashOfProcessedRoots := keccak256(36, add(32, add(64, mul(sidesLength, 32))))
-                    } 
+                    }
                     default {
                         revertWithReason(FAILED_PRECOMMIT_BASED_INTEROP_NOT_SUPPORTED(), 1)
                     }
-                    
+
                 }
             }
 

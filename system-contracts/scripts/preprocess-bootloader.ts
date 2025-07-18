@@ -119,7 +119,7 @@ const params = {
   //
   // In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
   // operator to ensure that it can form the correct calldata for the L1Messenger.
-  OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 1360000,
+  OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 2040000,
   ...SYSTEM_PARAMS,
 };
 
