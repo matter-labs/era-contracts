@@ -30,6 +30,7 @@ import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, IBridgedStandardToken, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
@@ -100,6 +101,27 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             address(addresses.bridgehub),
             abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
             abi.encode(true)
+        );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.settlementLayer.selector),
+            abi.encode(506)
+        );
+        vm.mockCall(
+            address(addresses.l1Nullifier),
+            abi.encodeWithSelector(IL1Nullifier.getProofData.selector),
+            abi.encode(
+                ProofData({
+                    settlementLayerChainId: 506,
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 0,
+                    batchLeafProofLen: 0,
+                    batchSettlementRoot: 0,
+                    chainIdLeaf: 0,
+                    ptr: 0,
+                    finalProofNode: false
+                })
+            )
         );
         uint256 chainId = eraZKChainId;
         l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, _tokenAddress);

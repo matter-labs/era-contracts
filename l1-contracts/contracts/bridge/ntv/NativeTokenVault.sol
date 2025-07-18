@@ -14,6 +14,7 @@ import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+import {IAssetTracker} from "../asset-tracker/IAssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
@@ -92,6 +93,8 @@ abstract contract NativeTokenVault is
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
 
+    function _assetTracker() internal view virtual returns (IAssetTracker);
+
     /// @inheritdoc INativeTokenVault
     function registerToken(address _nativeToken) external virtual {
         _registerToken(_nativeToken);
@@ -113,6 +116,7 @@ abstract contract NativeTokenVault is
         bytes32 currentAssetId = assetId[_nativeToken];
         if (currentAssetId == bytes32(0)) {
             tokenAssetId = _registerToken(_nativeToken);
+            _assetTracker().registerNewToken(tokenAssetId, block.chainid);
         } else {
             tokenAssetId = currentAssetId;
         }
@@ -173,7 +177,7 @@ abstract contract NativeTokenVault is
             token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
         }
         _handleChainBalanceDecrease({
-            _tokenOriginChainId: originChainId[_assetId],
+            // _tokenOriginChainId: originChainId[_assetId],
             _chainId: _chainId,
             _assetId: _assetId,
             _amount: amount,
@@ -192,7 +196,7 @@ abstract contract NativeTokenVault is
         (, receiver, , amount, ) = DataEncoding.decodeBridgeMintData(_data);
 
         _handleChainBalanceDecrease({
-            _tokenOriginChainId: originChainId[_assetId],
+            // _tokenOriginChainId: originChainId[_assetId],
             _chainId: _chainId,
             _assetId: _assetId,
             _amount: amount,
@@ -419,11 +423,7 @@ abstract contract NativeTokenVault is
     /// @param _nativeToken The address of the token to be registered.
     function _unsafeRegisterNativeToken(address _nativeToken) internal returns (bytes32 newAssetId) {
         newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
-        tokenAddress[newAssetId] = _nativeToken;
-        assetId[_nativeToken] = newAssetId;
-        originChainId[newAssetId] = block.chainid;
-        bridgedTokens[bridgedTokensCount] = newAssetId;
-        ++bridgedTokensCount;
+        _setNewTokenStorage(newAssetId, _nativeToken, block.chainid);
         ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
@@ -435,7 +435,7 @@ abstract contract NativeTokenVault is
     ) internal virtual;
 
     function _handleChainBalanceDecrease(
-        uint256 _tokenOriginChainId,
+        // uint256 _tokenOriginChainId,
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
@@ -502,10 +502,16 @@ abstract contract NativeTokenVault is
         address deployedToken = _deployBridgedToken(_tokenOriginChainId, _assetId, _originToken, _erc20Data);
         require(deployedToken == _expectedToken, AddressMismatch(_expectedToken, deployedToken));
 
-        tokenAddress[_assetId] = _expectedToken;
-        assetId[_expectedToken] = _assetId;
+        _setNewTokenStorage(_assetId, _expectedToken, _tokenOriginChainId);
+    }
+
+    function _setNewTokenStorage(bytes32 _assetId, address _tokenAddress, uint256 _originChainId) internal {
+        tokenAddress[_assetId] = _tokenAddress;
+        assetId[_tokenAddress] = _assetId;
+        originChainId[_assetId] = _originChainId;
         bridgedTokens[bridgedTokensCount] = _assetId;
         ++bridgedTokensCount;
+        _assetTracker().registerNewToken(_assetId, _originChainId);
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.
@@ -534,7 +540,6 @@ abstract contract NativeTokenVault is
         BeaconProxy l2Token = _deployBeaconProxy(salt, _tokenOriginChainId);
         BridgedStandardERC20(address(l2Token)).bridgeInitialize(_assetId, _originToken, _erc20Data);
 
-        originChainId[_assetId] = _tokenOriginChainId;
         return address(l2Token);
     }
 

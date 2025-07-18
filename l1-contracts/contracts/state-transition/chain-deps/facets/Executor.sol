@@ -232,6 +232,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         ///
     }
 
+    error SettlementLayerChainIdMismatch();
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
     /// @dev The logs processed here should line up such that only one log for each key from the
     ///      SystemLogKey enum in Constants.sol is processed per new batch.
@@ -330,6 +331,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.dependencyRootsRollingHash = logValue;
+            } else if (logKey == uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY)) {
+                if (logSender != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
+                uint256 settlementLayerChainId = uint256(logValue);
+                require(settlementLayerChainId == block.chainid, SettlementLayerChainIdMismatch());
             } else if (logKey > MAX_LOG_KEY) {
                 revert UnexpectedSystemLog(logKey);
             }

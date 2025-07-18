@@ -29,7 +29,7 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {IAssetTracker, TokenBalanceMigrationData} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L2_BRIDGEHUB, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
@@ -49,7 +49,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     bytes32 assetId;
     uint256 originalChainId;
     uint256 gwChainId;
-    bytes32 assetSettlementLayerLocation;
+    bytes32 assetMigrationNumberLocation;
+    uint256 migrationNumber = 19;
     bytes32 chainBalanceLocation;
     uint256 amount = 1000000000000000000;
 
@@ -96,20 +97,26 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         prepare();
         tokenAddress = tokens[1];
         assetId = DataEncoding.encodeNTVAssetId(block.chainid, tokenAddress);
-        assetSettlementLayerLocation = keccak256(abi.encodePacked(assetId, uint256(2 + 151)));
 
-        chainBalanceLocation = 0x13b704bded2382d6e555a218f4d57330c8d624337c03a7aa1779d78f557b4126;
+        // 0x13b704bded2382d6e555a218f4d57330c8d624337c03a7aa1779d78f557b4126;
         // the below does not work for some reason:
-        // chainBalanceLocation = (computeNestedMappingSlot(eraZKChainId, assetId, 0 + 151));
+    }
+
+    function getChainBalanceLocation(bytes32 _assetId, uint256 _chainId) internal pure returns (bytes32) {
+        return computeNestedMappingSlot(uint256(_assetId), _chainId, 0 + 151);
+    }
+
+    function getAssetMigrationNumberLocation(bytes32 _assetId, uint256 _chainId) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_assetId, keccak256(abi.encodePacked(_chainId, uint256(2 + 151)))));
     }
 
     function computeNestedMappingSlot(
         uint256 outerKey,
-        bytes32 innerKey,
+        uint256 innerKey,
         uint256 baseSlot
     ) internal pure returns (bytes32) {
         // Computes keccak256(abi.encode(outerKey, keccak256(abi.encode(innerKey, baseSlot))))
-        bytes32 innerHash = keccak256(abi.encode(innerKey, baseSlot));
+        bytes32 innerHash = keccak256(abi.encodePacked(innerKey, baseSlot));
         return keccak256(abi.encode(outerKey, innerHash));
     }
 
@@ -126,6 +133,14 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         //     abi.encode(bytes32(0))
         // );
         // assetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
+            chainId: eraZKChainId,
+            assetId: assetId,
+            tokenOriginChainId: 0,
+            amount: amount,
+            migrationNumber: migrationNumber,
+            isL1ToGateway: true
+        });
 
         FinalizeL1DepositParams memory finalizeWithdrawalParamsL1ToGateway = FinalizeL1DepositParams({
             chainId: eraZKChainId,
@@ -133,7 +148,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             l2MessageIndex: 0,
             l2Sender: L2_ASSET_TRACKER_ADDR,
             l2TxNumberInBatch: 0,
-            message: abi.encode(eraZKChainId, assetId, amount, 0, true),
+            message: abi.encode(data),
             merkleProof: new bytes32[](0)
         });
         vm.chainId(originalChainId);
@@ -162,15 +177,19 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         vm.mockCalls(address(addresses.bridgehub), abi.encodeWithSelector(IBridgehub.getZKChain.selector), mocks2);
 
-        vm.store(address(assetTracker), assetSettlementLayerLocation, bytes32(uint256(originalChainId)));
-        vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
+        vm.store(
+            address(assetTracker),
+            getAssetMigrationNumberLocation(assetId, eraZKChainId),
+            bytes32(migrationNumber - 1)
+        );
+        vm.store(address(assetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
 
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
-        assetTracker.confirmMigrationOnL2(1, assetId, amount, 0);
+        assetTracker.confirmMigrationOnL2(data);
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
-        assetTracker.confirmMigrationOnGateway(1, assetId, amount, true);
+        assetTracker.confirmMigrationOnGateway(data);
     }
 
     function test_migrationGatewayToL1() public {
@@ -191,8 +210,16 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(bytes32(0))
         );
 
-        vm.store(address(assetTracker), assetSettlementLayerLocation, bytes32(uint256(gwChainId)));
         assetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);
+
+        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
+            chainId: eraZKChainId,
+            assetId: assetId,
+            tokenOriginChainId: 0,
+            amount: amount,
+            migrationNumber: migrationNumber,
+            isL1ToGateway: false
+        });
 
         FinalizeL1DepositParams memory finalizeWithdrawalParamsGatewayToL1 = FinalizeL1DepositParams({
             chainId: gwChainId,
@@ -200,7 +227,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             l2MessageIndex: 0,
             l2Sender: L2_ASSET_TRACKER_ADDR,
             l2TxNumberInBatch: 0,
-            message: abi.encode(eraZKChainId, assetId, amount, 0, false),
+            message: abi.encode(data),
             merkleProof: new bytes32[](0)
         });
 
@@ -234,13 +261,18 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IBridgehub.getZKChain.selector),
             abi.encode(0x0000000000000000000000000000000000000011)
         );
-        vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
+        vm.store(address(assetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
+        vm.store(
+            address(assetTracker),
+            getAssetMigrationNumberLocation(assetId, eraZKChainId),
+            bytes32(migrationNumber - 1)
+        );
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
 
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
         vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
-        assetTracker.confirmMigrationOnGateway(eraZKChainId, assetId, amount, false);
+        assetTracker.confirmMigrationOnGateway(data);
     }
 
     function test_processLogsAndMessages() public {
