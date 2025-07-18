@@ -219,6 +219,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         /// for forge verification.
         deploySimpleContract("DiamondProxy", false);
 
+        (
+            addresses.bridgehub.chainAssetHandlerImplementation,
+            addresses.bridgehub.chainAssetHandlerProxy
+        ) = deployTuppWithContract("ChainAssetHandler", false);
+
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
@@ -382,7 +387,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         VerifierParams memory verifierParams = getVerifierParams();
 
         IL2ContractDeployer.ForceDeployment[] memory baseForceDeployments = SystemContractsProcessing
-            .getBaseForceDeployments();
+            .getBaseForceDeployments(config.l1ChainId, config.ownerAddress);
 
         // Additional force deployments after Gateway
         IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
@@ -592,14 +597,15 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         string[] memory additionalForceDeployments = getForceDeploymentNames();
 
-        bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
+        bytes[] memory additionalDependencies = new bytes[](5 + additionalForceDeployments.length); // Deps after Gateway upgrade
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+        additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
-            additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
+            additionalDependencies[5 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
         }
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
@@ -642,6 +648,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             "ctm_deployment_tracker_proxy_addr",
             addresses.bridgehub.ctmDeploymentTrackerProxy
         );
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_asset_handler_implementation_addr",
+            addresses.bridgehub.chainAssetHandlerImplementation
+        );
+        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
@@ -760,10 +772,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
         vm.serializeAddress(
             "bridges",
-            "l1_shared_bridge_implementation_addr",
+            "l1_asset_router_implementation_addr",
             addresses.bridges.l1AssetRouterImplementation
         );
-        vm.serializeAddress("bridges", "shared_bridge_proxy_addr", addresses.bridges.l1AssetRouterProxy);
+        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", addresses.bridges.l1AssetRouterProxy);
         // TODO: legacy name
         vm.serializeAddress(
             "bridges",
@@ -975,14 +987,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         // 1. Perform upgrade
         // 2. Unpause migration to/from Gateway
         stage0Calls = prepareStage0GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
+        vm.serializeBytes("governance_calls", "governance_stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
+        vm.serializeBytes("governance_calls", "governance_stage1_calls", abi.encode(stage1Calls));
         stage2Calls = prepareStage2GovernanceCalls();
 
         string memory governanceCallsSerialized = vm.serializeBytes(
             "governance_calls",
-            "stage2_calls",
+            "governance_stage2_calls",
             abi.encode(stage2Calls)
         );
 
@@ -991,16 +1003,20 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
+        Call[][] memory allCalls = new Call[][](4);
+
         allCalls[0] = preparePauseGatewayMigrationsCall();
         allCalls[1] = prepareGatewaySpecificStage0GovernanceCalls();
         allCalls[2] = prepareGovernanceUpgradeTimerStartCall();
+
+        allCalls[3] = prepareVersionSpecificStage0GovernanceCalls();
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](7);
+        Call[][] memory allCalls = new Call[][](8);
+
         allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
         allCalls[1] = prepareCheckMigrationsPausedCalls();
         allCalls[2] = prepareUpgradeProxiesCalls();
@@ -1008,17 +1024,39 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         allCalls[4] = provideSetNewVersionUpgradeCall();
         allCalls[5] = prepareDAValidatorCall();
         allCalls[6] = prepareGatewaySpecificStage1GovernanceCalls();
+
+        allCalls[7] = prepareVersionSpecificStage1GovernanceCalls();
+
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](5);
+
         allCalls[0] = prepareCheckUpgradeIsPresent();
         allCalls[1] = prepareUnpauseGatewayMigrationsCall();
         allCalls[2] = prepareGatewaySpecificStage2GovernanceCalls();
         allCalls[3] = prepareCheckMigrationsUnpausedCalls();
+
+        allCalls[4] = prepareVersionSpecificStage2GovernanceCalls();
+
         calls = mergeCallsArray(allCalls);
+    }
+
+    function prepareVersionSpecificStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
+    }
+
+    function prepareVersionSpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
+    }
+
+    function prepareVersionSpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
     }
 
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {
@@ -1531,6 +1569,15 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
                 initCalldata: ""
             });
             return abi.encode(block.chainid, diamondCut);
+        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+            return
+                abi.encode(
+                    config.l1ChainId,
+                    config.ownerAddress,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridgehub.messageRootProxy
+                );
         } else {
             return super.getCreationCalldata(contractName, isZKBytecode);
         }
