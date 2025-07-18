@@ -3,11 +3,11 @@
 pragma solidity ^0.8.20;
 
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
-import {InteropCallStarter} from "../../common/Messaging.sol";
+import {IL2CrossChainSender} from "../interfaces/IL2CrossChainSender.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL2AssetRouter is IAssetRouterBase {
+interface IL2AssetRouter is IAssetRouterBase, IL2CrossChainSender {
     event WithdrawalInitiatedAssetRouter(
         uint256 chainId,
         address indexed l2Sender,
@@ -37,19 +37,4 @@ interface IL2AssetRouter is IAssetRouterBase {
     /// a legacy asset.
     /// @param _assetId The assetId of the legacy token.
     function setLegacyTokenAssetHandler(bytes32 _assetId) external;
-
-    /// @notice Function that returns an InteropCallStarter corresponding to the interop call. Effectively this initiates bridging,
-    ///         BH part is processed within this function via `_bridgehubDeposit` call which also returns the data for an l2 call
-    ///         on the destination chain (which will be processed with the returned InteropCallStarter from this function).
-    /// @param _chainId Destination chain ID.
-    /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
-    /// @param _value The `msg.value` to be deposited on the target chain.
-    /// @param _data The calldata for the second bridge deposit.
-    /// @return interopCallStarter InteropCallStarter corresponding to the second bridge call.
-    function interopCenterInitiateBridge(
-        uint256 _chainId,
-        address _originalCaller,
-        uint256 _value,
-        bytes calldata _data
-    ) external payable returns (InteropCallStarter memory interopCallStarter);
 }

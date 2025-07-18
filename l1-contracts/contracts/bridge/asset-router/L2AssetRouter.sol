@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
+import {IL2CrossChainSender} from "../interfaces/IL2CrossChainSender.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
@@ -21,14 +22,15 @@ import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} f
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy, InvalidSelector, PayloadTooShort, ExecuteMessageFailed} from "../../common/L1ContractErrors.sol";
-import {IERC7786Receiver} from "../../interop/IERC7786Receiver.sol";
+import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Receiver {
+contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Recipient {
     /// @dev The address of the L2 legacy shared bridge.
     address public immutable L2_LEGACY_SHARED_BRIDGE;
 
@@ -53,15 +55,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
         if (_chainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (
-                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) &&
-                msg.sender != address(this) &&
-                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(this))
-            ) {
+            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && msg.sender != address(this)) {
                 revert InvalidCaller(msg.sender);
             }
         } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            if (msg.sender != address(this)) {
+                revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            }
         }
         _;
     }
@@ -130,21 +130,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     /// @notice Executes cross-chain interop messages following ERC-7786 standard
-    /// @param messageId Gateway-specific message identifier (currently unused)
-    /// @param sourceChain CAIP-2 chain identifier where the message originated
-    /// @param sender CAIP-10 account address that initiated the cross-chain message
+    /// @param sender ERC-7930 Address of the message sender
     /// @param payload Encoded function call data (must be finalizeDeposit)
-    /// @param attributes ERC-7786 message attributes (currently unused)
     /// @return Function selector confirming successful execution per ERC-7786
-    function executeMessage(
-        // kl todo: change back to strings
-        // solhint-disable-next-line no-unused-vars
-        bytes32 messageId, // Gateway-specific message identifier
-        uint256 sourceChain, // [CAIP-2] chain identifier
-        address sender, // [CAIP-10] account address
-        bytes calldata payload,
-        // solhint-disable-next-line no-unused-vars
-        bytes[] calldata attributes
+    function receiveMessage(
+        bytes32 /* receiveId */, // Unique identifier
+        bytes calldata sender, // ERC-7930 address
+        bytes calldata payload
     ) external payable returns (bytes4) {
         // This function serves as the L2AssetRouter's entry point for processing cross-chain bridge operations
         // initiated through the InteropCenter system. It implements critical security validations:
@@ -158,13 +150,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // 1. User calls InteropCenter on source L2
         // 2. InteropCenter calls interopCenterInitiateBridge() on source chain's L2AssetRouter
         // 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
-        // 4. Destination L2 validates sender == address(this) for non-L1 sources
+        // 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
         //    (L2AssetRouter address is equal for all ZKsync chains)
 
+        (uint256 sourceChain, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
+
         require(
-            (sourceChain == L1_CHAIN_ID && sender == L1_ASSET_ROUTER) ||
-                (sourceChain != L1_CHAIN_ID && sender == address(this)),
-            InvalidCaller(sender)
+            (sourceChain == L1_CHAIN_ID && senderAddress == L1_ASSET_ROUTER) ||
+                (sourceChain != L1_CHAIN_ID && senderAddress == address(this)),
+            InvalidCaller(senderAddress)
         );
 
         // The payload must contain a valid finalizeDeposit selector to ensure only legitimate
@@ -177,7 +171,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
         (bool success, ) = address(this).call(payload);
         require(success, ExecuteMessageFailed());
-        return IERC7786Receiver.executeMessage.selector;
+        return IERC7786Recipient.receiveMessage.selector;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -219,7 +213,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
     }
 
-    /// @inheritdoc IL2AssetRouter
+    /// @inheritdoc IL2CrossChainSender
     function interopCenterInitiateBridge(
         uint256 _chainId,
         address _originalCaller,
@@ -252,7 +246,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encode(IERC7786Attributes.interopCallValue.selector, _value);
         interopCallStarter = InteropCallStarter({
-            nextContract: request.l2Contract,
+            to: request.l2Contract,
             data: request.l2Calldata,
             callAttributes: attributes
         });
