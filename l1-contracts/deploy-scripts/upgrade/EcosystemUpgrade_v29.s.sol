@@ -90,12 +90,27 @@ import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
+    address[] internal oldValidatorTimelocks;
+    address[] internal oldGatewayValidatorTimelocks;
+
     /// @notice E2e upgrade generation
     function run() public virtual override {
         initialize(vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_UPGRADE_ECOSYSTEM_OUTPUT"));
+
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
+    }
+
+    function initializeConfig(string memory newConfigPath) internal override {
+        super.initializeConfig(newConfigPath);
+        string memory toml = vm.readFile(newConfigPath);
+
+        bytes memory encodedOldValidatorTimelocks = toml.readBytes("$.encoded_old_validator_timelocks");
+        oldValidatorTimelocks = abi.decode(encodedOldValidatorTimelocks, (address[]));
+
+        bytes memory encodedOldGatewayValidatorTimelocks = toml.readBytes("$.encoded_old_gateway_validator_timelocks");
+        oldGatewayValidatorTimelocks = abi.decode(encodedOldGatewayValidatorTimelocks, (address[]));
     }
 
     function _getL2UpgradeTargetAndData(
@@ -133,6 +148,78 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
             return abi.encode();
         }
         return super.getCreationCalldata(contractName, isZKBytecode);
+    }
+
+    function deployValidatorTimelock() internal override returns (address) {
+        return deploySimpleContract("ValidatorTimelock", false);
+    }
+
+    function encodePostUpgradeCalldata(StateTransitionDeployedAddresses memory stateTransitionAddresses) internal override returns (bytes memory) {
+        address[] memory oldValidatorTimelocks = stateTransitionAddresses.isOnGateway ? oldGatewayValidatorTimelocks : oldValidatorTimelocks;
+        return abi.encode(L1V29Upgrade.V29UpgradeParams({
+            oldValidatorTimelocks: oldValidatorTimelocks,
+            newValidatorTimelock: stateTransitionAddresses.validatorTimelock
+        }));
+    }
+
+    /// @notice Additional calls to newConfigure contracts
+    function prepareSetPostV29UpgradeableValidatorTimelockCall() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: addresses.stateTransition.chainTypeManagerProxy,
+            data: abi.encodeCall(
+                IChainTypeManager.setPostV29UpgradeableValidatorTimelock,
+                (addresses.stateTransition.validatorTimelock)
+            ),
+            value: 0
+        });
+    }
+
+    function prepareSetPostV29UpgradeableValidatorTimelockCallGW(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        bytes memory l2Calldata = abi.encodeCall(
+            IChainTypeManager.setPostV29UpgradeableValidatorTimelock,
+            (
+                gatewayConfig.gatewayStateTransition.validatorTimelock
+            )
+        );
+
+        calls = _prepareL1ToGatewayCall(
+            l2Calldata,
+            l2GasLimit,
+            l1GasPrice,
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+        );
+    }
+
+    function prepareGatewaySpecificStage1GovernanceCalls() public override returns (Call[] memory calls) {
+        Call[] memory baseCalls = super.prepareGatewaySpecificStage1GovernanceCalls(); 
+        if (gatewayConfig.chainId == 0) return baseCalls; // Gateway is unknown
+
+        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
+        uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
+        uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
+
+        Call[][] memory allCalls = new Call[][](2);
+        allCalls[0] = baseCalls;
+        allCalls[1] = prepareSetPostV29UpgradeableValidatorTimelockCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        return mergeCallsArray(allCalls);
+    }
+
+    function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](7);
+        allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
+        allCalls[1] = prepareCheckMigrationsPausedCalls();
+        allCalls[2] = prepareUpgradeProxiesCalls();
+        allCalls[3] = prepareNewChainCreationParamsCall();
+        allCalls[4] = provideSetNewVersionUpgradeCall();
+        allCalls[5] = prepareDAValidatorCall();
+        allCalls[6] = prepareSetPostV29UpgradeableValidatorTimelockCall();
+        allCalls[7] = prepareGatewaySpecificStage1GovernanceCalls();
+        calls = mergeCallsArray(allCalls);
     }
 
     function deployUsedUpgradeContract() internal override returns (address) {

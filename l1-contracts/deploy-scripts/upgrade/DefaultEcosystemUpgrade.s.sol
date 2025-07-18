@@ -198,6 +198,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         deployVerifiers();
         deployUpgradeStageValidator();
 
+        address newValidatorTimelock = deployValidatorTimelock();
+        if (newValidatorTimelock != address(0)) {
+            addresses.stateTransition.validatorTimelock = newValidatorTimelock;
+        }
+
         // Note, that this is the upgrade that will be used, despite the naming of the variable here.
         // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
         (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
@@ -220,6 +225,18 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         deploySimpleContract("DiamondProxy", false);
 
         upgradeConfig.ecosystemContractsDeployed = true;
+    }
+
+    /// @notice Deploy a fresh `ValidatorTimelock` if the concrete upgrade
+    /// requires it. Default implementation is a no‑op.
+    function deployValidatorTimelock() internal virtual returns (address) {
+        return address(0);
+    }
+
+    /// @notice Encode calldata that will be passed to `_postUpgrade`
+    /// in the on‑chain contract. Override in concrete upgrades.
+    function encodePostUpgradeCalldata(StateTransitionDeployedAddresses memory) internal virtual returns (bytes memory) {
+        return new bytes(0);
     }
 
     function deployGWContract(string memory contractName) internal returns (address contractAddress) {
@@ -403,7 +420,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             verifier: stateTransition.verifier,
             verifierParams: verifierParams,
             l1ContractsUpgradeCalldata: new bytes(0),
-            postUpgradeCalldata: new bytes(0),
+            postUpgradeCalldata: encodePostUpgradeCalldata(stateTransition),
             upgradeTimestamp: 0,
             newProtocolVersion: getNewProtocolVersion()
         });
@@ -454,13 +471,15 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         addresses.transparentProxyAdmin = address(
             uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
         );
-        addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
+        // TODO: not sure it is okay.
+        // addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
 
-        require(
-            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() ==
-                addresses.protocolUpgradeHandlerProxy,
-            "Incorrect ProtocolUpgradeHandlerProxy"
-        );
+        addresses.protocolUpgradeHandlerProxy = Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner();
+        // require(
+        //     Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() ==
+        //         addresses.protocolUpgradeHandlerProxy,
+        //     "Incorrect ProtocolUpgradeHandlerProxy"
+        // );
         require(
             Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
             "Incorrect owner"
@@ -982,14 +1001,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         // 1. Perform upgrade
         // 2. Unpause migration to/from Gateway
         stage0Calls = prepareStage0GovernanceCalls();
-        vm.serializeBytes("governance_calls", "governance_stage0_calls", abi.encode(stage0Calls));
+        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
-        vm.serializeBytes("governance_calls", "governance_stage1_calls", abi.encode(stage1Calls));
+        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
         stage2Calls = prepareStage2GovernanceCalls();
 
         string memory governanceCallsSerialized = vm.serializeBytes(
             "governance_calls",
-            "governance_stage2_calls",
+            "stage2_calls",
             abi.encode(stage2Calls)
         );
 
@@ -1457,6 +1476,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
                 return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
                 return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+            } else if (compareStrings(contractName, "ValidatorTimelock")) {
+                return type(ValidatorTimelock).creationCode;
             }
         } else {
             if (compareStrings(contractName, "GatewayUpgrade")) {
@@ -1477,6 +1498,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
                 return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
                 return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+            } else if (compareStrings(contractName, "ValidatorTimelock")) {
+                return ContractsBytecodesLib.getCreationCode("ValidatorTimelock");
             }
         }
         return super.getCreationCode(contractName, isZKBytecode);

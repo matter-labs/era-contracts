@@ -18,10 +18,10 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
         );
 
         address newValidatorTimelock = address(0x0000000000000000000000000000000000004235);
-        chainContractAddress.setValidatorTimelock(newValidatorTimelock);
+        chainContractAddress.setPostV29UpgradeableValidatorTimelock(newValidatorTimelock);
 
         assertEq(
-            chainContractAddress.validatorTimelock(),
+            chainContractAddress.postV29UpgradeableValidatorTimelock(),
             newValidatorTimelock,
             "Validator timelock update was not successful"
         );
@@ -41,8 +41,8 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
         vm.prank(notOwner);
         vm.expectRevert("Ownable: caller is not the owner");
         address newValidatorTimelock = address(0x0000000000000000000000000000000000004235);
-        chainContractAddress.setValidatorTimelock(newValidatorTimelock);
+        chainContractAddress.setPostV29UpgradeableValidatorTimelock(newValidatorTimelock);
 
-        assertEq(chainContractAddress.validatorTimelock(), validator, "Validator should not have been updated");
+        assertEq(chainContractAddress.postV29UpgradeableValidatorTimelock(), validator, "Validator should not have been updated");
     }
 }

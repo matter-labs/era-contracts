@@ -49,8 +49,12 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev The timestamp when protocolVersion can be last used
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
-    /// @dev The validatorTimelock contract address
+    /// @dev The validatorTimelock contract address. 
+    /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It will be deprecated after v29 upgrade.
     address public validatorTimelock;
+
+    /// @dev The address of the post-V29 upgradeable validatorTimelock
+    address public postV29UpgradeableValidatorTimelock;
 
     /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
@@ -147,7 +151,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         protocolVersion = _initializeData.protocolVersion;
         _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
-        validatorTimelock = _initializeData.validatorTimelock;
+        postV29UpgradeableValidatorTimelock = _initializeData.validatorTimelock;
         serverNotifierAddress = _initializeData.serverNotifier;
 
         _setChainCreationParams(_initializeData.chainCreationParams);
@@ -237,11 +241,21 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     }
 
     /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after CTM
+    /// @dev Note, that the validator timelock that this function sets is only used for pre-v29 protocol versions.
+    /// It is kept only for convenience.
     /// @param _validatorTimelock the new validatorTimelock address
-    function setValidatorTimelock(address _validatorTimelock) external onlyOwner {
+    function setLegacyValidatorTimelock(address _validatorTimelock) external onlyOwner {
         address oldValidatorTimelock = validatorTimelock;
         validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
+    }
+
+    /// @dev set the post-V29 upgradeable validatorTimelock
+    /// @param _postV29UpgradeableValidatorTimelock the new post-V29 upgradeable validatorTimelock address
+    function setPostV29UpgradeableValidatorTimelock(address _postV29UpgradeableValidatorTimelock) external onlyOwner {
+        address oldPostV29UpgradeableValidatorTimelock = postV29UpgradeableValidatorTimelock;
+        postV29UpgradeableValidatorTimelock = _postV29UpgradeableValidatorTimelock;
+        emit NewPostV29UpgradeableValidatorTimelock(oldPostV29UpgradeableValidatorTimelock, _postV29UpgradeableValidatorTimelock);
     }
 
     /// @dev set ServerNotifier.
