@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
+import {IL2CrossChainSender} from "../interfaces/IL2CrossChainSender.sol";
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
@@ -214,7 +215,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         emit DepositFinalizedAssetRouter(_originChainId, _assetId, _transferData);
     }
 
-    /// @inheritdoc IL2AssetRouter
+    /// @inheritdoc IL2CrossChainSender
     function interopCenterInitiateBridge(
         uint256 _chainId,
         address _originalCaller,

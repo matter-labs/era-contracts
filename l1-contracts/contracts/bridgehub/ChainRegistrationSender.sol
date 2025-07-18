@@ -6,10 +6,9 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 
 import {IChainRegistrationSender} from "./IChainRegistrationSender.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {IL1CrossChainSender} from "../bridge/asset-router/IL1CrossChainSender.sol";
+import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
-import {IL1CrossChainSender} from "../bridge/asset-router/IL1CrossChainSender.sol";
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";

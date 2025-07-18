@@ -27,6 +27,7 @@ import {IERC7786Attributes} from "./IERC7786Attributes.sol";
 import {AttributesDecoder} from "./AttributesDecoder.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
+import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol";
 
 /// @title InteropCenter
 /// @author Matter Labs
@@ -328,9 +329,13 @@ contract InteropCenter is
             });
         } else {
             // slither-disable-next-line arbitrary-send-eth
-            InteropCallStarter memory actualCallStarter = IL2AssetRouter(_callStarter.to).interopCenterInitiateBridge{
-                value: _callStarter.callAttributes.indirectCallMessageValue
-            }(_destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
+            InteropCallStarter memory actualCallStarter = IL2CrossChainSender(_callStarter.to)
+                .interopCenterInitiateBridge{value: _callStarter.callAttributes.indirectCallMessageValue}(
+                _destinationChainId,
+                _sender,
+                _callStarter.callAttributes.interopCallValue,
+                _callStarter.data
+            );
             // solhint-disable-next-line no-unused-vars
             // slither-disable-next-line unused-return
             (CallAttributes memory indirectCallAttributes, ) = this.parseAttributes(
