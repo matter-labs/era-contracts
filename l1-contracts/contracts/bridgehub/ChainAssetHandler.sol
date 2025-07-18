@@ -17,6 +17,7 @@ import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused} from "../common/L1ContractErrors.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
@@ -69,6 +70,14 @@ contract ChainAssetHandler is
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert NotL1(L1_CHAIN_ID, block.chainid);
+        }
+        _;
+    }
+
+    error NotSystemContext(address _sender);
+    modifier onlySystemContext() {
+        if (msg.sender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
+            revert NotSystemContext(msg.sender);
         }
         _;
     }
@@ -228,6 +237,26 @@ contract ChainAssetHandler is
             _originalCaller: _depositSender,
             _chainData: bridgehubBurnData.chainData
         });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            PAUSE
+    //////////////////////////////////////////////////////////////*/
+
+    function setSettlementLayerChainId(
+        uint256 _previousSettlementLayerChainId,
+        uint256 _currentSettlementLayerChainId
+    ) external onlySystemContext {
+        if (_previousSettlementLayerChainId == 0) {
+            if (block.chainid == L1_CHAIN_ID) {
+                migrationNumber[block.chainid] = 1;
+            }
+            /// For the initial call, we return, as there is no real migration.
+            return;
+        }
+        if (_previousSettlementLayerChainId != _currentSettlementLayerChainId) {
+            ++migrationNumber[block.chainid];
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
