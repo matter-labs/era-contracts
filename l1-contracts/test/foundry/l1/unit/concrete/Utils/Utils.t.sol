@@ -44,7 +44,7 @@ contract UtilsTest is Test {
     function test_CreateSystemLogs() public {
         bytes[] memory logs = Utils.createSystemLogs(bytes32(0));
 
-        assertEq(logs.length, 8, "logs length should be correct");
+        assertEq(logs.length, 9, "logs length should be correct");
 
         assertEq(
             logs[0],
@@ -121,6 +121,28 @@ contract UtilsTest is Test {
                 bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
             ),
             "log[6] should be correct"
+        );
+
+        assertEq(
+            logs[7],
+            Utils.constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                uint256(SystemLogKey.MESSAGE_ROOT_ROLLING_HASH_KEY),
+                bytes32(uint256(uint160(0)))
+            ),
+            "log[7] should be correct"
+        );
+
+        assertEq(
+            logs[8],
+            Utils.constructL2Log(
+                true,
+                L2_BOOTLOADER_ADDRESS,
+                uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
+                bytes32("")
+            ),
+            "log[8] should be correct"
         );
     }
 

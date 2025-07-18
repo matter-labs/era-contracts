@@ -35,7 +35,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 internal immutable L2_TOKEN_PROXY_BYTECODE_HASH;
+    bytes32 public immutable L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
     /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.

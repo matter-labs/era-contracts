@@ -23,7 +23,6 @@ import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IValidatorTimelock} from "./interfaces/IValidatorTimelock.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
@@ -114,15 +113,13 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
         deployDAValidators();
-        (addresses.stateTransition.validatorTimelock) = deploySimpleContract("ValidatorTimelock", false);
-
         (addresses.governance) = deploySimpleContract("Governance", false);
         (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
+
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
-
-        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
             "Bridgehub",
             false
@@ -131,6 +128,8 @@ contract DeployL1Script is Script, DeployUtils {
             "MessageRoot",
             false
         );
+
+        (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
 
         (
             addresses.stateTransition.serverNotifierImplementation,
@@ -182,7 +181,6 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.stateTransition.chainTypeManagerProxy
         ) = deployTuppWithContract("ChainTypeManager", false);
         registerChainTypeManager();
-        setChainTypeManagerInValidatorTimelock();
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
@@ -288,15 +286,6 @@ contract DeployL1Script is Script, DeployUtils {
         );
     }
 
-    function setChainTypeManagerInValidatorTimelock() public virtual {
-        IValidatorTimelock validatorTimelock = IValidatorTimelock(addresses.stateTransition.validatorTimelock);
-        if (address(validatorTimelock.chainTypeManager()) != addresses.stateTransition.chainTypeManagerProxy) {
-            vm.broadcast(msg.sender);
-            validatorTimelock.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
-        }
-        console.log("ChainTypeManager set in ValidatorTimelock");
-    }
-
     function deployDiamondProxy() internal {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
@@ -357,7 +346,7 @@ contract DeployL1Script is Script, DeployUtils {
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
-        IValidatorTimelock validatorTimelock = IValidatorTimelock(addresses.stateTransition.validatorTimelock);
+        ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.stateTransition.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);
 
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
@@ -843,6 +832,12 @@ contract DeployL1Script is Script, DeployUtils {
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
+        } else if (compareStrings(contractName, "ValidatorTimelock")) {
+            return
+                abi.encodeCall(
+                    ValidatorTimelock.initialize,
+                    (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
+                );
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

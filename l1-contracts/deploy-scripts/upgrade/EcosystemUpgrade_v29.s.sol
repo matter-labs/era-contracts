@@ -84,15 +84,15 @@ import {DeployL1Script} from "../DeployL1.s.sol";
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
+import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 
-/// @notice Script used for default upgrade flow
-/// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
+/// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
@@ -126,5 +126,29 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         }
 
         return super.getExpectedL2Address(contractName);
+    }
+
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override returns (bytes memory) {
+        if (!isZKBytecode && compareStrings(contractName, "L1V29Upgrade")) {
+            return type(L1V29Upgrade).creationCode;
+        }
+        return super.getCreationCode(contractName, isZKBytecode);
+    }
+
+    function getCreationCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view override returns (bytes memory) {
+        if (compareStrings(contractName, "L1V29Upgrade")) {
+            return abi.encode();
+        }
+        return super.getCreationCalldata(contractName, isZKBytecode);
+    }
+
+    function deployUsedUpgradeContract() internal override returns (address) {
+        return deploySimpleContract("L1V29Upgrade", false);
     }
 }
