@@ -1003,16 +1003,20 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
     function prepareStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
+        Call[][] memory allCalls = new Call[][](4);
+
         allCalls[0] = preparePauseGatewayMigrationsCall();
         allCalls[1] = prepareGatewaySpecificStage0GovernanceCalls();
         allCalls[2] = prepareGovernanceUpgradeTimerStartCall();
+
+        allCalls[3] = prepareVersionSpecificStage0GovernanceCalls();
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](7);
+        Call[][] memory allCalls = new Call[][](8);
+
         allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
         allCalls[1] = prepareCheckMigrationsPausedCalls();
         allCalls[2] = prepareUpgradeProxiesCalls();
@@ -1020,17 +1024,39 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         allCalls[4] = provideSetNewVersionUpgradeCall();
         allCalls[5] = prepareDAValidatorCall();
         allCalls[6] = prepareGatewaySpecificStage1GovernanceCalls();
+
+        allCalls[7] = prepareVersionSpecificStage1GovernanceCalls();
+
         calls = mergeCallsArray(allCalls);
     }
 
     /// @notice The second step of upgrade. By default it unpauses migrations.
     function prepareStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](5);
+
         allCalls[0] = prepareCheckUpgradeIsPresent();
         allCalls[1] = prepareUnpauseGatewayMigrationsCall();
         allCalls[2] = prepareGatewaySpecificStage2GovernanceCalls();
         allCalls[3] = prepareCheckMigrationsUnpausedCalls();
+
+        allCalls[4] = prepareVersionSpecificStage2GovernanceCalls();
+
         calls = mergeCallsArray(allCalls);
+    }
+
+    function prepareVersionSpecificStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
+    }
+
+    function prepareVersionSpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
+    }
+
+    function prepareVersionSpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
     }
 
     function provideSetNewVersionUpgradeCall() public virtual returns (Call[] memory calls) {

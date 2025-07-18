@@ -139,19 +139,12 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         return deploySimpleContract("L1V29Upgrade", false);
     }
 
-    /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
-    function prepareStage0GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
+    function prepareVersionSpecificStage0GovernanceCalls() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](1);
 
-        // Default calls
-        allCalls[0] = preparePauseGatewayMigrationsCall();
-        allCalls[1] = prepareGatewaySpecificStage0GovernanceCalls();
-        allCalls[2] = prepareGovernanceUpgradeTimerStartCall();
+        allCalls[0] = prepareSetCtmAssetHandlerAddressOnL1Call();
 
-        // v29 upgrade specific calls
-        allCalls[3] = prepareSetCtmAssetHandlerAddressOnL1Call();
-        
-        calls = mergeCallsArray(allCalls);
+        return mergeCallsArray(allCalls);
     }
 
     /// @notice Sets ctm asset handler address on L1. We need to update it because of ChainAssetHandler appearance.
@@ -160,7 +153,10 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
         calls[0] = Call({
             target: addresses.bridgehub.ctmDeploymentTrackerProxy,
-            data: abi.encodeCall(CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1, (addresses.stateTransition.chainTypeManagerProxy)),
+            data: abi.encodeCall(
+                CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1,
+                (addresses.stateTransition.chainTypeManagerProxy)
+            ),
             value: 0
         });
     }
