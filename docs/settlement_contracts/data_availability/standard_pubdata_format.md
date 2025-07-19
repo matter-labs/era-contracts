@@ -229,7 +229,7 @@ Note, that values like `initial_value`, `address` and `key` are not used in the 
 #### **L2**
 
 1. The operator provides both full `stateDiffs` (i.e. the array of the structs above) and the compressed state diffs (i.e. the array which contains the state diffs, compressed by the algorithm explained [below](#state-diff-compression-format)).
-2. The L2DAValidator must verify that the compressed version is consistent with the original stateDiffs and send the the _hash_ of the original state diff to its L1 counterpart. It will also include the compressed state diffs into the totalPubdata to be published onto L1.
+2. The L2DAValidator must verify that the compressed version is consistent with the original stateDiffs and send the _hash_ of the original state diff to its L1 counterpart. It will also include the compressed state diffs into the totalPubdata to be published onto L1.
 
 #### **L1**
 
