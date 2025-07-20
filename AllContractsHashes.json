@@ -833,11 +833,11 @@
   },
   {
     "contractName": "l1-contracts/CTMDeploymentTracker",
-    "zkBytecodeHash": "0x0100018b9fa22cfe3d78070a74edda6c24e49905c7c732a71fd632e53e6ed930",
+    "zkBytecodeHash": "0x010001bb56fab3222bc7780348197a675a35f2472b5d1b199e977ae9279021a3",
     "zkBytecodePath": "/l1-contracts/zkout/CTMDeploymentTracker.sol/CTMDeploymentTracker.json",
-    "evmBytecodeHash": "0x4f8f9d99f7c00487ccbcf9d1ae97cdd4b34d44363b986666d1576d33fcf51936",
+    "evmBytecodeHash": "0x95fccb40e9118ecd8d04692bca71822c65b1afba84794e7c3cabfa9398347c68",
     "evmBytecodePath": "/l1-contracts/out/CTMDeploymentTracker.sol/CTMDeploymentTracker.json",
-    "evmDeployedBytecodeHash": "0xd8ebcad7927bee833986495c9823b3a2aa463351c61a76605a0c92ea3f87eb46"
+    "evmDeployedBytecodeHash": "0xd2af0f406879aaf4fa2d33299929dc0285d16e0fa90f92e5014f3b0e566d5aa2"
   },
   {
     "contractName": "l1-contracts/ChainAdmin",

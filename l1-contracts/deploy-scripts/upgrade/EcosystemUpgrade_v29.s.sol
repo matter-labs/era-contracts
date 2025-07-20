@@ -230,4 +230,26 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     function deployUsedUpgradeContract() internal override returns (address) {
         return deploySimpleContract("L1V29Upgrade", false);
     }
+
+    function prepareVersionSpecificStage0GovernanceCalls() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](1);
+
+        allCalls[0] = prepareSetCtmAssetHandlerAddressOnL1Call();
+
+        return mergeCallsArray(allCalls);
+    }
+
+    /// @notice Sets ctm asset handler address on L1. We need to update it because of ChainAssetHandler appearance.
+    function prepareSetCtmAssetHandlerAddressOnL1Call() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: addresses.bridgehub.ctmDeploymentTrackerProxy,
+            data: abi.encodeCall(
+                CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1,
+                (addresses.stateTransition.chainTypeManagerProxy)
+            ),
+            value: 0
+        });
+    }
 }
