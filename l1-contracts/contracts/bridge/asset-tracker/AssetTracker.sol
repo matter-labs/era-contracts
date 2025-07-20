@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IAssetTracker, TokenBalanceMigrationData} from "./IAssetTracker.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log, L2Message} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -25,7 +25,7 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-// import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
+import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidChainId, InvalidSender} from "./AssetTrackerErrors.sol";
 
 error InvalidMigrationHash();
@@ -137,7 +137,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     /// @notice Called on the L1 when a deposit to the chain happens.
     /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
+    function handleChainBalanceIncreaseOnSL(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
         // onlyNativeTokenVaultOrInteropCenter {
 
         uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
@@ -163,7 +163,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
     /// @notice Called on the L1 when a withdrawal from the chain happens, or when a failed deposit is undone.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceDecrease(
+    function handleChainBalanceDecreaseOnSL(
         // uint256 _tokenOriginChainId,
         uint256 _chainId,
         bytes32 _assetId,
@@ -188,6 +188,19 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
             revert InsufficientChainBalanceAssetTracker(chainToUpdate, _assetId, _amount);
         }
         chainBalance[chainToUpdate][_assetId] -= _amount;
+    }
+
+    error InvalidAssetMigrationNumber(uint256, uint256);
+
+    function handleInitiateBridgingOnL2(uint256, bytes32 _assetId, uint256, bool) external {
+        require(
+            assetMigrationNumber[block.chainid][_assetId] == _getMigrationNumber(block.chainid) ||
+                L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == L1_CHAIN_ID,
+            InvalidAssetMigrationNumber(
+                assetMigrationNumber[block.chainid][_assetId],
+                _getMigrationNumber(block.chainid)
+            )
+        );
     }
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
@@ -358,8 +371,8 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     }
 
     function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
-        return 1 + _chainId - _chainId;
-        // return IChainAssetHandler(IBridgehub(BRIDGE_HUB).chainAssetHandler()).migrationNumber(_chainId);
+        // return 1 + _chainId - _chainId;
+        return IChainAssetHandler(IBridgehub(BRIDGE_HUB).chainAssetHandler()).migrationNumber(_chainId);
     }
 
     /// @notice This function receives the migration from the L2 or the Gateway.

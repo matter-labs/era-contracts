@@ -6,4 +6,6 @@ pragma solidity ^0.8.21;
 /// @custom:security-contact security@matterlabs.dev
 interface ISystemContext {
     function setChainId(uint256 _newChainId) external;
+
+    function getSettlementLayerChainId() external view returns (uint256);
 }

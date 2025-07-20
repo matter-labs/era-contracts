@@ -6,7 +6,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, SystemLogKey, L2_CHAIN_ASSET_HANDLER} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, SystemLogKey, L2_CHAIN_ASSET_HANDLER, L2_ASSET_TRACKER_ADDRESS} from "./Constants.sol";
 import {CannotInitializeFirstVirtualBlock, CannotReuseL2BlockNumberFromPreviousBatch, CurrentBatchNumberMustBeGreaterThanZero, InconsistentNewBatchTimestamp, IncorrectL2BlockHash, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, IncorrectVirtualBlockInsideMiniblock, InvalidNewL2BlockNumber, L2BlockAndBatchTimestampMismatch, L2BlockNumberZero, NoVirtualBlocks, NonMonotonicL2BlockTimestamp, PreviousL2BlockHashIsIncorrect, ProvidedBatchNumberIsNotCorrect, TimestampsShouldBeIncremental, UpgradeTransactionMustBeFirst} from "contracts/SystemContractErrors.sol";
 
 /**
@@ -92,6 +92,15 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     // kl todo remove this. just for debugging
     uint256 public numberOfHistoricalSettlementLayerChainIds;
 
+    error OnlyL2AssetTracker();
+
+    modifier onlyL2AssetTracker() {
+        if (msg.sender != L2_ASSET_TRACKER_ADDRESS) {
+            revert OnlyL2AssetTracker();
+        }
+        _;
+    }
+
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
     function setChainId(uint256 _newChainId) external onlyCallFrom(address(COMPLEX_UPGRADER_CONTRACT)) {
@@ -105,6 +114,10 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
             L2_CHAIN_ASSET_HANDLER.setSettlementLayerChainId(currentSettlementLayerChainId, _newSettlementLayerChainId);
             currentSettlementLayerChainId = _newSettlementLayerChainId;
         }
+    }
+
+    function getSettlementLayerChainId() external view onlyL2AssetTracker returns (uint256) {
+        return currentSettlementLayerChainId;
     }
 
     /// @notice Number of current transaction in block.

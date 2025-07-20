@@ -65,7 +65,7 @@ library Utils {
     }
 
     function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](9);
+        bytes[] memory logs = new bytes[](10);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -119,6 +119,12 @@ library Utils {
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
             bytes32("")
+        );
+        logs[9] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY),
+            bytes32(uint256(uint160(block.chainid)))
         );
 
         return logs;

@@ -21,7 +21,7 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NATIVE_TOKEN_VAULT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NATIVE_TOKEN_VAULT, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -34,6 +34,7 @@ import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.
 import {L2_BRIDGEHUB, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
@@ -194,21 +195,28 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
     function test_migrationGatewayToL1() public {
         vm.chainId(gwChainId);
-        vm.mockCall(
-            address(L2_BRIDGEHUB),
-            abi.encodeWithSelector(L2_BRIDGEHUB.getZKChain.selector),
-            abi.encode(tokenAddress)
-        );
-        vm.mockCall(
-            address(L2_BRIDGEHUB),
-            abi.encodeWithSelector(L2_BRIDGEHUB.settlementLayer.selector),
-            abi.encode(originalChainId)
-        );
-        vm.mockCall(
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-            abi.encode(bytes32(0))
-        );
+        {
+            vm.mockCall(
+                address(L2_BRIDGEHUB),
+                abi.encodeWithSelector(L2_BRIDGEHUB.getZKChain.selector),
+                abi.encode(tokenAddress)
+            );
+            vm.mockCall(
+                address(L2_BRIDGEHUB),
+                abi.encodeWithSelector(L2_BRIDGEHUB.settlementLayer.selector),
+                abi.encode(originalChainId)
+            );
+            vm.mockCall(
+                L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+                abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+                abi.encode(bytes32(0))
+            );
+            vm.mockCall(
+                address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+                abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+                abi.encode(migrationNumber)
+            );
+        }
 
         assetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);
 

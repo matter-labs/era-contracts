@@ -24,15 +24,22 @@ interface IAssetTracker {
 
     function registerLegacyTokenOnChain(bytes32 _assetId) external;
 
-    function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
+    function handleChainBalanceIncreaseOnSL(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        bool _isNative
+    ) external;
 
-    function handleChainBalanceDecrease(
+    function handleChainBalanceDecreaseOnSL(
         // uint256 _tokenOriginChainId,
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
         bool _isNative
     ) external;
+
+    function handleInitiateBridgingOnL2(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
 

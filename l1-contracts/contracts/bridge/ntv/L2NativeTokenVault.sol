@@ -264,6 +264,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
+        // We need to check the migration number.
+        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainId, _assetId, _amount, _isNative);
     }
 
     function _handleChainBalanceDecrease(

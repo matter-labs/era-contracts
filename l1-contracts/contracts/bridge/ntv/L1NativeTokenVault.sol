@@ -261,7 +261,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) internal override {
         // Note, that we do not update balances for chains where the assetId comes from,
         // since these chains can mint new instances of the token.
-        l1AssetTracker.handleChainBalanceIncrease(_chainId, _assetId, _amount, _isNative);
+        l1AssetTracker.handleChainBalanceIncreaseOnSL(_chainId, _assetId, _amount, _isNative);
     }
 
     function _handleChainBalanceDecrease(
@@ -272,7 +272,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         bool _isNative
     ) internal override {
         // On L1 the asset tracker is triggered when the user withdraws.
-        l1AssetTracker.handleChainBalanceDecrease({
+        l1AssetTracker.handleChainBalanceDecreaseOnSL({
             // _tokenOriginChainId: _tokenOriginChainId,
             _chainId: _chainId,
             _assetId: _assetId,

@@ -197,7 +197,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             address(assetTracker),
-            abi.encodeWithSelector(IAssetTracker.handleChainBalanceIncrease.selector),
+            abi.encodeWithSelector(IAssetTracker.handleChainBalanceIncreaseOnSL.selector),
             abi.encode()
         );
 

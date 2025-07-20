@@ -401,7 +401,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             revert NotInGatewayMode();
         }
         if (_baseTokenAmount > 0) {
-            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(
+            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncreaseOnSL(
                 _chainId,
                 BRIDGE_HUB.baseTokenAssetId(_chainId),
                 _baseTokenAmount,
@@ -409,7 +409,7 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
             );
         }
         if (_amount > 0) {
-            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
+            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncreaseOnSL(_chainId, _assetId, _amount, false);
         }
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
