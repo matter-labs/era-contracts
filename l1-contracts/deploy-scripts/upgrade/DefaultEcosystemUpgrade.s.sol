@@ -235,7 +235,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Encode calldata that will be passed to `_postUpgrade`
     /// in the on‑chain contract. Override in concrete upgrades.
-    function encodePostUpgradeCalldata(StateTransitionDeployedAddresses memory) internal virtual returns (bytes memory) {
+    function encodePostUpgradeCalldata(
+        StateTransitionDeployedAddresses memory
+    ) internal virtual returns (bytes memory) {
         return new bytes(0);
     }
 

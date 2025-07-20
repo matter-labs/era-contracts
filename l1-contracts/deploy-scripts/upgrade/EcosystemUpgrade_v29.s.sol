@@ -154,12 +154,19 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         return deploySimpleContract("ValidatorTimelock", false);
     }
 
-    function encodePostUpgradeCalldata(StateTransitionDeployedAddresses memory stateTransitionAddresses) internal override returns (bytes memory) {
-        address[] memory oldValidatorTimelocks = stateTransitionAddresses.isOnGateway ? oldGatewayValidatorTimelocks : oldValidatorTimelocks;
-        return abi.encode(L1V29Upgrade.V29UpgradeParams({
-            oldValidatorTimelocks: oldValidatorTimelocks,
-            newValidatorTimelock: stateTransitionAddresses.validatorTimelock
-        }));
+    function encodePostUpgradeCalldata(
+        StateTransitionDeployedAddresses memory stateTransitionAddresses
+    ) internal override returns (bytes memory) {
+        address[] memory oldValidatorTimelocks = stateTransitionAddresses.isOnGateway
+            ? oldGatewayValidatorTimelocks
+            : oldValidatorTimelocks;
+        return
+            abi.encode(
+                L1V29Upgrade.V29UpgradeParams({
+                    oldValidatorTimelocks: oldValidatorTimelocks,
+                    newValidatorTimelock: stateTransitionAddresses.validatorTimelock
+                })
+            );
     }
 
     /// @notice Additional calls to newConfigure contracts
@@ -182,9 +189,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             IChainTypeManager.setPostV29UpgradeableValidatorTimelock,
-            (
-                gatewayConfig.gatewayStateTransition.validatorTimelock
-            )
+            (gatewayConfig.gatewayStateTransition.validatorTimelock)
         );
 
         calls = _prepareL1ToGatewayCall(
@@ -196,7 +201,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     function prepareGatewaySpecificStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[] memory baseCalls = super.prepareGatewaySpecificStage1GovernanceCalls(); 
+        Call[] memory baseCalls = super.prepareGatewaySpecificStage1GovernanceCalls();
         if (gatewayConfig.chainId == 0) return baseCalls; // Gateway is unknown
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that

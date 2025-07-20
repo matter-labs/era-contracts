@@ -49,7 +49,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev The timestamp when protocolVersion can be last used
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
-    /// @dev The validatorTimelock contract address. 
+    /// @dev The validatorTimelock contract address.
     /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It will be deprecated after v29 upgrade.
     address public validatorTimelock;
 
@@ -255,7 +255,10 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function setPostV29UpgradeableValidatorTimelock(address _postV29UpgradeableValidatorTimelock) external onlyOwner {
         address oldPostV29UpgradeableValidatorTimelock = postV29UpgradeableValidatorTimelock;
         postV29UpgradeableValidatorTimelock = _postV29UpgradeableValidatorTimelock;
-        emit NewPostV29UpgradeableValidatorTimelock(oldPostV29UpgradeableValidatorTimelock, _postV29UpgradeableValidatorTimelock);
+        emit NewPostV29UpgradeableValidatorTimelock(
+            oldPostV29UpgradeableValidatorTimelock,
+            _postV29UpgradeableValidatorTimelock
+        );
     }
 
     /// @dev set ServerNotifier.

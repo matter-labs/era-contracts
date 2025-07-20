@@ -63,7 +63,10 @@ interface IChainTypeManager {
     event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
 
     /// @notice PostV29UpgradeableValidatorTimelock changed
-    event NewPostV29UpgradeableValidatorTimelock(address indexed oldPostV29UpgradeableValidatorTimelock, address indexed newPostV29UpgradeableValidatorTimelock);
+    event NewPostV29UpgradeableValidatorTimelock(
+        address indexed oldPostV29UpgradeableValidatorTimelock,
+        address indexed newPostV29UpgradeableValidatorTimelock
+    );
 
     /// @notice ServerNotifier changed
     event NewServerNotifier(address indexed oldServerNotifier, address indexed newServerNotifier);
