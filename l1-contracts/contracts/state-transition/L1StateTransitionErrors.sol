@@ -82,6 +82,8 @@ error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protoco
 error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 totalBlobsCommitmentSize);
 // 0x9044dff9
 error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
+// 0x89935a14
+error SettlementLayerChainIdMismatch();
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 // 0x52595598

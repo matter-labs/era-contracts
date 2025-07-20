@@ -30,6 +30,11 @@ struct ProofData {
 library MessageHashing {
     using UncheckedMath for uint256;
 
+    function getLeafHashFromMessage(L2Message memory _message) internal pure returns (bytes32 hashedLog) {
+        L2Log memory l2Log = _l2MessageToLog(_message);
+        hashedLog = getLeafHashFromLog(l2Log);
+    }
+
     /// @dev Convert arbitrary-length message to the raw L2 log
     function _l2MessageToLog(L2Message memory _message) internal pure returns (L2Log memory) {
         return
@@ -41,18 +46,6 @@ library MessageHashing {
                 key: bytes32(uint256(uint160(_message.sender))),
                 value: keccak256(_message.data)
             });
-    }
-
-    function getLeafHashFromMessage(L2Message memory _message) internal pure returns (bytes32 hashedLog) {
-        L2Log memory l2Log = _l2MessageToLog(_message);
-        hashedLog = getLeafHashFromLog(l2Log);
-    }
-
-    function getLeafHashFromLog(L2Log memory _log) internal pure returns (bytes32 hashedLog) {
-        hashedLog = keccak256(
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
-        );
     }
 
     function getL2LogFromL1ToL2Transaction(
@@ -78,6 +71,13 @@ library MessageHashing {
             key: _l2TxHash,
             value: bytes32(uint256(_status))
         });
+    }
+
+    function getLeafHashFromLog(L2Log memory _log) internal pure returns (bytes32 hashedLog) {
+        hashedLog = keccak256(
+            // solhint-disable-next-line func-named-parameters
+            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
+        );
     }
 
     /// @dev Returns the leaf hash for a chain with batch number and batch root.

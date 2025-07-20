@@ -26,9 +26,7 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
-import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidChainId, InvalidSender} from "./AssetTrackerErrors.sol";
-
-error InvalidMigrationHash();
+import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidWithdrawalChainId, InvalidAssetMigrationNumber, InvalidSender} from "./AssetTrackerErrors.sol";
 
 contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerModifiers {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -189,8 +187,6 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         }
         chainBalance[chainToUpdate][_assetId] -= _amount;
     }
-
-    error InvalidAssetMigrationNumber(uint256, uint256);
 
     function handleInitiateBridgingOnL2(uint256, bytes32 _assetId, uint256, bool) external {
         require(
@@ -393,7 +389,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         // require(_getMigrationNumber(chainId) == migrationNumber, InvalidMigrationNumber());
         if (data.isL1ToGateway) {
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
-            require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidChainId());
+            require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
 
             _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
             // if (data.tokenOriginChainId != data.chainId) {
@@ -401,7 +397,10 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
             // }
         } else {
             require(currentSettlementLayer == block.chainid, NotMigratedChain());
-            require(BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId), InvalidChainId());
+            require(
+                BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
+                InvalidWithdrawalChainId()
+            );
 
             _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
             _migrateFunds(_finalizeWithdrawalParams.chainId, data.chainId, data.assetId, data.amount);

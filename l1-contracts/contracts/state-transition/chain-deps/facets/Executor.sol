@@ -25,7 +25,7 @@ import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.s
 ///
 import {L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, HashMismatch, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
-import {DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
+import {DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs, SettlementLayerChainIdMismatch} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -232,7 +232,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         ///
     }
 
-    error SettlementLayerChainIdMismatch();
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
     /// @dev The logs processed here should line up such that only one log for each key from the
     ///      SystemLogKey enum in Constants.sol is processed per new batch.

@@ -176,13 +176,7 @@ abstract contract NativeTokenVault is
         if (token == address(0)) {
             token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
         }
-        _handleChainBalanceDecrease({
-            // _tokenOriginChainId: originChainId[_assetId],
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _amount: amount,
-            _isNative: false
-        });
+        _handleChainBalanceDecrease({_chainId: _chainId, _assetId: _assetId, _amount: amount, _isNative: false});
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
     }
 
@@ -195,13 +189,7 @@ abstract contract NativeTokenVault is
         // slither-disable-next-line unused-return
         (, receiver, , amount, ) = DataEncoding.decodeBridgeMintData(_data);
 
-        _handleChainBalanceDecrease({
-            // _tokenOriginChainId: originChainId[_assetId],
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _amount: amount,
-            _isNative: true
-        });
+        _handleChainBalanceDecrease({_chainId: _chainId, _assetId: _assetId, _amount: amount, _isNative: true});
         _withdrawFunds(_assetId, receiver, token, amount);
     }
 
@@ -435,7 +423,6 @@ abstract contract NativeTokenVault is
     ) internal virtual;
 
     function _handleChainBalanceDecrease(
-        // uint256 _tokenOriginChainId,
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,

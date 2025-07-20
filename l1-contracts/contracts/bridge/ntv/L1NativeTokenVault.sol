@@ -178,13 +178,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address l1Token = tokenAddress[_assetId];
         require(_amount != 0, NoFundsTransferred());
 
-        _handleChainBalanceDecrease({
-            // _tokenOriginChainId: originChainId[_assetId],
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _amount: _amount,
-            _isNative: false
-        });
+        _handleChainBalanceDecrease({_chainId: _chainId, _assetId: _assetId, _amount: _amount, _isNative: false});
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -273,7 +267,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ) internal override {
         // On L1 the asset tracker is triggered when the user withdraws.
         l1AssetTracker.handleChainBalanceDecreaseOnSL({
-            // _tokenOriginChainId: _tokenOriginChainId,
             _chainId: _chainId,
             _assetId: _assetId,
             _amount: _amount,
