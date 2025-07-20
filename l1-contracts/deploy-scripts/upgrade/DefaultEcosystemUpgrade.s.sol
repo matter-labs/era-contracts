@@ -1027,10 +1027,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         Call[][] memory allCalls = new Call[][](4);
 
         allCalls[0] = preparePauseGatewayMigrationsCall();
-        allCalls[1] = prepareGatewaySpecificStage0GovernanceCalls();
-        allCalls[2] = prepareGovernanceUpgradeTimerStartCall();
+        allCalls[1] = prepareVersionSpecificStage0GovernanceCallsL1();
+        allCalls[2] = prepareGatewaySpecificStage0GovernanceCalls();
+        allCalls[3] = prepareGovernanceUpgradeTimerStartCall();
 
-        allCalls[3] = prepareVersionSpecificStage0GovernanceCalls();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -1044,9 +1044,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         allCalls[3] = prepareNewChainCreationParamsCall();
         allCalls[4] = provideSetNewVersionUpgradeCall();
         allCalls[5] = prepareDAValidatorCall();
-        allCalls[6] = prepareGatewaySpecificStage1GovernanceCalls();
-
-        allCalls[7] = prepareVersionSpecificStage1GovernanceCalls();
+        allCalls[6] = prepareVersionSpecificStage1GovernanceCallsL1();
+        allCalls[7] = prepareGatewaySpecificStage1GovernanceCalls();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1057,25 +1056,48 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         allCalls[0] = prepareCheckUpgradeIsPresent();
         allCalls[1] = prepareUnpauseGatewayMigrationsCall();
-        allCalls[2] = prepareGatewaySpecificStage2GovernanceCalls();
-        allCalls[3] = prepareCheckMigrationsUnpausedCalls();
-
-        allCalls[4] = prepareVersionSpecificStage2GovernanceCalls();
+        allCalls[2] = prepareVersionSpecificStage2GovernanceCallsL1();
+        allCalls[3] = prepareGatewaySpecificStage2GovernanceCalls();
+        allCalls[4] = prepareCheckMigrationsUnpausedCalls();
 
         calls = mergeCallsArray(allCalls);
     }
 
-    function prepareVersionSpecificStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
+    function prepareVersionSpecificStage0GovernanceCallsL1() public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
     }
 
-    function prepareVersionSpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
+    function prepareVersionSpecificStage0GovernanceCallsGW(
+        uint256 priorityTxsL2GasLimit,
+        uint256 maxExpectedL1GasPrice
+    ) public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
     }
 
-    function prepareVersionSpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
+    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
+    }
+
+    function prepareVersionSpecificStage1GovernanceCallsGW(
+        uint256 priorityTxsL2GasLimit,
+        uint256 maxExpectedL1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
+    }
+
+    function prepareVersionSpecificStage2GovernanceCallsL1() public virtual returns (Call[] memory calls) {
+        // Empty by default.
+        return calls;
+    }
+
+    function prepareVersionSpecificStage2GovernanceCallsGW(
+        uint256 priorityTxsL2GasLimit,
+        uint256 maxExpectedL1GasPrice
+    ) public virtual returns (Call[] memory calls) {
         // Empty by default.
         return calls;
     }
@@ -1136,7 +1158,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
         uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
 
-        calls = preparePauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        Call[][] memory allCalls = new Call[][](2);
+        allCalls[0] = preparePauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[1] = prepareVersionSpecificStage0GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+
+        calls = mergeCallsArray(allCalls);
     }
 
     function deployUsedUpgradeContractGW() internal virtual returns (address) {
@@ -1165,7 +1191,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](5);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
@@ -1175,6 +1201,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         allCalls[1] = prepareNewChainCreationParamsCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[2] = prepareCTMImplementationUpgrade(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[3] = prepareDAValidatorCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[4] = prepareVersionSpecificStage1GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = mergeCallsArray(allCalls);
     }
@@ -1182,13 +1209,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function prepareGatewaySpecificStage2GovernanceCalls() public virtual returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        Call[][] memory allCalls = new Call[][](1);
+        Call[][] memory allCalls = new Call[][](2);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
         uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
 
         allCalls[0] = prepareUnpauseMigrationCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[1] = prepareVersionSpecificStage2GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = mergeCallsArray(allCalls);
     }

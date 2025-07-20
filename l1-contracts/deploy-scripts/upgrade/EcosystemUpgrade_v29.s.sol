@@ -200,43 +200,23 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         );
     }
 
-    function prepareGatewaySpecificStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[] memory baseCalls = super.prepareGatewaySpecificStage1GovernanceCalls();
-        if (gatewayConfig.chainId == 0) return baseCalls; // Gateway is unknown
-
-        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
-        uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
-
-        Call[][] memory allCalls = new Call[][](2);
-        allCalls[0] = baseCalls;
-        allCalls[1] = prepareSetPostV29UpgradeableValidatorTimelockCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        return mergeCallsArray(allCalls);
+    function prepareVersionSpecificStage1GovernanceCallsGW(
+        uint256 priorityTxsL2GasLimit,
+        uint256 maxExpectedL1GasPrice
+    ) public override returns (Call[] memory calls) {
+        // TODO: include call to set the new chain asset handler address on GW
+        return prepareSetPostV29UpgradeableValidatorTimelockCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
     }
 
-    function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](7);
-        allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
-        allCalls[1] = prepareCheckMigrationsPausedCalls();
-        allCalls[2] = prepareUpgradeProxiesCalls();
-        allCalls[3] = prepareNewChainCreationParamsCall();
-        allCalls[4] = provideSetNewVersionUpgradeCall();
-        allCalls[5] = prepareDAValidatorCall();
-        allCalls[6] = prepareSetPostV29UpgradeableValidatorTimelockCall();
-        allCalls[7] = prepareGatewaySpecificStage1GovernanceCalls();
+    function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](2);
+        allCalls[0] = prepareSetPostV29UpgradeableValidatorTimelockCall();
+        allCalls[1] = prepareSetCtmAssetHandlerAddressOnL1Call();
         calls = mergeCallsArray(allCalls);
     }
 
     function deployUsedUpgradeContract() internal override returns (address) {
         return deploySimpleContract("L1V29Upgrade", false);
-    }
-
-    function prepareVersionSpecificStage0GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](1);
-
-        allCalls[0] = prepareSetCtmAssetHandlerAddressOnL1Call();
-
-        return mergeCallsArray(allCalls);
     }
 
     /// @notice Sets ctm asset handler address on L1. We need to update it because of ChainAssetHandler appearance.
