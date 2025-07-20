@@ -198,10 +198,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         deployVerifiers();
         deployUpgradeStageValidator();
 
-        address newValidatorTimelock = deployValidatorTimelock();
-        if (newValidatorTimelock != address(0)) {
-            addresses.stateTransition.validatorTimelock = newValidatorTimelock;
-        }
 
         // Note, that this is the upgrade that will be used, despite the naming of the variable here.
         // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
@@ -216,6 +212,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
         addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
+        addresses.bridgehub.ctmDeploymentTrackerImplementation = deploySimpleContract("CTMDeploymentTracker", false);
 
         deployStateTransitionDiamondFacets();
 
@@ -224,18 +221,13 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         /// for forge verification.
         deploySimpleContract("DiamondProxy", false);
 
-        (
-            addresses.bridgehub.chainAssetHandlerImplementation,
-            addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
+        deployUpgradeSpecificContracts();
 
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
-    /// @notice Deploy a fresh `ValidatorTimelock` if the concrete upgrade
-    /// requires it. Default implementation is a no‑op.
-    function deployValidatorTimelock() internal virtual returns (address) {
-        return address(0);
+    function deployUpgradeSpecificContracts() internal virtual {
+        // Empty by default.
     }
 
     /// @notice Encode calldata that will be passed to `_postUpgrade`
@@ -260,6 +252,35 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
     }
+
+    function deployGWTuppWithContract(string memory contractName) internal returns (address proxyAddress) {
+        bytes memory creationCalldata = getCreationCalldata(contractName, true);
+        address implementation = Utils.deployThroughL1Deterministic(
+            getCreationCode(contractName, true),
+            creationCalldata,
+            0,
+            newConfig.priorityTxsL2GasLimit,
+            new bytes[](0),
+            gatewayConfig.chainId,
+            addresses.bridgehub.bridgehubProxy,
+            addresses.bridges.l1AssetRouterProxy
+        );
+        notifyAboutDeployment(implementation, contractName, creationCalldata, contractName, true);
+
+        bytes memory proxyCreationCalldata = abi.encode(implementation, gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin, getInitializeCalldata(contractName, true));
+        proxyAddress = Utils.deployThroughL1Deterministic(
+            ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
+            proxyCreationCalldata,
+            0,
+            newConfig.priorityTxsL2GasLimit,
+            new bytes[](0),
+            gatewayConfig.chainId,
+            addresses.bridgehub.bridgehubProxy,
+            addresses.bridges.l1AssetRouterProxy
+        );
+        notifyAboutDeployment(proxyAddress, contractName, proxyCreationCalldata, string.concat(contractName, " Proxy"), true);
+    }
+
 
     /// @notice Generate data required for the upgrade
     function generateUpgradeData() public virtual {
@@ -774,6 +795,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             "verifier_fflonk_addr",
             gatewayConfig.gatewayStateTransition.verifierFflonk
         );
+        vm.serializeAddress(
+            "gateway_state_transition",
+            "validator_timelock_addr",
+            gatewayConfig.gatewayStateTransition.validatorTimelock
+        );
+
         string memory gateway_state_transition = vm.serializeAddress(
             "gateway_state_transition",
             "verifier_plonk_addr",
@@ -1186,6 +1213,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
 
         gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
+
+        deployUpgradeSpecificContractGW();
+    }
+
+    function deployUpgradeSpecificContractGW() internal virtual {
+        // Empty by default.
     }
 
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
@@ -1431,7 +1464,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](6);
+        calls = new Call[](7);
 
         calls[0] = _buildCallProxyUpgrade(
             addresses.stateTransition.chainTypeManagerProxy,
@@ -1462,6 +1495,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         calls[5] = _buildCallProxyUpgrade(
             addresses.bridgehub.messageRootProxy,
             addresses.bridgehub.messageRootImplementation
+        );
+
+        calls[6] = _buildCallProxyUpgrade(
+            addresses.bridgehub.ctmDeploymentTrackerProxy,
+            addresses.bridgehub.ctmDeploymentTrackerImplementation
         );
     }
 
@@ -1631,6 +1669,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
                     addresses.bridges.l1AssetRouterProxy,
                     addresses.bridgehub.messageRootProxy
                 );
+        } else if (compareStrings(contractName, "ValidatorTimelock")) {
+            if (!isZKBytecode) {
+                return abi.encode(addresses.bridgehub.bridgehubProxy);
+            } else {
+                return abi.encode(L2_BRIDGEHUB_ADDR);
+            }
         } else {
             return super.getCreationCalldata(contractName, isZKBytecode);
         }
