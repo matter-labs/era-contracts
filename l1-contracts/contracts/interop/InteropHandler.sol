@@ -303,8 +303,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @notice The sole purpose of this function is to serve as a rescue mechanism in case the sender is a contract,
     ///         the unbundler chainid is set to the sender chainid and the unbundler address is set to the contract's address.
     ///         In particular, this happens when the unbundler is not specified.
-    ///         In such a case, the contract cannot call `InteropHandler.unbundleBundle` directly.
-    ///         Instead, it sends another bundle which calls `InteropHandler.unbundleBundle` via the `receiveMessage` function.
+    ///         In such a case, the contract might nol be able to call `InteropHandler.unbundleBundle` directly.
+    ///         Instead, it's able to send another bundle which calls `InteropHandler.unbundleBundle` via the `receiveMessage` function.
     /// @dev Implements ERC-7786 recipient interface. The payload must be encoded using abi.encodeCall
     ///      with one of the following function selectors:
     ///      - executeBundle: payload = abi.encodeCall(InteropHandler.executeBundle, (bundle, proof))
