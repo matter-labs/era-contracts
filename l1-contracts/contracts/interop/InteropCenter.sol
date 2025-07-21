@@ -113,7 +113,7 @@ contract InteropCenter is
                     InteropCenter entry points
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Sends a single message to another chain.
+    /// @notice Sends a single ERC-7786 message to another chain.
     /// @param recipient ERC-7930 address corresponding to the destination of a message. It must be corresponding to an EIP-155 chain.
     /// @param payload Payload to send.
     /// @param attributes Attributes of the call.
