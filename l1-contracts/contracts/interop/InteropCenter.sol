@@ -413,10 +413,10 @@ contract InteropCenter is
         bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
 
         uint256 attributesLength = _attributes.length;
+        uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributesLength; ++i) {
             bytes4 selector = bytes4(_attributes[i]);
-            /// Finding the matching attribute selector.
-            uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
+            /// Finding the matching attribute selector
             uint256 indexInSelectorsArray = attributeSelectorsLength;
             for (uint256 j = 0; j < attributeSelectorsLength; ++j) {
                 if (selector == ATTRIBUTE_SELECTORS[j]) {
