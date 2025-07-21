@@ -320,7 +320,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
 
         bytes4 selector = bytes4(payload[:4]);
 
-        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1(sender);
+        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
         if (selector == this.executeBundle.selector) {
             _handleExecuteBundle(payload, senderChainId, senderAddress, sender);
