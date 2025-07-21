@@ -153,7 +153,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
         //    (L2AssetRouter address is equal for all ZKsync chains)
 
-        (uint256 sourceChain, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
+        (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
         require(
             (sourceChain == L1_CHAIN_ID && senderAddress == L1_ASSET_ROUTER) ||
