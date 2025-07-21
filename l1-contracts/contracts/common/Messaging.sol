@@ -198,7 +198,7 @@ struct CallAttributes {
     uint256 indirectCallMessageValue;
 }
 
-/// @param executionAddress ERC-7930 Address allowed to execute on remote side. If set to 0 -> execution is permissionless.
+/// @param executionAddress ERC-7930 Address allowed to execute on remote side. If the byte array is empty then execution is permissionless.
 /// @param unbundlerAddress ERC-7930 Address allowed to unbundle. Note, that here no permissionless mode is available, unlike above.
 struct BundleAttributes {
     bytes executionAddress;
