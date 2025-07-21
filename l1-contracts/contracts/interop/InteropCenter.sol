@@ -220,7 +220,7 @@ contract InteropCenter is
                             Internal functions
     //////////////////////////////////////////////////////////////*/
 
-    function _ensureL2ToL2(uint256 _destinationChainId) internal {
+    function _ensureL2ToL2(uint256 _destinationChainId) internal view {
         require(
             L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
             NotL2ToL2(block.chainid, _destinationChainId)
