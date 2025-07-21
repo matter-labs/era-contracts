@@ -9,423 +9,411 @@ import {IConsensusRegistry} from "./interfaces/IConsensusRegistry.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @title ConsensusRegistry
-/// @dev Manages consensus nodes and committees for the L2 consensus protocol,
-/// owned by Matter Labs Multisig. Nodes act as both validators and attesters,
-/// each playing a distinct role in the consensus process. This contract facilitates
-/// the rotation of validator and attester committees, which represent a subset of nodes
+/// @dev Manages validator nodes and committees for the L2 consensus protocol,
+/// owned by Matter Labs Multisig. This contract facilitates
+/// the rotation of validator committees, which represent a subset of validator nodes
 /// expected to actively participate in the consensus process during a specific time window.
 /// @dev Designed for use with a proxy for upgradability.
 contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpgradeable {
-    /// @dev An array to keep track of node owners.
-    address[] public nodeOwners;
-    /// @dev A mapping of node owners => nodes.
-    mapping(address => Node) public nodes;
-    /// @dev A mapping for enabling efficient lookups when checking whether a given attester public key exists.
-    mapping(bytes32 => bool) public attesterPubKeyHashes;
+    /// @dev An array to keep track of validator owners.
+    address[] public validatorOwners;
+    /// @dev A mapping of validator owners => validators.
+    mapping(address => Validator) public validators;
     /// @dev A mapping for enabling efficient lookups when checking whether a given validator public key exists.
     mapping(bytes32 => bool) public validatorPubKeyHashes;
-    /// @dev Counter that increments with each new commit to the attester committee.
-    uint32 public attestersCommit;
     /// @dev Counter that increments with each new commit to the validator committee.
     uint32 public validatorsCommit;
+    /// @dev Block number when the last commit to the validator committee becomes active.
+    uint256 public validatorsCommitBlock;
+    /// @dev The delay in blocks before a committee commit becomes active.
+    uint256 public committeeActivationDelay;
+    /// @dev Represents the leader selection process configuration.
+    LeaderSelection public leaderSelection;
 
-    modifier onlyOwnerOrNodeOwner(address _nodeOwner) {
-        if (owner() != msg.sender && _nodeOwner != msg.sender) {
-            revert UnauthorizedOnlyOwnerOrNodeOwner();
+    modifier onlyOwnerOrValidatorOwner(address _validatorOwner) {
+        if (owner() != msg.sender && _validatorOwner != msg.sender) {
+            revert UnauthorizedOnlyOwnerOrValidatorOwner();
         }
         _;
     }
 
     function initialize(address _initialOwner) external initializer {
         if (_initialOwner == address(0)) {
-            revert InvalidInputNodeOwnerAddress();
+            revert InvalidInputValidatorOwnerAddress();
         }
         _transferOwnership(_initialOwner);
+
+        // Initialize leaderSelection with default values
+        leaderSelection = LeaderSelection({
+            lastSnapshotCommit: 0,
+            previousSnapshotCommit: 0,
+            latest: LeaderSelectionAttr({frequency: 1, weighted: false}),
+            snapshot: LeaderSelectionAttr({frequency: 1, weighted: false}),
+            previousSnapshot: LeaderSelectionAttr({frequency: 1, weighted: false})
+        });
     }
 
-    /// @notice Adds a new node to the registry.
-    /// @dev Fails if node owner already exists.
-    /// @dev Fails if a validator/attester with the same public key already exists.
-    /// @param _nodeOwner The address of the new node's owner.
-    /// @param _validatorWeight The voting weight of the validator.
-    /// @param _validatorPubKey The BLS12-381 public key of the validator.
-    /// @param _validatorPoP The proof-of-possession (PoP) of the validator's public key.
-    /// @param _attesterWeight The voting weight of the attester.
-    /// @param _attesterPubKey The ECDSA public key of the attester.
     function add(
-        address _nodeOwner,
+        address _validatorOwner,
+        bool _validatorIsLeader,
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
-        BLS12_381Signature calldata _validatorPoP,
-        uint32 _attesterWeight,
-        Secp256k1PublicKey calldata _attesterPubKey
+        BLS12_381Signature calldata _validatorPoP
     ) external onlyOwner {
         // Verify input.
-        _verifyInputAddress(_nodeOwner);
+        _verifyInputAddress(_validatorOwner);
         _verifyInputBLS12_381PublicKey(_validatorPubKey);
         _verifyInputBLS12_381Signature(_validatorPoP);
-        _verifyInputSecp256k1PublicKey(_attesterPubKey);
 
         // Verify storage.
-        _verifyNodeOwnerDoesNotExist(_nodeOwner);
-        bytes32 attesterPubKeyHash = _hashAttesterPubKey(_attesterPubKey);
-        _verifyAttesterPubKeyDoesNotExist(attesterPubKeyHash);
+        _verifyValidatorOwnerDoesNotExist(_validatorOwner);
         bytes32 validatorPubKeyHash = _hashValidatorPubKey(_validatorPubKey);
         _verifyValidatorPubKeyDoesNotExist(validatorPubKeyHash);
 
-        uint32 nodeOwnerIdx = uint32(nodeOwners.length);
-        nodeOwners.push(_nodeOwner);
-        nodes[_nodeOwner] = Node({
-            attesterLatest: AttesterAttr({
+        uint32 ownerIdx = uint32(validatorOwners.length);
+        validatorOwners.push(_validatorOwner);
+        validators[_validatorOwner] = Validator({
+            latest: ValidatorAttr({
                 active: true,
                 removed: false,
-                weight: _attesterWeight,
-                pubKey: _attesterPubKey
-            }),
-            attesterSnapshot: AttesterAttr({
-                active: false,
-                removed: false,
-                weight: 0,
-                pubKey: Secp256k1PublicKey({tag: bytes1(0), x: bytes32(0)})
-            }),
-            attesterLastUpdateCommit: attestersCommit,
-            validatorLatest: ValidatorAttr({
-                active: true,
-                removed: false,
+                leader: _validatorIsLeader,
                 weight: _validatorWeight,
                 pubKey: _validatorPubKey,
                 proofOfPossession: _validatorPoP
             }),
-            validatorSnapshot: ValidatorAttr({
+            snapshot: ValidatorAttr({
                 active: false,
                 removed: false,
+                leader: false,
                 weight: 0,
                 pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
                 proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
             }),
-            validatorLastUpdateCommit: validatorsCommit,
-            nodeOwnerIdx: nodeOwnerIdx
+            previousSnapshot: ValidatorAttr({
+                active: false,
+                removed: false,
+                leader: false,
+                weight: 0,
+                pubKey: BLS12_381PublicKey({a: bytes32(0), b: bytes32(0), c: bytes32(0)}),
+                proofOfPossession: BLS12_381Signature({a: bytes32(0), b: bytes16(0)})
+            }),
+            lastSnapshotCommit: validatorsCommit,
+            previousSnapshotCommit: 0,
+            ownerIdx: ownerIdx
         });
-        attesterPubKeyHashes[attesterPubKeyHash] = true;
         validatorPubKeyHashes[validatorPubKeyHash] = true;
 
-        emit NodeAdded({
-            nodeOwner: _nodeOwner,
+        emit ValidatorAdded({
+            validatorOwner: _validatorOwner,
             validatorWeight: _validatorWeight,
             validatorPubKey: _validatorPubKey,
-            validatorPoP: _validatorPoP,
-            attesterWeight: _attesterWeight,
-            attesterPubKey: _attesterPubKey
+            validatorPoP: _validatorPoP
         });
     }
 
-    /// @notice Deactivates a node, preventing it from participating in committees.
-    /// @dev Only callable by the contract owner or the node owner.
-    /// @dev Verifies that the node owner exists in the registry.
-    /// @param _nodeOwner The address of the node's owner to be inactivated.
-    function deactivate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
+    function remove(address _validatorOwner) external onlyOwner {
+        _verifyValidatorOwnerExists(_validatorOwner);
+        (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
-        _ensureAttesterSnapshot(node);
-        node.attesterLatest.active = false;
-        _ensureValidatorSnapshot(node);
-        node.validatorLatest.active = false;
+        _ensureValidatorSnapshot(validator);
+        validator.latest.removed = true;
 
-        emit NodeDeactivated(_nodeOwner);
+        emit ValidatorRemoved(_validatorOwner);
     }
 
-    /// @notice Activates a previously inactive node, allowing it to participate in committees.
-    /// @dev Only callable by the contract owner or the node owner.
-    /// @dev Verifies that the node owner exists in the registry.
-    /// @param _nodeOwner The address of the node's owner to be activated.
-    function activate(address _nodeOwner) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
+    function changeValidatorActive(
+        address _validatorOwner,
+        bool _isActive
+    ) external onlyOwnerOrValidatorOwner(_validatorOwner) {
+        _verifyValidatorOwnerExists(_validatorOwner);
+        (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
-        _ensureAttesterSnapshot(node);
-        node.attesterLatest.active = true;
-        _ensureValidatorSnapshot(node);
-        node.validatorLatest.active = true;
+        _ensureValidatorSnapshot(validator);
+        validator.latest.active = _isActive;
 
-        emit NodeActivated(_nodeOwner);
+        emit ValidatorActiveStatusChanged(_validatorOwner, _isActive);
     }
 
-    /// @notice Removes a node from the registry.
-    /// @dev Only callable by the contract owner.
-    /// @dev Verifies that the node owner exists in the registry.
-    /// @param _nodeOwner The address of the node's owner to be removed.
-    function remove(address _nodeOwner) external onlyOwner {
-        _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
+    function changeValidatorLeader(address _validatorOwner, bool _isLeader) external onlyOwner {
+        _verifyValidatorOwnerExists(_validatorOwner);
+        (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
-        _ensureAttesterSnapshot(node);
-        node.attesterLatest.removed = true;
-        _ensureValidatorSnapshot(node);
-        node.validatorLatest.removed = true;
+        _ensureValidatorSnapshot(validator);
+        validator.latest.leader = _isLeader;
 
-        emit NodeRemoved(_nodeOwner);
+        emit ValidatorLeaderStatusChanged(_validatorOwner, _isLeader);
     }
 
-    /// @notice Changes the validator weight of a node in the registry.
-    /// @dev Only callable by the contract owner.
-    /// @dev Verifies that the node owner exists in the registry.
-    /// @param _nodeOwner The address of the node's owner whose validator weight will be changed.
-    /// @param _weight The new validator weight to assign to the node.
-    function changeValidatorWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
-        _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
+    function changeValidatorWeight(address _validatorOwner, uint32 _weight) external onlyOwner {
+        _verifyValidatorOwnerExists(_validatorOwner);
+        (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
-        _ensureValidatorSnapshot(node);
-        node.validatorLatest.weight = _weight;
+        _ensureValidatorSnapshot(validator);
+        validator.latest.weight = _weight;
 
-        emit NodeValidatorWeightChanged(_nodeOwner, _weight);
+        emit ValidatorWeightChanged(_validatorOwner, _weight);
     }
 
-    /// @notice Changes the attester weight of a node in the registry.
-    /// @dev Only callable by the contract owner.
-    /// @dev Verifies that the node owner exists in the registry.
-    /// @param _nodeOwner The address of the node's owner whose attester weight will be changed.
-    /// @param _weight The new attester weight to assign to the node.
-    function changeAttesterWeight(address _nodeOwner, uint32 _weight) external onlyOwner {
-        _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
-        if (deleted) {
-            return;
-        }
-
-        _ensureAttesterSnapshot(node);
-        node.attesterLatest.weight = _weight;
-
-        emit NodeAttesterWeightChanged(_nodeOwner, _weight);
-    }
-
-    /// @notice Changes the validator's public key and proof-of-possession in the registry.
-    /// @dev Only callable by the contract owner or the node owner.
-    /// @dev Verifies that the node owner exists in the registry.
-    /// @param _nodeOwner The address of the node's owner whose validator key and PoP will be changed.
-    /// @param _pubKey The new BLS12-381 public key to assign to the node's validator.
-    /// @param _pop The new proof-of-possession (PoP) to assign to the node's validator.
     function changeValidatorKey(
-        address _nodeOwner,
+        address _validatorOwner,
         BLS12_381PublicKey calldata _pubKey,
         BLS12_381Signature calldata _pop
-    ) external onlyOwnerOrNodeOwner(_nodeOwner) {
+    ) external onlyOwnerOrValidatorOwner(_validatorOwner) {
         _verifyInputBLS12_381PublicKey(_pubKey);
         _verifyInputBLS12_381Signature(_pop);
-        _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
+        _verifyValidatorOwnerExists(_validatorOwner);
+        (Validator storage validator, bool deleted) = _getValidatorAndDeleteIfRequired(_validatorOwner);
         if (deleted) {
             return;
         }
 
-        bytes32 prevHash = _hashValidatorPubKey(node.validatorLatest.pubKey);
+        bytes32 prevHash = _hashValidatorPubKey(validator.latest.pubKey);
         delete validatorPubKeyHashes[prevHash];
         bytes32 newHash = _hashValidatorPubKey(_pubKey);
         _verifyValidatorPubKeyDoesNotExist(newHash);
         validatorPubKeyHashes[newHash] = true;
-        _ensureValidatorSnapshot(node);
-        node.validatorLatest.pubKey = _pubKey;
-        node.validatorLatest.proofOfPossession = _pop;
+        _ensureValidatorSnapshot(validator);
+        validator.latest.pubKey = _pubKey;
+        validator.latest.proofOfPossession = _pop;
 
-        emit NodeValidatorKeyChanged(_nodeOwner, _pubKey, _pop);
+        emit ValidatorKeyChanged(_validatorOwner, _pubKey, _pop);
     }
 
-    /// @notice Changes the attester's public key of a node in the registry.
-    /// @dev Only callable by the contract owner or the node owner.
-    /// @dev Verifies that the node owner exists in the registry.
-    /// @param _nodeOwner The address of the node's owner whose attester public key will be changed.
-    /// @param _pubKey The new ECDSA public key to assign to the node's attester.
-    function changeAttesterKey(
-        address _nodeOwner,
-        Secp256k1PublicKey calldata _pubKey
-    ) external onlyOwnerOrNodeOwner(_nodeOwner) {
-        _verifyInputSecp256k1PublicKey(_pubKey);
-        _verifyNodeOwnerExists(_nodeOwner);
-        (Node storage node, bool deleted) = _getNodeAndDeleteIfRequired(_nodeOwner);
-        if (deleted) {
-            return;
+    function commitValidatorCommittee() external onlyOwner {
+        // If validatorsCommitBlock is still in the future, revert.
+        if (block.number < validatorsCommitBlock) {
+            revert PreviousCommitStillPending();
         }
 
-        bytes32 prevHash = _hashAttesterPubKey(node.attesterLatest.pubKey);
-        delete attesterPubKeyHashes[prevHash];
-        bytes32 newHash = _hashAttesterPubKey(_pubKey);
-        _verifyAttesterPubKeyDoesNotExist(newHash);
-        attesterPubKeyHashes[newHash] = true;
-
-        _ensureAttesterSnapshot(node);
-        node.attesterLatest.pubKey = _pubKey;
-
-        emit NodeAttesterKeyChanged(_nodeOwner, _pubKey);
-    }
-
-    /// @notice Adds a new commit to the attester committee.
-    /// @dev Implicitly updates the attester committee by affecting readers based on the current state of a node's attester attributes:
-    /// - If "attestersCommit" > "node.attesterLastUpdateCommit", read "node.attesterLatest".
-    /// - If "attestersCommit" == "node.attesterLastUpdateCommit", read "node.attesterSnapshot".
-    /// @dev Only callable by the contract owner.
-    function commitAttesterCommittee() external onlyOwner {
-        ++attestersCommit;
-
-        emit AttestersCommitted(attestersCommit);
-    }
-
-    /// @notice Adds a new commit to the validator committee.
-    /// @dev Implicitly updates the validator committee by affecting readers based on the current state of a node's validator attributes:
-    /// - If "validatorsCommit" > "node.validatorLastUpdateCommit", read "node.validatorLatest".
-    /// - If "validatorsCommit" == "node.validatorLastUpdateCommit", read "node.validatorSnapshot".
-    /// @dev Only callable by the contract owner.
-    function commitValidatorCommittee() external onlyOwner {
-        ++validatorsCommit;
-
-        emit ValidatorsCommitted(validatorsCommit);
-    }
-
-    /// @notice Returns an array of `AttesterAttr` structs representing the current attester committee.
-    /// @dev Collects active and non-removed attesters based on the latest commit to the committee.
-    function getAttesterCommittee() public view returns (CommitteeAttester[] memory) {
-        uint256 len = nodeOwners.length;
-        CommitteeAttester[] memory committee = new CommitteeAttester[](len);
-        uint256 count = 0;
+        // Check if there's at least one active leader validator
+        bool hasActiveLeader = false;
+        uint256 len = validatorOwners.length;
 
         for (uint256 i = 0; i < len; ++i) {
-            Node storage node = nodes[nodeOwners[i]];
-            AttesterAttr memory attester = attestersCommit > node.attesterLastUpdateCommit
-                ? node.attesterLatest
-                : node.attesterSnapshot;
-            if (attester.active && !attester.removed) {
-                committee[count] = CommitteeAttester({weight: attester.weight, pubKey: attester.pubKey});
-                ++count;
+            Validator storage validator = validators[validatorOwners[i]];
+            ValidatorAttr memory validatorAttr = validator.latest;
+
+            if (validatorAttr.active && !validatorAttr.removed && validatorAttr.leader) {
+                hasActiveLeader = true;
+                break;
             }
         }
 
-        // Resize the array.
-        assembly {
-            mstore(committee, count)
+        if (!hasActiveLeader) {
+            revert NoActiveLeader();
         }
-        return committee;
+
+        // Increment the commit number.
+        ++validatorsCommit;
+
+        // Schedule the new commit to activate after the delay
+        validatorsCommitBlock = block.number + committeeActivationDelay;
+
+        emit ValidatorsCommitted(validatorsCommit, validatorsCommitBlock);
     }
 
-    /// @notice Returns an array of `ValidatorAttr` structs representing the current attester committee.
-    /// @dev Collects active and non-removed validators based on the latest commit to the committee.
-    function getValidatorCommittee() public view returns (CommitteeValidator[] memory) {
-        uint256 len = nodeOwners.length;
+    function getValidatorCommittee() public view returns (CommitteeValidator[] memory, LeaderSelectionAttr memory) {
+        return (_getCommittee(false), _getLeaderSelectionAttributes(false));
+    }
+
+    function getNextValidatorCommittee() public view returns (CommitteeValidator[] memory, LeaderSelectionAttr memory) {
+        if (block.number >= validatorsCommitBlock) {
+            revert NoPendingCommittee();
+        }
+        return (_getCommittee(true), _getLeaderSelectionAttributes(true));
+    }
+
+    function setCommitteeActivationDelay(uint256 _delay) external onlyOwner {
+        committeeActivationDelay = _delay;
+        emit CommitteeActivationDelayChanged(_delay);
+    }
+
+    /// @notice Updates the leader selection configuration
+    /// @dev Only callable by the contract owner
+    /// @param _frequency The number of views between leader changes. If it is 0 then the leader never rotates.
+    /// @param _weighted Whether leaders are selected proportionally to their weight. If false, then the leader is selected round-robin.
+    function updateLeaderSelection(uint64 _frequency, bool _weighted) external onlyOwner {
+        // Ensure leader selection is properly snapshotted
+        _ensureLeaderSelectionSnapshot();
+
+        // Update with new values
+        leaderSelection.latest = LeaderSelectionAttr({frequency: _frequency, weighted: _weighted});
+
+        emit LeaderSelectionChanged(leaderSelection.latest);
+    }
+
+    /// @notice Internal helper to build committee arrays
+    /// @dev Handles the common logic for getting current or next validator committee
+    /// @param _isNextCommittee Whether to get the next committee instead of the current one
+    /// @return committee Array of committee validators
+    function _getCommittee(bool _isNextCommittee) private view returns (CommitteeValidator[] memory) {
+        uint256 len = validatorOwners.length;
         CommitteeValidator[] memory committee = new CommitteeValidator[](len);
         uint256 count = 0;
 
         for (uint256 i = 0; i < len; ++i) {
-            Node storage node = nodes[nodeOwners[i]];
-            ValidatorAttr memory validator = validatorsCommit > node.validatorLastUpdateCommit
-                ? node.validatorLatest
-                : node.validatorSnapshot;
-            if (validator.active && !validator.removed) {
+            Validator storage validator = validators[validatorOwners[i]];
+            ValidatorAttr memory validatorAttr;
+
+            if (_isNextCommittee) {
+                // Get the attributes that will be active in the next committee
+                if (validator.lastSnapshotCommit < validatorsCommit) {
+                    validatorAttr = validator.latest;
+                } else {
+                    validatorAttr = validator.snapshot;
+                }
+            } else {
+                validatorAttr = _getValidatorAttributes(validator);
+            }
+
+            if (validatorAttr.active && !validatorAttr.removed) {
                 committee[count] = CommitteeValidator({
-                    weight: validator.weight,
-                    pubKey: validator.pubKey,
-                    proofOfPossession: validator.proofOfPossession
+                    weight: validatorAttr.weight,
+                    leader: validatorAttr.leader,
+                    pubKey: validatorAttr.pubKey,
+                    proofOfPossession: validatorAttr.proofOfPossession
                 });
                 ++count;
             }
         }
 
-        // Resize the array.
+        // Resize the array
         assembly {
             mstore(committee, count)
         }
         return committee;
     }
 
-    function numNodes() public view returns (uint256) {
-        return nodeOwners.length;
-    }
+    /// @notice Returns the validator attributes based on current commits and snapshots
+    /// @dev Helper function to get the appropriate validator attributes based on commit state
+    function _getValidatorAttributes(Validator storage validator) private view returns (ValidatorAttr memory) {
+        uint32 currentActiveCommit;
 
-    function _getNodeAndDeleteIfRequired(address _nodeOwner) private returns (Node storage, bool) {
-        Node storage node = nodes[_nodeOwner];
-        bool pendingDeletion = _isNodePendingDeletion(node);
-        if (pendingDeletion) {
-            _deleteNode(_nodeOwner, node);
+        if (block.number >= validatorsCommitBlock) {
+            currentActiveCommit = validatorsCommit;
+        } else {
+            currentActiveCommit = validatorsCommit - 1;
         }
-        return (node, pendingDeletion);
+
+        if (currentActiveCommit > validator.lastSnapshotCommit) {
+            return validator.latest;
+        } else if (currentActiveCommit > validator.previousSnapshotCommit) {
+            return validator.snapshot;
+        } else {
+            return validator.previousSnapshot;
+        }
     }
 
-    function _isNodePendingDeletion(Node storage _node) private returns (bool) {
-        bool attesterRemoved = (attestersCommit > _node.attesterLastUpdateCommit)
-            ? _node.attesterLatest.removed
-            : _node.attesterSnapshot.removed;
-        bool validatorRemoved = (validatorsCommit > _node.validatorLastUpdateCommit)
-            ? _node.validatorLatest.removed
-            : _node.validatorSnapshot.removed;
-        return attesterRemoved && validatorRemoved;
+    function _getLeaderSelectionAttributes(bool _isNextCommittee) private view returns (LeaderSelectionAttr memory) {
+        if (_isNextCommittee) {
+            // Get the leader selection that will be active in the next committee
+            if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+                return leaderSelection.latest;
+            } else {
+                return leaderSelection.snapshot;
+            }
+        } else {
+            // Get currently active leader selection
+            uint32 currentActiveCommit;
+            if (block.number >= validatorsCommitBlock) {
+                currentActiveCommit = validatorsCommit;
+            } else {
+                currentActiveCommit = validatorsCommit - 1;
+            }
+
+            if (currentActiveCommit > leaderSelection.lastSnapshotCommit) {
+                return leaderSelection.latest;
+            } else if (currentActiveCommit > leaderSelection.previousSnapshotCommit) {
+                return leaderSelection.snapshot;
+            } else {
+                return leaderSelection.previousSnapshot;
+            }
+        }
     }
 
-    function _deleteNode(address _nodeOwner, Node storage _node) private {
-        // Delete from array by swapping the last node owner (gas-efficient, not preserving order).
-        address lastNodeOwner = nodeOwners[nodeOwners.length - 1];
-        nodeOwners[_node.nodeOwnerIdx] = lastNodeOwner;
-        nodeOwners.pop();
-        // Update the node owned by the last node owner.
-        nodes[lastNodeOwner].nodeOwnerIdx = _node.nodeOwnerIdx;
+    function numValidators() public view returns (uint256) {
+        return validatorOwners.length;
+    }
+
+    function _getValidatorAndDeleteIfRequired(address _validatorOwner) private returns (Validator storage, bool) {
+        Validator storage validator = validators[_validatorOwner];
+        bool pendingDeletion = _isValidatorPendingDeletion(validator);
+        if (pendingDeletion) {
+            _deleteValidator(_validatorOwner, validator);
+        }
+        return (validator, pendingDeletion);
+    }
+
+    function _isValidatorPendingDeletion(Validator storage _validator) private view returns (bool) {
+        ValidatorAttr memory attr = _getValidatorAttributes(_validator);
+        return attr.removed;
+    }
+
+    function _deleteValidator(address _validatorOwner, Validator storage _validator) private {
+        // Delete from array by swapping the last validator owner (gas-efficient, not preserving order).
+        address lastValidatorOwner = validatorOwners[validatorOwners.length - 1];
+        validatorOwners[_validator.ownerIdx] = lastValidatorOwner;
+        validatorOwners.pop();
+        // Update the validator owned by the last validator owner.
+        validators[lastValidatorOwner].ownerIdx = _validator.ownerIdx;
 
         // Delete from the remaining mapping.
-        delete attesterPubKeyHashes[_hashAttesterPubKey(_node.attesterLatest.pubKey)];
-        delete validatorPubKeyHashes[_hashValidatorPubKey(_node.validatorLatest.pubKey)];
-        delete nodes[_nodeOwner];
+        delete validatorPubKeyHashes[_hashValidatorPubKey(_validator.latest.pubKey)];
+        delete validators[_validatorOwner];
 
-        emit NodeDeleted(_nodeOwner);
+        emit ValidatorDeleted(_validatorOwner);
     }
 
-    function _ensureAttesterSnapshot(Node storage _node) private {
-        if (_node.attesterLastUpdateCommit < attestersCommit) {
-            _node.attesterSnapshot = _node.attesterLatest;
-            _node.attesterLastUpdateCommit = attestersCommit;
+    function _ensureValidatorSnapshot(Validator storage _validator) private {
+        if (_validator.lastSnapshotCommit < validatorsCommit) {
+            // When creating a snapshot, preserve the previous one
+            _validator.previousSnapshot = _validator.snapshot;
+            _validator.previousSnapshotCommit = _validator.lastSnapshotCommit;
+            _validator.snapshot = _validator.latest;
+            _validator.lastSnapshotCommit = validatorsCommit;
         }
     }
 
-    function _ensureValidatorSnapshot(Node storage _node) private {
-        if (_node.validatorLastUpdateCommit < validatorsCommit) {
-            _node.validatorSnapshot = _node.validatorLatest;
-            _node.validatorLastUpdateCommit = validatorsCommit;
+    function _ensureLeaderSelectionSnapshot() private {
+        if (leaderSelection.lastSnapshotCommit < validatorsCommit) {
+            // When creating a snapshot, preserve the previous one
+            leaderSelection.previousSnapshot = leaderSelection.snapshot;
+            leaderSelection.previousSnapshotCommit = leaderSelection.lastSnapshotCommit;
+            leaderSelection.snapshot = leaderSelection.latest;
+            leaderSelection.lastSnapshotCommit = validatorsCommit;
         }
     }
 
-    function _isNodeOwnerExists(address _nodeOwner) private view returns (bool) {
-        BLS12_381PublicKey storage pubKey = nodes[_nodeOwner].validatorLatest.pubKey;
+    function _isValidatorOwnerExists(address _validatorOwner) private view returns (bool) {
+        BLS12_381PublicKey storage pubKey = validators[_validatorOwner].latest.pubKey;
         if (pubKey.a == bytes32(0) && pubKey.b == bytes32(0) && pubKey.c == bytes32(0)) {
             return false;
         }
         return true;
     }
 
-    function _verifyNodeOwnerExists(address _nodeOwner) private view {
-        if (!_isNodeOwnerExists(_nodeOwner)) {
-            revert NodeOwnerDoesNotExist();
+    function _verifyValidatorOwnerExists(address _validatorOwner) private view {
+        if (!_isValidatorOwnerExists(_validatorOwner)) {
+            revert ValidatorOwnerDoesNotExist();
         }
     }
 
-    function _verifyNodeOwnerDoesNotExist(address _nodeOwner) private view {
-        if (_isNodeOwnerExists(_nodeOwner)) {
-            revert NodeOwnerExists();
+    function _verifyValidatorOwnerDoesNotExist(address _validatorOwner) private view {
+        if (_isValidatorOwnerExists(_validatorOwner)) {
+            revert ValidatorOwnerExists();
         }
-    }
-
-    function _hashAttesterPubKey(Secp256k1PublicKey storage _pubKey) private view returns (bytes32) {
-        return keccak256(abi.encode(_pubKey.tag, _pubKey.x));
-    }
-
-    function _hashAttesterPubKey(Secp256k1PublicKey calldata _pubKey) private pure returns (bytes32) {
-        return keccak256(abi.encode(_pubKey.tag, _pubKey.x));
     }
 
     function _hashValidatorPubKey(BLS12_381PublicKey storage _pubKey) private view returns (bytes32) {
@@ -436,19 +424,13 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         return keccak256(abi.encode(_pubKey.a, _pubKey.b, _pubKey.c));
     }
 
-    function _verifyInputAddress(address _nodeOwner) private pure {
-        if (_nodeOwner == address(0)) {
-            revert InvalidInputNodeOwnerAddress();
+    function _verifyInputAddress(address _validatorOwner) private pure {
+        if (_validatorOwner == address(0)) {
+            revert InvalidInputValidatorOwnerAddress();
         }
     }
 
-    function _verifyAttesterPubKeyDoesNotExist(bytes32 _hash) private view {
-        if (attesterPubKeyHashes[_hash]) {
-            revert AttesterPubKeyExists();
-        }
-    }
-
-    function _verifyValidatorPubKeyDoesNotExist(bytes32 _hash) private {
+    function _verifyValidatorPubKeyDoesNotExist(bytes32 _hash) private view {
         if (validatorPubKeyHashes[_hash]) {
             revert ValidatorPubKeyExists();
         }
@@ -466,21 +448,11 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         }
     }
 
-    function _verifyInputSecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure {
-        if (_isEmptySecp256k1PublicKey(_pubKey)) {
-            revert InvalidInputSecp256k1PublicKey();
-        }
-    }
-
     function _isEmptyBLS12_381PublicKey(BLS12_381PublicKey calldata _pubKey) private pure returns (bool) {
         return _pubKey.a == bytes32(0) && _pubKey.b == bytes32(0) && _pubKey.c == bytes32(0);
     }
 
     function _isEmptyBLS12_381Signature(BLS12_381Signature calldata _pop) private pure returns (bool) {
         return _pop.a == bytes32(0) && _pop.b == bytes16(0);
-    }
-
-    function _isEmptySecp256k1PublicKey(Secp256k1PublicKey calldata _pubKey) private pure returns (bool) {
-        return _pubKey.tag == bytes1(0) && _pubKey.x == bytes32(0);
     }
 }
