@@ -422,7 +422,7 @@ contract InteropCenter is
             for (uint256 j = 0; j < attributeSelectorsLength; ++j) {
                 if (selector == ATTRIBUTE_SELECTORS[j]) {
                     /// check if the attribute was already set.
-                    require(!attributeUsed[j], AttributeAlreadySet(j));
+                    require(!attributeUsed[j], AttributeAlreadySet(selector));
                     attributeUsed[j] = true;
                     indexInSelectorsArray = j;
                     break;
