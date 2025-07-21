@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_BRIDGE_HUB, L2_CHAIN_ASSET_HANDLER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, WRAPPED_BASE_TOKEN_IMPL_ADDRESS} from "./Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS, L2_BRIDGE_HUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, WRAPPED_BASE_TOKEN_IMPL_ADDRESS, L2_INTEROP_HANDLER} from "./Constants.sol";
 import {ForceDeployment, IContractDeployer} from "./interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "./interfaces/IL2GenesisUpgrade.sol";
@@ -33,6 +33,11 @@ library L2GenesisForceDeploymentsHelper {
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData
         );
+        // Decode the fixed and additional force deployments data.
+        FixedForceDeploymentsData memory fixedForceDeploymentsData = abi.decode(
+            _fixedForceDeploymentsData,
+            (FixedForceDeploymentsData)
+        );
 
         // Force deploy the contracts on specified addresses.
         IContractDeployer(DEPLOYER_SYSTEM_CONTRACT).forceDeployOnAddresses{value: msg.value}(forceDeployments);
@@ -45,23 +50,64 @@ library L2GenesisForceDeploymentsHelper {
         address bridgehubOwner = L2_BRIDGE_HUB.owner();
 
         // Prepare calldata to set addresses in BridgeHub.
-        bytes memory data = abi.encodeCall(
+        bytes memory bridgehubConstructorData = abi.encodeCall(
             L2_BRIDGE_HUB.setAddresses,
-            (address(L2_ASSET_ROUTER), _ctmDeployer, address(L2_MESSAGE_ROOT), address(L2_CHAIN_ASSET_HANDLER))
+            (
+                address(L2_ASSET_ROUTER),
+                _ctmDeployer,
+                address(L2_MESSAGE_ROOT),
+                address(L2_CHAIN_ASSET_HANDLER),
+                address(L2_INTEROP_CENTER),
+                fixedForceDeploymentsData.aliasedChainRegistrationSender
+            )
         );
 
         // Execute the call to set addresses in BridgeHub.
         (bool success, bytes memory returnData) = SystemContractHelper.mimicCall(
             address(L2_BRIDGE_HUB),
             bridgehubOwner,
-            data
+            bridgehubConstructorData
         );
 
         // Revert with the original revert reason if the call failed.
+        /// @dev Propagate the revert reason from the failed call.
         if (!success) {
-            /// @dev Propagate the revert reason from the failed call.
             assembly {
                 revert(add(returnData, 0x20), returndatasize())
+            }
+        }
+
+        bytes memory interopCenterConstructorData = abi.encodeCall(
+            L2_INTEROP_CENTER.setAddresses,
+            (address(L2_ASSET_ROUTER), address(L2_ASSET_TRACKER_ADDRESS))
+        );
+
+        (bool success2, bytes memory returnData2) = SystemContractHelper.mimicCall(
+            address(L2_INTEROP_CENTER),
+            bridgehubOwner,
+            interopCenterConstructorData
+        );
+        if (!success2) {
+            // Progapatate revert reason
+            assembly {
+                revert(add(returnData2, 0x20), returndatasize())
+            }
+        }
+
+        bytes memory messageRootConstructorData = abi.encodeCall(
+            L2_MESSAGE_ROOT.setAddresses,
+            (L2_ASSET_TRACKER_ADDRESS)
+        );
+
+        (bool success3, bytes memory returnData3) = SystemContractHelper.mimicCall(
+            address(L2_MESSAGE_ROOT),
+            bridgehubOwner,
+            messageRootConstructorData
+        );
+        if (!success3) {
+            // Progapatate revert reason
+            assembly {
+                revert(add(returnData3, 0x20), returndatasize())
             }
         }
     }
@@ -88,7 +134,7 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        forceDeployments = new ForceDeployment[](5);
+        forceDeployments = new ForceDeployment[](8);
 
         // Configure the MessageRoot deployment.
         forceDeployments[0] = ForceDeployment({
@@ -159,7 +205,7 @@ library L2GenesisForceDeploymentsHelper {
         // Configure the Native Token Vault deployment.
         forceDeployments[3] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.l2NtvBytecodeHash,
-            newAddress: address(L2_NATIVE_TOKEN_VAULT),
+            newAddress: L2_NATIVE_TOKEN_VAULT_ADDR,
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
@@ -189,6 +235,41 @@ library L2GenesisForceDeploymentsHelper {
                 address(L2_ASSET_ROUTER),
                 address(L2_MESSAGE_ROOT)
             )
+        });
+
+        forceDeployments[5] = ForceDeployment({
+            bytecodeHash: fixedForceDeploymentsData.interopCenterBytecodeHash,
+            newAddress: address(L2_INTEROP_CENTER),
+            callConstructor: true,
+            value: 0,
+            input: abi.encode(
+                L2_BRIDGE_HUB,
+                fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.aliasedL1Governance
+            )
+        });
+
+        forceDeployments[6] = ForceDeployment({
+            bytecodeHash: fixedForceDeploymentsData.assetTrackerBytecodeHash,
+            newAddress: L2_ASSET_TRACKER_ADDRESS,
+            callConstructor: true,
+            value: 0,
+            // solhint-disable-next-line func-named-parameters
+            input: abi.encode(
+                fixedForceDeploymentsData.l1ChainId,
+                address(L2_BRIDGE_HUB),
+                address(L2_ASSET_ROUTER),
+                L2_NATIVE_TOKEN_VAULT_ADDR,
+                address(L2_MESSAGE_ROOT)
+            )
+        });
+
+        forceDeployments[7] = ForceDeployment({
+            bytecodeHash: fixedForceDeploymentsData.interopHandlerBytecodeHash,
+            newAddress: address(L2_INTEROP_HANDLER),
+            callConstructor: true,
+            value: 0,
+            input: abi.encode()
         });
     }
 

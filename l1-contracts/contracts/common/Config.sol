@@ -179,3 +179,7 @@ bytes32 constant DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH = bytes32(uint256(1));
 
 /// @dev The length of a packed transaction precommitment in bytes. It consists of two parts: 32-byte tx hash and 1-byte status (0 or 1).
 uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
+
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_LEAVES = 16_384;
+
+uint256 constant L2_TO_L1_LOGS_MERKLE_TREE_DEPTH = 14 + 1;

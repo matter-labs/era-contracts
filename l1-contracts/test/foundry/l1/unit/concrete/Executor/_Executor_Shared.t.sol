@@ -57,6 +57,7 @@ contract ExecutorTest is Test {
     ValidatorTimelock internal validatorTimelock;
     address internal rollupL1DAValidator;
     MessageRoot internal messageRoot;
+    DummyBridgehub dummyBridgehub;
 
     uint256 eraChainId;
 
@@ -177,7 +178,8 @@ contract ExecutorTest is Test {
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
+        dummyBridgehub = new DummyBridgehub();
+        address interopCenter = makeAddr("interopCenter");
         messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
@@ -229,6 +231,7 @@ contract ExecutorTest is Test {
             // TODO REVIEW
             chainId: eraChainId,
             bridgehub: address(dummyBridgehub),
+            interopCenter: interopCenter,
             chainTypeManager: address(chainTypeManager),
             protocolVersion: 0,
             admin: owner,
@@ -327,7 +330,7 @@ contract ExecutorTest is Test {
 
         vm.mockCall(
             address(sharedBridge),
-            abi.encodeWithSelector(IL1AssetRouter.bridgehubDepositBaseToken.selector),
+            abi.encodeWithSelector(IAssetRouterBase.bridgehubDepositBaseToken.selector),
             abi.encode(true)
         );
     }

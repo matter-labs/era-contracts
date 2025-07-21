@@ -18,6 +18,7 @@ fs_permissions = [
     { access = "read", path = "../l2-contracts/zkout/" },
     { access = "read", path = "../l1-contracts/artifacts-zk/" },
     { access = "read", path = "../l1-contracts/script-out/" },
+    { access = "read", path = "../l1-contracts/broadcast/" },
     { access = "read", path = "../da-contracts/" },
     { access = "read", path = "../system-contracts/zkout/" },
     { access = "read", path = "./script-config" },
@@ -47,6 +48,7 @@ optimizer_runs = 9999999
 # TODO(X): the latest foundry disallows reverts that happen inside the internal calls and we should fix tests that rely
 # on such reverts
 allow_internal_expect_revert = true
+
 
 [profile.default.zksync] 
 enable_eravm_extensions = true

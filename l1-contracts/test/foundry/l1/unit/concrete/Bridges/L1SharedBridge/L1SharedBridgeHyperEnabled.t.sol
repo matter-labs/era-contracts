@@ -5,6 +5,7 @@ import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -45,7 +46,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
     }
 
     function test_bridgehubDeposit_Eth() public {
-        // vm.prank(bridgehubAddress);
+        // vm.prank(interopCenterAddress);
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         _setBaseTokenAssetId(tokenAssetId);
@@ -100,7 +101,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setSharedBridgeDepositHappened(chainId, txHash, txDataHash);
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
-        _setNativeTokenVaultChainBalance(chainId, address(token), amount);
+        _setAssetTrackerChainBalance(chainId, address(token), amount);
 
         vm.mockCall(
             bridgehubAddress,
@@ -121,7 +122,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit ClaimedFailedDepositAssetRouter(chainId, tokenAssetId, abi.encode(bytes32(0)));
-        vm.prank(bridgehubAddress);
+        // vm.prank(bridgehubAddress);
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,
@@ -164,7 +165,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         // solhint-disable-next-line func-named-parameters
         vm.expectEmit(true, true, true, false, address(sharedBridge));
         emit ClaimedFailedDepositAssetRouter(chainId, ETH_TOKEN_ASSET_ID, abi.encode(bytes32(0)));
-        vm.prank(bridgehubAddress);
+        // vm.prank(bridgehubAddress);
         l1Nullifier.claimFailedDeposit({
             _chainId: chainId,
             _depositSender: alice,

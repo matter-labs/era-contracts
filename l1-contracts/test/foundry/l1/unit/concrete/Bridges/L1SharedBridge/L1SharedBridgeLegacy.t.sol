@@ -7,6 +7,7 @@ import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
@@ -53,7 +54,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         vm.deal(address(sharedBridge), amount);
 
         /// storing chainBalance
-        _setNativeTokenVaultChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
+        _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
             abi.encodeWithSelector(IBridgehub.baseToken.selector),
@@ -99,7 +100,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawalLegacyErc20Bridge_ErcOnEth() public {
         /// storing chainBalance
-        _setNativeTokenVaultChainBalance(eraChainId, address(token), amount);
+        _setAssetTrackerChainBalance(eraChainId, address(token), amount);
 
         // solhint-disable-next-line func-named-parameters
         bytes memory message = abi.encodePacked(
