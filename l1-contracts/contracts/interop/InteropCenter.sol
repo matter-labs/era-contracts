@@ -411,7 +411,7 @@ contract InteropCenter is
 
         bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
-        bool[] memory attributeUsed = new bool[](4);
+        bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
 
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {
