@@ -7,26 +7,25 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IAssetTracker, TokenBalanceMigrationData} from "./IAssetTracker.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log, L2Message} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, InvalidProof, ReconstructionMismatch, Unauthorized, ChainIdNotRegistered} from "../../common/L1ContractErrors.sol";
+import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, InvalidProof, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH, SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
-import {FinalizeL1DepositParams} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
-import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidWithdrawalChainId, InvalidAssetMigrationNumber, InvalidSender} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidAmount, InvalidAssetId, InvalidAssetMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
 
 contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerModifiers {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -59,6 +58,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         BRIDGE_HUB = IBridgehub(_bridgeHub);
         NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
+        // kl todo add L1_ASSET_TRACKER
     }
 
     /// @notice Checks that the message sender is the L1 asset tracker.
@@ -205,7 +205,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
     }
 
-    /// we need this funciton to make sure the settlement layer is up to date.
+    /// we need this function to make sure the settlement layer is up to date.
     function _ensureTokenIsRegistered(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
         if (!isMinterChain[_tokenOriginChainId][_assetId]) {
             isMinterChain[_tokenOriginChainId][_assetId] = true;

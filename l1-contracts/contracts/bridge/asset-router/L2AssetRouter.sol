@@ -20,7 +20,7 @@ import {InteropCallStarter} from "../../common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy, InvalidSelector, PayloadTooShort, ExecuteMessageFailed} from "../../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, ExecuteMessageFailed, InvalidCaller, InvalidSelector, PayloadTooShort, TokenNotLegacy, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IERC7786Receiver} from "../../interop/IERC7786Receiver.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 

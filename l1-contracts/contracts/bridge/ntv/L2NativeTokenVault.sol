@@ -18,7 +18,7 @@ import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 import {IAssetTracker} from "../asset-tracker/IAssetTracker.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_TRACKER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";

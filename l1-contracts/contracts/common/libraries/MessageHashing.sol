@@ -7,10 +7,9 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SUPPORTED_PROOF_METADATA_VERSION} fro
 import {MerklePathEmpty} from "../L1ContractErrors.sol";
 import {UncheckedMath} from "./UncheckedMath.sol";
 import {L2Log, L2Message, TxStatus} from "../Messaging.sol";
-import {L2_BOOTLOADER_ADDRESS} from "../l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 
 import {UnsupportedProofMetadataVersion} from "../../state-transition/L1StateTransitionErrors.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {HashedLogIsDefault, InvalidProofLengthForFinalNode} from "../../common/L1ContractErrors.sol";
 
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");

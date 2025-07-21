@@ -138,10 +138,6 @@ error IncorrectBatchBounds(
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
-// 0xddb74934
-error InsufficientChainBalanceAssetTracker(uint256 chainId, bytes32 assetId, uint256 amount);
-// 0x826fb11e
-error InsufficientChainBalance();
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
 // 0xcbd9d2e0
