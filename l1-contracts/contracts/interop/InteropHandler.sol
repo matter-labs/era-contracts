@@ -299,7 +299,6 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         emit BundleVerified(_bundleHash);
     }
 
-
     /// @notice The sole purpose of this function is to serve as a rescue mechanism in case the sender is a contract,
     ///         the unbundler chainid is set to the sender chainid and the unbundler address is set to the contract's address.
     ///         In particular, this happens when the unbundler is not specified.
@@ -361,7 +360,8 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             );
 
             // Verify sender has execution permission
-            require((executionChainId == senderChainId || executionChainId == 0) && executionAddress == senderAddress,
+            require(
+                (executionChainId == senderChainId || executionChainId == 0) && executionAddress == senderAddress,
                 ExecutingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.executionAddress)
             );
         }
