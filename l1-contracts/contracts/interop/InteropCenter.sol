@@ -70,10 +70,7 @@ contract InteropCenter is
     }
 
     modifier onlyL2ToL2(uint256 _destinationChainId) {
-        require(
-            L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
-            NotL2ToL2(block.chainid, _destinationChainId)
-        );
+        _ensureL2ToL2(_destinationChainId);
         _;
     }
 
@@ -124,10 +121,7 @@ contract InteropCenter is
     ) external payable whenNotPaused returns (bytes32 sendId) {
         (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
 
-        require(
-            L1_CHAIN_ID != block.chainid && recipientChainId != L1_CHAIN_ID,
-            NotL2ToL2(block.chainid, recipientChainId)
-        );
+        _ensureL2ToL2(recipientChainId);
 
         (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
             attributes,
@@ -225,6 +219,13 @@ contract InteropCenter is
     /*//////////////////////////////////////////////////////////////
                             Internal functions
     //////////////////////////////////////////////////////////////*/
+
+    function _ensureL2ToL2(uint256 _destinationChainId) internal {
+        require(
+            L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
+            NotL2ToL2(block.chainid, _destinationChainId)
+        );
+    }
 
     /// @notice Ensures the received base token value matches expected for the destination chain.
     /// @param _destinationChainId Destination chain ID.
