@@ -89,7 +89,6 @@ contract ZKSProvider is Script {
 
         while (totalBatchesExecuted < actualBatchNumber && loopCount < 30) {
             loopCount++;
-            // kl todo create2 a getTotalBatchesExecuted readed that takes an extra var so we can iterate
             // totalBatchesExecuted = getters.getTotalBatchesExecuted();
             totalBatchesExecuted = getTotalBatchesExecuted(address(getters));
             uint256 secondsToWait = 5;

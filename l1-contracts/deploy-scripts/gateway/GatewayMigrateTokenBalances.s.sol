@@ -116,7 +116,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             //  != block.chainid) {
             console.log("Token", vm.toString(assetId), "migration number", migrationNumber);
             // }
-            // kl todo implement properly, compare agains interopCenter migration number.
+            // kl todo implement properly, compare against interopCenter migration number.
         }
     }
 
