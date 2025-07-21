@@ -53,9 +53,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It will be deprecated after v29 upgrade.
     address public validatorTimelock;
 
-    /// @dev The address of the post-V29 upgradeable validatorTimelock
-    address public postV29UpgradeableValidatorTimelock;
-
     /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
 
@@ -70,6 +67,9 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev The contract, that notifies server about l1 changes
     address public serverNotifierAddress;
+
+    /// @dev The address of the post-V29 upgradeable validatorTimelock
+    address public postV29UpgradeableValidatorTimelock;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.

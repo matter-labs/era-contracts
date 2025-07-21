@@ -254,7 +254,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function deployGWTuppWithContract(string memory contractName) internal returns (address proxyAddress) {
+        console.log("hi");
         bytes memory creationCalldata = getCreationCalldata(contractName, true);
+        console.log("hi2");
         address implementation = Utils.deployThroughL1Deterministic(
             getCreationCode(contractName, true),
             creationCalldata,
@@ -265,6 +267,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             addresses.bridgehub.bridgehubProxy,
             addresses.bridges.l1AssetRouterProxy
         );
+        console.log("hi3");
         notifyAboutDeployment(implementation, contractName, creationCalldata, contractName, true);
 
         bytes memory proxyCreationCalldata = abi.encode(implementation, gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin, getInitializeCalldata(contractName, true));
@@ -1634,6 +1637,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             } else {
                 return abi.encode(L2_BRIDGEHUB_ADDR);
             }
+        } else if (compareStrings(contractName, "VerifierFflonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "VerifierPlonk")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
             if (!isZKBytecode) {
                 return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);

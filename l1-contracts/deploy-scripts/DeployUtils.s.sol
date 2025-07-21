@@ -347,8 +347,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual returns (bytes memory) {
-        require(!isZKBytecode, "ZK bytecode is not supported for this contract");
-
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Bridgehub")) {
