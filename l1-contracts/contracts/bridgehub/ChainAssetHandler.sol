@@ -168,6 +168,7 @@ contract ChainAssetHandler is
             chainData: chainMintData
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
+        ++migrationNumber[bridgehubBurnData.chainId];
 
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
@@ -202,7 +203,7 @@ contract ChainAssetHandler is
             BRIDGEHUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId);
         }
-
+        ++migrationNumber[bridgehubMintData.chainId];
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
@@ -230,6 +231,8 @@ contract ChainAssetHandler is
             _depositSender: _depositSender,
             _ctmData: bridgehubBurnData.ctmData
         });
+
+        --migrationNumber[bridgehubBurnData.chainId];
 
         IZKChain(zkChain).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubBurnData.chainId,

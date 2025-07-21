@@ -31,7 +31,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     function startTokenMigrationOnL2OrGateway(
-        bool isGateway,
+        bool toGateway,
         uint256 chainId,
         string memory l2RpcUrl,
         string memory gwRpcUrl
@@ -39,6 +39,10 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         // string memory originalRpcUrl = vm.activeRpcUrl();
         vm.createSelectFork(l2RpcUrl);
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
+        if (!toGateway) {
+            vm.createSelectFork(gwRpcUrl);
+        }
+        console.log("Forked to", gwRpcUrl);
 
         // Set L2 RPC for each token and migrate balances
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
@@ -46,11 +50,11 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
             console.log("Migrating token balance for assetId:", uint256(assetId));
             vm.broadcast();
-            if (isGateway) {
-                vm.createSelectFork(gwRpcUrl);
-                l2AssetTracker.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
-            } else {
+            if (toGateway) {
                 l2AssetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
+            } else {
+                // console.log(l2AssetTracker.chainBalance(chainId, assetId));
+                l2AssetTracker.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
             }
         }
     }
@@ -65,22 +69,30 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     }
 
     function finishMigrationOnL1(
+        bool toGateway,
         IBridgehub bridgehub,
         uint256 chainId,
+        uint256 gatewayChainId,
         string memory l2RpcUrl,
+        string memory gwRpcUrl,
         bool onlyWaitForFinalization
     ) public {
         IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
         IAssetTracker l1AssetTracker = IAssetTracker(interopCenter.assetTracker());
 
         uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
-        bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile();
+        bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile(toGateway ? chainId : gatewayChainId);
 
         uint256 bridgedTokenCount = msgHashes.length;
         FinalizeL1DepositParams[] memory finalizeL1DepositParams = new FinalizeL1DepositParams[](bridgedTokenCount);
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
-            finalizeL1DepositParams[i] = getFinalizeWithdrawalParams(chainId, l2RpcUrl, msgHashes[i], 0);
+            finalizeL1DepositParams[i] = getFinalizeWithdrawalParams(
+                toGateway ? chainId : gatewayChainId,
+                toGateway ? l2RpcUrl : gwRpcUrl,
+                msgHashes[i],
+                0
+            );
         }
         // console.log("msgHashes");
         // console.log(msgHashes.length);
@@ -120,13 +132,12 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         }
     }
 
-    function loadHashesFromStartTokenMigrationFile() public returns (bytes32[] memory) {
-        uint256 l2ChainId = 271;
+    function loadHashesFromStartTokenMigrationFile(uint256 chainOrGatewayChainId) public returns (bytes32[] memory) {
         string memory selector = vm.toString(abi.encodeWithSelector(this.startTokenMigrationOnL2OrGateway.selector));
         // string(bytes4(this.startTokenMigrationOnL2OrGateway.selector))[2:10];
         string memory actualSelector = "0675d915";
         require(compareStrings(selector, string.concat("0x", actualSelector)), "Selector mismatch");
         string memory startMigrationSelector = string.concat("/", actualSelector, "-");
-        return getHashesForChainAndSelector(l2ChainId, startMigrationSelector);
+        return getHashesForChainAndSelector(chainOrGatewayChainId, startMigrationSelector);
     }
 }

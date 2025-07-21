@@ -210,7 +210,9 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         if (!isMinterChain[_tokenOriginChainId][_assetId]) {
             isMinterChain[_tokenOriginChainId][_assetId] = true;
         }
-        _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
+        if (_tokenOriginChainId != L1_CHAIN_ID) {
+            _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
+        }
     }
 
     function _ensureSettlementLayerIsMinter(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
@@ -251,7 +253,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
                 // its just a log and not a message
                 continue;
             }
-            // kl todo we need to process failed deposits here. 
+            // kl todo we need to process failed deposits here.
             if (log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                 ++msgCount;
                 continue;
@@ -363,7 +365,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         });
 
         /// do we want to set this?
-        assetMigrationNumber[_chainId][_assetId] = migrationNumber;
+        // assetMigrationNumber[_chainId][_assetId] = migrationNumber;
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
