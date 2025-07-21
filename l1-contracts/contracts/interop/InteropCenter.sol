@@ -414,50 +414,49 @@ contract InteropCenter is
         bool[] memory attributeUsed = new bool[](ATTRIBUTE_SELECTORS.length);
 
         uint256 attributesLength = _attributes.length;
-        uint256 attributeSelectorsLength = ATTRIBUTE_SELECTORS.length;
         for (uint256 i = 0; i < attributesLength; ++i) {
             bytes4 selector = bytes4(_attributes[i]);
-            /// Finding the matching attribute selector
-            uint256 indexInSelectorsArray = attributeSelectorsLength;
-            for (uint256 j = 0; j < attributeSelectorsLength; ++j) {
-                if (selector == ATTRIBUTE_SELECTORS[j]) {
-                    /// check if the attribute was already set.
-                    require(!attributeUsed[j], AttributeAlreadySet(selector));
-                    attributeUsed[j] = true;
-                    indexInSelectorsArray = j;
-                    break;
-                }
-            }
-            // Revert if the selector does not match any of the known attributes.
-            require(
-                indexInSelectorsArray != attributeSelectorsLength,
-                IERC7786GatewaySource.UnsupportedAttribute(selector)
-            );
-            // Checking whether selectors satisfy the restrictions.
             if (_restriction == AttributeParsingRestrictions.OnlyInteropCallValue) {
-                require(indexInSelectorsArray == 0, AttributeNotForInteropCallValue(selector));
+                require(
+                    selector == IERC7786Attributes.interopCallValue.selector,
+                    AttributeNotForInteropCallValue(selector)
+                );
             }
-            if (indexInSelectorsArray < 2) {
+            if (selector == IERC7786Attributes.interopCallValue.selector) {
+                require(!attributeUsed[0], AttributeAlreadySet(selector));
                 require(
                     _restriction != AttributeParsingRestrictions.OnlyBundleAttributes,
                     AttributeNotForBundle(selector)
                 );
-            } else {
+                attributeUsed[0] = true;
+                callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
+            } else if (selector == IERC7786Attributes.indirectCall.selector) {
+                require(!attributeUsed[1], AttributeAlreadySet(selector));
+                require(
+                    _restriction != AttributeParsingRestrictions.OnlyBundleAttributes,
+                    AttributeNotForBundle(selector)
+                );
+                attributeUsed[1] = true;
+                callAttributes.directCall = false;
+                callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
+            } else if (selector == IERC7786Attributes.executionAddress.selector) {
+                require(!attributeUsed[2], AttributeAlreadySet(selector));
                 require(
                     _restriction != AttributeParsingRestrictions.OnlyInteropCallValue,
                     AttributeNotForCall(selector)
                 );
-            }
-            // setting the attributes
-            if (indexInSelectorsArray == 0) {
-                callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (indexInSelectorsArray == 1) {
-                callAttributes.directCall = false;
-                callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
-            } else if (indexInSelectorsArray == 2) {
+                attributeUsed[2] = true;
                 bundleAttributes.executionAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
-            } else if (indexInSelectorsArray == 3) {
+            } else if (selector == IERC7786Attributes.unbundlerAddress.selector) {
+                require(!attributeUsed[3], AttributeAlreadySet(selector));
+                require(
+                    _restriction != AttributeParsingRestrictions.OnlyInteropCallValue,
+                    AttributeNotForCall(selector)
+                );
+                attributeUsed[3] = true;
                 bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
+            } else {
+                revert IERC7786GatewaySource.UnsupportedAttribute(selector);
             }
         }
     }
