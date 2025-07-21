@@ -298,6 +298,10 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     }
 
     /// @notice Receives cross-chain messages to execute or unbundle interop bundles.
+    ///         The purpose of this function is to serve as a way to execute or unbundle the bundle, when on message/bundle sending the unbundler
+    ///         address was unspecicied. In this case, the unbundler address defaults to the InteroperableAddress of the sender.
+    ///         That means it's possible to initiate execution/unbundle of the bundle only on the source chain. In case of the source
+    ///         chain being different from the destination it's only possible via sending another message to InteropHandler following format specified below.
     /// @dev Implements ERC-7786 recipient interface. The payload must be encoded using abi.encodeCall
     ///      with one of the following function selectors:
     ///      - executeBundle: payload = abi.encodeCall(InteropHandler.executeBundle, (bundle, proof))
