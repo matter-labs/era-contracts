@@ -54,7 +54,6 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             // It's also possible that the caller is InteropHandler itself, in case the execution was initiated through receiveMessage.
             require(
                 (msg.sender == address(this) ||
-                    interopBundle.bundleAttributes.executionAddress.length == 0 ||
                     ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
                 ExecutingNotAllowed(
                     bundleHash,
@@ -361,9 +360,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             );
 
             // Verify sender has execution permission
-            require(
-                interopBundle.bundleAttributes.executionAddress.length == 0 ||
-                    ((executionChainId == senderChainId || executionChainId == 0) && executionAddress == senderAddress),
+            require((executionChainId == senderChainId || executionChainId == 0) && executionAddress == senderAddress,
                 ExecutingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.executionAddress)
             );
         }
