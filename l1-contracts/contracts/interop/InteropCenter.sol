@@ -123,11 +123,11 @@ contract InteropCenter is
         bytes calldata payload,
         bytes[] calldata attributes
     ) external payable whenNotPaused returns (bytes32 sendId) {
-        (uint256 _recipientChainId, address _recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
+        (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(recipient);
 
         require(
-            L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
-            NotL2ToL2(block.chainid, _destinationChainId)
+            L1_CHAIN_ID != block.chainid && recipientChainId != L1_CHAIN_ID,
+            NotL2ToL2(block.chainid, recipientChainId)
         );
 
         (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) = parseAttributes(
@@ -145,7 +145,7 @@ contract InteropCenter is
 
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](1);
         callStartersInternal[0] = InteropCallStarterInternal({
-            to: _destinationAddress,
+            to: recipientAddress,
             data: payload,
             callAttributes: callAttributes
         });
@@ -155,7 +155,7 @@ contract InteropCenter is
         originalCallAttributes[0] = attributes;
 
         bytes32 bundleHash = _sendBundle(
-            _destinationChainId,
+            recipientChainId,
             callStartersInternal,
             bundleAttributes,
             originalCallAttributes
