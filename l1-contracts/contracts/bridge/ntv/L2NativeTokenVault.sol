@@ -269,7 +269,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     }
 
     function _handleChainBalanceDecrease(
-        // uint256 _tokenOriginChainId,
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
