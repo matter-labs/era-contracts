@@ -251,6 +251,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
                 // its just a log and not a message
                 continue;
             }
+            // kl todo we need to process failed deposits here. 
             if (log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                 ++msgCount;
                 continue;

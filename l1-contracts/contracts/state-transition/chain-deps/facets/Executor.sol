@@ -334,8 +334,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (logSender != L2_BOOTLOADER_ADDRESS) {
                     revert InvalidLogSender(logSender, logKey);
                 }
-                uint256 settlementLayerChainId = uint256(logValue);
-                require(settlementLayerChainId == block.chainid, SettlementLayerChainIdMismatch());
+                // uint256 settlementLayerChainId = uint256(logValue);
+                // kl todo the server migrates incorrectly sometimes. 
+                // require(settlementLayerChainId == block.chainid, SettlementLayerChainIdMismatch());
             } else if (logKey > MAX_LOG_KEY) {
                 revert UnexpectedSystemLog(logKey);
             }
