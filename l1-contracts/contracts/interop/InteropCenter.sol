@@ -123,7 +123,7 @@ contract InteropCenter is
         bytes calldata payload,
         bytes[] calldata attributes
     ) external payable whenNotPaused returns (bytes32 sendId) {
-        (uint256 _destinationChainId, address _destinationAddress) = InteroperableAddress.parseEvmV1(recipient);
+        (uint256 _recipientChainId, address _recipientAddress) = InteroperableAddress.parseEvmV1(recipient);
 
         require(
             L1_CHAIN_ID != block.chainid && _destinationChainId != L1_CHAIN_ID,
