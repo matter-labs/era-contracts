@@ -94,7 +94,6 @@ contract InteropCenter is
 
     /// @notice Used to initialize the contract
     ///         This contract is also deployed on L2 as a system contract.
-    ///         On the L2 owner and its related functions will not be used.
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer onlyL1 {
         _transferOwnership(_owner);
