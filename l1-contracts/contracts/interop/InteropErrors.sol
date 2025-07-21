@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.21;
 
-// 0x04bb396e
+// 0x9031f751
 error AttributeAlreadySet(bytes4 selector);
 // 0xcd73770b
 error AttributeNotForBundle(bytes4 selector);
