@@ -21,7 +21,7 @@ import {InteropCallStarter} from "../../common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy, InvalidSelector, PayloadTooShort, ExecuteMessageFailed} from "../../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, Unauthorized, TokenNotLegacy, InvalidSelector, PayloadTooShort, ExecuteMessageFailed} from "../../common/L1ContractErrors.sol";
 import {IERC7786Recipient} from "../../interop/IERC7786Recipient.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
@@ -44,9 +44,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
         if (_originChainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == L1_ASSET_ROUTER, InvalidCaller(msg.sender));
+            require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == L1_ASSET_ROUTER, Unauthorized(msg.sender));
         } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            revert Unauthorized(msg.sender); // xL2 messaging not supported for now
         }
         _;
     }
@@ -56,11 +56,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         if (_chainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && msg.sender != address(this)) {
-                revert InvalidCaller(msg.sender);
+                revert Unauthorized(msg.sender);
             }
         } else {
             if (msg.sender != address(this)) {
-                revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+                revert Unauthorized(msg.sender); // xL2 messaging not supported for now
             }
         }
         _;
@@ -68,12 +68,12 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
     /// @notice Checks that the message sender is the legacy L2 bridge.
     modifier onlyLegacyBridge() {
-        require(msg.sender == L2_LEGACY_SHARED_BRIDGE, InvalidCaller(msg.sender));
+        require(msg.sender == L2_LEGACY_SHARED_BRIDGE, Unauthorized(msg.sender));
         _;
     }
 
     modifier onlyNTV() {
-        require(msg.sender == L2_NATIVE_TOKEN_VAULT_ADDR, InvalidCaller(msg.sender));
+        require(msg.sender == L2_NATIVE_TOKEN_VAULT_ADDR, Unauthorized(msg.sender));
         _;
     }
 
@@ -156,9 +156,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
         require(
-            (sourceChain == L1_CHAIN_ID && senderAddress == L1_ASSET_ROUTER) ||
-                (sourceChain != L1_CHAIN_ID && senderAddress == address(this)),
-            InvalidCaller(senderAddress)
+            (senderChainId == L1_CHAIN_ID && senderAddress == L1_ASSET_ROUTER) ||
+                (senderChainId != L1_CHAIN_ID && senderAddress == address(this)),
+            Unauthorized(senderAddress)
         );
 
         // The payload must contain a valid finalizeDeposit selector to ensure only legitimate

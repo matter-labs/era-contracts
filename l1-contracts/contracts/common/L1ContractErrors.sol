@@ -142,8 +142,6 @@ error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 error InsufficientChainBalanceAssetTracker(uint256 chainId, bytes32 assetId, uint256 amount);
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
-// 0xcbd9d2e0
-error InvalidCaller(address);
 // 0x7a47c9a2
 error InvalidChainId();
 // 0x92daded2

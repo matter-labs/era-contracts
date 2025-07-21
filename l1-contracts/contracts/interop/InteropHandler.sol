@@ -10,7 +10,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready, UnauthorizedMessageSender, WrongDestinationChainId} from "./InteropErrors.sol";
-import {InvalidCaller, InvalidSelector} from "../common/L1ContractErrors.sol";
+import {Unauthorized, InvalidSelector} from "../common/L1ContractErrors.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -316,7 +316,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     ) external payable nonReentrant returns (bytes4) {
         // Verify that call to this function is a result of a call being executed, meaning this message came from a valid bundle.
         // This is the only way receiveMessage can be invoked on InteropHandler by itself.
-        require(msg.sender == address(this), InvalidCaller(msg.sender));
+        require(msg.sender == address(this), Unauthorized(msg.sender));
 
         bytes4 selector = bytes4(payload[:4]);
 
