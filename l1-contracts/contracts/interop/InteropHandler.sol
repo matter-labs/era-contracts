@@ -43,23 +43,26 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             WrongDestinationChainId(bundleHash, interopBundle.destinationChainId, block.chainid)
         );
 
-        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
-            interopBundle.bundleAttributes.executionAddress
-        );
-
-        // Verify that the caller has permission to execute the bundle.
-        // Note, that in case the executionAddress wasn't specified in the bundle then executing is permissionless, as documented in Messaging.sol
-        // It's also possible that the caller is InteropHandler itself, in case the execution was initiated through receiveMessage.
-        require(
-            (msg.sender == address(this) ||
-                interopBundle.bundleAttributes.executionAddress.length == 0 ||
-                ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
-            ExecutingNotAllowed(
-                bundleHash,
-                InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
+        // If the execution address is not specified then the execution is permissionless.
+        if (interopBundle.bundleAttributes.executionAddress.length != 0) {
+            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
                 interopBundle.bundleAttributes.executionAddress
-            )
-        );
+            );
+
+            // Verify that the caller has permission to execute the bundle.
+            // Note, that in case the executionAddress wasn't specified in the bundle then executing is permissionless, as documented in Messaging.sol
+            // It's also possible that the caller is InteropHandler itself, in case the execution was initiated through receiveMessage.
+            require(
+                (msg.sender == address(this) ||
+                    interopBundle.bundleAttributes.executionAddress.length == 0 ||
+                    ((executionChainId == block.chainid || executionChainId == 0) && executionAddress == msg.sender)),
+                ExecutingNotAllowed(
+                    bundleHash,
+                    InteroperableAddress.formatEvmV1(block.chainid, msg.sender),
+                    interopBundle.bundleAttributes.executionAddress
+                )
+            );
+        }
 
         // We shouldn't process bundles which are either fully executed, or were unbundled here.
         // If the bundle if fully executed, it's not expected that anything else should be done with the bundle, it's finalized already.
@@ -351,16 +354,19 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // Decode the bundle to get execution permissions
         (InteropBundle memory interopBundle, , ) = _getBundleData(bundle, proof.chainId);
 
-        (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
-            interopBundle.bundleAttributes.executionAddress
-        );
+        // If the execution address is not specified then the execution is permissionless.
+        if (interopBundle.bundleAttributes.executionAddress.length != 0) {
+            (uint256 executionChainId, address executionAddress) = InteroperableAddress.parseEvmV1(
+                interopBundle.bundleAttributes.executionAddress
+            );
 
-        // Verify sender has execution permission
-        require(
-            interopBundle.bundleAttributes.executionAddress.length == 0 ||
-                ((executionChainId == senderChainId || executionChainId == 0) && executionAddress == senderAddress),
-            ExecutingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.executionAddress)
-        );
+            // Verify sender has execution permission
+            require(
+                interopBundle.bundleAttributes.executionAddress.length == 0 ||
+                    ((executionChainId == senderChainId || executionChainId == 0) && executionAddress == senderAddress),
+                ExecutingNotAllowed(keccak256(bundle), sender, interopBundle.bundleAttributes.executionAddress)
+            );
+        }
 
         this.executeBundle(bundle, proof);
     }
