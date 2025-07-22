@@ -42,7 +42,7 @@ remappings = [
     "l2-contracts/=../l2-contracts/contracts/",
     "@openzeppelin/contracts-v4/=lib/openzeppelin-contracts-v4/contracts/",
     "@openzeppelin/contracts-upgradeable-v4/=lib/openzeppelin-contracts-upgradeable-v4/contracts/",
-    "@openzeppelin/contracts-master/=../lib/openzeppelin-contracts-master/contracts/",
+    "@openzeppelin/contracts-master/=lib/openzeppelin-contracts-master/contracts/",
 ]
 optimizer = true
 optimizer_runs = 9999999
