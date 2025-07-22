@@ -410,10 +410,8 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+            return abi.encode(addresses.stateTransition.verifierFflonk);
         } else if (compareStrings(contractName, "VerifierFflonk")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();

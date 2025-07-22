@@ -13,10 +13,8 @@ import {PrepareL1L2TransactionParams, StateTransitionDeployedAddresses, Utils} f
 import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IBridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -668,7 +666,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "verifier_fflonk_addr", addresses.stateTransition.verifierFflonk);
-        vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
             "default_upgrade_addr",
@@ -736,15 +733,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             gatewayConfig.gatewayStateTransition.genesisUpgrade
         );
         vm.serializeAddress("gateway_state_transition", "verifier_addr", gatewayConfig.gatewayStateTransition.verifier);
-        vm.serializeAddress(
+        string memory gateway_state_transition = vm.serializeAddress(
             "gateway_state_transition",
             "verifier_fflonk_addr",
             gatewayConfig.gatewayStateTransition.verifierFflonk
-        );
-        string memory gateway_state_transition = vm.serializeAddress(
-            "gateway_state_transition",
-            "verifier_plonk_addr",
-            gatewayConfig.gatewayStateTransition.verifierPlonk
         );
 
         vm.serializeBytes("gateway", "diamond_cut_data", gatewayConfig.facetCutsData);
@@ -1089,7 +1081,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         require(upgradeConfig.initialized, "Not initialized");
 
         gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
         gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
 
         gatewayConfig.gatewayStateTransition.executorFacet = deployGWContract("ExecutorFacet");
@@ -1507,13 +1498,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             }
         } else if (compareStrings(contractName, "Verifier")) {
             if (!isZKBytecode) {
-                return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+                return abi.encode(addresses.stateTransition.verifierFflonk);
             } else {
-                return
-                    abi.encode(
-                        gatewayConfig.gatewayStateTransition.verifierFflonk,
-                        gatewayConfig.gatewayStateTransition.verifierPlonk
-                    );
+                return abi.encode(gatewayConfig.gatewayStateTransition.verifierFflonk);
             }
         } else if (compareStrings(contractName, "AdminFacet")) {
             if (!isZKBytecode) {

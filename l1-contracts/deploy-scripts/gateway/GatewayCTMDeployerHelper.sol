@@ -192,12 +192,10 @@ library GatewayCTMDeployerHelper {
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
         address verifierFflonk = _deployInternal("L1VerifierFflonk", "L1VerifierFflonk.sol", hex"", innerConfig);
-        address verifierPlonk = _deployInternal("L1VerifierPlonk", "L1VerifierPlonk.sol", hex"", innerConfig);
 
         _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
-        _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
 
-        bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk);
+        bytes memory constructorParams = abi.encode(verifierFflonk);
 
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(
@@ -208,8 +206,8 @@ library GatewayCTMDeployerHelper {
             );
         } else {
             _deployedContracts.stateTransition.verifier = _deployInternal(
-                "DualVerifier",
-                "DualVerifier.sol",
+                "L1VerifierFflonk",
+                "L1VerifierFflonk.sol",
                 constructorParams,
                 innerConfig
             );
@@ -374,7 +372,7 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
         // Include both verifiers since we cannot determine which one will be used
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");

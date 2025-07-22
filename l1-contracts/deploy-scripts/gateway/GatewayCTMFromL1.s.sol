@@ -161,7 +161,6 @@ contract GatewayCTMFromL1 is Script {
                 chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                 verifier: expectedGatewayContracts.stateTransition.verifier,
                 verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
-                verifierPlonk: expectedGatewayContracts.stateTransition.verifierPlonk,
                 adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
                 mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
                 executorFacet: expectedGatewayContracts.stateTransition.executorFacet,
@@ -392,8 +391,6 @@ contract GatewayCTMFromL1 is Script {
             _deployInternal(ContractsBytecodesLib.getCreationCode("VerifierFflonk"), hex"")
         );
         console.log("VerifierFflonk deployed at", verifierFflonk);
-        address verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("VerifierPlonk"), hex""));
-        console.log("VerifierPlonk deployed at", verifierPlonk);
 
         if (config.testnetVerifier) {
             verifier = address(
@@ -401,10 +398,7 @@ contract GatewayCTMFromL1 is Script {
             );
         } else {
             verifier = address(
-                _deployInternal(
-                    ContractsBytecodesLib.getCreationCode("DualVerifier"),
-                    abi.encode(verifierFflonk, verifierPlonk)
-                )
+                _deployInternal(ContractsBytecodesLib.getCreationCode("VerifierFflonk"), abi.encode(verifierFflonk))
             );
         }
 

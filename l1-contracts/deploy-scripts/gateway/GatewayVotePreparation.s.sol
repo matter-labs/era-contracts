@@ -216,7 +216,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 chainTypeManagerImplementation: expectedGatewayContracts.stateTransition.chainTypeManagerImplementation,
                 verifier: expectedGatewayContracts.stateTransition.verifier,
                 verifierFflonk: expectedGatewayContracts.stateTransition.verifierFflonk,
-                verifierPlonk: expectedGatewayContracts.stateTransition.verifierPlonk,
                 adminFacet: expectedGatewayContracts.stateTransition.adminFacet,
                 mailboxFacet: expectedGatewayContracts.stateTransition.mailboxFacet,
                 executorFacet: expectedGatewayContracts.stateTransition.executorFacet,

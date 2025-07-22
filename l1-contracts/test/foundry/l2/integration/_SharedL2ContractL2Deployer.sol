@@ -19,7 +19,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
+import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -52,9 +52,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
         addresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
-        addresses.stateTransition.verifier = address(
-            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
-        );
+        addresses.stateTransition.verifier = address(new TestnetVerifier(address(0)));
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         addresses.stateTransition.validatorTimelock = address(
             new TransparentUpgradeableProxy(

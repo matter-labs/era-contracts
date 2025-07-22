@@ -33,8 +33,6 @@ import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
 import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
@@ -213,7 +211,6 @@ contract DeployL1Script is Script, DeployUtils {
 
     function deployVerifiers() internal {
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
-        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
     }
 
@@ -743,12 +740,10 @@ contract DeployL1Script is Script, DeployUtils {
                 if (config.testnetVerifier) {
                     return type(TestnetVerifier).creationCode;
                 } else {
-                    return type(DualVerifier).creationCode;
+                    return type(L1VerifierFflonk).creationCode;
                 }
             } else if (compareStrings(contractName, "VerifierFflonk")) {
                 return type(L1VerifierFflonk).creationCode;
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return type(L1VerifierPlonk).creationCode;
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
@@ -790,7 +785,7 @@ contract DeployL1Script is Script, DeployUtils {
                 if (config.testnetVerifier) {
                     return getCreationCode("TestnetVerifier", true);
                 } else {
-                    return getCreationCode("DualVerifier", true);
+                    return getCreationCode("VerifierFflonk", true);
                 }
             }
         }

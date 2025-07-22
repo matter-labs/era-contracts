@@ -55,7 +55,6 @@ struct StateTransitionDeployedAddresses {
     address chainTypeManagerImplementation;
     address verifier;
     address verifierFflonk;
-    address verifierPlonk;
     address adminFacet;
     address mailboxFacet;
     address executorFacet;
