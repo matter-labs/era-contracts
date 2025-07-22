@@ -493,7 +493,7 @@ contract InteropCenter is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Parses the attributes of the call or bundle.
-    /// @param _attributes EIP-7786 Attributes of the call or bundle.
+    /// @param _attributes ERC-7786 Attributes of the call or bundle.
     /// @param _restriction Restriction for parsing attributes.
     function parseAttributes(
         bytes[] calldata _attributes,
