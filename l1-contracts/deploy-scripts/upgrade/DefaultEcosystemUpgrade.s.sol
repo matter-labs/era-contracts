@@ -93,6 +93,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
      */
     bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
 
+    uint256 internal constant MAX_ADDITIONAL_DELAY = 2 weeks;
+
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         ExpectedL2Addresses expectedL2Addresses;
@@ -134,7 +136,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         bytes upgradeCutData;
     }
 
-    // TODO: this struct is used for gateway-related data as well, this should be fixed.
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
         bytes fixedForceDeploymentsData;
@@ -176,7 +177,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Full default upgrade preparation flow
     function prepareEcosystemUpgrade() public virtual {
-        deployNewEcosystemContracts();
+        deployNewEcosystemContractsL1();
         console.log("Ecosystem contracts are deployed!");
         deployNewEcosystemContractsGW();
         console.log("Ecosystem contracts for GW are deployed!");
@@ -191,7 +192,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     /// @notice Deploy everything that should be deployed
-    function deployNewEcosystemContracts() public virtual {
+    function deployNewEcosystemContractsL1() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
         instantiateCreate2Factory();
@@ -202,6 +203,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         // Note, that this is the upgrade that will be used, despite the naming of the variable here.
         // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
+
+        // TODO(refactor): rename to "upgrade contract", it is not a default upgrade.
         (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
@@ -210,6 +213,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
         addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault", false);
+        addresses.bridges.erc20BridgeImplementation = deploySimpleContract("L1ERC20Bridge", false);
+        addresses.bridges.bridgedStandardERC20Implementation = deploySimpleContract("BridgedStandardERC20", false);
 
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
         addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
@@ -222,12 +227,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         /// for forge verification.
         deploySimpleContract("DiamondProxy", false);
 
-        deployUpgradeSpecificContracts();
+        deployUpgradeSpecificContractsL1();
 
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
-    function deployUpgradeSpecificContracts() internal virtual {
+    function deployUpgradeSpecificContractsL1() internal virtual {
         // Empty by default.
     }
 
@@ -300,6 +305,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition);
         generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
+        upgradeConfig.upgradeCutPrepared = true;
         console.log("UpgradeCutGenerated");
         saveOutput(upgradeConfig.outputPath);
     }
@@ -419,7 +425,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         if (!stateTransition.isOnGateway) {
             newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
-            upgradeConfig.upgradeCutPrepared = true;
         } else {
             gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         }
@@ -503,15 +508,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         addresses.transparentProxyAdmin = address(
             uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
         );
-        // TODO: not sure it is okay.
-        // addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
-
-        addresses.protocolUpgradeHandlerProxy = Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner();
-        // require(
-        //     Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() ==
-        //         addresses.protocolUpgradeHandlerProxy,
-        //     "Incorrect ProtocolUpgradeHandlerProxy"
-        // );
         require(
             Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
             "Incorrect owner"
@@ -613,6 +609,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
 
+        addresses.bridges.bridgedTokenBeacon = address(
+            L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy)).bridgedTokenBeacon()
+        );
+
         address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
         (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
@@ -674,9 +674,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
             chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             l2SharedBridgeLegacyImpl: address(0),
-            // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),
-            // upgradeAddresses.expectedL2Addresses.l2BridgedStandardERC20Impl,
             dangerousTestOnlyForcedBeacon: address(0)
         });
     }
@@ -986,7 +984,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
-        vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
         vm.serializeUint(
             "root",
             "governance_upgrade_timer_initial_delay",
@@ -1217,10 +1214,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
 
-        deployUpgradeSpecificContractGW();
+        deployUpgradeSpecificContractsGW();
     }
 
-    function deployUpgradeSpecificContractGW() internal virtual {
+    function deployUpgradeSpecificContractsGW() internal virtual {
         // Empty by default.
     }
 
@@ -1270,7 +1267,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         uint256 deadline = getOldProtocolDeadline();
         uint256 newProtocolVersion = getNewProtocolVersion();
         Diamond.DiamondCutData memory upgradeCut = generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
-        gatewayConfig.upgradeCutData = abi.encode(upgradeCut);
 
         bytes memory l2Calldata = abi.encodeCall(
             ChainTypeManager.setNewVersionUpgrade,
@@ -1467,7 +1463,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](7);
+        calls = new Call[](9);
 
         calls[0] = _buildCallProxyUpgrade(
             addresses.stateTransition.chainTypeManagerProxy,
@@ -1504,6 +1500,16 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             addresses.bridgehub.ctmDeploymentTrackerProxy,
             addresses.bridgehub.ctmDeploymentTrackerImplementation
         );
+
+        calls[7] = _buildCallProxyUpgrade(
+            addresses.bridges.erc20BridgeProxy,
+            addresses.bridges.erc20BridgeImplementation
+        );
+
+        calls[8] = _buildCallBeaconProxyUpgrade(
+            addresses.bridges.bridgedTokenBeacon,
+            addresses.bridges.bridgedStandardERC20Implementation
+        );
     }
 
     function _buildCallProxyUpgrade(
@@ -1517,6 +1523,20 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
                 (ITransparentUpgradeableProxy(payable(proxyAddress)), newImplementationAddress)
+            ),
+            value: 0
+        });
+    }
+
+    function _buildCallBeaconProxyUpgrade(
+        address proxyAddress,
+        address newImplementationAddress
+    ) internal virtual returns (Call memory call) {
+        call = Call({
+            target: proxyAddress,
+            data: abi.encodeCall(
+                UpgradeableBeacon.upgradeTo,
+                (newImplementationAddress)
             ),
             value: 0
         });
@@ -1621,8 +1641,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             return abi.encode(config.ownerAddress);
         } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
             uint256 initialDelay = newConfig.governanceUpgradeTimerInitialDelay;
-            uint256 maxAdditionalDelay = 2 weeks;
-            return abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, newConfig.ecosystemAdminAddress);
+            return abi.encode(initialDelay, MAX_ADDITIONAL_DELAY, config.ownerAddress, newConfig.ecosystemAdminAddress);
         } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L2StandardERC20")) {

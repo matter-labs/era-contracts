@@ -51,6 +51,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @dev The validatorTimelock contract address.
     /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It will be deprecated after v29 upgrade.
+    /// We kept both validatorTimelock and validatorTimelockPostV29 for backward compatibility of nodes that rely on the validatorTimelock address being available.
     address public validatorTimelock;
 
     /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
@@ -240,7 +241,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    /// @dev set validatorTimelock. Cannot do it during initialization, as validatorTimelock is deployed after CTM
+    /// @dev set legacy validatorTimelock.
     /// @dev Note, that the validator timelock that this function sets is only used for pre-v29 protocol versions.
     /// It is kept only for convenience.
     /// @param _validatorTimelock the new validatorTimelock address
@@ -250,7 +251,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
     }
 
-    /// @dev set the post-V29 upgradeable validatorTimelock
+    /// @dev set the post-V29 validator timelock. Cannot do it during initialization, as validatorTimelockPostV29 is deployed after CTM.
     /// @param _validatorTimelockPostV29 the new post-V29 upgradeable validatorTimelock address
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external onlyOwner {
         address oldvalidatorTimelockPostV29 = validatorTimelockPostV29;

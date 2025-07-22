@@ -614,9 +614,6 @@ contract DeployL1Script is Script, DeployUtils {
         address proxyAdmin,
         bool isZKBytecode
     ) internal returns (address implementation, address proxy) {
-        // TODO: just remove the param
-        require(!isZKBytecode, "ZK bytecode is not supported for this contract");
-
         implementation = deployViaCreate2AndNotify(
             getCreationCode(contractName, false),
             getCreationCalldata(contractName, false),

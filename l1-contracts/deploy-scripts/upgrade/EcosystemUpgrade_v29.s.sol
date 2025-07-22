@@ -150,8 +150,8 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         return super.getCreationCalldata(contractName, isZKBytecode);
     }
 
-    function deployUpgradeSpecificContracts() internal override {
-        super.deployUpgradeSpecificContracts();
+    function deployUpgradeSpecificContractsL1() internal override {
+        super.deployUpgradeSpecificContractsL1();
 
         (
             addresses.bridgehub.chainAssetHandlerImplementation,
@@ -164,8 +164,8 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         ) = deployTuppWithContract("ValidatorTimelock", false);
     }
 
-    function deployUpgradeSpecificContractGW() internal override {
-        super.deployUpgradeSpecificContractGW();
+    function deployUpgradeSpecificContractsGW() internal override {
+        super.deployUpgradeSpecificContractsGW();
         
         gatewayConfig.gatewayStateTransition.validatorTimelock = deployGWTuppWithContract("ValidatorTimelock");
     }
@@ -186,25 +186,25 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     /// @notice Additional calls to newConfigure contracts
-    function prepareSetValidatorTimelockPostV29ic virtual returns (Call[] memory calls) {
+    function prepareSetValidatorTimelockPostV29L1() internal virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
         calls[0] = Call({
             target: addresses.stateTransition.chainTypeManagerProxy,
             data: abi.encodeCall(
-                IChainTypeManager.setValidatorTimelockPostV29
+                IChainTypeManager.setValidatorTimelockPostV29,
                 (addresses.stateTransition.validatorTimelock)
             ),
             value: 0
         });
     }
 
-    function prepareSetValidatorTimelockPostV29
+    function prepareSetValidatorTimelockPostV29GW(
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
-            IChainTypeManager.setValidatorTimelockPostV29
+            IChainTypeManager.setValidatorTimelockPostV29,
             (gatewayConfig.gatewayStateTransition.validatorTimelock)
         );
 
@@ -221,13 +221,15 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         uint256 maxExpectedL1GasPrice
     ) public override returns (Call[] memory calls) {
         // TODO: include call to set the new chain asset handler address on GW
-        return prepareSetValidatorTimelockPostV29rityTxsL2GasLimit, maxExpectedL1GasPrice);
+        return prepareSetValidatorTimelockPostV29GW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
     }
 
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](2);
-        allCalls[0] = prepareSetValidatorTimelockPostV29
-        allCalls[1] = prepareSetCtmAssetHandlerAddressOnL1Call();
+        Call[][] memory allCalls = new Call[][](3);
+        allCalls[0] = prepareSetValidatorTimelockPostV29L1();
+        // TODO: ensure that this same thing is done on GW.
+        allCalls[1] = prepareSetChainAssetHandlerOnBridgehubCall();
+        allCalls[2] = prepareSetCtmAssetHandlerAddressOnL1Call();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -249,6 +251,15 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
                 CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1,
                 (addresses.stateTransition.chainTypeManagerProxy)
             ),
+            value: 0
+        });
+    }
+
+    function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: addresses.bridgehub.bridgehubProxy,
+            data: abi.encodeCall(Bridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
             value: 0
         });
     }
