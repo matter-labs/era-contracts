@@ -2,10 +2,10 @@
 
 pragma solidity 0.8.28;
 
-import {SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
-import {ISystemContext} from "./interfaces/ISystemContext.sol";
+import {SYSTEM_CONTEXT_CONTRACT} from "../Constants.sol";
+import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {InvalidChainId} from "contracts/SystemContractErrors.sol";
-import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
+import {IL2GenesisUpgrade} from "../interfaces/IL2GenesisUpgrade.sol";
 
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
 
