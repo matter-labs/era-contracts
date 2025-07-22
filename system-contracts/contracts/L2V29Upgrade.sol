@@ -59,16 +59,13 @@ contract L2V29Upgrade {
         // Get the current L2 Brigehub owner.
         address owner = IBridgehub(L2_BRIDGE_HUB).owner();
 
-        // Get the l1CtmDeployer from L2 Bridgehub. It doesn't change, so we get it here for simplicity.
-        address l1CtmDeployer = IBridgehub(L2_BRIDGE_HUB).l1CtmDeployer();
-
         // Call L2 Bridgehub out of it's owner's name to setAddresses.
         SystemContractHelper.mimicCallWithPropagatedRevert(
             address(L2_BRIDGE_HUB),
             owner,
             abi.encodeCall(
-                IBridgehub.setAddresses,
-                (address(L2_ASSET_ROUTER), l1CtmDeployer, address(L2_MESSAGE_ROOT), L2_CHAIN_ASSET_HANDLER)
+                IBridgehub.setChainAssetHandler,
+                (L2_CHAIN_ASSET_HANDLER)
             )
         );
     }
