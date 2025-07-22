@@ -3,12 +3,8 @@ pragma solidity ^0.8.21;
 
 // 0x9031f751
 error AttributeAlreadySet(bytes4 selector);
-// 0xcd73770b
-error AttributeNotForBundle(bytes4 selector);
-// 0x2531ea93
-error AttributeNotForCall(bytes4 selector);
-// 0xec11242f
-error AttributeNotForInteropCallValue(bytes4 selector);
+// 0xbcb41ec7
+error AttributeViolatesRestriction(bytes4 selector, uint256 restriction);
 // 0x5bba5111
 error BundleAlreadyProcessed(bytes32 bundleHash);
 // 0xa43d2953

@@ -20,7 +20,7 @@ import {MsgValueMismatch, Unauthorized, NotL1, NotL2ToL2} from "../common/L1Cont
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle, IndirectCallValueMismatch} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -423,7 +423,7 @@ contract InteropCenter is
                     _restriction == AttributeParsingRestrictions.OnlyInteropCallValue ||
                         _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
                         _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeNotForBundle(selector)
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[0] = true;
                 callAttributes.interopCallValue = AttributesDecoder.decodeUint256(_attributes[i]);
@@ -432,7 +432,7 @@ contract InteropCenter is
                 require(
                     _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
                         _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeNotForBundle(selector)
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[1] = true;
                 callAttributes.directCall = false;
@@ -442,7 +442,7 @@ contract InteropCenter is
                 require(
                     _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
                         _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeNotForCall(selector)
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[2] = true;
                 bundleAttributes.executionAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
@@ -451,7 +451,7 @@ contract InteropCenter is
                 require(
                     _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
                         _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
-                    AttributeNotForCall(selector)
+                    AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[3] = true;
                 bundleAttributes.unbundlerAddress = AttributesDecoder.decodeInteroperableAddress(_attributes[i]);
