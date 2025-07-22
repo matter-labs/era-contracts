@@ -535,7 +535,8 @@ contract InteropCenter is
             } else if (selector == IERC7786Attributes.executionAddress.selector) {
                 require(!attributeUsed[2], AttributeAlreadySet(selector));
                 require(
-                    _restriction != AttributeParsingRestrictions.OnlyInteropCallValue,
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                    _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeNotForCall(selector)
                 );
                 attributeUsed[2] = true;
@@ -543,7 +544,8 @@ contract InteropCenter is
             } else if (selector == IERC7786Attributes.unbundlerAddress.selector) {
                 require(!attributeUsed[3], AttributeAlreadySet(selector));
                 require(
-                    _restriction != AttributeParsingRestrictions.OnlyInteropCallValue,
+                    _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
+                    _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeNotForCall(selector)
                 );
                 attributeUsed[3] = true;
