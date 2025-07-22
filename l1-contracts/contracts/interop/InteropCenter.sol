@@ -509,16 +509,13 @@ contract InteropCenter is
         uint256 attributesLength = _attributes.length;
         for (uint256 i = 0; i < attributesLength; ++i) {
             bytes4 selector = bytes4(_attributes[i]);
-            if (_restriction == AttributeParsingRestrictions.OnlyInteropCallValue) {
-                require(
-                    selector == IERC7786Attributes.interopCallValue.selector,
-                    AttributeNotForInteropCallValue(selector)
-                );
-            }
+
             if (selector == IERC7786Attributes.interopCallValue.selector) {
                 require(!attributeUsed[0], AttributeAlreadySet(selector));
                 require(
-                    _restriction != AttributeParsingRestrictions.OnlyBundleAttributes,
+                    _restriction == AttributeParsingRestrictions.OnlyInteropCallValue ||
+                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
+                    _restriction == AttributeParsingRestrictions.CallAndBundleAttributes
                     AttributeNotForBundle(selector)
                 );
                 attributeUsed[0] = true;
@@ -526,7 +523,8 @@ contract InteropCenter is
             } else if (selector == IERC7786Attributes.indirectCall.selector) {
                 require(!attributeUsed[1], AttributeAlreadySet(selector));
                 require(
-                    _restriction != AttributeParsingRestrictions.OnlyBundleAttributes,
+                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
+                    _restriction == AttributeParsingRestrictions.CallAndBundleAttributes
                     AttributeNotForBundle(selector)
                 );
                 attributeUsed[1] = true;
