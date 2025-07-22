@@ -235,6 +235,10 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         return deploySimpleContract("L1V29Upgrade", false);
     }
 
+    function deployUsedUpgradeContractGW() internal override returns (address) {
+        return deployGWContract("L1V29Upgrade");
+    }
+
     /// @notice Sets ctm asset handler address on L1. We need to update it because of ChainAssetHandler appearance.
     function prepareSetCtmAssetHandlerAddressOnL1Call() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);

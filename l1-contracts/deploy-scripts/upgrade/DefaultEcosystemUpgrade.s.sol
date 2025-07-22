@@ -134,6 +134,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         bytes upgradeCutData;
     }
 
+    // TODO: this struct is used for gateway-related data as well, this should be fixed.
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
         bytes fixedForceDeploymentsData;
@@ -992,7 +993,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             newConfig.governanceUpgradeTimerInitialDelay
         );
 
-        vm.serializeBytes("root", "gateway_diamond_cut", newlyGeneratedData.upgradeCutData); /// kl todo
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);

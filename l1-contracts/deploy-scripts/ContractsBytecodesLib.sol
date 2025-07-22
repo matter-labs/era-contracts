@@ -43,7 +43,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[37] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[38] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
@@ -80,7 +80,8 @@ library ContractsBytecodesLib {
             "ServerNotifier", // ???
             "ValidatorTimelock",
             "ValidiumL1DAValidator", // ???
-            "L2MessageVerification"
+            "L2MessageVerification",
+            "L1V29Upgrade"
         ];
 
         string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
