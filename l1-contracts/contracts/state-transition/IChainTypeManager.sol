@@ -62,10 +62,10 @@ interface IChainTypeManager {
     /// @notice ValidatorTimelock changed
     event NewValidatorTimelock(address indexed oldValidatorTimelock, address indexed newValidatorTimelock);
 
-    /// @notice PostV29UpgradeableValidatorTimelock changed
-    event NewPostV29UpgradeableValidatorTimelock(
-        address indexed oldPostV29UpgradeableValidatorTimelock,
-        address indexed newPostV29UpgradeableValidatorTimelock
+    /// @notice validatorTimelockPostV29 changed
+    event NewValidatorTimelockPostV29(
+        address indexed oldvalidatorTimelockPostV29,
+        address indexed newvalidatorTimelockPostV29
     );
 
     /// @notice ServerNotifier changed
@@ -127,7 +127,7 @@ interface IChainTypeManager {
 
     function setLegacyValidatorTimelock(address _validatorTimelock) external;
 
-    function setPostV29UpgradeableValidatorTimelock(address _postV29UpgradeableValidatorTimelock) external;
+    function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external;
 
     function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external;
 

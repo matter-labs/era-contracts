@@ -186,25 +186,25 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     /// @notice Additional calls to newConfigure contracts
-    function prepareSetPostV29UpgradeableValidatorTimelockCall() public virtual returns (Call[] memory calls) {
+    function prepareSetValidatorTimelockPostV29ic virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
         calls[0] = Call({
             target: addresses.stateTransition.chainTypeManagerProxy,
             data: abi.encodeCall(
-                IChainTypeManager.setPostV29UpgradeableValidatorTimelock,
+                IChainTypeManager.setValidatorTimelockPostV29
                 (addresses.stateTransition.validatorTimelock)
             ),
             value: 0
         });
     }
 
-    function prepareSetPostV29UpgradeableValidatorTimelockCallGW(
+    function prepareSetValidatorTimelockPostV29
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
-            IChainTypeManager.setPostV29UpgradeableValidatorTimelock,
+            IChainTypeManager.setValidatorTimelockPostV29
             (gatewayConfig.gatewayStateTransition.validatorTimelock)
         );
 
@@ -221,12 +221,12 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         uint256 maxExpectedL1GasPrice
     ) public override returns (Call[] memory calls) {
         // TODO: include call to set the new chain asset handler address on GW
-        return prepareSetPostV29UpgradeableValidatorTimelockCallGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        return prepareSetValidatorTimelockPostV29rityTxsL2GasLimit, maxExpectedL1GasPrice);
     }
 
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](2);
-        allCalls[0] = prepareSetPostV29UpgradeableValidatorTimelockCall();
+        allCalls[0] = prepareSetValidatorTimelockPostV29
         allCalls[1] = prepareSetCtmAssetHandlerAddressOnL1Call();
         calls = mergeCallsArray(allCalls);
     }

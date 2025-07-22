@@ -69,7 +69,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     address public serverNotifierAddress;
 
     /// @dev The address of the post-V29 upgradeable validatorTimelock
-    address public postV29UpgradeableValidatorTimelock;
+    address public validatorTimelockPostV29;
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -151,7 +151,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         protocolVersion = _initializeData.protocolVersion;
         _setProtocolVersionDeadline(_initializeData.protocolVersion, type(uint256).max);
-        postV29UpgradeableValidatorTimelock = _initializeData.validatorTimelock;
+        validatorTimelockPostV29 = _initializeData.validatorTimelock;
         serverNotifierAddress = _initializeData.serverNotifier;
 
         _setChainCreationParams(_initializeData.chainCreationParams);
@@ -251,13 +251,13 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     }
 
     /// @dev set the post-V29 upgradeable validatorTimelock
-    /// @param _postV29UpgradeableValidatorTimelock the new post-V29 upgradeable validatorTimelock address
-    function setPostV29UpgradeableValidatorTimelock(address _postV29UpgradeableValidatorTimelock) external onlyOwner {
-        address oldPostV29UpgradeableValidatorTimelock = postV29UpgradeableValidatorTimelock;
-        postV29UpgradeableValidatorTimelock = _postV29UpgradeableValidatorTimelock;
-        emit NewPostV29UpgradeableValidatorTimelock(
-            oldPostV29UpgradeableValidatorTimelock,
-            _postV29UpgradeableValidatorTimelock
+    /// @param _validatorTimelockPostV29 the new post-V29 upgradeable validatorTimelock address
+    function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external onlyOwner {
+        address oldvalidatorTimelockPostV29 = validatorTimelockPostV29;
+        validatorTimelockPostV29 = _validatorTimelockPostV29;
+        emit NewValidatorTimelockPostV29(
+            oldvalidatorTimelockPostV29,
+            _validatorTimelockPostV29
         );
     }
 
