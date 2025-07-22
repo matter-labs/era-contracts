@@ -103,8 +103,6 @@ error EmptyData();
 error EmptyDeposit();
 // 0x84286507
 error EmptyPrecommitData(uint256 batchNumber);
-// 0x456f8f7a
-error EmptyProofLength();
 // 0x627e0872
 error ETHDepositNotSupported();
 // 0xac4a3f98
@@ -338,8 +336,6 @@ error Unauthorized(address caller);
 error UndefinedDiamondCutAction();
 // 0x6aa39880
 error UnexpectedSystemLog(uint256 logKey);
-// 0xc352bb73
-error UnknownVerifierType();
 // 0xf3dd1b9c
 error UnsupportedCommitBatchEncoding(uint8 version);
 // 0x084a1449
