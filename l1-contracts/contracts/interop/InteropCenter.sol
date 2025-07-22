@@ -143,19 +143,16 @@ contract InteropCenter is
             callAttributes: callAttributes
         });
 
-        // Separate call and bundle attributes from the mixed attributes array
-        (
-            bytes[][] memory originalCallAttributes,
-            bytes[] memory originalBundleAttributes
-        ) = _separateCallAndBundleAttributes(attributes);
+        // Prepare original attributes array for the single call
+        bytes[][] memory originalCallAttributes = new bytes[][](1);
+        originalCallAttributes[0] = attributes;
 
-        bytes32 bundleHash = _sendBundle({
-            _destinationChainId: recipientChainId,
-            _callStarters: callStartersInternal,
-            _bundleAttributes: bundleAttributes,
-            _originalCallAttributes: originalCallAttributes,
-            _originalBundleAttributes: originalBundleAttributes
-        });
+        bytes32 bundleHash = _sendBundle(
+            recipientChainId,
+            callStartersInternal,
+            bundleAttributes,
+            originalCallAttributes
+        );
 
         // We return the sendId of the only message that was sent in the bundle above. We always send messages in bundles, even if there's only one message being sent.
         // Note, that bundleHash is unique for every bundle. Each sendId is determined as keccak256 of bundleHash where the message (call) is contained,
@@ -215,8 +212,7 @@ contract InteropCenter is
             _destinationChainId: _destinationChainId,
             _callStarters: callStartersInternal,
             _bundleAttributes: bundleAttributes,
-            _originalCallAttributes: originalCallAttributes,
-            _originalBundleAttributes: _bundleAttributes
+            _originalCallAttributes: originalCallAttributes
         });
     }
 
@@ -258,14 +254,12 @@ contract InteropCenter is
     /// @param _callStarters Array of InteropCallStarterInternal structs, corresponding to the calls in bundle.
     /// @param _bundleAttributes Attributes of the bundle.
     /// @param _originalCallAttributes Original ERC-7786 attributes for each call to emit in MessageSent events.
-    /// @param _originalBundleAttributes Original ERC-7786 bundle attributes to emit in MessageSent events.
     /// @return bundleHash Hash of the sent bundle.
     function _sendBundle(
         uint256 _destinationChainId,
         InteropCallStarterInternal[] memory _callStarters,
         BundleAttributes memory _bundleAttributes,
-        bytes[][] memory _originalCallAttributes,
-        bytes[] memory _originalBundleAttributes
+        bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
         // This will calculate how much value does all of the calls use cumulatively.
         uint256 totalCallsValue;
@@ -305,105 +299,18 @@ contract InteropCenter is
         // Emit ERC-7786 MessageSent event for each call in the bundle
         for (uint256 i = 0; i < callStartersLength; ++i) {
             InteropCall memory currentCall = bundle.calls[i];
-
-            // Create concatenated attributes array (call attributes + bundle attributes)
-            bytes[] memory concatenatedAttributes = _concatenateAttributes(
-                _originalCallAttributes[i],
-                _originalBundleAttributes
-            );
-
             emit MessageSent({
                 sendId: keccak256(abi.encodePacked(bundleHash, i)),
                 sender: InteroperableAddress.formatEvmV1(block.chainid, currentCall.from),
                 recipient: InteroperableAddress.formatEvmV1(_destinationChainId, currentCall.to),
                 payload: _callStarters[i].data,
                 value: _callStarters[i].callAttributes.interopCallValue,
-                attributes: concatenatedAttributes
+                attributes: _originalCallAttributes[i]
             });
         }
 
         // Emit event stating that the bundle was sent out successfully.
         emit InteropBundleSent(msgHash, bundleHash, bundle);
-    }
-
-    /// @notice Concatenates call attributes with bundle attributes for ERC-7786 event emission.
-    /// @param _callAttributes The original call attributes.
-    /// @param _bundleAttributes The original bundle attributes.
-    /// @return concatenated The concatenated attributes array.
-    function _concatenateAttributes(
-        bytes[] memory _callAttributes,
-        bytes[] memory _bundleAttributes
-    ) internal pure returns (bytes[] memory concatenated) {
-        // Create concatenated array
-        concatenated = new bytes[](_callAttributes.length + _bundleAttributes.length);
-
-        // Copy call attributes first
-        uint256 callAttributesLength = _callAttributes.length;
-        for (uint256 i = 0; i < callAttributesLength; ++i) {
-            concatenated[i] = _callAttributes[i];
-        }
-
-        // Copy bundle attributes after call attributes
-        uint256 bundleAttributesLength = _bundleAttributes.length;
-        for (uint256 i = 0; i < bundleAttributesLength; ++i) {
-            concatenated[callAttributesLength + i] = _bundleAttributes[i];
-        }
-    }
-
-    /// @notice Separates call and bundle attributes from a mixed attributes array.
-    /// @param _mixedAttributes The mixed attributes array containing both call and bundle attributes.
-    /// @return callAttributes Array containing only call attributes (for single call).
-    /// @return bundleAttributes Array containing only bundle attributes.
-    function _separateCallAndBundleAttributes(
-        bytes[] calldata _mixedAttributes
-    ) internal pure returns (bytes[][] memory callAttributes, bytes[] memory bundleAttributes) {
-        uint256 callAttributesCount = 0;
-        uint256 bundleAttributesCount = 0;
-
-        // Count call and bundle attributes
-        uint256 mixedAttributesLength = _mixedAttributes.length;
-        for (uint256 i = 0; i < mixedAttributesLength; ++i) {
-            bytes4 selector = bytes4(_mixedAttributes[i]);
-            if (
-                selector == IERC7786Attributes.interopCallValue.selector ||
-                selector == IERC7786Attributes.indirectCall.selector
-            ) {
-                ++callAttributesCount;
-            } else if (
-                selector == IERC7786Attributes.executionAddress.selector ||
-                selector == IERC7786Attributes.unbundlerAddress.selector
-            ) {
-                ++bundleAttributesCount;
-            }
-        }
-
-        // Create arrays for separated attributes
-        bytes[] memory singleCallAttributes = new bytes[](callAttributesCount);
-        bundleAttributes = new bytes[](bundleAttributesCount);
-        callAttributes = new bytes[][](1);
-
-        uint256 callIndex = 0;
-        uint256 bundleIndex = 0;
-
-        // Separate the attributes
-        for (uint256 i = 0; i < mixedAttributesLength; ++i) {
-            bytes4 selector = bytes4(_mixedAttributes[i]);
-            if (
-                selector == IERC7786Attributes.interopCallValue.selector ||
-                selector == IERC7786Attributes.indirectCall.selector
-            ) {
-                singleCallAttributes[callIndex] = _mixedAttributes[i];
-                ++callIndex;
-            } else if (
-                selector == IERC7786Attributes.executionAddress.selector ||
-                selector == IERC7786Attributes.unbundlerAddress.selector
-            ) {
-                bundleAttributes[bundleIndex] = _mixedAttributes[i];
-                ++bundleIndex;
-            }
-        }
-
-        callAttributes[0] = singleCallAttributes;
     }
 
     function _processCallStarter(
