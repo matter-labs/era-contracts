@@ -400,17 +400,15 @@ contract InteropCenter is IInteropCenter, ReentrancyGuard, Ownable2StepUpgradeab
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }
-        if (_baseTokenAmount > 0) {
-            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncreaseOnSL(
-                _chainId,
-                BRIDGE_HUB.baseTokenAssetId(_chainId),
-                _baseTokenAmount,
-                false
-            );
-        }
-        if (_amount > 0) {
-            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncreaseOnSL(_chainId, _assetId, _amount, false);
-        }
+        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncreaseOnGateway({
+            _chainId: _chainId,
+            _canonicalTxHash: _canonicalTxHash,
+            _baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(_chainId),
+            _baseTokenAmount: _baseTokenAmount,
+            _assetId: _assetId,
+            _amount: _amount
+        });
+
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
