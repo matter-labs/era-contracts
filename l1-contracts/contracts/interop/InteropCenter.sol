@@ -20,7 +20,7 @@ import {MsgValueMismatch, Unauthorized, NotL1, NotL2ToL2} from "../common/L1Cont
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle, IndirectCallValueMismatch, AttributeNotForInteropCallValue} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeNotForCall, AttributeNotForBundle, IndirectCallValueMismatch} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -421,8 +421,8 @@ contract InteropCenter is
                 require(!attributeUsed[0], AttributeAlreadySet(selector));
                 require(
                     _restriction == AttributeParsingRestrictions.OnlyInteropCallValue ||
-                    _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
-                    _restriction == AttributeParsingRestrictions.CallAndBundleAttributes
+                        _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeNotForBundle(selector)
                 );
                 attributeUsed[0] = true;
@@ -431,7 +431,7 @@ contract InteropCenter is
                 require(!attributeUsed[1], AttributeAlreadySet(selector));
                 require(
                     _restriction == AttributeParsingRestrictions.OnlyCallAttributes ||
-                    _restriction == AttributeParsingRestrictions.CallAndBundleAttributes
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeNotForBundle(selector)
                 );
                 attributeUsed[1] = true;
@@ -441,7 +441,7 @@ contract InteropCenter is
                 require(!attributeUsed[2], AttributeAlreadySet(selector));
                 require(
                     _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                    _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeNotForCall(selector)
                 );
                 attributeUsed[2] = true;
@@ -450,7 +450,7 @@ contract InteropCenter is
                 require(!attributeUsed[3], AttributeAlreadySet(selector));
                 require(
                     _restriction == AttributeParsingRestrictions.OnlyBundleAttributes ||
-                    _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
+                        _restriction == AttributeParsingRestrictions.CallAndBundleAttributes,
                     AttributeNotForCall(selector)
                 );
                 attributeUsed[3] = true;
