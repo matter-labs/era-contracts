@@ -28,6 +28,7 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IInteropHandler, CallStatus} from "contracts/interop/IInteropHandler.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {UnauthorizedMessageSender} from "contracts/interop/InteropErrors.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
@@ -353,5 +354,28 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             })
         });
         return interopBundle;
+    }
+
+    /// @notice Regression test to ensure bundles can only be verified from InteropCenter
+    /// @dev This test verifies that the fix for unauthorized bundle verification is working
+    function test_verifyBundle_revertWhen_messageNotFromInteropCenter() public {
+        address nonInteropCenter = makeAddr("nonInteropCenter");
+
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        bytes memory bundle = abi.encode(interopBundle);
+
+        MessageInclusionProof memory proof = getInclusionProof(nonInteropCenter);
+
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UnauthorizedMessageSender.selector, L2_INTEROP_CENTER_ADDR, nonInteropCenter)
+        );
+
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
     }
 }
