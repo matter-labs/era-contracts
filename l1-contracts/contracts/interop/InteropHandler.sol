@@ -63,12 +63,11 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             );
         }
 
-        // We shouldn't process bundles which are either fully executed, or were unbundled here.
-        // If the bundle if fully executed, it's not expected that anything else should be done with the bundle, it's finalized already.
-        // If the bundle were unbundled, it's either fully finalized (all calls are cancelled or executed), in which case nothing else could be done, similar to above,
-        // or some of the calls are still unprocessed, in this case they should be processed via unbundling.
+        // We can only process bundles that are either unreceived (first time processing) or verified (already verified but not executed).
+        // This whitelist approach ensures that if new bundle statuses are added in the future, they will be explicitly rejected
+        // until they are explicitly allowed, preventing potential security vulnerabilities.
         require(
-            status != BundleStatus.FullyExecuted && status != BundleStatus.Unbundled,
+            status == BundleStatus.Unreceived || status == BundleStatus.Verified,
             BundleAlreadyProcessed(bundleHash)
         );
 
