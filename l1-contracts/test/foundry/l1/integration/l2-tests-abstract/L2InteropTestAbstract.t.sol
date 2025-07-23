@@ -175,9 +175,17 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         vm.prank(EXECUTION_ADDRESS);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).executeBundle(bundle, proof);
         // Check storage changes
-        assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)), 2, "BundleStatus should be FullyExecuted");
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            2,
+            "BundleStatus should be FullyExecuted"
+        );
         for (uint256 i = 0; i < interopBundle.calls.length; ++i) {
-            assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, i)), 1, "CallStatus should be Executed");
+            assertEq(
+                uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, i)),
+                1,
+                "CallStatus should be Executed"
+            );
         }
     }
 
@@ -215,10 +223,26 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         vm.prank(UNBUNDLER_ADDRESS);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses1);
         // Check storage changes after first unbundle
-        assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)), 0, "Call 0 should be Unprocessed");
-        assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)), 2, "Call 1 should be Cancelled");
-        assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)), 1, "Call 2 should be Executed");
-        assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)), 3, "BundleStatus should be Unbundled");
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
+            0,
+            "Call 0 should be Unprocessed"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)),
+            2,
+            "Call 1 should be Cancelled"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)),
+            1,
+            "Call 2 should be Executed"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            3,
+            "BundleStatus should be Unbundled"
+        );
         // Expect events for second unbundle
         vm.expectEmit(true, false, false, false);
         emit IInteropHandler.CallProcessed(bundleHash, 0, CallStatus.Executed);
@@ -227,10 +251,26 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         vm.prank(UNBUNDLER_ADDRESS);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses2);
         // Check storage changes after second unbundle
-        assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)), 1, "Call 0 should be Executed");
-        assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)), 2, "Call 1 should be Cancelled");
-        assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)), 1, "Call 2 should be Executed");
-        assertEq(uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)), 3, "BundleStatus should be Unbundled");
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
+            1,
+            "Call 0 should be Executed"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)),
+            2,
+            "Call 1 should be Cancelled"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)),
+            1,
+            "Call 2 should be Executed"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            3,
+            "BundleStatus should be Unbundled"
+        );
     }
 
     function getInteropBundle(uint256 amount) public returns (InteropBundle memory) {

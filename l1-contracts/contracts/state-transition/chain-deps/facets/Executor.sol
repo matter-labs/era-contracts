@@ -401,7 +401,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 let ptr := add(_packedTxPrecommitments, 32)
                 let ptrTo := add(ptr, length)
 
-                for {} lt(ptr, ptrTo) {
+                for {
+
+                } lt(ptr, ptrTo) {
                     ptr := add(ptr, precommitmentLength)
                 } {
                     let txPrecommitment := keccak256(ptr, precommitmentLength)
