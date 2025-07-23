@@ -116,7 +116,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual {
+    ) internal virtual {
         address assetHandler = assetHandlerAddress[_assetId];
         require(assetHandler != address(0), AssetHandlerDoesNotExist(_assetId));
 
