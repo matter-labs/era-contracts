@@ -71,6 +71,16 @@ abstract contract GatewayGovernanceUtils is Script {
         uint256 gatewayChainId;
     }
 
+    struct PrepareGatewayGovernanceCalls {
+        uint256 _l1GasPrice;
+        address _gatewayCTMAddress;
+        address _gatewayRollupDAManager;
+        address _gatewayValidatorTimelock;
+        address _gatewayServerNotifier;
+        address _refundRecipient;
+        uint256 _ctmChainId;
+    }
+
     GatewayGovernanceConfig internal _gatewayGovernanceConfig;
 
     function _initializeGatewayGovernanceConfig(GatewayGovernanceConfig memory config) internal {
@@ -87,33 +97,32 @@ abstract contract GatewayGovernanceUtils is Script {
     }
 
     function _prepareGatewayGovernanceCalls(
-        uint256 _l1GasPrice,
-        address _gatewayCTMAddress,
-        address _gatewayRollupDAManager,
-        address _gatewayValidatorTimelock,
-        address _gatewayServerNotifier,
-        address _refundRecipient
+        PrepareGatewayGovernanceCalls memory prepareGWGovCallsStruct
     ) internal returns (Call[] memory calls) {
-        calls = _getRegisterSettlementLayerCalls();
-
         // Registration of the new chain type manager inside the ZK Gateway chain
         {
-            bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (_gatewayCTMAddress));
-
-            calls = Utils.mergeCalls(
-                calls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    _l1GasPrice,
-                    data,
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    L2_BRIDGEHUB_ADDR,
-                    _gatewayGovernanceConfig.gatewayChainId,
-                    _gatewayGovernanceConfig.bridgehubProxy,
-                    _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    _refundRecipient
-                )
+            bytes memory data = abi.encodeCall(
+                IBridgehub.addChainTypeManager,
+                (prepareGWGovCallsStruct._gatewayCTMAddress)
             );
+
+            calls = Utils.prepareGovernanceL1L2DirectTransaction(
+                prepareGWGovCallsStruct._l1GasPrice,
+                data,
+                Utils.MAX_PRIORITY_TX_GAS,
+                new bytes[](0),
+                L2_BRIDGEHUB_ADDR,
+                _gatewayGovernanceConfig.gatewayChainId,
+                _gatewayGovernanceConfig.bridgehubProxy,
+                _gatewayGovernanceConfig.l1AssetRouterProxy,
+                prepareGWGovCallsStruct._refundRecipient
+            );
+        }
+
+        {
+            if (prepareGWGovCallsStruct._ctmChainId == 0) {
+                calls = Utils.mergeCalls(calls, _getRegisterSettlementLayerCalls());
+            }
         }
 
         // Registering an asset that corresponds to chains inside L1AssetRouter
@@ -156,6 +165,11 @@ abstract contract GatewayGovernanceUtils is Script {
                 _gatewayGovernanceConfig.ctmDeploymentTrackerProxy
             );
 
+            console.log("Computed chain asset id: ");
+            console.logBytes32(chainAssetId);
+            // chainAssetId = 0x33DFCA47FDF7C5C3D496BEB919BBA770E7C50FB948D431CB84E446B225084BFE;
+
+            // 0x0bbd3803f7eb4c6597e5bdf9ac9ba7936df9ee20
             bytes memory secondBridgeData = abi.encodePacked(
                 SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
                 abi.encode(chainAssetId, L2_BRIDGEHUB_ADDR)
@@ -164,7 +178,7 @@ abstract contract GatewayGovernanceUtils is Script {
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2TwoBridgesTransaction(
-                    _l1GasPrice,
+                    prepareGWGovCallsStruct._l1GasPrice,
                     Utils.MAX_PRIORITY_TX_GAS,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
@@ -172,7 +186,7 @@ abstract contract GatewayGovernanceUtils is Script {
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
                     0,
                     secondBridgeData,
-                    _refundRecipient
+                    prepareGWGovCallsStruct._refundRecipient
                 )
             );
         }
@@ -180,15 +194,21 @@ abstract contract GatewayGovernanceUtils is Script {
         // Setting the address of the GW ChainTypeManager as the correct ChainTypeManager to handle
         // chains that migrate from L1.
         {
+            console.log("CTM proxy L1: ", _gatewayGovernanceConfig.chainTypeManagerProxy);
+            console.log("CTM proxy L2 (GW): ", prepareGWGovCallsStruct._gatewayCTMAddress);
             bytes memory secondBridgeData = abi.encodePacked(
                 bytes1(0x01),
-                abi.encode(_gatewayGovernanceConfig.chainTypeManagerProxy, _gatewayCTMAddress)
+                abi.encode(_gatewayGovernanceConfig.chainTypeManagerProxy, prepareGWGovCallsStruct._gatewayCTMAddress)
             );
+            // bytes memory secondBridgeData = abi.encodePacked(
+            //     bytes1(0x01),
+            //     abi.encode(address(0), prepareGWGovCallsStruct._gatewayCTMAddress)
+            // );
 
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2TwoBridgesTransaction(
-                    _l1GasPrice,
+                    prepareGWGovCallsStruct._l1GasPrice,
                     Utils.MAX_PRIORITY_TX_GAS,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
@@ -196,10 +216,12 @@ abstract contract GatewayGovernanceUtils is Script {
                     _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
                     0,
                     secondBridgeData,
-                    _refundRecipient
+                    prepareGWGovCallsStruct._refundRecipient
                 )
             );
         }
+
+        // revert();
 
         // Accept ownership calls
         {
@@ -208,43 +230,43 @@ abstract contract GatewayGovernanceUtils is Script {
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(
-                    _l1GasPrice,
+                    prepareGWGovCallsStruct._l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
                     new bytes[](0),
-                    _gatewayRollupDAManager,
+                    prepareGWGovCallsStruct._gatewayRollupDAManager,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    _refundRecipient
+                    prepareGWGovCallsStruct._refundRecipient
                 )
             );
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(
-                    _l1GasPrice,
+                    prepareGWGovCallsStruct._l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
                     new bytes[](0),
-                    _gatewayValidatorTimelock,
+                    prepareGWGovCallsStruct._gatewayValidatorTimelock,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    _refundRecipient
+                    prepareGWGovCallsStruct._refundRecipient
                 )
             );
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(
-                    _l1GasPrice,
+                    prepareGWGovCallsStruct._l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
                     new bytes[](0),
-                    _gatewayServerNotifier,
+                    prepareGWGovCallsStruct._gatewayServerNotifier,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    _refundRecipient
+                    prepareGWGovCallsStruct._refundRecipient
                 )
             );
         }
