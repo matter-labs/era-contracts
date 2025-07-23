@@ -26,6 +26,7 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IInteropHandler, CallStatus} from "contracts/interop/IInteropHandler.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
 import {UnauthorizedMessageSender, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
@@ -402,5 +403,94 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         );
 
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+    }
+
+    /// @notice Test pause functionality in InteropCenter
+    function test_interopCenter_pause() public {
+        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+
+        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
+
+        bytes memory recipient = abi.encodePacked(uint256(271), address(0x123));
+        bytes memory payload = abi.encode("test");
+        bytes[] memory attributes = new bytes[](0);
+
+        vm.expectRevert("Pausable: paused");
+        InteropCenter(L2_INTEROP_CENTER_ADDR).sendMessage(recipient, payload, attributes);
+    }
+
+    /// @notice Test unpause functionality in InteropCenter
+    function test_interopCenter_unpause() public {
+        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
+
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+
+        assertFalse(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be unpaused");
+    }
+
+    /// @notice Test setAddresses functionality in InteropCenter
+    function test_interopCenter_setAddresses() public {
+        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+
+        address newAssetRouter = makeAddr("newAssetRouter");
+        address newAssetTracker = makeAddr("newAssetTracker");
+
+        address oldAssetRouter = InteropCenter(L2_INTEROP_CENTER_ADDR).assetRouter();
+        address oldAssetTracker = address(InteropCenter(L2_INTEROP_CENTER_ADDR).assetTracker());
+
+        vm.expectEmit(true, true, false, false);
+        emit IInteropCenter.NewAssetRouter(oldAssetRouter, newAssetRouter);
+        vm.expectEmit(true, true, false, false);
+        emit IInteropCenter.NewAssetTracker(oldAssetTracker, newAssetTracker);
+
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(newAssetRouter, newAssetTracker);
+
+        assertEq(InteropCenter(L2_INTEROP_CENTER_ADDR).assetRouter(), newAssetRouter, "Asset router not updated");
+        assertEq(
+            address(InteropCenter(L2_INTEROP_CENTER_ADDR).assetTracker()),
+            newAssetTracker,
+            "Asset tracker not updated"
+        );
+    }
+
+    /// @notice Test that only owner can pause InteropCenter
+    function test_interopCenter_pause_onlyOwner() public {
+        address nonOwner = makeAddr("nonOwner");
+
+        vm.prank(nonOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+    }
+
+    /// @notice Test that only owner can unpause InteropCenter
+    function test_interopCenter_unpause_onlyOwner() public {
+        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+
+        address nonOwner = makeAddr("nonOwner");
+        vm.prank(nonOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+    }
+
+    /// @notice Test that only owner can call setAddresses
+    function test_interopCenter_setAddresses_onlyOwner() public {
+        address nonOwner = makeAddr("nonOwner");
+        address newAssetRouter = makeAddr("newAssetRouter");
+        address newAssetTracker = makeAddr("newAssetTracker");
+
+        vm.prank(nonOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        InteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(newAssetRouter, newAssetTracker);
     }
 }
