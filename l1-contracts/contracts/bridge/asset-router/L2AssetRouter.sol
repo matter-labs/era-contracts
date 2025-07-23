@@ -219,7 +219,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         address _originalCaller,
         uint256 _value,
         bytes calldata _data
-    ) external payable returns (InteropCallStarter memory interopCallStarter) {
+    ) external payable onlyL2InteropCenter returns (InteropCallStarter memory interopCallStarter) {
         // This function is called by the InteropCenter when processing indirect interop calls.
         // It prepares the bridge operation for cross-chain execution through these steps:
         // 1. Processing the deposit through the standard bridgehub flow
