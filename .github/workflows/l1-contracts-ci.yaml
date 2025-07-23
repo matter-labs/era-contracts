@@ -256,7 +256,6 @@ jobs:
       - name: Compare VerifierFflonk.sol
         run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierFflonk.sol
 
-
   coverage:
     defaults:
       run:
