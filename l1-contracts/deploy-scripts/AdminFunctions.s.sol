@@ -141,6 +141,11 @@ contract AdminFunctions is Script {
         Utils.executeCalls(governanceAddr, bytes32(0), 0, calls);
     }
 
+    function ecosystemAdminExecuteCalls(bytes memory callsToExecute, address ecosystemAdminAddr) public {
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+        saveAndSendAdminTx(ecosystemAdminAddr, calls, true);
+    }
+
     function adminEncodeMulticall(bytes memory callsToExecute) external {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
 

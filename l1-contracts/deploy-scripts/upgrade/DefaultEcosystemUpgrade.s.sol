@@ -224,6 +224,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
 
+        addresses.stateTransition.serverNotifierImplementation = deploySimpleContract("ServerNotifier", false);
+
         /// for forge verification.
         deploySimpleContract("DiamondProxy", false);
 
@@ -1047,6 +1049,27 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
 
         vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+    }
+
+    function prepareEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](1);
+        allCalls[0] = prepareUpgradeServerNotifierCall();
+        calls = mergeCallsArray(allCalls);
+
+        vm.writeToml(abi.encode(calls), upgradeConfig.outputPath, ".ecosystem_admin_calls");
+    }
+
+    function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
+        address serverNotifierProxyAdmin = address(uint160(uint256(vm.load(addresses.stateTransition.serverNotifierProxy, ADMIN_SLOT))));
+
+        Call memory call = Call({
+            target: serverNotifierProxyAdmin,
+            data: abi.encodeCall(
+                ProxyAdmin.upgrade,
+                (ITransparentUpgradeableProxy(payable(addresses.stateTransition.serverNotifierProxy)), addresses.stateTransition.serverNotifierImplementation)
+            ),
+            value: 0
+        });
     }
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
