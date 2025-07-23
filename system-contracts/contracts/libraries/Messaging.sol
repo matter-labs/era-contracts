@@ -139,7 +139,7 @@ struct BridgehubL2TransactionRequest {
 }
 
 struct InteropCallStarter {
-    bool directCall;
+    bool indirectCall;
     address nextContract;
     bytes data;
     uint256 value;
@@ -151,7 +151,7 @@ struct InteropCallStarter {
 }
 
 struct InteropCall {
-    bool directCall;
+    bool indirectCall;
     address to;
     address from;
     uint256 value;

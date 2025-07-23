@@ -190,11 +190,11 @@ struct InteropCallStarterInternal {
 }
 
 /// @param interopCallValue Base token value on destination chain to send for interop call.
-/// @param directCall True for direct interop, false if routed through bridge.
+/// @param indirectCall True if routed through bridge, false for direct interop.
 /// @param indirectCallMessageValue Base token value on sending chain to send for indirect call.
 struct CallAttributes {
     uint256 interopCallValue;
-    bool directCall;
+    bool indirectCall;
     uint256 indirectCallMessageValue;
 }
 

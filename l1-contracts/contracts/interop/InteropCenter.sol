@@ -324,16 +324,7 @@ contract InteropCenter is
         uint256 _destinationChainId,
         address _sender
     ) internal returns (InteropCall memory interopCall) {
-        if (_callStarter.callAttributes.directCall) {
-            interopCall = InteropCall({
-                version: INTEROP_CALL_VERSION,
-                shadowAccount: false,
-                to: _callStarter.to,
-                data: _callStarter.data,
-                value: _callStarter.callAttributes.interopCallValue,
-                from: _sender
-            });
-        } else {
+        if (_callStarter.callAttributes.indirectCall) {
             // slither-disable-next-line arbitrary-send-eth
             InteropCallStarter memory actualCallStarter = IL2CrossChainSender(_callStarter.to)
                 .interopCenterInitiateBridge{value: _callStarter.callAttributes.indirectCallMessageValue}(
@@ -362,6 +353,15 @@ contract InteropCenter is
                 data: actualCallStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
                 from: _callStarter.to
+            });
+        } else {
+            interopCall = InteropCall({
+                version: INTEROP_CALL_VERSION,
+                shadowAccount: false,
+                to: _callStarter.to,
+                data: _callStarter.data,
+                value: _callStarter.callAttributes.interopCallValue,
+                from: _sender
             });
         }
     }
@@ -413,7 +413,7 @@ contract InteropCenter is
         AttributeParsingRestrictions _restriction
     ) public pure returns (CallAttributes memory callAttributes, BundleAttributes memory bundleAttributes) {
         // Default value is direct call.
-        callAttributes.directCall = true;
+        callAttributes.indirectCall = false;
 
         bytes4[4] memory ATTRIBUTE_SELECTORS = _getERC7786AttributeSelectors();
         // We can only pass each attribute once.
@@ -441,7 +441,7 @@ contract InteropCenter is
                     AttributeViolatesRestriction(selector, uint256(_restriction))
                 );
                 attributeUsed[1] = true;
-                callAttributes.directCall = false;
+                callAttributes.indirectCall = true;
                 callAttributes.indirectCallMessageValue = AttributesDecoder.decodeUint256(_attributes[i]);
             } else if (selector == IERC7786Attributes.executionAddress.selector) {
                 require(!attributeUsed[2], AttributeAlreadySet(selector));
