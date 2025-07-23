@@ -15,9 +15,9 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1, OnlyChain} from "./L1BridgehubErrors.sol";
+import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1,OnlyAssetTracker, OnlyChain} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused} from "../common/L1ContractErrors.sol";
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
@@ -51,7 +51,7 @@ contract ChainAssetHandler is
     bool public migrationPaused;
 
     /// @notice used to track the number of times each chain has migrated.
-    mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
+    mapping(uint256 chainId => uint256 migrationNumber) internal migrationNumber;
 
     modifier onlyAssetRouter() {
         if (msg.sender != ASSET_ROUTER) {
@@ -71,6 +71,15 @@ contract ChainAssetHandler is
         if (L1_CHAIN_ID != block.chainid) {
             revert NotL1(L1_CHAIN_ID, block.chainid);
         }
+        _;
+    }
+
+    modifier onlyAssetTracker() {
+        // kl todo add contract discoverability, simplify this.
+        require(
+            msg.sender == L2_ASSET_TRACKER_ADDR || msg.sender == address(BRIDGE_HUB.interopCenter().assetTracker()),
+            OnlyAssetTracker(msg.sender, address(BRIDGE_HUB.interopCenter().assetTracker()))
+        );
         _;
     }
 
@@ -100,6 +109,14 @@ contract ChainAssetHandler is
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Getters
+    //////////////////////////////////////////////////////////////*/
+
+    function getMigrationNumber(uint256 _chainId) external view onlyAssetTracker returns (uint256) {
+        return migrationNumber[_chainId];
     }
 
     /*//////////////////////////////////////////////////////////////

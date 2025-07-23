@@ -112,7 +112,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
                 finalizeL1DepositParams[i].message,
                 (TokenBalanceMigrationData)
             );
-            if (l1AssetTracker.assetMigrationNumber(data.chainId, data.assetId) < data.migrationNumber) {
+            if (!l1AssetTracker.tokenMigrated(data.chainId, data.assetId)) {
                 vm.broadcast();
                 l1AssetTracker.receiveMigrationOnL1(finalizeL1DepositParams[i]);
             }
@@ -123,12 +123,8 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             bytes32 assetId = assetIds[i];
-            // if (
-            uint256 migrationNumber = l2AssetTracker.assetMigrationNumber(chainId, assetId);
-            //  != block.chainid) {
-            console.log("Token", vm.toString(assetId), "migration number", migrationNumber);
-            // }
-            // kl todo implement properly, compare against interopCenter migration number.
+            bool migrated = l2AssetTracker.tokenMigratedThisChain(assetId);
+            require(migrated, "Token not migrated");
         }
     }
 

@@ -51,7 +51,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     uint256 originalChainId;
     uint256 gwChainId;
     bytes32 assetMigrationNumberLocation;
-    uint256 migrationNumber = 19;
+    uint256 migrationNumber = 20;
     bytes32 chainBalanceLocation;
     uint256 amount = 1000000000000000000;
 
@@ -181,7 +181,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(
             address(assetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 1)
+            bytes32(migrationNumber - 2)
         );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
 
@@ -213,7 +213,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             );
             vm.mockCall(
                 address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
-                abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+                abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
                 abi.encode(migrationNumber)
             );
         }

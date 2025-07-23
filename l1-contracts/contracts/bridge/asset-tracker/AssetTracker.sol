@@ -25,7 +25,7 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidAmount, InvalidAssetId, InvalidAssetMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidAmount, InvalidMigrationNumber, InvalidAssetId, InvalidAssetMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
 
 contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerModifiers {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -51,11 +51,11 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     /// @notice Used on the L2 instead of the settlement layer
     /// @dev Maps the migration number for each asset on the L2.
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) internal assetMigrationNumber;
 
-    mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) public totalSupply;
+    mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) internal totalSupply;
 
-    mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) public balanceChange;
+    mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
 
     constructor(uint256 _l1ChainId, address _bridgeHub, address, address _nativeTokenVault, address _messageRoot) {
         L1_CHAIN_ID = _l1ChainId;
@@ -103,6 +103,14 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         // TODO: implement
     }
 
+    function tokenMigratedThisChain(bytes32 _assetId) external view returns (bool) {
+        return tokenMigrated(block.chainid, _assetId);
+    }
+
+    function tokenMigrated(uint256 _chainId, bytes32 _assetId) public view returns (bool) {
+        return assetMigrationNumber[_chainId][_assetId] == _getMigrationNumber(_chainId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Register token
     //////////////////////////////////////////////////////////////*/
@@ -129,7 +137,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     // }
 
     function _registerTokenOnL2(bytes32 _assetId) internal {
-        assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
+        assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -416,7 +424,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
     function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
         // return 1 + _chainId - _chainId;
-        return IChainAssetHandler(IBridgehub(BRIDGE_HUB).chainAssetHandler()).migrationNumber(_chainId);
+        return IChainAssetHandler(IBridgehub(BRIDGE_HUB).chainAssetHandler()).getMigrationNumber(_chainId);
     }
 
     /// @notice This function receives the migration from the L2 or the Gateway.
@@ -438,6 +446,14 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         if (data.isL1ToGateway) {
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
+            uint256 chainMigrationNumber = _getMigrationNumber(data.chainId);
+
+            // we check parity here to make sure that we migrated back to L1 from Gateway.
+            // In the future we might initalize chains on GW. So we subtract from chainMigrationNumber.
+            require(
+                chainMigrationNumber - ((assetMigrationNumber[data.chainId][data.assetId]) % 2) == 1,
+                InvalidMigrationNumber()
+            );
 
             _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
             // if (data.tokenOriginChainId != data.chainId) {

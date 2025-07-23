@@ -25,7 +25,9 @@ interface IAssetTracker {
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function assetMigrationNumber(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+    function tokenMigratedThisChain(bytes32 _assetId) external view returns (bool);
+
+    function tokenMigrated(uint256 _chainId, bytes32 _assetId) external view returns (bool);
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) external;
 
