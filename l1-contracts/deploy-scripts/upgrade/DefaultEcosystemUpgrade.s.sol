@@ -317,7 +317,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
+        console.log("PREPARE DEFAULT GOVERNANCE CALLS");
         prepareDefaultGovernanceCalls();
+        console.log("PREPARE DEFAULT ECOSYSTEM ADMIN CALLS");
+        prepareDefaultEcosystemAdminCalls();
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -608,6 +611,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
         newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
             .validatorTimelock();
+        addresses.stateTransition.serverNotifierProxy = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).serverNotifierAddress();
 
         newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
 
@@ -986,6 +990,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
+        vm.serializeBytes("root", "ecosystem_admin_calls", new bytes(0)); // Will be populated later
+
         vm.serializeUint(
             "root",
             "governance_upgrade_timer_initial_delay",
@@ -1051,12 +1057,21 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
     }
 
-    function prepareEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
+    function prepareDefaultEcosystemAdminCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](1);
         allCalls[0] = prepareUpgradeServerNotifierCall();
         calls = mergeCallsArray(allCalls);
 
-        vm.writeToml(abi.encode(calls), upgradeConfig.outputPath, ".ecosystem_admin_calls");
+        console.log("ADMIN CALLS");
+        console.logBytes(abi.encode(calls));
+
+        string memory ecosystemAdminCallsSerialized = vm.serializeBytes(
+            "ecosystem_admin_calls",
+            "server_notifier_upgrade",
+            abi.encode(calls)
+        );
+
+        vm.writeToml(ecosystemAdminCallsSerialized, upgradeConfig.outputPath, ".ecosystem_admin_calls");
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
@@ -1070,6 +1085,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             ),
             value: 0
         });
+
+        calls = new Call[](1);
+        calls[0] = call;
     }
 
     /// @notice The zeroth step of upgrade. By default it just stops gateway migrations
