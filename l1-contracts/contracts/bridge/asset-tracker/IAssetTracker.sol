@@ -16,6 +16,13 @@ struct TokenBalanceMigrationData {
 }
 
 interface IAssetTracker {
+    struct BalanceChange {
+        bytes32 baseTokenAssetId;
+        uint256 baseTokenAmount;
+        bytes32 assetId;
+        uint256 amount;
+    }
+
     function BRIDGE_HUB() external view returns (IBridgehub);
 
     function assetMigrationNumber(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
@@ -24,22 +31,32 @@ interface IAssetTracker {
 
     function registerLegacyTokenOnChain(bytes32 _assetId) external;
 
-    function handleChainBalanceIncreaseOnSL(
+    function handleChainBalanceIncreaseOnL1(
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
         bool _isNative
     ) external;
 
-    function handleChainBalanceDecreaseOnSL(
-        // uint256 _tokenOriginChainId,
+    function handleChainBalanceDecreaseOnL1(
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
         bool _isNative
+    ) external;
+
+    function handleChainBalanceIncreaseOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        bytes32 _baseTokenAssetId,
+        uint256 _baseTokenAmount,
+        bytes32 _assetId,
+        uint256 _amount
     ) external;
 
     function handleInitiateBridgingOnL2(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
+
+    function handleFinalizeBridgingOnL2(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
 

@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1} from "./L1BridgehubErrors.sol";
+import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1, OnlyChain} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused} from "../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -41,7 +41,7 @@ contract ChainAssetHandler is
 
     uint256 internal immutable L1_CHAIN_ID;
 
-    IBridgehub internal immutable BRIDGEHUB;
+    IBridgehub internal immutable BRIDGE_HUB;
 
     IMessageRoot internal immutable MESSAGE_ROOT;
 
@@ -91,7 +91,7 @@ contract ChainAssetHandler is
         IMessageRoot _messageRoot
     ) reentrancyGuardInitializer {
         _disableInitializers();
-        BRIDGEHUB = _bridgehub;
+        BRIDGE_HUB = _bridgehub;
         L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
@@ -100,6 +100,30 @@ contract ChainAssetHandler is
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            V30 Upgrade
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Checks that the message sender is the specified ZK Chain.
+    /// @param _chainId The ID of the chain that is required to be the caller.
+    modifier onlyChain(uint256 _chainId) {
+        if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+        }
+        _;
+    }
+
+    error MigrationNumberAlreadySet();
+    error OnlyOnGateway();
+
+    function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
+        if (migrationNumber[_chainId] != 0) {
+            revert MigrationNumberAlreadySet();
+        }
+        require(block.chainid != L1_CHAIN_ID, OnlyOnGateway());
+        migrationNumber[_chainId] = 1;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -128,8 +152,8 @@ contract ChainAssetHandler is
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        if (_assetId != BRIDGEHUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
-            revert IncorrectChainAssetId(_assetId, BRIDGEHUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId));
+        if (_assetId != BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
+            revert IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId));
         }
 
         address zkChain;
@@ -137,7 +161,7 @@ contract ChainAssetHandler is
         // to avoid stack too deep
         {
             address ctm;
-            (zkChain, ctm) = BRIDGEHUB.forwardedBridgeBurnSetSettlementLayer(
+            (zkChain, ctm) = BRIDGE_HUB.forwardedBridgeBurnSetSettlementLayer(
                 bridgehubBurnData.chainId,
                 _settlementChainId
             );
@@ -157,13 +181,13 @@ contract ChainAssetHandler is
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == L1_CHAIN_ID
                 ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
-                : BRIDGEHUB.getZKChain(_settlementChainId),
+                : BRIDGE_HUB.getZKChain(_settlementChainId),
             _originalCaller,
             bridgehubBurnData.chainData
         );
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
-            baseTokenAssetId: BRIDGEHUB.baseTokenAssetId(bridgehubBurnData.chainId),
+            baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(bridgehubBurnData.chainId),
             ctmData: ctmMintData,
             chainData: chainMintData
         });
@@ -187,7 +211,7 @@ contract ChainAssetHandler is
             (BridgehubMintCTMAssetData)
         );
 
-        (address zkChain, address ctm) = BRIDGEHUB.forwardedBridgeMint(
+        (address zkChain, address ctm) = BRIDGE_HUB.forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
             bridgehubMintData.baseTokenAssetId
@@ -200,7 +224,7 @@ contract ChainAssetHandler is
                 revert ChainIdNotRegistered(bridgehubMintData.chainId);
             }
             // We want to allow any chain to be migrated,
-            BRIDGEHUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
+            BRIDGE_HUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId);
         }
         ++migrationNumber[bridgehubMintData.chainId];
@@ -223,7 +247,7 @@ contract ChainAssetHandler is
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        (address zkChain, address ctm) = BRIDGEHUB.forwardedBridgeRecoverFailedTransfer(bridgehubBurnData.chainId);
+        (address zkChain, address ctm) = BRIDGE_HUB.forwardedBridgeRecoverFailedTransfer(bridgehubBurnData.chainId);
 
         IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubBurnData.chainId,
@@ -243,7 +267,7 @@ contract ChainAssetHandler is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            PAUSE
+                            L2 functions
     //////////////////////////////////////////////////////////////*/
 
     function setSettlementLayerChainId(

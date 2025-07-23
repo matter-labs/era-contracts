@@ -6,8 +6,8 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {IAssetTracker, TokenBalanceMigrationData} from "./IAssetTracker.sol";
-import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log, L2Message} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -52,6 +52,10 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     /// @dev Maps the migration number for each asset on the L2.
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
+
+    mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) public totalSupply;
+
+    mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) public balanceChange;
 
     constructor(uint256 _l1ChainId, address _bridgeHub, address, address _nativeTokenVault, address _messageRoot) {
         L1_CHAIN_ID = _l1ChainId;
@@ -135,7 +139,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     /// @notice Called on the L1 when a deposit to the chain happens.
     /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceIncreaseOnSL(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
+    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
         // onlyNativeTokenVaultOrInteropCenter {
 
         uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
@@ -161,13 +165,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
     /// @notice Called on the L1 when a withdrawal from the chain happens, or when a failed deposit is undone.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceDecreaseOnSL(
-        // uint256 _tokenOriginChainId,
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool
-    ) external {
+    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
         // onlyNativeTokenVault
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
@@ -188,15 +186,43 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         chainBalance[chainToUpdate][_assetId] -= _amount;
     }
 
-    function handleInitiateBridgingOnL2(uint256, bytes32 _assetId, uint256, bool) external {
+    function handleChainBalanceIncreaseOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        bytes32 _baseTokenAssetId,
+        uint256 _baseTokenAmount,
+        bytes32 _assetId,
+        uint256 _amount
+    ) external {
+        if (_amount > 0) {
+            chainBalance[_chainId][_assetId] += _amount;
+        }
+        if (_baseTokenAmount > 0) {
+            chainBalance[_chainId][_baseTokenAssetId] += _baseTokenAmount;
+        }
+        balanceChange[_chainId][_canonicalTxHash] = BalanceChange({
+            baseTokenAssetId: _baseTokenAssetId,
+            baseTokenAmount: _baseTokenAmount,
+            assetId: _assetId,
+            amount: _amount
+        });
+    }
+
+    function handleInitiateBridgingOnL2(uint256, bytes32 _assetId, uint256, bool) external view {
+        uint256 migrationNumber = _getMigrationNumber(block.chainid);
+        uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         require(
-            assetMigrationNumber[block.chainid][_assetId] == _getMigrationNumber(block.chainid) ||
+            savedAssetMigrationNumber == migrationNumber ||
                 L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == L1_CHAIN_ID,
-            InvalidAssetMigrationNumber(
-                assetMigrationNumber[block.chainid][_assetId],
-                _getMigrationNumber(block.chainid)
-            )
+            InvalidAssetMigrationNumber(savedAssetMigrationNumber, migrationNumber)
         );
+    }
+
+    function handleFinalizeBridgingOnL2(uint256, bytes32 _assetId, uint256, bool) external {
+        uint256 migrationNumber = _getMigrationNumber(block.chainid);
+        if (totalSupply[migrationNumber][_assetId] == 0) {
+            totalSupply[migrationNumber][_assetId] = IERC20(L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId)).totalSupply();
+        }
     }
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
@@ -249,11 +275,13 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
             );
             // slither-disable-next-line unused-return
             reconstructedLogsTree.push(hashedLog);
+            if (log.sender == L2_BOOTLOADER_ADDRESS && log.value == bytes32(uint256(TxStatus.Failure))) {
+                _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key);
+            }
             if (log.sender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                 // its just a log and not a message
                 continue;
             }
-            // kl todo we need to process failed deposits here.
             if (log.key != bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                 ++msgCount;
                 continue;
@@ -265,6 +293,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
                 revert InvalidMessage();
             }
             if (message[0] != BUNDLE_IDENTIFIER) {
+                // This should not be possible in V30. In V31 this will be a trigger.
                 continue;
             }
 
@@ -316,6 +345,16 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         _appendChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
     }
 
+    function _handlePotentialFailedDeposit(uint256 _chainId, bytes32 _canonicalTxHash) internal {
+        BalanceChange memory savedBalanceChange = balanceChange[_chainId][_canonicalTxHash];
+        if (savedBalanceChange.amount > 0) {
+            chainBalance[_chainId][savedBalanceChange.assetId] -= savedBalanceChange.amount;
+        }
+        if (savedBalanceChange.baseTokenAmount > 0) {
+            chainBalance[_chainId][savedBalanceChange.baseTokenAssetId] -= savedBalanceChange.baseTokenAmount;
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
@@ -329,8 +368,14 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
             return;
         }
 
-        uint256 amount = IERC20(tokenAddress).totalSupply();
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
+        uint256 amount;
+        uint256 savedTotalSupply = totalSupply[migrationNumber][_assetId];
+        if (savedTotalSupply == 0) {
+            amount = IERC20(tokenAddress).totalSupply();
+        } else {
+            amount = savedTotalSupply;
+        }
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             chainId: block.chainid,
