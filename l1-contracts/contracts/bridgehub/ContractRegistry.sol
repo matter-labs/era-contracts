@@ -10,7 +10,6 @@ import {IContractRegistry} from "./IContractRegistry.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The ContractRegistry contract is used to register and manage the contracts.
 contract ContractRegistry is IContractRegistry, Ownable2StepUpgradeable, ReentrancyGuard {
-
     mapping(Contract => address ecosystemContract) public contractAddress;
 
     constructor() {

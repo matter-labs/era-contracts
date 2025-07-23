@@ -29,7 +29,7 @@ interface IContractRegistry {
         MessageRoot,
         ContractRegistry,
         ChainTypeManager,
-        WrappedBaseTokenStore, /// todo check if needed 
+        WrappedBaseTokenStore, /// todo check if needed
         L1ByteCodeSupplier, /// todo was removed from contracts, still needed in Server?
         Multicall3
     }
