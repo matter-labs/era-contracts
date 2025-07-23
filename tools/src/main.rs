@@ -66,21 +66,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fflonk_verifier_contract_template =
         fs::read_to_string("data/fflonk_verifier_contract_template.txt")?;
 
-    let plonk_verifier_contract_template = if opt.l2_mode {
-        plonk_verifier_contract_template
-            .replace("contract VerifierPlonk", "contract L2VerifierPlonk")
-    } else {
-        plonk_verifier_contract_template
-            .replace("contract VerifierPlonk", "contract L1VerifierPlonk")
-    };
+    let plonk_verifier_contract_template = plonk_verifier_contract_template
+        .replace("contract VerifierPlonk", "contract L1VerifierPlonk");
 
-    let fflonk_verifier_contract_template = if opt.l2_mode {
-        fflonk_verifier_contract_template
-            .replace("contract VerifierFflonk", "contract L2VerifierFflonk")
-    } else {
-        fflonk_verifier_contract_template
-            .replace("contract VerifierFflonk", "contract L1VerifierFflonk")
-    };
+    let fflonk_verifier_contract_template = fflonk_verifier_contract_template
+        .replace("contract VerifierFflonk", "contract L1VerifierFflonk");
 
     let plonk_verification_key = fs::read_to_string(&opt.plonk_input_path)
         .unwrap_or_else(|_| panic!("Unable to read from {}", &opt.plonk_input_path));

@@ -278,11 +278,11 @@ jobs:
         working-directory: tools
         run: cargo run -- --l2_mode
 
-      - name: Compare L2VerifierPlonk.sol
-        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol
+      - name: Compare L1VerifierPlonk.sol
+        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierPlonk.sol
 
-      - name: Compare L2VerifierFflonk.sol
-        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierFflonk.sol
+      - name: Compare L1VerifierFflonk.sol
+        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierFflonk.sol
 
   coverage:
     defaults:
