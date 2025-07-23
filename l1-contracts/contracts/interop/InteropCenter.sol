@@ -288,6 +288,10 @@ contract InteropCenter is
             InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, msg.sender);
             bundle.calls[i] = interopCall;
             totalCallsValue += _callStarters[i].callAttributes.interopCallValue;
+            // For indirect calls, also account for the bridge message value that gets sent to the AssetRouter
+            if (_callStarters[i].callAttributes.indirectCall) {
+                totalCallsValue += _callStarters[i].callAttributes.indirectCallMessageValue;
+            }
         }
 
         // Ensure that tokens required for bundle execution were received.
