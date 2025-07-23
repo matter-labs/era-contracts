@@ -103,10 +103,10 @@ contract InteropCenter is
     function setAddresses(address _assetRouter, address _assetTracker) external onlyOwner {
         address oldAssetRouter = assetRouter;
         address oldAssetTracker = address(assetTracker);
-        
+
         assetRouter = _assetRouter;
         assetTracker = IAssetTracker(_assetTracker);
-        
+
         emit NewAssetRouter(oldAssetRouter, _assetRouter);
         emit NewAssetTracker(oldAssetTracker, _assetTracker);
     }
