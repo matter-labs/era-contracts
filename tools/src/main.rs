@@ -47,9 +47,6 @@ struct Opt {
     #[structopt(long = "plonk_output_path", default_value = "data/VerifierPlonk.sol")]
     plonk_output_path: String,
 
-    /// The Verifier is to be compiled for an L2 network, where modexp precompile is not available.
-    #[structopt(short = "l2", long = "l2_mode")]
-    l2_mode: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -94,14 +91,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         &plonk_verifier_contract_template,
         &plonk_vk,
         &plonk_vk_hash,
-        opt.l2_mode,
     )?;
 
     let fflonk_verifier_contract_template = fflonk_insert_residue_elements_and_commitments(
         &fflonk_verifier_contract_template,
         &fflonk_vk,
         &fflonk_vk_hash,
-        opt.l2_mode,
     )?;
 
     let mut plonk_file = File::create(opt.plonk_output_path)?;
