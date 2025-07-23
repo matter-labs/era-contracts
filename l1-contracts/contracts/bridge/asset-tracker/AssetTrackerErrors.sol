@@ -17,4 +17,3 @@ error InvalidWithdrawalChainId();
 error NotMigratedChain();
 // 0xddb74934
 error InsufficientChainBalanceAssetTracker(uint256 chainId, bytes32 assetId, uint256 amount);
-
