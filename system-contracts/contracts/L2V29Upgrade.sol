@@ -36,22 +36,22 @@ contract L2V29Upgrade {
         ensureOwnable2StepOwner(address(L2_ASSET_ROUTER), _aliasedGovernance);
         ensureOwnable2StepOwner(address(L2_NATIVE_TOKEN_VAULT), _aliasedGovernance);
 
-        // 2. If the legacy shared bridge does not exist on this chain, no need to proceed
+        // 2. Call setAddresses in L2 Brighehub contract to set the address of ChainAssetHandler, a new contract.
+        setChainAssetHandler();
+
+        // 3. If the legacy shared bridge does not exist on this chain, no need to proceed
         address l2LegacySharedBridge = L2_ASSET_ROUTER.L2_LEGACY_SHARED_BRIDGE();
         if (l2LegacySharedBridge == address(0)) {
             // The chain does not have a legacy L2 shared bridge; no further work required.
             return;
         }
 
-        // 3. Migrate ownership of the legacy shared bridge and its beacon proxy.
+        // 4. Migrate ownership of the legacy shared bridge and its beacon proxy.
         migrateSharedBridgeLegacyOwner(l2LegacySharedBridge, _aliasedGovernance);
         migrateBeaconProxyOwner(l2LegacySharedBridge, _aliasedGovernance);
 
-        // 4. Patch the bridged ETH token metadata bug.
+        // 5. Patch the bridged ETH token metadata bug.
         fixBridgedETHBug(_bridgedEthAssetId, _aliasedGovernance);
-
-        // 5. Call setAddresses in L2 Brighehub contract to set the address of ChainAssetHandler, a new contract.
-        setChainAssetHandler();
     }
 
     /// @notice Calls setAddresses on L2 Bridgehub to set the address of newly appeared ChainAssetHandler contract.

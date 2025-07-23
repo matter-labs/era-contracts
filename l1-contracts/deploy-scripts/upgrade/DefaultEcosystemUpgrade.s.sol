@@ -615,10 +615,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
 
-        addresses.bridges.bridgedTokenBeacon = address(
-            L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy)).bridgedTokenBeacon()
-        );
-
         address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
         (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
@@ -1504,7 +1500,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
-        calls = new Call[](9);
+        calls = new Call[](8);
 
         calls[0] = _buildCallProxyUpgrade(
             addresses.stateTransition.chainTypeManagerProxy,
@@ -1545,11 +1541,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         calls[7] = _buildCallProxyUpgrade(
             addresses.bridges.erc20BridgeProxy,
             addresses.bridges.erc20BridgeImplementation
-        );
-
-        calls[8] = _buildCallBeaconProxyUpgrade(
-            addresses.bridges.bridgedTokenBeacon,
-            addresses.bridges.bridgedStandardERC20Implementation
         );
     }
 
