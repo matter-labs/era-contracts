@@ -28,7 +28,7 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IInteropHandler, CallStatus} from "contracts/interop/IInteropHandler.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
-import {UnauthorizedMessageSender} from "contracts/interop/InteropErrors.sol";
+import {UnauthorizedMessageSender, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
@@ -374,6 +374,31 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
 
         vm.expectRevert(
             abi.encodeWithSelector(UnauthorizedMessageSender.selector, L2_INTEROP_CENTER_ADDR, nonInteropCenter)
+        );
+
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+    }
+
+    /// @notice Regression test to ensure bundles can only be executed on the correct destination chain
+    /// @dev This test verifies that the fix for destination chain ID validation is working
+    function test_verifyBundle_revertWhen_wrongDestinationChainId() public {
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        uint256 wrongChainId = 12345;
+        interopBundle.destinationChainId = wrongChainId;
+
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(WrongDestinationChainId.selector, bundleHash, wrongChainId, block.chainid)
         );
 
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
