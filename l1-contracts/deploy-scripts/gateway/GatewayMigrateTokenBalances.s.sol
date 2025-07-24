@@ -83,6 +83,11 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
         bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile(toGateway ? chainId : gatewayChainId);
 
+        if (msgHashes.length == 0) {
+            console.log("No messages found for chainId:", chainId);
+            return;
+        }
+
         uint256 bridgedTokenCount = msgHashes.length;
         FinalizeL1DepositParams[] memory finalizeL1DepositParams = new FinalizeL1DepositParams[](bridgedTokenCount);
 

@@ -27,7 +27,18 @@ contract BroadcastUtils is Script {
             "latest.parsed.json"
         );
         // console.log("path", path);
-        string memory json = vm.readFile(path);
+        // string memory json = vm.readFile(path);
+
+        string memory json;
+        bool fileExists = true;
+
+        try vm.readFile(path) returns (string memory content) {
+            json = content;
+        } catch {
+            fileExists = false;
+            console.log("File does not exist at path:", path);
+            return new bytes32[](0);
+        }
 
         uint256 length = 0;
         bytes memory transactionBytes = vm.parseJson(json, "$.transactions");
