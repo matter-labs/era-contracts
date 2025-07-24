@@ -251,7 +251,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
     }
 
-    /// @dev set the post-V29 validator timelock. Cannot do it during initialization, as validatorTimelockPostV29 is deployed after CTM.
+    /// @dev Used to set post-V29 validator timelock. Cannot do it during initialization, as validatorTimelockPostV29 is deployed after CTM.
     /// @param _validatorTimelockPostV29 the new post-V29 upgradeable validatorTimelock address
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external onlyOwner {
         address oldvalidatorTimelockPostV29 = validatorTimelockPostV29;
