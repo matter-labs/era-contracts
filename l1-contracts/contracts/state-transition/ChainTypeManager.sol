@@ -241,7 +241,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    /// @dev set legacy validatorTimelock.
+    /// @dev Used to set legacy validatorTimelock.
     /// @dev Note, that the validator timelock that this function sets is only used for pre-v29 protocol versions.
     /// It is kept only for convenience.
     /// @param _validatorTimelock the new validatorTimelock address
@@ -251,7 +251,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
     }
 
-    /// @dev set the post-V29 validator timelock. Cannot do it during initialization, as validatorTimelockPostV29 is deployed after CTM.
+    /// @dev Used to set post-V29 validator timelock. Cannot do it during initialization, as validatorTimelockPostV29 is deployed after CTM.
     /// @param _validatorTimelockPostV29 the new post-V29 upgradeable validatorTimelock address
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external onlyOwner {
         address oldValidatorTimelockPostV29 = validatorTimelockPostV29;
@@ -586,10 +586,10 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return getZKChain(_chainId);
     }
 
-    /// @notice return the validator timelock address
+    /// @notice Returns the legacy validator timelock address.
     /// @dev This function is used to return the validator timelock address for pre-v29 protocol versions.
     /// @dev This function is deprecated and will be removed in the future.
-    function validatorTimelock() public view returns (address) {
+    function validatorTimelock() external view returns (address) {
         return __DEPRECATED_validatorTimelock;
     }
 }
