@@ -5,6 +5,7 @@ import "../../../lib/forge-std/src/Test.sol";
 import "../../../lib/forge-std/src/console.sol";
 import "./CelestiaL1DAValidator.sol";
 import "../../IL1DAValidator.sol";
+import {ISP1Verifier} from "./ISP1Verifier.sol";
 
 contract CelestiaL1DAValidatorTest is Test {
     CelestiaL1DAValidator public validator;
@@ -36,9 +37,9 @@ contract CelestiaL1DAValidatorTest is Test {
 
         // Deploy the validator contract
         validator = new CelestiaL1DAValidator(
-            0x397A5f7f3dBd538f23DE225B51f532c34448dA9B, // SP1Groth16Verifier
-            0xF0c6429ebAB2e7DC6e05DaFB61128bE21f13cb1e, // Blobstream
-            0x005a902e725cde951470b808cc74ba08d2470219e281b82aec0a1c239da7db7e // EQS Vkey
+            0x397A5f7f3dBd538f23DE225B51f532c34448dA9B, // SP1Groth16Verifier, Sepolia deployment
+            0xF0c6429ebAB2e7DC6e05DaFB61128bE21f13cb1e, // Blobstream, Sepolia deployment
+            0x009e55c6e4a99bfea454bb3575dc8558470f4d3347744821f1022fe8504da65a // EQS Vkey
         );
     }
 
@@ -74,14 +75,10 @@ contract CelestiaL1DAValidatorTest is Test {
             // Decode the input
             CelestiaZKStackInput memory decodedInput = abi.decode(testCase, (CelestiaZKStackInput));
             console.log("Decoded input");
+
             // In the real world, the "eqKeccakHash" comes from the L2 DA contract
             // we know it's valid because it's proved in the zkEVM.
             (bytes32 eqKeccakHash, bytes32 eqDataRoot) = abi.decode(decodedInput.publicValues, (bytes32, bytes32));
-            console.log("Decoded public values");
-
-            console.log("eqKeccakHash", vm.toString(eqKeccakHash));
-            console.log("eqDataRoot", vm.toString(eqDataRoot));
-            console.log("Input data length:", operatorDAInput.length);
 
             try validator.checkDA(0, 0, keccak256(abi.encodePacked(new bytes(32), eqKeccakHash)), operatorDAInput, MAX_BLOBS_SUPPORTED) returns (L1DAValidatorOutput memory output) {
                 console.log("Case", i, "passed!");

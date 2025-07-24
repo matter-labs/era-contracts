@@ -24,6 +24,7 @@ contract CelestiaL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
             _chainedBytecodesHash,
             _totalL2ToL1PubdataAndStateDiffs
         );
+        require(_leftoverSuffix.length == 0, "CelestiaL2DAValidator: leftoverSuffix must be empty");
 
         bytes32 fullPubdataHash = keccak256(_totalPubdata);
         outputHash = keccak256(abi.encodePacked(stateDiffHash, fullPubdataHash));
