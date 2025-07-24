@@ -43,10 +43,6 @@ contract setValidatorTimelockTest is ChainTypeManagerTest {
         address newValidatorTimelock = address(0x0000000000000000000000000000000000004235);
         chainContractAddress.setValidatorTimelockPostV29(newValidatorTimelock);
 
-        assertEq(
-            chainContractAddress.validatorTimelockPostV29(),
-            validator,
-            "Validator should not have been updated"
-        );
+        assertEq(chainContractAddress.validatorTimelockPostV29(), validator, "Validator should not have been updated");
     }
 }

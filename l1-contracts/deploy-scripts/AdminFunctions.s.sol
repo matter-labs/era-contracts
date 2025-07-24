@@ -649,18 +649,11 @@ contract AdminFunctions is Script {
         address validatorTimelock,
         bool _shouldSend
     ) public {
-        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(
-            bridgehub,
-            l2ChainId
-        );
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(bridgehub, l2ChainId);
 
         bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (l2ChainId, validatorAddress));
         Call[] memory calls = new Call[](1);
-        calls[0] = Call({
-            target: validatorTimelock,
-            value: 0,
-            data: callData
-        });
+        calls[0] = Call({target: validatorTimelock, value: 0, data: callData});
 
         saveAndSendAdminTx(l2ChainInfo.admin, calls, _shouldSend);
     }

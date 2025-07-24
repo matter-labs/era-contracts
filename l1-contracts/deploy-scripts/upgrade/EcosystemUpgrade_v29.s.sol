@@ -88,7 +88,6 @@ import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
-
 /// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
@@ -113,7 +112,9 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         bytes memory encodedOldValidatorTimelocks = toml.readBytes("$.V29.encoded_old_validator_timelocks");
         oldValidatorTimelocks = abi.decode(encodedOldValidatorTimelocks, (address[]));
 
-        bytes memory encodedOldGatewayValidatorTimelocks = toml.readBytes("$.V29.encoded_old_gateway_validator_timelocks");
+        bytes memory encodedOldGatewayValidatorTimelocks = toml.readBytes(
+            "$.V29.encoded_old_gateway_validator_timelocks"
+        );
         oldGatewayValidatorTimelocks = abi.decode(encodedOldGatewayValidatorTimelocks, (address[]));
     }
 
@@ -166,15 +167,12 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
             addresses.bridgehub.chainAssetHandlerProxy
         ) = deployTuppWithContract("ChainAssetHandler", false);
 
-        (
-            ,
-            addresses.stateTransition.validatorTimelock
-        ) = deployTuppWithContract("ValidatorTimelock", false);
+        (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
     }
 
     function deployUpgradeSpecificContractsGW() internal override {
         super.deployUpgradeSpecificContractsGW();
-        
+
         gatewayConfig.gatewayStateTransition.validatorTimelock = deployGWTuppWithContract("ValidatorTimelock");
     }
 
@@ -308,17 +306,27 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         return deployGWContract("L1V29Upgrade");
     }
 
-    function getInitializeCalldata(string memory contractName, bool isZKBytecode) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "ValidatorTimelock")) {
             if (!isZKBytecode) {
-                return abi.encodeCall(ValidatorTimelock.initialize, (config.ownerAddress, uint32(config.contracts.validatorTimelockExecutionDelay)));
+                return
+                    abi.encodeCall(
+                        ValidatorTimelock.initialize,
+                        (config.ownerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
+                    );
             } else {
                 // On Gateway, the delay is always 0.
-                return abi.encodeCall(ValidatorTimelock.initialize, (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), uint32(0)));
+                return
+                    abi.encodeCall(
+                        ValidatorTimelock.initialize,
+                        (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), uint32(0))
+                    );
             }
         } else {
             return super.getInitializeCalldata(contractName, isZKBytecode);
         }
     }
-
 }

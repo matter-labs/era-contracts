@@ -200,7 +200,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         deployVerifiers();
         deployUpgradeStageValidator();
 
-
         // Note, that this is the upgrade that will be used, despite the naming of the variable here.
         // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
 
@@ -275,7 +274,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
         notifyAboutDeployment(implementation, contractName, creationCalldata, contractName, true);
 
-        bytes memory proxyCreationCalldata = abi.encode(implementation, gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin, getInitializeCalldata(contractName, true));
+        bytes memory proxyCreationCalldata = abi.encode(
+            implementation,
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin,
+            getInitializeCalldata(contractName, true)
+        );
         proxyAddress = Utils.deployThroughL1Deterministic(
             ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
             proxyCreationCalldata,
@@ -286,9 +289,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             addresses.bridgehub.bridgehubProxy,
             addresses.bridges.l1AssetRouterProxy
         );
-        notifyAboutDeployment(proxyAddress, contractName, proxyCreationCalldata, string.concat(contractName, " Proxy"), true);
+        notifyAboutDeployment(
+            proxyAddress,
+            contractName,
+            proxyCreationCalldata,
+            string.concat(contractName, " Proxy"),
+            true
+        );
     }
-
 
     /// @notice Generate data required for the upgrade
     function generateUpgradeData() public virtual {
@@ -606,7 +614,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
         newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
             .validatorTimelock();
-        addresses.stateTransition.serverNotifierProxy = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).serverNotifierAddress();
+        addresses.stateTransition.serverNotifierProxy = ChainTypeManager(
+            addresses.stateTransition.chainTypeManagerProxy
+        ).serverNotifierAddress();
 
         newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
 
@@ -1063,13 +1073,18 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
-        address serverNotifierProxyAdmin = address(uint160(uint256(vm.load(addresses.stateTransition.serverNotifierProxy, ADMIN_SLOT))));
+        address serverNotifierProxyAdmin = address(
+            uint160(uint256(vm.load(addresses.stateTransition.serverNotifierProxy, ADMIN_SLOT)))
+        );
 
         Call memory call = Call({
             target: serverNotifierProxyAdmin,
             data: abi.encodeCall(
                 ProxyAdmin.upgrade,
-                (ITransparentUpgradeableProxy(payable(addresses.stateTransition.serverNotifierProxy)), addresses.stateTransition.serverNotifierImplementation)
+                (
+                    ITransparentUpgradeableProxy(payable(addresses.stateTransition.serverNotifierProxy)),
+                    addresses.stateTransition.serverNotifierImplementation
+                )
             ),
             value: 0
         });
@@ -1558,10 +1573,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     ) internal virtual returns (Call memory call) {
         call = Call({
             target: proxyAddress,
-            data: abi.encodeCall(
-                UpgradeableBeacon.upgradeTo,
-                (newImplementationAddress)
-            ),
+            data: abi.encodeCall(UpgradeableBeacon.upgradeTo, (newImplementationAddress)),
             value: 0
         });
     }

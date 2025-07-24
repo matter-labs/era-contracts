@@ -63,10 +63,7 @@ contract L2V29Upgrade {
         SystemContractHelper.mimicCallWithPropagatedRevert(
             address(L2_BRIDGE_HUB),
             owner,
-            abi.encodeCall(
-                IBridgehub.setChainAssetHandler,
-                (L2_CHAIN_ASSET_HANDLER)
-            )
+            abi.encodeCall(IBridgehub.setChainAssetHandler, (L2_CHAIN_ASSET_HANDLER))
         );
     }
 

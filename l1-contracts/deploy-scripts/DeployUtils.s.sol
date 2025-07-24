@@ -458,7 +458,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
         }
     }
 
-    function getInitializeCalldata(string memory contractName, bool isZKBytecode) internal virtual returns (bytes memory);
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual returns (bytes memory);
 
     function test() internal virtual {}
 }

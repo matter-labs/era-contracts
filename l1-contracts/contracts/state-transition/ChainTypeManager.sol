@@ -256,10 +256,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function setValidatorTimelockPostV29(address _validatorTimelockPostV29) external onlyOwner {
         address oldvalidatorTimelockPostV29 = validatorTimelockPostV29;
         validatorTimelockPostV29 = _validatorTimelockPostV29;
-        emit NewValidatorTimelockPostV29(
-            oldvalidatorTimelockPostV29,
-            _validatorTimelockPostV29
-        );
+        emit NewValidatorTimelockPostV29(oldvalidatorTimelockPostV29, _validatorTimelockPostV29);
     }
 
     /// @dev set ServerNotifier.
