@@ -19,4 +19,4 @@ jobs:
       - name: Find and check markdown files
         run: |
           GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          find . -type f -name "*.md" ! -path "*/node_modules/*" ! -path "*/openzeppelin*" ! -path "*/murky/*" -exec lychee --max-concurrency 1 --cache --retry-wait-time 10 --github-token $GITHUB_TOKEN {} +
+          find . -type f -name "*.md" ! -path "*/node_modules/*" ! -path "*/openzeppelin*" ! -path "*/murky/*" -exec lychee --max-concurrency 1 --cache --retry-wait-time 15 --github-token $GITHUB_TOKEN {} +
