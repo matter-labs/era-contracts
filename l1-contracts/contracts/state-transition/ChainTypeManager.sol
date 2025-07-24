@@ -50,9 +50,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     mapping(uint256 _protocolVersion => uint256) public protocolVersionDeadline;
 
     /// @dev The validatorTimelock contract address.
-    /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It will be deprecated after v29 upgrade.
-    /// We kept both validatorTimelock and validatorTimelockPostV29 for backward compatibility of nodes that rely on the validatorTimelock address being available.
-    address public validatorTimelock;
+    /// @dev Note, that address contains validator timelock for pre-v29 protocol versions. It is deprecated and will be removed in the future.
+    address internal __DEPRECATED_validatorTimelock;
 
     /// @dev The stored cutData for upgrade diamond cut. protocolVersion => cutHash
     mapping(uint256 protocolVersion => bytes32 cutHash) public upgradeCutHash;
@@ -69,7 +68,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @dev The contract, that notifies server about l1 changes
     address public serverNotifierAddress;
 
-    /// @dev The address of the post-V29 upgradeable validatorTimelock
+    /// @dev The address of the post-V29 upgradeable validatorTimelock.
+    /// @dev Both validatorTimelock and validatorTimelockPostV29 getters are available for backward compatibility of nodes that rely on the validatorTimelock address being available.
     address public validatorTimelockPostV29;
 
     /// @dev Contract is expected to be used as proxy implementation.
@@ -246,8 +246,8 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// It is kept only for convenience.
     /// @param _validatorTimelock the new validatorTimelock address
     function setLegacyValidatorTimelock(address _validatorTimelock) external onlyOwner {
-        address oldValidatorTimelock = validatorTimelock;
-        validatorTimelock = _validatorTimelock;
+        address oldValidatorTimelock = __DEPRECATED_validatorTimelock;
+        __DEPRECATED_validatorTimelock = _validatorTimelock;
         emit NewValidatorTimelock(oldValidatorTimelock, _validatorTimelock);
     }
 
@@ -436,7 +436,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             bytes32(uint256(uint160(address(this)))),
             bytes32(protocolVersion),
             bytes32(uint256(uint160(_admin))),
-            bytes32(uint256(uint160(validatorTimelock))),
+            bytes32(uint256(uint160(validatorTimelockPostV29))),
             _baseTokenAssetId,
             storedBatchZero,
             diamondCut.initCalldata
@@ -587,5 +587,12 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             return legacyAddress;
         }
         return getZKChain(_chainId);
+    }
+
+    /// @notice return the validator timelock address
+    /// @dev This function is used to return the validator timelock address for pre-v29 protocol versions.
+    /// @dev This function is deprecated and will be removed in the future.
+    function validatorTimelock() public view returns (address) {
+        return __DEPRECATED_validatorTimelock;
     }
 }
