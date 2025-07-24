@@ -59,7 +59,7 @@ library DynamicIncrementalMerkle {
         return bytes32(0);
     }
 
-    function setupMemory(Bytes32PushTree memory self, bytes32 zero) internal returns (bytes32 initialRoot) {
+    function setupMemory(Bytes32PushTree memory self, bytes32 zero) internal pure returns (bytes32 initialRoot) {
         self._nextLeafIndex = 0;
         self._zeros[0] = zero;
         self._zerosLengthMemory = 1;
@@ -91,7 +91,7 @@ library DynamicIncrementalMerkle {
         }
     }
 
-    function clearMemory(Bytes32PushTree memory self) internal {
+    function clearMemory(Bytes32PushTree memory self) internal pure {
         self._nextLeafIndex = 0;
         uint256 length = self._zerosLengthMemory;
         for (uint256 i = length; 0 < i; --i) {
@@ -156,7 +156,7 @@ library DynamicIncrementalMerkle {
         return (index, currentLevelHash);
     }
 
-    function pushMemory(Bytes32PushTree memory self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
+    function pushMemory(Bytes32PushTree memory self, bytes32 leaf) internal pure returns (uint256 index, bytes32 newRoot) {
         // Cache read
         uint256 levels = self._zerosLengthMemory - 1;
 
@@ -249,7 +249,7 @@ library DynamicIncrementalMerkle {
         return Arrays.unsafeAccess(self._sides, self._sides.length - 1).value;
     }
 
-    function rootMemory(Bytes32PushTree memory self) internal view returns (bytes32) {
+    function rootMemory(Bytes32PushTree memory self) internal pure returns (bytes32) {
         // note the last element of the sides array is the root, and is not really a side.
         return self._sides[self._sidesLengthMemory - 1];
     }
@@ -261,7 +261,7 @@ library DynamicIncrementalMerkle {
         return self._sides.length - 1;
     }
 
-    function heightMemory(Bytes32PushTree memory self) internal view returns (uint256) {
+    function heightMemory(Bytes32PushTree memory self) internal pure returns (uint256) {
         return self._sidesLengthMemory - 1;
     }
 }
