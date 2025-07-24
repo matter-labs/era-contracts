@@ -262,9 +262,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function deployGWTuppWithContract(string memory contractName) internal returns (address proxyAddress) {
-        console.log("hi");
         bytes memory creationCalldata = getCreationCalldata(contractName, true);
-        console.log("hi2");
         address implementation = Utils.deployThroughL1Deterministic(
             getCreationCode(contractName, true),
             creationCalldata,
@@ -275,7 +273,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             addresses.bridgehub.bridgehubProxy,
             addresses.bridges.l1AssetRouterProxy
         );
-        console.log("hi3");
         notifyAboutDeployment(implementation, contractName, creationCalldata, contractName, true);
 
         bytes memory proxyCreationCalldata = abi.encode(implementation, gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin, getInitializeCalldata(contractName, true));
@@ -317,9 +314,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
-        console.log("PREPARE DEFAULT GOVERNANCE CALLS");
         prepareDefaultGovernanceCalls();
-        console.log("PREPARE DEFAULT ECOSYSTEM ADMIN CALLS");
         prepareDefaultEcosystemAdminCalls();
     }
 
@@ -1057,9 +1052,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         Call[][] memory allCalls = new Call[][](1);
         allCalls[0] = prepareUpgradeServerNotifierCall();
         calls = mergeCallsArray(allCalls);
-
-        console.log("ADMIN CALLS");
-        console.logBytes(abi.encode(calls));
 
         string memory ecosystemAdminCallsSerialized = vm.serializeBytes(
             "ecosystem_admin_calls",

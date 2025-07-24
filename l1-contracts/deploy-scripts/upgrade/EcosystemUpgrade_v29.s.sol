@@ -216,7 +216,6 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         calls = mergeCallsArray(allCalls);
     }
 
-        /// @notice Additional calls to newConfigure contracts
     function prepareSetValidatorTimelockPostV29L1() internal virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
@@ -274,7 +273,6 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        // The CTM assetId has not yet been registered on production chains and so we need to calculate it manually.
         bytes32 chainAssetId = DataEncoding.encodeAssetId(
             block.chainid,
             bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
