@@ -122,9 +122,9 @@ library ContractsBytecodesLib {
             // Original: Getters.sol
             return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
         } else if (Utils.compareStrings(contractIdentifier, "VerifierFflonk")) {
-            return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
+            return Utils.readZKFoundryBytecodeL1("VerifierFflonk.sol", "VerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "VerifierPlonk")) {
-            return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
+            return Utils.readZKFoundryBytecodeL1("VerifierPlonk.sol", "VerifierPlonk");
         }
 
         // --- General Cases ---
