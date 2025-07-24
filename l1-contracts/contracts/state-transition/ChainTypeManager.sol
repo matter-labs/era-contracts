@@ -241,7 +241,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         emit NewAdmin(previousAdmin, currentPendingAdmin);
     }
 
-    /// @dev set legacy validatorTimelock.
+    /// @dev Used to set legacy validatorTimelock.
     /// @dev Note, that the validator timelock that this function sets is only used for pre-v29 protocol versions.
     /// It is kept only for convenience.
     /// @param _validatorTimelock the new validatorTimelock address
