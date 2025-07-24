@@ -45,7 +45,7 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         uint32 eqBatchNumber;
         uint64 eqChainId;
         // The public values must be exactly 4 x 32 bytes for keccak hash, data root, batch number, and chain id
-        require(publicValues.length == 128, "CelestiaL1DAValidator: invalid public values length");
+        require(publicValues.length == 76, "CelestiaL1DAValidator: invalid public values length");
         assembly {
             let ptr := add(publicValues, 32)  // skip length prefix
             eqKeccakHash := mload(ptr)        // first bytes32
