@@ -10,10 +10,9 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "./IBridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
-import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused} from "../common/L1ContractErrors.sol";

@@ -1710,15 +1710,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
                 initCalldata: ""
             });
             return abi.encode(block.chainid, diamondCut);
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
-            return
-                abi.encode(
-                    config.l1ChainId,
-                    config.ownerAddress,
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    addresses.bridgehub.messageRootProxy
-                );
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
             if (!isZKBytecode) {
                 return abi.encode(addresses.bridgehub.bridgehubProxy);
