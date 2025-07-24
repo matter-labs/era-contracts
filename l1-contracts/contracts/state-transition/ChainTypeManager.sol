@@ -586,7 +586,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         return getZKChain(_chainId);
     }
 
-    /// @notice return the validator timelock address
+    /// @notice Returns the legacy validator timelock address.
     /// @dev This function is used to return the validator timelock address for pre-v29 protocol versions.
     /// @dev This function is deprecated and will be removed in the future.
     function validatorTimelock() public view returns (address) {
