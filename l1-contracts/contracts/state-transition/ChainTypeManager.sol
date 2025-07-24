@@ -589,7 +589,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @notice Returns the legacy validator timelock address.
     /// @dev This function is used to return the validator timelock address for pre-v29 protocol versions.
     /// @dev This function is deprecated and will be removed in the future.
-    function validatorTimelock() public view returns (address) {
+    function validatorTimelock() external view returns (address) {
         return __DEPRECATED_validatorTimelock;
     }
 }
