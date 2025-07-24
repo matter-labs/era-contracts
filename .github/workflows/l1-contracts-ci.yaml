@@ -251,10 +251,10 @@ jobs:
         run: cargo run
 
       - name: Compare L1VerifierPlonk.sol
-        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierPlonk.sol
+        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/VerifierPlonk.sol
 
       - name: Compare VerifierFflonk.sol
-        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierFflonk.sol
+        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/VerifierFflonk.sol
 
   coverage:
     defaults:
