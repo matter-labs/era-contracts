@@ -41,13 +41,5 @@ cargo run --bin zksync_verifier_contract_generator --release -- --variant custom
 Omitting the `--variant` flag defaults to `custom` behavior:
 
 ```shell
-cargo run --bin zksync_verifier_contract_generator --release -- --plonk_input_path data/plonk_scheduler_key.json --fflonk_input_path data/fflonk_scheduler_key.json --plonk_output_path ../l1-contracts/contracts/state-transition/verifiers/L1VerifierPlonk.sol --fflonk_output_path ../l1-contracts/contracts/state-transition/verifiers/L1VerifierFflonk.sol
-```
-
-## L2 mode
-
-At the time of this writing, `modexp` precompile is not present on zkSync Era. In order to deploy the verifier on top of a ZK Chain, a different version has to be used with custom implementation of modular exponentiation.
-
-```shell
-cargo run --bin zksync_verifier_contract_generator --release --  --plonk_input_path data/plonk_scheduler_key.json --fflonk_input_path data/fflonk_scheduler_key.json --plonk_output_path ../l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol --l2_mode --fflonk_output_path ../l1-contracts/contracts/state-transition/verifiers/L2VerifierFflonk.sol
+cargo run --bin zksync_verifier_contract_generator --release -- --plonk_input_path data/plonk_scheduler_key.json --fflonk_input_path data/fflonk_scheduler_key.json --plonk_output_path ../l1-contracts/contracts/state-transition/verifiers/VerifierPlonk.sol --fflonk_output_path ../l1-contracts/contracts/state-transition/verifiers/VerifierFflonk.sol
 ```

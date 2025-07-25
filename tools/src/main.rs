@@ -72,9 +72,6 @@ struct Opt {
     #[structopt(long = "plonk_output_path", default_value = "data/VerifierPlonk.sol")]
     plonk_output_path: String,
 
-    /// The Verifier is to be compiled for an L2 network, where modexp precompile is not available.
-    #[structopt(short = "l2", long = "l2_mode")]
-    l2_mode: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -94,27 +91,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fflonk_verifier_contract_template =
         fs::read_to_string("data/fflonk_verifier_contract_template.txt")?;
 
-    let plonk_verifier_contract_template = if opt.l2_mode {
-        plonk_verifier_contract_template
-            .replace("contract VerifierPlonk", "contract L2VerifierPlonk")
-    } else {
-        plonk_verifier_contract_template
-            .replace("contract VerifierPlonk", "contract L1VerifierPlonk")
-    };
+    let plonk_verification_key = fs::read_to_string(&opt.plonk_input_path)
+        .unwrap_or_else(|_| panic!("Unable to read from {}", &opt.plonk_input_path));
 
-    let fflonk_verifier_contract_template = if opt.l2_mode {
-        fflonk_verifier_contract_template
-            .replace("contract VerifierFflonk", "contract L2VerifierFflonk")
-    } else {
-        fflonk_verifier_contract_template
-            .replace("contract VerifierFflonk", "contract L1VerifierFflonk")
-    };
-
-    let plonk_verification_key = fs::read_to_string(&plonk_input_path)
-        .unwrap_or_else(|_| panic!("Unable to read from {}", &plonk_input_path));
-
-    let fflonk_verification_key = fs::read_to_string(&fflonk_input_path)
-        .unwrap_or_else(|_| panic!("Unable to read from {}", &fflonk_input_path));
+    let fflonk_verification_key = fs::read_to_string(&opt.fflonk_input_path)
+        .unwrap_or_else(|_| panic!("Unable to read from {}", &opt.fflonk_input_path));
 
     let plonk_verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
         serde_json::from_str(&plonk_verification_key).unwrap();
@@ -132,7 +113,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         &plonk_verifier_contract_template,
         &plonk_vk,
         &plonk_vk_hash,
-        opt.l2_mode,
         &contract_name,
     )?;
 
@@ -140,7 +120,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         &fflonk_verifier_contract_template,
         &fflonk_vk,
         &fflonk_vk_hash,
-        opt.l2_mode,
         &contract_name,
     )?;
 
