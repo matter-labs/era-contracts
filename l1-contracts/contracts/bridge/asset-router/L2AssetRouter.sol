@@ -140,7 +140,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     ) external payable returns (bytes4) {
         // This function serves as the L2AssetRouter's entry point for processing cross-chain bridge operations
         // initiated through the InteropCenter system. It implements critical security validations:
-        // - L1->L2 calls: Only L1_ASSET_ROUTER can send messages from L1_CHAIN_ID
+        // - L1->L2 calls: Currently Interop can only be initiated on L2, so this case shouldn't be covered.
         // - L2->L2 calls: Only this contract (L2AssetRouter) can send messages from other L2 chains
         //
         // This dual validation prevents attackers from spoofing cross-chain messages by requiring
@@ -155,11 +155,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
 
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
-        require(
-            (senderChainId == L1_CHAIN_ID && senderAddress == L1_ASSET_ROUTER) ||
-                (senderChainId != L1_CHAIN_ID && senderAddress == address(this)),
-            Unauthorized(senderAddress)
-        );
+        require((senderChainId != L1_CHAIN_ID && senderAddress == address(this)), Unauthorized(senderAddress));
 
         // The payload must contain a valid finalizeDeposit selector to ensure only legitimate
         // bridge operations are executed. This prevents arbitrary function calls through the interop system.
