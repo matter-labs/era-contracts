@@ -36,25 +36,8 @@ pub fn create_hash_map<Type: Copy>(
     hash_map
 }
 
-pub fn get_modexp_function(l2_mode: bool) -> String {
-    if l2_mode {
-        r#"function modexp(value, power) -> res {
-                res := 1
-                for {
-
-                } gt(power, 0) {
-
-                } {
-                    if mod(power, 2) {
-                        res := mulmod(res, value, R_MOD)
-                    }
-                    value := mulmod(value, value, R_MOD)
-                    power := shr(1, power)
-                }
-            }"#
-        .to_string()
-    } else {
-        r#"function modexp(value, power) -> res {
+pub fn get_modexp_function() -> String {
+    r#"function modexp(value, power) -> res {
                 mstore(0x00, 0x20)
                 mstore(0x20, 0x20)
                 mstore(0x40, 0x20)
@@ -66,6 +49,5 @@ pub fn get_modexp_function(l2_mode: bool) -> String {
                 }
                 res := mload(0x00)
             }"#
-        .to_string()
-    }
+    .to_string()
 }

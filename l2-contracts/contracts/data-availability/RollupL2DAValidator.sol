@@ -7,7 +7,7 @@ import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
 import {PUBDATA_CHUNK_PUBLISHER} from "../L2ContractHelper.sol";
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
-import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+import {EfficientCall} from "@matterlabs/zksync-contracts/contracts/system-contracts/libraries/EfficientCall.sol";
 
 import {PubdataField, ReconstructionMismatch} from "./DAErrors.sol";
 

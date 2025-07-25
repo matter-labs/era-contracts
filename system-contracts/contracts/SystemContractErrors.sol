@@ -30,6 +30,8 @@ error CompressorEnumIndexNotEqual(uint256 expected, uint256 actual);
 error CompressorInitialWritesProcessedNotEqual(uint256 expected, uint256 actual);
 // 0x6ad429e8
 error CurrentBatchNumberMustBeGreaterThanZero();
+// 0x01e6c91e
+error DeprecatedFunction(bytes4 selector);
 // 0x9be48d8d
 error DerivedKeyNotEqualToCompressedValue(bytes32 expected, bytes32 provided);
 // 0xe223db5e
