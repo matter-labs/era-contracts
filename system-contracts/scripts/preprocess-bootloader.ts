@@ -106,7 +106,7 @@ const params = {
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
   RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2InteropRootStorage", "addInteropRoot"),
-  COMPRESSED_BYTECODES_SLOTS: 196608,
+  COMPRESSED_BYTECODES_SLOTS: 294912,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
   SYSTEM_CONTEXT_EXPECTED_CODE_HASH: getSystemContextCodeHash(),
@@ -119,7 +119,7 @@ const params = {
   //
   // In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
   // operator to ensure that it can form the correct calldata for the L1Messenger.
-  OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 1360000,
+  OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 2040000,
   ...SYSTEM_PARAMS,
 };
 

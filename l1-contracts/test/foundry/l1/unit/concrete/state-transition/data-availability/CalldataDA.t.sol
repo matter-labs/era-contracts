@@ -120,7 +120,7 @@ contract CalldataDATest is Test {
     function test_RevertWhen_OnlyOneBlobWithCalldataAllowed(uint256 blobsProvided) public {
         vm.assume(blobsProvided != 1);
         bytes32 fullPubdataHash = Utils.randomBytes32("fullPubdataHash");
-        uint256 maxBlobsSupported = 6;
+        uint256 maxBlobsSupported = 9;
         bytes memory pubdataInput = "";
 
         vm.expectRevert(OnlyOneBlobWithCalldataAllowed.selector);
@@ -129,7 +129,7 @@ contract CalldataDATest is Test {
 
     function test_RevertWhen_PubdataTooBig() public {
         uint256 blobsProvided = 1;
-        uint256 maxBlobsSupported = 6;
+        uint256 maxBlobsSupported = 9;
         bytes calldata pubdataInput = makeBytesArrayOfLength(BLOB_SIZE_BYTES + 33);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
@@ -139,7 +139,7 @@ contract CalldataDATest is Test {
 
     function test_RevertWhen_PubdataInputTooSmall() public {
         uint256 blobsProvided = 1;
-        uint256 maxBlobsSupported = 6;
+        uint256 maxBlobsSupported = 9;
         bytes calldata pubdataInput = makeBytesArrayOfLength(31);
         bytes32 fullPubdataHash = keccak256(pubdataInput);
 
@@ -151,7 +151,7 @@ contract CalldataDATest is Test {
 
     function test_RevertWhen_PubdataDoesntMatchPubdataHash() public {
         uint256 blobsProvided = 1;
-        uint256 maxBlobsSupported = 6;
+        uint256 maxBlobsSupported = 9;
         bytes memory pubdataInputWithoutBlobCommitment = "verifydonttrustzkistheendgamemagicmoonmath";
         bytes32 blobCommitment = Utils.randomBytes32("blobCommitment");
         bytes memory pubdataInput = abi.encodePacked(pubdataInputWithoutBlobCommitment, blobCommitment);
@@ -169,7 +169,7 @@ contract CalldataDATest is Test {
 
     function test_ProcessCalldataDA() public {
         uint256 blobsProvided = 1;
-        uint256 maxBlobsSupported = 6;
+        uint256 maxBlobsSupported = 9;
         bytes memory pubdataInputWithoutBlobCommitment = "verifydonttrustzkistheendgamemagicmoonmath";
         bytes32 blobCommitment = Utils.randomBytes32("blobCommitment");
         bytes memory pubdataInput = abi.encodePacked(pubdataInputWithoutBlobCommitment, blobCommitment);
@@ -182,13 +182,16 @@ contract CalldataDATest is Test {
             pubdataInput
         );
 
-        assertEq(blobCommitments.length, 6, "blobCommitmentsLength");
+        assertEq(blobCommitments.length, 9, "blobCommitmentsLength");
         assertEq(blobCommitments[0], blobCommitment, "blobCommitment1");
         assertEq(blobCommitments[1], bytes32(0), "blobCommitment2");
         assertEq(blobCommitments[2], bytes32(0), "blobCommitment3");
         assertEq(blobCommitments[3], bytes32(0), "blobCommitment4");
         assertEq(blobCommitments[4], bytes32(0), "blobCommitment5");
         assertEq(blobCommitments[5], bytes32(0), "blobCommitment6");
+        assertEq(blobCommitments[6], bytes32(0), "blobCommitment7");
+        assertEq(blobCommitments[7], bytes32(0), "blobCommitment8");
+        assertEq(blobCommitments[8], bytes32(0), "blobCommitment9");
         assertEq(pubdata, pubdataInputWithoutBlobCommitment, "pubdata");
     }
 
