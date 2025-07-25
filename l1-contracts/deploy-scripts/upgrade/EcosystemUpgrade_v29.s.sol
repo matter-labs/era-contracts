@@ -65,7 +65,7 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
 import {TransitionaryOwner} from "contracts/governance/TransitionaryOwner.sol";
 import {SystemContractsProcessing} from "./SystemContractsProcessing.s.sol";
@@ -85,17 +85,37 @@ import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol"
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 /// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
+    address[] internal oldValidatorTimelocks;
+    address[] internal oldGatewayValidatorTimelocks;
+
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_UPGRADE_ECOSYSTEM_OUTPUT"));
+
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
+        prepareDefaultEcosystemAdminCalls();
+    }
+
+    function initializeConfig(string memory newConfigPath) internal override {
+        super.initializeConfig(newConfigPath);
+        string memory toml = vm.readFile(newConfigPath);
+
+        bytes memory encodedOldValidatorTimelocks = toml.readBytes("$.V29.encoded_old_validator_timelocks");
+        oldValidatorTimelocks = abi.decode(encodedOldValidatorTimelocks, (address[]));
+
+        bytes memory encodedOldGatewayValidatorTimelocks = toml.readBytes(
+            "$.V29.encoded_old_gateway_validator_timelocks"
+        );
+        oldGatewayValidatorTimelocks = abi.decode(encodedOldGatewayValidatorTimelocks, (address[]));
     }
 
     function _getL2UpgradeTargetAndData(
@@ -115,25 +135,29 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         );
     }
 
-    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](1);
+    function getForceDeploymentNames() internal override returns (string[] memory) {
+        string[] memory forceDeploymentNames = new string[](1);
         forceDeploymentNames[0] = "L2V29Upgrade";
+        return forceDeploymentNames;
     }
 
     function getExpectedL2Address(string memory contractName) public override returns (address) {
         if (compareStrings(contractName, "L2V29Upgrade")) {
-            return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
+            return L2_VERSION_SPECIFIC_UPGRADER_ADDR;
         }
-
         return super.getExpectedL2Address(contractName);
     }
 
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode && compareStrings(contractName, "L1V29Upgrade")) {
-            return type(L1V29Upgrade).creationCode;
+    ) internal view override returns (bytes memory) {
+        if (compareStrings(contractName, "L1V29Upgrade")) {
+            if (!isZKBytecode) {
+                return type(L1V29Upgrade).creationCode;
+            } else {
+                return ContractsBytecodesLib.getCreationCode("L1V29Upgrade", true);
+            }
         }
         return super.getCreationCode(contractName, isZKBytecode);
     }
@@ -148,7 +172,174 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         return super.getCreationCalldata(contractName, isZKBytecode);
     }
 
+    function deployUpgradeSpecificContractsL1() internal override {
+        super.deployUpgradeSpecificContractsL1();
+
+        (
+            addresses.bridgehub.chainAssetHandlerImplementation,
+            addresses.bridgehub.chainAssetHandlerProxy
+        ) = deployTuppWithContract("ChainAssetHandler", false);
+
+        (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
+    }
+
+    function deployUpgradeSpecificContractsGW() internal override {
+        super.deployUpgradeSpecificContractsGW();
+
+        gatewayConfig.gatewayStateTransition.validatorTimelock = deployGWTuppWithContract("ValidatorTimelock");
+    }
+
+    function encodePostUpgradeCalldata(
+        StateTransitionDeployedAddresses memory stateTransitionAddresses
+    ) internal override returns (bytes memory) {
+        address[] memory oldValidatorTimelocks = stateTransitionAddresses.isOnGateway
+            ? oldGatewayValidatorTimelocks
+            : oldValidatorTimelocks;
+        return
+            abi.encode(
+                L1V29Upgrade.V29UpgradeParams({
+                    oldValidatorTimelocks: oldValidatorTimelocks,
+                    newValidatorTimelock: stateTransitionAddresses.validatorTimelock
+                })
+            );
+    }
+
+    function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](3);
+        allCalls[0] = prepareSetValidatorTimelockPostV29L1();
+        allCalls[1] = prepareSetChainAssetHandlerOnBridgehubCall();
+        allCalls[2] = prepareSetCtmAssetHandlerAddressOnL1Call();
+        calls = mergeCallsArray(allCalls);
+    }
+
+    function prepareVersionSpecificStage1GovernanceCallsGW(
+        uint256 priorityTxsL2GasLimit,
+        uint256 maxExpectedL1GasPrice
+    ) public override returns (Call[] memory calls) {
+        // The below does not contain the call to set the chain asset handler address on Bridgehub on GW, because
+        // it is done for all ZK Chains as part of the `L2V29Upgrade` upgrade.
+
+        // This is the calldata needed to set the chain asset handler as the asset handler for the CTM.
+        Call[][] memory allCalls = new Call[][](2);
+        allCalls[0] = prepareSetCtmAssetHandlerAddressOnGWCall(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[1] = prepareSetValidatorTimelockPostV29GW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+
+        calls = mergeCallsArray(allCalls);
+    }
+
+    function prepareSetValidatorTimelockPostV29L1() internal virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: addresses.stateTransition.chainTypeManagerProxy,
+            data: abi.encodeCall(
+                IChainTypeManager.setValidatorTimelockPostV29,
+                (addresses.stateTransition.validatorTimelock)
+            ),
+            value: 0
+        });
+    }
+
+    function prepareSetValidatorTimelockPostV29GW(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        bytes memory l2Calldata = abi.encodeCall(
+            IChainTypeManager.setValidatorTimelockPostV29,
+            (gatewayConfig.gatewayStateTransition.validatorTimelock)
+        );
+
+        calls = _prepareL1ToGatewayCall(
+            l2Calldata,
+            l2GasLimit,
+            l1GasPrice,
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+        );
+    }
+
+    function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: addresses.bridgehub.bridgehubProxy,
+            data: abi.encodeCall(Bridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
+            value: 0
+        });
+    }
+
+    /// @notice Sets ctm asset handler address on L1. We need to update it because of ChainAssetHandler appearance.
+    function prepareSetCtmAssetHandlerAddressOnL1Call() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+
+        calls[0] = Call({
+            target: addresses.bridgehub.ctmDeploymentTrackerProxy,
+            data: abi.encodeCall(
+                CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1,
+                (addresses.stateTransition.chainTypeManagerProxy)
+            ),
+            value: 0
+        });
+    }
+
+    function prepareSetCtmAssetHandlerAddressOnGWCall(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        bytes32 chainAssetId = DataEncoding.encodeAssetId(
+            block.chainid,
+            bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
+            addresses.bridgehub.ctmDeploymentTrackerProxy
+        );
+
+        bytes memory secondBridgeData = abi.encodePacked(
+            SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION,
+            abi.encode(chainAssetId, L2_CHAIN_ASSET_HANDLER_ADDR)
+        );
+
+        calls = Utils.mergeCalls(
+            calls,
+            Utils.prepareGovernanceL1L2TwoBridgesTransaction(
+                l1GasPrice,
+                l2GasLimit,
+                gatewayConfig.chainId,
+                addresses.bridgehub.bridgehubProxy,
+                addresses.bridges.l1AssetRouterProxy,
+                addresses.bridges.l1AssetRouterProxy,
+                0,
+                secondBridgeData,
+                msg.sender
+            )
+        );
+    }
+
     function deployUsedUpgradeContract() internal override returns (address) {
         return deploySimpleContract("L1V29Upgrade", false);
+    }
+
+    function deployUsedUpgradeContractGW() internal override returns (address) {
+        return deployGWContract("L1V29Upgrade");
+    }
+
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "ValidatorTimelock")) {
+            if (!isZKBytecode) {
+                return
+                    abi.encodeCall(
+                        ValidatorTimelock.initialize,
+                        (config.ownerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
+                    );
+            } else {
+                // On Gateway, the delay is always 0.
+                return
+                    abi.encodeCall(
+                        ValidatorTimelock.initialize,
+                        (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), uint32(0))
+                    );
+            }
+        } else {
+            return super.getInitializeCalldata(contractName, isZKBytecode);
+        }
     }
 }

@@ -12,5 +12,9 @@ interface IBridgehub {
         address _chainAssetHandler
     ) external;
 
+    function setChainAssetHandler(address _chainAssetHandler) external;
+
     function owner() external view returns (address);
+
+    function l1CtmDeployer() external returns (address);
 }
