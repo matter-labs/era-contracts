@@ -57,6 +57,8 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
     }
 
     /// @notice Used to register the ctm asset in L1 contracts, AssetRouter and Bridgehub.
+    /// @dev This function is called during the ecosystem genesis process
+    /// @dev while `setCtmAssetHandlerAddressOnL1` is called during the ecosystem upgrade process.
     /// @param _ctmAddress the address of the ctm asset
     function registerCTMAssetOnL1(address _ctmAddress) external onlyOwner {
         if (!BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress)) {
@@ -70,6 +72,8 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
     }
 
     /// @notice Used to set the ctm asset handler address in L1AssetRouter.
+    /// @dev This function is called during the ecosystem upgrade process
+    /// @dev while `registerCTMAssetOnL1` is called during the ecosystem genesis process.
     /// @param _ctmAddress the address of the ctm asset.
     function setCtmAssetHandlerAddressOnL1(address _ctmAddress) external onlyOwner {
         L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(
