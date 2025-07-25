@@ -77,10 +77,6 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         return SHA256_ROUND_GAS_COST * ((_length + 8) / SHA256_ROUND_NUMBER_OF_BYTES + 1);
     }
 
-    function logTreeSides() internal view returns (bytes32[] memory logSides) {
-        return logsTree._sides;
-    }
-
     /// @notice Sends L2ToL1Log.
     /// @param _isService The `isService` flag.
     /// @param _key The `key` part of the L2Log.
@@ -127,12 +123,6 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
 
         logIdInMerkleTree = numberOfLogsToProcess;
         ++numberOfLogsToProcess;
-
-        if (logIdInMerkleTree == 0) {
-            logsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-        }
-
-        logsTree.push(hashedLog);
 
         emit L2ToL1LogSent(_l2ToL1Log);
     }
@@ -359,7 +349,6 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         );
 
         /// Clear logs state
-        logsTree.clear();
         numberOfLogsToProcess = 0;
         chainedMessagesHash = bytes32(0);
         chainedL1BytecodesRevealDataHash = bytes32(0);
