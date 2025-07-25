@@ -468,15 +468,36 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         });
     }
 
+    function getForceDeployment(
+        string memory contractName
+    ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
+        return
+            IL2ContractDeployer.ForceDeployment({
+                bytecodeHash: getL2BytecodeHash(contractName),
+                newAddress: getExpectedL2Address(contractName),
+                callConstructor: false,
+                value: 0,
+                input: ""
+            });
+    }
+
     function getAdditionalForceDeployments()
         internal
-        virtual
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
     {
-        return new IL2ContractDeployer.ForceDeployment[](0);
+        string[] memory forceDeploymentNames = getForceDeploymentNames();
+        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentNames.length);
+        for (uint256 i; i < forceDeploymentNames.length; i++) {
+            additionalForceDeployments[i] = getForceDeployment(forceDeploymentNames[i]);
+        }
+        return additionalForceDeployments;
     }
 
     function getAdditionalDependenciesNames() internal virtual returns (string[] memory forceDeploymentNames) {
+        return new string[](0);
+    }
+
+    function getForceDeploymentNames() internal virtual returns (string[] memory forceDeploymentNames) {
         forceDeploymentNames = new string[](0);
     }
 
@@ -614,12 +635,15 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
-        return
-            Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), // the same as it is currently in the DeployL1.s.sol. Todo unify.
-                getL2BytecodeHash(contractName),
-                hex"" // the same as it is currently in DeployL1.s.sol
-            );
+        string[2] memory expectedCreate2Deployed = ["RollupL2DAValidator", "NoDAL2DAValidator"];
+
+        for (uint256 i; i < expectedCreate2Deployed.length; i++) {
+            if (compareStrings(contractName, expectedCreate2Deployed[i])) {
+                return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
+            }
+        }
+
+        revert(string.concat("No expected L2 address for: ", contractName));
     }
 
     function getGovernanceUpgradeInitialDelay() external view virtual returns (uint256) {
