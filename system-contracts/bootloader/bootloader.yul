@@ -562,7 +562,7 @@ object "Bootloader" {
             /// for the sake of simplicity we will spend 32 bytes on each
             /// of those for now.
             function MAX_MEM_SIZE() -> ret {
-                ret := 80000000
+                ret := 120000000
             }
 
             function L1_TX_INTRINSIC_L2_GAS() -> ret {
