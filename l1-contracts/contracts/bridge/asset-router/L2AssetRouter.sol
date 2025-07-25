@@ -20,7 +20,7 @@ import {InteropCallStarter} from "../../common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, Unauthorized, TokenNotLegacy, InvalidSelector, PayloadTooShort, ExecuteMessageFailed} from "../../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, ExecuteMessageFailed, InvalidCaller, InvalidSelector, PayloadTooShort, TokenNotLegacy, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IERC7786Receiver} from "../../interop/IERC7786Receiver.sol";
 import {IERC7786Attributes} from "../../interop/IERC7786Attributes.sol";
 
@@ -53,15 +53,13 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
         if (_chainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
-            if (
-                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) &&
-                msg.sender != address(this) &&
-                (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != address(this))
-            ) {
+            if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && msg.sender != address(this)) {
                 revert InvalidCaller(msg.sender);
             }
         } else {
-            revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            if (msg.sender != address(this)) {
+                revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
+            }
         }
         _;
     }

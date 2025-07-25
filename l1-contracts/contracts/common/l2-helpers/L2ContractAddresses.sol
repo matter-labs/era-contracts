@@ -9,6 +9,10 @@ import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
+import {IInteropCenter} from "../../interop/IInteropCenter.sol";
+import {IAssetTracker} from "../../bridge/asset-tracker/IAssetTracker.sol";
+import {ISystemContext} from "../interfaces/ISystemContext.sol";
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
@@ -52,6 +56,7 @@ IBaseToken constant L2_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(L2_BASE_TOKEN_SYS
 
 /// @dev The address of the context system contract
 address constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0b);
+ISystemContext constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT = ISystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);
 
 /// @dev The address of the pubdata chunk publisher contract
 address constant L2_PUBDATA_CHUNK_PUBLISHER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x11);
@@ -99,12 +104,15 @@ IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(add
 
 /// @dev The address of the L2 chain handler system contract
 address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
+IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
 
 /// @dev the address of the L2 interop center
 address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
+IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
 /// @dev the address of the L2 interop handler
 address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
 
 /// @dev the address of the L2 asset tracker
 address constant L2_ASSET_TRACKER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
+IAssetTracker constant L2_ASSET_TRACKER = IAssetTracker(L2_ASSET_TRACKER_ADDR);

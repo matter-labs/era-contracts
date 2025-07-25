@@ -16,7 +16,7 @@ import {IL2AssetRouter} from "./asset-router/IL2AssetRouter.sol";
 import {IL2NativeTokenVault} from "./ntv/IL2NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
-import {AmountMustBeGreaterThanZero, DeployFailed, EmptyBytes32, Unauthorized, ZeroAddress, InvalidCaller} from "../common/L1ContractErrors.sol";
+import {AmountMustBeGreaterThanZero, DeployFailed, EmptyBytes32, InvalidCaller, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
