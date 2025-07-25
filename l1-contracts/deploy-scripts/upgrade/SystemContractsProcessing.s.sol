@@ -250,23 +250,21 @@ library SystemContractsProcessing {
             isPrecompile: false
         });
         systemContracts[30] = SystemContract({
-            addr: 0x0000000000000000000000000000000000010001,
-            codeName: "L2V29Upgrade",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-        systemContracts[31] = SystemContract({
             addr: 0x0000000000000000000000000000000000010006,
             codeName: "SloadContract",
             lang: Language.Solidity,
             isPrecompile: false
         });
-        systemContracts[32] = SystemContract({
+        systemContracts[31] = SystemContract({
             addr: 0x0000000000000000000000000000000000010008,
             codeName: "L2InteropRootStorage",
             lang: Language.Solidity,
             isPrecompile: false
         });
+
+        // Note, that we do not populate the system contract for the genesis upgrade address,
+        // as it is used during the genesis upgrade or during upgrades (and so it should be populated
+        // as part of the upgrade script).
 
         return systemContracts;
     }

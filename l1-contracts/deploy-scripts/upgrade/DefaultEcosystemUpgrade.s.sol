@@ -448,9 +448,6 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         // Additional force deployments after Gateway
         IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments = getAdditionalForceDeployments();
-        // add additional force deployments here
-
-        // TODO: do we update *all* fixed force deployments?
 
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = SystemContractsProcessing.mergeForceDeployments(
             baseForceDeployments,
@@ -471,31 +468,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         });
     }
 
-    function getForceDeployment(
-        string memory contractName
-    ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
-        return
-            IL2ContractDeployer.ForceDeployment({
-                bytecodeHash: getL2BytecodeHash(contractName),
-                newAddress: getExpectedL2Address(contractName),
-                callConstructor: true,
-                value: 0,
-                input: "" // todo add constructor args here?
-            });
-    }
-
     function getAdditionalForceDeployments()
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
     {
-        string[] memory forceDeploymentNames = getForceDeploymentNames();
-        additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentNames.length);
-        for (uint256 i; i < forceDeploymentNames.length; i++) {
-            additionalForceDeployments[i] = getForceDeployment(forceDeploymentNames[i]);
-        }
+        return new IL2ContractDeployer.ForceDeployment[](0);
     }
 
-    function getForceDeploymentNames() internal virtual returns (string[] memory forceDeploymentNames) {
+    function getAdditionalDependenciesNames() internal virtual returns (string[] memory forceDeploymentNames) {
         forceDeploymentNames = new string[](0);
     }
 
@@ -648,13 +628,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
-        string[] memory additionalForceDeployments = getForceDeploymentNames();
+        string[] memory additionalForceDeployments = getAdditionalDependenciesNames();
 
         bytes[] memory additionalDependencies = new bytes[](5 + additionalForceDeployments.length); // Deps after Gateway upgrade
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+        // TODO(refactor): do we need this?
         additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
