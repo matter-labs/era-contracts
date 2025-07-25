@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import {Merkle} from "./Merkle.sol";
 import {Arrays} from "@openzeppelin/contracts-v4/utils/Arrays.sol";
@@ -59,7 +59,8 @@ library DynamicIncrementalMerkle {
         return bytes32(0);
     }
 
-    function setupMemory(Bytes32PushTree memory self, bytes32 zero) internal returns (bytes32 initialRoot) {
+    /// @dev Same as above, but for memory tree.
+    function setupMemory(Bytes32PushTree memory self, bytes32 zero) internal pure returns (bytes32 initialRoot) {
         self._nextLeafIndex = 0;
         self._zeros[0] = zero;
         self._zerosLengthMemory = 1;
@@ -91,7 +92,8 @@ library DynamicIncrementalMerkle {
         }
     }
 
-    function clearMemory(Bytes32PushTree memory self) internal {
+    /// @dev Same as above, but for memory tree.
+    function clearMemory(Bytes32PushTree memory self) internal pure {
         self._nextLeafIndex = 0;
         uint256 length = self._zerosLengthMemory;
         for (uint256 i = length; 0 < i; --i) {
@@ -156,7 +158,11 @@ library DynamicIncrementalMerkle {
         return (index, currentLevelHash);
     }
 
-    function pushMemory(Bytes32PushTree memory self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
+    /// @dev Same as above, but for memory tree.
+    function pushMemory(
+        Bytes32PushTree memory self,
+        bytes32 leaf
+    ) internal pure returns (uint256 index, bytes32 newRoot) {
         // Cache read
         uint256 levels = self._zerosLengthMemory - 1;
 
@@ -207,7 +213,6 @@ library DynamicIncrementalMerkle {
     /**
      * @dev Extend until end.
      */
-
     /// @dev here we can extend the array, so the depth is not predetermined.
     function extendUntilEnd(Bytes32PushTree storage self, uint256 finalDepth) internal {
         bytes32 currentZero = self._zeros[self._zeros.length - 1];
@@ -224,7 +229,7 @@ library DynamicIncrementalMerkle {
         }
     }
 
-    /// @dev
+    /// @dev Same as above, but for memory tree.
     function extendUntilEndMemory(Bytes32PushTree memory self) internal pure {
         bytes32 currentZero = self._zeros[self._zerosLengthMemory - 1];
         if (self._nextLeafIndex == 0) {
@@ -249,8 +254,8 @@ library DynamicIncrementalMerkle {
         return Arrays.unsafeAccess(self._sides, self._sides.length - 1).value;
     }
 
-    function rootMemory(Bytes32PushTree memory self) internal view returns (bytes32) {
-        // note the last element of the sides array is the root, and is not really a side.
+    /// @dev Same as above, but for memory tree.
+    function rootMemory(Bytes32PushTree memory self) internal pure returns (bytes32) {
         return self._sides[self._sidesLengthMemory - 1];
     }
 
@@ -261,7 +266,8 @@ library DynamicIncrementalMerkle {
         return self._sides.length - 1;
     }
 
-    function heightMemory(Bytes32PushTree memory self) internal view returns (uint256) {
+    /// @dev Same as above, but for memory tree.
+    function heightMemory(Bytes32PushTree memory self) internal pure returns (uint256) {
         return self._sidesLengthMemory - 1;
     }
 }

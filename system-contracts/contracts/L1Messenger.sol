@@ -34,7 +34,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
 
     /// @notice Sequential hash of logs sent in the current block.
     /// @dev Will be reset at the end of the block to zero value.
-    bytes32 internal __DEPRECATED_chainedLogsHash;
+    bytes32 internal chainedLogsHash;
 
     /// @notice Number of logs sent in the current block.
     /// @dev Will be reset at the end of the block to zero value.
@@ -75,10 +75,6 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
     /// The gas cost of calculation of sha256 of bytes array of such length.
     function sha256GasCost(uint256 _length) internal pure returns (uint256) {
         return SHA256_ROUND_GAS_COST * ((_length + 8) / SHA256_ROUND_NUMBER_OF_BYTES + 1);
-    }
-
-    function logTreeSides() internal view returns (bytes32[] memory logSides) {
-        return logsTree._sides;
     }
 
     /// @notice Sends L2ToL1Log.
@@ -123,16 +119,11 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             )
         );
 
+        chainedLogsHash = keccak256(abi.encode(chainedLogsHash, hashedLog));
+
         logIdInMerkleTree = numberOfLogsToProcess;
         ++numberOfLogsToProcess;
 
-        if (logIdInMerkleTree == 0) {
-            logsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-        }
-
-        // kl todo 1.
-        // chainedLogsHash = keccak256(abi.encode(chainedLogsHash, hashedLog));
-        logsTree.push(hashedLog);
         emit L2ToL1LogSent(_l2ToL1Log);
     }
 
@@ -242,19 +233,16 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         }
         calldataPtr += 4;
 
-        bytes32 inputLogsRootHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
-        bytes32 storedLogsRootHash;
-        if (numberOfLogsToProcess == 0) {
-            logsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-        }
-        logsTree.extendUntilEnd(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
-        storedLogsRootHash = logsTree.root();
-        if (inputLogsRootHash != storedLogsRootHash) {
-            // revert ReconstructionMismatch(PubdataField.InputLogsHash, storedLogsRootHash, inputLogsRootHash);
-            // kl todo
+        bytes32 inputChainedLogsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
+        if (inputChainedLogsHash != chainedLogsHash) {
+            revert ReconstructionMismatch(PubdataField.InputLogsHash, chainedLogsHash, inputChainedLogsHash);
         }
         calldataPtr += 32;
-        calldataPtr += 32; // todo remove and change memory layout
+
+        // Check happens below after we reconstruct the logs root hash
+        bytes32 inputLogsRootHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
+        calldataPtr += 32;
+
         bytes32 inputChainedMsgsHash = bytes32(_operatorInput[calldataPtr:calldataPtr + 32]);
         if (inputChainedMsgsHash != chainedMessagesHash) {
             revert ReconstructionMismatch(PubdataField.InputMsgsHash, chainedMessagesHash, inputChainedMsgsHash);
@@ -312,25 +300,26 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
                 _zerosLengthMemory: 0
             });
         reconstructedLogsTree.setupMemory(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
+        bytes32 reconstructedChainedLogsHash = bytes32(0);
         for (uint256 i = 0; i < numberOfL2ToL1Logs; ++i) {
             bytes32 hashedLog = EfficientCall.keccak(
                 _operatorInput[calldataPtr:calldataPtr + L2_TO_L1_LOG_SERIALIZE_SIZE]
             );
             calldataPtr += L2_TO_L1_LOG_SERIALIZE_SIZE;
             reconstructedLogsTree.pushMemory(hashedLog);
+            reconstructedChainedLogsHash = keccak256(abi.encode(reconstructedChainedLogsHash, hashedLog));
         }
-        // bytes32 localLogsRootHash = reconstructedLogsTree.rootMemory();
+        if (reconstructedChainedLogsHash != chainedLogsHash) {
+            revert ReconstructionMismatch(PubdataField.LogsHash, chainedLogsHash, reconstructedChainedLogsHash);
+        }
         reconstructedLogsTree.extendUntilEndMemory();
         bytes32 localLogsRootHash = reconstructedLogsTree.rootMemory();
-        // if (localLogsRootHash != inputLogsRootHash) {
-        //     revert ReconstructionMismatch(PubdataField.LogsHash, inputLogsRootHash, localLogsRootHash);
-        // }
 
         bytes32 messageRootHash = L2_MESSAGE_ROOT.getAggregatedRoot();
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, messageRootHash));
 
         if (inputLogsRootHash != localLogsRootHash) {
-            //     revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputLogsRootHash);
+            revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputLogsRootHash);
         }
 
         bytes32 l2DAValidatorOutputhash = bytes32(0);
@@ -360,7 +349,6 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         );
 
         /// Clear logs state
-        logsTree.clear();
         numberOfLogsToProcess = 0;
         chainedMessagesHash = bytes32(0);
         chainedL1BytecodesRevealDataHash = bytes32(0);
