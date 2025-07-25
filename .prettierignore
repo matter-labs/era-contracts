@@ -14,3 +14,6 @@ l1-contracts/artifacts-forge
 l1-contracts/zkout
 l2-contracts/zkout
 system-contracts/zkout
+tee-contracts/broadcast
+tee-contracts/test/sig_quote_v3_sgx
+tee-contracts/test/sig_quote_v4_tdx
