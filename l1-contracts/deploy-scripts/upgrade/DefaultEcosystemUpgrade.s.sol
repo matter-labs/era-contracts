@@ -470,6 +470,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
     function getAdditionalForceDeployments()
         internal
+        virtual
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
     {
         return new IL2ContractDeployer.ForceDeployment[](0);
