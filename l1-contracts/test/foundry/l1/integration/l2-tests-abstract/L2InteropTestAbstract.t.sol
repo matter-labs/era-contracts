@@ -26,8 +26,11 @@ import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {IInteropHandler, CallStatus} from "contracts/interop/IInteropHandler.sol";
 import {IERC7786Attributes} from "contracts/interop/IERC7786Attributes.sol";
+import {UnauthorizedMessageSender, WrongDestinationChainId} from "contracts/interop/InteropErrors.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -42,6 +45,8 @@ import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contra
 import {IMessageVerification} from "contracts/state-transition/chain-interfaces/IMessageVerification.sol";
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "./Utils.sol";
 import {GasFields, InteropTrigger, TRIGGER_IDENTIFIER} from "contracts/dev-contracts/test/Utils.sol";
+import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
+import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 
 abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
     address constant UNBUNDLER_ADDRESS = address(0x1);
@@ -86,7 +91,8 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // (bool success, ) = recipient.call(data);
         // assertTrue(success);
     }
-    function getInclusionProof() public view returns (MessageInclusionProof memory) {
+
+    function getInclusionProof(address messageSender) public view returns (MessageInclusionProof memory) {
         bytes32[] memory proof = new bytes32[](27);
         proof[0] = bytes32(0x010f050000000000000000000000000000000000000000000000000000000000);
         proof[1] = bytes32(0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba);
@@ -123,7 +129,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
                 l2MessageIndex: 0,
                 message: L2Message(
                     0,
-                    address(0x0000000000000000000000000000000000010003),
+                    address(messageSender),
                     hex"9c884fd1000000000000000000000000000000000000000000000000000000000000010f76b59944c0e577e988c1b823ef4ad168478ddfe6044cca433996ade7637ec70d00000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d81300000000000000000000000083aeb38092d5f5a5cf7fb8ccf94c981c1d37d813000000000000000000000000ee0dcf9b8c3048530fd6b2211ae3ba32e8590905000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000001c1010000000000000000000000000000000000000000000000000000000000000009000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000180000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000004574254430000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000457425443000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000"
                 ),
                 proof: proof
@@ -131,7 +137,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function test_l2MessageVerification() public {
-        MessageInclusionProof memory proof = getInclusionProof();
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
         L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared(
             proof.chainId,
             proof.l1BatchNumber,
@@ -153,7 +159,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
     function test_executeBundle() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof();
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
         vm.mockCall(
             address(L2_MESSAGE_VERIFICATION),
             abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
@@ -164,14 +170,31 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
             abi.encode(bytes(""))
         );
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+        // Expect event
+        vm.expectEmit(true, false, false, false);
+        emit IInteropHandler.BundleExecuted(bundleHash);
         vm.prank(EXECUTION_ADDRESS);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).executeBundle(bundle, proof);
+        // Check storage changes
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            2,
+            "BundleStatus should be FullyExecuted"
+        );
+        for (uint256 i = 0; i < interopBundle.calls.length; ++i) {
+            assertEq(
+                uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, i)),
+                1,
+                "CallStatus should be Executed"
+            );
+        }
     }
 
     function test_unbundleBundle() public {
         InteropBundle memory interopBundle = getInteropBundle(3);
         bytes memory bundle = abi.encode(interopBundle);
-        MessageInclusionProof memory proof = getInclusionProof();
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
         vm.mockCall(
             address(L2_MESSAGE_VERIFICATION),
             abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
@@ -182,6 +205,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
             abi.encode(bytes(""))
         );
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
         CallStatus[] memory callStatuses1 = new CallStatus[](3);
         callStatuses1[0] = CallStatus.Unprocessed;
@@ -191,10 +215,64 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         callStatuses2[0] = CallStatus.Executed;
         callStatuses2[1] = CallStatus.Cancelled;
         callStatuses2[2] = CallStatus.Unprocessed;
+        // Expect events for first unbundle
+        vm.expectEmit(true, false, false, false);
+        emit IInteropHandler.CallProcessed(bundleHash, 1, CallStatus.Cancelled);
+        vm.expectEmit(true, false, false, false);
+        emit IInteropHandler.CallProcessed(bundleHash, 2, CallStatus.Executed);
+        vm.expectEmit(true, false, false, false);
+        emit IInteropHandler.BundleUnbundled(bundleHash);
         vm.prank(UNBUNDLER_ADDRESS);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses1);
+        // Check storage changes after first unbundle
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
+            0,
+            "Call 0 should be Unprocessed"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)),
+            2,
+            "Call 1 should be Cancelled"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)),
+            1,
+            "Call 2 should be Executed"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            3,
+            "BundleStatus should be Unbundled"
+        );
+        // Expect events for second unbundle
+        vm.expectEmit(true, false, false, false);
+        emit IInteropHandler.CallProcessed(bundleHash, 0, CallStatus.Executed);
+        vm.expectEmit(true, false, false, false);
+        emit IInteropHandler.BundleUnbundled(bundleHash);
         vm.prank(UNBUNDLER_ADDRESS);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).unbundleBundle(proof.chainId, bundle, callStatuses2);
+        // Check storage changes after second unbundle
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 0)),
+            1,
+            "Call 0 should be Executed"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 1)),
+            2,
+            "Call 1 should be Cancelled"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).callStatus(bundleHash, 2)),
+            1,
+            "Call 2 should be Executed"
+        );
+        assertEq(
+            uint256(InteropHandler(L2_INTEROP_HANDLER_ADDR).bundleStatus(bundleHash)),
+            3,
+            "BundleStatus should be Unbundled"
+        );
     }
 
     function getInteropBundle(uint256 amount) public returns (InteropBundle memory) {
@@ -268,14 +346,151 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         });
         InteropBundle memory interopBundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
-            destinationChainId: 271,
+            destinationChainId: 31337,
             interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,
             bundleAttributes: BundleAttributes({
-                executionAddress: EXECUTION_ADDRESS,
-                unbundlerAddress: UNBUNDLER_ADDRESS
+                executionAddress: InteroperableAddress.formatEvmV1(EXECUTION_ADDRESS),
+                unbundlerAddress: InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS)
             })
         });
         return interopBundle;
+    }
+
+    /// @notice Regression test to ensure bundles can only be verified from InteropCenter
+    /// @dev This test verifies that the fix for unauthorized bundle verification is working
+    function test_verifyBundle_revertWhen_messageNotFromInteropCenter() public {
+        address nonInteropCenter = makeAddr("nonInteropCenter");
+
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        bytes memory bundle = abi.encode(interopBundle);
+
+        MessageInclusionProof memory proof = getInclusionProof(nonInteropCenter);
+
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(UnauthorizedMessageSender.selector, L2_INTEROP_CENTER_ADDR, nonInteropCenter)
+        );
+
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+    }
+
+    /// @notice Regression test to ensure bundles can only be executed on the correct destination chain
+    /// @dev This test verifies that the fix for destination chain ID validation is working
+    function test_verifyBundle_revertWhen_wrongDestinationChainId() public {
+        InteropBundle memory interopBundle = getInteropBundle(1);
+        uint256 wrongChainId = 12345;
+        interopBundle.destinationChainId = wrongChainId;
+
+        bytes memory bundle = abi.encode(interopBundle);
+        MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
+
+        vm.mockCall(
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encodeWithSelector(L2_MESSAGE_VERIFICATION.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
+
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(WrongDestinationChainId.selector, bundleHash, wrongChainId, block.chainid)
+        );
+
+        IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
+    }
+
+    /// @notice Test pause functionality in InteropCenter
+    function test_interopCenter_pause() public {
+        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+
+        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
+
+        bytes memory recipient = abi.encodePacked(uint256(271), address(0x123));
+        bytes memory payload = abi.encode("test");
+        bytes[] memory attributes = new bytes[](0);
+
+        vm.expectRevert("Pausable: paused");
+        InteropCenter(L2_INTEROP_CENTER_ADDR).sendMessage(recipient, payload, attributes);
+    }
+
+    /// @notice Test unpause functionality in InteropCenter
+    function test_interopCenter_unpause() public {
+        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+        assertTrue(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be paused");
+
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+
+        assertFalse(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be unpaused");
+    }
+
+    /// @notice Test setAddresses functionality in InteropCenter
+    function test_interopCenter_setAddresses() public {
+        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+
+        address newAssetRouter = makeAddr("newAssetRouter");
+        address newAssetTracker = makeAddr("newAssetTracker");
+
+        address oldAssetRouter = InteropCenter(L2_INTEROP_CENTER_ADDR).assetRouter();
+        address oldAssetTracker = address(InteropCenter(L2_INTEROP_CENTER_ADDR).assetTracker());
+
+        vm.expectEmit(true, true, false, false);
+        emit IInteropCenter.NewAssetRouter(oldAssetRouter, newAssetRouter);
+        vm.expectEmit(true, true, false, false);
+        emit IInteropCenter.NewAssetTracker(oldAssetTracker, newAssetTracker);
+
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(newAssetRouter, newAssetTracker);
+
+        assertEq(InteropCenter(L2_INTEROP_CENTER_ADDR).assetRouter(), newAssetRouter, "Asset router not updated");
+        assertEq(
+            address(InteropCenter(L2_INTEROP_CENTER_ADDR).assetTracker()),
+            newAssetTracker,
+            "Asset tracker not updated"
+        );
+    }
+
+    /// @notice Test that only owner can pause InteropCenter
+    function test_interopCenter_pause_onlyOwner() public {
+        address nonOwner = makeAddr("nonOwner");
+
+        vm.prank(nonOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+    }
+
+    /// @notice Test that only owner can unpause InteropCenter
+    function test_interopCenter_unpause_onlyOwner() public {
+        address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
+        vm.prank(interopCenterOwner);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).pause();
+
+        address nonOwner = makeAddr("nonOwner");
+        vm.prank(nonOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
+    }
+
+    /// @notice Test that only owner can call setAddresses
+    function test_interopCenter_setAddresses_onlyOwner() public {
+        address nonOwner = makeAddr("nonOwner");
+        address newAssetRouter = makeAddr("newAssetRouter");
+        address newAssetTracker = makeAddr("newAssetTracker");
+
+        vm.prank(nonOwner);
+        vm.expectRevert("Ownable: caller is not the owner");
+        InteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(newAssetRouter, newAssetTracker);
     }
 }

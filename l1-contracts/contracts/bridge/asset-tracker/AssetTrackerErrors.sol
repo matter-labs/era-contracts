@@ -5,8 +5,6 @@ pragma solidity ^0.8.21;
 error InvalidAmount();
 // 0xfafca5a0
 error InvalidAssetId();
-// 0x7a47c9a2
-error InvalidChainId();
 // 0x4ecc0587
 error InvalidMigrationNumber();
 // 0xddb5de5e

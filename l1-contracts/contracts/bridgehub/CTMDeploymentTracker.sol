@@ -6,7 +6,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IL1CrossChainSender} from "../bridge/asset-router/IL1CrossChainSender.sol";
+import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
