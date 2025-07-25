@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {L1Nullifier, IBridgehub} from "../bridge/L1Nullifier.sol";
+import {IBridgehub, L1Nullifier} from "../bridge/L1Nullifier.sol";
 
 contract L1NullifierDev is L1Nullifier {
     constructor(

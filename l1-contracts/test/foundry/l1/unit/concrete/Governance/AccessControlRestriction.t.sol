@@ -10,7 +10,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IAccessControlRestriction} from "contracts/governance/IAccessControlRestriction.sol";
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
-import {ZeroAddress, NoCallsProvided, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
+import {AccessToFallbackDenied, AccessToFunctionDenied, NoCallsProvided, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {Call} from "contracts/governance/Common.sol";
 
 contract AccessRestrictionTest is Test {
