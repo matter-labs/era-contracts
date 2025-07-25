@@ -15,7 +15,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, HashMismatch, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
-import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
+import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchL2DAValidator, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -358,7 +358,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // so we know that this value will be non-zero as well.
         s.precommitmentForTheLatestBatch = newPrecommitment;
 
-        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastMiniblockNumberHint, newPrecommitment);
+        emit BatchPrecommitmentSet(_batchNumber, info.untrustedLastL2BlockNumberHint, newPrecommitment);
     }
 
     /// @notice Calculates rolling hash of precommitments received from `_packedTxPrecommitments`.
@@ -377,6 +377,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
             // Caching constant(s) for use in assembly
             uint256 precommitmentLength = PACKED_L2_PRECOMMITMENT_LENGTH;
+            /// @solidity memory-safe-assembly
             assembly {
                 // Storing the current rolling hash in position 0. This way It will be more convenient
                 // to recalculate it.
@@ -405,7 +406,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function commitBatchesSharedBridge(
-        address, // _chainId
+        address, // _chainAddress
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _commitData
@@ -562,7 +563,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _executedBatchIdx
     ) internal {
         if (_priorityOpsData.itemHashes.length != _storedBatch.numberOfLayer1Txs) {
-            revert MismatchNumberOfLayer1Txs(_priorityOpsData.itemHashes.length, _storedBatch.numberOfLayer1Txs);
+            revert MismatchNumberOfLayer1Txs(_storedBatch.numberOfLayer1Txs, _priorityOpsData.itemHashes.length);
         }
         bytes32 priorityOperationsHash = _rollingHash(_priorityOpsData.itemHashes);
         bytes32 dependencyRootsRollingHash = _verifyDependencyInteropRoots(_dependencyRoots);
@@ -592,6 +593,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
             } else {
                 revert CommitBasedInteropNotSupported();
+            }
+            if (correctRootHash == bytes32(0)) {
+                revert MessageRootIsZero();
             }
             if (interopRoot.sides.length != 1 || interopRoot.sides[0] != correctRootHash) {
                 revert InvalidMessageRoot(correctRootHash, interopRoot.sides[0]);
@@ -626,7 +630,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function executeBatchesSharedBridge(
-        address, // _chainId
+        address, // _chainAddress
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
@@ -661,7 +665,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     /// @inheritdoc IExecutor
     function proveBatchesSharedBridge(
-        address, // _chainId
+        address, // _chainAddress
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData

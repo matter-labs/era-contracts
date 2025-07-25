@@ -416,13 +416,6 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
         addresses.transparentProxyAdmin = address(
             uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
         );
-        addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
-
-        require(
-            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() ==
-                addresses.protocolUpgradeHandlerProxy,
-            "Incorrect ProtocolUpgradeHandlerProxy"
-        );
         require(
             Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
             "Incorrect owner"
@@ -871,7 +864,6 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
         vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
-        vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
         vm.serializeUint(
             "root",
             "governance_upgrade_timer_initial_delay",

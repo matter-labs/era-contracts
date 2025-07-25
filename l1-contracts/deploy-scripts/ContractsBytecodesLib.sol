@@ -66,7 +66,7 @@ library ContractsBytecodesLib {
             "L2NativeTokenVault",
             "L2SharedBridgeLegacy",
             "L2SharedBridgeLegacyDev",
-            "L2TestnetVerifier",
+            "TestnetVerifier",
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
@@ -80,8 +80,8 @@ library ContractsBytecodesLib {
             "ServerNotifier", // ???
             "ValidatorTimelock",
             "ValidiumL1DAValidator", // ???
-            "VerifierFflonk",
-            "VerifierPlonk"
+            "L2MessageVerification",
+            "L1V29Upgrade"
         ];
 
         string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
@@ -114,18 +114,19 @@ library ContractsBytecodesLib {
         if (Utils.compareStrings(contractIdentifier, "AdminFacet")) {
             // Original: Admin.sol
             return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
-        }
-        if (Utils.compareStrings(contractIdentifier, "MailboxFacet")) {
+        } else if (Utils.compareStrings(contractIdentifier, "MailboxFacet")) {
             // Original: Mailbox.sol
             return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
-        }
-        if (Utils.compareStrings(contractIdentifier, "ExecutorFacet")) {
+        } else if (Utils.compareStrings(contractIdentifier, "ExecutorFacet")) {
             // Original: Executor.sol
             return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
-        }
-        if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
+        } else if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
             // Original: Getters.sol
             return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
+        } else if (Utils.compareStrings(contractIdentifier, "VerifierFflonk")) {
+            return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
+        } else if (Utils.compareStrings(contractIdentifier, "VerifierPlonk")) {
+            return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
         }
 
         // --- General Cases ---

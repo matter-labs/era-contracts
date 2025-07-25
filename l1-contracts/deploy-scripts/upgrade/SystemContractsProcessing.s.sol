@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../Utils.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WETH_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WETH_IMPL_ADDR, L2_MESSAGE_VERIFICATION, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -25,9 +25,9 @@ struct SystemContract {
 }
 
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 32;
+uint256 constant SYSTEM_CONTRACTS_COUNT = 33;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
-uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 5;
+uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 7;
 
 library SystemContractsProcessing {
     /// @notice Retrieves the entire list of system contracts as a memory array
@@ -250,17 +250,21 @@ library SystemContractsProcessing {
             isPrecompile: false
         });
         systemContracts[30] = SystemContract({
-            addr: 0x0000000000000000000000000000000000010001,
-            codeName: "L2GenesisUpgrade",
-            lang: Language.Solidity,
-            isPrecompile: false
-        });
-        systemContracts[31] = SystemContract({
             addr: 0x0000000000000000000000000000000000010006,
             codeName: "SloadContract",
             lang: Language.Solidity,
             isPrecompile: false
         });
+        systemContracts[31] = SystemContract({
+            addr: 0x0000000000000000000000000000000000010008,
+            codeName: "L2InteropRootStorage",
+            lang: Language.Solidity,
+            isPrecompile: false
+        });
+
+        // Note, that we do not populate the system contract for the genesis upgrade address,
+        // as it is used during the genesis upgrade or during upgrades (and so it should be populated
+        // as part of the upgrade script).
 
         return systemContracts;
     }
@@ -349,15 +353,17 @@ library SystemContractsProcessing {
         result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
         result[3] = ContractsBytecodesLib.getCreationCode("MessageRoot");
         result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
+        result[5] = ContractsBytecodesLib.getCreationCode("L2MessageVerification");
+        result[6] = ContractsBytecodesLib.getCreationCode("ChainAssetHandler");
     }
 
     /// Note, that while proper initialization may require multiple steps,
     /// those will be conducted inside a specialized upgrade. We still provide
     /// these force deployments here for the sake of consistency
-    function getOtherBuiltinForceDeployments()
-        internal
-        returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
-    {
+    function getOtherBuiltinForceDeployments(
+        uint256 l1ChainId,
+        address owner
+    ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
         forceDeployments = new IL2ContractDeployer.ForceDeployment[](OTHER_BUILT_IN_CONTRACTS_COUNT);
         bytes[] memory bytecodes = getOtherContractsBytecodes();
 
@@ -396,6 +402,20 @@ library SystemContractsProcessing {
             value: 0,
             input: ""
         });
+        forceDeployments[5] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[5]),
+            newAddress: address(L2_MESSAGE_VERIFICATION),
+            callConstructor: false,
+            value: 0,
+            input: ""
+        });
+        forceDeployments[6] = IL2ContractDeployer.ForceDeployment({
+            bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[6]),
+            newAddress: L2_CHAIN_ASSET_HANDLER_ADDR,
+            callConstructor: true,
+            value: 0,
+            input: abi.encode(l1ChainId, owner, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR)
+        });
     }
 
     function forceDeploymentsToHashes(
@@ -432,9 +452,22 @@ library SystemContractsProcessing {
 
     function getBaseForceDeployments()
         internal
-        returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments)
+        returns (
+            // For purpose of making compilation of earlier upgrade scripts possible.
+            IL2ContractDeployer.ForceDeployment[] memory forceDeployments
+        )
     {
-        IL2ContractDeployer.ForceDeployment[] memory otherForceDeployments = getOtherBuiltinForceDeployments();
+        getBaseForceDeployments(0, address(0));
+    }
+
+    function getBaseForceDeployments(
+        uint256 l1ChainId,
+        address owner
+    ) internal returns (IL2ContractDeployer.ForceDeployment[] memory forceDeployments) {
+        IL2ContractDeployer.ForceDeployment[] memory otherForceDeployments = getOtherBuiltinForceDeployments(
+            l1ChainId,
+            owner
+        );
         IL2ContractDeployer.ForceDeployment[] memory systemForceDeployments = getSystemContractsForceDeployments();
 
         forceDeployments = mergeForceDeployments(systemForceDeployments, otherForceDeployments);
