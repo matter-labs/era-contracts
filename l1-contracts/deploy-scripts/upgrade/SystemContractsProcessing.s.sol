@@ -7,6 +7,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -344,11 +345,11 @@ library SystemContractsProcessing {
     function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
 
-        result[0] = ContractsBytecodesLib.getCreationCode("Bridgehub");
-        result[1] = ContractsBytecodesLib.getCreationCode("L2AssetRouter");
-        result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
-        result[3] = ContractsBytecodesLib.getCreationCode("MessageRoot");
-        result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
+        result[0] = ContractsBytecodesLib.getCreationCode(AllContracts.Bridgehub);
+        result[1] = ContractsBytecodesLib.getCreationCode(AllContracts.L2AssetRouter);
+        result[2] = ContractsBytecodesLib.getCreationCode(AllContracts.L2NativeTokenVault);
+        result[3] = ContractsBytecodesLib.getCreationCode(AllContracts.MessageRoot);
+        result[4] = ContractsBytecodesLib.getCreationCode(AllContracts.L2WrappedBaseToken);
     }
 
     /// Note, that while proper initialization may require multiple steps,

@@ -34,6 +34,7 @@ import {L2GatewayTestAbstract} from "../l2-tests-abstract/L2GatewayTestAbstract.
 
 import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 
 contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer, L2GatewayTestAbstract {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
@@ -57,14 +58,14 @@ contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer, L2GatewayTestAbstr
     }
 
     function getCreationCode(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal view virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(
-        string memory contractName
+        AllContracts contractName
     ) internal virtual override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
         return super.getInitializeCalldata(contractName);
     }

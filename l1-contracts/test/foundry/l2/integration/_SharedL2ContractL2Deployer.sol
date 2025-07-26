@@ -26,6 +26,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 // import {DeployL1IntegrationScript} from "../../l1/integration/deploy-scripts/DeployL1Integration.s.sol";
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
@@ -100,18 +101,18 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     function test() internal virtual override {}
 
     function getCreationCode(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         revert("Not implemented");
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(AllContracts contractName) internal virtual override returns (bytes memory) {
         return ("Not implemented initialize calldata");
     }
 
     function deployTuppWithContract(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal virtual override returns (address implementation, address proxy) {
         revert("Not implemented tupp");

@@ -5,6 +5,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Utils} from "./Utils.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
+import {IContractRegistry, AllContracts, EcosystemContract, CTMContract} from "../contracts/bridgehub/IContractRegistry.sol";
+import {IChainTypeManager} from "../contracts/state-transition/IChainTypeManager.sol";
 
 /// @title Create2FactoryUtils
 /// @notice This abstract contract encapsulates all Create2Factory processing logic,
@@ -87,11 +89,7 @@ abstract contract Create2FactoryUtils is Script {
         bytes memory constructorArgs
     ) internal virtual returns (address) {
         return
-            Utils.deployViaCreate2(
-                abi.encodePacked(creationCode, constructorArgs),
-                create2FactoryParams.factorySalt,
-                create2FactoryState.create2FactoryAddress
-            );
+            deployViaCreate2(abi.encodePacked(creationCode, constructorArgs));
     }
 
     /// @notice Deploys a contract via Create2 and notifies via console logs.
@@ -103,14 +101,14 @@ abstract contract Create2FactoryUtils is Script {
     function deployViaCreate2AndNotify(
         bytes memory creationCode,
         bytes memory constructorParams,
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal returns (address deployedAddress) {
         deployedAddress = deployViaCreate2AndNotify(
             creationCode,
             constructorParams,
             contractName,
-            contractName,
+            Utils.getDeployedContractName(contractName),
             isZKBytecode
         );
     }
@@ -119,12 +117,12 @@ abstract contract Create2FactoryUtils is Script {
     /// @param creationCode The creation code for the contract.
     /// @param constructorParams The encoded constructor parameters.
     /// @param contractName The internal name of the contract.
-    /// @param displayName The name to be displayed in the logs.
+    // / @param displayName The name to be displayed in the logs.
     /// @return deployedAddress The deployed contract address.
     function deployViaCreate2AndNotify(
         bytes memory creationCode,
         bytes memory constructorParams,
-        string memory contractName,
+        AllContracts contractName,
         string memory displayName,
         bool isZKBytecode
     ) internal returns (address deployedAddress) {
@@ -157,7 +155,7 @@ abstract contract Create2FactoryUtils is Script {
         bytes memory initCode,
         bytes memory constructorParams,
         address owner,
-        string memory contractName,
+        AllContracts contractName,
         string memory displayName,
         bool isZKBytecode
     ) internal returns (address contractAddress) {
@@ -171,11 +169,11 @@ abstract contract Create2FactoryUtils is Script {
     /// @param constructorParams The encoded constructor parameters.
     function notifyAboutDeployment(
         address contractAddr,
-        string memory contractName,
+        AllContracts contractName,
         bytes memory constructorParams,
         bool isZKBytecode
     ) internal {
-        notifyAboutDeployment(contractAddr, contractName, constructorParams, contractName, isZKBytecode);
+        notifyAboutDeployment(contractAddr, contractName, constructorParams, Utils.getDeployedContractName(contractName), isZKBytecode);
     }
 
     /// @notice Notifies about a deployment by printing messages to the console.
@@ -186,7 +184,7 @@ abstract contract Create2FactoryUtils is Script {
     /// @param displayName The display name for the contract.
     function notifyAboutDeployment(
         address contractAddr,
-        string memory contractName,
+        AllContracts contractName,
         bytes memory constructorParams,
         string memory displayName,
         bool isZKBytecode
@@ -194,7 +192,7 @@ abstract contract Create2FactoryUtils is Script {
         string memory basicMessage = string.concat(displayName, " has been deployed at ", vm.toString(contractAddr));
         console.log(basicMessage);
 
-        string memory deployedContractName = getDeployedContractName(contractName);
+        string memory deployedContractName = Utils.getDeployedContractName(contractName);
         string memory forgeMessage;
         if (constructorParams.length == 0) {
             forgeMessage = string.concat(
@@ -218,18 +216,6 @@ abstract contract Create2FactoryUtils is Script {
             forgeMessage = string.concat(forgeMessage, " --verifier zksync");
         }
         console.log(forgeMessage);
-    }
-
-    /// @notice Returns the deployed contract name.
-    /// This function can be modified if the deployed name should differ from the internal name.
-    /// @param contractName The internal name of the contract.
-    /// @return The name to be used for verification.
-    function getDeployedContractName(string memory contractName) internal view virtual returns (string memory) {
-        if (compareStrings(contractName, "BridgedTokenBeacon")) {
-            return "UpgradeableBeacon";
-        } else {
-            return contractName;
-        }
     }
 
     /// @notice Compares two strings for equality.

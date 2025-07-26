@@ -36,6 +36,7 @@ import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstrac
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1IntegrationScript {
     using stdToml for string;
@@ -61,28 +62,28 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
-        addresses.stateTransition.genesisUpgrade = deploySimpleContract("L1GenesisUpgrade", true);
-        addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
-        addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
+        addresses.stateTransition.genesisUpgrade = deploySimpleContract(AllContracts.L1GenesisUpgrade, true);
+        addresses.stateTransition.verifier = deploySimpleContract(AllContracts.Verifier, true);
+        addresses.stateTransition.validatorTimelock = deploySimpleContract(AllContracts.ValidatorTimelock, true);
         deployStateTransitionDiamondFacets();
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", true);
+        ) = deployTuppWithContract(AllContracts.ChainTypeManager, true);
     }
 
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployL1IntegrationScript, SharedL2ContractDeployer) {}
 
     function getCreationCode(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
         return super.getCreationCode(contractName, false);
     }
 
     function getInitializeCalldata(
-        string memory contractName
+        AllContracts contractName
     ) internal virtual override(DeployIntegrationUtils, DeployL1Script) returns (bytes memory) {
         return super.getInitializeCalldata(contractName);
     }

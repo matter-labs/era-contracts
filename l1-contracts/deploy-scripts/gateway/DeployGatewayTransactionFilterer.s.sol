@@ -7,6 +7,7 @@ import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayT
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {stdToml} from "forge-std/StdToml.sol";
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 
 /// @title DeployGatewayTransactionFilterer
 /// @notice This script deploys a GatewayTransactionFilterer behind a TransparentUpgradeableProxy,
@@ -38,7 +39,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
         address implementation = deployViaCreate2AndNotify(
             type(GatewayTransactionFilterer).creationCode,
             abi.encode(bridgehub, l1AssetRouter),
-            "GatewayTransactionFilterer",
+            AllContracts.GatewayTransactionFilterer,
             "GatewayTransactionFilterer",
             false
         );
@@ -56,7 +57,7 @@ contract DeployGatewayTransactionFilterer is Script, Create2FactoryUtils {
                 chainProxyAdmin, // the admin for the proxy (already deployed)
                 initData // initialization calldata to set chainAdmin as owner
             ),
-            "TransparentUpgradeableProxy",
+            AllContracts.TransparentUpgradeableProxy,
             "GatewayTxFiltererProxy",
             false
         );

@@ -78,6 +78,7 @@ import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
 import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 
 import {DeployL1Script} from "../DeployL1.s.sol";
 
@@ -186,7 +187,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function deployUsedUpgradeContract() internal virtual returns (address) {
-        return deploySimpleContract("DefaultUpgrade", false);
+        return deploySimpleContract(AllContracts.DefaultUpgrade, false);
     }
 
     /// @notice Deploy everything that should be deployed
@@ -201,28 +202,28 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         // Note, that this is the upgrade that will be used, despite the naming of the variable here.
         // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
         (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
-        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract(AllContracts.L1GenesisUpgrade, false);
 
-        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
+        addresses.bridgehub.bridgehubImplementation = deploySimpleContract(AllContracts.Bridgehub, false);
 
-        addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
-        addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
-        addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault", false);
+        addresses.bridges.l1NullifierImplementation = deploySimpleContract(AllContracts.L1Nullifier, false);
+        addresses.bridges.l1AssetRouterImplementation = deploySimpleContract(AllContracts.L1AssetRouter, false);
+        addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract(AllContracts.L1NativeTokenVault, false);
 
-        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
-        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
+        upgradeAddresses.upgradeTimer = deploySimpleContract(AllContracts.GovernanceUpgradeTimer, false);
+        addresses.bridgehub.messageRootImplementation = deploySimpleContract(AllContracts.MessageRoot, false);
 
         deployStateTransitionDiamondFacets();
 
-        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
+        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract(AllContracts.ChainTypeManager, false);
 
         /// for forge verification.
-        deploySimpleContract("DiamondProxy", false);
+        deploySimpleContract(AllContracts.DiamondProxy, false);
 
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
-    function deployGWContract(string memory contractName) internal returns (address contractAddress) {
+    function deployGWContract(AllContracts contractName) internal returns (address contractAddress) {
         bytes memory creationCalldata = getCreationCalldata(contractName, true);
         contractAddress = Utils.deployThroughL1Deterministic(
             getCreationCode(contractName, true),
@@ -234,7 +235,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             addresses.bridgehub.bridgehubProxy,
             addresses.bridges.l1AssetRouterProxy
         );
-        notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
+        notifyAboutDeployment(contractAddress, contractName, creationCalldata, true);
     }
 
     /// @notice Generate data required for the upgrade
@@ -410,7 +411,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function getForceDeployment(
-        string memory contractName
+        AllContracts contractName
     ) public virtual returns (IL2ContractDeployer.ForceDeployment memory forceDeployment) {
         return
             IL2ContractDeployer.ForceDeployment({
@@ -426,15 +427,15 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         internal
         returns (IL2ContractDeployer.ForceDeployment[] memory additionalForceDeployments)
     {
-        string[] memory forceDeploymentNames = getForceDeploymentNames();
+        AllContracts[] memory forceDeploymentNames = getForceDeploymentNames();
         additionalForceDeployments = new IL2ContractDeployer.ForceDeployment[](forceDeploymentNames.length);
         for (uint256 i; i < forceDeploymentNames.length; i++) {
             additionalForceDeployments[i] = getForceDeployment(forceDeploymentNames[i]);
         }
     }
 
-    function getForceDeploymentNames() internal virtual returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](0);
+    function getForceDeploymentNames() internal virtual returns (AllContracts[] memory forceDeploymentNames) {
+        forceDeploymentNames = new AllContracts[](0);
     }
 
     function getEcosystemAdmin() external virtual returns (address) {
@@ -574,7 +575,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         upgradeConfig.fixedForceDeploymentsDataGenerated = true;
     }
 
-    function getExpectedL2Address(string memory contractName) public virtual returns (address) {
+    function getExpectedL2Address(AllContracts contractName) public virtual returns (address) {
         return
             Utils.getL2AddressViaCreate2Factory(
                 bytes32(0), // the same as it is currently in the DeployL1.s.sol. Todo unify.
@@ -590,13 +591,13 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
-        string[] memory additionalForceDeployments = getForceDeploymentNames();
+        AllContracts[] memory additionalForceDeployments = getForceDeploymentNames();
 
         bytes[] memory additionalDependencies = new bytes[](4 + additionalForceDeployments.length); // Deps after Gateway upgrade
-        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
-        additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+        additionalDependencies[0] = ContractsBytecodesLib.getCreationCode(AllContracts.L2SharedBridgeLegacy);
+        additionalDependencies[1] = ContractsBytecodesLib.getCreationCode(AllContracts.BridgedStandardERC20);
+        additionalDependencies[2] = ContractsBytecodesLib.getCreationCode(AllContracts.RollupL2DAValidator);
+        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode(AllContracts.ValidiumL2DAValidator);
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
             additionalDependencies[4 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
@@ -613,14 +614,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
-            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
+            l2TokenProxyBytecodeHash: getL2BytecodeHash(AllContracts.BridgedTokenBeacon),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
-            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
-            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
-            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
-            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
+            bridgehubBytecodeHash: getL2BytecodeHash(AllContracts.Bridgehub),
+            l2AssetRouterBytecodeHash: getL2BytecodeHash(AllContracts.L2AssetRouter),
+            l2NtvBytecodeHash: getL2BytecodeHash(AllContracts.L2NativeTokenVault),
+            messageRootBytecodeHash: getL2BytecodeHash(AllContracts.MessageRoot),
+            chainAssetHandlerBytecodeHash: getL2BytecodeHash(AllContracts.ChainAssetHandler),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),
@@ -832,12 +833,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeAddress(
             "contracts_newConfig",
             "expected_rollup_l2_da_validator",
-            getExpectedL2Address("RollupL2DAValidator")
+            getExpectedL2Address(AllContracts.RollupL2DAValidator)
         );
         vm.serializeAddress(
             "contracts_newConfig",
             "expected_validium_l2_da_validator",
-            getExpectedL2Address("NoDAL2DAValidator")
+            getExpectedL2Address(AllContracts.ValidiumL2DAValidator)
         );
         vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
 
@@ -1081,26 +1082,26 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function deployUsedUpgradeContractGW() internal virtual returns (address) {
-        return deployGWContract("DefaultUpgrade");
+        return deployGWContract(AllContracts.DefaultUpgrade);
     }
 
     /// @notice Deploy everything that should be deployed for GW
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
-        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
-        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
+        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract(AllContracts.VerifierFflonk);
+        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract(AllContracts.VerifierPlonk);
+        gatewayConfig.gatewayStateTransition.verifier = deployGWContract(AllContracts.Verifier);
 
-        gatewayConfig.gatewayStateTransition.executorFacet = deployGWContract("ExecutorFacet");
-        gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract("AdminFacet");
-        gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
-        gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract("GettersFacet");
-        gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract("DiamondInit");
+        gatewayConfig.gatewayStateTransition.executorFacet = deployGWContract(AllContracts.ExecutorFacet);
+        gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract(AllContracts.AdminFacet);
+        gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract(AllContracts.MailboxFacet);
+        gatewayConfig.gatewayStateTransition.gettersFacet = deployGWContract(AllContracts.GettersFacet);
+        gatewayConfig.gatewayStateTransition.diamondInit = deployGWContract(AllContracts.DiamondInit);
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
-        gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract("L1GenesisUpgrade");
+        gatewayConfig.gatewayStateTransition.genesisUpgrade = deployGWContract(AllContracts.L1GenesisUpgrade);
 
-        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract("ChainTypeManager");
+        gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation = deployGWContract(AllContracts.ChainTypeManager);
     }
 
     function prepareGatewaySpecificStage1GovernanceCalls() public virtual returns (Call[] memory calls) {
@@ -1402,7 +1403,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             target: addresses.daAddresses.rollupDAManager,
             data: abi.encodeCall(
                 RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, getExpectedL2Address("RollupL2DAValidator"), true)
+                (addresses.daAddresses.l1RollupDAValidator, getExpectedL2Address(AllContracts.RollupL2DAValidator), true)
             ),
             value: 0
         });
@@ -1416,7 +1417,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             RollupDAManager.updateDAPair,
             (
                 gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
-                getExpectedL2Address("RollupL2DAValidator"),
+                getExpectedL2Address(AllContracts.RollupL2DAValidator),
                 true
             )
         );
@@ -1430,82 +1431,82 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function getCreationCode(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "DiamondProxy")) {
+            if (contractName == AllContracts.DiamondProxy) {
                 return type(DiamondProxy).creationCode;
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            } else if (contractName == AllContracts.DefaultUpgrade) {
                 return type(DefaultUpgrade).creationCode;
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            } else if (contractName == AllContracts.BytecodesSupplier) {
                 return type(BytecodesSupplier).creationCode;
-            } else if (compareStrings(contractName, "TransitionaryOwner")) {
+            } else if (contractName == AllContracts.TransitionaryOwner) {
                 return type(TransitionaryOwner).creationCode;
-            } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
+            } else if (contractName == AllContracts.GovernanceUpgradeTimer) {
                 return type(GovernanceUpgradeTimer).creationCode;
-            } else if (compareStrings(contractName, "L2StandardERC20")) {
-                return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-            } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+            } else if (contractName == AllContracts.BridgedStandardERC20) {
+                return ContractsBytecodesLib.getCreationCode(AllContracts.BridgedStandardERC20);
+            } else if (contractName == AllContracts.RollupL2DAValidator) {
+                return ContractsBytecodesLib.getCreationCode(AllContracts.RollupL2DAValidator);
+            } else if (contractName == AllContracts.ValidiumL2DAValidator) {
+                return ContractsBytecodesLib.getCreationCode(AllContracts.ValidiumL2DAValidator);
             }
         } else {
-            if (compareStrings(contractName, "GatewayUpgrade")) {
+            if (contractName == AllContracts.GatewayUpgrade) {
                 return Utils.readZKFoundryBytecodeL1("GatewayUpgrade.sol", "GatewayUpgrade");
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            } else if (contractName == AllContracts.DefaultUpgrade) {
                 return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
+            } else if (contractName == AllContracts.BytecodesSupplier) {
                 return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
-            } else if (compareStrings(contractName, "TransitionaryOwner")) {
+            } else if (contractName == AllContracts.TransitionaryOwner) {
                 return Utils.readZKFoundryBytecodeL1("TransitionaryOwner.sol", "TransitionaryOwner");
-            } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
+            } else if (contractName == AllContracts.GovernanceUpgradeTimer) {
                 return Utils.readZKFoundryBytecodeL1("GovernanceUpgradeTimer.sol", "GovernanceUpgradeTimer");
-            } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
-                return ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
-            } else if (compareStrings(contractName, "L2StandardERC20")) {
-                return ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-            } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
-                return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+            } else if (contractName == AllContracts.L2SharedBridgeLegacy) {
+                return ContractsBytecodesLib.getCreationCode(AllContracts.L2SharedBridgeLegacy);
+            } else if (contractName == AllContracts.BridgedStandardERC20) {
+                return ContractsBytecodesLib.getCreationCode(AllContracts.BridgedStandardERC20);
+            } else if (contractName == AllContracts.RollupL2DAValidator) {
+                return ContractsBytecodesLib.getCreationCode(AllContracts.RollupL2DAValidator);
+            } else if (contractName == AllContracts.ValidiumL2DAValidator) {
+                return ContractsBytecodesLib.getCreationCode(AllContracts.ValidiumL2DAValidator);
             }
         }
         return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getCreationCalldata(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "GatewayUpgrade")) {
+        if (contractName == AllContracts.GatewayUpgrade) {
             return abi.encode();
-        } else if (compareStrings(contractName, "DefaultUpgrade")) {
+        } else if (contractName == AllContracts.DefaultUpgrade) {
             return abi.encode();
-        } else if (compareStrings(contractName, "BytecodesSupplier")) {
+        } else if (contractName == AllContracts.BytecodesSupplier) {
             return abi.encode();
-        } else if (compareStrings(contractName, "TransitionaryOwner")) {
+        } else if (contractName == AllContracts.TransitionaryOwner) {
             return abi.encode(config.ownerAddress);
-        } else if (compareStrings(contractName, "GovernanceUpgradeTimer")) {
+        } else if (contractName == AllContracts.GovernanceUpgradeTimer) {
             uint256 initialDelay = newConfig.governanceUpgradeTimerInitialDelay;
             uint256 maxAdditionalDelay = 2 weeks;
             return abi.encode(initialDelay, maxAdditionalDelay, config.ownerAddress, newConfig.ecosystemAdminAddress);
-        } else if (compareStrings(contractName, "L2LegacySharedBridge")) {
+        } else if (contractName == AllContracts.L2SharedBridgeLegacy) {
             return abi.encode();
-        } else if (compareStrings(contractName, "L2StandardERC20")) {
+        } else if (contractName == AllContracts.BridgedStandardERC20) {
             return abi.encode();
-        } else if (compareStrings(contractName, "RollupL2DAValidator")) {
+        } else if (contractName == AllContracts.RollupL2DAValidator) {
             return abi.encode();
-        } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
+        } else if (contractName == AllContracts.ValidiumL2DAValidator) {
             return abi.encode();
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
+        } else if (contractName == AllContracts.ChainTypeManager) {
             if (!isZKBytecode) {
                 return abi.encode(addresses.bridgehub.bridgehubProxy);
             } else {
                 return abi.encode(L2_BRIDGEHUB_ADDR);
             }
-        } else if (compareStrings(contractName, "Verifier")) {
+        } else if (contractName == AllContracts.Verifier) {
             if (!isZKBytecode) {
                 return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
             } else {
@@ -1515,15 +1516,15 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
                         gatewayConfig.gatewayStateTransition.verifierPlonk
                     );
             }
-        } else if (compareStrings(contractName, "AdminFacet")) {
+        } else if (contractName == AllContracts.AdminFacet) {
             if (!isZKBytecode) {
                 return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
             } else {
                 return abi.encode(config.l1ChainId, gatewayConfig.gatewayStateTransition.rollupDAManager);
             }
-        } else if (compareStrings(contractName, "UpgradeStageValidator")) {
+        } else if (contractName == AllContracts.UpgradeStageValidator) {
             return abi.encode(addresses.stateTransition.chainTypeManagerProxy, config.contracts.latestProtocolVersion);
-        } else if (compareStrings(contractName, "DiamondProxy")) {
+        } else if (contractName == AllContracts.DiamondProxy) {
             Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](0);
             Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
                 facetCuts: facetCuts,
@@ -1537,7 +1538,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     }
 
     function deployUpgradeStageValidator() internal {
-        upgradeAddresses.upgradeStageValidator = deploySimpleContract("UpgradeStageValidator", false);
+        upgradeAddresses.upgradeStageValidator = deploySimpleContract(AllContracts.UpgradeStageValidator, false);
     }
 
     ////////////////////////////// Misc utils /////////////////////////////////

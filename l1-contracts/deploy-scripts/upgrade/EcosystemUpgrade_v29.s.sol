@@ -85,6 +85,7 @@ import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol"
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 
 /// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
@@ -115,13 +116,13 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         );
     }
 
-    function getForceDeploymentNames() internal override returns (string[] memory forceDeploymentNames) {
-        forceDeploymentNames = new string[](1);
-        forceDeploymentNames[0] = "L2V29Upgrade";
+    function getForceDeploymentNames() internal override returns (AllContracts[] memory forceDeploymentNames) {
+        forceDeploymentNames = new AllContracts[](1);
+        forceDeploymentNames[0] = AllContracts.L2V29Upgrade;
     }
 
-    function getExpectedL2Address(string memory contractName) public override returns (address) {
-        if (compareStrings(contractName, "L2V29Upgrade")) {
+    function getExpectedL2Address(AllContracts contractName) public override returns (address) {
+        if (contractName == AllContracts.L2V29Upgrade) {
             return address(L2_VERSION_SPECIFIC_UPGRADER_ADDR);
         }
 
@@ -129,26 +130,26 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     function getCreationCode(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode && compareStrings(contractName, "L1V29Upgrade")) {
+        if (!isZKBytecode && contractName == AllContracts.L1V29Upgrade) {
             return type(L1V29Upgrade).creationCode;
         }
         return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getCreationCalldata(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal view override returns (bytes memory) {
-        if (compareStrings(contractName, "L1V29Upgrade")) {
+        if (contractName == AllContracts.L1V29Upgrade) {
             return abi.encode();
         }
         return super.getCreationCalldata(contractName, isZKBytecode);
     }
 
     function deployUsedUpgradeContract() internal override returns (address) {
-        return deploySimpleContract("L1V29Upgrade", false);
+        return deploySimpleContract(AllContracts.L1V29Upgrade, false);
     }
 }

@@ -27,6 +27,7 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
 bytes32 constant EXECUTE_EMERGENCY_UPGRADE_GUARDIANS_TYPEHASH = keccak256(
@@ -940,10 +941,10 @@ library Utils {
     /**
      * @dev Returns the bytecode of a given DA contract.
      */
-    function readDAContractBytecode(string memory contractIdentifier) internal view returns (bytes memory) {
+    function readDAContractBytecode(AllContracts contractIdentifier) internal view returns (bytes memory) {
         return
             readFoundryBytecode(
-                string.concat("/../da-contracts/out/", contractIdentifier, ".sol/", contractIdentifier, ".json")
+                string.concat("/../da-contracts/out/", Utils.getDeployedContractName(contractIdentifier), ".sol/", Utils.getDeployedContractName(contractIdentifier), ".json")
             );
     }
 
@@ -1002,6 +1003,155 @@ library Utils {
         string memory json = vm.readFile(path);
         bytes memory bytecode = vm.parseJsonBytes(json, ".deployedBytecode.object");
         return bytecode;
+    }
+
+    error ContractNameNotFound(AllContracts contractName);
+    /// @notice Returns the deployed contract name.
+    /// This function can be modified if the deployed name should differ from the internal name.
+    /// @param contractName The internal name of the contract.
+    /// @return The name to be used for verification.
+    function getDeployedContractName(AllContracts contractName) internal view returns (string memory) {
+        if (contractName == AllContracts.AssetTracker) {
+            return "AssetTracker";
+        } else if (contractName == AllContracts.Bridgehub) {
+            return "Bridgehub";
+        } else if (contractName == AllContracts.ChainAssetHandler) {
+            return "ChainAssetHandler";
+        } else if (contractName == AllContracts.ChainRegistrar) {
+            return "ChainRegistrar";
+        } else if (contractName == AllContracts.ConsensusRegistry) {
+            return "ConsensusRegistry";
+        } else if (contractName == AllContracts.CTMDeploymentTracker) {
+            return "CTMDeploymentTracker";
+        } else if (contractName == AllContracts.BytecodesSupplier) {
+            return "BytecodesSupplier";
+        } else if (contractName == AllContracts.ContractRegistry) {
+            return "ContractRegistry";
+        } else if (contractName == AllContracts.InteropCenter) {
+            return "InteropCenter";
+        } else if (contractName == AllContracts.Governance) {
+            return "Governance";
+        } else if (contractName == AllContracts.L2AdminFactory) {
+            return "L2AdminFactory";
+        } else if (contractName == AllContracts.L2ProxyAdminDeployer) {
+            return "L2ProxyAdminDeployer";
+        } else if (contractName == AllContracts.L1AssetRouter) {
+            return "L1AssetRouter";
+        } else if (contractName == AllContracts.L2AssetRouter) {
+            return "L2AssetRouter";
+        } else if (contractName == AllContracts.L2SharedBridgeLegacy) {
+            return "L2SharedBridgeLegacy";
+        } else if (contractName == AllContracts.L2SharedBridgeLegacyDev) {
+            return "L2SharedBridgeLegacyDev";
+        } else if (contractName == AllContracts.L1NativeTokenVault) {
+            return "L1NativeTokenVault";
+        } else if (contractName == AllContracts.L2NativeTokenVault) {
+            return "L2NativeTokenVault";
+        } else if (contractName == AllContracts.L2WrappedBaseToken) {
+            return "L2WrappedBaseToken";
+        } else if (contractName == AllContracts.L1ERC20Bridge) {
+            return "L1ERC20Bridge";
+        } else if (contractName == AllContracts.L1Nullifier) {
+            return "L1Nullifier";
+        } else if (contractName == AllContracts.BridgedStandardERC20) {
+            return "BridgedStandardERC20";
+        } else if (contractName == AllContracts.BridgedTokenBeacon) {
+            return "UpgradeableBeacon";
+        } else if (contractName == AllContracts.UpgradeableBeacon) {
+            return "UpgradeableBeacon";
+        } else if (contractName == AllContracts.BeaconProxy) {
+            return "BeaconProxy";
+        } else if (contractName == AllContracts.RollupDAManager) {
+            return "RollupDAManager";
+        } else if (contractName == AllContracts.TimestampAsserter) {
+            return "TimestampAsserter";
+        } else if (contractName == AllContracts.SystemTransparentUpgradeableProxy) {
+            return "SystemTransparentUpgradeableProxy";
+        } else if (contractName == AllContracts.L2GatewayUpgrade) {
+            return "L2GatewayUpgrade";
+        } else if (contractName == AllContracts.Verifier) {
+            return "Verifier";
+        } else if (contractName == AllContracts.VerifierFflonk) {
+            return "VerifierFflonk";
+        } else if (contractName == AllContracts.VerifierPlonk) {
+            return "VerifierPlonk";
+        } else if (contractName == AllContracts.ValidatorTimelock) {
+            return "ValidatorTimelock";
+        } else if (contractName == AllContracts.DualVerifier) {
+            return "DualVerifier";
+        } else if (contractName == AllContracts.TestnetVerifier) {
+            return "TestnetVerifier";
+        } else if (contractName == AllContracts.ProxyAdmin) {
+            return "ProxyAdmin";
+        } else if (contractName == AllContracts.ServerNotifier) {
+            return "ServerNotifier";
+        } else if (contractName == AllContracts.GovernanceUpgradeTimer) {
+            return "GovernanceUpgradeTimer";
+        } else if (contractName == AllContracts.MessageRoot) {
+            return "MessageRoot";
+        } else if (contractName == AllContracts.WrappedBaseTokenStore) {
+            return "WrappedBaseTokenStore";
+        } else if (contractName == AllContracts.L1ByteCodeSupplier) {
+            return "L1ByteCodeSupplier";
+        } else if (contractName == AllContracts.Multicall3) {
+            return "Multicall3";
+        } else if (contractName == AllContracts.TransparentUpgradeableProxy) {
+            return "TransparentUpgradeableProxy";
+        } else if (contractName == AllContracts.ChainTypeManager) {
+            return "ChainTypeManager";
+        } else if (contractName == AllContracts.L1GenesisUpgrade) {
+            return "L1GenesisUpgrade";
+        } else if (contractName == AllContracts.DefaultUpgrade) {
+            return "DefaultUpgrade";
+        } else if (contractName == AllContracts.L1V29Upgrade) {
+            return "L1V29Upgrade";
+        } else if (contractName == AllContracts.L2V29Upgrade) {
+            return "L2V29Upgrade";
+        } else if (contractName == AllContracts.AdminFacet) {
+            return "AdminFacet";
+        } else if (contractName == AllContracts.ExecutorFacet) {
+            return "ExecutorFacet";
+        } else if (contractName == AllContracts.GettersFacet) {
+            return "GettersFacet";
+        } else if (contractName == AllContracts.MailboxFacet) {
+            return "MailboxFacet";
+        } else if (contractName == AllContracts.DiamondProxy) {
+            return "DiamondProxy";
+        } else if (contractName == AllContracts.DiamondInit) {
+            return "DiamondInit";
+        } else if (contractName == AllContracts.ChainAdminOwnable) {
+            return "ChainAdminOwnable";
+        } else if (contractName == AllContracts.ChainAdmin) {
+            return "ChainAdmin";
+        } else if (contractName == AllContracts.RollupL1DAValidator) {
+            return "RollupL1DAValidator";
+        } else if (contractName == AllContracts.RollupL2DAValidator) {
+            return "RollupL2DAValidator";
+        } else if (contractName == AllContracts.ValidiumL1DAValidator) {
+            return "ValidiumL1DAValidator";
+        } else if (contractName == AllContracts.ValidiumL2DAValidator) {
+            return "ValidiumL2DAValidator";
+        } else if (contractName == AllContracts.RelayedSLDAValidator) {
+            return "RelayedSLDAValidator";
+        } else if (contractName == AllContracts.ForceDeployUpgrader) {
+            return "ForceDeployUpgrader";
+        } else if (contractName == AllContracts.AvailL1DAValidator) {
+            return "AvailL1DAValidator";
+        } else if (contractName == AllContracts.AvailL2DAValidator) {
+            return "AvailL2DAValidator";
+        } else if (contractName == AllContracts.DummyAvailBridge) {
+            return "DummyAvailBridge";
+        } else if (contractName == AllContracts.GatewayTransactionFilterer) {
+            return "GatewayTransactionFilterer";
+        } else if (contractName == AllContracts.AccessControlRestriction) {
+            return "AccessControlRestriction";
+        } else if (contractName == AllContracts.PermanentRestriction) {
+            return "PermanentRestriction";
+        } else if (contractName == AllContracts.UpgradeStageValidator) {
+            return "UpgradeStageValidator";
+        } else {
+            revert ContractNameNotFound(contractName);
+        }
     }
 
     function executeUpgrade(

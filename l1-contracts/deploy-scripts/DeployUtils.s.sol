@@ -12,8 +12,10 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
-
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
+import {IContractRegistry, EcosystemContract, CTMContract} from "contracts/bridgehub/IContractRegistry.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -55,6 +57,8 @@ struct BridgehubDeployedAddresses {
     address messageRootProxy;
     address chainAssetHandlerImplementation;
     address chainAssetHandlerProxy;
+    address contractRegistryImplementation;
+    address contractRegistryProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -190,11 +194,11 @@ abstract contract DeployUtils is Create2FactoryUtils {
     }
 
     function deployStateTransitionDiamondFacets() internal {
-        addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet", false);
-        addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
-        addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
-        addresses.stateTransition.gettersFacet = deploySimpleContract("GettersFacet", false);
-        addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
+        addresses.stateTransition.executorFacet = deploySimpleContract(AllContracts.ExecutorFacet, false);
+        addresses.stateTransition.adminFacet = deploySimpleContract(AllContracts.AdminFacet, false);
+        addresses.stateTransition.mailboxFacet = deploySimpleContract(AllContracts.MailboxFacet, false);
+        addresses.stateTransition.gettersFacet = deploySimpleContract(AllContracts.GettersFacet, false);
+        addresses.stateTransition.diamondInit = deploySimpleContract(AllContracts.DiamondInit, false);
     }
 
     function getFacetCuts(
@@ -306,8 +310,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function deploySimpleContract(
-        string memory contractName,
+    function deploySimpleContractWithoutRegistration(
+        // string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal returns (address contractAddress) {
         contractAddress = deployViaCreate2AndNotify(
@@ -318,8 +323,36 @@ abstract contract DeployUtils is Create2FactoryUtils {
         );
     }
 
-    function deployWithCreate2AndOwner(
-        string memory contractName,
+    function deploySimpleContract(
+        // string memory contractName,
+        AllContracts contractName,
+        bool isZKBytecode
+    ) internal returns (address contractAddress) {
+        contractAddress = deploySimpleContractWithoutRegistration(contractName, isZKBytecode);
+        registerContract(contractName, contractAddress, isZKBytecode);
+    }
+
+
+    function registerContract(
+        AllContracts contractName,
+        address contractAddress,
+        bool isZKBytecode
+    ) internal {
+        IContractRegistry contractRegistry = IContractRegistry(addresses.bridgehub.contractRegistryProxy);
+        if (uint256(contractName) < uint256(type(EcosystemContract).max)) {
+            EcosystemContract ecosystemContract = contractRegistry.ecosystemContractFromContract(contractName);
+            vm.broadcast(msg.sender);
+            contractRegistry.setEcosystemContractAddress(ecosystemContract, contractAddress);
+        } else {
+            CTMContract ctmContract = contractRegistry.ctmContractFromContract(contractName);
+            vm.broadcast(msg.sender);
+            contractRegistry.setCTMContractAddress(address(addresses.stateTransition.chainTypeManagerProxy), ctmContract, contractAddress);
+        }
+    }
+
+    function deployWithCreate2AndOwnerWithoutRegistration(
+        // string memory contractName,
+        AllContracts contractName,
         address owner,
         bool isZKBytecode
     ) internal returns (address contractAddress) {
@@ -328,34 +361,46 @@ abstract contract DeployUtils is Create2FactoryUtils {
             getCreationCalldata(contractName, false),
             owner,
             contractName,
-            string.concat(contractName, " Implementation"),
+            string.concat(Utils.getDeployedContractName(contractName), " Implementation"),
             isZKBytecode
         );
     }
 
+    function deployWithCreate2AndOwner(
+        // string memory contractName,
+        AllContracts contractName,
+        address owner,
+        bool isZKBytecode
+    ) internal returns (address contractAddress) {
+        contractAddress = deployWithCreate2AndOwnerWithoutRegistration(contractName, owner, isZKBytecode);
+        registerContract(contractName, contractAddress, isZKBytecode);
+    }
+
     function deployTuppWithContract(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal virtual returns (address implementation, address proxy);
 
     function getCreationCode(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal view virtual returns (bytes memory);
 
     function getCreationCalldata(
-        string memory contractName,
+        AllContracts contractName,
         bool isZKBytecode
     ) internal view virtual returns (bytes memory) {
-        if (compareStrings(contractName, "ChainRegistrar")) {
+        if (contractName == AllContracts.ChainRegistrar) {
             return abi.encode();
-        } else if (compareStrings(contractName, "Bridgehub")) {
+        } else if (contractName == AllContracts.ContractRegistry) {
+            return abi.encode();
+        } else if (contractName == AllContracts.Bridgehub) {
             return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
-        } else if (compareStrings(contractName, "MessageRoot")) {
+        } else if (contractName == AllContracts.MessageRoot) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
-        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+        } else if (contractName == AllContracts.CTMDeploymentTracker) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+        } else if (contractName == AllContracts.ChainAssetHandler) {
             return
                 abi.encode(
                     config.l1ChainId,
@@ -364,14 +409,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     addresses.bridges.l1AssetRouterProxy,
                     addresses.bridgehub.messageRootProxy
                 );
-        } else if (compareStrings(contractName, "L1Nullifier")) {
+        } else if (contractName == AllContracts.L1Nullifier) {
             return
                 abi.encode(
                     addresses.bridgehub.bridgehubProxy,
                     config.eraChainId,
                     addresses.stateTransition.diamondProxy
                 );
-        } else if (compareStrings(contractName, "L1AssetRouter")) {
+        } else if (contractName == AllContracts.L1AssetRouter) {
             return
                 abi.encode(
                     config.tokens.tokenWethAddress,
@@ -380,7 +425,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     config.eraChainId,
                     addresses.stateTransition.diamondProxy
                 );
-        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+        } else if (contractName == AllContracts.L1ERC20Bridge) {
             return
                 abi.encode(
                     addresses.bridges.l1NullifierProxy,
@@ -388,78 +433,78 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     addresses.vaults.l1NativeTokenVaultProxy,
                     config.eraChainId
                 );
-        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+        } else if (contractName == AllContracts.L1NativeTokenVault) {
             return
                 abi.encode(
                     config.tokens.tokenWethAddress,
                     addresses.bridges.l1AssetRouterProxy,
                     addresses.bridges.l1NullifierProxy
                 );
-        } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+        } else if (contractName == AllContracts.BridgedStandardERC20) {
             return abi.encode();
-        } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+        } else if (contractName == AllContracts.BridgedTokenBeacon) {
             return abi.encode(addresses.bridges.bridgedStandardERC20Implementation);
-        } else if (compareStrings(contractName, "RollupDAManager")) {
+        } else if (contractName == AllContracts.RollupDAManager) {
             return abi.encode();
-        } else if (compareStrings(contractName, "RollupL1DAValidator")) {
+        } else if (contractName == AllContracts.RollupL1DAValidator) {
             return abi.encode(addresses.daAddresses.l1RollupDAValidator);
-        } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+        } else if (contractName == AllContracts.ValidiumL1DAValidator) {
             return abi.encode();
-        } else if (compareStrings(contractName, "AvailL1DAValidator")) {
+        } else if (contractName == AllContracts.AvailL1DAValidator) {
             return abi.encode(addresses.daAddresses.availBridge);
-        } else if (compareStrings(contractName, "DummyAvailBridge")) {
+        } else if (contractName == AllContracts.DummyAvailBridge) {
             return abi.encode();
-        } else if (compareStrings(contractName, "Verifier")) {
+        } else if (contractName == AllContracts.Verifier) {
             return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
-        } else if (compareStrings(contractName, "VerifierFflonk")) {
+        } else if (contractName == AllContracts.VerifierFflonk) {
             return abi.encode();
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
+        } else if (contractName == AllContracts.VerifierPlonk) {
             return abi.encode();
-        } else if (compareStrings(contractName, "DefaultUpgrade")) {
+        } else if (contractName == AllContracts.DefaultUpgrade) {
             return abi.encode();
-        } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+        } else if (contractName == AllContracts.L1GenesisUpgrade) {
             return abi.encode();
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
+        } else if (contractName == AllContracts.ValidatorTimelock) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
-        } else if (compareStrings(contractName, "Governance")) {
+        } else if (contractName == AllContracts.Governance) {
             return
                 abi.encode(
                     config.ownerAddress,
                     config.contracts.governanceSecurityCouncilAddress,
                     config.contracts.governanceMinDelay
                 );
-        } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+        } else if (contractName == AllContracts.ChainAdminOwnable) {
             return abi.encode(config.ownerAddress, address(0));
-        } else if (compareStrings(contractName, "AccessControlRestriction")) {
+        } else if (contractName == AllContracts.AccessControlRestriction) {
             return abi.encode(uint256(0), config.ownerAddress);
-        } else if (compareStrings(contractName, "ChainAdmin")) {
+        } else if (contractName == AllContracts.ChainAdmin) {
             address[] memory restrictions = new address[](1);
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
+        } else if (contractName == AllContracts.ChainTypeManager) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
-        } else if (compareStrings(contractName, "BytecodesSupplier")) {
+        } else if (contractName == AllContracts.BytecodesSupplier) {
             return abi.encode();
-        } else if (compareStrings(contractName, "ProxyAdmin")) {
+        } else if (contractName == AllContracts.ProxyAdmin) {
             return abi.encode();
-        } else if (compareStrings(contractName, "ExecutorFacet")) {
+        } else if (contractName == AllContracts.ExecutorFacet) {
             return abi.encode(config.l1ChainId);
-        } else if (compareStrings(contractName, "AdminFacet")) {
+        } else if (contractName == AllContracts.AdminFacet) {
             return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
-        } else if (compareStrings(contractName, "MailboxFacet")) {
+        } else if (contractName == AllContracts.MailboxFacet) {
             return abi.encode(config.eraChainId, config.l1ChainId);
-        } else if (compareStrings(contractName, "GettersFacet")) {
+        } else if (contractName == AllContracts.GettersFacet) {
             return abi.encode();
-        } else if (compareStrings(contractName, "ServerNotifier")) {
+        } else if (contractName == AllContracts.ServerNotifier) {
             return abi.encode();
-        } else if (compareStrings(contractName, "DiamondInit")) {
+        } else if (contractName == AllContracts.DiamondInit) {
             return abi.encode();
         } else {
-            revert(string.concat("Contract ", contractName, " creation calldata not set"));
+            revert(string.concat("Contract ", Utils.getDeployedContractName(contractName), " creation calldata not set"));
         }
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory);
+    function getInitializeCalldata(AllContracts contractName) internal virtual returns (bytes memory);
 
     function test() internal virtual {}
 }

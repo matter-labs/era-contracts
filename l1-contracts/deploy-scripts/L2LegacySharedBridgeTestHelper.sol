@@ -6,6 +6,7 @@ import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol
 import {Utils} from "./Utils.sol";
 import {L2SharedBridgeLegacyDev} from "contracts/dev-contracts/L2SharedBridgeLegacyDev.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {AllContracts} from "contracts/bridgehub/IContractRegistry.sol";
 
 library L2LegacySharedBridgeTestHelper {
     function calculateL2LegacySharedBridgeProxyAddr(
@@ -17,12 +18,12 @@ library L2LegacySharedBridgeTestHelper {
         // that supports the legacy bridge.
 
         bytes32 implHash = L2ContractHelper.hashL2Bytecode(
-            ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacyDev")
+            ContractsBytecodesLib.getCreationCode(AllContracts.L2SharedBridgeLegacyDev)
         );
         address implAddress = Utils.getL2AddressViaCreate2Factory(bytes32(0), implHash, hex"");
 
         bytes32 proxyHash = L2ContractHelper.hashL2Bytecode(
-            ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy")
+            ContractsBytecodesLib.getCreationCode(AllContracts.TransparentUpgradeableProxy)
         );
 
         return
@@ -45,7 +46,7 @@ library L2LegacySharedBridgeTestHelper {
         address _ecosystemL1Governance
     ) internal view returns (bytes memory) {
         bytes32 beaconProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(
-            ContractsBytecodesLib.getCreationCode("BeaconProxy")
+            ContractsBytecodesLib.getCreationCode(AllContracts.BeaconProxy)
         );
 
         bytes memory initializeData = abi.encodeCall(
@@ -75,7 +76,7 @@ library L2LegacySharedBridgeTestHelper {
         );
 
         bytes32 bridgedL2ERC20Hash = L2ContractHelper.hashL2Bytecode(
-            ContractsBytecodesLib.getCreationCode("BridgedStandardERC20")
+            ContractsBytecodesLib.getCreationCode(AllContracts.BridgedStandardERC20)
         );
         address bridgeL2ERC20ImplAddress = L2ContractHelper.computeCreate2Address(
             l2SharedBridgeAddress,
@@ -85,10 +86,10 @@ library L2LegacySharedBridgeTestHelper {
         );
 
         bytes32 tokenBeaconBytecodeHash = L2ContractHelper.hashL2Bytecode(
-            ContractsBytecodesLib.getCreationCode("UpgradeableBeacon")
+            ContractsBytecodesLib.getCreationCode(AllContracts.UpgradeableBeacon)
         );
         tokenBeaconProxyBytecodeHash = L2ContractHelper.hashL2Bytecode(
-            ContractsBytecodesLib.getCreationCode("BeaconProxy")
+            ContractsBytecodesLib.getCreationCode(AllContracts.BeaconProxy)
         );
         tokenBeaconAddress = L2ContractHelper.computeCreate2Address(
             l2SharedBridgeAddress,
