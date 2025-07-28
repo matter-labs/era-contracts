@@ -43,6 +43,8 @@ library DynamicIncrementalMerkle {
         bytes32[] _zeros;
         uint256 _sidesLengthMemory;
         uint256 _zerosLengthMemory;
+        bytes32[] _pendingLeaves;
+        uint256 _pendingLeavesLengthMemory;
     }
 
     /**
@@ -72,8 +74,6 @@ library DynamicIncrementalMerkle {
     /**
      * @dev Resets the tree to a blank state.
      * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
-     * @param zero The value that represents an empty leaf.
-     * @return initialRoot The initial root of the tree.
      */
     function reset(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
         clear(self);
@@ -90,6 +90,7 @@ library DynamicIncrementalMerkle {
         for (uint256 i = length; 0 < i; --i) {
             self._sides.pop();
         }
+        delete self._pendingLeaves;
     }
 
     /// @dev Same as above, but for memory tree.
@@ -103,6 +104,127 @@ library DynamicIncrementalMerkle {
         for (uint256 i = length; 0 < i; --i) {
             self._sides[i] = bytes32(0);
         }
+        length = self._pendingLeavesLengthMemory;
+        for (uint256 i = length; 0 < i; --i) {
+            self._pendingLeaves[i] = bytes32(0);
+        }
+        self._pendingLeavesLengthMemory = 0;
+    }
+
+    /**
+     * @dev Insert a new leaf in the tree without recalculating the root, deferring computation for batch processing.
+     * This is more efficient than regular push() when adding multiple leaves, as it avoids O(log n) computation
+     * per leaf and instead batches them for O(pendingLeaves + log n) processing in recalculateRoot().
+     * 
+     * The root will be automatically recalculated when:
+     * - root() is called
+     * - push() is called (non-lazy)
+     * - recalculateRoot() is called explicitly
+     */
+    function pushLazy(Bytes32PushTree storage self, bytes32 leaf) internal returns (uint256 index) {
+        index = self._nextLeafIndex + self._pendingLeaves.length;
+        self._pendingLeaves.push(leaf);
+        return index;
+    }
+
+    /**
+     * @dev Process all pending leaves and recalculate the tree root using optimized batch processing.
+     * 
+     * This function provides O(pendingLeaves + log² n) complexity instead of the naive O(pendingLeaves × log n)
+     * approach of processing each leaf individually. It works by:
+     * 
+     * 1. Processing leaves in power-of-2 batches that align with tree structure
+     * 2. Building complete subtrees for each batch in O(batchSize) time
+     * 3. Integrating each subtree into the main tree in O(log n) time
+     * 
+     * The batching strategy finds the largest power-of-2 batch that:
+     * - Doesn't exceed remaining pending leaves
+     * - Starts at an even boundary for its level (optimal tree alignment)
+     */
+    function recalculateRoot(Bytes32PushTree storage self) internal returns (bytes32 newRoot) {
+        uint256 pendingCount = self._pendingLeaves.length;
+        if (pendingCount == 0) {
+            return Arrays.unsafeAccess(self._sides, self._sides.length - 1).value;
+        }
+
+        uint256 startIndex = self._nextLeafIndex;
+        
+        // Extend tree if needed to accommodate all pending leaves
+        uint256 levels = self._zeros.length - 1;
+        while (startIndex + pendingCount > (1 << levels)) {
+            bytes32 zero = self._zeros[levels];
+            bytes32 newZero = Merkle.efficientHash(zero, zero);
+            self._zeros.push(newZero);
+            self._sides.push(bytes32(0));
+            ++levels;
+        }
+
+        // Process leaves in optimally-sized batches that align with tree structure
+        uint256 processed = 0;
+        while (processed < pendingCount) {
+            // Find the largest power-of-2 batch that starts at an even boundary
+            uint256 currentIndex = startIndex + processed;
+            uint256 remaining = pendingCount - processed;
+            
+            // Find the largest batch size that:
+            // 1. Is a power of 2 (aligns with binary tree structure)
+            // 2. Doesn't exceed remaining leaves
+            // 3. Starts at even boundary for its level (minimizes tree updates)
+            uint256 batchSize = 1;
+            while (batchSize * 2 <= remaining && (currentIndex % (batchSize * 2)) == 0) {
+                batchSize *= 2;
+            }
+            
+            // Build complete subtree for this batch - O(batchSize) complexity
+            bytes32[] memory currentLevel = new bytes32[](batchSize);
+            for (uint256 i = 0; i < batchSize; i++) {
+                currentLevel[i] = self._pendingLeaves[processed + i];
+            }
+            
+            // Hash up the subtree bottom-up until we have a single root
+            uint256 subtreeHeight = 0;
+            while (currentLevel.length > 1) {
+                uint256 nextLevelSize = currentLevel.length / 2;
+                bytes32[] memory nextLevel = new bytes32[](nextLevelSize);
+                
+                for (uint256 i = 0; i < nextLevelSize; i++) {
+                    nextLevel[i] = Merkle.efficientHash(currentLevel[i * 2], currentLevel[i * 2 + 1]);
+                }
+                
+                currentLevel = nextLevel;
+                subtreeHeight++;
+            }
+            
+            bytes32 subtreeRoot = currentLevel[0];
+            
+            // Integrate subtree root into main tree - O(log n) complexity
+            uint256 pos = currentIndex >> subtreeHeight;
+            for (uint256 level = subtreeHeight; level < levels; level++) {
+                bool isLeft = (pos % 2) == 0;
+                
+                // Update sides array if this is a left child
+                if (isLeft) {
+                    Arrays.unsafeAccess(self._sides, level).value = subtreeRoot;
+                }
+                
+                // Calculate parent hash using sibling from sides or zero
+                subtreeRoot = Merkle.efficientHash(
+                    isLeft ? subtreeRoot : Arrays.unsafeAccess(self._sides, level).value,
+                    isLeft ? Arrays.unsafeAccess(self._zeros, level).value : subtreeRoot
+                );
+                
+                pos >>= 1;
+            }
+            
+            processed += batchSize;
+            newRoot = subtreeRoot;
+        }
+
+        // Update tree state and clean up
+        self._nextLeafIndex += pendingCount;
+        Arrays.unsafeAccess(self._sides, levels).value = newRoot;
+        delete self._pendingLeaves;
+        return newRoot;
     }
 
     /**
@@ -113,6 +235,9 @@ library DynamicIncrementalMerkle {
      * second pre-image attacks.
      */
     function push(Bytes32PushTree storage self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
+        if (self._pendingLeaves.length > 0) {
+            recalculateRoot(self);
+        }
         // Cache read
         uint256 levels = self._zeros.length - 1;
 
@@ -163,6 +288,9 @@ library DynamicIncrementalMerkle {
         Bytes32PushTree memory self,
         bytes32 leaf
     ) internal pure returns (uint256 index, bytes32 newRoot) {
+        if (self._pendingLeavesLengthMemory > 0) {
+            recalculateRootMemory(self);
+        }
         // Cache read
         uint256 levels = self._zerosLengthMemory - 1;
 
@@ -210,10 +338,116 @@ library DynamicIncrementalMerkle {
         self._sides[levels] = currentLevelHash;
         return (index, currentLevelHash);
     }
+
+    /**
+     * @dev Insert a new leaf in the memory tree without recalculating the root, deferring computation for batch processing.
+     * This is the memory version of pushLazy() with the same efficiency benefits.
+     */
+    function pushLazyMemory(Bytes32PushTree memory self, bytes32 leaf) internal pure returns (uint256 index) {
+        index = self._nextLeafIndex + self._pendingLeavesLengthMemory;
+        self._pendingLeaves[self._pendingLeavesLengthMemory] = leaf;
+        self._pendingLeavesLengthMemory++;
+        return index;
+    }
+
+    /**
+     * @dev Process all pending leaves and recalculate the tree root using optimized batch processing for memory trees.
+     * This is the memory version of recalculateRoot() with the same O(pendingLeaves + log² n) complexity.
+     */
+    function recalculateRootMemory(Bytes32PushTree memory self) internal pure returns (bytes32 newRoot) {
+        uint256 pendingCount = self._pendingLeavesLengthMemory;
+        if (pendingCount == 0) {
+            return self._sides[self._sidesLengthMemory - 1];
+        }
+
+        uint256 startIndex = self._nextLeafIndex;
+        
+        // Extend tree if needed to accommodate all pending leaves
+        uint256 levels = self._zerosLengthMemory - 1;
+        while (startIndex + pendingCount > (1 << levels)) {
+            bytes32 zero = self._zeros[levels];
+            bytes32 newZero = Merkle.efficientHash(zero, zero);
+            self._zeros[self._zerosLengthMemory] = newZero;
+            self._zerosLengthMemory++;
+            self._sides[self._sidesLengthMemory] = bytes32(0);
+            self._sidesLengthMemory++;
+            ++levels;
+        }
+
+        // Process leaves in optimally-sized batches that align with tree structure
+        uint256 processed = 0;
+        while (processed < pendingCount) {
+            // Find the largest power-of-2 batch that starts at an even boundary
+            uint256 currentIndex = startIndex + processed;
+            uint256 remaining = pendingCount - processed;
+            
+            // Find the largest batch size that aligns with tree structure
+            uint256 batchSize = 1;
+            while (batchSize * 2 <= remaining && (currentIndex % (batchSize * 2)) == 0) {
+                batchSize *= 2;
+            }
+            
+            // Build complete subtree for this batch - O(batchSize) complexity
+            bytes32[] memory currentLevel = new bytes32[](batchSize);
+            for (uint256 i = 0; i < batchSize; i++) {
+                currentLevel[i] = self._pendingLeaves[processed + i];
+            }
+            
+            // Hash up the subtree bottom-up until we have a single root
+            uint256 subtreeHeight = 0;
+            while (currentLevel.length > 1) {
+                uint256 nextLevelSize = currentLevel.length / 2;
+                bytes32[] memory nextLevel = new bytes32[](nextLevelSize);
+                
+                for (uint256 i = 0; i < nextLevelSize; i++) {
+                    nextLevel[i] = Merkle.efficientHash(currentLevel[i * 2], currentLevel[i * 2 + 1]);
+                }
+                
+                currentLevel = nextLevel;
+                subtreeHeight++;
+            }
+            
+            bytes32 subtreeRoot = currentLevel[0];
+            
+            // Integrate subtree root into main tree - O(log n) complexity
+            uint256 pos = currentIndex >> subtreeHeight;
+            for (uint256 level = subtreeHeight; level < levels; level++) {
+                bool isLeft = (pos % 2) == 0;
+                
+                // Update sides array if this is a left child
+                if (isLeft) {
+                    self._sides[level] = subtreeRoot;
+                }
+                
+                // Calculate parent hash using sibling from sides or zero
+                subtreeRoot = Merkle.efficientHash(
+                    isLeft ? subtreeRoot : self._sides[level],
+                    isLeft ? self._zeros[level] : subtreeRoot
+                );
+                
+                pos >>= 1;
+            }
+            
+            processed += batchSize;
+            newRoot = subtreeRoot;
+        }
+
+        // Update tree state and clean up
+        self._nextLeafIndex += pendingCount;
+        self._sides[levels] = newRoot;
+        
+        // Clear pending leaves in memory
+        for (uint256 i = 0; i < self._pendingLeavesLengthMemory; i++) {
+            self._pendingLeaves[i] = bytes32(0);
+        }
+        self._pendingLeavesLengthMemory = 0;
+        
+        return newRoot;
+    }
+
     /**
      * @dev Extend until end.
      */
-    /// @dev here we can extend the array, so the depth is not predetermined.
     function extendUntilEnd(Bytes32PushTree storage self, uint256 finalDepth) internal {
         bytes32 currentZero = self._zeros[self._zeros.length - 1];
         if (self._nextLeafIndex == 0) {
@@ -250,12 +484,18 @@ library DynamicIncrementalMerkle {
     /**
      * @dev Tree's root.
      */
-    function root(Bytes32PushTree storage self) internal view returns (bytes32) {
+    function root(Bytes32PushTree storage self) internal returns (bytes32) {
+        if (self._pendingLeaves.length > 0) {
+            return recalculateRoot(self);
+        }
         return Arrays.unsafeAccess(self._sides, self._sides.length - 1).value;
     }
 
     /// @dev Same as above, but for memory tree.
     function rootMemory(Bytes32PushTree memory self) internal pure returns (bytes32) {
+        if (self._pendingLeavesLengthMemory > 0) {
+            return recalculateRootMemory(self);
+        }
         return self._sides[self._sidesLengthMemory - 1];
     }
 
