@@ -106,19 +106,26 @@ const params = {
   ),
   RIGHT_PADDED_PUBLISH_TIMESTAMP_DATA_TO_L1_SELECTOR: getPaddedSelector("SystemContext", "publishTimestampDataToL1"),
   RIGHT_PADDED_SET_L2_INTEROP_ROOT_SELECTOR: getPaddedSelector("L2InteropRootStorage", "addInteropRoot"),
-  COMPRESSED_BYTECODES_SLOTS: 294912,
+  /// The "worst" case is many small bytecodes. Each bytecode needs:
+  /// - 32-byte formatted bytecode hash
+  /// - 32-byte zero (it will be replaced within the code with left-padded selector of the `publishCompressedBytecode`).
+  /// - ABI-encoding of the parameters of the `publishCompressedBytecode` method (which accepts 2x
+  /// bytes calldata).
+  /// That's 8 slots in total for each bytecode. So compressed bytecode slots should be at least
+  /// 8 * (number_of_blobs * 130_000 / 32) + some overhead just in case.
+  COMPRESSED_BYTECODES_SLOTS: 294000,
   ENSURE_RETURNED_MAGIC: 1,
   FORBID_ZERO_GAS_PER_PUBDATA: 1,
   SYSTEM_CONTEXT_EXPECTED_CODE_HASH: getSystemContextCodeHash(),
   PADDED_FORCE_DEPLOY_ON_ADDRESSES_SELECTOR: getPaddedSelector("ContractDeployer", "forceDeployOnAddresses"),
-  // One of "worst case" scenarios for the number of state diffs in a batch is when 780kb of pubdata is spent
-  // on repeated writes, that are all zeroed out. In this case, the number of diffs is 780kb / 5 = 156k. This means that they will have
-  // accommodate 42432000 bytes of calldata for the uncompressed state diffs. Adding 780kb on top leaves us with
-  // roughly 43212000 bytes needed for calldata.
-  // 1350375 slots are needed to accommodate this amount of data. We round up to 1360000 slots just in case.
-  //
-  // In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
-  // operator to ensure that it can form the correct calldata for the L1Messenger.
+  /// One of "worst case" scenarios for the number of state diffs in a batch is when 1170kb (130kb in blob * 9) of pubdata is spent
+  /// on repeated writes, that are all zeroed out. In this case, the number of diffs is `1170kb / 5 = 234k`. This means that they will have
+  /// accommodate 63648kb (234k * 272) of calldata for the uncompressed state diffs. Adding 1170kb on top leaves us with
+  /// roughly 64818kb needed for calldata.
+  /// ~2026000 slots are needed to accommodate this amount of data. We round up to 2040000 slots just in case.
+  ///
+  /// In theory though much more calldata could be used (if for instance 1 byte is used for enum index). It is the responsibility of the
+  /// operator to ensure that it can form the correct calldata for the L1Messenger.
   OPERATOR_PROVIDED_L1_MESSENGER_PUBDATA_SLOTS: 2040000,
   ...SYSTEM_PARAMS,
 };
