@@ -25,7 +25,7 @@ struct SystemContract {
 }
 
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 33;
+uint256 constant SYSTEM_CONTRACTS_COUNT = 32;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 7;
 
