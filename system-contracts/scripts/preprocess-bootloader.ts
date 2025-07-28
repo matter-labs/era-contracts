@@ -100,6 +100,7 @@ const params = {
   SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),
   PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector("Compressor", "publishCompressedBytecode"),
   GET_MARKER_PADDED_SELECTOR: getPaddedSelector("KnownCodesStorage", "getMarker"),
+  GET_CODE_SIZE_SELECTOR: getPaddedSelector("AccountCodeStorage", "getCodeSize"),
   RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "setL2Block"),
   RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR: getPaddedSelector(
     "SystemContext",

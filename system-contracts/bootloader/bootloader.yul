@@ -695,6 +695,10 @@ object "Bootloader" {
                 ret := 0x0000000000000000000000000000000000010008
             }
 
+            function L2_INTEROP_CENTER_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000001000b
+            }
+
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
             /// and the end of the area dedicated for the compressed bytecodes.
             /// In fact, only distance of 192 should be sufficient: there it would be possible to insert
@@ -1889,6 +1893,25 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
+            function getCodeSize(address) -> ret {
+                mstore(0, {{GET_CODE_SIZE_SELECTOR}})
+                mstore(4, address)
+                let success := call(
+                    gas(),
+                    KNOWN_CODES_CONTRACT_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    32
+                )
+
+                if iszero(success) {
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
 
             /// @dev Used to refund the current transaction.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
@@ -3255,8 +3278,14 @@ object "Bootloader" {
                 if iszero(success) {
                     debugLog("Failed to set new settlement layer chain id: ", currentSettlementLayerChainId)
 
-                    /// kl todo: here during the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
-                    revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
+                    /// here during the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
+                    /// todo remove after v30 upgrade.
+                    let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
+                    debugLog("codeSize", codeSize)
+                    let codeSize2 := getCodeSize(add(L2_INTEROP_ROOT_STORAGE(), 10))
+                    if iszero(eq(codeSize, codeSize2)) {
+                        revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
+                    }
                 }
             }
 
