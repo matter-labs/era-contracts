@@ -11,6 +11,9 @@ error InvalidMockProofLength();
 // 0x09bde339
 error InvalidProof();
 
+// 0x616008dd
+error UnsupportedChainIdForMockVerifier();
+
 /// @title Dual Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -70,7 +73,10 @@ contract DualVerifier is IVerifier {
             return PLONK_VERIFIER.verify(args, _extractOhBenderProof(_proof));
         } else if (verifierType == OHBENDER_MOCK_VERIFICATION_TYPE) {
             // just for safety.
-            require(block.chinid() == 31337, "Mock verifier can only be used on local chain");
+            if (block.chainid != 31337) {
+                revert UnsupportedChainIdForMockVerifier();
+            }
+
             uint256[] memory args = new uint256[](1);
             args[0] = computeOhBenderHash(_proof[1], _publicInputs);
 
