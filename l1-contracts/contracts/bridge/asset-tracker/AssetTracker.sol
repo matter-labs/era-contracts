@@ -11,7 +11,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_CHAIN_ASSE
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, InvalidProof, ReconstructionMismatch, Unauthorized, ChainIdNotRegistered, InvalidChainId} from "../../common/L1ContractErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, InvalidProof, ReconstructionMismatch, Unauthorized, ChainIdNotRegistered} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
