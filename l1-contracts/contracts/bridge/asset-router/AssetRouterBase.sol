@@ -109,14 +109,14 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual;
+    ) external payable virtual;
 
     function _bridgehubDepositBaseToken(
         uint256 _chainId,
         bytes32 _assetId,
         address _originalCaller,
         uint256 _amount
-    ) public payable virtual {
+    ) internal virtual {
         address assetHandler = assetHandlerAddress[_assetId];
         require(assetHandler != address(0), AssetHandlerDoesNotExist(_assetId));
 
@@ -220,7 +220,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAssetRouterBase
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public payable virtual;
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) external payable virtual;
 
     function _finalizeDeposit(
         uint256 _chainId,

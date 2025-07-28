@@ -23,8 +23,9 @@ import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotL1, NotRelayedSender, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdAlreadyExists, ChainIdCantBeCurrentChain, ChainIdMismatch, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, IncorrectBridgeHubAddress, MigrationPaused, MsgValueMismatch, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, WrongMagicValue, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
+import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotRelayedSender, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdAlreadyExists, ChainIdCantBeCurrentChain, ChainIdMismatch, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, IncorrectBridgeHubAddress, MigrationPaused, MsgValueMismatch, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, WrongMagicValue, ZKChainLimitReached, ZeroAddress, ZeroChainId, NotL1} from "../common/L1ContractErrors.sol";
+import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -538,7 +539,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1CrossChainSender(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
@@ -566,7 +567,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             })
         );
 
-        IL1AssetRouter(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
+        IL1CrossChainSender(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
             _request.chainId,
             outputRequest.txDataHash,
             canonicalTxHash
