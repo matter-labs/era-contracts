@@ -15,21 +15,12 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
-<<<<<<< HEAD
 import {BUNDLE_IDENTIFIER, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
-import {MsgValueMismatch, Unauthorized} from "../common/L1ContractErrors.sol";
-import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
-
-import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-import {AttributeAlreadySet, AttributeNotForBundle, AttributeNotForCall, AttributeNotForInteropCallValue, IndirectCallValueMismatch} from "./InteropErrors.sol";
-=======
-import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal, CallAttributes, BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "../common/Messaging.sol";
-import {MsgValueMismatch, Unauthorized, NotL1, NotL2ToL2} from "../common/L1ContractErrors.sol";
+import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
 import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch} from "./InteropErrors.sol";
->>>>>>> 832edb3add4592d0e22787a4f77aa39f107c3489
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -394,7 +385,6 @@ contract InteropCenter is
         bytes32 _assetId,
         uint256 _amount
     ) external override onlySettlementLayerRelayedSender {
-<<<<<<< HEAD
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }
@@ -407,20 +397,6 @@ contract InteropCenter is
             _amount: _amount
         });
 
-=======
-        require(L1_CHAIN_ID != block.chainid, NotInGatewayMode());
-        if (_baseTokenAmount > 0) {
-            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(
-                _chainId,
-                BRIDGE_HUB.baseTokenAssetId(_chainId),
-                _baseTokenAmount,
-                false
-            );
-        }
-        if (_amount > 0) {
-            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
-        }
->>>>>>> 832edb3add4592d0e22787a4f77aa39f107c3489
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }

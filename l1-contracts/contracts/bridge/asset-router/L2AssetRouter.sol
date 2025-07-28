@@ -56,19 +56,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         if (_chainId == L1_CHAIN_ID) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && msg.sender != address(this)) {
-<<<<<<< HEAD
-                revert InvalidCaller(msg.sender);
-            }
-        } else {
-            if (msg.sender != address(this)) {
-                revert InvalidCaller(msg.sender); // xL2 messaging not supported for now
-=======
                 revert Unauthorized(msg.sender);
             }
         } else {
             if (msg.sender != address(this)) {
                 revert Unauthorized(msg.sender);
->>>>>>> 832edb3add4592d0e22787a4f77aa39f107c3489
             }
         }
         _;

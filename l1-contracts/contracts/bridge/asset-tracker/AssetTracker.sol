@@ -24,13 +24,8 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-<<<<<<< HEAD
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidAmount, InvalidMigrationNumber, InvalidAssetId, InvalidAssetMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
-=======
-// import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
-import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidSender} from "./AssetTrackerErrors.sol";
->>>>>>> 832edb3add4592d0e22787a4f77aa39f107c3489
+import {InvalidAmount, InvalidMigrationNumber, InvalidAssetId, InvalidAssetMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
 
 contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerModifiers {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
