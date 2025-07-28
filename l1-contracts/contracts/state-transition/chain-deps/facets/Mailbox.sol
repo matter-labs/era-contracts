@@ -299,8 +299,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp,
         uint256 _baseTokenAmount,
-        bytes32 _assetId,
-        uint256 _amount
+        bool _getBalanceChange
     ) external override onlyL1 returns (bytes32 canonicalTxHash) {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
@@ -309,13 +308,20 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             revert NotHyperchain();
         }
 
+        (bytes32 assetId, uint256 amount) = (bytes32(0), 0);
+        if (_getBalanceChange) {
+            IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
+             
+            (assetId, amount) = (assetTracker.getBalanceChange(s.chainId));
+        }
+
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
             _expirationTimestamp: _expirationTimestamp,
             _baseTokenAmount: _baseTokenAmount,
-            _assetId: _assetId,
-            _amount: _amount
+            _assetId: assetId,
+            _amount: amount
         });
         canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
@@ -387,8 +393,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 _canonicalTxHash: canonicalTxHash,
                 _expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION),
                 _baseTokenAmount: 0,
-                _assetId: bytes32(0),
-                _amount: 0
+                _getBalanceChange: false
             });
         }
     }
@@ -467,20 +472,16 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                     _canonicalTxHash: canonicalTxHash,
                     _expirationTimestamp: _params.expirationTimestamp,
                     _baseTokenAmount: _params.request.mintValue,
-                    _assetId: bytes32(0),
-                    _amount: 0
+                    _getBalanceChange: false
                 });
             } else {
-                IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
-                (bytes32 assetId, uint256 amount) = (assetTracker.getBalanceChange(s.chainId));
                 // slither-disable-next-line unused-return
                 IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
                     _chainId: s.chainId,
                     _canonicalTxHash: canonicalTxHash,
                     _expirationTimestamp: _params.expirationTimestamp,
                     _baseTokenAmount: _params.request.mintValue,
-                    _assetId: assetId,
-                    _amount: amount
+                    _getBalanceChange: true
                 });
             }
         }

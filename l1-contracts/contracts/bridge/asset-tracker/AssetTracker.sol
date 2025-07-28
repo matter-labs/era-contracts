@@ -164,7 +164,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     /// @notice Called on the L1 by the chain's mailbox when a deposit happens
     /// @notice Used for deposits via Gateway.
     function getBalanceChange(uint256 _chainId) external returns (bytes32 assetId, uint256 amount) {
-        // kl todo add only chainId.
+        // kl todo add only whitelisted settlement layers.
         assetId = bytes32(TransientPrimitivesLib.getUint256(_chainId));
         amount = TransientPrimitivesLib.getUint256(_chainId + 1);
         TransientPrimitivesLib.set(_chainId, 0);
