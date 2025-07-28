@@ -11,7 +11,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, InvalidProof, ReconstructionMismatch, Unauthorized, ChainIdNotRegistered} from "../../common/L1ContractErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidInteropCalldata, InvalidMessage, InvalidProof, ReconstructionMismatch, Unauthorized, ChainIdNotRegistered, InvalidChainId} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
@@ -24,7 +24,7 @@ import {FinalizeL1DepositParams} from "../../bridge/interfaces/IL1Nullifier.sol"
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitves/TransientPrimitives.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 // import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
-import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidChainId, InvalidSender} from "./AssetTrackerErrors.sol";
+import {NotMigratedChain, InvalidAssetId, InvalidAmount, InvalidSender} from "./AssetTrackerErrors.sol";
 
 contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerModifiers {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;

@@ -155,7 +155,7 @@ struct InteropRoot {
 /// @param chainId The chain ID of the transaction to check.
 /// @param l2BatchNumber The L2 batch number where the withdrawal was processed.
 /// @param l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-/// @param l2sender The address of the message sender on L2 (base token system contract address or asset handler)
+/// @param l2Sender The address of the message sender on L2 (base token system contract address or asset handler)
 /// @param l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
 /// @param message The L2 withdraw data, stored in an L2 -> L1 message.
 /// @param merkleProof The Merkle proof of the inclusion L2 -> L1 message about withdrawal initialization.
@@ -170,44 +170,46 @@ struct FinalizeL1DepositParams {
 }
 
 /// @dev Struct used to define parameters for adding a single call in an interop bundle.
-/// @param nextContract Address of the contract to call on the destination chain.
-/// @param data Calldata payload to send to nextContract.
+/// @param to Address to call on the destination chain.
+/// @param data Calldata payload to send to `to` address on the destination chain.
 /// @param callAttributes EIP-7786 Attributes.
 struct InteropCallStarter {
-    address nextContract;
+    address to;
     bytes data;
     bytes[] callAttributes;
 }
 
 /// @dev Internal representation of an InteropCallStarter after parsing its parameters.
-/// @param nextContract Address of the contract to call on the destination chain.
+/// @param to Address to call on the destination chain.
 /// @param data Calldata payload to send.
 /// @param callAttributes EIP-7786 Attributes.
 struct InteropCallStarterInternal {
-    address nextContract;
+    address to;
     bytes data;
     CallAttributes callAttributes;
 }
 
 /// @param interopCallValue Base token value on destination chain to send for interop call.
-/// @param directCall True for direct interop, false if routed through bridge.
+/// @param indirectCall True if routed through bridge, false for direct interop.
 /// @param indirectCallMessageValue Base token value on sending chain to send for indirect call.
 struct CallAttributes {
     uint256 interopCallValue;
-    bool directCall;
+    bool indirectCall;
     uint256 indirectCallMessageValue;
 }
 
-/// @param executionAddress Address allowed to execute on remote side. If set to 0 -> execution is permissionless.
-/// @param unbundlerAddress Address allowed to unbundle. Note, that here no permissionless mode is available, unlike above.
+/// @param executionAddress ERC-7930 Address allowed to execute the bundle on the destination chain. If the byte array is empty then execution is permissionless.
+/// @param unbundlerAddress ERC-7930 Address allowed to unbundle the bundle on the destination chain. Note, that it is required to be nonempty, unlike `executionAddress`.
 struct BundleAttributes {
-    address executionAddress;
-    address unbundlerAddress;
+    bytes executionAddress;
+    bytes unbundlerAddress;
 }
 
 /// @dev A single call.
 /// @param version Version of the InteropCall.
-/// @param shadowAccount If true, execute via a shadow account, otherwise normal. In current release always false.
+/// @param shadowAccount If true, execute via a shadow account, otherwise normal. In current release always false, as it's not yet implemented.
+///                      Shadow accounts help with interop when `to` doesn't support 7786. In this case, a "shadow" account could be deployed, allowing
+///                      the user to hold funds securely on the destination chain, and interact with anything on destination chain using this shadow account.
 /// @param to Destination contract address on the target chain.
 /// @param from Original sender address that initiated the call.
 /// @param value Amount of base token to send with the call.
@@ -237,8 +239,7 @@ enum CallStatus {
 /// @param interopBundleSalt Salt of the interopBundle. It's required to ensure that all bundles have distinct hashes.
 ///                          It's equal to the keccak256(abi.encodePacked(senderOfTheBundle, NumberOfBundleSentByTheSender))
 /// @param calls Array of InteropCall structs to execute.
-/// @param executionAddress Optional address authorized to execute this bundle; zero-address means permissionless.
-/// @param unbundlerAddress Address authorized to unbundle this bundle.
+/// @param bundleAttributes Bundle execution and unbundling attributes.
 struct InteropBundle {
     bytes1 version;
     uint256 destinationChainId;

@@ -140,12 +140,10 @@ error IncorrectBridgeHubAddress(address bridgehub);
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0xddb74934
 error InsufficientChainBalanceAssetTracker(uint256 chainId, bytes32 assetId, uint256 amount);
-// 0x826fb11e
-error InsufficientChainBalance();
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
-// 0xcbd9d2e0
-error InvalidCaller(address);
+// 0x7a47c9a2
+error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
@@ -256,6 +254,10 @@ error NotAZKChain(address addr);
 error NotCurrentSettlementLayer();
 // 0xdd7e3621
 error NotInitializedReentrancyGuard();
+// 0xecb34449
+error NotL1(uint256 l1ChainId, uint256 blockChainId);
+// 0xc5441a63
+error NotL2ToL2(uint256 sourceChainId, uint256 destinationChainId);
 // 0xdf17e316
 error NotWhitelisted(address);
 // 0xf3ed9dfa
