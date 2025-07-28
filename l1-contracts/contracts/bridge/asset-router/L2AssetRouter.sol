@@ -46,7 +46,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             require(AddressAliasHelper.undoL1ToL2Alias(msg.sender) == L1_ASSET_ROUTER, Unauthorized(msg.sender));
         } else {
-            revert Unauthorized(msg.sender); // xL2 messaging not supported for now
+            revert Unauthorized(msg.sender);
         }
         _;
     }
@@ -60,7 +60,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
             }
         } else {
             if (msg.sender != address(this)) {
-                revert Unauthorized(msg.sender); // xL2 messaging not supported for now
+                revert Unauthorized(msg.sender);
             }
         }
         _;
@@ -140,7 +140,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     ) external payable returns (bytes4) {
         // This function serves as the L2AssetRouter's entry point for processing cross-chain bridge operations
         // initiated through the InteropCenter system. It implements critical security validations:
-        // - L1->L2 calls: Only L1_ASSET_ROUTER can send messages from L1_CHAIN_ID
+        // - L1->L2 calls: Currently Interop can only be initiated on L2, so this case shouldn't be covered.
         // - L2->L2 calls: Only this contract (L2AssetRouter) can send messages from other L2 chains
         //
         // This dual validation prevents attackers from spoofing cross-chain messages by requiring
@@ -148,18 +148,14 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         //
         // INDIRECT CALL PATTERN (L2->L2 interop flow):
         // 1. User calls InteropCenter on source L2
-        // 2. InteropCenter calls interopCenterInitiateBridge() on source chain's L2AssetRouter
+        // 2. InteropCenter calls initiateBridging() on source chain's L2AssetRouter
         // 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
         // 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
         //    (L2AssetRouter address is equal for all ZKsync chains)
 
         (uint256 senderChainId, address senderAddress) = InteroperableAddress.parseEvmV1Calldata(sender);
 
-        require(
-            (senderChainId == L1_CHAIN_ID && senderAddress == L1_ASSET_ROUTER) ||
-                (senderChainId != L1_CHAIN_ID && senderAddress == address(this)),
-            Unauthorized(senderAddress)
-        );
+        require((senderChainId != L1_CHAIN_ID && senderAddress == address(this)), Unauthorized(senderAddress));
 
         // The payload must contain a valid finalizeDeposit selector to ensure only legitimate
         // bridge operations are executed. This prevents arbitrary function calls through the interop system.
@@ -214,7 +210,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     /// @inheritdoc IL2CrossChainSender
-    function interopCenterInitiateBridge(
+    function initiateBridging(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,

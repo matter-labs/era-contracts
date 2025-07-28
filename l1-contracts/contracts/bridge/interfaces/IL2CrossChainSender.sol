@@ -16,7 +16,7 @@ interface IL2CrossChainSender {
     /// @param _value The `msg.value` to be deposited on the target chain.
     /// @param _data The calldata for the second bridge deposit.
     /// @return interopCallStarter InteropCallStarter corresponding to the second bridge call.
-    function interopCenterInitiateBridge(
+    function initiateBridging(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,
