@@ -255,29 +255,19 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
 
-    function _handleChainBalanceIncrease(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) internal override {
+    function _handleChainBalanceIncrease(uint256, bytes32 _assetId, uint256) internal override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
         // We need to check the migration number.
-        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_chainId, _assetId, _amount, _isNative);
+        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_assetId);
     }
 
-    function _handleChainBalanceDecrease(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) internal override {
+    function _handleChainBalanceDecrease(uint256, bytes32 _assetId, uint256) internal override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
-        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(_chainId, _assetId, _amount, _isNative);
+        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(_assetId);
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {

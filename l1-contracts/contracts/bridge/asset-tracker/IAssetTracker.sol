@@ -33,19 +33,9 @@ interface IAssetTracker {
 
     function registerLegacyTokenOnChain(bytes32 _assetId) external;
 
-    function handleChainBalanceIncreaseOnL1(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) external;
+    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
 
-    function handleChainBalanceDecreaseOnL1(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) external;
+    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
 
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,
@@ -56,9 +46,9 @@ interface IAssetTracker {
         uint256 _amount
     ) external;
 
-    function handleInitiateBridgingOnL2(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
+    function handleInitiateBridgingOnL2(bytes32 _assetId) external;
 
-    function handleFinalizeBridgingOnL2(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
+    function handleFinalizeBridgingOnL2(bytes32 _assetId) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
 

@@ -179,7 +179,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address l1Token = tokenAddress[_assetId];
         require(_amount != 0, NoFundsTransferred());
 
-        _handleChainBalanceDecrease({_chainId: _chainId, _assetId: _assetId, _amount: _amount, _isNative: false});
+        _handleChainBalanceDecrease({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -248,29 +248,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return BeaconProxy(payable(proxyAddress));
     }
 
-    function _handleChainBalanceIncrease(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) internal override {
+    function _handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
         // Note, that we do not update balances for chains where the assetId comes from,
         // since these chains can mint new instances of the token.
-        l1AssetTracker.handleChainBalanceIncreaseOnL1(_chainId, _assetId, _amount, _isNative);
+        l1AssetTracker.handleChainBalanceIncreaseOnL1(_chainId, _assetId, _amount);
     }
 
-    function _handleChainBalanceDecrease(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) internal override {
+    function _handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
         // On L1 the asset tracker is triggered when the user withdraws.
-        l1AssetTracker.handleChainBalanceDecreaseOnL1({
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _amount: _amount,
-            _isNative: _isNative
-        });
+        l1AssetTracker.handleChainBalanceDecreaseOnL1({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
     }
 }

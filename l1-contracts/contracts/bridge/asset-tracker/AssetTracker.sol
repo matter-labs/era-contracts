@@ -147,7 +147,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     /// @notice Called on the L1 when a deposit to the chain happens.
     /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
+    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
         // onlyNativeTokenVaultOrInteropCenter {
 
         uint256 currentSettlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
@@ -173,7 +173,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
 
     /// @notice Called on the L1 when a withdrawal from the chain happens, or when a failed deposit is undone.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool) external {
+    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
         // onlyNativeTokenVault
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
@@ -216,7 +216,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         });
     }
 
-    function handleInitiateBridgingOnL2(uint256, bytes32 _assetId, uint256, bool) external view {
+    function handleInitiateBridgingOnL2(bytes32 _assetId) external view {
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         require(
@@ -226,7 +226,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
         );
     }
 
-    function handleFinalizeBridgingOnL2(uint256, bytes32 _assetId, uint256, bool) external {
+    function handleFinalizeBridgingOnL2(bytes32 _assetId) external {
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
         if (totalSupply[migrationNumber][_assetId] == 0) {
             totalSupply[migrationNumber][_assetId] = IERC20(L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId)).totalSupply();
