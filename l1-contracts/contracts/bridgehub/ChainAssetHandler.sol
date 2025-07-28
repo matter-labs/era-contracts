@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, OnlyAssetTracker, OnlyChain} from "./L1BridgehubErrors.sol";
+import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, OnlyAssetTracker, OnlyChain, MigrationNumberMismatch} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, NotL1, MigrationPaused} from "../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -206,7 +206,8 @@ contract ChainAssetHandler is
             chainId: bridgehubBurnData.chainId,
             baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(bridgehubBurnData.chainId),
             ctmData: ctmMintData,
-            chainData: chainMintData
+            chainData: chainMintData,
+            migrationNumber: migrationNumber[bridgehubBurnData.chainId]
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
         ++migrationNumber[bridgehubBurnData.chainId];
@@ -244,7 +245,15 @@ contract ChainAssetHandler is
             BRIDGE_HUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId);
         }
-        ++migrationNumber[bridgehubMintData.chainId];
+        if (migrationNumber[bridgehubMintData.chainId] == 0) {
+            migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
+        } else {
+            uint256 newMigrationNumber = ++migrationNumber[bridgehubMintData.chainId];
+            require(
+                newMigrationNumber == bridgehubMintData.migrationNumber,
+                MigrationNumberMismatch(newMigrationNumber, bridgehubMintData.migrationNumber)
+            );
+        }
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);

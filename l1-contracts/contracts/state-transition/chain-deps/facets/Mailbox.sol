@@ -311,7 +311,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         (bytes32 assetId, uint256 amount) = (bytes32(0), 0);
         if (_getBalanceChange) {
             IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
-             
+
             (assetId, amount) = (assetTracker.getBalanceChange(s.chainId));
         }
 
