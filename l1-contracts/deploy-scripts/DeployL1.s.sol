@@ -902,6 +902,8 @@ contract DeployL1Script is Script, DeployUtils {
                 return Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
+            } else if (compareStrings(contractName, "BeaconProxy")) {
+                return Utils.readZKFoundryBytecodeL1("BeaconProxy.sol", "BeaconProxy");
             } else {
                 revert(string.concat("Contract ", contractName, " creation code not set"));
             }
