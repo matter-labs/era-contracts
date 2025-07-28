@@ -532,6 +532,16 @@ describe("ConsensusRegistry", function () {
       ).to.be.reverted;
     });
 
+    it("Should not allow validatorOwner to change their own validator key", async function () {
+      const validator = validators[0];
+      const validEntry = makeRandomValidatorEntry(makeRandomValidator(), 100);
+      await expect(
+        registry
+          .connect(validator.ownerKey)
+          .changeValidatorKey(validator.ownerKey.address, validEntry.validatorPubKey, validEntry.validatorPoP, { gasLimit })
+      ).to.be.reverted;
+    });
+
     it("Should not allow validatorOwner to update leader selection", async function () {
       await expect(registry.connect(validators[0].ownerKey).updateLeaderSelection(5, true, { gasLimit })).to.be.reverted;
     });

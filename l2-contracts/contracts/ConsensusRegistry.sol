@@ -298,7 +298,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
         address _validatorOwner,
         BLS12_381PublicKey calldata _pubKey,
         BLS12_381Signature calldata _pop
-    ) external onlyOwnerOrValidatorOwner(_validatorOwner) {
+    ) external onlyOwner {
         _verifyValidatorOwnerExists(_validatorOwner);
 
         // Verify input.
