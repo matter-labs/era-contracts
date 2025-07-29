@@ -19,7 +19,7 @@ import {BUNDLE_IDENTIFIER, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERS
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
-import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
+import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
@@ -57,7 +57,7 @@ contract InteropCenter is
     ///         It adds one more layer of security on top of cross chain communication.
     ///         Refer to its documentation for more details.
     /// @dev This is not used but is required for discoverability.
-    IAssetTracker public assetTracker;
+    IL2AssetTracker public assetTracker;
 
     /// @notice This mapping stores a number of interop bundles sent by an individual sender.
     ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
@@ -105,7 +105,7 @@ contract InteropCenter is
         address oldAssetTracker = address(assetTracker);
 
         assetRouter = _assetRouter;
-        assetTracker = IAssetTracker(_assetTracker);
+        assetTracker = IL2AssetTracker(_assetTracker);
 
         emit NewAssetRouter(oldAssetRouter, _assetRouter);
         emit NewAssetTracker(oldAssetTracker, _assetTracker);
@@ -388,7 +388,7 @@ contract InteropCenter is
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }
-        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncreaseOnGateway({
+        IL2AssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncreaseOnGateway({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
             _baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(_chainId),

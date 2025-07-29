@@ -31,7 +31,7 @@ import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlemen
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {MessageVerification, IMessageVerification} from "./MessageVerification.sol";
-import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
+import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -310,7 +310,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         (bytes32 assetId, uint256 amount) = (bytes32(0), 0);
         if (_getBalanceChange) {
-            IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
+            IL1AssetTracker assetTracker = IL1AssetTracker(address(IInteropCenter(s.interopCenter).assetTracker()));
 
             (assetId, amount) = (assetTracker.getBalanceChange(s.chainId));
         }
