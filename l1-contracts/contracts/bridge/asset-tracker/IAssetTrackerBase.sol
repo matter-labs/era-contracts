@@ -13,14 +13,15 @@ struct TokenBalanceMigrationData {
     bool isL1ToGateway;
 }
 
-interface IAssetTrackerBase {
-    struct BalanceChange {
-        bytes32 baseTokenAssetId;
-        uint256 baseTokenAmount;
-        bytes32 assetId;
-        uint256 amount;
-    }
+struct BalanceChange {
+    bytes32 baseTokenAssetId;
+    uint256 baseTokenAmount;
+    bytes32 assetId;
+    uint256 amount;
+    uint256 tokenOriginChainId;
+}
 
+interface IAssetTrackerBase {
     function BRIDGE_HUB() external view returns (IBridgehub);
 
     function tokenMigratedThisChain(bytes32 _assetId) external view returns (bool);

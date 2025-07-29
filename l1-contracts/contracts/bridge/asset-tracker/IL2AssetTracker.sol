@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {TokenBalanceMigrationData} from "./IAssetTrackerBase.sol";
+import {TokenBalanceMigrationData, BalanceChange} from "./IAssetTrackerBase.sol";
 
 interface IL2AssetTracker {
     function setAddresses(
@@ -17,10 +17,7 @@ interface IL2AssetTracker {
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        bytes32 _baseTokenAssetId,
-        uint256 _baseTokenAmount,
-        bytes32 _assetId,
-        uint256 _amount
+        BalanceChange calldata _balanceChange
     ) external;
 
     function handleInitiateBridgingOnL2(bytes32 _assetId) external;

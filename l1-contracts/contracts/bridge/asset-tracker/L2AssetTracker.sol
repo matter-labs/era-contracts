@@ -18,7 +18,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 import {InvalidAmount, InvalidAssetId, InvalidAssetMigrationNumber, NotMigratedChain} from "./AssetTrackerErrors.sol";
-import {AssetTrackerBase} from "./AssetTrackerBase.sol";
+import {AssetTrackerBase, BalanceChange} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
@@ -81,23 +81,25 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,
         bytes32 _canonicalTxHash,
-        bytes32 _baseTokenAssetId,
-        uint256 _baseTokenAmount,
-        bytes32 _assetId,
-        uint256 _amount
+        BalanceChange calldata _balanceChange
     ) external {
-        if (_amount > 0) {
-            chainBalance[_chainId][_assetId] += _amount;
+        if (_balanceChange.amount > 0) {
+            chainBalance[_chainId][_balanceChange.assetId] += _balanceChange.amount;
         }
-        if (_baseTokenAmount > 0) {
-            chainBalance[_chainId][_baseTokenAssetId] += _baseTokenAmount;
+        if (_balanceChange.baseTokenAmount > 0) {
+            chainBalance[_chainId][_balanceChange.baseTokenAssetId] += _balanceChange.baseTokenAmount;
         }
-        balanceChange[_chainId][_canonicalTxHash] = BalanceChange({
-            baseTokenAssetId: _baseTokenAssetId,
-            baseTokenAmount: _baseTokenAmount,
-            assetId: _assetId,
-            amount: _amount
-        });
+        if (
+            _balanceChange.tokenOriginChainId != 0 &&
+            _balanceChange.assetId != bytes32(0) &&
+            !isMinterChain[_balanceChange.tokenOriginChainId][_balanceChange.assetId]
+        ) {
+            isMinterChain[_balanceChange.tokenOriginChainId][_balanceChange.assetId] = true;
+        }
+
+        /// A malicious chain can cause a collision for the canonical tx hash.
+        /// This will only decrease the chain's balance, so it is not a security issue.
+        balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
     function handleInitiateBridgingOnL2(bytes32 _assetId) external view {
@@ -124,6 +126,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// note we don't process L1 txs here, since we can do that when accepting the tx.
     // kl todo: estimate the txs size, and how much we can handle on GW.
     function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external {
+        /// add onlyChain(processLogsInput.chainId)
         uint256 msgCount = 0;
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkleMemory
             .Bytes32PushTree({

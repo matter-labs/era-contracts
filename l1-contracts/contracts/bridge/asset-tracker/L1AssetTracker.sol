@@ -68,13 +68,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
     function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
-        // onlyNativeTokenVaultOrInteropCenter {
+        // onlyNativeTokenVault {
 
         uint256 currentSettlementLayer = _bridgeHub().settlementLayer(_chainId);
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
-            TransientPrimitivesLib.set(_chainId, uint256(_assetId));
-            TransientPrimitivesLib.set(_chainId + 1, _amount);
+            uint256 key = uint256(keccak256(abi.encode(_chainId)));
+            TransientPrimitivesLib.set(key, uint256(_assetId));
+            TransientPrimitivesLib.set(key + 1, _amount);
         }
         if (!isMinterChain[chainToUpdate][_assetId]) {
             chainBalance[chainToUpdate][_assetId] += _amount;
@@ -85,10 +86,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Used for deposits via Gateway.
     function getBalanceChange(uint256 _chainId) external returns (bytes32 assetId, uint256 amount) {
         // kl todo add only whitelisted settlement layers.
-        assetId = bytes32(TransientPrimitivesLib.getUint256(_chainId));
-        amount = TransientPrimitivesLib.getUint256(_chainId + 1);
-        TransientPrimitivesLib.set(_chainId, 0);
-        TransientPrimitivesLib.set(_chainId + 1, 0);
+        uint256 key = uint256(keccak256(abi.encode(_chainId)));
+        assetId = bytes32(TransientPrimitivesLib.getUint256(key));
+        amount = TransientPrimitivesLib.getUint256(key + 1);
+        TransientPrimitivesLib.set(key, 0);
+        TransientPrimitivesLib.set(key + 1, 0);
     }
 
     /// @notice Called on the L1 when a withdrawal from the chain happens, or when a failed deposit is undone.

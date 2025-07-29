@@ -32,6 +32,8 @@ import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlemen
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {IMessageVerification, MessageVerification} from "./MessageVerification.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
+import {BalanceChange} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
+import {INativeTokenVault} from "../../../bridge/ntv/INativeTokenVault.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -309,19 +311,27 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         }
 
         (bytes32 assetId, uint256 amount) = (bytes32(0), 0);
+        BalanceChange memory balanceChange;
+        /// baseTokenAssetId is set on Gateway.
+        balanceChange.baseTokenAmount = _baseTokenAmount;
+
         if (_getBalanceChange) {
             IL1AssetTracker assetTracker = IL1AssetTracker(address(IInteropCenter(s.interopCenter).assetTracker()));
+            INativeTokenVault nativeTokenVault = INativeTokenVault(
+                IL1AssetRouter(IInteropCenter(s.interopCenter).assetRouter()).nativeTokenVault()
+            );
 
             (assetId, amount) = (assetTracker.getBalanceChange(s.chainId));
+            balanceChange.assetId = assetId;
+            balanceChange.amount = amount;
+            balanceChange.tokenOriginChainId = nativeTokenVault.originChainId(assetId);
         }
 
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
             _expirationTimestamp: _expirationTimestamp,
-            _baseTokenAmount: _baseTokenAmount,
-            _assetId: assetId,
-            _amount: amount
+            _balanceChange: balanceChange
         });
         canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
@@ -339,14 +349,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp,
-        uint256 _baseTokenAmount,
-        bytes32 _assetId,
-        uint256 _amount
+        BalanceChange memory _balanceChange
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
             IInteropCenter.forwardTransactionOnGatewayWithBalanceChange,
-            (_chainId, _canonicalTxHash, _expirationTimestamp, _baseTokenAmount, _assetId, _amount)
+            (_chainId, _canonicalTxHash, _expirationTimestamp, _balanceChange)
         );
         return
             BridgehubL2TransactionRequest({
