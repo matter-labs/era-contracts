@@ -25,12 +25,12 @@ import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddre
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
-import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, InvalidChainId} from "../../../common/L1ContractErrors.sol";
+import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
 import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {MessageVerification, IMessageVerification} from "./MessageVerification.sol";
+import {IMessageVerification, MessageVerification} from "./MessageVerification.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.

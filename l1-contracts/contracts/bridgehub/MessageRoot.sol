@@ -11,10 +11,9 @@ import {IMessageRoot} from "./IMessageRoot.sol";
 import {ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
-import {MessageHashing} from "../common/libraries/MessageHashing.sol";
+import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 
 import {MessageVerification} from "../state-transition/chain-deps/facets/MessageVerification.sol";
-import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(

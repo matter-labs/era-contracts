@@ -14,7 +14,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidMigrationNumber, InvalidAssetId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
