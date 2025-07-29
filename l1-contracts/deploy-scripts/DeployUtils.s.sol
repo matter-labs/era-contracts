@@ -466,7 +466,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "DiamondInit")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "AssetTracker")) {
+        } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(
                     config.l1ChainId,

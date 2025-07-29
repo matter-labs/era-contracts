@@ -7,6 +7,8 @@ pragma solidity ^0.8.20;
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+
 // import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 // import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
@@ -143,6 +145,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         // https://github.com/matter-labs/era-contracts/blob/cebfe26a41f3b83039a7d36558bf4e0401b154fc/l1-contracts/contracts/bridge/ntv/NativeTokenVault.sol#L163
         vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
         vm.prank(address(l2NativeTokenVault.ASSET_ROUTER()));
+        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
         IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
 
         assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);

@@ -13,14 +13,14 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
+import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L1Nullifier, IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -77,7 +77,7 @@ contract L1AssetRouterTest is Test {
     address l1WethAddress;
     address l2SharedBridge;
     address l1NullifierAddress;
-    AssetTracker l1AssetTracker;
+    L1AssetTracker l1AssetTracker;
     TestnetERC20Token token;
     bytes32 tokenAssetId;
     uint256 eraPostUpgradeFirstBatch;
@@ -180,7 +180,7 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
-        l1AssetTracker = new AssetTracker(
+        l1AssetTracker = new L1AssetTracker(
             block.chainid,
             bridgehubAddress,
             address(sharedBridge),
@@ -237,19 +237,19 @@ contract L1AssetRouterTest is Test {
         bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         stdstore
             .target(address(l1AssetTracker))
-            .sig(IAssetTracker.chainBalance.selector)
+            .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(eraChainId)
             .with_key(ETH_TOKEN_ASSET_ID)
             .checked_write(100);
         stdstore
             .target(address(l1AssetTracker))
-            .sig(IAssetTracker.chainBalance.selector)
+            .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(chainId)
             .with_key(ETH_TOKEN_ASSET_ID)
             .checked_write(100);
         stdstore
             .target(address(l1AssetTracker))
-            .sig(IAssetTracker.chainBalance.selector)
+            .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(chainId)
             .with_key(tokenAssetId)
             .checked_write(100);
@@ -335,7 +335,7 @@ contract L1AssetRouterTest is Test {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _token);
         stdstore
             .target(address(l1AssetTracker))
-            .sig(IAssetTracker.chainBalance.selector)
+            .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(_chainId)
             .with_key(assetId)
             .checked_write(_value);

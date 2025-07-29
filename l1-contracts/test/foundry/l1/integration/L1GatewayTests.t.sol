@@ -45,6 +45,7 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,
@@ -295,6 +296,11 @@ contract L1GatewayTests is
             abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
             abi.encode(addresses.chainTypeManager.protocolVersion())
         );
+        vm.mockCall(
+            address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encode(2)
+        );
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 
@@ -310,7 +316,8 @@ contract L1GatewayTests is
             baseTokenAssetId: baseTokenAssetId,
             ctmData: ctmData,
             chainData: chainData,
-            migrationNumber: 0
+            migrationNumber: IChainAssetHandler(address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
+                .getMigrationNumber(migratingChainId)
         });
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(
