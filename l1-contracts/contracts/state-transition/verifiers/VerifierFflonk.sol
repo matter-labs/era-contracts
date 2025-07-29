@@ -11,7 +11,7 @@ import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 /// * Fflonk Paper: https://eprint.iacr.org/2021/1167
 /// @dev Contract was generated from a verification key with a hash of 0x17e8d7931f1314431359233e65c22657a32c335205e3c24ce292c5819becfaa7
 /// @custom:security-contact security@matterlabs.dev
-contract L1VerifierFflonk is IVerifierV2 {
+contract VerifierFflonk is IVerifierV2 {
     // ================Constants================
     uint32 internal constant DST_0 = 0;
     uint32 internal constant DST_1 = 1;

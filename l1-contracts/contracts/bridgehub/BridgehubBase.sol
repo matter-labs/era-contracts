@@ -849,6 +849,7 @@ abstract contract BridgehubBase is IBridgehub, ReentrancyGuard, Ownable2StepUpgr
     }
 
     /// @notice Pauses migration functions.
+    /// @dev Remove this with V30, the functionality was moved to the ChainAssetHandler in V29.
     function pauseMigration() external onlyOwner {
         migrationPaused = true;
     }

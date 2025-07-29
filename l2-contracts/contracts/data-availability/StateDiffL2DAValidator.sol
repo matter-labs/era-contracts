@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {PubdataField, ReconstructionMismatch} from "./DAErrors.sol";
 import {COMPRESSOR_CONTRACT, L2ContractHelper} from "../L2ContractHelper.sol";
 
-import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
+import {EfficientCall} from "@matterlabs/zksync-contracts/contracts/system-contracts/libraries/EfficientCall.sol";
 
 /// @dev The current version of state diff compression being used.
 uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
