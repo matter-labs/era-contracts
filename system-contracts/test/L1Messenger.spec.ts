@@ -57,8 +57,7 @@ describe("L1Messenger tests", () => {
       .connect(bootloaderAccount)
       .publishPubdataAndClearState(
         ethers.constants.AddressZero,
-        await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger),
-        { gasLimit: 1000000000 }
+        await emulator.buildTotalL2ToL1PubdataAndStateDiffs(l1Messenger)
       );
     await network.provider.request({
       method: "hardhat_stopImpersonatingAccount",
