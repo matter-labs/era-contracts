@@ -272,8 +272,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
                 _zeros: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
                 _sidesLengthMemory: 0,
                 _zerosLengthMemory: 0,
-                _pendingLeaves: new bytes32[](logsLength),
-                _pendingLeavesLengthMemory: 0
+                _needsRootRecalculation: false
             }); // todo 100 to const
         // slither-disable-next-line unused-return
         reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);

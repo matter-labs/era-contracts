@@ -29,8 +29,7 @@ contract IncrementalMerkleTestTest is Test {
             new bytes32[](14),
             0,
             0,
-            new bytes32[](100),
-            0
+            false
         );
         merkleTestMemory.setup(zero);
     }
@@ -156,7 +155,7 @@ contract IncrementalMerkleTestTest is Test {
     function testFromServer() public {
         uint256 length = 15;
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory = DynamicIncrementalMerkleMemory
-            .Bytes32PushTree(0, new bytes32[](length), new bytes32[](length), 0, 0, new bytes32[](100), 0);
+            .Bytes32PushTree(0, new bytes32[](length), new bytes32[](length), 0, 0, false);
         merkleTestMemory.setup(zero);
         merkleTestMemory.push(bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd"));
         merkleTestMemory.push(bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12"));
@@ -235,6 +234,28 @@ contract IncrementalMerkleTestTest is Test {
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestLazy = setUpMemory();
 
         uint256 numElements = 42;
+
+        // Regular pushes
+        for (uint256 i = 0; i < numElements; i++) {
+            merkleTestRegular.push(bytes32(i));
+        }
+
+        // Lazy pushes
+        for (uint256 i = 0; i < numElements; i++) {
+            merkleTestLazy.pushLazy(bytes32(i));
+        }
+
+        // Both should produce the same root
+        assertEq(merkleTestRegular.root(), merkleTestLazy.root());
+        assertEq(merkleTestRegular._nextLeafIndex, merkleTestLazy._nextLeafIndex);
+        assertEq(merkleTestRegular.height(), merkleTestLazy.height());
+    }
+
+    function testPushLazySmallBatch() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestRegular = setUpMemory();
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestLazy = setUpMemory();
+
+        uint256 numElements = 4;
 
         // Regular pushes
         for (uint256 i = 0; i < numElements; i++) {
