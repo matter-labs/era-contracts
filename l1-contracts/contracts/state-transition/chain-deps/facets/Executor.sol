@@ -13,16 +13,10 @@ import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
-///
-/// DEBUG SUPPORT START
-///
-// import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, PACKED_L2_BLOCK_TIMESTAMP_MASK } from "../../../common/Config.sol";
-// import {IL1DAValidator} from "../../chain-interfaces/IL1DAValidator.sol";
-// import {CommitBasedInteropNotSupported, MismatchL2DAValidator} from "../../L1StateTransitionErrors.sol";
-// import {BatchHashMismatch, InvalidProof, L2TimestampTooBig, TimeNotReached } from "../../../common/L1ContractErrors.sol";
-///
-/// DEBUG SUPPORT END
-///
+import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, PACKED_L2_BLOCK_TIMESTAMP_MASK } from "../../../common/Config.sol";
+import {IL1DAValidator} from "../../chain-interfaces/IL1DAValidator.sol";
+import {CommitBasedInteropNotSupported, MismatchL2DAValidator} from "../../L1StateTransitionErrors.sol";
+import {BatchHashMismatch, InvalidProof, L2TimestampTooBig, TimeNotReached } from "../../../common/L1ContractErrors.sol";
 import {L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
 import {DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
@@ -85,32 +79,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Get the chained hash of priority transaction hashes.
         LogProcessingOutput memory logOutput = _processL2Logs(_newBatch, _expectedSystemContractUpgradeTxHash);
 
-        ///
-        /// DEBUG SUPPORT START
-        ///
-        // L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
-        //     _chainId: s.chainId,
-        //     _batchNumber: uint256(_newBatch.batchNumber),
-        //     _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
-        //     _operatorDAInput: _newBatch.operatorDAInput,
-        //     _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
-        // });
-        L1DAValidatorOutput memory daOutput;
-        daOutput.stateDiffHash = bytes32(_newBatch.operatorDAInput);
-        daOutput.blobsOpeningCommitments = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
-        daOutput.blobsLinearHashes = new bytes32[](TOTAL_BLOBS_IN_COMMITMENT);
-        ///
-        /// DEBUG SUPPORT END
-        ///
-        ///
-        /// DEBUG SUPPORT START
-        ///
-        //        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
-        //            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
-        //        }
-        ///
-        /// DEBUG SUPPORT END
-        ///
+        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+            _chainId: s.chainId,
+            _batchNumber: uint256(_newBatch.batchNumber),
+            _l2DAValidatorOutputHash: logOutput.l2DAValidatorOutputHash,
+            _operatorDAInput: _newBatch.operatorDAInput,
+            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        });
+
+        if (_previousBatch.batchHash != logOutput.previousBatchHash) {
+            revert HashMismatch(logOutput.previousBatchHash, _previousBatch.batchHash);
+        }
         // Check that the priority operation hash in the L2 logs is as expected
         if (logOutput.chainedPriorityTxsHash != _newBatch.priorityOperationsHash) {
             revert HashMismatch(logOutput.chainedPriorityTxsHash, _newBatch.priorityOperationsHash);
@@ -212,25 +191,19 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert NonIncreasingTimestamp();
         }
 
-        ///
-        /// DEBUG SUPPORT START
-        ///
-        // uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
-        //        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
-        //        // So here we need to only double check that:
-        //        // - The timestamp of the batch is not too small.
-        //        // - The timestamp of the last L2 block is not too big.
-        //        // New batch timestamp is too small
-        //        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
-        //            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
-        //        }
-        //        // The last L2 block timestamp is too big
-        //        if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
-        //            revert L2TimestampTooBig();
-        //        }
-        ///
-        /// DEBUG SUPPORT END
-        ///
+        uint256 lastL2BlockTimestamp = _packedBatchAndL2BlockTimestamp & PACKED_L2_BLOCK_TIMESTAMP_MASK;
+        // All L2 blocks have timestamps within the range of [batchTimestamp, lastL2BlockTimestamp].
+        // So here we need to only double check that:
+        // - The timestamp of the batch is not too small.
+        // - The timestamp of the last L2 block is not too big.
+        // New batch timestamp is too small
+        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > batchTimestamp) {
+            revert TimeNotReached(batchTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
+        }
+        // The last L2 block timestamp is too big
+        if (lastL2BlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
+            revert L2TimestampTooBig();
+        }
     }
 
     /// @dev Check that L2 logs are proper and batch contain all meta information for them
@@ -300,15 +273,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
-                ///
-                /// DEBUG SUPPORT START
-                ///
-                // if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
-                //     revert MismatchL2DAValidator();
-                // }
-                ///
-                /// DEBUG SUPPORT END
-                ///
+                if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
+                    revert MismatchL2DAValidator();
+                }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
@@ -457,7 +424,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             cachedStoredBatchHashes != _hashLegacyStoredBatchInfo(lastCommittedBatchData)
         ) {
             // incorrect previous batch data
-            // revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(lastCommittedBatchData));
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
@@ -560,7 +527,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert NonSequentialBatch();
         }
         if (_hashStoredBatchInfo(_storedBatch) != s.storedBatchHashes[currentBatchNumber]) {
-            // revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
+            revert BatchHashMismatch(s.storedBatchHashes[currentBatchNumber], _hashStoredBatchInfo(_storedBatch));
         }
         if (_priorityOperationsHash != _storedBatch.priorityOperationsHash) {
             revert PriorityOperationsRollingHashMismatch();
@@ -727,17 +694,17 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             _hashStoredBatchInfo(prevBatch) != cachedStoredBatchHashes &&
             _hashLegacyStoredBatchInfo(prevBatch) != cachedStoredBatchHashes
         ) {
-            // revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(prevBatch));
+            revert BatchHashMismatch(cachedStoredBatchHashes, _hashStoredBatchInfo(prevBatch));
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
-                // revert BatchHashMismatch(
-                //     s.storedBatchHashes[currentTotalBatchesVerified],
-                //     _hashStoredBatchInfo(committedBatches[i])
-                // );
+                revert BatchHashMismatch(
+                    s.storedBatchHashes[currentTotalBatchesVerified],
+                    _hashStoredBatchInfo(committedBatches[i])
+                );
             }
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
