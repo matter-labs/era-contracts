@@ -14,7 +14,6 @@ import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
-import {IAssetTracker} from "../asset-tracker/IAssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
@@ -23,6 +22,7 @@ import {BridgeHelper} from "../BridgeHelper.sol";
 import {EmptyToken} from "../L1BridgeContractErrors.sol";
 import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotLegacy, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
+import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -93,7 +93,7 @@ abstract contract NativeTokenVault is
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
 
-    function _assetTracker() internal view virtual returns (IAssetTracker);
+    function _assetTracker() internal view virtual returns (IAssetTrackerBase);
 
     /// @inheritdoc INativeTokenVault
     function registerToken(address _nativeToken) external virtual {
