@@ -20,7 +20,7 @@ import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1Cont
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, CallDestinationChainMismatch, IndirectCallValueMismatch} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -186,6 +186,17 @@ contract InteropCenter is
         bytes[][] memory originalCallAttributes = new bytes[][](callStartersLength);
 
         for (uint256 i = 0; i < callStartersLength; ++i) {
+            // Parse 7930 address to extract chain ID and address
+            (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(
+                _callStarters[i].to
+            );
+
+            // Ensure all calls target the same destination chain
+            require(
+                recipientChainId == _destinationChainId,
+                CallDestinationChainMismatch(_destinationChainId, recipientChainId)
+            );
+
             // Store original attributes for MessageSent event emission
             originalCallAttributes[i] = _callStarters[i].callAttributes;
 
@@ -195,7 +206,7 @@ contract InteropCenter is
                 AttributeParsingRestrictions.OnlyCallAttributes
             );
             callStartersInternal[i] = InteropCallStarterInternal({
-                to: _callStarters[i].to,
+                to: recipientAddress,
                 data: _callStarters[i].data,
                 callAttributes: callAttributes
             });
@@ -328,9 +339,12 @@ contract InteropCenter is
         uint256 _destinationChainId,
         address _sender
     ) internal returns (InteropCall memory interopCall) {
+        // Use the already-parsed address from InteropCallStarterInternal
+        address recipientAddress = _callStarter.to;
+
         if (_callStarter.callAttributes.indirectCall) {
             // slither-disable-next-line arbitrary-send-eth
-            InteropCallStarter memory actualCallStarter = IL2CrossChainSender(_callStarter.to).initiateBridging{
+            InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateBridging{
                 value: _callStarter.callAttributes.indirectCallMessageValue
             }(_destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
             // solhint-disable-next-line no-unused-vars
@@ -346,19 +360,21 @@ contract InteropCenter is
                     indirectCallAttributes.interopCallValue
                 )
             );
+            // Parse the returned 7930 address from actualCallStarter.to
+            (, address actualCallRecipient) = InteroperableAddress.parseEvmV1(actualCallStarter.to);
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
                 shadowAccount: false,
-                to: actualCallStarter.to,
+                to: actualCallRecipient,
                 data: actualCallStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
-                from: _callStarter.to
+                from: recipientAddress
             });
         } else {
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
                 shadowAccount: false,
-                to: _callStarter.to,
+                to: recipientAddress,
                 data: _callStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
                 from: _sender
