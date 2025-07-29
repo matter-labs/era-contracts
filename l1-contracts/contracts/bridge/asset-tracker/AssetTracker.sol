@@ -264,17 +264,19 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
     // kl todo: estimate the txs size, and how much we can handle on GW.
     function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external {
         uint256 msgCount = 0;
+        uint256 logsLength = _processLogsInputs.logs.length;
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkleMemory
             .Bytes32PushTree({
                 _nextLeafIndex: 0,
                 _sides: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
                 _zeros: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
                 _sidesLengthMemory: 0,
-                _zerosLengthMemory: 0
+                _zerosLengthMemory: 0,
+                _pendingLeaves: new bytes32[](logsLength),
+                _pendingLeavesLengthMemory: 0
             }); // todo 100 to const
         // slither-disable-next-line unused-return
         reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
-        uint256 logsLength = _processLogsInputs.logs.length;
         for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
             L2Log memory log = _processLogsInputs.logs[logCount];
             bytes32 hashedLog = keccak256(
@@ -282,7 +284,7 @@ contract AssetTracker is IAssetTracker, Ownable2StepUpgradeable, AssetHandlerMod
                 abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
             );
             // slither-disable-next-line unused-return
-            reconstructedLogsTree.push(hashedLog);
+            reconstructedLogsTree.pushLazy(hashedLog);
             if (log.sender == L2_BOOTLOADER_ADDRESS && log.value == bytes32(uint256(TxStatus.Failure))) {
                 _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key);
             }
