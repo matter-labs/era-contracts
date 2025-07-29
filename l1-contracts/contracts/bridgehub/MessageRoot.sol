@@ -13,6 +13,9 @@ import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
+import {MessageVerification} from "../state-transition/chain-deps/facets/MessageVerification.sol";
+import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
+
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
@@ -26,7 +29,7 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-contract MessageRoot is IMessageRoot, Initializable {
+contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
@@ -79,6 +82,8 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
+
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainRoots;
 
     address public assetTracker;
 
@@ -177,6 +182,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
 
         _emitRoot(sharedTreeRoot);
+        chainRoots[_chainId][_batchNumber] = _chainBatchRoot;
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
@@ -243,5 +249,35 @@ contract MessageRoot is IMessageRoot, Initializable {
         sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialHash, _chainId));
 
         emit AddedChain(_chainId, cachedChainCount);
+    }
+
+    function _proveL2LeafInclusion(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) internal view override returns (bool) {
+        ProofData memory proofData = MessageHashing._getProofData({
+            _chainId: _chainId,
+            _batchNumber: _batchNumber,
+            _leafProofMask: _leafProofMask,
+            _leaf: _leaf,
+            _proof: _proof
+        });
+        if (proofData.finalProofNode) {
+            // For proof based interop this is the SL InteropRoot at block number _batchNumber
+            bytes32 correctBatchRoot = chainRoots[_chainId][_batchNumber];
+            return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
+        }
+
+        return
+            this.proveL2LeafInclusionShared({
+                _chainId: proofData.settlementLayerChainId,
+                _blockOrBatchNumber: proofData.settlementLayerBatchNumber, // SL block number
+                _leafProofMask: proofData.settlementLayerBatchRootMask,
+                _leaf: proofData.chainIdLeaf,
+                _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
+            });
     }
 }
