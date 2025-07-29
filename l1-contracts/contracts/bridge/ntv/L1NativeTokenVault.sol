@@ -43,6 +43,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     ///      This mapping was deprecated in favor of AssetTracker component, now it will be responsible for tracking chain balances.
     ///      We have a `chainBalance` function now, which returns the values in this mapping, for backwards compatibility.
+    // slither-disable-next-line uninitialized-state
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) internal DEPRECATED_chainBalance;
 
     /// @dev Returns the value of `DEPRECATED_chainBalance` for backwards compatibility.
@@ -76,6 +77,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev Accepts ether only from the contract that was the shared Bridge.
     receive() external payable {
         require(address(L1_NULLIFIER) == msg.sender, Unauthorized(msg.sender));
+    }
+
+    function _assetTracker() internal view override returns (IAssetTracker) {
+        return l1AssetTracker;
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
@@ -174,13 +179,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address l1Token = tokenAddress[_assetId];
         require(_amount != 0, NoFundsTransferred());
 
-        _handleChainBalanceDecrease({
-            _tokenOriginChainId: originChainId[_assetId],
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _amount: _amount,
-            _isNative: false
-        });
+        _handleChainBalanceDecrease({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -249,31 +248,14 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return BeaconProxy(payable(proxyAddress));
     }
 
-    function _handleChainBalanceIncrease(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) internal override {
+    function _handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
         // Note, that we do not update balances for chains where the assetId comes from,
         // since these chains can mint new instances of the token.
-        l1AssetTracker.handleChainBalanceIncrease(_chainId, _assetId, _amount, _isNative);
+        l1AssetTracker.handleChainBalanceIncreaseOnL1(_chainId, _assetId, _amount);
     }
 
-    function _handleChainBalanceDecrease(
-        uint256 _tokenOriginChainId,
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) internal override {
+    function _handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
         // On L1 the asset tracker is triggered when the user withdraws.
-        l1AssetTracker.handleChainBalanceDecrease({
-            _tokenOriginChainId: _tokenOriginChainId,
-            _chainId: _chainId,
-            _assetId: _assetId,
-            _amount: _amount,
-            _isNative: _isNative
-        });
+        l1AssetTracker.handleChainBalanceDecreaseOnL1({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
     }
 }

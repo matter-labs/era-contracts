@@ -102,7 +102,8 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             chainId: mintChainId,
             baseTokenAssetId: baseTokenAssetId,
             ctmData: ctmData,
-            chainData: chainData
+            chainData: chainData,
+            migrationNumber: 0
         });
         vm.prank(aliasedL1AssetRouter);
         l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));

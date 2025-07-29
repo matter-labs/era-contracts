@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
+import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {L2_ASSET_ROUTER, L2_BRIDGE_HUB, L2_NATIVE_TOKEN_VAULT} from "./Constants.sol";
-import {IBridgedStandardERC20} from "./interfaces/IBridgedStandardERC20.sol";
-import {LegacyBridgeNotProxy} from "./SystemContractErrors.sol";
+import {L2_ASSET_ROUTER, L2_BRIDGE_HUB, L2_NATIVE_TOKEN_VAULT} from "../Constants.sol";
+import {IBridgedStandardERC20} from "../interfaces/IBridgedStandardERC20.sol";
+import {LegacyBridgeNotProxy} from "../SystemContractErrors.sol";
 
 /// @dev Storage slot with the admin of the contract used for EIP‑1967 proxies (e.g., TUP, BeaconProxy, etc.).
 bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;

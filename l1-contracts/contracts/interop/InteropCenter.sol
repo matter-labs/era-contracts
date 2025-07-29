@@ -15,8 +15,8 @@ import {IInteropCenter} from "./IInteropCenter.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
-import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal, CallAttributes, BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "../common/Messaging.sol";
-import {MsgValueMismatch, Unauthorized, NotL1, NotL2ToL2} from "../common/L1ContractErrors.sol";
+import {BUNDLE_IDENTIFIER, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
+import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
@@ -385,18 +385,18 @@ contract InteropCenter is
         bytes32 _assetId,
         uint256 _amount
     ) external override onlySettlementLayerRelayedSender {
-        require(L1_CHAIN_ID != block.chainid, NotInGatewayMode());
-        if (_baseTokenAmount > 0) {
-            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(
-                _chainId,
-                BRIDGE_HUB.baseTokenAssetId(_chainId),
-                _baseTokenAmount,
-                false
-            );
+        if (L1_CHAIN_ID == block.chainid) {
+            revert NotInGatewayMode();
         }
-        if (_amount > 0) {
-            IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncrease(_chainId, _assetId, _amount, false);
-        }
+        IAssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncreaseOnGateway({
+            _chainId: _chainId,
+            _canonicalTxHash: _canonicalTxHash,
+            _baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(_chainId),
+            _baseTokenAmount: _baseTokenAmount,
+            _assetId: _assetId,
+            _amount: _amount
+        });
+
         address zkChain = BRIDGE_HUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }

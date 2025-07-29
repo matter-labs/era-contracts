@@ -6,20 +6,49 @@ import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecuto
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
+struct TokenBalanceMigrationData {
+    uint256 chainId;
+    bytes32 assetId;
+    uint256 tokenOriginChainId;
+    uint256 amount;
+    uint256 migrationNumber;
+    bool isL1ToGateway;
+}
+
 interface IAssetTracker {
+    struct BalanceChange {
+        bytes32 baseTokenAssetId;
+        uint256 baseTokenAmount;
+        bytes32 assetId;
+        uint256 amount;
+    }
+
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function assetSettlementLayer(bytes32 _assetId) external view returns (uint256);
+    function tokenMigratedThisChain(bytes32 _assetId) external view returns (bool);
 
-    function handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount, bool _isNative) external;
+    function tokenMigrated(uint256 _chainId, bytes32 _assetId) external view returns (bool);
 
-    function handleChainBalanceDecrease(
-        uint256 _tokenOriginChainId,
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) external;
+
+    function registerLegacyTokenOnChain(bytes32 _assetId) external;
+
+    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
+
+    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
+
+    function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        bytes32 _baseTokenAssetId,
+        uint256 _baseTokenAmount,
         bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
+        uint256 _amount
     ) external;
+
+    function handleInitiateBridgingOnL2(bytes32 _assetId) external;
+
+    function handleFinalizeBridgingOnL2(bytes32 _assetId) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
 
@@ -33,17 +62,7 @@ interface IAssetTracker {
 
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
-    function confirmMigrationOnL2(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        uint256 _migrationNumber
-    ) external;
+    function confirmMigrationOnL2(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
-    function confirmMigrationOnGateway(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isL1ToGateway
-    ) external;
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 }

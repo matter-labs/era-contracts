@@ -15,7 +15,7 @@ import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
-import {NoEthAllowed, HyperchainNotRegistered} from "./L1BridgehubErrors.sol";
+import {HyperchainNotRegistered, NoEthAllowed} from "./L1BridgehubErrors.sol";
 error ChainAlreadyRegistered();
 
 /// @dev The encoding version of the data.

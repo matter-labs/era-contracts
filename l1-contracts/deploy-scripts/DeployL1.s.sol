@@ -348,6 +348,9 @@ contract DeployL1Script is Script, DeployUtils {
         vm.broadcast(msg.sender);
         ntv.setAssetTracker(addresses.bridgehub.assetTrackerProxy);
         console.log("L1NativeTokenVault updated with AssetTracker address");
+
+        vm.broadcast(msg.sender);
+        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
     function setL1NativeTokenVaultParams() internal {
@@ -360,9 +363,6 @@ contract DeployL1Script is Script, DeployUtils {
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
         l1Nullifier.setL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-
-        vm.broadcast(msg.sender);
-        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
     function updateOwners() internal {

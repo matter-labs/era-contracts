@@ -435,6 +435,18 @@ object "Bootloader" {
                 ret := mul(INTEROP_ROOT_ROLLING_HASH_SLOT(), 32)
             }
 
+            function SETTLEMENT_LAYER_CHAIN_ID_SLOT() -> ret {
+                ret := add(INTEROP_ROOT_ROLLING_HASH_SLOT(), 1)
+            }
+
+            function SETTLEMENT_LAYER_CHAIN_ID_BYTE() -> ret {
+                ret := mul(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 32)
+            }
+
+            function getSettlementLayerChainId() -> ret {
+                ret := mload(SETTLEMENT_LAYER_CHAIN_ID_BYTE())
+            }
+
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
             /// Each compressed bytecode is provided in the following format:
             /// - 32 byte formatted bytecode hash
@@ -446,7 +458,7 @@ object "Bootloader" {
             /// At the start of the bootloader, the value stored at the `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT` is equal to
             /// `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT + 32`, where the hash of the first compressed bytecode to publish should be stored.
             function COMPRESSED_BYTECODES_BEGIN_SLOT() -> ret {
-                ret := add(INTEROP_ROOT_ROLLING_HASH_SLOT(), 1)
+                ret := add(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 1)
             }
 
             /// @dev The byte starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -681,6 +693,10 @@ object "Bootloader" {
 
             function L2_INTEROP_ROOT_STORAGE() -> ret {
                 ret := 0x0000000000000000000000000000000000010008
+            }
+
+            function L2_INTEROP_CENTER_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000001000b
             }
 
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
@@ -1877,6 +1893,25 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
+            function getCodeSize(address) -> ret {
+                mstore(0, {{GET_CODE_SIZE_SELECTOR}})
+                mstore(4, address)
+                let success := call(
+                    gas(),
+                    KNOWN_CODES_CONTRACT_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    32
+                )
+
+                if iszero(success) {
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
 
             /// @dev Used to refund the current transaction.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
@@ -3224,6 +3259,36 @@ object "Bootloader" {
                 }
             }
 
+            function setSettlementLayerChainId(currentSettlementLayerChainId) {
+                mstore(0, {{RIGHT_PADDED_SET_SETTLEMENT_LAYER_CHAIN_ID_SELECTOR}})
+                mstore(4, currentSettlementLayerChainId)
+
+                debugLog("Setting settlement layer chain id: ", currentSettlementLayerChainId)
+
+                let success := call(
+                    gas(),
+                    SYSTEM_CONTEXT_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("Failed to set new settlement layer chain id: ", currentSettlementLayerChainId)
+
+                    /// here during the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
+                    /// todo remove after v30 upgrade.
+                    let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
+                    debugLog("codeSize", codeSize)
+                    let codeSize2 := getCodeSize(add(L2_INTEROP_ROOT_STORAGE(), 10))
+                    if iszero(eq(codeSize, codeSize2)) {
+                        revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
+                    }
+                }
+            }
+
             /// @notice Sets the context information for the current L2 block.
             /// @param txId The index of the transaction in the batch for which to get the L2 block information.
             function setL2Block(txId) {
@@ -4288,6 +4353,10 @@ object "Bootloader" {
                 ret := 37
             }
 
+            function FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE() -> ret {
+                ret := 38
+            }
+
             /// @dev Accepts a 1-word literal and returns its length in bytes
             /// @param str A string literal
             function getStrLen(str) -> len {
@@ -4470,8 +4539,13 @@ object "Bootloader" {
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
-            function protocolUpgradeTxHashKey() -> ret {
+            function settlementLayerChainIdLogKey() -> ret {
                 ret := 9
+            }
+
+            /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
+            function protocolUpgradeTxHashKey() -> ret {
+                ret := 10
             }
 
             ////////////////////////////////////////////////////////////////////////////
@@ -4511,6 +4585,9 @@ object "Bootloader" {
                 /// the operator still provides it to make sure that its data is in sync.
                 let EXPECTED_BASE_FEE := mload(192)
 
+                /// @notice The settlement layer chain id.
+                let SETTLEMENT_LAYER_CHAIN_ID := getSettlementLayerChainId()
+
                 validateOperatorProvidedPrices(FAIR_L2_GAS_PRICE, FAIR_PUBDATA_PRICE)
 
 
@@ -4535,6 +4612,9 @@ object "Bootloader" {
 
                 setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
 
+
+                setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
+
                 <!-- @endif -->
 
                 <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
@@ -4548,6 +4628,8 @@ object "Bootloader" {
                 default {
                     setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
                 }
+
+                setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
 
                 GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, FAIR_PUBDATA_PRICE)
 
@@ -4689,7 +4771,8 @@ object "Bootloader" {
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
             sendToL1Native(true, txsStatusRollingHashKey(), mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE()))
-            
+            sendToL1Native(true, settlementLayerChainIdLogKey(), getSettlementLayerChainId())
+
             // After all of the interop roots are processed, sending hash to L1.
             let rollingHashOfProcessedRoots := mload(INTEROP_ROOT_ROLLING_HASH_BYTE())
             sendToL1Native(true, interopRootRollingHashLogKey(), rollingHashOfProcessedRoots)

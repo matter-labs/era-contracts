@@ -15,8 +15,9 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter} from "./L1BridgehubErrors.sol";
-import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
+import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, OnlyAssetTracker, OnlyChain, MigrationNumberMismatch} from "./L1BridgehubErrors.sol";
+import {ChainIdNotRegistered, NotL1, MigrationPaused} from "../common/L1ContractErrors.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
@@ -40,7 +41,7 @@ contract ChainAssetHandler is
 
     uint256 internal immutable L1_CHAIN_ID;
 
-    IBridgehub internal immutable BRIDGEHUB;
+    IBridgehub internal immutable BRIDGE_HUB;
 
     IMessageRoot internal immutable MESSAGE_ROOT;
 
@@ -48,6 +49,9 @@ contract ChainAssetHandler is
 
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
+
+    /// @notice used to track the number of times each chain has migrated.
+    mapping(uint256 chainId => uint256 migrationNumber) internal migrationNumber;
 
     modifier onlyAssetRouter() {
         if (msg.sender != ASSET_ROUTER) {
@@ -70,6 +74,23 @@ contract ChainAssetHandler is
         _;
     }
 
+    modifier onlyAssetTracker() {
+        // kl todo add contract discoverability, simplify this.
+        require(
+            msg.sender == L2_ASSET_TRACKER_ADDR || msg.sender == address(BRIDGE_HUB.interopCenter().assetTracker()),
+            OnlyAssetTracker(msg.sender, address(BRIDGE_HUB.interopCenter().assetTracker()))
+        );
+        _;
+    }
+
+    error NotSystemContext(address _sender);
+    modifier onlySystemContext() {
+        if (msg.sender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
+            revert NotSystemContext(msg.sender);
+        }
+        _;
+    }
+
     /// @notice to avoid parity hack
     constructor(
         uint256 _l1ChainId,
@@ -79,7 +100,7 @@ contract ChainAssetHandler is
         IMessageRoot _messageRoot
     ) reentrancyGuardInitializer {
         _disableInitializers();
-        BRIDGEHUB = _bridgehub;
+        BRIDGE_HUB = _bridgehub;
         L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
@@ -88,6 +109,38 @@ contract ChainAssetHandler is
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Getters
+    //////////////////////////////////////////////////////////////*/
+
+    function getMigrationNumber(uint256 _chainId) external view onlyAssetTracker returns (uint256) {
+        return migrationNumber[_chainId];
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            V30 Upgrade
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Checks that the message sender is the specified ZK Chain.
+    /// @param _chainId The ID of the chain that is required to be the caller.
+    modifier onlyChain(uint256 _chainId) {
+        if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+        }
+        _;
+    }
+
+    error MigrationNumberAlreadySet();
+    error OnlyOnGateway();
+
+    function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
+        if (migrationNumber[_chainId] != 0) {
+            revert MigrationNumberAlreadySet();
+        }
+        require(block.chainid != L1_CHAIN_ID, OnlyOnGateway());
+        migrationNumber[_chainId] = 1;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -116,8 +169,8 @@ contract ChainAssetHandler is
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        if (_assetId != BRIDGEHUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
-            revert IncorrectChainAssetId(_assetId, BRIDGEHUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId));
+        if (_assetId != BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
+            revert IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId));
         }
 
         address zkChain;
@@ -125,7 +178,7 @@ contract ChainAssetHandler is
         // to avoid stack too deep
         {
             address ctm;
-            (zkChain, ctm) = BRIDGEHUB.forwardedBridgeBurnSetSettlementLayer(
+            (zkChain, ctm) = BRIDGE_HUB.forwardedBridgeBurnSetSettlementLayer(
                 bridgehubBurnData.chainId,
                 _settlementChainId
             );
@@ -145,17 +198,19 @@ contract ChainAssetHandler is
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == L1_CHAIN_ID
                 ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
-                : BRIDGEHUB.getZKChain(_settlementChainId),
+                : BRIDGE_HUB.getZKChain(_settlementChainId),
             _originalCaller,
             bridgehubBurnData.chainData
         );
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
-            baseTokenAssetId: BRIDGEHUB.baseTokenAssetId(bridgehubBurnData.chainId),
+            baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(bridgehubBurnData.chainId),
             ctmData: ctmMintData,
-            chainData: chainMintData
+            chainData: chainMintData,
+            migrationNumber: migrationNumber[bridgehubBurnData.chainId]
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
+        ++migrationNumber[bridgehubBurnData.chainId];
 
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
@@ -174,7 +229,7 @@ contract ChainAssetHandler is
             (BridgehubMintCTMAssetData)
         );
 
-        (address zkChain, address ctm) = BRIDGEHUB.forwardedBridgeMint(
+        (address zkChain, address ctm) = BRIDGE_HUB.forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
             bridgehubMintData.baseTokenAssetId
@@ -187,10 +242,18 @@ contract ChainAssetHandler is
                 revert ChainIdNotRegistered(bridgehubMintData.chainId);
             }
             // We want to allow any chain to be migrated,
-            BRIDGEHUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
+            BRIDGE_HUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId);
         }
-
+        if (migrationNumber[bridgehubMintData.chainId] == 0) {
+            migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
+        } else {
+            uint256 newMigrationNumber = ++migrationNumber[bridgehubMintData.chainId];
+            require(
+                newMigrationNumber == bridgehubMintData.migrationNumber,
+                MigrationNumberMismatch(newMigrationNumber, bridgehubMintData.migrationNumber)
+            );
+        }
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);
@@ -210,7 +273,7 @@ contract ChainAssetHandler is
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        (address zkChain, address ctm) = BRIDGEHUB.forwardedBridgeRecoverFailedTransfer(bridgehubBurnData.chainId);
+        (address zkChain, address ctm) = BRIDGE_HUB.forwardedBridgeRecoverFailedTransfer(bridgehubBurnData.chainId);
 
         IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubBurnData.chainId,
@@ -219,12 +282,34 @@ contract ChainAssetHandler is
             _ctmData: bridgehubBurnData.ctmData
         });
 
+        --migrationNumber[bridgehubBurnData.chainId];
+
         IZKChain(zkChain).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubBurnData.chainId,
             _assetInfo: _assetId,
             _originalCaller: _depositSender,
             _chainData: bridgehubBurnData.chainData
         });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            L2 functions
+    //////////////////////////////////////////////////////////////*/
+
+    function setSettlementLayerChainId(
+        uint256 _previousSettlementLayerChainId,
+        uint256 _currentSettlementLayerChainId
+    ) external onlySystemContext {
+        if (_previousSettlementLayerChainId == 0) {
+            if (block.chainid == L1_CHAIN_ID) {
+                migrationNumber[block.chainid] = 1;
+            }
+            /// For the initial call, we return, as there is no real migration.
+            return;
+        }
+        if (_previousSettlementLayerChainId != _currentSettlementLayerChainId) {
+            ++migrationNumber[block.chainid];
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
