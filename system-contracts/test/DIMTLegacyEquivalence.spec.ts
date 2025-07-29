@@ -171,7 +171,7 @@ describe("DIMT Legacy Equivalence", function () {
         // Skip empty array test case for now, there's an issue with the ethers.js binding
         continue;
       }
-      
+
       const result = await dimtTester.testLazyEquivalence(testCase.leaves);
       const { regularRoot, lazyRoot } = result;
       expect(regularRoot).to.equal(lazyRoot, `Lazy edge case failed for ${testCase.name}`);

@@ -124,7 +124,7 @@ contract DIMTLegacyTester {
         lazyTree.reset(ZERO_HASH);
 
         uint256 leavesLength = leaves.length;
-        
+
         // Regular pushes
         for (uint256 i = 0; i < leavesLength; ++i) {
             (, regularRoot) = regularTree.push(leaves[i]);
@@ -152,24 +152,27 @@ contract DIMTLegacyTester {
 
         // Regular tree: push all leaves normally
         uint256 i;
-        for (i = 0; i < initialLeaves.length; ++i) {
+        uint256 initialLeavesLength = initialLeaves.length;
+        for (i = 0; i < initialLeavesLength; ++i) {
             regularTree.push(initialLeaves[i]);
         }
-        for (i = 0; i < lazyLeaves.length; ++i) {
+        uint256 lazyLeavesLength = lazyLeaves.length;
+        for (i = 0; i < lazyLeavesLength; ++i) {
             regularTree.push(lazyLeaves[i]);
         }
-        for (i = 0; i < finalLeaves.length; ++i) {
+        uint256 finalLeavesLength = finalLeaves.length;
+        for (i = 0; i < finalLeavesLength; ++i) {
             (, regularRoot) = regularTree.push(finalLeaves[i]);
         }
 
         // Mixed tree: initial pushes, then lazy pushes, then final pushes
-        for (i = 0; i < initialLeaves.length; ++i) {
+        for (i = 0; i < initialLeavesLength; ++i) {
             mixedTree.push(initialLeaves[i]);
         }
-        for (i = 0; i < lazyLeaves.length; ++i) {
+        for (i = 0; i < lazyLeavesLength; ++i) {
             mixedTree.pushLazy(lazyLeaves[i]);
         }
-        for (i = 0; i < finalLeaves.length; ++i) {
+        for (i = 0; i < finalLeavesLength; ++i) {
             (, mixedRoot) = mixedTree.push(finalLeaves[i]);
         }
 
@@ -179,7 +182,9 @@ contract DIMTLegacyTester {
     /**
      * @dev Test lazy functionality for memory trees by comparing pushLazyMemory + recalculateRootMemory vs regular pushMemory
      */
-    function testLazyEquivalenceMemory(bytes32[] calldata leaves) external pure returns (bytes32 regularRoot, bytes32 lazyRoot) {
+    function testLazyEquivalenceMemory(
+        bytes32[] calldata leaves
+    ) external pure returns (bytes32 regularRoot, bytes32 lazyRoot) {
         if (leaves.length == 0) {
             return (bytes32(0), bytes32(0));
         }
@@ -191,7 +196,7 @@ contract DIMTLegacyTester {
         regularTree._sides = new bytes32[](32);
         regularTree._zeros = new bytes32[](32);
         regularTree._pendingLeaves = new bytes32[](leaves.length);
-        
+
         lazyTree._sides = new bytes32[](32);
         lazyTree._zeros = new bytes32[](32);
         lazyTree._pendingLeaves = new bytes32[](leaves.length);
@@ -201,7 +206,7 @@ contract DIMTLegacyTester {
         lazyTree.setupMemory(ZERO_HASH);
 
         uint256 leavesLength = leaves.length;
-        
+
         // Regular pushes
         for (uint256 i = 0; i < leavesLength; ++i) {
             (, regularRoot) = regularTree.pushMemory(leaves[i]);
@@ -228,12 +233,12 @@ contract DIMTLegacyTester {
         DynamicIncrementalMerkle.Bytes32PushTree memory mixedTree;
 
         uint256 totalLeaves = initialLeaves.length + lazyLeaves.length + finalLeaves.length;
-        
+
         // Pre-allocate arrays for memory operations
         regularTree._sides = new bytes32[](32);
         regularTree._zeros = new bytes32[](32);
         regularTree._pendingLeaves = new bytes32[](totalLeaves);
-        
+
         mixedTree._sides = new bytes32[](32);
         mixedTree._zeros = new bytes32[](32);
         mixedTree._pendingLeaves = new bytes32[](totalLeaves);
@@ -243,24 +248,27 @@ contract DIMTLegacyTester {
 
         // Regular tree: push all leaves normally
         uint256 i;
-        for (i = 0; i < initialLeaves.length; ++i) {
+        uint256 initialLeavesLength = initialLeaves.length;
+        for (i = 0; i < initialLeavesLength; ++i) {
             regularTree.pushMemory(initialLeaves[i]);
         }
-        for (i = 0; i < lazyLeaves.length; ++i) {
+        uint256 lazyLeavesLength = lazyLeaves.length;
+        for (i = 0; i < lazyLeavesLength; ++i) {
             regularTree.pushMemory(lazyLeaves[i]);
         }
-        for (i = 0; i < finalLeaves.length; ++i) {
+        uint256 finalLeavesLength = finalLeaves.length;
+        for (i = 0; i < finalLeavesLength; ++i) {
             (, regularRoot) = regularTree.pushMemory(finalLeaves[i]);
         }
 
         // Mixed tree: initial pushes, then lazy pushes, then final pushes
-        for (i = 0; i < initialLeaves.length; ++i) {
+        for (i = 0; i < initialLeavesLength; ++i) {
             mixedTree.pushMemory(initialLeaves[i]);
         }
-        for (i = 0; i < lazyLeaves.length; ++i) {
+        for (i = 0; i < lazyLeavesLength; ++i) {
             mixedTree.pushLazyMemory(lazyLeaves[i]);
         }
-        for (i = 0; i < finalLeaves.length; ++i) {
+        for (i = 0; i < finalLeavesLength; ++i) {
             (, mixedRoot) = mixedTree.pushMemory(finalLeaves[i]);
         }
 
