@@ -108,7 +108,11 @@ library DynamicIncrementalMerkle {
      * @dev Internal function that handles both lazy and non-lazy push operations for storage.
      * Returns the index and optionally the new root (if not lazy).
      */
-    function _pushInner(Bytes32PushTree storage self, bytes32 leaf, bool isLazy) internal returns (uint256 index, bytes32 newRoot) {
+    function _pushInner(
+        Bytes32PushTree storage self,
+        bytes32 leaf,
+        bool isLazy
+    ) internal returns (uint256 index, bytes32 newRoot) {
         // Cache read
         uint256 levels = self._zeros.length - 1;
 
@@ -188,7 +192,11 @@ library DynamicIncrementalMerkle {
      * @dev Internal function that handles both lazy and non-lazy push operations for memory.
      * Returns the index and optionally the new root (if not lazy).
      */
-    function _pushInnerMemory(Bytes32PushTree memory self, bytes32 leaf, bool isLazy) internal pure returns (uint256 index, bytes32 newRoot) {
+    function _pushInnerMemory(
+        Bytes32PushTree memory self,
+        bytes32 leaf,
+        bool isLazy
+    ) internal pure returns (uint256 index, bytes32 newRoot) {
         // Cache read
         uint256 levels = self._zerosLengthMemory - 1;
 

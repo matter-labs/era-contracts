@@ -65,7 +65,11 @@ library DynamicIncrementalMerkleMemory {
      * @dev Internal function that handles both lazy and non-lazy push operations.
      * Returns the index and optionally the new root (if not lazy).
      */
-    function _pushInner(Bytes32PushTree memory self, bytes32 leaf, bool isLazy) internal pure returns (uint256 index, bytes32 newRoot) {
+    function _pushInner(
+        Bytes32PushTree memory self,
+        bytes32 leaf,
+        bool isLazy
+    ) internal pure returns (uint256 index, bytes32 newRoot) {
         // Cache read
         uint256 levels = self._zerosLengthMemory - 1;
 
