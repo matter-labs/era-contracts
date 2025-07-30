@@ -62,13 +62,10 @@ library DynamicIncrementalMerkleMemory {
     }
 
     /**
-     * @dev Insert a new leaf in the tree, and compute the new root. Returns the position of the inserted leaf in the
-     * tree, and the resulting root.
-     *
-     * Hashing the leaf before calling this function is recommended as a protection against
-     * second pre-image attacks.
+     * @dev Internal function that handles both lazy and non-lazy push operations.
+     * Returns the index and optionally the new root (if not lazy).
      */
-    function push(Bytes32PushTree memory self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
+    function _pushInner(Bytes32PushTree memory self, bytes32 leaf, bool isLazy) internal pure returns (uint256 index, bytes32 newRoot) {
         // Cache read
         uint256 levels = self._zerosLengthMemory - 1;
 
@@ -98,8 +95,14 @@ library DynamicIncrementalMerkleMemory {
             // If so, next time we will come from the right, so we need to save it
             if (isLeft && !updatedSides) {
                 self._sides[i] = currentLevelHash;
-                // Note: in order to update the sides we should stop here. We continue in order to store the new root.
                 updatedSides = true;
+                if (isLazy) {
+                    // Mark that root needs recalculation due to lazy update
+                    self._needsRootRecalculation = true;
+                    // Early return when sides are updated - we don't need to continue
+                    return (index, bytes32(0));
+                }
+                // Note: in order to update the sides we should stop here. We continue in order to store the new root.
             }
 
             // Compute the current node hash by using the hash function
@@ -119,6 +122,17 @@ library DynamicIncrementalMerkleMemory {
     }
 
     /**
+     * @dev Insert a new leaf in the tree, and compute the new root. Returns the position of the inserted leaf in the
+     * tree, and the resulting root.
+     *
+     * Hashing the leaf before calling this function is recommended as a protection against
+     * second pre-image attacks.
+     */
+    function push(Bytes32PushTree memory self, bytes32 leaf) internal pure returns (uint256 index, bytes32 newRoot) {
+        return _pushInner(self, leaf, false);
+    }
+
+    /**
      * @dev Insert a new leaf in the memory tree lazily. Returns the position of the inserted leaf in the
      * tree. This is the lazy version that updates only the needed side array entry and defers
      * root computation until root() is called.
@@ -127,56 +141,7 @@ library DynamicIncrementalMerkleMemory {
      * second pre-image attacks.
      */
     function pushLazy(Bytes32PushTree memory self, bytes32 leaf) internal pure returns (uint256 index) {
-        // Cache read
-        uint256 levels = self._zerosLengthMemory - 1;
-
-        // Get leaf index
-        // solhint-disable-next-line gas-increment-by-one
-        index = self._nextLeafIndex++;
-
-        // Check if tree is full.
-        if (index == 1 << levels) {
-            bytes32 zero = self._zeros[levels];
-            bytes32 newZero = Merkle.efficientHash(zero, zero);
-            self._zeros[self._zerosLengthMemory] = newZero;
-            ++self._zerosLengthMemory;
-            self._sides[self._sidesLengthMemory] = bytes32(0);
-            ++self._sidesLengthMemory;
-            ++levels;
-        }
-
-        // Rebuild branch from leaf to root (lazy: complete computation but optimize when updatedSides = true)
-        uint256 currentIndex = index;
-        bytes32 currentLevelHash = leaf;
-        bool updatedSides = false;
-        for (uint32 i = 0; i < levels; ++i) {
-            // Reaching the parent node, is currentLevelHash the left child?
-            bool isLeft = currentIndex % 2 == 0;
-
-            // If so, next time we will come from the right, so we need to save it
-            if (isLeft && !updatedSides) {
-                self._sides[i] = currentLevelHash;
-                updatedSides = true;
-                // Mark that root needs recalculation due to lazy update
-                self._needsRootRecalculation = true;
-                // Early return when sides are updated - we don't need to continue
-                return index;
-            }
-
-            // Compute the current node hash by using the hash function
-            // with either its sibling (side) or the zero value for that level.
-            currentLevelHash = Merkle.efficientHash(
-                isLeft ? currentLevelHash : self._sides[i],
-                isLeft ? self._zeros[i] : currentLevelHash
-            );
-
-            // Update node index
-            currentIndex >>= 1;
-        }
-        // Note this is overloading the sides array with the root.
-        self._sides[levels] = currentLevelHash;
-        self._needsRootRecalculation = false;
-        return index;
+        (index, ) = _pushInner(self, leaf, true);
     }
 
     /**
