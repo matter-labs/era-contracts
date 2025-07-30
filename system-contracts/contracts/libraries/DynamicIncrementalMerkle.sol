@@ -373,19 +373,18 @@ library DynamicIncrementalMerkle {
      */
     function _recalculateRoot(Bytes32PushTree storage self) internal view returns (bytes32) {
         uint256 levels = self._zeros.length - 1;
-
-        // Calculate the root by traversing from the rightmost leaf up to root
         uint256 leafCount = self._nextLeafIndex;
+
         if (leafCount == 0) {
             return bytes32(0);
         }
 
-        // Find the rightmost path and calculate root
-        bytes32 currentLevelHash = Arrays.unsafeAccess(self._sides, 0).value;
         uint256 currentIndex = leafCount - 1;
 
+        bytes32 currentLevelHash = Arrays.unsafeAccess(self._sides, 0).value;
+
         for (uint32 i = 0; i < levels; ++i) {
-            bool isLeft = currentIndex % 2 == 0;
+            bool isLeft = (currentIndex % 2) == 0;
 
             currentLevelHash = Merkle.efficientHash(
                 isLeft ? currentLevelHash : Arrays.unsafeAccess(self._sides, i).value,
@@ -412,23 +411,23 @@ library DynamicIncrementalMerkle {
     }
 
     /**
-     * @dev Recalculate the root from current tree state when lazy updates have been made (memory version).
+     * @dev Recalculate the root from current tree state when lazy updates have been made.
+     * This simulates what a complete pushes sequence would have computed.
      */
     function _recalculateRootMemory(Bytes32PushTree memory self) internal pure returns (bytes32) {
         uint256 levels = self._zerosLengthMemory - 1;
-
-        // Calculate the root by traversing from the rightmost leaf up to root
         uint256 leafCount = self._nextLeafIndex;
+
         if (leafCount == 0) {
             return bytes32(0);
         }
 
-        // Find the rightmost path and calculate root
-        bytes32 currentLevelHash = self._sides[0];
         uint256 currentIndex = leafCount - 1;
 
+        bytes32 currentLevelHash = bytes32(leafCount - 1);
+
         for (uint32 i = 0; i < levels; ++i) {
-            bool isLeft = currentIndex % 2 == 0;
+            bool isLeft = (currentIndex % 2) == 0;
 
             currentLevelHash = Merkle.efficientHash(
                 isLeft ? currentLevelHash : self._sides[i],
