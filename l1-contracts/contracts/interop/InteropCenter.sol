@@ -19,7 +19,7 @@ import {BUNDLE_IDENTIFIER, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERS
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
-import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
+import {IL2AssetTracker, BalanceChange} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
@@ -192,9 +192,7 @@ contract InteropCenter is
             _ensureEmptyChainReference(_callStarters[i].to);
 
             // Parse 7930 address to extract chain ID and address
-            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(
-                _callStarters[i].to
-            );
+            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
 
             // Store original attributes for MessageSent event emission
             originalCallAttributes[i] = _callStarters[i].callAttributes;
