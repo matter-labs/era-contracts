@@ -168,9 +168,9 @@ contract InteropCenter is
 
     /// @notice Sends an interop bundle.
     ///         Same as above, but more than one call can be given, and they are given in InteropCallStarter format.
-    /// @param _destinationChainId Chain ID to send to. It's an ERC-7930 address that MUST have an empty address, and encodes an EVM destination chain ID.
+    /// @param _destinationChainId Chain ID to send to. It's an ERC-7930 address that MUST have an empty address field, and encodes an EVM destination chain ID.
     /// @param _callStarters Array of call descriptors. The ERC-7930 address in each callStarter.to
-    ///                      MUST have an empty ChainReference (ChainReferenceLength = 0). We assume all of the calls should go to the _destinationChainId,
+    ///                      MUST have an empty ChainReference field. We assume all of the calls should go to the _destinationChainId,
     ///                      so specifying the chain ID in _callStarters is redundant.
     /// @param _bundleAttributes Attributes of the bundle.
     /// @return bundleHash Hash of the sent bundle.
@@ -240,7 +240,7 @@ contract InteropCenter is
                             Internal functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice Verifies that the ERC-7930 address has an empty ChainReference.
+    /// @notice Verifies that the ERC-7930 address has an empty ChainReference field.
     /// @dev This function is used to ensure that CallStarters in sendBundle do not include ChainReference, as required
     ///      by our implementation. The ChainReference length is stored at byte offset 0x04 in the ERC-7930 format.
     /// @param _interoperableAddress The ERC-7930 address to verify.
@@ -254,7 +254,7 @@ contract InteropCenter is
     }
 
     /// @notice Verifies that the ERC-7930 address has an empty address field.
-    /// @dev This function ensures that the address does not contain an address field.
+    /// @dev This function is used to ensure that the address does not contain an address field.
     ///      The address length is stored at byte offset (0x05 + chainReferenceLength) in the ERC-7930 format.
     /// @param _interoperableAddress The ERC-7930 address to verify.
     function _ensureEmptyAddress(bytes calldata _interoperableAddress) internal pure {
