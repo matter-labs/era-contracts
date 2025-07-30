@@ -242,7 +242,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         bytes[] memory attributes = new bytes[](1);
         attributes[0] = abi.encode(IERC7786Attributes.interopCallValue.selector, _value);
         interopCallStarter = InteropCallStarter({
-            to: InteroperableAddress.formatEvmV1(_chainId, request.l2Contract),
+            to: InteroperableAddress.formatEvmV1(request.l2Contract),
             data: request.l2Calldata,
             callAttributes: attributes
         });
