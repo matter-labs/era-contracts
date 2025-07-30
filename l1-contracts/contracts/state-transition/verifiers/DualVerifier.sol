@@ -72,8 +72,8 @@ contract DualVerifier is IVerifier {
 
             return PLONK_VERIFIER.verify(args, _extractOhBenderProof(_proof));
         } else if (verifierType == OHBENDER_MOCK_VERIFICATION_TYPE) {
-            // just for safety.
-            if (block.chainid != 31337) {
+            // just for safety - only allowing default anvil chain and sepolia testnet
+            if (block.chainid != 31337 && block.chainid != 11155111) {
                 revert UnsupportedChainIdForMockVerifier();
             }
 
