@@ -21,7 +21,7 @@ import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NATIVE_TOKEN_VAULT, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NATIVE_TOKEN_VAULT, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -29,12 +29,14 @@ import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {IAssetTracker, TokenBalanceMigrationData} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {IAssetTrackerBase, TokenBalanceMigrationData} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L2_BRIDGEHUB, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {L2AssetTracker, IL2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
+import {L1AssetTracker, IL1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
@@ -43,7 +45,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     address[] public users;
     address[] public l2ContractAddresses;
 
-    IAssetTracker assetTracker;
+    IL1AssetTracker assetTracker;
+    IL2AssetTracker l2AssetTracker;
     address l1AssetTracker = address(0);
 
     address tokenAddress;
@@ -89,7 +92,16 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
 
-        assetTracker = addresses.interopCenter.assetTracker();
+        assetTracker = IL1AssetTracker(address(addresses.interopCenter.assetTracker()));
+        l2AssetTracker = new L2AssetTracker();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        l2AssetTracker.setAddresses(
+            block.chainid,
+            address(addresses.bridgehub),
+            address(addresses.ecosystemAddresses.bridges.l1AssetRouterProxy),
+            address(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy)
+        );
     }
 
     function setUp() public {
@@ -183,14 +195,25 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
             bytes32(migrationNumber - 2)
         );
+        vm.store(
+            address(l2AssetTracker),
+            getAssetMigrationNumberLocation(assetId, eraZKChainId),
+            bytes32(migrationNumber - 2)
+        );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
+        vm.mockCall(
+            address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encode(migrationNumber - 1)
+        );
+        console.log("chainAssetHandler", address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy));
 
-        assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
+        IL1AssetTracker(assetTracker).receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
 
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
-        assetTracker.confirmMigrationOnL2(data);
+        l2AssetTracker.confirmMigrationOnL2(data);
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
-        assetTracker.confirmMigrationOnGateway(data);
+        l2AssetTracker.confirmMigrationOnGateway(data);
     }
 
     function test_migrationGatewayToL1() public {
@@ -218,7 +241,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             );
         }
 
-        assetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);
+        l2AssetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);
 
         TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             chainId: eraZKChainId,
@@ -270,17 +293,27 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(0x0000000000000000000000000000000000000011)
         );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
+
         vm.store(
             address(assetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
             bytes32(migrationNumber - 1)
         );
+        vm.mockCall(
+            address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encode(migrationNumber)
+        );
+        console.log("chainAssetHandler", address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy));
 
         assetTracker.receiveMigrationOnL1(finalizeWithdrawalParamsGatewayToL1);
 
         vm.prank(AddressAliasHelper.applyL1ToL2Alias(l1AssetTracker));
         vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
-        assetTracker.confirmMigrationOnGateway(data);
+        vm.store(address(l2AssetTracker), chainBalanceLocation, bytes32(amount));
+        vm.store(address(l2AssetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
+
+        l2AssetTracker.confirmMigrationOnGateway(data);
     }
 
     function test_processLogsAndMessages() public {

@@ -4,7 +4,9 @@ pragma solidity ^0.8.21;
 
 import {InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
+import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
+import {BalanceChange} from "../bridge/asset-tracker/IAssetTrackerBase.sol";
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IInteropCenter {
@@ -27,7 +29,9 @@ interface IInteropCenter {
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function assetTracker() external view returns (IAssetTracker);
+    function assetTracker() external view returns (IL2AssetTracker);
+
+    function assetRouter() external view returns (address);
 
     function setAddresses(address assetRouter, address assetTracker) external;
     /// Mailbox forwarder
@@ -36,9 +40,7 @@ interface IInteropCenter {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp,
-        uint256 _baseTokenAmount,
-        bytes32 _assetId,
-        uint256 _amount
+        BalanceChange memory _balanceChange
     ) external;
 
     function sendBundle(

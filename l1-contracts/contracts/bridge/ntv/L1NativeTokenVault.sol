@@ -17,7 +17,8 @@ import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
-import {IAssetTracker} from "../asset-tracker/IAssetTracker.sol";
+import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
+import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../../common/Config.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -38,7 +39,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @notice AssetTracker component address on L1. On L2 the address is L2_ASSET_TRACKER_ADDR.
     ///         It adds one more layer of security on top of cross chain communication.
     ///         Refer to its documentation for more details.
-    IAssetTracker public l1AssetTracker;
+    IL1AssetTracker public l1AssetTracker;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     ///      This mapping was deprecated in favor of AssetTracker component, now it will be responsible for tracking chain balances.
@@ -79,8 +80,8 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(address(L1_NULLIFIER) == msg.sender, Unauthorized(msg.sender));
     }
 
-    function _assetTracker() internal view override returns (IAssetTracker) {
-        return l1AssetTracker;
+    function _assetTracker() internal view override returns (IAssetTrackerBase) {
+        return IAssetTrackerBase(address(l1AssetTracker));
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
@@ -101,7 +102,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     ///      Only callable by owner.
     /// @param _l1AssetTracker The address of the AssetTracker component.
     function setAssetTracker(address _l1AssetTracker) external onlyOwner {
-        l1AssetTracker = IAssetTracker(_l1AssetTracker);
+        l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
     }
 
     /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
