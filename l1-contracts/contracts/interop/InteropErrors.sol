@@ -11,8 +11,6 @@ error BundleAlreadyProcessed(bytes32 bundleHash);
 error BundleVerifiedAlready(bytes32 bundleHash);
 // 0xd5c7a376
 error CallAlreadyExecuted(bytes32 bundleHash, uint256 callIndex);
-// 0x9f25bec8
-error CallDestinationChainMismatch(uint256 expected, uint256 actual);
 // 0xc087b727
 error CallNotExecutable(bytes32 bundleHash, uint256 callIndex);
 // 0xf729f26d
