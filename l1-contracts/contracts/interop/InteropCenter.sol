@@ -188,10 +188,8 @@ contract InteropCenter is
         bytes[][] memory originalCallAttributes = new bytes[][](callStartersLength);
 
         for (uint256 i = 0; i < callStartersLength; ++i) {
-            // Ensure that the InteroperableAddress has an empty ChainReference
             _ensureEmptyChainReference(_callStarters[i].to);
 
-            // Parse 7930 address to extract chain ID and address
             (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
 
             // Store original attributes for MessageSent event emission
