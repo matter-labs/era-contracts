@@ -31,6 +31,7 @@ import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, Inv
 import {EthTransferFailed, NativeTokenVaultAlreadySet, WrongL2Sender, WrongMsgLength} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
+import {IMessageRoot} from "../bridgehub/MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -51,6 +52,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
+
+    /// @dev MessageRoot smart contract that is used to prove message inclusion.
+    IMessageRoot public immutable MESSAGE_ROOT;
 
     /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
@@ -137,12 +141,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         IBridgehub _bridgehub,
+        IMessageRoot _messageRoot,
         IInteropCenter _interopCenter,
         uint256 _eraChainId,
         address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
+        MESSAGE_ROOT = _messageRoot;
         INTEROP_CENTER = _interopCenter;
         ERA_CHAIN_ID = _eraChainId;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
@@ -332,7 +338,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) internal whenNotPaused {
         {
-            bool proofValid = BRIDGE_HUB.proveL1ToL2TransactionStatus({
+            bool proofValid = MESSAGE_ROOT.proveL1ToL2TransactionStatusShared({
                 _chainId: _chainId,
                 _l2TxHash: _l2TxHash,
                 _l2BatchNumber: _l2BatchNumber,
@@ -519,9 +525,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             });
         }
 
-        bool success = BRIDGE_HUB.proveL2MessageInclusion({
+        bool success = MESSAGE_ROOT.proveL2MessageInclusionShared({
             _chainId: _finalizeWithdrawalParams.chainId,
-            _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
+            _blockOrBatchNumber: _finalizeWithdrawalParams.l2BatchNumber,
             _index: _finalizeWithdrawalParams.l2MessageIndex,
             _message: l2ToL1Message,
             _proof: _finalizeWithdrawalParams.merkleProof

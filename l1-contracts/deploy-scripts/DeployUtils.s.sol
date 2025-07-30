@@ -378,6 +378,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return
                 abi.encode(
                     addresses.bridgehub.bridgehubProxy,
+                    addresses.bridgehub.messageRootProxy,
                     addresses.bridgehub.interopCenterProxy,
                     config.eraChainId,
                     addresses.stateTransition.diamondProxy

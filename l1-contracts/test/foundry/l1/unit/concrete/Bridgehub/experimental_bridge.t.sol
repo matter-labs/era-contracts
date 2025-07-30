@@ -107,6 +107,7 @@ contract ExperimentalBridgeTest is Test {
         dummyBridgehub = new DummyBridgehubSetter(l1ChainId, bridgeOwner, type(uint256).max);
         bridgehub = Bridgehub(address(dummyBridgehub));
         interopCenter = new InteropCenter(bridgehub, l1ChainId, bridgeOwner);
+        messageRoot = new MessageRoot(bridgehub);
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
         mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid);
@@ -116,7 +117,7 @@ contract ExperimentalBridgeTest is Test {
         address mockL1WethAddress = makeAddr("Weth");
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
-        l1Nullifier = new L1Nullifier(bridgehub, interopCenter, eraChainId, eraDiamondProxy);
+        l1Nullifier = new L1Nullifier(bridgehub, messageRoot, interopCenter, eraChainId, eraDiamondProxy);
         l1NullifierAddress = address(l1Nullifier);
 
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
@@ -142,8 +143,6 @@ contract ExperimentalBridgeTest is Test {
         testTokenAddress = address(testToken);
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
-
-        messageRoot = new MessageRoot(bridgehub);
 
         sharedBridge = new L1AssetRouter(
             mockL1WethAddress,

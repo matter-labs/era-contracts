@@ -28,6 +28,7 @@ import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
 import {ClaimFailedDepositFailed, EmptyToken, EthTransferFailed, NativeTokenVaultAlreadySet, WrongCounterpart} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 
 /// We are testing all the specified revert and require cases.
 contract L1AssetRouterFailTest is L1AssetRouterTest {
@@ -257,10 +258,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -289,10 +290,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -327,10 +328,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 eraChainId,
                 txHash,
                 l2BatchNumber,
@@ -372,10 +373,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, 1);
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 eraChainId,
                 txHash,
                 l2BatchNumber,
@@ -397,8 +398,8 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             )
         );
         vm.mockCall(
-            address(bridgehubAddress),
-            abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),
+            messageRootAddress,
+            abi.encodeWithSelector(IMessageVerification.proveL1ToL2TransactionStatusShared.selector),
             abi.encode(true)
         );
         l1Nullifier.bridgeRecoverFailedTransfer({
@@ -416,8 +417,8 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_claimFailedDeposit_proofInvalid() public {
         vm.mockCall(
-            bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.proveL1ToL2TransactionStatus.selector),
+            messageRootAddress,
+            abi.encodeWithSelector(IMessageVerification.proveL1ToL2TransactionStatusShared.selector),
             abi.encode(address(0))
         );
         // vm.prank(bridgehubAddress);
@@ -437,10 +438,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
     function test_claimFailedDeposit_amountZero() public {
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -472,10 +473,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.deal(address(sharedBridge), amount);
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -516,10 +517,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         require(l1Nullifier.depositHappened(chainId, txHash) == txDataHash, "Deposit not set");
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -648,7 +649,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             amount
         );
 
-        vm.mockCall(bridgehubAddress, abi.encode(IBridgehub.proveL2MessageInclusion.selector), abi.encode(true));
+        vm.mockCall(messageRootAddress, abi.encode(IMessageVerification.proveL2MessageInclusionShared.selector), abi.encode(true));
 
         vm.expectRevert(
             abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.PostUpgradeFirstBatch)
@@ -672,10 +673,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -708,10 +709,10 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         });
 
         vm.mockCall(
-            bridgehubAddress,
+            messageRootAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IMessageVerification.proveL2MessageInclusionShared.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,

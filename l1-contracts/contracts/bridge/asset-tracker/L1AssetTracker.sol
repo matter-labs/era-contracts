@@ -16,8 +16,10 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
+import {AssetIdMismatch} from "../../common/L1ContractErrors.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     uint256 public immutable L1_CHAIN_ID;
@@ -123,12 +125,20 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     /// we need this function to make sure the settlement layer is up to date.
-    function _ensureTokenIsRegistered(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
+    function _ensureTokenIsRegistered(bytes32 _assetId, uint256 _tokenOriginChainId, address _originToken) internal {
         if (!isMinterChain[_tokenOriginChainId][_assetId]) {
             isMinterChain[_tokenOriginChainId][_assetId] = true;
         }
         if (_tokenOriginChainId != _l1ChainId()) {
             _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
+        }
+    }
+
+    function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal pure {
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
+        if (_assetId != expectedAssetId) {
+            // Make sure that a NativeTokenVault sent the message
+            revert AssetIdMismatch(expectedAssetId, _assetId);
         }
     }
 
@@ -159,6 +169,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         uint256 currentSettlementLayer = _bridgeHub().settlementLayer(data.chainId);
         // require(_getMigrationNumber(chainId) == migrationNumber, InvalidMigrationNumber());
+        uint256 fromChainId;
+        uint256 toChainId;
+
         if (data.isL1ToGateway) {
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
@@ -171,10 +184,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
             );
 
-            _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
-            // if (data.tokenOriginChainId != data.chainId) {
-            _migrateFunds(data.chainId, currentSettlementLayer, data.assetId, data.amount);
-            // }
+            /// We check the assetId to make sure the chain is not lying about it.
+            _assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+
+            fromChainId = data.chainId;
+            toChainId = currentSettlementLayer;
         } else {
             require(currentSettlementLayer == block.chainid, NotMigratedChain());
             require(
@@ -182,9 +196,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 InvalidWithdrawalChainId()
             );
 
-            _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
-            _migrateFunds(_finalizeWithdrawalParams.chainId, data.chainId, data.assetId, data.amount);
+            /// We trust the settlement layer to provide the correct assetId.
+
+            fromChainId = _finalizeWithdrawalParams.chainId;
+            toChainId = data.chainId;
         }
+
+        _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId, data.originToken);
+        _migrateFunds(fromChainId, toChainId, data.assetId, data.amount);
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
         _sendToChain(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,

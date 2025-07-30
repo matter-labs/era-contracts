@@ -4,6 +4,10 @@ pragma solidity ^0.8.21;
 
 // 0x587df426
 error AlreadyCurrentSL(uint256 blockChainId);
+// 0xb0b5006f
+error ChainAlreadyRegistered();
+// 0xbe263463
+error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 // 0x65e8a019
 error ChainExists();
 // 0xeab895aa
@@ -14,6 +18,8 @@ error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 error IncorrectSender(address prevMsgSender, address chainAdmin);
 // 0x913183d8
 error MessageRootNotRegistered();
+// 0x12b08c62
+error MigrationNumberAlreadySet();
 // 0xde1362a2
 error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
 // 0x7f4316f3
@@ -32,6 +38,8 @@ error NotOwner(address sender, address owner);
 error NotOwnerViaRouter(address msgSender, address originalCaller);
 // 0xa2ac02a0
 error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
+// 0xb35a7373
+error NotSystemContext(address _sender);
 // 0x3db511f4
 error OnlyAssetTracker(address, address);
 // 0x527b87c7
@@ -42,9 +50,12 @@ error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, addres
 error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
+// 0x52013f4d
+error OnlyOnGateway();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1
 error SLNotWhitelisted();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
+

@@ -8,12 +8,13 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain} from "./L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, ChainBatchRootAlreadyExists} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 
-import {MessageVerification} from "../state-transition/chain-deps/facets/MessageVerification.sol";
+import {MessageVerification} from "../common/MessageVerification.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -82,9 +83,11 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
-    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainRoots;
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
     address public assetTracker;
+
+    mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeBatchNumber;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
@@ -136,6 +139,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _initialize();
     }
 
+    function initializeV30Upgrade() external initializer {
+        uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+        for (uint256 i = 0; i < allZKChains.length; i++) {
+            v30UpgradeBatchNumber[allZKChains[i]] = IGetters(BRIDGE_HUB.getZKChain(allZKChains[i])).getTotalBatchesExecuted();
+        }
+    }
+
     function setAddresses(address _assetTracker) external onlyBridgehubOwner {
         assetTracker = _assetTracker;
     }
@@ -166,6 +176,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
         }
+        require(chainBatchRoots[_chainId][_batchNumber] == bytes32(0), ChainBatchRootAlreadyExists(_chainId, _batchNumber));
 
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
         bytes32 chainRoot;
@@ -181,7 +192,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
 
         _emitRoot(sharedTreeRoot);
-        chainRoots[_chainId][_batchNumber] = _chainBatchRoot;
+        chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
@@ -250,6 +261,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         emit AddedChain(_chainId, cachedChainCount);
     }
 
+    //////////////////////////////
+    //// IMessageVerification ////
+    //////////////////////////////
+
     function _proveL2LeafInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -266,7 +281,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         });
         if (proofData.finalProofNode) {
             // For proof based interop this is the SL InteropRoot at block number _batchNumber
-            bytes32 correctBatchRoot = chainRoots[_chainId][_batchNumber];
+            bytes32 correctBatchRoot = _getChainBatchRoot(_chainId, _batchNumber);
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
 
@@ -278,5 +293,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
                 _leaf: proofData.chainIdLeaf,
                 _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
             });
+    }
+
+    /// @notice Internal to get the historical batch root for chains before the v30 upgrade.
+    function _getChainBatchRoot(uint256 _chainId, uint256 _batchNumber) internal view returns (bytes32) {
+        if (v30UpgradeBatchNumber[_chainId] >= _batchNumber) {
+            return IGetters(BRIDGE_HUB.getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
+        }
+        return chainBatchRoots[_chainId][_batchNumber];
     }
 }

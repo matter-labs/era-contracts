@@ -10,6 +10,7 @@ struct TokenBalanceMigrationData {
     uint256 tokenOriginChainId;
     uint256 amount;
     uint256 migrationNumber;
+    address originToken;
     bool isL1ToGateway;
 }
 

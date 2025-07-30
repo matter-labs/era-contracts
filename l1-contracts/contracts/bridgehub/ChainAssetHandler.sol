@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberMismatch, NotAssetRouter, OnlyAssetTracker, OnlyChain} from "./L1BridgehubErrors.sol";
+import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberMismatch, NotAssetRouter, OnlyAssetTracker, OnlyChain, NotSystemContext, MigrationNumberAlreadySet, OnlyOnGateway} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -83,7 +83,6 @@ contract ChainAssetHandler is
         _;
     }
 
-    error NotSystemContext(address _sender);
     modifier onlySystemContext() {
         if (msg.sender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
             revert NotSystemContext(msg.sender);
@@ -132,8 +131,6 @@ contract ChainAssetHandler is
         _;
     }
 
-    error MigrationNumberAlreadySet();
-    error OnlyOnGateway();
 
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
         if (migrationNumber[_chainId] != 0) {

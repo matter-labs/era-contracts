@@ -27,6 +27,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 
 contract L1AssetRouterTest is Test {
     using stdStorage for StdStorage;
@@ -73,6 +74,7 @@ contract L1AssetRouterTest is Test {
     L1Nullifier l1Nullifier;
     address bridgehubAddress;
     address interopCenterAddress;
+    address messageRootAddress;
     address l1ERC20BridgeAddress;
     address l1WethAddress;
     address l2SharedBridge;
@@ -115,6 +117,7 @@ contract L1AssetRouterTest is Test {
         proxyAdmin = makeAddr("proxyAdmin");
         // zkSync = makeAddr("zkSync");
         bridgehubAddress = makeAddr("bridgehub");
+        messageRootAddress = makeAddr("messageRoot");
         interopCenterAddress = makeAddr("interopCenter");
         alice = makeAddr("alice");
         // bob = makeAddr("bob");
@@ -127,7 +130,6 @@ contract L1AssetRouterTest is Test {
         l2MessageIndex = uint256(uint160(makeAddr("l2MessageIndex")));
         l2TxNumberInBatch = uint16(uint160(makeAddr("l2TxNumberInBatch")));
         l2LegacySharedBridgeAddr = makeAddr("l2LegacySharedBridge");
-        address messageRootAddress = makeAddr("messageRootAddress");
 
         merkleProof = new bytes32[](1);
         eraPostUpgradeFirstBatch = 1;
@@ -141,6 +143,7 @@ contract L1AssetRouterTest is Test {
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IBridgehub(bridgehubAddress),
+            _messageRoot: IMessageRoot(messageRootAddress),
             _interopCenter: IInteropCenter(interopCenterAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy

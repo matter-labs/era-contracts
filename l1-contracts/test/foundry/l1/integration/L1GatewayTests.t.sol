@@ -46,6 +46,7 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,
@@ -223,16 +224,16 @@ contract L1GatewayTests is
 
         // Mock Call for Msg Inclusion
         vm.mockCall(
-            address(addresses.bridgehub),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
-                migratingChainId,
-                l2TxHash,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2TxNumberInBatch,
-                merkleProof,
-                TxStatus.Failure
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector
+                // migratingChainId,
+                // l2TxHash,
+                // l2BatchNumber,
+                // l2MessageIndex,
+                // l2TxNumberInBatch,
+                // merkleProof,
+                // TxStatus.Failure
             ),
             abi.encode(true)
         );
@@ -282,8 +283,8 @@ contract L1GatewayTests is
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
         vm.mockCall(
