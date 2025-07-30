@@ -114,6 +114,7 @@ library DynamicIncrementalMerkleMemory {
         }
         // Note this is overloading the sides array with the root.
         self._sides[levels] = currentLevelHash;
+        self._needsRootRecalculation = false;
         return (index, currentLevelHash);
     }
 
