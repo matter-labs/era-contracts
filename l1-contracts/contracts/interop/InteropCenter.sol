@@ -20,7 +20,7 @@ import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1Cont
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IAssetTracker} from "../bridge/asset-tracker/IAssetTracker.sol";
-import {AttributeAlreadySet, AttributeViolatesRestriction, CallDestinationChainMismatch, IndirectCallValueMismatch} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, CallDestinationChainMismatch, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -169,7 +169,9 @@ contract InteropCenter is
     /// @notice Sends an interop bundle.
     ///         Same as above, but more than one call can be given, and they are given in InteropCallStarter format.
     /// @param _destinationChainId Chain ID to send to.
-    /// @param _callStarters Array of call descriptors.
+    /// @param _callStarters Array of call descriptors. The InteroperableAddress in each callStarter.to
+    ///                      MUST have an empty ChainReference (ChainReferenceLength = 0). We assume all of the calls should go to the _destinationChainId,
+    ///                      so specifying the chain ID in _callStarters is redundant.
     /// @param _bundleAttributes Attributes of the bundle.
     /// @return bundleHash Hash of the sent bundle.
     function sendBundle(
@@ -186,6 +188,9 @@ contract InteropCenter is
         bytes[][] memory originalCallAttributes = new bytes[][](callStartersLength);
 
         for (uint256 i = 0; i < callStartersLength; ++i) {
+            // Ensure that the InteroperableAddress has an empty ChainReference
+            _ensureEmptyChainReference(_callStarters[i].to);
+
             // Parse 7930 address to extract chain ID and address
             (uint256 recipientChainId, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(
                 _callStarters[i].to
@@ -236,6 +241,19 @@ contract InteropCenter is
     /*//////////////////////////////////////////////////////////////
                             Internal functions
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Verifies that the ERC-7930 InteroperableAddress has an empty ChainReference.
+    /// @dev This function is used to ensure that CallStarters in sendBundle do not include ChainReference, as required
+    ///      by our implementation. The ChainReference length is stored at byte offset 0x04 in the ERC-7930 format.
+    /// @param _interoperableAddress The ERC-7930 InteroperableAddress to verify.
+    function _ensureEmptyChainReference(bytes calldata _interoperableAddress) internal pure {
+        require(
+            _interoperableAddress.length >= 5,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
+        require(chainReferenceLength == 0, InteroperableAddressChainReferenceNotEmpty(_interoperableAddress));
+    }
 
     function _ensureL2ToL2(uint256 _destinationChainId) internal view {
         require(
