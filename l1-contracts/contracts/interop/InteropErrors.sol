@@ -21,6 +21,8 @@ error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executi
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0xfe8b1b16
 error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
+// 0x????????
+error InteroperableAddressNotEmpty(bytes interoperableAddress);
 // 0x32c2e156
 error MessageNotIncluded();
 // 0x89fd2c76
