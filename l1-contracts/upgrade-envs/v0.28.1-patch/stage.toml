@@ -37,6 +37,7 @@ evm_emulator_hash = "0x01000d83e0329d9144ad041430fafcbc2b388e5434db8cb8a96e80157
 bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
 rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
 
+# taken from v28 output ecosystem.yaml
 default_upgrade = "0x621a2111259500c7f7fc103e6c59418b8b9be6bf"
 
 governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"

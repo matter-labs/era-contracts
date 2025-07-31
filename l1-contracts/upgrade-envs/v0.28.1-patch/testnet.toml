@@ -39,8 +39,8 @@ evm_emulator_hash = "0x01000d83e0329d9144ad041430fafcbc2b388e5434db8cb8a96e80157
 bridgehub_proxy_address = "0x35A54c8C757806eB6820629bc82d90E056394C92"
 rollup_da_manager = "0xB168490e38E5E7e1B8eB256a701Ee8314Cbf0E15"
 
-# UPDATED
-default_upgrade: TODO
+# UPDATED (taken from v28 output)
+default_upgrade = "0xDA65afc634528bC2ef5149d811Acda864dD78Ab6"
 
 governance_security_council_address = "0x25Ab0397DA109A50C8921A1d4a034e0973602469"
 # UPDATED
@@ -62,4 +62,4 @@ rollup_sl_da_validator = "0x931661BAdBc221bd686446F17A0EA40aa5196779"
 
 # UPDATED
 # verifier on gateway (has to be manually deployed)
-verifier = TODO
+verifier = "0x50D67071Ef3a465225bCbB28339AcD8835aaE557"

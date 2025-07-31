@@ -42,7 +42,7 @@ transparent_proxy_admin = "0xC2a36181fB524a6bEfE639aFEd37A67e77d62cf1"
 rollup_da_manager = "0xE689e79a06D3D09f99C21E534cCF6a8b7C9b3C45"
 
 # UPDATED
-default_upgrade: TODO
+default_upgrade = "0xDA65afc634528bC2ef5149d811Acda864dD78Ab6"
 
 governance_security_council_address = "0xBDFfCC71FE84020238F2990a6D2954e87355De0D"
 # UPDATED

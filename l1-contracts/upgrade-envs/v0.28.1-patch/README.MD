@@ -72,6 +72,23 @@ after this need to put verifier address in stage.toml or equivalent.
 
 ## L1
 
+Make sure to run `yarn build:foundry` in l2-contracts directory too.
+
+```shell
+export SEPOLIA="https://1rpc.io/sepolia"
+```
+
+To run in stage:
+```shell
+V28_1_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.1-patch/stage.toml V28_1_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.1-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_1.s.sol:EcosystemUpgrade_v28_1 --ffi --rpc-url ${SEPOLIA?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
+```
+
+To run in testnet:
+```shell
+V28_1_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.1-patch/testnet.toml V28_1_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.1-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_1.s.sol:EcosystemUpgrade_v28_1 --ffi --rpc-url ${SEPOLIA?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
+```
+
+
 To run main calldata: 
 
  V28_1_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.1-patch/stage.toml V28_1_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.1-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_1.s.sol:EcosystemUpgrade_v28_1 --ffi --rpc-url ${SEPOLIA?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
