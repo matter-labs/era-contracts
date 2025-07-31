@@ -131,6 +131,67 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
         // Empty by default.
         return calls;
     }
+    
+    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(
+            newlyGeneratedData.upgradeCutData,
+            (Diamond.DiamondCutData)
+        );
+        uint256 v27 = SemVer.packSemVer(0, 27, 0);
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/upgrade-envs/v0.28.1-patch/output_v28_patched/stage.toml");
+        string memory toml = vm.readFile(path);
+
+        bytes memory patchedDiamondCut =  toml.readBytes("$.chain_upgrade_diamond_cut");
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(
+            patchedDiamondCut,
+            (Diamond.DiamondCutData)
+        );
+
+        Call memory ctmCall = Call({
+            target: addresses.stateTransition.chainTypeManagerProxy,
+            data: abi.encodeCall(
+                ChainTypeManager.setUpgradeDiamondCut,
+                (patchedDiamondCut, v27)
+            ),
+            value: 0
+        });
+
+        calls = new Call[](1);
+        calls[0] = ctmCall;
+        return calls;
+    }
+
+    function prepareVersionSpecificStage1GovernanceCallsGW(
+        uint256 priorityTxsL2GasLimit,
+        uint256 maxExpectedL1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        /// note check that v27 points to v28 and there is no v27.1 intermediate.
+        uint256 v27 = SemVer.packSemVer(0, 27, 0);
+
+        bytes memory l2Calldata = abi.encodeCall(
+            ChainTypeManager.setUpgradeDiamondCut,
+            (emptyDiamondCut(), v27)
+        );
+
+        calls = _prepareL1ToGatewayCall(
+            l2Calldata,
+            priorityTxsL2GasLimit,
+            maxExpectedL1GasPrice,
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+        );
+        // kl todo should we set the deadline on GW? In practice,
+        // we should not migrated chains there. 
+    }
+
+    function emptyDiamondCut() public virtual returns (Diamond.DiamondCutData memory cutData) {
+        Diamond.FacetCut[] memory emptyArray;
+        cutData = Diamond.DiamondCutData({
+            facetCuts: emptyArray,
+            initAddress: address(0),
+            initCalldata: new bytes(0)
+        });
+    }
 
     function getProposedUpgrade(
         StateTransitionDeployedAddresses memory stateTransition
