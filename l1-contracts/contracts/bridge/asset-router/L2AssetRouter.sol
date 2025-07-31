@@ -148,7 +148,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         //
         // INDIRECT CALL PATTERN (L2->L2 interop flow):
         // 1. User calls InteropCenter on source L2
-        // 2. InteropCenter calls initiateBridging() on source chain's L2AssetRouter
+        // 2. InteropCenter calls initiateIndirectCall() on source chain's L2AssetRouter
         // 3. Source L2AssetRouter becomes the "sender" for the destination L2 call
         // 4. Destination L2 validates senderAddress == address(this) for non-L1 sources
         //    (L2AssetRouter address is equal for all ZKsync chains)
@@ -210,7 +210,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     }
 
     /// @inheritdoc IL2CrossChainSender
-    function initiateBridging(
+    function initiateIndirectCall(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,

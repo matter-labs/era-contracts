@@ -8,15 +8,17 @@ import {InteropCallStarter} from "../../common/Messaging.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IL2CrossChainSender {
-    /// @notice Function that returns an InteropCallStarter corresponding to the interop call. Effectively this initiates bridging,
-    ///         BH part is processed within this function via `_bridgehubDeposit` call which also returns the data for an l2 call
-    ///         on the destination chain (which will be processed with the returned InteropCallStarter from this function).
+    /// @notice Function that returns an InteropCallStarter corresponding to the interop call. Effectively this initiates a two step call,
+    ///         where there is a middleman in the InteropCall. The expected usage is as follows:
+    ///         We call initiateIndirectCall on contract A on source chain. It returns an interopCallStarter which will be used to pass the call
+    ///         to the destination chain. In this second call the sender is contract A on source chain. This "indirect" call mechanism could be used for complex
+    ///         Interop scenarious, such as bridging.
     /// @param _chainId Destination chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _value The `msg.value` to be deposited on the target chain.
     /// @param _data The calldata for the second bridge deposit.
     /// @return interopCallStarter InteropCallStarter corresponding to the second bridge call.
-    function initiateBridging(
+    function initiateIndirectCall(
         uint256 _chainId,
         address _originalCaller,
         uint256 _value,
