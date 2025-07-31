@@ -159,6 +159,7 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
         }
 
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
+        return contractAddress;
     }
 
     function deployTuppWithContract(

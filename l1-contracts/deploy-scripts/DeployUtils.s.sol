@@ -215,6 +215,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         }
     }
 
+    // todo rename to getInitialDiamondCutData
     function getDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
