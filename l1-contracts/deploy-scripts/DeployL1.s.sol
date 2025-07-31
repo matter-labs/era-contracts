@@ -785,16 +785,8 @@ contract DeployL1Script is Script, DeployUtils {
             } else if (compareStrings(contractName, "UpgradeStageValidator")) {
                 return type(UpgradeStageValidator).creationCode;
             }
-        } else {
-            if (compareStrings(contractName, "Verifier")) {
-                if (config.testnetVerifier) {
-                    return getCreationCode("TestnetVerifier", true);
-                } else {
-                    return getCreationCode("DualVerifier", true);
-                }
-            }
-        }
-        return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
+        } 
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(

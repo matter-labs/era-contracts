@@ -86,10 +86,16 @@ import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol"
 import {SemVer} from "../../contracts/common/libraries/SemVer.sol";
 
 /// @notice Script used for v29 upgrade flow
-contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
+contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
-    NewlyGeneratedData internal newlyGeneratedData;
+    struct PreviousUpgradeData {
+        // Diamond.DiamondCutData upgradeCut;
+        bytes upgradeCutData;
+        uint256 previousProtocolVersion;
+    }
+
+    PreviousUpgradeData previousUpgradeData;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
@@ -97,12 +103,38 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
             vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
         );
+        initializePreviousUpgradeFile();
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
     }
 
-    function deployNewEcosystemContracts() public override {
+    function deployGWContracts() public virtual {
+        initialize(
+            vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
+        );
+
+        deployNewEcosystemContractsGWManual();
+    }
+
+    function initializePreviousUpgradeFile() public virtual {
+        string memory root = vm.projectRoot();
+        string memory path = string.concat(root, "/upgrade-envs/v0.28.1-patch/output_v28_patched/stage/v28-ecosystem.toml");
+        string memory toml = vm.readFile(path);
+        bytes memory patchedDiamondCut =  toml.readBytes("$.chain_upgrade_diamond_cut");
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(
+            patchedDiamondCut,
+            (Diamond.DiamondCutData)
+        );
+        previousUpgradeData.upgradeCutData = abi.encode(upgradeCut);
+
+        /// kl todo load properly from file.
+        uint256 v27 = SemVer.packSemVer(0, 27, 0);
+        previousUpgradeData.previousProtocolVersion = v27;
+    }
+
+    function deployNewEcosystemContractsL1() public override {
         require(upgradeConfig.initialized, "Not initialized");
 
         instantiateCreate2Factory();
@@ -115,36 +147,28 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
     }
 
 
-    // we will not overwrite, and deploy everything for ease of use.
-    // function deployNewEcosystemContractsGW() public virtual {
-    //     require(upgradeConfig.initialized, "Not initialized");
+    function deployNewEcosystemContractsGW() public virtual override {
+        require(upgradeConfig.initialized, "Not initialized");
 
-    //     gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
-    //     gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
-    //     gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
-    // }
-
-    function prepareVersionSpecificStage1GovernanceCallsGW(
-        uint256 priorityTxsL2GasLimit,
-        uint256 maxExpectedL1GasPrice
-    ) public virtual returns (Call[] memory calls) {
-        // Empty by default.
-        return calls;
+        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
+        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
+        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
+        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployGWContract("DefaultUpgrade");
     }
-    
-    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual returns (Call[] memory calls) {
-        Diamond.DiamondCutData memory upgradeCut = abi.decode(
-            newlyGeneratedData.upgradeCutData,
-            (Diamond.DiamondCutData)
-        );
-        uint256 v27 = SemVer.packSemVer(0, 27, 0);
-        string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/upgrade-envs/v0.28.1-patch/output_v28_patched/stage.toml");
-        string memory toml = vm.readFile(path);
 
-        bytes memory patchedDiamondCut =  toml.readBytes("$.chain_upgrade_diamond_cut");
+    function deployNewEcosystemContractsGWManual() public virtual {
+        require(upgradeConfig.initialized, "Not initialized");
+
+        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContractDirect("VerifierFflonk");
+        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContractDirect("VerifierPlonk");
+        gatewayConfig.gatewayStateTransition.verifier = deployGWContractDirect("Verifier");
+        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployGWContractDirect("DefaultUpgrade");
+    }
+
+    
+    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
-            patchedDiamondCut,
+            previousUpgradeData.upgradeCutData,
             (Diamond.DiamondCutData)
         );
 
@@ -152,7 +176,7 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
             target: addresses.stateTransition.chainTypeManagerProxy,
             data: abi.encodeCall(
                 ChainTypeManager.setUpgradeDiamondCut,
-                (patchedDiamondCut, v27)
+                (upgradeCut, previousUpgradeData.previousProtocolVersion)
             ),
             value: 0
         });
@@ -165,7 +189,7 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
     function prepareVersionSpecificStage1GovernanceCallsGW(
         uint256 priorityTxsL2GasLimit,
         uint256 maxExpectedL1GasPrice
-    ) public virtual returns (Call[] memory calls) {
+    ) public virtual override  returns (Call[] memory calls) {
         /// note check that v27 points to v28 and there is no v27.1 intermediate.
         uint256 v27 = SemVer.packSemVer(0, 27, 0);
 
@@ -191,6 +215,12 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
             initAddress: address(0),
             initCalldata: new bytes(0)
         });
+    }
+
+    function getFacetCutes(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+        return new Diamond.FacetCut[](0);
     }
 
     function getProposedUpgrade(

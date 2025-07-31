@@ -29,7 +29,7 @@ library ContractsBytecodesLib {
 
         uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
-            if (Utils.compareStrings(DA_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
+            if (compareStrings(DA_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 return Utils.readDAContractBytecode(contractIdentifier);
             }
         }
@@ -101,7 +101,7 @@ library ContractsBytecodesLib {
 
         // --- Special Cases: System Contracts ---
         // These contracts are typically read from a 'system-contracts' or similar directory.
-        if (Utils.compareStrings(contractIdentifier, "SystemTransparentUpgradeableProxy")) {
+        if (compareStrings(contractIdentifier, "SystemTransparentUpgradeableProxy")) {
             return
                 Utils.readZKFoundryBytecodeSystemContracts(
                     "TransparentUpgradeableProxy.sol",
@@ -111,21 +111,21 @@ library ContractsBytecodesLib {
 
         // --- Special Cases: L1 Contracts with specific file/contract names ---
         // These L1 contracts do not follow the direct ContractIdentifier.sol mapping.
-        if (Utils.compareStrings(contractIdentifier, "AdminFacet")) {
+        if (compareStrings(contractIdentifier, "AdminFacet")) {
             // Original: Admin.sol
             return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
-        } else if (Utils.compareStrings(contractIdentifier, "MailboxFacet")) {
+        } else if (compareStrings(contractIdentifier, "MailboxFacet")) {
             // Original: Mailbox.sol
             return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
-        } else if (Utils.compareStrings(contractIdentifier, "ExecutorFacet")) {
+        } else if (compareStrings(contractIdentifier, "ExecutorFacet")) {
             // Original: Executor.sol
             return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
-        } else if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
+        } else if (compareStrings(contractIdentifier, "GettersFacet")) {
             // Original: Getters.sol
             return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
-        } else if (Utils.compareStrings(contractIdentifier, "VerifierFflonk")) {
+        } else if (compareStrings(contractIdentifier, "VerifierFflonk")) {
             return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
-        } else if (Utils.compareStrings(contractIdentifier, "VerifierPlonk")) {
+        } else if (compareStrings(contractIdentifier, "VerifierPlonk")) {
             return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
         }
 
@@ -134,7 +134,7 @@ library ContractsBytecodesLib {
         // If so, loads ContractIdentifier.sol and expects contract class ContractIdentifier.
         uint256 SYSTEM_CONTRACT_IDENTIFIERS_LENGTH = SYSTEM_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < SYSTEM_CONTRACT_IDENTIFIERS_LENGTH; i++) {
-            if (Utils.compareStrings(SYSTEM_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
+            if (compareStrings(SYSTEM_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 // The contractIdentifier itself is used for both filename and contract name.
                 return
                     Utils.readZKFoundryBytecodeSystemContracts(
@@ -146,14 +146,14 @@ library ContractsBytecodesLib {
 
         uint256 L2_GENERIC_CONTRACT_IDENTIFIERS_LENGTH = L2_GENERIC_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < L2_GENERIC_CONTRACT_IDENTIFIERS_LENGTH; i++) {
-            if (Utils.compareStrings(L2_GENERIC_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
+            if (compareStrings(L2_GENERIC_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 return Utils.readZKFoundryBytecodeL2(string.concat(contractIdentifier, ".sol"), contractIdentifier);
             }
         }
 
         uint256 L1_GENERIC_CONTRACT_IDENTIFIERS_LENGTH = L1_GENERIC_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < L1_GENERIC_CONTRACT_IDENTIFIERS_LENGTH; i++) {
-            if (Utils.compareStrings(L1_GENERIC_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
+            if (compareStrings(L1_GENERIC_CONTRACT_IDENTIFIERS[i], contractIdentifier)) {
                 // The contractIdentifier itself is used for both filename and contract name.
                 return Utils.readZKFoundryBytecodeL1(string.concat(contractIdentifier, ".sol"), contractIdentifier);
             }
@@ -162,5 +162,9 @@ library ContractsBytecodesLib {
         revert(
             string.concat("ContractsBytecodesLib: Unknown or unsupported ZK contract identifier: ", contractIdentifier)
         );
+    }
+
+    function compareStrings(string memory a, string memory b) internal pure returns (bool) {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 }

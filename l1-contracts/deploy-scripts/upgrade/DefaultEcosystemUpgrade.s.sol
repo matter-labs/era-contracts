@@ -80,6 +80,8 @@ import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {DeployL1Script} from "../DeployL1.s.sol";
+import {Gateway, EcosystemUpgradeConfig} from "./UpgradeUtils.sol";
+
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -126,15 +128,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         uint256 maxExpectedL1GasPrice;
     }
 
-    // solhint-disable-next-line gas-struct-packing
-    struct Gateway {
-        StateTransitionDeployedAddresses gatewayStateTransition;
-        bytes facetCutsData;
-        bytes additionalForceDeployments;
-        uint256 chainId;
-        address baseToken;
-        bytes upgradeCutData;
-    }
+
 
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
@@ -143,17 +137,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         bytes upgradeCutData;
     }
 
-    /// @notice Internal state of the upgrade script
-    struct EcosystemUpgradeConfig {
-        bool initialized;
-        bool expectedL2AddressesInitialized;
-        bool fixedForceDeploymentsDataGenerated;
-        bool diamondCutPrepared;
-        bool upgradeCutPrepared;
-        bool factoryDepsPublished;
-        bool ecosystemContractsDeployed;
-        string outputPath;
-    }
+
 
     AdditionalConfig internal newConfig;
     Gateway internal gatewayConfig;
@@ -417,11 +401,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
 
-        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
-
-        Diamond.FacetCut[] memory facetCuts;
-        facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
-        facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
+        Diamond.FacetCut[] memory facetCuts = getFacetCutes(stateTransition);
 
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
 
@@ -436,6 +416,16 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         } else {
             gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         }
+    }
+
+    function getFacetCutes(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public virtual returns (Diamond.FacetCut[] memory facetCuts) {
+        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
+
+        Diamond.FacetCut[] memory facetCuts;
+        facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
+        facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
     }
 
     function getProposedUpgrade(

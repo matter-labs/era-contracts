@@ -14,6 +14,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -340,7 +341,18 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual returns (bytes memory);
+    ) internal view virtual returns (bytes memory) {
+        if (!isZKBytecode) {
+            if (compareStrings(contractName, "Verifier")) {
+                if (config.testnetVerifier) {
+                    return getCreationCode("TestnetVerifier", true);
+                } else {
+                    return getCreationCode("DualVerifier", true);
+                }
+            }
+        }
+        return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
+    }
 
     function getCreationCalldata(
         string memory contractName,
