@@ -985,6 +985,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
         vm.serializeAddress("root", "owner_address", config.ownerAddress);
+        vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", config.ownerAddress);
+
         vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
@@ -1041,14 +1043,14 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         // 1. Perform upgrade
         // 2. Unpause migration to/from Gateway
         stage0Calls = prepareStage0GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage0_calls", abi.encode(stage0Calls));
+        vm.serializeBytes("governance_calls", "governance_stage0_calls", abi.encode(stage0Calls));
         stage1Calls = prepareStage1GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
+        vm.serializeBytes("governance_calls", "governance_stage1_calls", abi.encode(stage1Calls));
         stage2Calls = prepareStage2GovernanceCalls();
 
         string memory governanceCallsSerialized = vm.serializeBytes(
             "governance_calls",
-            "stage2_calls",
+            "governance_stage2_calls",
             abi.encode(stage2Calls)
         );
 

@@ -150,6 +150,7 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
 
         string memory toml = vm.readFile(newConfigPath);
         gatewayConfig.gatewayStateTransition.verifier = toml.readAddress("$.gateway.gateway_state_transition.verifier");
+        addresses.stateTransition.defaultUpgrade = toml.readAddress("$.contracts.default_upgrade");
         console.log("gatewayConfig.gatewayStateTransition.verifier: %s", gatewayConfig.gatewayStateTransition.verifier);
     }
 
@@ -161,8 +162,6 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         deployVerifiers();
         deployUpgradeStageValidator();
 
-        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
-        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
@@ -240,6 +239,11 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
     ////////////////// skip gateway for stage start
 
     function prepareGovernanceUpgradeTimerCheckCall() public virtual override returns (Call[] memory calls) {
+        calls = new Call[](0);
+        return calls;
+    }
+
+    function prepareGovernanceUpgradeTimerStartCall() public virtual override returns (Call[] memory calls) {
         calls = new Call[](0);
         return calls;
     }
