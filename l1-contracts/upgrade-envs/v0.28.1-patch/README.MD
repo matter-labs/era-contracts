@@ -17,6 +17,9 @@ export GATEWAY_RPC=https://rpc.era-gateway-stage.zksync.dev
 # For testnet
 export GATEWAY_RPC=https://rpc.era-gateway-testnet.zksync.dev/
 
+# For mainnet
+export GATEWAY_RPC=https://rpc.era-gateway-mainnet.zksync.dev/
+
 # This private key must have ZK tokens on respective network
 export PRIVATE_KEY=XXX
 ```
@@ -35,7 +38,6 @@ cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.by
 cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/DualVerifier.sol/DualVerifier.json | tr -d '"') -r ${GATEWAY_RPC?} --private-key ${PRIVATE_KEY?}
 ```
 
-
 deploy GW contracts: 
 
 ```shell
@@ -43,6 +45,12 @@ forge script --sig "deployGWContracts()" ./deploy-scripts/upgrade/EcosystemUpgra
 ```
 
 If you get error starting with `0x3e5efef9` - this means UnknownCodeHash - and you didn't push the stuff correctly before.
+
+**Production**
+* don't push bytecodes for TestnetVerifier
+* remember to update EcosystemUpgrade_v28_1_GW.s.sol to turn off testnet verifier
+* set gas to 20'000'000
+
 
 Now copy the logs - and put them in output/ENV directory.
 They will look like:
@@ -52,8 +60,8 @@ They will look like:
   forge verify-contract 0x3CFB3a80Af42cBE4d82C14301690A62D53e870a5 VerifierFflonk --verifier zksync
   VerifierPlonk has been deployed at 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717
   forge verify-contract 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717 VerifierPlonk --verifier zksync
-  Verifier has been deployed at 0x50D67071Ef3a465225bCbB28339AcD8835aaE557
-  forge verify-contract 0x50D67071Ef3a465225bCbB28339AcD8835aaE557 Verifier --constructor-args 0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 --verifier zksync
+  Verifier has been deployed at 0xFd5b270Ee63DBDee8e0053731F5d832dE383Ed19
+  forge verify-contract 0xFd5b270Ee63DBDee8e0053731F5d832dE383Ed19 Verifier --constructor-args 0x0000000000000000000000003cfb3a80af42cbe4d82c14301690a62d53e870a500000000000000000000000092a9fd0e84354213d9c3d33128edd6ea55ee0717 --verifier zksync
 ```
 
 ### Contract verification
@@ -65,10 +73,14 @@ export CONTRACT_VERIFIER_URL=https://rpc-explorer-verify.era-gateway-testnet.zks
 
 forge verify-contract 0x3CFB3a80Af42cBE4d82C14301690A62D53e870a5 L1VerifierFflonk --verifier zksync --zksync --verifier-url ${CONTRACT_VERIFIER_URL?}
 forge verify-contract 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717 L1VerifierPlonk --verifier zksync --zksync --verifier-url ${CONTRACT_VERIFIER_URL?}
-forge verify-contract 0x50D67071Ef3a465225bCbB28339AcD8835aaE557 TestnetVerifier --verifier zksync --constructor-args 0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 --zksync --verifier-url ${CONTRACT_VERIFIER_URL?}
+forge verify-contract 0xFd5b270Ee63DBDee8e0053731F5d832dE383Ed19 TestnetVerifier --verifier zksync --constructor-args 0x0000000000000000000000003cfb3a80af42cbe4d82c14301690a62d53e870a500000000000000000000000092a9fd0e84354213d9c3d33128edd6ea55ee0717 --zksync --verifier-url ${CONTRACT_VERIFIER_URL?}
 ```
 
 after this need to put verifier address in stage.toml or equivalent.
+
+```shell
+export CONTRACT_VERIFIER_URL=https://rpc-explorer-verify.era-gateway-mainnet.zksync.dev/contract_verification
+```
 
 ## L1
 

@@ -1,0 +1,7 @@
+// Gateway verifiers, manually created:
+// FFlonk vk: 0x6f36a08c517b060fa97308cdb3e23b04842ff839d451a753ec8fae1a5408304a
+// https://gateway.explorer.zksync.io/address/0xE503e484869517D37087776D82C9F0591aCc9d14#contract#read
+
+0x3CFB3a80Af42cBE4d82C14301690A62D53e870a5 VerifierFflonk
+0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717 VerifierPlonk
+0xE503e484869517D37087776D82C9F0591aCc9d14 Verifier
