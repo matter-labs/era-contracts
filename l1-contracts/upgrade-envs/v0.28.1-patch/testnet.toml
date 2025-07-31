@@ -63,3 +63,4 @@ rollup_sl_da_validator = "0x931661BAdBc221bd686446F17A0EA40aa5196779"
 # UPDATED
 # verifier on gateway (has to be manually deployed)
 verifier = "0x50D67071Ef3a465225bCbB28339AcD8835aaE557"
+default_upgrade = "0x69653a812038424290EFd0e7Ae8DcFB2Bbf9c9b2"
