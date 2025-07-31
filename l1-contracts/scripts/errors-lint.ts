@@ -5,7 +5,7 @@ import { ethers } from "ethers";
 import * as https from "https";
 
 // Helper function to query the signature database
-async function querySignatureDatabase(signature: string): Promise<any> {
+async function querySignatureDatabase(signature: string): Promise<number> {
   const url = `https://www.4byte.directory/api/v1/signatures/?text_signature=${encodeURIComponent(
     signature
   )}&_=${Date.now()}`; // add a timestamp to avoid caching
@@ -18,7 +18,12 @@ async function querySignatureDatabase(signature: string): Promise<any> {
         });
         res.on("end", () => {
           try {
-            resolve(JSON.parse(data));
+            const parsedData = JSON.parse(data);
+            if (typeof parsedData.count === "number") {
+              resolve(parsedData.count);
+            } else {
+              reject(new Error(`Invalid response from signature database: "count" is not a number. Response: ${data}`));
+            }
           } catch (e) {
             reject(new Error(`Failed to parse response from signature database: ${data}`));
           }
@@ -33,7 +38,7 @@ async function querySignatureDatabase(signature: string): Promise<any> {
 // Helper function to submit a signature to the database
 async function submitSignatureToDatabase(signature: string): Promise<void> {
   const postData = JSON.stringify({
-    text_signature: signature
+    text_signature: signature,
   });
 
   const options = {
@@ -42,8 +47,8 @@ async function submitSignatureToDatabase(signature: string): Promise<void> {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Content-Length": Buffer.byteLength(postData)
-    }
+      "Content-Length": Buffer.byteLength(postData),
+    },
   };
 
   return new Promise((resolve, reject) => {
@@ -56,10 +61,14 @@ async function submitSignatureToDatabase(signature: string): Promise<void> {
           console.log(`Signature "${signature}" submitted successfully.`);
           resolve();
         } else if (res.statusCode === 400 && responseBody.includes("already exists")) {
-          console.log(`Signature "${signature}" already exists in the database (race condition?). Treating as success.`);
+          console.log(
+            `Signature "${signature}" already exists in the database (race condition?). Treating as success.`
+          );
           resolve();
         } else {
-          reject(new Error(`Failed to submit signature "${signature}". Status: ${res.statusCode}, Body: ${responseBody}`));
+          reject(
+            new Error(`Failed to submit signature "${signature}". Status: ${res.statusCode}, Body: ${responseBody}`)
+          );
         }
       });
     });
@@ -153,7 +162,11 @@ function sortErrorBlocks(lines: string[]): string[] {
 }
 
 // Process a file: handle selector insertion, multiline parsing, and sorting
-async function processFile(filePath: string, fix: boolean, collectedErrors: Map<string, [string, string]>): Promise<boolean> {
+async function processFile(
+  filePath: string,
+  fix: boolean,
+  collectedErrors: Map<string, [string, string]>
+): Promise<boolean> {
   const content = fs.readFileSync(filePath, "utf8");
 
   // Find all enum definitions in the file
@@ -213,8 +226,8 @@ async function processFile(filePath: string, fix: boolean, collectedErrors: Map<
 
       // Submit signature to https://www4byte.directory/ if --fix is provided
       if (fix) {
-        const dbResult = await querySignatureDatabase(sig);
-        if (dbResult.count === 0) {
+        const count = await querySignatureDatabase(sig);
+        if (count === 0) {
           await submitSignatureToDatabase(sig);
         } else {
           console.log(`Signature "${sig}" already exists in the database.`);
