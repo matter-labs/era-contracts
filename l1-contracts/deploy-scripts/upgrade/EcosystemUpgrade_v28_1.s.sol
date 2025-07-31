@@ -171,57 +171,59 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
 
     }
 
+
+    ///// V27 -> v28.1 upgrade ignore for now
     
-    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
-        Diamond.DiamondCutData memory upgradeCut = abi.decode(
-            previousUpgradeData.upgradeCutData,
-            (Diamond.DiamondCutData)
-        );
+    // function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
+    //     Diamond.DiamondCutData memory upgradeCut = abi.decode(
+    //         previousUpgradeData.upgradeCutData,
+    //         (Diamond.DiamondCutData)
+    //     );
 
-        Call memory ctmCall = Call({
-            target: addresses.stateTransition.chainTypeManagerProxy,
-            data: abi.encodeCall(
-                ChainTypeManager.setUpgradeDiamondCut,
-                (upgradeCut, previousUpgradeData.previousProtocolVersion)
-            ),
-            value: 0
-        });
+    //     Call memory ctmCall = Call({
+    //         target: addresses.stateTransition.chainTypeManagerProxy,
+    //         data: abi.encodeCall(
+    //             ChainTypeManager.setUpgradeDiamondCut,
+    //             (upgradeCut, previousUpgradeData.previousProtocolVersion)
+    //         ),
+    //         value: 0
+    //     });
 
-        calls = new Call[](1);
-        calls[0] = ctmCall;
-        return calls;
-    }
+    //     calls = new Call[](1);
+    //     calls[0] = ctmCall;
+    //     return calls;
+    // }
 
-    function prepareVersionSpecificStage1GovernanceCallsGW(
-        uint256 priorityTxsL2GasLimit,
-        uint256 maxExpectedL1GasPrice
-    ) public virtual override  returns (Call[] memory calls) {
-        /// note check that v27 points to v28 and there is no v27.1 intermediate.
-        uint256 v27 = SemVer.packSemVer(0, 27, 0);
+    // function prepareVersionSpecificStage1GovernanceCallsGW(
+    //     uint256 priorityTxsL2GasLimit,
+    //     uint256 maxExpectedL1GasPrice
+    // ) public virtual override  returns (Call[] memory calls) {
+    //     /// note check that v27 points to v28 and there is no v27.1 intermediate.
+    //     uint256 v27 = SemVer.packSemVer(0, 27, 0);
 
-        bytes memory l2Calldata = abi.encodeCall(
-            ChainTypeManager.setUpgradeDiamondCut,
-            (emptyDiamondCut(), v27)
-        );
+    //     bytes memory l2Calldata = abi.encodeCall(
+    //         ChainTypeManager.setUpgradeDiamondCut,
+    //         (emptyDiamondCut(), v27)
+    //     );
 
-        calls = _prepareL1ToGatewayCall(
-            l2Calldata,
-            priorityTxsL2GasLimit,
-            maxExpectedL1GasPrice,
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
-        );
-        // kl todo should we set the deadline on GW? In practice,
-        // we should not migrated chains there. 
-    }
+    //     calls = _prepareL1ToGatewayCall(
+    //         l2Calldata,
+    //         priorityTxsL2GasLimit,
+    //         maxExpectedL1GasPrice,
+    //         gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+    //     );
+    //     // kl todo should we set the deadline on GW? In practice,
+    //     // we should not migrated chains there. 
+    // }
 
     /// @notice Update implementations in proxies
-    function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
+    function prepareUpgradeProxiesCalls() public virtual override returns (Call[] memory calls) {
         /// we don't do any proxy upgrades.
         calls = new Call[](0);
         return calls;
     }
 
-    function prepareDAValidatorCall() public virtual returns (Call[] memory calls) {
+    function prepareDAValidatorCall() public virtual override returns (Call[] memory calls) {
         calls = new Call[](0);
         return calls;
     }
@@ -229,10 +231,33 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
     function prepareDAValidatorCallGW(
         uint256 l2GasLimit,
         uint256 l1GasPrice
-    ) public virtual returns (Call[] memory calls) {
+    ) public virtual override returns (Call[] memory calls) {
         calls = new Call[](0);
         return calls;
     }
+
+    ////////////////// skip gateway for stage start
+
+    function prepareGatewaySpecificStage0GovernanceCalls() public virtual override returns (Call[] memory calls) {
+        calls = new Call[](0);
+    }
+
+    function prepareGatewaySpecificStage1GovernanceCalls() public virtual override returns (Call[] memory calls) {
+        calls = new Call[](0);
+    }
+
+    function prepareNewChainCreationParamsCall() public virtual override returns (Call[] memory calls) {
+        calls = new Call[](0);
+        return calls;
+    }
+
+    function prepareGatewaySpecificStage2GovernanceCalls() public virtual override returns (Call[] memory calls) {
+        calls = new Call[](0);
+        return calls;
+    }
+
+    ////////////////// skip gateway for stage end
+
 
     function emptyDiamondCut() public virtual returns (Diamond.DiamondCutData memory cutData) {
         Diamond.FacetCut[] memory emptyArray;
