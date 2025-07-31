@@ -14,6 +14,8 @@ error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 error IncorrectSender(address prevMsgSender, address chainAdmin);
 // 0x913183d8
 error MessageRootNotRegistered();
+// 0xde1362a2
+error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
 // 0x7f4316f3
 error NoEthAllowed();
 // 0xf306a770

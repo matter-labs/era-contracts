@@ -6,7 +6,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, SystemLogKey} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, SystemLogKey, L2_CHAIN_ASSET_HANDLER, L2_ASSET_TRACKER_ADDRESS} from "./Constants.sol";
 import {CannotInitializeFirstVirtualBlock, CannotReuseL2BlockNumberFromPreviousBatch, CurrentBatchNumberMustBeGreaterThanZero, InconsistentNewBatchTimestamp, IncorrectL2BlockHash, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, IncorrectVirtualBlockInsideMiniblock, InvalidNewL2BlockNumber, L2BlockAndBatchTimestampMismatch, L2BlockNumberZero, NoVirtualBlocks, NonMonotonicL2BlockTimestamp, PreviousL2BlockHashIsIncorrect, ProvidedBatchNumberIsNotCorrect, TimestampsShouldBeIncremental, UpgradeTransactionMustBeFirst} from "contracts/SystemContractErrors.sol";
 
 /**
@@ -83,10 +83,41 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
 
+    // todo make private
+    uint256 public currentSettlementLayerChainId;
+
+    // kl todo remove this. just for debugging
+    mapping(uint256 index => uint256 chainId) public settlementLayerChainIds;
+
+    // kl todo remove this. just for debugging
+    uint256 public numberOfHistoricalSettlementLayerChainIds;
+
+    error OnlyL2AssetTracker();
+
+    modifier onlyL2AssetTracker() {
+        if (msg.sender != L2_ASSET_TRACKER_ADDRESS) {
+            revert OnlyL2AssetTracker();
+        }
+        _;
+    }
+
     /// @notice Set the chainId origin.
     /// @param _newChainId The chainId
     function setChainId(uint256 _newChainId) external onlyCallFrom(address(COMPLEX_UPGRADER_CONTRACT)) {
         chainId = _newChainId;
+    }
+
+    function setSettlementLayerChainId(uint256 _newSettlementLayerChainId) external onlyCallFromBootloader {
+        if (currentSettlementLayerChainId != _newSettlementLayerChainId) {
+            settlementLayerChainIds[numberOfHistoricalSettlementLayerChainIds] = _newSettlementLayerChainId;
+            ++numberOfHistoricalSettlementLayerChainIds;
+            L2_CHAIN_ASSET_HANDLER.setSettlementLayerChainId(currentSettlementLayerChainId, _newSettlementLayerChainId);
+            currentSettlementLayerChainId = _newSettlementLayerChainId;
+        }
+    }
+
+    function getSettlementLayerChainId() external view onlyL2AssetTracker returns (uint256) {
+        return currentSettlementLayerChainId;
     }
 
     /// @notice Number of current transaction in block.

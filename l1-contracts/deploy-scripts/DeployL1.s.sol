@@ -39,11 +39,11 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {ChainRegistrationSender, IChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
-import {InteropCenter, IInteropCenter} from "contracts/interop/InteropCenter.sol";
-import {MessageRoot, IMessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
+import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IMessageRoot, MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker, ICTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L1NativeTokenVault, IL1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {IL1NativeTokenVault, L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -53,7 +53,8 @@ import {ChainTypeManager, ChainTypeManagerInitializeData, IChainTypeManager} fro
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
+import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
+import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL1ERC20Bridge, L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
@@ -166,7 +167,7 @@ contract DeployL1Script is Script, DeployUtils {
         (
             addresses.bridgehub.assetTrackerImplementation,
             addresses.bridgehub.assetTrackerProxy
-        ) = deployTuppWithContract("AssetTracker", false);
+        ) = deployTuppWithContract("L1AssetTracker", false);
         updateSharedBridge();
         // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
         (
@@ -348,6 +349,9 @@ contract DeployL1Script is Script, DeployUtils {
         vm.broadcast(msg.sender);
         ntv.setAssetTracker(addresses.bridgehub.assetTrackerProxy);
         console.log("L1NativeTokenVault updated with AssetTracker address");
+
+        vm.broadcast(msg.sender);
+        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
     function setL1NativeTokenVaultParams() internal {
@@ -360,9 +364,6 @@ contract DeployL1Script is Script, DeployUtils {
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
         l1Nullifier.setL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-
-        vm.broadcast(msg.sender);
-        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
     function updateOwners() internal {
@@ -638,7 +639,7 @@ contract DeployL1Script is Script, DeployUtils {
             chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             interopCenterBytecodeHash: getL2BytecodeHash("InteropCenter"),
             interopHandlerBytecodeHash: getL2BytecodeHash("InteropHandler"),
-            assetTrackerBytecodeHash: getL2BytecodeHash("AssetTracker"),
+            assetTrackerBytecodeHash: getL2BytecodeHash("L2AssetTracker"),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -763,8 +764,10 @@ contract DeployL1Script is Script, DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "AssetTracker")) {
-                return type(AssetTracker).creationCode;
+            if (compareStrings(contractName, "L1AssetTracker")) {
+                return type(L1AssetTracker).creationCode;
+            } else if (compareStrings(contractName, "L2AssetTracker")) {
+                return type(L2AssetTracker).creationCode;
             } else if (compareStrings(contractName, "ChainRegistrar")) {
                 return type(ChainRegistrar).creationCode;
             } else if (compareStrings(contractName, "Bridgehub")) {
@@ -896,8 +899,8 @@ contract DeployL1Script is Script, DeployUtils {
                 );
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
-        } else if (compareStrings(contractName, "AssetTracker")) {
-            return abi.encodeCall(AssetTracker.initialize, ());
+        } else if (compareStrings(contractName, "L1AssetTracker")) {
+            return abi.encodeCall(L1AssetTracker.initialize, ());
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
             return
                 abi.encodeCall(

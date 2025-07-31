@@ -25,7 +25,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contract
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {FinalizeL1DepositParams, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {FinalizeL1DepositParams, L1Nullifier, IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -44,6 +44,8 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,
@@ -111,6 +113,23 @@ contract L1GatewayTests is
         gatewayChain = IZKChain(IBridgehub(addresses.bridgehub).getZKChain(gatewayChainId));
         vm.deal(migratingChain.getAdmin(), 100000000000000000000000000000000000);
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
+
+        vm.mockCall(
+            address(addresses.l1Nullifier),
+            abi.encodeWithSelector(IL1Nullifier.getProofData.selector),
+            abi.encode(
+                ProofData({
+                    settlementLayerChainId: 0,
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 0,
+                    batchLeafProofLen: 0,
+                    batchSettlementRoot: 0,
+                    chainIdLeaf: 0,
+                    ptr: 0,
+                    finalProofNode: false
+                })
+            )
+        );
 
         // vm.deal(msg.sender, 100000000000000000000000000000000000);
         // vm.deal(bridgehub, 100000000000000000000000000000000000);
@@ -277,6 +296,11 @@ contract L1GatewayTests is
             abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
             abi.encode(addresses.chainTypeManager.protocolVersion())
         );
+        vm.mockCall(
+            address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encode(2)
+        );
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 
@@ -291,7 +315,9 @@ contract L1GatewayTests is
             chainId: migratingChainId,
             baseTokenAssetId: baseTokenAssetId,
             ctmData: ctmData,
-            chainData: chainData
+            chainData: chainData,
+            migrationNumber: IChainAssetHandler(address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
+                .getMigrationNumber(migratingChainId)
         });
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(

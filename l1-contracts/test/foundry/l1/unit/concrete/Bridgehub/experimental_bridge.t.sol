@@ -33,8 +33,8 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {SecondBridgeAddressTooLow} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdTooBig, MsgValueMismatch, NonEmptyMsgValue, SharedBridgeNotSet, SlotOccupied, Unauthorized, WrongMagicValue, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
-import {AssetTracker} from "contracts/bridge/asset-tracker/AssetTracker.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {L1AssetTracker, IL1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -58,7 +58,7 @@ contract ExperimentalBridgeTest is Test {
     L1NativeTokenVault ntv;
     IMessageRoot messageRoot;
     L1Nullifier l1Nullifier;
-    AssetTracker assetTracker;
+    L1AssetTracker assetTracker;
 
     bytes32 tokenAssetId;
 
@@ -123,8 +123,8 @@ contract ExperimentalBridgeTest is Test {
         mockSecondSharedBridge = new DummySharedBridge(keccak256("0xdef"));
 
         // kl todo: clean this up. NTV id deployed below in deployNTV. its was a mess before this upgrade.
-        ntv = _deployNTV(address(mockSharedBridge));
-        assetTracker = new AssetTracker(
+        ntv = _deployNTVWithoutEthToken(address(mockSharedBridge));
+        assetTracker = new L1AssetTracker(
             block.chainid,
             address(bridgehub),
             address(mockSharedBridge),
@@ -134,6 +134,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.prank(bridgeOwner);
         ntv.setAssetTracker(address(assetTracker));
+        ntv.registerEthToken();
 
         mockSecondSharedBridge.setNativeTokenVault(ntv);
 
@@ -196,7 +197,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.mockCall(
             address(assetTracker),
-            abi.encodeWithSelector(IAssetTracker.handleChainBalanceIncrease.selector),
+            abi.encodeWithSelector(IL1AssetTracker.handleChainBalanceIncreaseOnL1.selector),
             abi.encode()
         );
 
@@ -212,7 +213,7 @@ contract ExperimentalBridgeTest is Test {
         assertEq(bridgehub.owner(), bridgeOwner);
     }
 
-    function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
+    function _deployNTVWithoutEthToken(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
         L1NativeTokenVault ntvImpl = new L1NativeTokenVault(weth, _sharedBridgeAddr, l1Nullifier);
         TransparentUpgradeableProxy ntvProxy = new TransparentUpgradeableProxy(
             address(ntvImpl),
@@ -223,13 +224,19 @@ contract ExperimentalBridgeTest is Test {
 
         vm.prank(bridgeOwner);
         L1AssetRouter(_sharedBridgeAddr).setNativeTokenVault(addr);
+    }
+
+    function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
+        addr = _deployNTVWithoutEthToken(_sharedBridgeAddr);
+        vm.prank(bridgeOwner);
+        addr.setAssetTracker(address(assetTracker));
 
         addr.registerEthToken();
     }
 
     function _useFullSharedBridge() internal {
         ntv = _deployNTV(address(sharedBridge));
-        assetTracker = new AssetTracker(
+        assetTracker = new L1AssetTracker(
             block.chainid,
             address(bridgehub),
             address(mockSharedBridge),

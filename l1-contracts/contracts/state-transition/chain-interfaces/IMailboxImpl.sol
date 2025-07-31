@@ -125,8 +125,7 @@ interface IMailboxImpl is IZKChainBase {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp,
         uint256 _baseTokenAmount,
-        bytes32 _assetId,
-        uint256 _amount
+        bool _getBalanceChange
     ) external returns (bytes32 canonicalTxHash);
 
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1.

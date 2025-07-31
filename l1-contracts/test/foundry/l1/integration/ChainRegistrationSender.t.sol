@@ -27,7 +27,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {CHAIN_REGISTRATION_SENDER_ENCODING_VERSION} from "contracts/bridgehub/ChainRegistrationSender.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {

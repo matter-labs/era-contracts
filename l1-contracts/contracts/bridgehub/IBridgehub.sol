@@ -44,6 +44,7 @@ struct BridgehubMintCTMAssetData {
     bytes32 baseTokenAssetId;
     bytes ctmData;
     bytes chainData;
+    uint256 migrationNumber;
 }
 
 struct BridgehubBurnCTMAssetData {
