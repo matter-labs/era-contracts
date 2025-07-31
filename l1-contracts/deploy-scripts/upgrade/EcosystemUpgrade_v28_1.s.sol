@@ -88,11 +88,15 @@ import {SemVer} from "../../contracts/common/libraries/SemVer.sol";
 /// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
+    string ecosystem;
 
     struct PreviousUpgradeData {
         // Diamond.DiamondCutData upgradeCut;
-        bytes upgradeCutData;
+        bytes upgradeCutDataL1;
+        bytes upgradeCutDataGW;
         uint256 previousProtocolVersion;
+        bytes chainCreationParamsL1;
+        bytes chainCreationParamsGW;
     }
 
     PreviousUpgradeData previousUpgradeData;
@@ -103,12 +107,14 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
             vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
         );
-        initializePreviousUpgradeFile();
+        ecosystem = vm.envString("V28_1_PATCH_UPGRADE_ECOSYSTEM");
         initializeOther( 
             vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
         );
+        initializePreviousUpgradeFile();
         prepareEcosystemUpgrade();
+
 
         prepareDefaultGovernanceCalls();
     }
@@ -128,28 +134,100 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         /// GW contract deployment and publishing is done manually.
     }
 
+
+    /// only needed for v27 to v28.1 jump upgrade
     function initializePreviousUpgradeFile() public virtual {
         string memory root = vm.projectRoot();
-        string memory path = string.concat(root, "/upgrade-envs/v0.28.1-patch/output_v28_patched/stage/v28-ecosystem.toml");
+        console.log("ecosystem: %s", ecosystem);
+        string memory path = string.concat(root, string.concat("/upgrade-envs/v0.28.1-patch/output_v28_patched/",ecosystem, "/v28-ecosystem.toml"));
         string memory toml = vm.readFile(path);
-        bytes memory patchedDiamondCut =  toml.readBytes("$.chain_upgrade_diamond_cut");
-        Diamond.DiamondCutData memory upgradeCut = abi.decode(
-            patchedDiamondCut,
+        bytes memory unpatchedDiamondCutL1 =  toml.readBytes("$.diamond_cut_data_l1");
+        bytes memory unpatchedDiamondCutGW =  toml.readBytes("$.diamond_cut_data_gw");
+
+        Diamond.DiamondCutData memory upgradeCutL1 = abi.decode(
+            unpatchedDiamondCutL1,
             (Diamond.DiamondCutData)
         );
-        previousUpgradeData.upgradeCutData = abi.encode(upgradeCut);
+
+        Diamond.DiamondCutData memory upgradeCutGW = abi.decode(
+            unpatchedDiamondCutGW,
+            (Diamond.DiamondCutData)
+        );
+
+        upgradeCutL1 = patchUpgradeDiamondCut(upgradeCutL1, addresses.stateTransition.verifier);
+
+        upgradeCutGW = patchUpgradeDiamondCut(upgradeCutGW, gatewayConfig.gatewayStateTransition.verifier);
+
+        previousUpgradeData.upgradeCutDataL1 = abi.encode(upgradeCutL1);
+        previousUpgradeData.upgradeCutDataGW = abi.encode(upgradeCutGW);
+
+        bytes memory chainCreationParamsL1 = toml.readBytes("$.set_chain_creation_params_l1");
+        bytes memory chainCreationParamsGW = toml.readBytes("$.set_chain_creation_params_gw");
+
+        ChainCreationParams memory chainCreationParamsL1Data = abi.decode(chainCreationParamsL1, (ChainCreationParams));
+
+        ChainCreationParams memory chainCreationParamsGWData = abi.decode(chainCreationParamsGW, (ChainCreationParams));
+
+        chainCreationParamsL1Data.diamondCut = patchChainCreationDiamondCut(chainCreationParamsL1Data.diamondCut, addresses.stateTransition.verifier);
+
+        chainCreationParamsGWData.diamondCut = patchChainCreationDiamondCut(chainCreationParamsGWData.diamondCut, gatewayConfig.gatewayStateTransition.verifier);
+
+        previousUpgradeData.chainCreationParamsL1 = abi.encode(chainCreationParamsL1Data);
+        previousUpgradeData.chainCreationParamsGW = abi.encode(chainCreationParamsGWData);
 
         /// kl todo load properly from file.
         uint256 v27 = SemVer.packSemVer(0, 27, 0);
         previousUpgradeData.previousProtocolVersion = v27;
     }
 
+    function patchChainCreationDiamondCut(Diamond.DiamondCutData memory upgradeCut, address _verifier) public virtual returns (Diamond.DiamondCutData memory patchedUpgradeCut) {
+        patchedUpgradeCut = upgradeCut;
+
+        // NewParser parser = new NewParser();
+        // parser.parse(upgradeCut.initCalldata);
+        bytes memory upgradeCalldata = upgradeCut.initCalldata;
+        // console.logBytes(upgradeCalldata);
+        DiamondInitializeDataNewChain memory initializeData = abi.decode(upgradeCalldata, (DiamondInitializeDataNewChain));
+        initializeData.verifier = IVerifier(_verifier);
+        patchedUpgradeCut.initCalldata = abi.encode(initializeData);
+        return patchedUpgradeCut;
+    }
+
+    function patchUpgradeDiamondCut(Diamond.DiamondCutData memory upgradeCut, address _verifier) public virtual returns (Diamond.DiamondCutData memory patchedUpgradeCut) {
+        patchedUpgradeCut = upgradeCut;
+        NewParser parser = new NewParser();
+        bytes memory upgradeCalldata = parser.parse(upgradeCut.initCalldata);
+        
+        // bytes memory upgradeCalldata = upgradeCut.initCalldata[4:];
+        // console.logBytes(upgradeCut.initCalldata);
+        // console.logBytes(upgradeCalldata);
+
+        (ProposedUpgrade memory proposedUpgrade) = abi.decode(upgradeCalldata, (ProposedUpgrade));
+        proposedUpgrade.verifier = _verifier;
+        patchedUpgradeCut.initCalldata = abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade));
+        return patchedUpgradeCut;
+    }
+
+    function getChainCreationParams(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual override returns (ChainCreationParams memory) {
+        Diamond.DiamondCutData memory diamondCut = getDiamondCutData(stateTransition);
+        // console.logBytes(previousUpgradeData.chainCreationParamsGW);
+        // console.logBytes(previousUpgradeData.chainCreationParamsL1);
+        if (stateTransition.isOnGateway) {
+            return abi.decode(previousUpgradeData.chainCreationParamsGW, (ChainCreationParams));
+        } else {
+            return abi.decode(previousUpgradeData.chainCreationParamsL1, (ChainCreationParams));
+        }
+    }
+    /// just for v28.1 special params, GW verifier and other contracts.
     function initializeOther(string memory newConfigPath, string memory _outputPath) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
 
         string memory toml = vm.readFile(newConfigPath);
         gatewayConfig.gatewayStateTransition.verifier = toml.readAddress("$.gateway.gateway_state_transition.verifier");
+        gatewayConfig.gatewayStateTransition.defaultUpgrade = toml.readAddress("$.gateway.gateway_state_transition.default_upgrade");
         addresses.stateTransition.defaultUpgrade = toml.readAddress("$.contracts.default_upgrade");
         console.log("gatewayConfig.gatewayStateTransition.verifier: %s", gatewayConfig.gatewayStateTransition.verifier);
     }
@@ -165,7 +243,7 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
-
+    /// all GW contracts are manually deployed before.
     function deployNewEcosystemContractsGW() public virtual override {
         require(upgradeConfig.initialized, "Not initialized");
 
@@ -174,47 +252,52 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
 
     ///// V27 -> v28.1 upgrade ignore for now
     
-    // function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
-    //     Diamond.DiamondCutData memory upgradeCut = abi.decode(
-    //         previousUpgradeData.upgradeCutData,
-    //         (Diamond.DiamondCutData)
-    //     );
+    function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(
+            previousUpgradeData.upgradeCutDataL1,
+            (Diamond.DiamondCutData)
+        );
 
-    //     Call memory ctmCall = Call({
-    //         target: addresses.stateTransition.chainTypeManagerProxy,
-    //         data: abi.encodeCall(
-    //             ChainTypeManager.setUpgradeDiamondCut,
-    //             (upgradeCut, previousUpgradeData.previousProtocolVersion)
-    //         ),
-    //         value: 0
-    //     });
+        Call memory ctmCall = Call({
+            target: addresses.stateTransition.chainTypeManagerProxy,
+            data: abi.encodeCall(
+                ChainTypeManager.setUpgradeDiamondCut,
+                (upgradeCut, previousUpgradeData.previousProtocolVersion)
+            ),
+            value: 0
+        });
 
-    //     calls = new Call[](1);
-    //     calls[0] = ctmCall;
-    //     return calls;
-    // }
+        calls = new Call[](1);
+        calls[0] = ctmCall;
+        return calls;
+    }
 
-    // function prepareVersionSpecificStage1GovernanceCallsGW(
-    //     uint256 priorityTxsL2GasLimit,
-    //     uint256 maxExpectedL1GasPrice
-    // ) public virtual override  returns (Call[] memory calls) {
-    //     /// note check that v27 points to v28 and there is no v27.1 intermediate.
-    //     uint256 v27 = SemVer.packSemVer(0, 27, 0);
+    function prepareVersionSpecificStage1GovernanceCallsGW(
+        uint256 priorityTxsL2GasLimit,
+        uint256 maxExpectedL1GasPrice
+    ) public virtual override  returns (Call[] memory calls) {
+        /// note check that v27 points to v28 and there is no v27.1 intermediate.
+        uint256 v27 = SemVer.packSemVer(0, 27, 0);
 
-    //     bytes memory l2Calldata = abi.encodeCall(
-    //         ChainTypeManager.setUpgradeDiamondCut,
-    //         (emptyDiamondCut(), v27)
-    //     );
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(
+            previousUpgradeData.upgradeCutDataGW,
+            (Diamond.DiamondCutData)
+        );
 
-    //     calls = _prepareL1ToGatewayCall(
-    //         l2Calldata,
-    //         priorityTxsL2GasLimit,
-    //         maxExpectedL1GasPrice,
-    //         gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
-    //     );
-    //     // kl todo should we set the deadline on GW? In practice,
-    //     // we should not migrated chains there. 
-    // }
+        bytes memory l2Calldata = abi.encodeCall(
+            ChainTypeManager.setUpgradeDiamondCut,
+            (upgradeCut, v27)
+        );
+
+        calls = _prepareL1ToGatewayCall(
+            l2Calldata,
+            priorityTxsL2GasLimit,
+            maxExpectedL1GasPrice,
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+        );
+        // kl todo should we set the deadline on GW? In practice,
+        // we should not have migrated chains there. 
+    }
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual override returns (Call[] memory calls) {
@@ -236,7 +319,8 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         return calls;
     }
 
-    ////////////////// skip gateway for stage start
+    ////////////////// skip other things
+
 
     function prepareGovernanceUpgradeTimerCheckCall() public virtual override returns (Call[] memory calls) {
         calls = new Call[](0);
@@ -248,25 +332,75 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         return calls;
     }
 
-    function prepareGatewaySpecificStage0GovernanceCalls() public virtual override returns (Call[] memory calls) {
-        calls = new Call[](0);
-    }
-
-    function prepareGatewaySpecificStage1GovernanceCalls() public virtual override returns (Call[] memory calls) {
-        calls = new Call[](0);
-    }
-
-    function prepareNewChainCreationParamsCall() public virtual override returns (Call[] memory calls) {
+    function prepareCTMImplementationUpgrade(        uint256 l2GasLimit,
+        uint256 l1GasPrice) public virtual override returns (Call[] memory calls) {
         calls = new Call[](0);
         return calls;
     }
+    
+    ////////////////// skip gateway for stage start
 
-    function prepareGatewaySpecificStage2GovernanceCalls() public virtual override returns (Call[] memory calls) {
-        calls = new Call[](0);
-        return calls;
-    }
+    // function prepareGatewaySpecificStage0GovernanceCalls() public virtual override returns (Call[] memory calls) {
+    //     calls = new Call[](0);
+    // }
+
+    // function prepareGatewaySpecificStage1GovernanceCalls() public virtual override returns (Call[] memory calls) {
+    //     calls = new Call[](0);
+    // }
+
+    // function prepareGatewaySpecificStage2GovernanceCalls() public override virtual returns (Call[] memory calls) {
+    //     calls = new Call[](0);
+    //     return calls;
+    // }
+
+    // function provideSetNewVersionUpgradeCallForGateway(
+    //     uint256 l2GasLimit,
+    //     uint256 l1GasPrice
+    // ) public virtual override returns (Call[] memory calls) {
+    //     calls = new Call[](0);
+    //     return calls;
+    // }
+
+    // function prepareNewChainCreationParamsCallForGateway(        uint256 l2GasLimit,
+    //     uint256 l1GasPrice) public virtual override returns (Call[] memory calls) {
+    //     calls = new Call[](0);
+    //     return calls;
+    // }
 
     ////////////////// skip gateway for stage end
+
+    ////////////////// skip L1 for stage start
+
+
+    // function prepareCheckMigrationsPausedCalls() public virtual override returns (Call[] memory calls) {
+    //     calls = new Call[](0);
+    //     return calls;
+    // }
+
+    // function prepareNewChainCreationParamsCall() public virtual override returns (Call[] memory calls) {
+    //     calls = new Call[](0);
+    //     return calls;
+    // }
+
+    // function provideSetNewVersionUpgradeCall() public virtual override returns (Call[] memory calls) {
+    //     calls = new Call[](0);
+    //     return calls;
+    // }
+
+    // function prepareStage2GovernanceCalls() public virtual override returns (Call[] memory calls) {
+    //     Call[][] memory allCalls = new Call[][](5);
+
+    //     allCalls[0] = prepareCheckUpgradeIsPresent();
+    //     allCalls[1] = prepareUnpauseGatewayMigrationsCall();
+    //     allCalls[2] = prepareVersionSpecificStage2GovernanceCallsL1();
+    //     allCalls[2] = prepareGatewaySpecificStage2GovernanceCalls();
+    //     allCalls[4] = prepareCheckMigrationsUnpausedCalls();
+
+    //     calls = mergeCallsArray(allCalls);
+    // }
+
+    ////////////////// skip L1 for stage end
+
 
 
     function emptyDiamondCut() public virtual returns (Diamond.DiamondCutData memory cutData) {
@@ -337,5 +471,12 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
             // But it is still here, just in case we want to enable some additional functionality
             reservedDynamic: new bytes(0)
         });
+    }
+}
+
+
+contract NewParser {
+    function parse(bytes calldata data) public pure returns (bytes memory) {
+        return data[4:];
     }
 }

@@ -236,7 +236,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
     function getChainCreationParams(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal returns (ChainCreationParams memory) {
+    ) internal virtual returns (ChainCreationParams memory) {
         Diamond.DiamondCutData memory diamondCut = getDiamondCutData(stateTransition);
         return
             ChainCreationParams({
