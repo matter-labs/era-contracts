@@ -2,20 +2,75 @@ works:
 
 to deploy factory deps on GW, needs to be run manually for each contract.
 
+## Gateway
+
+First, build the contracts:
+
+```shell
 forge clean
 yarn build:foundry
+```
 
-cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/L1VerifierFflonk.sol/L1VerifierFflonk.json | tr -d '"') -r https://rpc.era-gateway-stage.zksync.dev --private-key ${PRIVATE_KEY?}
+```shell
+# For stage
+export GATEWAY_RPC=https://rpc.era-gateway-stage.zksync.dev
+# For testnet
+export GATEWAY_RPC=https://rpc.era-gateway-testnet.zksync.dev/
 
-cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/L1VerifierPlonk.sol/L1VerifierPlonk.json | tr -d '"') -r https://rpc.era-gateway-stage.zksync.dev --private-key ${PRIVATE_KEY?}
+# This private key must have ZK tokens on respective network
+export PRIVATE_KEY=XXX
+```
 
-cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/TestnetVerifier.sol/TestnetVerifier.json | tr -d '"') -r https://rpc.era-gateway-stage.zksync.dev --private-key ${PRIVATE_KEY?}
+Then deploy the bytecodes (you might have to be whitelisted in sequencer in order for this step to succeed):
+
+You also need zksync-foundry version of cast.
+
+**WARNING** - currently we are pushign L1 Verifier not L2 verifier.
+
+```shell
+cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/DefaultUpgrade.sol/DefaultUpgrade.json | tr -d '"') -r ${GATEWAY_RPC?} --private-key ${PRIVATE_KEY?}
+cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/L1VerifierPlonk.sol/L1VerifierPlonk.json | tr -d '"') -r ${GATEWAY_RPC?} --private-key ${PRIVATE_KEY?}
+cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/L1VerifierFFlonk.sol/L1VerifierFflonk.json | tr -d '"') -r ${GATEWAY_RPC?} --private-key ${PRIVATE_KEY?}
+cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/TestnetVerifier.sol/TestnetVerifier.json | tr -d '"') -r ${GATEWAY_RPC?} --private-key ${PRIVATE_KEY?}
+cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/DualVerifier.sol/DualVerifier.json | tr -d '"') -r ${GATEWAY_RPC?} --private-key ${PRIVATE_KEY?}
+```
+
 
 deploy GW contracts: 
 
-V28_1_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.1-patch/stage.toml V28_1_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.1-ecosystem.toml forge script --sig "deployGWContracts()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_1_GW.s.sol:EcosystemUpgrade_v28_1_GW --ffi --rpc-url ${SEPOLIA_GATEWAY_STAGE?} --zksync --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
+```shell
+forge script --sig "deployGWContracts()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_1_GW.s.sol:EcosystemUpgrade_v28_1_GW --ffi --rpc-url ${GATEWAY_RPC?} --zksync --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
+```
+
+If you get error starting with `0x3e5efef9` - this means UnknownCodeHash - and you didn't push the stuff correctly before.
+
+Now copy the logs - and put them in output/ENV directory.
+They will look like:
+
+```
+  VerifierFflonk has been deployed at 0x3CFB3a80Af42cBE4d82C14301690A62D53e870a5
+  forge verify-contract 0x3CFB3a80Af42cBE4d82C14301690A62D53e870a5 VerifierFflonk --verifier zksync
+  VerifierPlonk has been deployed at 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717
+  forge verify-contract 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717 VerifierPlonk --verifier zksync
+  Verifier has been deployed at 0x50D67071Ef3a465225bCbB28339AcD8835aaE557
+  forge verify-contract 0x50D67071Ef3a465225bCbB28339AcD8835aaE557 Verifier --constructor-args 0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 --verifier zksync
+```
+
+### Contract verification
+
+Please run (and adjust the address & rpc):
+
+```shell
+export CONTRACT_VERIFIER_URL=https://rpc-explorer-verify.era-gateway-testnet.zksync.dev/contract_verification
+
+forge verify-contract 0x3CFB3a80Af42cBE4d82C14301690A62D53e870a5 L1VerifierFflonk --verifier zksync --zksync --verifier-url ${CONTRACT_VERIFIER_URL?}
+forge verify-contract 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717 L1VerifierPlonk --verifier zksync --zksync --verifier-url ${CONTRACT_VERIFIER_URL?}
+forge verify-contract 0x50D67071Ef3a465225bCbB28339AcD8835aaE557 TestnetVerifier --verifier zksync --constructor-args 0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 --zksync --verifier-url ${CONTRACT_VERIFIER_URL?}
+```
 
 after this need to put verifier address in stage.toml or equivalent.
+
+## L1
 
 To run main calldata: 
 
