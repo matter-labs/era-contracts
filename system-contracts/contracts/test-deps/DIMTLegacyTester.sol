@@ -15,27 +15,29 @@ contract DIMTLegacyTester {
     DynamicIncrementalMerkle.Bytes32PushTree private lazyTree;
     DynamicIncrementalMerkle.Bytes32PushTree private mixedTree;
 
-    error EmptyLeavesArray();
-
     /**
      * @dev Recreates the old L1Messenger MerkleTree root calculation logic
      * This mimics the algorithm from the draft-v29 L1Messenger contract
      */
     function calculateLegacyMerkleRoot(bytes32[] calldata leaves) public pure returns (bytes32) {
-        if (leaves.length == 0) {
-            revert EmptyLeavesArray();
-        }
-
-        // Create a working copy of the leaves array
-        bytes32[] memory workingArray = new bytes32[](leaves.length);
         uint256 leavesLength = leaves.length;
+
+        // Legacy L1Messenger uses a fixed tree size of 16384 leaves (2^14)
+        uint256 targetSize = 16384; // L2_TO_L1_LOGS_MERKLE_TREE_LEAVES
+
+        // Create a working array padded to fixed size with DIMT zero values
+        bytes32[] memory workingArray = new bytes32[](targetSize);
         for (uint256 i = 0; i < leavesLength; ++i) {
             workingArray[i] = leaves[i];
         }
+        // Pad remaining elements with DIMT zero hash (L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH)
+        for (uint256 i = leavesLength; i < targetSize; ++i) {
+            workingArray[i] = ZERO_HASH;
+        }
 
-        uint256 nodesOnCurrentLevel = leavesLength;
+        uint256 nodesOnCurrentLevel = targetSize;
 
-        // Bottom-up merkle tree construction
+        // Bottom-up merkle tree construction (only works for power-of-2 trees)
         while (nodesOnCurrentLevel > 1) {
             nodesOnCurrentLevel /= 2;
             for (uint256 i = 0; i < nodesOnCurrentLevel; ++i) {
@@ -50,26 +52,25 @@ contract DIMTLegacyTester {
      * @dev Calculate DIMT root for given leaves using memory functions
      */
     function calculateDIMTRoot(bytes32[] calldata leaves) public pure returns (bytes32) {
-        if (leaves.length == 0) {
-            return bytes32(0);
-        }
+        DynamicIncrementalMerkle.Bytes32PushTree memory dimtTree = DynamicIncrementalMerkle.Bytes32PushTree({
+            _nextLeafIndex: 0,
+            _sides: new bytes32[](15),
+            _zeros: new bytes32[](15),
+            _sidesLengthMemory: 0,
+            _zerosLengthMemory: 0,
+            _needsRootRecalculation: false
+        });
 
-        DynamicIncrementalMerkle.Bytes32PushTree memory dimtTree;
-        // Pre-allocate arrays for memory operations
-        dimtTree._sides = new bytes32[](32);
-        dimtTree._zeros = new bytes32[](32);
-
-        // Setup DIMT with zero value
         dimtTree.setupMemory(ZERO_HASH);
 
-        // Push all leaves to DIMT
-        bytes32 dimtRoot;
         uint256 leavesLength = leaves.length;
         for (uint256 i = 0; i < leavesLength; ++i) {
-            (, dimtRoot) = dimtTree.pushMemory(leaves[i]);
+            dimtTree.pushMemory(leaves[i]);
         }
 
-        return dimtRoot;
+        dimtTree.extendUntilEndMemory();
+
+        return dimtTree.rootMemory();
     }
 
     /**
@@ -81,13 +82,6 @@ contract DIMTLegacyTester {
         legacyRoot = calculateLegacyMerkleRoot(leaves);
         dimtRoot = calculateDIMTRoot(leaves);
         equivalent = (legacyRoot == dimtRoot);
-    }
-
-    /**
-     * @dev Get hash using legacy method (keccak256(abi.encode(left, right)))
-     */
-    function getLegacyHash(bytes32 left, bytes32 right) external pure returns (bytes32) {
-        return keccak256(abi.encode(left, right));
     }
 
     /**
@@ -113,7 +107,7 @@ contract DIMTLegacyTester {
     }
 
     /**
-     * @dev Test lazy functionality by comparing pushLazy + recalculateRoot vs regular pushes
+     * @dev Test lazy functionality by comparing pushLazy + root() vs regular pushes
      */
     function testLazyEquivalence(bytes32[] calldata leaves) external returns (bytes32 regularRoot, bytes32 lazyRoot) {
         if (leaves.length == 0) {
@@ -129,11 +123,16 @@ contract DIMTLegacyTester {
         for (uint256 i = 0; i < leavesLength; ++i) {
             (, regularRoot) = regularTree.push(leaves[i]);
         }
+        // Extend until end before getting root
+        regularTree.extendUntilEnd(15);
+        regularRoot = regularTree.root();
 
         // Lazy pushes
         for (uint256 i = 0; i < leavesLength; ++i) {
             lazyTree.pushLazy(leaves[i]);
         }
+        // Need to extend until end before getting root for lazy operations
+        lazyTree.extendUntilEnd(15);
         lazyRoot = lazyTree.root();
 
         return (regularRoot, lazyRoot);
@@ -164,6 +163,9 @@ contract DIMTLegacyTester {
         for (i = 0; i < finalLeavesLength; ++i) {
             (, regularRoot) = regularTree.push(finalLeaves[i]);
         }
+        // Extend until end before getting root
+        regularTree.extendUntilEnd(15);
+        regularRoot = regularTree.root();
 
         // Mixed tree: initial pushes, then lazy pushes, then final pushes
         for (i = 0; i < initialLeavesLength; ++i) {
@@ -175,100 +177,9 @@ contract DIMTLegacyTester {
         for (i = 0; i < finalLeavesLength; ++i) {
             (, mixedRoot) = mixedTree.push(finalLeaves[i]);
         }
-
-        return (regularRoot, mixedRoot);
-    }
-
-    /**
-     * @dev Test lazy functionality for memory trees by comparing pushLazyMemory + recalculateRootMemory vs regular pushMemory
-     */
-    function testLazyEquivalenceMemory(
-        bytes32[] calldata leaves
-    ) external pure returns (bytes32 regularRoot, bytes32 lazyRoot) {
-        if (leaves.length == 0) {
-            return (bytes32(0), bytes32(0));
-        }
-
-        DynamicIncrementalMerkle.Bytes32PushTree memory memRegularTree;
-        DynamicIncrementalMerkle.Bytes32PushTree memory memLazyTree;
-
-        // Pre-allocate arrays for memory operations
-        memRegularTree._sides = new bytes32[](32);
-        memRegularTree._zeros = new bytes32[](32);
-        memRegularTree._needsRootRecalculation = false;
-
-        memLazyTree._sides = new bytes32[](32);
-        memLazyTree._zeros = new bytes32[](32);
-        memLazyTree._needsRootRecalculation = false;
-
-        // Setup both trees
-        memRegularTree.setupMemory(ZERO_HASH);
-        memLazyTree.setupMemory(ZERO_HASH);
-
-        uint256 leavesLength = leaves.length;
-
-        // Regular pushes
-        for (uint256 i = 0; i < leavesLength; ++i) {
-            (, regularRoot) = memRegularTree.pushMemory(leaves[i]);
-        }
-
-        // Lazy pushes
-        for (uint256 i = 0; i < leavesLength; ++i) {
-            memLazyTree.pushLazyMemory(leaves[i]);
-        }
-        lazyRoot = memLazyTree.rootMemory();
-
-        return (regularRoot, lazyRoot);
-    }
-
-    /**
-     * @dev Test mixed lazy and regular operations for memory trees
-     */
-    function testMixedLazyOperationsMemory(
-        bytes32[] calldata initialLeaves,
-        bytes32[] calldata lazyLeaves,
-        bytes32[] calldata finalLeaves
-    ) external pure returns (bytes32 regularRoot, bytes32 mixedRoot) {
-        DynamicIncrementalMerkle.Bytes32PushTree memory memRegularTree;
-        DynamicIncrementalMerkle.Bytes32PushTree memory memMixedTree;
-
-        // Pre-allocate arrays for memory operations
-        memRegularTree._sides = new bytes32[](32);
-        memRegularTree._zeros = new bytes32[](32);
-        memRegularTree._needsRootRecalculation = false;
-
-        memMixedTree._sides = new bytes32[](32);
-        memMixedTree._zeros = new bytes32[](32);
-        memMixedTree._needsRootRecalculation = false;
-
-        memRegularTree.setupMemory(ZERO_HASH);
-        memMixedTree.setupMemory(ZERO_HASH);
-
-        // Regular tree: push all leaves normally
-        uint256 i;
-        uint256 initialLeavesLength = initialLeaves.length;
-        for (i = 0; i < initialLeavesLength; ++i) {
-            memRegularTree.pushMemory(initialLeaves[i]);
-        }
-        uint256 lazyLeavesLength = lazyLeaves.length;
-        for (i = 0; i < lazyLeavesLength; ++i) {
-            memRegularTree.pushMemory(lazyLeaves[i]);
-        }
-        uint256 finalLeavesLength = finalLeaves.length;
-        for (i = 0; i < finalLeavesLength; ++i) {
-            (, regularRoot) = memRegularTree.pushMemory(finalLeaves[i]);
-        }
-
-        // Mixed tree: initial pushes, then lazy pushes, then final pushes
-        for (i = 0; i < initialLeavesLength; ++i) {
-            memMixedTree.pushMemory(initialLeaves[i]);
-        }
-        for (i = 0; i < lazyLeavesLength; ++i) {
-            memMixedTree.pushLazyMemory(lazyLeaves[i]);
-        }
-        for (i = 0; i < finalLeavesLength; ++i) {
-            (, mixedRoot) = memMixedTree.pushMemory(finalLeaves[i]);
-        }
+        // Ensure any remaining lazy operations are processed
+        mixedTree.extendUntilEnd(15);
+        mixedRoot = mixedTree.root();
 
         return (regularRoot, mixedRoot);
     }

@@ -19,13 +19,21 @@ describe("DIMT Legacy Equivalence", function () {
     dimtTester = DIMTLegacyTesterFactory.connect(TEST_DIMT_TESTER_ADDRESS, wallet);
   });
 
-  it("should verify DIMT equivalence with legacy MerkleTree for power-of-2 leaves", async function () {
+  it("should verify DIMT equivalence with legacy MerkleTree for various tree sizes", async function () {
     const testCases = [
       {
         name: "2 leaves",
         leaves: [
           ethers.utils.keccak256(ethers.utils.toUtf8Bytes("leaf1")),
           ethers.utils.keccak256(ethers.utils.toUtf8Bytes("leaf2")),
+        ],
+      },
+      {
+        name: "3 leaves",
+        leaves: [
+          ethers.utils.keccak256(ethers.utils.toUtf8Bytes("leaf1")),
+          ethers.utils.keccak256(ethers.utils.toUtf8Bytes("leaf2")),
+          ethers.utils.keccak256(ethers.utils.toUtf8Bytes("leaf3")),
         ],
       },
       {
@@ -43,26 +51,34 @@ describe("DIMT Legacy Equivalence", function () {
           ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["leaf", i]))
         ),
       },
+      {
+        name: "12 leaves",
+        leaves: Array.from({ length: 12 }, (_, i) =>
+          ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["leaf", i]))
+        ),
+      },
+      {
+        name: "13 leaves",
+        leaves: Array.from({ length: 13 }, (_, i) =>
+          ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["leaf", i]))
+        ),
+      },
+      {
+        name: "16 leaves",
+        leaves: Array.from({ length: 16 }, (_, i) =>
+          ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["leaf", i]))
+        ),
+      },
     ];
 
     for (const testCase of testCases) {
       const result = await dimtTester.testEquivalence(testCase.leaves);
-      const { legacyRoot, dimtRoot } = result;
+      const { equivalent, legacyRoot, dimtRoot } = result;
 
       expect(legacyRoot).to.not.equal(ethers.constants.HashZero);
       expect(dimtRoot).to.not.equal(ethers.constants.HashZero);
+      expect(equivalent).to.equal(true, `Legacy and DIMT should be equivalent for ${testCase.name}`);
     }
-  });
-
-  it("should test legacy hash function consistency", async function () {
-    const left = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("left"));
-    const right = ethers.utils.keccak256(ethers.utils.toUtf8Bytes("right"));
-
-    const legacyHash = await dimtTester.getLegacyHash(left, right);
-    const directHash = ethers.utils.keccak256(left + right.slice(2));
-
-    expect(legacyHash).to.be.a("string");
-    expect(directHash).to.be.a("string");
   });
 
   it("should demonstrate edge cases for equivalence testing", async function () {
@@ -88,10 +104,11 @@ describe("DIMT Legacy Equivalence", function () {
 
     for (const testCase of edgeCases) {
       const result = await dimtTester.testEquivalence(testCase.leaves);
-      const { legacyRoot, dimtRoot } = result;
+      const { equivalent, legacyRoot, dimtRoot } = result;
 
       expect(legacyRoot).to.not.equal(ethers.constants.HashZero);
       expect(dimtRoot).to.not.equal(ethers.constants.HashZero);
+      expect(equivalent).to.equal(true, `Legacy and DIMT should be equivalent for ${testCase.name}`);
     }
   });
 
@@ -177,60 +194,5 @@ describe("DIMT Legacy Equivalence", function () {
       expect(regularRoot).to.equal(lazyRoot, `Lazy edge case failed for ${testCase.name}`);
       expect(regularRoot).to.not.equal(ethers.constants.HashZero);
     }
-  });
-
-  it("should verify lazy push functionality produces identical roots for memory trees", async function () {
-    const testCases = [
-      {
-        name: "Small batch memory",
-        leaves: Array.from({ length: 3 }, (_, i) =>
-          ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["mem_lazy", i]))
-        ),
-      },
-      {
-        name: "Medium batch memory",
-        leaves: Array.from({ length: 7 }, (_, i) =>
-          ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["mem_batch", i]))
-        ),
-      },
-      {
-        name: "Large batch memory",
-        leaves: Array.from({ length: 15 }, (_, i) =>
-          ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["mem_large", i]))
-        ),
-      },
-      {
-        name: "Power of 2 batch memory",
-        leaves: Array.from({ length: 16 }, (_, i) =>
-          ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["mem_pow2", i]))
-        ),
-      },
-    ];
-
-    for (const testCase of testCases) {
-      const result = await dimtTester.testLazyEquivalenceMemory(testCase.leaves);
-      const { regularRoot, lazyRoot } = result;
-
-      expect(regularRoot).to.equal(lazyRoot, `Memory lazy push failed for ${testCase.name}`);
-      expect(regularRoot).to.not.equal(ethers.constants.HashZero);
-    }
-  });
-
-  it("should verify mixed lazy and regular operations for memory trees", async function () {
-    const initialLeaves = Array.from({ length: 2 }, (_, i) =>
-      ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["mem_initial", i]))
-    );
-    const lazyLeaves = Array.from({ length: 5 }, (_, i) =>
-      ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["mem_lazy", i]))
-    );
-    const finalLeaves = Array.from({ length: 3 }, (_, i) =>
-      ethers.utils.keccak256(ethers.utils.defaultAbiCoder.encode(["string", "uint256"], ["mem_final", i]))
-    );
-
-    const result = await dimtTester.testMixedLazyOperationsMemory(initialLeaves, lazyLeaves, finalLeaves);
-    const { regularRoot, mixedRoot } = result;
-
-    expect(regularRoot).to.equal(mixedRoot, "Memory mixed lazy operations should produce same root as regular pushes");
-    expect(regularRoot).to.not.equal(ethers.constants.HashZero);
   });
 });

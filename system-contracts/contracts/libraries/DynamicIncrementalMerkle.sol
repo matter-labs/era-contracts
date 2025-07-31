@@ -288,6 +288,7 @@ library DynamicIncrementalMerkle {
             self._zeros.push(currentZero);
             self._sides.push(currentSide);
         }
+        self._needsRootRecalculation = false;
     }
 
     /// @dev Same as above, but for memory tree.
@@ -306,6 +307,7 @@ library DynamicIncrementalMerkle {
         }
         self._sidesLengthMemory = self._sides.length;
         self._zerosLengthMemory = self._zeros.length;
+        self._needsRootRecalculation = false;
     }
 
     /**
@@ -364,7 +366,7 @@ library DynamicIncrementalMerkle {
 
         uint256 currentIndex = leafCount - 1;
 
-        bytes32 currentLevelHash = bytes32(leafCount - 1);
+        bytes32 currentLevelHash = self._sides[0];
 
         for (uint32 i = 0; i < levels; ++i) {
             bool isLeft = (currentIndex % 2) == 0;
