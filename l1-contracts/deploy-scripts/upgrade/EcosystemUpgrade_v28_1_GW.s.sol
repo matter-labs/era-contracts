@@ -161,17 +161,6 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
     }
 
-        // string[] memory args = new string[](5);
-        // args[0] = "cast";
-        // args[1] = "send";
-        // args[2] = "0x0000000000000000000000000000000000020002";
-        // args[2] = vm.toString(gatewayConfig.chainId);
-        // args[3] = "--zk-factory-deps";
-        // args[4] = vm.toString(creationCode);
-        // args[5] = "--json";
-
-        // bytes memory modifiedJsonBytes = vm.ffi(args);
-
     function deployTuppWithContract(
         string memory contractName,
         bool isZKBytecode
