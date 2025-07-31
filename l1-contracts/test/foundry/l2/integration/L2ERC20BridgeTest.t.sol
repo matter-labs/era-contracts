@@ -46,4 +46,11 @@ contract L2Erc20Test is Test, L2Erc20TestAbstract, SharedL2ContractL2Deployer {
     ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
+
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override(DeployUtils, SharedL2ContractL2Deployer) returns (bytes memory) {
+        revert("Not implemented");
+    }
 }
