@@ -214,6 +214,26 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         // we should not migrated chains there. 
     }
 
+    /// @notice Update implementations in proxies
+    function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
+        /// we don't do any proxy upgrades.
+        calls = new Call[](0);
+        return calls;
+    }
+
+    function prepareDAValidatorCall() public virtual returns (Call[] memory calls) {
+        calls = new Call[](0);
+        return calls;
+    }
+
+    function prepareDAValidatorCallGW(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        calls = new Call[](0);
+        return calls;
+    }
+
     function emptyDiamondCut() public virtual returns (Diamond.DiamondCutData memory cutData) {
         Diamond.FacetCut[] memory emptyArray;
         cutData = Diamond.DiamondCutData({
