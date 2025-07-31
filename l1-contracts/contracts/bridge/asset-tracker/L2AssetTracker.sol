@@ -134,7 +134,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 _sides: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
                 _zeros: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
                 _sidesLengthMemory: 0,
-                _zerosLengthMemory: 0
+                _zerosLengthMemory: 0,
+                _needsRootRecalculation: false
             }); // todo 100 to const
         // slither-disable-next-line unused-return
         reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
@@ -146,7 +147,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
             );
             // slither-disable-next-line unused-return
-            reconstructedLogsTree.push(hashedLog);
+            reconstructedLogsTree.pushLazy(hashedLog);
             if (log.sender == L2_BOOTLOADER_ADDRESS && log.value == bytes32(uint256(TxStatus.Failure))) {
                 _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key);
             }
