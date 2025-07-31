@@ -120,6 +120,7 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
         //     vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
         //     vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
         // );
+        config.testnetVerifier = true;
 
         deployNewEcosystemContractsGWManual();
     }
@@ -127,11 +128,15 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
     function deployNewEcosystemContractsGWManual() public virtual {
         // require(upgradeConfig.initialized, "Not initialized");
 
-        deployGWContractDirect("VerifierFflonk");
-        deployGWContractDirect("VerifierPlonk");
-        deployGWContractDirect("Verifier");
-        deployGWContractDirect("DefaultUpgrade");
+        addresses.stateTransition.verifierFflonk = deployGWContractDirect("VerifierFflonk");
+        addresses.stateTransition.verifierPlonk = deployGWContractDirect("VerifierPlonk");
+        addresses.stateTransition.verifier = deployGWContractDirect("Verifier");
+        // addresses.defaultUpgrade = 
+        // deployGWContractDirect("DefaultUopgrade");
+
     }
+
+    error HashIsNonZero(bytes32);
 
     function deployGWContractDirect(string memory contractName) internal returns (address contractAddress) {
         bytes memory creationCalldata = getCreationCalldata(contractName, true);
@@ -141,8 +146,17 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
 
         address contractAddress = Utils.getL2AddressViaCreate2Factory(create2salt, bytecodeHash, creationCalldata);
 
-        (bool success, ) = L2_CREATE2_FACTORY_ADDR.call(deployData);
-        require(success, string.concat("Failed to deploy contract ", contractName));
+        uint256 codeSize = contractAddress.code.length;
+        if (codeSize == 0) {
+            vm.broadcast();
+            (bool success, bytes memory result) = L2_CREATE2_FACTORY_ADDR.call(deployData);
+            if (!success) {
+                // if (!compareStrings(string(result), string(abi.encodeWithSelector(HashIsNonZero.selector, bytecodeHash)))) {
+                //     revert(string.concat("Failed to deploy contract ", contractName));
+                // }
+                console.logBytes(result);
+            }
+        }
 
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
     }

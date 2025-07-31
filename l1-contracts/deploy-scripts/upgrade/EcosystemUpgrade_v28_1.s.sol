@@ -9,7 +9,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {PrepareL1L2TransactionParams, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {PrepareL1L2TransactionParams, StateTransitionDeployedAddresses, Utils, FacetCut} from "../Utils.sol";
 import {IBridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
@@ -104,18 +104,28 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
             vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
         );
         initializePreviousUpgradeFile();
+        initializeOther( 
+            vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
+        );
         prepareEcosystemUpgrade();
 
         prepareDefaultGovernanceCalls();
     }
 
     function deployGWContracts() public virtual {
-        initialize(
-            vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
-        );
+        // initialize(
+        //     vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
+        //     vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
+        // );
 
-        deployNewEcosystemContractsGWManual();
+        //  we need to run GW contract deployment from another script directly against the GW due to the tx filterer.
+    }
+
+
+    function publishBytecodes() public virtual override {
+        upgradeConfig.factoryDepsPublished = true;
+        /// GW contract deployment and publishing is done manually.
     }
 
     function initializePreviousUpgradeFile() public virtual {
@@ -134,6 +144,14 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         previousUpgradeData.previousProtocolVersion = v27;
     }
 
+    function initializeOther(string memory newConfigPath, string memory _outputPath) public virtual {
+        string memory root = vm.projectRoot();
+        newConfigPath = string.concat(root, newConfigPath);
+
+        string memory toml = vm.readFile(newConfigPath);
+        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress("$.gateway.gateway_state_transition.verifier");
+    }
+
     function deployNewEcosystemContractsL1() public override {
         require(upgradeConfig.initialized, "Not initialized");
 
@@ -144,25 +162,13 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
 
         (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
+        upgradeConfig.ecosystemContractsDeployed = true;
     }
 
 
     function deployNewEcosystemContractsGW() public virtual override {
         require(upgradeConfig.initialized, "Not initialized");
 
-        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
-        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
-        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployGWContract("DefaultUpgrade");
-    }
-
-    function deployNewEcosystemContractsGWManual() public virtual {
-        require(upgradeConfig.initialized, "Not initialized");
-
-        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContractDirect("VerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContractDirect("VerifierPlonk");
-        gatewayConfig.gatewayStateTransition.verifier = deployGWContractDirect("Verifier");
-        gatewayConfig.gatewayStateTransition.defaultUpgrade = deployGWContractDirect("DefaultUpgrade");
     }
 
     
@@ -217,10 +223,11 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         });
     }
 
-    function getFacetCutes(
+    function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) public virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        return new Diamond.FacetCut[](0);
+    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+        facetCuts = new FacetCut[](0);
+        return facetCuts;
     }
 
     function getProposedUpgrade(

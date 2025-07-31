@@ -401,7 +401,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
 
-        Diamond.FacetCut[] memory facetCuts = getFacetCutes(stateTransition);
+        Diamond.FacetCut[] memory facetCuts = getFacetCutsOuter(stateTransition);
 
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
 
@@ -418,7 +418,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         }
     }
 
-    function getFacetCutes(
+    function getFacetCutsOuter(
         StateTransitionDeployedAddresses memory stateTransition
     ) public virtual returns (Diamond.FacetCut[] memory facetCuts) {
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
@@ -1020,9 +1020,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         }
 
         // Double check for consistency:
-        require(bytes32(factoryDeps[0]) == config.contracts.bootloaderHash, "bootloader hash factory dep mismatch");
-        require(bytes32(factoryDeps[1]) == config.contracts.defaultAAHash, "default aa hash factory dep mismatch");
-        require(bytes32(factoryDeps[2]) == config.contracts.evmEmulatorHash, "EVM emulator hash factory dep mismatch");
+        require(bytes32(factoryDeps[0]) == config.contracts.bootloaderHash, string.concat("bootloader hash factory dep mismatch ", vm.toString(bytes32(factoryDeps[0])), " != ", vm.toString(config.contracts.bootloaderHash)));
+        require(bytes32(factoryDeps[1]) == config.contracts.defaultAAHash, string.concat("default aa hash factory dep mismatch ", vm.toString(bytes32(factoryDeps[1])), " != ", vm.toString(config.contracts.defaultAAHash)));
+        require(bytes32(factoryDeps[2]) == config.contracts.evmEmulatorHash, string.concat("EVM emulator hash factory dep mismatch ", vm.toString(bytes32(factoryDeps[2])), " != ", vm.toString(config.contracts.evmEmulatorHash)));
 
         factoryDepsHashes = factoryDeps;
 

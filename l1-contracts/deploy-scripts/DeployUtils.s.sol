@@ -342,7 +342,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual returns (bytes memory) {
-        if (!isZKBytecode) {
+        if (isZKBytecode) {
             if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
                     return getCreationCode("TestnetVerifier", true);
