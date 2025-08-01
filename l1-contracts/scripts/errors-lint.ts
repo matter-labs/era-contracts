@@ -227,7 +227,7 @@ async function processFile(
         modified = true;
       }
 
-      // Submit signature to https://www.openchain.xyz/ if --fix is provided
+      // Submit signature to https://openchain.xyz/ if --fix is provided
       if (fix) {
         const exists = await querySignatureDatabase(sig);
         if (!exists) {
