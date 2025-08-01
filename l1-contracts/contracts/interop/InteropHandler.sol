@@ -93,7 +93,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // Since we provide the flag `_executeAllCalls` to be true, if either of the calls fail,
         // the `_executeCalls` will fail as well, thus making the whole flow revert, no changes will be applied to the state.
         _executeCalls({
-            _sourceChainId: _proof.chainId,
+            _sourceChainId: interopBundle.sourceChainId,
             _bundleHash: bundleHash,
             _interopBundle: interopBundle,
             _executeAllCalls: true,
