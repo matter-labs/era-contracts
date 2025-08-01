@@ -3,10 +3,11 @@
 pragma solidity ^0.8.20;
 
 import {IAssetRouterBase} from "./IAssetRouterBase.sol";
+import {IL2CrossChainSender} from "../interfaces/IL2CrossChainSender.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IL2AssetRouter is IAssetRouterBase {
+interface IL2AssetRouter is IAssetRouterBase, IL2CrossChainSender {
     event WithdrawalInitiatedAssetRouter(
         uint256 chainId,
         address indexed l2Sender,

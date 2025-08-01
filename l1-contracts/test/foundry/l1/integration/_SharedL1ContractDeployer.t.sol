@@ -5,6 +5,8 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {DeployL1IntegrationScript} from "./deploy-scripts/DeployL1Integration.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -22,11 +24,13 @@ contract L1ContractDeployer is Test {
         address bridgehubProxyAddress;
         address bridgehubOwnerAddress;
         Bridgehub bridgehub;
+        IInteropCenter interopCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
         L1Nullifier l1Nullifier;
         L1NativeTokenVault l1NativeTokenVault;
         IChainTypeManager chainTypeManager;
+        ChainRegistrationSender chainRegistrationSender;
     }
 
     Config public ecosystemConfig;
@@ -50,12 +54,13 @@ contract L1ContractDeployer is Test {
         );
 
         l1Script = new DeployL1IntegrationScript();
-        l1Script.runForTest();
+        l1Script.runForTest(false);
 
         addresses.ecosystemAddresses = l1Script.getAddresses();
         ecosystemConfig = l1Script.getConfig();
 
         addresses.bridgehub = Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
+        addresses.interopCenter = IInteropCenter(addresses.ecosystemAddresses.bridgehub.interopCenterProxy);
         addresses.chainTypeManager = IChainTypeManager(
             addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy
         );
@@ -67,6 +72,9 @@ contract L1ContractDeployer is Test {
         addresses.l1Nullifier = L1Nullifier(addresses.ecosystemAddresses.bridges.l1NullifierProxy);
         addresses.l1NativeTokenVault = L1NativeTokenVault(
             payable(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy)
+        );
+        addresses.chainRegistrationSender = ChainRegistrationSender(
+            addresses.ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
         );
 
         _acceptOwnership();

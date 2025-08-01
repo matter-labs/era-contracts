@@ -20,8 +20,6 @@ error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batch
 error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
 // 0xfbd630b8
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
-// 0x7a47c9a2
-error InvalidChainId();
 // 0xc06789fa
 error InvalidCommitment();
 // 0xd2531c15

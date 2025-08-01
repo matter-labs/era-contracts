@@ -3,11 +3,12 @@
 pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
+import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainExists, MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "./L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -79,6 +80,8 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
+    address public assetTracker;
+
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
         if (msg.sender != address(BRIDGE_HUB) && msg.sender != address(BRIDGE_HUB.chainAssetHandler())) {
@@ -100,6 +103,20 @@ contract MessageRoot is IMessageRoot, Initializable {
         _;
     }
 
+    modifier onlyAssetTracker() {
+        if (msg.sender != assetTracker) {
+            revert OnlyAssetTracker(msg.sender, assetTracker);
+        }
+        _;
+    }
+
+    modifier onlyBridgehubOwner() {
+        if (msg.sender != Ownable(address(BRIDGE_HUB)).owner()) {
+            revert OnlyBridgehubOwner(msg.sender, Ownable(address(BRIDGE_HUB)).owner());
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -113,6 +130,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
     function initialize() external initializer {
         _initialize();
+    }
+
+    function setAddresses(address _assetTracker) external onlyBridgehubOwner {
+        assetTracker = _assetTracker;
     }
 
     /// @notice Adds a single chain to the message root.
@@ -136,7 +157,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
+    ) external onlyAssetTracker {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
@@ -155,12 +176,17 @@ contract MessageRoot is IMessageRoot, Initializable {
 
         emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
 
+        _emitRoot(sharedTreeRoot);
+        historicalRoot[block.number] = sharedTreeRoot;
+    }
+
+    /// @notice emit a new message root when committing a new batch
+    function _emitRoot(bytes32 _root) internal {
         // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
         // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
         bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = sharedTreeRoot;
+        _sides[0] = _root;
         emit NewInteropRoot(block.chainid, block.number, 0, _sides);
-        historicalRoot[block.number] = sharedTreeRoot;
     }
 
     /// @notice Gets the aggregated root of all chains.
@@ -189,9 +215,7 @@ contract MessageRoot is IMessageRoot, Initializable {
             newLeaves[i] = MessageHashing.chainIdLeafHash(chainTree[chainId].root(), chainId);
         }
         bytes32 newRoot = sharedTree.updateAllLeaves(newLeaves);
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = newRoot;
-        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+        _emitRoot(newRoot);
         historicalRoot[block.number] = newRoot;
     }
 

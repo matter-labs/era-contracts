@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -16,13 +16,18 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
+import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
+import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {IInteropHandler, InteropHandler} from "contracts/interop/InteropHandler.sol";
+// import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
+import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../../l1/integration/l2-tests-abstract/Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
 import {Utils} from "deploy-scripts/Utils.sol";
@@ -31,7 +36,8 @@ library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
-    address internal constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
+    /// rich account on era_test_node
+    address internal constant RANDOM_ADDRESS = address(0xBC989fDe9e54cAd2aB4392Af6dF60f04873A033A);
 
     /**
      * @dev Initializes the system contracts.
@@ -44,32 +50,46 @@ library L2Utils {
     }
 
     function forceDeploySystemContracts(SystemContractsArgs memory _args) internal {
-        forceDeployMessageRoot();
+        if (_args.broadcast) {
+            // we will broadcast from this address, it needs funds.
+            _args.aliasedOwner = RANDOM_ADDRESS;
+        }
+        forceDeployMessageRoot(_args);
         forceDeployBridgehub(_args);
         forceDeployChainAssetHandler(_args);
         forceDeployAssetRouter(_args);
         forceDeployNativeTokenVault(_args);
+        forceDeployL2MessageVerification(_args);
+        forceDeployL2InteropRootStorage(_args);
+        forceDeployInteropCenter(_args);
+        forceDeployInteropHandler(_args);
     }
 
-    function forceDeployMessageRoot() internal {
+    function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
+        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
         new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR));
-        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR));
+        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR), _args.broadcast);
     }
 
     function forceDeployBridgehub(SystemContractsArgs memory _args) internal {
+        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
         new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100);
         forceDeployWithConstructor(
             "Bridgehub",
             L2_BRIDGEHUB_ADDR,
-            abi.encode(_args.l1ChainId, _args.aliasedOwner, 100)
+            abi.encode(_args.l1ChainId, _args.aliasedOwner, 100),
+            _args.broadcast
         );
         Bridgehub bridgehub = Bridgehub(L2_BRIDGEHUB_ADDR);
-        vm.prank(_args.aliasedOwner);
+        prankOrBroadcast(_args.broadcast, _args.aliasedOwner);
+
         bridgehub.setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
-            L2_CHAIN_ASSET_HANDLER_ADDR
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            L2_INTEROP_CENTER_ADDR,
+            address(0x000000000000000000000000000000000002000a)
         );
     }
 
@@ -90,8 +110,52 @@ library L2Utils {
                 L2_BRIDGEHUB_ADDR,
                 L2_ASSET_ROUTER_ADDR,
                 L2_MESSAGE_ROOT_ADDR
-            )
+            ),
+            _args.broadcast
         );
+    }
+
+    function forceDeployL2MessageVerification(SystemContractsArgs memory _args) internal {
+        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
+        new L2MessageVerification();
+        forceDeployWithConstructor(
+            "L2MessageVerification",
+            address(L2_MESSAGE_VERIFICATION),
+            abi.encode(),
+            _args.broadcast
+        );
+    }
+
+    function forceDeployL2InteropRootStorage(SystemContractsArgs memory _args) internal {
+        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
+        new DummyL2InteropRootStorage();
+        forceDeployWithConstructor(
+            "DummyL2InteropRootStorage",
+            address(L2_INTEROP_ROOT_STORAGE),
+            abi.encode(),
+            _args.broadcast
+        );
+    }
+
+    function forceDeployInteropCenter(SystemContractsArgs memory _args) internal {
+        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
+        new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId, _args.aliasedOwner);
+        forceDeployWithConstructor(
+            "InteropCenter",
+            L2_INTEROP_CENTER_ADDR,
+            abi.encode(L2_BRIDGEHUB_ADDR, _args.l1ChainId, _args.aliasedOwner),
+            _args.broadcast
+        );
+        InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
+        prankOrBroadcast(_args.broadcast, _args.aliasedOwner);
+        interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
+    }
+
+    function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {
+        prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
+        new InteropHandler();
+        forceDeployWithConstructor("InteropHandler", L2_INTEROP_HANDLER_ADDR, abi.encode(), _args.broadcast);
+        InteropHandler interopHandler = InteropHandler(L2_INTEROP_HANDLER_ADDR);
     }
 
     /// @notice Deploys the L2AssetRouter contract.
@@ -99,6 +163,7 @@ library L2Utils {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         {
+            prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
             new L2AssetRouter(
                 _args.l1ChainId,
                 _args.eraChainId,
@@ -118,7 +183,8 @@ library L2Utils {
                 _args.legacySharedBridge,
                 ethAssetId,
                 _args.aliasedOwner
-            )
+            ),
+            _args.broadcast
         );
     }
 
@@ -127,6 +193,7 @@ library L2Utils {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         {
+            prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
             new L2NativeTokenVault({
                 _l1ChainId: _args.l1ChainId,
                 _aliasedOwner: _args.aliasedOwner,
@@ -150,14 +217,16 @@ library L2Utils {
                 _args.contractsDeployedAlready,
                 address(0),
                 ethAssetId
-            )
+            ),
+            _args.broadcast
         );
     }
 
     function forceDeployWithConstructor(
         string memory _contractName,
         address _address,
-        bytes memory _constructorArgs
+        bytes memory _constructorArgs,
+        bool _broadcast
     ) public {
         bytes memory bytecode = Utils.readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
 
@@ -171,8 +240,9 @@ library L2Utils {
             value: 0,
             input: _constructorArgs
         });
+        console.logBytes32(bytecodehash);
 
-        vm.prank(L2_FORCE_DEPLOYER_ADDR);
+        prankOrBroadcast(_broadcast, L2_FORCE_DEPLOYER_ADDR);
         IContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(deployments);
     }
 
@@ -194,5 +264,33 @@ library L2Utils {
             revert DeployFailed();
         }
         return contractAddress;
+    }
+
+    // function getCreationCode(string memory _contractName) internal view returns (bytes memory) {
+    //     if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("L2StandardTriggerAccount"))) {
+    //         return
+    //             abi.encodePacked(
+    //                 readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
+    //             );
+    //     } else if (keccak256(abi.encode(_contractName)) == keccak256(abi.encode("InteropAccount"))) {
+    //         return
+    //             abi.encodePacked(
+    //                 readZKFoundryBytecodeSystemContracts(string.concat(_contractName, ".sol"), _contractName)
+    //             );
+    //     }
+    //     bytes memory bytecode = readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
+    //     return bytecode;
+    // }
+
+    function prankOrBroadcast(bool _broadcast, address _from) public {
+        if (_broadcast) {
+            if (_from != L2_FORCE_DEPLOYER_ADDR) {
+                vm.broadcast(_from);
+            } else {
+                vm.broadcast();
+            }
+        } else {
+            vm.prank(_from);
+        }
     }
 }

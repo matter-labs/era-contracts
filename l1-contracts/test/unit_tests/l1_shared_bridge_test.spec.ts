@@ -12,7 +12,7 @@ import { L1NativeTokenVaultFactory } from "../../typechain/L1NativeTokenVaultFac
 
 import { getTokens } from "../../src.ts/deploy-token";
 import { Action, facetCut } from "../../src.ts/diamondCut";
-import { ethTestConfig } from "../../src.ts/utils";
+import { ethTestConfig } from "../../src.ts/constants";
 import type { Deployer } from "../../src.ts/deploy";
 import { initialTestnetDeploymentProcess } from "../../src.ts/deploy-test-process";
 
