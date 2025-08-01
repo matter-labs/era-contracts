@@ -170,11 +170,6 @@ async function processFile(
   fix: boolean,
   collectedErrors: Map<string, [string, string]>
 ): Promise<boolean> {
-async function processFile(
-  filePath: string,
-  fix: boolean,
-  collectedErrors: Map<string, [string, string]>
-): Promise<boolean> {
   const content = fs.readFileSync(filePath, "utf8");
 
   // Find all enum definitions in the file
@@ -299,7 +294,6 @@ async function main() {
     const usedErrors = new Set<string>();
     for (const customErrorFile of errorsPaths) {
       const absolutePath = path.resolve(contractsPath + "/" + customErrorFile);
-      const result = await processFile(absolutePath, options.fix, declaredErrors);
       const result = await processFile(absolutePath, options.fix, declaredErrors);
       if (result && options.check) hasErrors = true;
     }
