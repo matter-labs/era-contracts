@@ -4,6 +4,21 @@ import * as path from "path";
 import { ethers } from "ethers";
 import * as https from "https";
 
+// Constant arrays
+const CONTRACTS_DIRECTORIES = {
+  contracts: [
+    "common/L1ContractErrors.sol",
+    "bridge/L1BridgeContractErrors.sol",
+    "bridgehub/L1BridgehubErrors.sol",
+    "state-transition/L1StateTransitionErrors.sol",
+    "upgrades/ZkSyncUpgradeErrors.sol",
+  ],
+  "deploy-scripts": ["ZkSyncScriptErrors.sol"],
+  "../l2-contracts/contracts": ["errors/L2ContractErrors.sol"],
+  "../system-contracts/contracts": ["SystemContractErrors.sol"],
+  "../da-contracts/contracts": ["DAContractsErrors.sol"],
+};
+
 // Helper function to query the signature database
 async function querySignatureDatabase(signature: string): Promise<number> {
   const url = `https://www.4byte.directory/api/v1/signatures/?text_signature=${encodeURIComponent(
@@ -81,21 +96,6 @@ async function submitSignatureToDatabase(signature: string): Promise<void> {
     req.end();
   });
 }
-
-// Constant arrays
-const CONTRACTS_DIRECTORIES = {
-  contracts: [
-    "common/L1ContractErrors.sol",
-    "bridge/L1BridgeContractErrors.sol",
-    "bridgehub/L1BridgehubErrors.sol",
-    "state-transition/L1StateTransitionErrors.sol",
-    "upgrades/ZkSyncUpgradeErrors.sol",
-  ],
-  "deploy-scripts": ["ZkSyncScriptErrors.sol"],
-  "../l2-contracts/contracts": ["errors/L2ContractErrors.sol"],
-  "../system-contracts/contracts": ["SystemContractErrors.sol"],
-  "../da-contracts/contracts": ["DAContractsErrors.sol"],
-};
 
 // Helper: sort error blocks (selector + multi-line error) alphabetically by error name
 function sortErrorBlocks(lines: string[]): string[] {
