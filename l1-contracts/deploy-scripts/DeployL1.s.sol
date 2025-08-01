@@ -28,8 +28,8 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
+import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
+import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -806,9 +806,9 @@ contract DeployL1Script is Script, DeployUtils {
                     return type(DualVerifier).creationCode;
                 }
             } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return type(L1VerifierFflonk).creationCode;
+                return type(VerifierFflonk).creationCode;
             } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return type(L1VerifierPlonk).creationCode;
+                return type(VerifierPlonk).creationCode;
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
