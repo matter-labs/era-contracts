@@ -9,7 +9,7 @@ import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
-import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready, UnauthorizedMessageSender, WrongDestinationChainId} from "./InteropErrors.sol";
+import {MessageNotIncluded, BundleAlreadyProcessed, CanNotUnbundle, CallAlreadyExecuted, CallNotExecutable, WrongCallStatusLength, UnbundlingNotAllowed, ExecutingNotAllowed, BundleVerifiedAlready, UnauthorizedMessageSender, WrongDestinationChainId, WrongSourceChainId} from "./InteropErrors.sol";
 import {Unauthorized, InvalidSelector} from "../common/L1ContractErrors.sol";
 
 /// @title InteropHandler
@@ -35,6 +35,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
             _proof.chainId
+        );
+
+        // Verify that the source chainId of the bundle matches the proof's chainId
+        require(
+            interopBundle.sourceChainId == _proof.chainId,
+            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, _proof.chainId)
         );
 
         // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get executed
@@ -109,6 +115,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             _proof.chainId
         );
 
+        // Verify that the source chainId of the bundle matches the proof's chainId
+        require(
+            interopBundle.sourceChainId == _proof.chainId,
+            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, _proof.chainId)
+        );
+
         // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get verified
         require(
             interopBundle.destinationChainId == block.chainid,
@@ -142,6 +154,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
             _sourceChainId
+        );
+
+        // Verify that the source chainId of the bundle matches the provided source chainId
+        require(
+            interopBundle.sourceChainId == _sourceChainId,
+            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, _sourceChainId)
         );
 
         // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get unbundled

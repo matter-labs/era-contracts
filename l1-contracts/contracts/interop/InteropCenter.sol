@@ -273,6 +273,7 @@ contract InteropCenter is
         // Form an InteropBundle.
         InteropBundle memory bundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: block.chainid,
             destinationChainId: _destinationChainId,
             interopBundleSalt: keccak256(abi.encodePacked(msg.sender, interopBundleNonce[msg.sender])),
             calls: new InteropCall[](_callStarters.length),

@@ -159,6 +159,7 @@ struct InteropCall {
 }
 
 struct InteropBundle {
+    uint256 sourceChainId;
     uint256 destinationChainId;
     InteropCall[] calls;
     // If not set - anyone can execute it.
