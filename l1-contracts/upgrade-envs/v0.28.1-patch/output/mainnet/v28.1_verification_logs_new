@@ -39,6 +39,23 @@ Block: 23046252
 Paid: 0.000211062382538784 ETH (451052 gas * 0.467933592 gwei)
 
 ✅ Sequence #1 on mainnet | Total Paid: 0.003423175765269372 ETH (7443080 gas * avg 0.462884907 gwei)
+
+Chain 1
+
+Estimated gas price: 2.697065267 gwei
+
+Estimated total gas used for script: 623561
+
+Estimated amount required: 0.001681784714955787 ETH
+
+==========================
+
+##### mainnet
+✅  [Success] Hash: 0xf3974fbf46829d0c4d39ac6f12c48b3789ecd0c3fd6d786bb0cabe4102d84740
+Block: 23046660
+Paid: 0.000655997440563352 ETH (451448 gas * 1.453096349 gwei)
+
+✅ Sequence #1 on mainnet | Total Paid: 0.000655997440563352 ETH (451448 gas * avg 1.453096349 gwei)
                                                                                                                                                                                                                                                                           
 
 ==========================

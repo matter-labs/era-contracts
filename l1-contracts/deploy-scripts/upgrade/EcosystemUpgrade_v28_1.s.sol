@@ -256,7 +256,7 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
 
         instantiateCreate2Factory();
 
-        // deployVerifiers();
+        deployVerifiers();
         // deployUpgradeStageValidator();
         console.log(addresses.stateTransition.chainTypeManagerProxy);
         console.log(config.contracts.latestProtocolVersion);
