@@ -1,0 +1,78 @@
+== Logs ==
+  Using deterministic Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  VerifierFflonk has been deployed at 0xfe24793dA87e538863e06dA6E376aa811752deC6
+  forge verify-contract 0xfe24793dA87e538863e06dA6E376aa811752deC6 VerifierFflonk
+  VerifierPlonk has been deployed at 0xDDccC1FF492B360053E90dd484A698001Feb0645
+  forge verify-contract 0xDDccC1FF492B360053E90dd484A698001Feb0645 VerifierPlonk
+  Verifier has been deployed at 0xFC8861B055a749A95A2129a16070ccB30Db6aFfc
+  forge verify-contract 0xFC8861B055a749A95A2129a16070ccB30Db6aFfc Verifier --constructor-args 0x000000000000000000000000fe24793da87e538863e06da6e376aa811752dec6000000000000000000000000ddccc1ff492b360053e90dd484a698001feb0645
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 1
+
+Estimated gas price: 0.821129539 gwei
+
+Estimated total gas used for script: 10280750
+
+Estimated amount required: 0.00844182750807425 ETH
+
+==========================
+
+##### mainnet
+✅  [Success] Hash: 0x7fbab4be8ab23d5ac25e8d0be756199547758e2f40995d50e51716d8f2c3a7de
+Block: 23046243
+Paid: 0.00151666033767534 ETH (3211780 gas * 0.472218003 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0x69e38e34c08c387234115a97d087ba29f340737650f57d643861f3d32512e7d7
+Block: 23046251
+Paid: 0.001695453045055248 ETH (3780248 gas * 0.448503126 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0x493121055437b1fa840998e21ee8f3a300cad028b0bf180e9183dcd2f8044c39
+Block: 23046252
+Paid: 0.000211062382538784 ETH (451052 gas * 0.467933592 gwei)
+
+✅ Sequence #1 on mainnet | Total Paid: 0.003423175765269372 ETH (7443080 gas * avg 0.462884907 gwei)
+                                                                                                                                                                                                                                                                          
+
+==========================
+
+ONCHAIN EXECUTION COMPLETE & SUCCESSFUL.
+
+Transactions saved to: /Users/kalmanlajko/programming/zksync/zksync-era4/contracts/l1-contracts/broadcast/EcosystemUpgrade_v28_1.s.sol/1/run-latest.json
+
+Sensitive values saved to: /Users/kalmanlajko/programming/zksync/zksync-era4/contracts/l1-contracts/cache-forge/EcosystemUpgrade_v28_1.s.sol/1/run-latest.json
+
+== Logs ==
+  Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  0xc2eE6b6af7d616f6e27ce7F4A451Aedc2b0F5f5C
+  120259084289
+  UpgradeStageValidator has been deployed at 0xe28ad831d216fCD71BF3944867f3834dB55eD382
+  forge verify-contract 0xe28ad831d216fCD71BF3944867f3834dB55eD382 UpgradeStageValidator --constructor-args 0x000000000000000000000000c2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c0000000000000000000000000000000000000000000000000000001c00000001
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 1
+
+Estimated gas price: 1.427053032 gwei
+
+Estimated total gas used for script: 447387
+
+Estimated amount required: 0.000638444974827384 ETH
+
+==========================
+
+##### mainnet
+✅  [Success] Hash: 0x5daba4ce33fabc653a0644ac9e1685e643a6357091f9d25afb248c30e8e2b725
+Block: 23046376
+Paid: 0.000236814854265266 ETH (305906 gas * 0.774142561 gwei)
+
+✅ Sequence #1 on mainnet | Total Paid: 0.000236814854265266 ETH (305906 gas * avg 0.774142561 gwei)

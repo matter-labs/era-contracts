@@ -1,0 +1,74 @@
+  gatewayConfig.gatewayStateTransition.verifier: 0xE503e484869517D37087776D82C9F0591aCc9d14
+  Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  VerifierFflonk has been deployed at 0x1AC4F629Fdc77A7700B68d03bF8D1A53f2210911
+  forge verify-contract 0x1AC4F629Fdc77A7700B68d03bF8D1A53f2210911 VerifierFflonk
+  VerifierPlonk has been deployed at 0x2db2ffdecb7446aaab01FAc3f4D55863db3C5bd6
+  forge verify-contract 0x2db2ffdecb7446aaab01FAc3f4D55863db3C5bd6 VerifierPlonk
+  Verifier has been deployed at 0x741fF3BFC48cee0E964C5ff7C7fDddb33bE56293
+  forge verify-contract 0x741fF3BFC48cee0E964C5ff7C7fDddb33bE56293 Verifier --constructor-args 0x0000000000000000000000001ac4f629fdc77a7700b68d03bf8d1a53f22109110000000000000000000000002db2ffdecb7446aaab01fac3f4d55863db3c5bd6
+  UpgradeStageValidator has been deployed at 0x2355b64C449277436d16a4C31f6d4796acf04222
+  forge verify-contract 0x2355b64C449277436d16a4C31f6d4796acf04222 UpgradeStageValidator --constructor-args 0x000000000000000000000000c2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c0000000000000000000000000000000000000000000000000000001c00000001
+    Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  VerifierFflonk has been deployed at 0x1AC4F629Fdc77A7700B68d03bF8D1A53f2210911
+  forge verify-contract 0x1AC4F629Fdc77A7700B68d03bF8D1A53f2210911 VerifierFflonk
+  VerifierPlonk has been deployed at 0x2db2ffdecb7446aaab01FAc3f4D55863db3C5bd6
+  forge verify-contract 0x2db2ffdecb7446aaab01FAc3f4D55863db3C5bd6 VerifierPlonk
+  Verifier has been deployed at 0x741fF3BFC48cee0E964C5ff7C7fDddb33bE56293
+  forge verify-contract 0x741fF3BFC48cee0E964C5ff7C7fDddb33bE56293 Verifier --constructor-args 0x0000000000000000000000001ac4f629fdc77a7700b68d03bf8d1a53f22109110000000000000000000000002db2ffdecb7446aaab01fac3f4d55863db3c5bd6
+  UpgradeStageValidator has been deployed at 0x2355b64C449277436d16a4C31f6d4796acf04222
+  forge verify-contract 0x2355b64C449277436d16a4C31f6d4796acf04222 UpgradeStageValidator --constructor-args 0x000000000000000000000000c2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c0000000000000000000000000000000000000000000000000000001c00000001
+  Ecosystem contracts are deployed!
+  Ecosystem contracts for GW are deployed!
+  Bytecodes published!
+  Generated fixed force deployments data
+  Prepared diamond cut data
+  Diamond proxy address: 0x32400084C286CF3E17e7B677ea9583e60a000324
+  Current protocol version: 0.28.0
+  Diamond proxy address: 0x32400084C286CF3E17e7B677ea9583e60a000324
+  Current protocol version: 0.28.0
+  UpgradeCutGenerated
+  Upgrade data generated!
+  Base token not ETH, approving
+  Diamond proxy address: 0x32400084C286CF3E17e7B677ea9583e60a000324
+  Current protocol version: 0.28.0
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+
+  Estimated amount required: 0.02079574063821936 ETH
+
+==========================
+
+##### mainnet
+✅  [Success] Hash: 0x109125a7f1e8aa9e232877354eb51d9cfa551f248fca70dda5174da37172f53b
+Block: 23045042
+Paid: 0.00044529078115361 ETH (508015 gas * 0.876530774 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xbc67bd7ced8b84533473e9fb31530a098453bb0cd94a76624028f730470a7b66
+Block: 23045043
+Paid: 0.002770997442921936 ETH (3212164 gas * 0.862657524 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0x57130c8ba21773ba02193697e2742581f1c440c0197359c932be7531ef9a68cd
+Block: 23045044
+Paid: 0.003245536858653096 ETH (3780632 gas * 0.858464103 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0xfd3a48b3e34c39092fb94a80ff27f9cbde658014619bc7b2979a9255c5711117
+Block: 23045045
+Paid: 0.000395396651515872 ETH (451448 gas * 0.875840964 gwei)
+
+
+##### mainnet
+✅  [Success] Hash: 0x23774fee6f86e7fbc94633f4a4426d2867031d12ab73bef143400e099c199696
+Block: 23045046
+Paid: 0.00026331476115355 ETH (305906 gas * 0.860770175 gwei)
+
+✅ Sequence #1 on mainnet | Total Paid: 0.007120536495398064 ETH (8258165 gas * avg 0.866852708 gwei)
+                                                                                                                                                                                                                                                                                    
+

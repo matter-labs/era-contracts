@@ -1,0 +1,63 @@
+era_chain_id = 270
+testnet_verifier = true
+governance_upgrade_timer_initial_delay = 1200
+owner_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
+
+# This should always be false for non-loadtest environments.
+support_l2_legacy_shared_bridge_test = false
+
+# changed for v28.1
+old_protocol_version = 0x1c00000000
+
+priority_txs_l2_gas_limit = 2000000
+max_expected_l1_gas_price = 50000000000
+
+[contracts]
+governance_min_delay = 0
+
+max_number_of_chains = 100
+create2_factory_salt = "0x83de3677ffea74c9815331db7f4c737a32c161db4cae7d47504a336c4c5bcfb7"
+create2_factory_addr = "0x4e59b44847b379578588920cA78FbF26c0B4956C"
+validator_timelock_execution_delay = 0
+genesis_root = "0x85fa0abaa93032259defb7bc3d060f1fcce909600a71841e9a578db386723966"
+genesis_rollup_leaf_index = 78
+genesis_batch_commitment = "0xc66918c8860c607e73892cb3e686bfba6185f7a49f8c7ec21fb1cce3c4f353cd"
+recursion_node_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_leaf_level_vk_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+recursion_circuits_set_vks_hash = "0x0000000000000000000000000000000000000000000000000000000000000000"
+priority_tx_max_gas_limit = 72000000
+diamond_init_pubdata_pricing_mode = 0
+diamond_init_batch_overhead_l1_gas = 1000000
+diamond_init_max_pubdata_per_batch = 120000
+diamond_init_max_l2_gas_per_batch = 80000000
+diamond_init_priority_tx_max_pubdata = 99000
+diamond_init_minimal_l2_gas_price = 250000000
+bootloader_hash = "0x0100085f9382a7928dd83bfc529121827b5f29f18b9aa10d18aa68e1be7ddc35"
+default_aa_hash = "0x010005f72e443c94460f4583fb38ef5d0c5cd9897021c41df840f91465c0392e"
+evm_emulator_hash = "0x01000d83e0329d9144ad041430fafcbc2b388e5434db8cb8a96e80157738a1da"
+bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
+rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
+
+# taken from v28 output ecosystem.yaml
+default_upgrade = "0x621a2111259500c7f7fc103e6c59418b8b9be6bf"
+
+governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
+# changed for v28.1
+latest_protocol_version = 0x1c00000001
+l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
+protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
+
+[tokens]
+token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
+
+[gateway]
+chain_id = 123
+
+[gateway.gateway_state_transition]
+chain_type_manager_proxy_addr = "0x7f5401a0a0340f6a68fe3162e7bb3a57e262d18e"
+rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
+chain_type_manager_proxy_admin = "0x0f7bef9694575a0e149dad6808d69f678746608b"
+rollup_sl_da_validator = "0x719A5aE8dF7468C7E1C22278eD3fD472e9904604"
+# changed for v28.1
+verifier = "0xFd5b270Ee63DBDee8e0053731F5d832dE383Ed19"
+default_upgrade = "0x69653a812038424290EFd0e7Ae8DcFB2Bbf9c9b2"
