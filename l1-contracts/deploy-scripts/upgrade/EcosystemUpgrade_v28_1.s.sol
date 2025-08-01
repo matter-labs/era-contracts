@@ -84,6 +84,16 @@ import {DeployL1Script} from "../DeployL1.s.sol";
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 import {SemVer} from "../../contracts/common/libraries/SemVer.sol";
+struct InitializeDataNewChainLegacy {
+    IVerifier verifier;
+    VerifierParams verifierParams;
+    bytes32 l2BootloaderBytecodeHash;
+    bytes32 l2DefaultAccountBytecodeHash;
+    bytes32 l2EvmEmulatorBytecodeHash;
+    uint256 priorityTxMaxGasLimit;
+    FeeParams feeParams;
+    address blobVersionedHashRetriever;
+}
 
 /// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
@@ -112,6 +122,7 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
             vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
         );
+        deployNewEcosystemContractsL1();
         initializePreviousUpgradeFile();
         prepareEcosystemUpgrade();
 
@@ -168,7 +179,11 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
 
         ChainCreationParams memory chainCreationParamsGWData = abi.decode(chainCreationParamsGW, (ChainCreationParams));
 
+        // console.log("Before patch chainCreationParamsL1Data.diamondCut:");
+        // console.logBytes(abi.encode(chainCreationParamsL1Data.diamondCut));
         chainCreationParamsL1Data.diamondCut = patchChainCreationDiamondCut(chainCreationParamsL1Data.diamondCut, addresses.stateTransition.verifier);
+        // console.log("After patch chainCreationParamsL1Data.diamondCut");
+        // console.logBytes(abi.encode(chainCreationParamsL1Data.diamondCut));
 
         chainCreationParamsGWData.diamondCut = patchChainCreationDiamondCut(chainCreationParamsGWData.diamondCut, gatewayConfig.gatewayStateTransition.verifier);
 
@@ -187,7 +202,7 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         // parser.parse(upgradeCut.initCalldata);
         bytes memory upgradeCalldata = upgradeCut.initCalldata;
         // console.logBytes(upgradeCalldata);
-        DiamondInitializeDataNewChain memory initializeData = abi.decode(upgradeCalldata, (DiamondInitializeDataNewChain));
+        InitializeDataNewChainLegacy memory initializeData = abi.decode(upgradeCalldata, (InitializeDataNewChainLegacy));
         initializeData.verifier = IVerifier(_verifier);
         patchedUpgradeCut.initCalldata = abi.encode(initializeData);
         return patchedUpgradeCut;

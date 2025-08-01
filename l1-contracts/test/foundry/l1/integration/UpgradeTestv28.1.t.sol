@@ -12,10 +12,10 @@ import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
 
 // For now, this test is testing "stage" - as mainnet wasn't updated yet.
-string constant ECOSYSTEM_INPUT = "/upgrade-envs/v0.28.1-patch/stage.toml";
+string constant ECOSYSTEM_INPUT = "/upgrade-envs/v0.28.1-patch/testnet.toml";
 string constant ECOSYSTEM_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage.toml";
 string constant CHAIN_INPUT = "/upgrade-envs/v0.28.1-patch/stage-gateway.toml";
-string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-gateway.toml";
+string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/v0.28.1-patch.toml";
 
 contract UpgradeIntegrationTest is Test {
     EcosystemUpgrade_v28_1 ecosystemUpgrade;
