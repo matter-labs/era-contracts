@@ -102,7 +102,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
+    ) internal view virtual override(DeployUtils) returns (bytes memory) {
         revert("Not implemented");
     }
 

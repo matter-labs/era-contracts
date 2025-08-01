@@ -59,4 +59,11 @@ contract L2GatewayTests is Test, L2GatewayTestAbstract, SharedL2ContractL2Deploy
     ) public override(SharedL2ContractL2Deployer, SharedL2ContractDeployer) {
         super.deployL2Contracts(_l1ChainId);
     }
+
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override(DeployUtils, SharedL2ContractL2Deployer) returns (bytes memory) {
+        revert("Not implemented");
+    }
 }
