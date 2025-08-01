@@ -12,7 +12,7 @@ interface IL2CrossChainSender {
     ///         where there is a middleman in the InteropCall. The expected usage is as follows:
     ///         We call initiateIndirectCall on contract A on source chain. It returns an interopCallStarter which will be used to pass the call
     ///         to the destination chain. In this second call the sender is contract A on source chain. This "indirect" call mechanism could be used for complex
-    ///         Interop scenarious, such as bridging.
+    ///         Interop scenarios, such as bridging.
     /// @param _chainId Destination chain ID.
     /// @param _originalCaller The `msg.sender` address from the external call that initiated current one.
     /// @param _value The `msg.value` to be deposited on the target chain.
