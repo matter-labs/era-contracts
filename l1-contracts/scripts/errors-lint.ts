@@ -20,8 +20,8 @@ const CONTRACTS_DIRECTORIES = {
 };
 
 // Helper function to query the signature database
-async function querySignatureDatabase(signature: string): Promise<number> {
-  const url = `https://www.4byte.directory/api/v1/signatures/?text_signature=${encodeURIComponent(
+async function querySignatureDatabase(signature: string): Promise<boolean> {
+  const url = `https://api.openchain.xyz/signature-database/v1/search?query=${encodeURIComponent(
     signature
   )}&_=${Date.now()}`; // add a timestamp to avoid caching
   return new Promise((resolve, reject) => {
@@ -34,11 +34,13 @@ async function querySignatureDatabase(signature: string): Promise<number> {
         res.on("end", () => {
           try {
             const parsedData = JSON.parse(data);
-            if (typeof parsedData.count === "number") {
-              resolve(parsedData.count);
-            } else {
-              reject(new Error(`Invalid response from signature database: "count" is not a number. Response: ${data}`));
+            if (!parsedData.ok || !parsedData.result) {
+              return reject(new Error(`Invalid response from signature database. Response: ${data}`));
             }
+
+            const { event, function: func } = parsedData.result;
+            const signatureFound = Object.keys(event || {}).length > 0 || Object.keys(func || {}).length > 0;
+            resolve(signatureFound);
           } catch (e) {
             reject(new Error(`Failed to parse response from signature database: ${data}`));
           }
@@ -53,12 +55,13 @@ async function querySignatureDatabase(signature: string): Promise<number> {
 // Helper function to submit a signature to the database
 async function submitSignatureToDatabase(signature: string): Promise<void> {
   const postData = JSON.stringify({
-    text_signature: signature,
+    function: [signature],
+    event: [],
   });
 
   const options = {
-    hostname: "www.4byte.directory",
-    path: "/api/v1/signatures/",
+    hostname: "api.openchain.xyz",
+    path: "/signature-database/v1/import",
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -224,10 +227,10 @@ async function processFile(
         modified = true;
       }
 
-      // Submit signature to https://www4byte.directory/ if --fix is provided
+      // Submit signature to https://www.openchain.xyz/ if --fix is provided
       if (fix) {
-        const count = await querySignatureDatabase(sig);
-        if (count === 0) {
+        const exists = await querySignatureDatabase(sig);
+        if (!exists) {
           await submitSignatureToDatabase(sig);
         } else {
           console.log(`Signature "${sig}" already exists in the database.`);
