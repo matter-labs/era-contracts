@@ -10,7 +10,7 @@ import {BLOB_DA_INPUT_SIZE, BLS_MODULUS, POINT_EVALUATION_PRECOMPILE_ADDR, PUBDA
 
 import {BlobCommitmentNotPublished, BlobHashCommitmentError, EmptyBlobVersionHash, InvalidPubdataCommitmentsSize, InvalidPubdataSource, NonEmptyBlobVersionHash, PointEvalCallFailed, PointEvalFailed, PubdataCommitmentsEmpty} from "./DAContractsErrors.sol";
 
-uint256 constant BLOBS_SUPPORTED = 6;
+uint256 constant BLOBS_SUPPORTED = 9;
 
 /// @dev The number of blocks within each we allow blob to be used for DA.
 /// On Ethereum blobs expire within 4096 epochs, i.e. 4096 * 32 blocks. We reserve

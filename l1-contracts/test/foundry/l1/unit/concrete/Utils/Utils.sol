@@ -30,7 +30,7 @@ address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008
 // constant in tests, but can be arbitrary address in real environments
 address constant L2_DA_VALIDATOR_ADDRESS = 0x2f3Bc0cB46C9780990afbf86A60bdf6439DE991C;
 
-uint256 constant MAX_NUMBER_OF_BLOBS = 6;
+uint256 constant MAX_NUMBER_OF_BLOBS = 9;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 
 library Utils {
