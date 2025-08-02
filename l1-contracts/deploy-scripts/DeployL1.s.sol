@@ -43,10 +43,11 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -69,6 +70,13 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
+
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+
 contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
 
@@ -83,7 +91,7 @@ contract DeployL1Script is Script, DeployUtils {
 
         // In the production environment, there will be a separate script dedicated to accepting the adminship
         // but for testing purposes we'll have to do it here.
-        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        L1Bridgehub bridgehub = L1Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.broadcast(addresses.chainAdmin);
         bridgehub.acceptAdmin();
     }
@@ -121,11 +129,11 @@ contract DeployL1Script is Script, DeployUtils {
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
-            "Bridgehub",
+            "L1Bridgehub",
             false
         );
         (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
-            "MessageRoot",
+            "L1MessageRoot",
             false
         );
 
@@ -170,7 +178,7 @@ contract DeployL1Script is Script, DeployUtils {
         (
             addresses.bridgehub.chainAssetHandlerImplementation,
             addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
+        ) = deployTuppWithContract("L1ChainAssetHandler", false);
         setBridgehubParams();
 
         initializeGeneratedData();
@@ -564,7 +572,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.writeToml(toml, outputPath);
     }
 
-    function prepareForceDeploymentsData() internal view returns (bytes memory) {
+    function prepareForceDeploymentsData() internal returns (bytes memory) {
         require(addresses.governance != address(0), "Governance address is not set");
 
         address dangerousTestOnlyForcedBeacon;
@@ -583,11 +591,24 @@ contract DeployL1Script is Script, DeployUtils {
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
-            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
-            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
-            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
-            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
+            bridgehubBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSBytecodeInfoForContract("L2Bridgehub.sol", "L2Bridgehub")
+                : abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSBytecodeInfoForContract("L2AssetRouter.sol", "L2AssetRouter")
+                : abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSBytecodeInfoForContract("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
+                : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSBytecodeInfoForContract("L2MessageRoot.sol", "L2MessageRoot")
+                : abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            beaconDeployerInfo: config.isZKsyncOS
+                ? Utils.getZKOSBytecodeInfoForContract("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
+                : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            chainAssetHandlerBytecodeInfo: config.isZKsyncOS
+                ? Utils.getZKOSBytecodeInfoForContract("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
+                : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -711,12 +732,12 @@ contract DeployL1Script is Script, DeployUtils {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "ChainRegistrar")) {
                 return type(ChainRegistrar).creationCode;
-            } else if (compareStrings(contractName, "Bridgehub")) {
-                return type(Bridgehub).creationCode;
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return type(ChainAssetHandler).creationCode;
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return type(MessageRoot).creationCode;
+            } else if (compareStrings(contractName, "L1Bridgehub")) {
+                return type(L1Bridgehub).creationCode;
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return type(L1ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return type(L1MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return type(CTMDeploymentTracker).creationCode;
             } else if (compareStrings(contractName, "L1Nullifier")) {
@@ -798,11 +819,11 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "Bridgehub")) {
-            return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
-        } else if (compareStrings(contractName, "MessageRoot")) {
-            return abi.encodeCall(MessageRoot.initialize, ());
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+        if (compareStrings(contractName, "L1Bridgehub")) {
+            return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
+        } else if (compareStrings(contractName, "L1MessageRoot")) {
+            return abi.encodeCall(L1MessageRoot.initialize, ());
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return abi.encode();
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));

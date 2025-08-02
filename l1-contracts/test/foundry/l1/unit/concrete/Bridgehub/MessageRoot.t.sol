@@ -3,7 +3,8 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
@@ -21,11 +22,11 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 
 contract MessageRootTest is Test {
     address bridgeHub;
-    MessageRoot messageRoot;
+    L1MessageRoot messageRoot;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
-        messageRoot = new MessageRoot(IBridgehub(bridgeHub));
+        messageRoot = new L1MessageRoot(IBridgehub(bridgeHub));
     }
 
     function test_init() public {
@@ -66,7 +67,7 @@ contract MessageRootTest is Test {
 
         vm.prank(bridgeHub);
         vm.expectEmit(true, false, false, false);
-        emit MessageRoot.AddedChain(alphaChainId, 0);
+        emit MessageRootBase.AddedChain(alphaChainId, 0);
         messageRoot.addNewChain(alphaChainId);
 
         assertTrue(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
@@ -103,7 +104,7 @@ contract MessageRootTest is Test {
 
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
-        emit MessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        emit MessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
         vm.expectEmit(true, false, false, false);
         emit MessageRoot.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));

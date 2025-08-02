@@ -48,11 +48,11 @@ library ContractsBytecodesLib {
             "BeaconProxy",
             "BridgedStandardERC20",
             "BridgedTokenBeacon",
-            "Bridgehub",
+            "L2Bridgehub",
             "BytecodesSupplier", // ???
             "ChainAdmin",
             "ChainAdminOwnable",
-            "ChainAssetHandler",
+            "L2ChainAssetHandler",
             "ChainRegistrar",
             "ChainTypeManager",
             "CTMDeploymentTracker",
@@ -70,7 +70,7 @@ library ContractsBytecodesLib {
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
-            "MessageRoot",
+            "L2MessageRoot",
             "PermanentRestriction",
             "ProxyAdmin", // ??
             "UpgradeableBeacon",
