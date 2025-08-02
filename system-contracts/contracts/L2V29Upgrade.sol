@@ -7,9 +7,10 @@ import {IL2SharedBridgeLegacy} from "./interfaces/IL2SharedBridgeLegacy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {L2_ASSET_ROUTER, L2_BRIDGE_HUB, L2_NATIVE_TOKEN_VAULT} from "./Constants.sol";
+import {L2_ASSET_ROUTER, L2_BRIDGE_HUB, L2_NATIVE_TOKEN_VAULT, L2_CHAIN_ASSET_HANDLER} from "./Constants.sol";
 import {IBridgedStandardERC20} from "./interfaces/IBridgedStandardERC20.sol";
 import {LegacyBridgeNotProxy} from "./SystemContractErrors.sol";
+import {IBridgehub} from "./interfaces/IBridgehub.sol";
 
 /// @dev Storage slot with the admin of the contract used for EIP‑1967 proxies (e.g., TUP, BeaconProxy, etc.).
 bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
@@ -35,19 +36,35 @@ contract L2V29Upgrade {
         ensureOwnable2StepOwner(address(L2_ASSET_ROUTER), _aliasedGovernance);
         ensureOwnable2StepOwner(address(L2_NATIVE_TOKEN_VAULT), _aliasedGovernance);
 
-        // 2. If the legacy shared bridge does not exist on this chain, no need to proceed
+        // 2. Call setAddresses in L2 Brighehub contract to set the address of ChainAssetHandler, a new contract.
+        setChainAssetHandler();
+
+        // 3. If the legacy shared bridge does not exist on this chain, no need to proceed
         address l2LegacySharedBridge = L2_ASSET_ROUTER.L2_LEGACY_SHARED_BRIDGE();
         if (l2LegacySharedBridge == address(0)) {
             // The chain does not have a legacy L2 shared bridge; no further work required.
             return;
         }
 
-        // 3. Migrate ownership of the legacy shared bridge and its beacon proxy.
+        // 4. Migrate ownership of the legacy shared bridge and its beacon proxy.
         migrateSharedBridgeLegacyOwner(l2LegacySharedBridge, _aliasedGovernance);
         migrateBeaconProxyOwner(l2LegacySharedBridge, _aliasedGovernance);
 
-        // 4. Patch the bridged ETH token metadata bug.
+        // 5. Patch the bridged ETH token metadata bug.
         fixBridgedETHBug(_bridgedEthAssetId, _aliasedGovernance);
+    }
+
+    /// @notice Calls setAddresses on L2 Bridgehub to set the address of newly appeared ChainAssetHandler contract.
+    function setChainAssetHandler() internal {
+        // Get the current L2 Brigehub owner.
+        address owner = IBridgehub(L2_BRIDGE_HUB).owner();
+
+        // Call L2 Bridgehub out of it's owner's name to setAddresses.
+        SystemContractHelper.mimicCallWithPropagatedRevert(
+            address(L2_BRIDGE_HUB),
+            owner,
+            abi.encodeCall(IBridgehub.setChainAssetHandler, (L2_CHAIN_ASSET_HANDLER))
+        );
     }
 
     /// @notice Makes `_aliasedGovernance` the owner of the legacy shared bridge’s

@@ -141,6 +141,11 @@ contract AdminFunctions is Script {
         Utils.executeCalls(governanceAddr, bytes32(0), 0, calls);
     }
 
+    function ecosystemAdminExecuteCalls(bytes memory callsToExecute, address ecosystemAdminAddr) public {
+        Call[] memory calls = abi.decode(callsToExecute, (Call[]));
+        saveAndSendAdminTx(ecosystemAdminAddr, calls, true);
+    }
+
     function adminEncodeMulticall(bytes memory callsToExecute) external {
         Call[] memory calls = abi.decode(callsToExecute, (Call[]));
 
@@ -635,6 +640,22 @@ contract AdminFunctions is Script {
                 _shouldSend: _shouldSend
             })
         );
+    }
+
+    function enableValidator(
+        address bridgehub,
+        uint256 l2ChainId,
+        address validatorAddress,
+        address validatorTimelock,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory l2ChainInfo = Utils.chainInfoFromBridgehubAndChainId(bridgehub, l2ChainId);
+
+        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (l2ChainId, validatorAddress));
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: validatorTimelock, value: 0, data: callData});
+
+        saveAndSendAdminTx(l2ChainInfo.admin, calls, _shouldSend);
     }
 
     struct StartMigrateChainFromGatewayParams {

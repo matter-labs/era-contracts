@@ -364,6 +364,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             "validator_timelock_addr",
             output.gatewayStateTransition.validatorTimelock
         );
+        vm.serializeAddress("gateway_state_transition", "rollup_da_manager_addr", output.rollupDAManager);
         string memory gatewayStateTransition = vm.serializeAddress(
             "gateway_state_transition",
             "diamond_proxy_addr",

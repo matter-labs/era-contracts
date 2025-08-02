@@ -14,7 +14,10 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
 
     function test() internal virtual override {}
 
-    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory);
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory);
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
