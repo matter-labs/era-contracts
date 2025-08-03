@@ -32,10 +32,6 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
     /// @dev Maps the migration number for each asset on the L2.
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) internal assetMigrationNumber;
-
-    mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) internal totalSupply;
-
-    mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
     function _l1ChainId() internal view virtual returns (uint256);
 
     function _bridgeHub() internal view virtual returns (IBridgehub);

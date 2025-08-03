@@ -458,15 +458,6 @@ abstract contract NativeTokenVault is
         }
     }
 
-    /// @notice Checks that the assetId is correct for the origin token and chain.
-    function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal view {
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
-        if (_assetId != expectedAssetId) {
-            // Make sure that a NativeTokenVault sent the message
-            revert AssetIdMismatch(expectedAssetId, _assetId);
-        }
-    }
-
     function _ensureAndSaveTokenDeployedInner(
         uint256 _tokenOriginChainId,
         bytes32 _assetId,
@@ -474,7 +465,7 @@ abstract contract NativeTokenVault is
         bytes memory _erc20Data,
         address _expectedToken
     ) internal {
-        _assetIdCheck(_tokenOriginChainId, _assetId, _originToken);
+        DataEncoding.assetIdCheck(_tokenOriginChainId, _assetId, _originToken);
 
         address deployedToken = _deployBridgedToken(_tokenOriginChainId, _assetId, _originToken, _erc20Data);
         require(deployedToken == _expectedToken, AddressMismatch(_expectedToken, deployedToken));

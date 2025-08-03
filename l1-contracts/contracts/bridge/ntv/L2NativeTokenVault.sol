@@ -164,7 +164,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         address _expectedToken,
         address _l1LegacyToken
     ) internal {
-        _assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
+        DataEncoding.assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
 
         /// token is a legacy token, no need to deploy
         require(_l1LegacyToken == _originToken, AddressMismatch(_originToken, _l1LegacyToken));

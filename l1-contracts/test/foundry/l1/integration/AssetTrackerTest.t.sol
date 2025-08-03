@@ -149,9 +149,10 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             chainId: eraZKChainId,
             assetId: assetId,
-            tokenOriginChainId: 0,
+            tokenOriginChainId: block.chainid,
             amount: amount,
             migrationNumber: migrationNumber,
+            originToken: tokenAddress,
             isL1ToGateway: true
         });
 
@@ -246,9 +247,10 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
             chainId: eraZKChainId,
             assetId: assetId,
-            tokenOriginChainId: 0,
+            tokenOriginChainId: block.chainid,
             amount: amount,
             migrationNumber: migrationNumber,
+            originToken: tokenAddress,
             isL1ToGateway: false
         });
 

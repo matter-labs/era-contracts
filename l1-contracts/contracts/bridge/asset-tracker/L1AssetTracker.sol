@@ -16,7 +16,6 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
-import {AssetIdMismatch} from "../../common/L1ContractErrors.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -134,13 +133,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         }
     }
 
-    function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal pure {
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
-        if (_assetId != expectedAssetId) {
-            // Make sure that a NativeTokenVault sent the message
-            revert AssetIdMismatch(expectedAssetId, _assetId);
-        }
-    }
+
 
     function _ensureSettlementLayerIsMinter(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
         uint256 settlementLayer = _bridgeHub().settlementLayer(_tokenOriginChainId);
@@ -185,7 +178,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             );
 
             /// We check the assetId to make sure the chain is not lying about it.
-            _assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+            DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
 
             fromChainId = data.chainId;
             toChainId = currentSettlementLayer;

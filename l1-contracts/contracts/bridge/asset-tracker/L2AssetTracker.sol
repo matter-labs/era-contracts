@@ -20,6 +20,8 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {InvalidAmount, InvalidAssetId, InvalidAssetMigrationNumber, NotMigratedChain} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase, BalanceChange} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
+import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -33,6 +35,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     IMessageRoot public MESSAGE_ROOT;
 
     address public L1_ASSET_TRACKER;
+
+    mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) internal totalSupply;
+
+    mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
