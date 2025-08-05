@@ -34,11 +34,16 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     IMessageRoot public MESSAGE_ROOT;
 
-    address public L1_ASSET_TRACKER;
 
     mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) internal totalSupply;
 
     mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
+
+    /// used only on Gateway.
+    mapping(bytes32 assetId => address originToken) internal originToken;
+
+    /// used only on Gateway.
+    mapping(bytes32 assetId => uint256 originChainId) internal tokenOriginChainId;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -58,7 +63,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         BRIDGE_HUB = IBridgehub(_bridgeHub);
         NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
-        // kl todo add L1_ASSET_TRACKER
     }
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
@@ -76,10 +80,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return MESSAGE_ROOT;
     }
 
-    function _l1AssetTracker() internal view override returns (address) {
-        return L1_ASSET_TRACKER;
-    }
-
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
@@ -92,16 +92,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         if (_balanceChange.amount > 0) {
             chainBalance[_chainId][_balanceChange.assetId] += _balanceChange.amount;
         }
-        if (_balanceChange.baseTokenAmount > 0) {
+        if (_balanceChange.baseTokenAmount > 0 && _balanceChange.tokenOriginChainId != _chainId) {
             chainBalance[_chainId][_balanceChange.baseTokenAssetId] += _balanceChange.baseTokenAmount;
         }
-        if (
-            _balanceChange.tokenOriginChainId != 0 &&
-            _balanceChange.assetId != bytes32(0) &&
-            !isMinterChain[_balanceChange.tokenOriginChainId][_balanceChange.assetId]
-        ) {
-            isMinterChain[_balanceChange.tokenOriginChainId][_balanceChange.assetId] = true;
-        }
+        /// kl todo should we save tokenOriginChainId here?
+        /// It is only needed for migration back to L1 when the token is not L1 registered. But these tokens are, so? 
+
 
         /// A malicious chain can cause a collision for the canonical tx hash.
         /// This will only decrease the chain's balance, so it is not a security issue.
@@ -195,22 +191,22 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                     interopCall.data
                 );
                 // slither-disable-next-line unused-return
-                (, , , uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
+                (, , address originalToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
                 // slither-disable-next-line unused-return
-                (uint256 tokenOriginChainId, , , ) = this.parseTokenData(erc20Metadata);
-                isMinterChain[tokenOriginChainId][assetId] = true;
+                (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
+                DataEncoding.assetIdCheck(tokenOriginalChainId, assetId, originalToken);
+                if (originToken[assetId] == address(0)) {
+                    originToken[assetId] = originalToken;
+                    tokenOriginChainId[assetId] = tokenOriginalChainId;
+                }
 
-                // if (!isMinterChain[fromChainId][assetId]) {
-                if (tokenOriginChainId != fromChainId) {
+                if (tokenOriginalChainId != fromChainId) {
                     chainBalance[fromChainId][assetId] -= amount;
                 }
-                // if (!isMinterChain[interopBundle.destinationChainId][assetId]) {
-                if (tokenOriginChainId != interopBundle.destinationChainId) {
+                if (tokenOriginalChainId != interopBundle.destinationChainId) {
                     chainBalance[interopBundle.destinationChainId][assetId] += amount;
                 }
             }
-
-            // kl todo add change minter role here
         }
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
@@ -240,6 +236,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Migrates the token balance from L2 to L1.
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
+    /// @dev This function is permissionless, it does not affect the state.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
         address tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
 
@@ -249,19 +246,29 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
         uint256 amount;
-        uint256 savedTotalSupply = totalSupply[migrationNumber][_assetId];
-        if (savedTotalSupply == 0) {
-            amount = IERC20(tokenAddress).totalSupply();
+        {
+            uint256 savedTotalSupply = totalSupply[migrationNumber][_assetId];
+            if (savedTotalSupply == 0) {
+                amount = IERC20(tokenAddress).totalSupply();
+            } else {
+                amount = savedTotalSupply;
+            }
+        }
+        uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
+        address originalToken;
+        if (originChainId == block.chainid) {
+            originalToken = tokenAddress;
         } else {
-            amount = savedTotalSupply;
+            originalToken = IBridgedStandardToken(tokenAddress).originToken();
         }
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             chainId: block.chainid,
             assetId: _assetId,
-            tokenOriginChainId: L2_NATIVE_TOKEN_VAULT.originChainId(_assetId),
+            tokenOriginChainId: originChainId,
             amount: amount,
             migrationNumber: migrationNumber,
+            originToken: originalToken,
             isL1ToGateway: true
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
@@ -269,6 +276,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Migrates the token balance from Gateway to L1.
     /// @dev This function can be called multiple times on the Gateway as it does not have a direct effect.
+    /// @dev This function is permissionless, it does not affect the state.
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
@@ -282,9 +290,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             chainId: _chainId,
             assetId: _assetId,
-            tokenOriginChainId: 0,
+            tokenOriginChainId: tokenOriginChainId[_assetId],
             amount: chainBalance[_chainId][_assetId],
             migrationNumber: migrationNumber,
+            originToken: originToken[_assetId],
             isL1ToGateway: false
         });
 

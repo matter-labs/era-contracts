@@ -28,9 +28,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     INativeTokenVault public immutable NATIVE_TOKEN_VAULT;
 
     IMessageRoot public immutable MESSAGE_ROOT;
-
-    address public immutable L1_ASSET_TRACKER;
-
     constructor(uint256 _l1ChainId, address _bridgeHub, address, address _nativeTokenVault, address _messageRoot) {
         L1_CHAIN_ID = _l1ChainId;
         BRIDGE_HUB = IBridgehub(_bridgeHub);
@@ -57,10 +54,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         return MESSAGE_ROOT;
     }
 
-    function _l1AssetTracker() internal view override returns (address) {
-        return L1_ASSET_TRACKER;
-    }
-
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
@@ -68,7 +61,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Called on the L1 when a deposit to the chain happens.
     /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
+    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) external {
         // onlyNativeTokenVault {
 
         uint256 currentSettlementLayer = _bridgeHub().settlementLayer(_chainId);
@@ -78,9 +71,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             TransientPrimitivesLib.set(key, uint256(_assetId));
             TransientPrimitivesLib.set(key + 1, _amount);
         }
-        if (!isMinterChain[chainToUpdate][_assetId]) {
+        // if (!isMinterChain[chainToUpdate][_assetId]) {
             chainBalance[chainToUpdate][_assetId] += _amount;
-        }
+        // }
     }
 
     /// @notice Called on the L1 by the chain's mailbox when a deposit happens
@@ -96,18 +89,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// @notice Called on the L1 when a withdrawal from the chain happens, or when a failed deposit is undone.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
+    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) external {
         // onlyNativeTokenVault
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
-        if (chainToUpdate != _chainId) {
-            uint256 _tokenOriginChainId = _nativeTokenVault().originChainId(_assetId);
-            if (_chainId == _tokenOriginChainId && chainToUpdate != _chainId) {
-                _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
-            }
-        }
-
-        if (isMinterChain[chainToUpdate][_assetId]) {
+        bool chainToUpdateIsMinter = _tokenOriginChainId == chainToUpdate || _bridgeHub().settlementLayer(_tokenOriginChainId) == chainToUpdate ;
+        if (chainToUpdateIsMinter) {
             return;
         }
         // Check that the chain has sufficient balance
@@ -121,25 +108,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 settlementLayer = IL1Nullifier(IL1NativeTokenVault(address(_nativeTokenVault())).L1_NULLIFIER())
             .getTransientSettlementLayer();
         chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
-    }
-
-    /// we need this function to make sure the settlement layer is up to date.
-    function _ensureTokenIsRegistered(bytes32 _assetId, uint256 _tokenOriginChainId, address _originToken) internal {
-        if (!isMinterChain[_tokenOriginChainId][_assetId]) {
-            isMinterChain[_tokenOriginChainId][_assetId] = true;
-        }
-        if (_tokenOriginChainId != _l1ChainId()) {
-            _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
-        }
-    }
-
-
-
-    function _ensureSettlementLayerIsMinter(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
-        uint256 settlementLayer = _bridgeHub().settlementLayer(_tokenOriginChainId);
-        if (settlementLayer != block.chainid && settlementLayer != 0) {
-            isMinterChain[settlementLayer][_assetId] = true;
-        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -195,8 +163,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             toChainId = data.chainId;
         }
 
-        _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId, data.originToken);
-        _migrateFunds(fromChainId, toChainId, data.assetId, data.amount);
+        _migrateFunds(fromChainId, toChainId, data.assetId, data.amount, data.tokenOriginChainId);
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
         _sendToChain(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
@@ -205,12 +172,20 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _sendToChain(data.chainId, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
     }
 
-    function _migrateFunds(uint256 _fromChainId, uint256 _toChainId, bytes32 _assetId, uint256 _amount) internal {
-        if (!isMinterChain[_fromChainId][_assetId]) {
+    function _migrateFunds(uint256 _fromChainId, uint256 _toChainId, bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) internal {
+        bool fromChainIsMinter = _tokenOriginChainId == _fromChainId || _bridgeHub().settlementLayer(_tokenOriginChainId) == _fromChainId;
+        if (fromChainIsMinter) {
+            return;
+        }
+        bool toChainIsMinter = _tokenOriginChainId == _toChainId || _bridgeHub().settlementLayer(_tokenOriginChainId) == _toChainId;
+        if (toChainIsMinter) {
+            return;
+        }
+        // if (!isMinterChain[_fromChainId][_assetId]) {
             // && data.tokenOriginChainId != _fromChainId) { kl todo can probably remove
             chainBalance[_fromChainId][_assetId] -= _amount;
             chainBalance[_toChainId][_assetId] += _amount;
-        }
+        // }
     }
 
     function _sendToChain(uint256 _chainId, bytes memory _data) internal {

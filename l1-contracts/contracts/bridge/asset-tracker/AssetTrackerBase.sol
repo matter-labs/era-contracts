@@ -26,8 +26,6 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
     /// @dev Only used on settlement layers
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
-    mapping(uint256 chainId => mapping(bytes32 assetId => bool isMinter)) public isMinterChain;
-
     /// @notice Used on the L2 instead of the settlement layer
     /// @dev Maps the migration number for each asset on the L2.
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
@@ -39,14 +37,6 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
     function _nativeTokenVault() internal view virtual returns (INativeTokenVault);
 
     function _messageRoot() internal view virtual returns (IMessageRoot);
-
-    function _l1AssetTracker() internal view virtual returns (address);
-
-    /// @notice Checks that the message sender is the L1 asset tracker.
-    modifier onlyL1AssetTracker() {
-        require(msg.sender == AddressAliasHelper.applyL1ToL2Alias(_l1AssetTracker()), Unauthorized(msg.sender));
-        _;
-    }
 
     modifier onlyL1() {
         require(block.chainid == _l1ChainId(), Unauthorized(msg.sender));
@@ -93,7 +83,7 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
     }
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) external {
-        isMinterChain[_originChainId][_assetId] = true;
+        // isMinterChain[_originChainId][_assetId] = true;
         /// todo call from ntv only probably
         /// todo figure out L1 vs L2 differences
         if (block.chainid == _l1ChainId()) {
