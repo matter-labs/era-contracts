@@ -20,7 +20,7 @@ import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1Cont
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 import {IL2AssetTracker, BalanceChange} from "../bridge/asset-tracker/IL2AssetTracker.sol";
-import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch} from "./InteropErrors.sol";
+import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";
 import {IERC7786Attributes} from "./IERC7786Attributes.sol";
@@ -168,15 +168,25 @@ contract InteropCenter is
 
     /// @notice Sends an interop bundle.
     ///         Same as above, but more than one call can be given, and they are given in InteropCallStarter format.
-    /// @param _destinationChainId Chain ID to send to.
-    /// @param _callStarters Array of call descriptors.
+    /// @param _destinationChainId Chain ID to send to. It's an ERC-7930 address that MUST have an empty address field, and encodes an EVM destination chain ID.
+    /// @param _callStarters Array of call descriptors. The ERC-7930 address in each callStarter.to
+    ///                      MUST have an empty ChainReference field. We assume all of the calls should go to the _destinationChainId,
+    ///                      so specifying the chain ID in _callStarters is redundant.
     /// @param _bundleAttributes Attributes of the bundle.
     /// @return bundleHash Hash of the sent bundle.
     function sendBundle(
-        uint256 _destinationChainId,
+        bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
-    ) external payable onlyL2ToL2(_destinationChainId) whenNotPaused returns (bytes32 bundleHash) {
+    ) external payable whenNotPaused returns (bytes32 bundleHash) {
+        // Validate that the destination chain ERC-7930 address has an empty address field.
+        _ensureEmptyAddress(_destinationChainId);
+
+        // Extract the actual chain ID from the ERC-7930 address
+        (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
+
+        // Ensure this is an L2 to L2 transaction
+        _ensureL2ToL2(destinationChainId);
         InteropCallStarterInternal[] memory callStartersInternal = new InteropCallStarterInternal[](
             _callStarters.length
         );
@@ -186,6 +196,10 @@ contract InteropCenter is
         bytes[][] memory originalCallAttributes = new bytes[][](callStartersLength);
 
         for (uint256 i = 0; i < callStartersLength; ++i) {
+            _ensureEmptyChainReference(_callStarters[i].to);
+
+            (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
+
             // Store original attributes for MessageSent event emission
             originalCallAttributes[i] = _callStarters[i].callAttributes;
 
@@ -195,7 +209,7 @@ contract InteropCenter is
                 AttributeParsingRestrictions.OnlyCallAttributes
             );
             callStartersInternal[i] = InteropCallStarterInternal({
-                to: _callStarters[i].to,
+                to: recipientAddress,
                 data: _callStarters[i].data,
                 callAttributes: callAttributes
             });
@@ -215,7 +229,7 @@ contract InteropCenter is
         }
 
         bundleHash = _sendBundle({
-            _destinationChainId: _destinationChainId,
+            _destinationChainId: destinationChainId,
             _callStarters: callStartersInternal,
             _bundleAttributes: bundleAttributes,
             _originalCallAttributes: originalCallAttributes
@@ -225,6 +239,37 @@ contract InteropCenter is
     /*//////////////////////////////////////////////////////////////
                             Internal functions
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice Verifies that the ERC-7930 address has an empty ChainReference field.
+    /// @dev This function is used to ensure that CallStarters in sendBundle do not include ChainReference, as required
+    ///      by our implementation. The ChainReference length is stored at byte offset 0x04 in the ERC-7930 format.
+    /// @param _interoperableAddress The ERC-7930 address to verify.
+    function _ensureEmptyChainReference(bytes calldata _interoperableAddress) internal pure {
+        require(
+            _interoperableAddress.length >= 5,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
+        require(chainReferenceLength == 0, InteroperableAddressChainReferenceNotEmpty(_interoperableAddress));
+    }
+
+    /// @notice Verifies that the ERC-7930 address has an empty address field.
+    /// @dev This function is used to ensure that the address does not contain an address field.
+    ///      The address length is stored at byte offset (0x05 + chainReferenceLength) in the ERC-7930 format.
+    /// @param _interoperableAddress The ERC-7930 address to verify.
+    function _ensureEmptyAddress(bytes calldata _interoperableAddress) internal pure {
+        require(
+            _interoperableAddress.length >= 5,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        uint8 chainReferenceLength = uint8(_interoperableAddress[0x04]);
+        require(
+            _interoperableAddress.length >= 6 + chainReferenceLength,
+            InteroperableAddress.InteroperableAddressParsingError(_interoperableAddress)
+        );
+        uint8 addressLength = uint8(_interoperableAddress[0x05 + chainReferenceLength]);
+        require(addressLength == 0, InteroperableAddressNotEmpty(_interoperableAddress));
+    }
 
     function _ensureL2ToL2(uint256 _destinationChainId) internal view {
         require(
@@ -328,9 +373,12 @@ contract InteropCenter is
         uint256 _destinationChainId,
         address _sender
     ) internal returns (InteropCall memory interopCall) {
+        // Use the already-parsed address from InteropCallStarterInternal
+        address recipientAddress = _callStarter.to;
+
         if (_callStarter.callAttributes.indirectCall) {
             // slither-disable-next-line arbitrary-send-eth
-            InteropCallStarter memory actualCallStarter = IL2CrossChainSender(_callStarter.to).initiateBridging{
+            InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateBridging{
                 value: _callStarter.callAttributes.indirectCallMessageValue
             }(_destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
             // solhint-disable-next-line no-unused-vars
@@ -346,19 +394,21 @@ contract InteropCenter is
                     indirectCallAttributes.interopCallValue
                 )
             );
+            // Parse the returned 7930 address from actualCallStarter.to
+            (, address actualCallRecipient) = InteroperableAddress.parseEvmV1(actualCallStarter.to);
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
                 shadowAccount: false,
-                to: actualCallStarter.to,
+                to: actualCallRecipient,
                 data: actualCallStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
-                from: _callStarter.to
+                from: recipientAddress
             });
         } else {
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
                 shadowAccount: false,
-                to: _callStarter.to,
+                to: recipientAddress,
                 data: _callStarter.data,
                 value: _callStarter.callAttributes.interopCallValue,
                 from: _sender
