@@ -18,7 +18,8 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 import {InvalidAmount, InvalidAssetId, InvalidAssetMigrationNumber, NotMigratedChain} from "./AssetTrackerErrors.sol";
-import {AssetTrackerBase, BalanceChange} from "./AssetTrackerBase.sol";
+import {AssetTrackerBase} from "./AssetTrackerBase.sol";
+import {BalanceChange} from "./IAssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
