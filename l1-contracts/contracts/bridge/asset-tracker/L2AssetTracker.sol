@@ -34,7 +34,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     IMessageRoot public MESSAGE_ROOT;
 
-
     mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) internal totalSupply;
 
     mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
@@ -96,8 +95,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             chainBalance[_chainId][_balanceChange.baseTokenAssetId] += _balanceChange.baseTokenAmount;
         }
         /// kl todo should we save tokenOriginChainId here?
-        /// It is only needed for migration back to L1 when the token is not L1 registered. But these tokens are, so? 
-
+        /// It is only needed for migration back to L1 when the token is not L1 registered. But these tokens are, so?
 
         /// A malicious chain can cause a collision for the canonical tx hash.
         /// This will only decrease the chain's balance, so it is not a security issue.
@@ -191,7 +189,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                     interopCall.data
                 );
                 // slither-disable-next-line unused-return
-                (, , address originalToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
+                (, , address originalToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding
+                    .decodeBridgeMintData(transferData);
                 // slither-disable-next-line unused-return
                 (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
                 DataEncoding.assetIdCheck(tokenOriginalChainId, assetId, originalToken);

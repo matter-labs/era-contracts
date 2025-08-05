@@ -156,15 +156,16 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) public view returns (bool) {
-        return proveL1ToL2TransactionStatusShared({
-            _chainId: s.chainId,
-            _l2TxHash: _l2TxHash,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof,
-            _status: _status
-        });
+        return
+            proveL1ToL2TransactionStatusShared({
+                _chainId: s.chainId,
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _status: _status
+            });
     }
 
     /// @inheritdoc IMessageVerification

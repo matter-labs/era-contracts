@@ -58,4 +58,3 @@ error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBr
 error SLNotWhitelisted();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
-

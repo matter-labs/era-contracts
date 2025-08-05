@@ -142,7 +142,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     function initializeV30Upgrade() external initializer {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         for (uint256 i = 0; i < allZKChains.length; i++) {
-            v30UpgradeBatchNumber[allZKChains[i]] = IGetters(BRIDGE_HUB.getZKChain(allZKChains[i])).getTotalBatchesExecuted();
+            v30UpgradeBatchNumber[allZKChains[i]] = IGetters(BRIDGE_HUB.getZKChain(allZKChains[i]))
+                .getTotalBatchesExecuted();
         }
     }
 
@@ -176,7 +177,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
         }
-        require(chainBatchRoots[_chainId][_batchNumber] == bytes32(0), ChainBatchRootAlreadyExists(_chainId, _batchNumber));
+        require(
+            chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
+            ChainBatchRootAlreadyExists(_chainId, _batchNumber)
+        );
 
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
         bytes32 chainRoot;

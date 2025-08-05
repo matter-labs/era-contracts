@@ -649,7 +649,11 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
             amount
         );
 
-        vm.mockCall(messageRootAddress, abi.encode(IMessageVerification.proveL2MessageInclusionShared.selector), abi.encode(true));
+        vm.mockCall(
+            messageRootAddress,
+            abi.encode(IMessageVerification.proveL2MessageInclusionShared.selector),
+            abi.encode(true)
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(SharedBridgeValueNotSet.selector, SharedBridgeKey.PostUpgradeFirstBatch)

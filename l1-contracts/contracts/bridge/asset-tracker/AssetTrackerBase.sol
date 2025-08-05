@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {IAssetTrackerBase, BalanceChange} from "./IAssetTrackerBase.sol";
+import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
 import {L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
@@ -14,7 +14,6 @@ import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 
 abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable, AssetHandlerModifiers {

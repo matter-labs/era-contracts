@@ -131,7 +131,6 @@ contract ChainAssetHandler is
         _;
     }
 
-
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
         if (migrationNumber[_chainId] != 0) {
             revert MigrationNumberAlreadySet();
