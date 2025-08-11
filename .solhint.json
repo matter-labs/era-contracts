@@ -4,6 +4,7 @@
     "avoid-call-value": "error",
     "avoid-low-level-calls": "off",
     "avoid-sha3": "error",
+    "avoid-tx-origin": "off",
     "check-send-result": "error",
     "compiler-version": ["error", "^0.8.0"],
     "const-name-snakecase": "off",
