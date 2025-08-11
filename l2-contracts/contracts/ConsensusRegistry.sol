@@ -55,10 +55,7 @@ contract ConsensusRegistry is IConsensusRegistry, Initializable, Ownable2StepUpg
 
     function add(
         address _validatorOwner,
-<<<<<<< HEAD
         bool _validatorIsLeader,
-=======
->>>>>>> origin/main
         uint32 _validatorWeight,
         BLS12_381PublicKey calldata _validatorPubKey,
         BLS12_381Signature calldata _validatorPoP
