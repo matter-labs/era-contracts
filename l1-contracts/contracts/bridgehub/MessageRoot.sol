@@ -59,6 +59,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
+    uint256 public immutable L1_CHAIN_ID;
+
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -110,9 +112,15 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _;
     }
 
-    modifier onlyAssetTracker() {
-        if (msg.sender != assetTracker) {
-            revert OnlyAssetTracker(msg.sender, assetTracker);
+    modifier onlyAssetTrackerOnGwAndChainOnL1(uint256 _chainId) {
+        if (block.chainid != L1_CHAIN_ID) {
+            if (msg.sender != assetTracker) {
+                revert OnlyAssetTracker(msg.sender, assetTracker);
+            }
+        } else {
+            if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
+                revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+            }
         }
         _;
     }
@@ -130,6 +138,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @param _bridgehub Address of the Bridgehub.
     constructor(IBridgehub _bridgehub) {
         BRIDGE_HUB = _bridgehub;
+        L1_CHAIN_ID = BRIDGE_HUB.L1_CHAIN_ID();
         _initialize();
         _disableInitializers();
     }
@@ -172,7 +181,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyAssetTracker {
+    ) external onlyAssetTrackerOnGwAndChainOnL1(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
@@ -182,6 +191,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
         );
 
+        chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
+        if (block.chainid == L1_CHAIN_ID) {
+            return;
+        }
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
@@ -196,7 +209,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
 
         _emitRoot(sharedTreeRoot);
-        chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         historicalRoot[block.number] = sharedTreeRoot;
     }
 

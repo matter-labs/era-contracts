@@ -179,6 +179,11 @@ contract ExecutorTest is Test {
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         dummyBridgehub = new DummyBridgehub();
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehub.L1_CHAIN_ID.selector),
+            abi.encode(1)
+        );
         address interopCenter = makeAddr("interopCenter");
         messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
         dummyBridgehub.setMessageRoot(address(messageRoot));
