@@ -33,6 +33,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -336,6 +337,16 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
                     abi.encodeCall(
                         ValidatorTimelock.initialize,
                         (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), uint32(0))
+                    );
+            }
+        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+            if (!isZKBytecode) {
+                return abi.encodeCall(ChainAssetHandler.initialize, (config.ownerAddress));
+            } else {
+                return
+                    abi.encodeCall(
+                        ChainAssetHandler.initialize,
+                        AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress)
                     );
             }
         } else {

@@ -807,7 +807,7 @@ contract DeployL1Script is Script, DeployUtils {
             } else if (compareStrings(contractName, "MessageRoot")) {
                 return abi.encodeCall(MessageRoot.initialize, ());
             } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return abi.encode();
+                return abi.encodeCall(ChainAssetHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1Nullifier")) {

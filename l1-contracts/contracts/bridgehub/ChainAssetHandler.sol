@@ -89,6 +89,12 @@ contract ChainAssetHandler is
         _transferOwnership(_owner);
     }
 
+    /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
+    /// @param _owner the owner of the contract
+    function initialize(address _owner) external reentrancyGuardInitializer {
+        _transferOwnership(_owner);
+    }
+
     /*//////////////////////////////////////////////////////////////
                         Chain migration
     //////////////////////////////////////////////////////////////*/
