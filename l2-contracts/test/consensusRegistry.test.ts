@@ -73,10 +73,7 @@ describe("ConsensusRegistry", function () {
       await (
         await registry.add(
           validatorEntries[i].ownerAddr,
-<<<<<<< HEAD
           validatorEntries[i].validatorIsLeader,
-=======
->>>>>>> origin/main
           validatorEntries[i].validatorWeight,
           validatorEntries[i].validatorPubKey,
           validatorEntries[i].validatorPoP
