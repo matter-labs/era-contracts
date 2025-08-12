@@ -13,7 +13,6 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
-
 import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "./interfaces/IL1Nullifier.sol";
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
@@ -214,8 +213,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @notice Legacy function used for migration, do not use!
+    /// @dev Returns the deprecated chain balance for backwards compatibility.
     /// @param _chainId The chain id we want to get the balance for.
     /// @param _token The address of the token.
+    /// @return The balance of the token on the specified chain (deprecated).
     // slither-disable-next-line uninitialized-state-variables
     function chainBalance(uint256 _chainId, address _token) external view returns (uint256) {
         // slither-disable-next-line uninitialized-state-variables
@@ -264,7 +265,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
-    /// @dev Calls the library `encodeTxDataHash`. Used as a wrapped for try / catch case.
+    /// @dev Calls the library `encodeTxDataHash`. Used as a wrapper for try / catch case.
     /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
     /// @param _encodingVersion EncodingVersion.
     /// @param _originalCaller The address of the entity that initiated the deposit.
@@ -315,6 +316,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @param _checkedInLegacyBridge Whether the deposit was already checked in the legacy bridge system.
     /// @param _chainId The ZK chain id to which deposit was initiated.
     /// @param _depositSender The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
@@ -362,6 +364,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _proof: _merkleProof
             });
             TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
+            emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
             require(proofValid, InvalidProof());
         }
 
@@ -541,10 +544,19 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _proof: _finalizeWithdrawalParams.merkleProof
         });
         TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
+        emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
         // withdrawal wrong proof
         require(success, InvalidProof());
     }
 
+    /// @notice Extracts and returns proof data for settlement layer verification.
+    /// @dev Wrapper function around MessageHashing._getProofData for public access.
+    /// @param _chainId The chain ID where the proof was generated.
+    /// @param _batchNumber The batch number containing the proof.
+    /// @param _leafProofMask The leaf proof mask for merkle verification.
+    /// @param _leaf The leaf hash to verify.
+    /// @param _proof The merkle proof array.
+    /// @return The extracted proof data including settlement layer information.
     function getProofData(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -573,7 +585,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _chainId The ZK chain ID.
     /// @param _l2ToL1message The encoded L2 -> L1 message.
     /// @return assetId The ID of the bridged asset.
-    /// @return transferData The transfer data used to finalize withdawal.
+    /// @return transferData The transfer data used to finalize withdrawal.
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
