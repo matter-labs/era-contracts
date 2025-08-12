@@ -119,6 +119,18 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         oldGatewayValidatorTimelocks = abi.decode(encodedOldGatewayValidatorTimelocks, (address[]));
     }
 
+    function saveOutputVersionSpecific() internal override {
+        console.log("Actually writing output here");
+        vm.serializeBytes("v29", "encoded_old_gateway_validator_timelocks", abi.encode(oldGatewayValidatorTimelocks));
+        string memory oldValidatorTimelocksSerialized = vm.serializeBytes(
+            "v29",
+            "encoded_old_validator_timelocks",
+            abi.encode(oldValidatorTimelocks)
+        );
+
+        vm.writeToml(oldValidatorTimelocksSerialized, upgradeConfig.outputPath, ".v29");
+    }
+
     function _getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal override returns (address, bytes memory) {

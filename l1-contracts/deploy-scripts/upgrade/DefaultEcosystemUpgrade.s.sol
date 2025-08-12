@@ -693,6 +693,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         });
     }
 
+    function saveOutputVersionSpecific() internal virtual {}
+
     function saveOutput(string memory outputPath) internal virtual override {
         vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
@@ -999,6 +1001,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
         vm.serializeBytes("root", "ecosystem_admin_calls", new bytes(0)); // Will be populated later
+        vm.serializeBytes("root", "v29", new bytes(0)); // Will be populated later
 
         vm.serializeUint(
             "root",
@@ -1009,6 +1012,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
 
         vm.writeToml(toml, outputPath);
+
+        saveOutputVersionSpecific();
     }
 
     /////////////////////////// Blockchain interactions ////////////////////////////
