@@ -34,6 +34,7 @@ import {IMessageVerification, MessageVerification} from "../../../common/Message
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {BalanceChange} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVault} from "../../../bridge/ntv/INativeTokenVault.sol";
+import {IBridgedStandardToken} from "../../../bridge/BridgedStandardERC20.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -323,9 +324,22 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             );
 
             (assetId, amount) = (assetTracker.getBalanceChange(s.chainId, _chainId));
-            balanceChange.assetId = assetId;
-            balanceChange.amount = amount;
-            balanceChange.tokenOriginChainId = nativeTokenVault.originChainId(assetId);
+            uint256 tokenOriginChainId = nativeTokenVault.originChainId(assetId);
+            address originToken;
+            address tokenAddress = nativeTokenVault.tokenAddress(assetId);
+            if (tokenOriginChainId == block.chainid) {
+                originToken = tokenAddress;
+            } else {
+                originToken = IBridgedStandardToken(tokenAddress).originToken();
+            }
+            balanceChange = BalanceChange({
+                baseTokenAssetId: bytes32(0),
+                baseTokenAmount: 0,
+                assetId: assetId,
+                amount: amount,
+                tokenOriginChainId: tokenOriginChainId,
+                originToken: originToken
+            });
         }
 
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({

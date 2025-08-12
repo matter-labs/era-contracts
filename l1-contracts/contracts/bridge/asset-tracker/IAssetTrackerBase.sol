@@ -20,6 +20,7 @@ struct BalanceChange {
     bytes32 assetId;
     uint256 amount;
     uint256 tokenOriginChainId;
+    address originToken;
 }
 
 interface IAssetTrackerBase {

@@ -70,7 +70,8 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             baseTokenAmount: 0,
             assetId: bytes32(0),
             amount: 0,
-            tokenOriginChainId: 0
+            tokenOriginChainId: 0,
+            originToken: address(0)
         });
         l2InteropCenter.forwardTransactionOnGatewayWithBalanceChange(mintChainId, bytes32(0), 0, balanceChange);
     }

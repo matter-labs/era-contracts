@@ -9,6 +9,10 @@ error InvalidAmount();
 error InvalidAssetId();
 // 0x61c1fbf6
 error InvalidAssetMigrationNumber(uint256, uint256);
+// 0x7ad8c2c9
+error InvalidCanonicalTxHash(bytes32);
+// 0x05208b6d
+error InvalidChainMigrationNumber(uint256, uint256);
 // 0x9530c5e1
 error InvalidMigrationNumber(uint256, uint256);
 // 0xddb5de5e

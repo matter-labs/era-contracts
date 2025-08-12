@@ -123,7 +123,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     }
 
     function getAssetMigrationNumberLocation(bytes32 _assetId, uint256 _chainId) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(_assetId, keccak256(abi.encodePacked(_chainId, uint256(2 + 151)))));
+        return keccak256(abi.encodePacked(_assetId, keccak256(abi.encodePacked(_chainId, uint256(1 + 151)))));
     }
 
     function computeNestedMappingSlot(
@@ -197,18 +197,18 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(
             address(assetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 2)
+            bytes32(migrationNumber - 1)
         );
         vm.store(
             address(l2AssetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 2)
+            bytes32(migrationNumber - 1)
         );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
         vm.mockCall(
             address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
             abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
-            abi.encode(migrationNumber - 1)
+            abi.encode(migrationNumber)
         );
         console.log("chainAssetHandler", address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy));
 

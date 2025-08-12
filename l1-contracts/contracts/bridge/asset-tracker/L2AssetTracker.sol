@@ -17,7 +17,7 @@ import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncr
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {InvalidAmount, InvalidAssetId, InvalidAssetMigrationNumber, NotMigratedChain} from "./AssetTrackerErrors.sol";
+import {InvalidAmount, InvalidAssetId, InvalidAssetMigrationNumber, InvalidCanonicalTxHash, NotMigratedChain} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
@@ -96,11 +96,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         if (_balanceChange.baseTokenAmount > 0 && _balanceChange.tokenOriginChainId != _chainId) {
             chainBalance[_chainId][_balanceChange.baseTokenAssetId] += _balanceChange.baseTokenAmount;
         }
-        /// kl todo should we save tokenOriginChainId here?
-        /// It is only needed for migration back to L1 when the token is not L1 registered. But these tokens are, so?
+        _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
 
         /// A malicious chain can cause a collision for the canonical tx hash.
-        /// This will only decrease the chain's balance, so it is not a security issue.
+        require(balanceChange[_chainId][_canonicalTxHash].amount == 0, InvalidCanonicalTxHash(_canonicalTxHash));
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
@@ -146,6 +145,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         // slither-disable-next-line unused-return
         reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         uint256 logsLength = _processLogsInputs.logs.length;
+        bytes32 baseTokenAssetId = _bridgehub().baseTokenAssetId(_processLogsInputs.chainId);
         for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
             L2Log memory log = _processLogsInputs.logs[logCount];
             bytes32 hashedLog = keccak256(
@@ -178,11 +178,16 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
             InteropBundle memory interopBundle = this.parseInteropBundle(message);
 
-            // handle msg.value call separately
             InteropCall memory interopCall = interopBundle.calls[0];
             uint256 callsLength = interopBundle.calls.length;
+
             for (uint256 callCount = 1; callCount < callsLength; ++callCount) {
                 interopCall = interopBundle.calls[callCount];
+
+                if (interopCall.value > 0) {
+                    require(chainBalance[_processLogsInputs.chainId][baseTokenAssetId] >= interopCall.value, InvalidAmount());
+                    chainBalance[_processLogsInputs.chainId][baseTokenAssetId] -= interopCall.value;
+                }
 
                 // e.g. for direct calls we just skip
                 if (interopCall.from != L2_ASSET_ROUTER_ADDR) {
@@ -333,6 +338,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
+
+    function _registerToken(bytes32 _assetId, address _originalToken, uint256 _tokenOriginChainId) internal {
+        if (originToken[_assetId] == address(0)) {
+            originToken[_assetId] = _originalToken;
+            tokenOriginChainId[_assetId] = _tokenOriginChainId;
+        }
+    }
 
     function parseInteropBundle(bytes calldata _bundleData) external pure returns (InteropBundle memory interopBundle) {
         interopBundle = abi.decode(_bundleData[1:], (InteropBundle));
