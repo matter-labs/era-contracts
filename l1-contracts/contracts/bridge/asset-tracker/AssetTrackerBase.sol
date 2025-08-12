@@ -81,7 +81,7 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
         _registerTokenOnL2(_assetId);
     }
 
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) external {
+    function registerNewToken(bytes32 _assetId, uint256) external {
         // isMinterChain[_originChainId][_assetId] = true;
         /// todo call from ntv only probably
         /// todo figure out L1 vs L2 differences
@@ -106,7 +106,6 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
     function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
-        // return 1 + _chainId - _chainId;
         return IChainAssetHandler(IBridgehub(_bridgeHub()).chainAssetHandler()).getMigrationNumber(_chainId);
     }
 }

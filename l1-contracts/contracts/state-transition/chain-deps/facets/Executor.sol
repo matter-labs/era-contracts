@@ -676,7 +676,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // Interop is only allowed on GW currently, so we go through the Asset Tracker when on Gateway.
-        // When on L1, we append directly to the Message Root, though interop is not allowed there, it is only used for 
+        // When on L1, we append directly to the Message Root, though interop is not allowed there, it is only used for
         // message verification.
         if (block.chainid != L1_CHAIN_ID) {
             uint256 messagesLength = messages.length;

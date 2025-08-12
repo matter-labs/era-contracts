@@ -61,12 +61,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Called on the L1 when a deposit to the chain happens.
     /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceIncreaseOnL1(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        uint256 _tokenOriginChainId
-    ) external {
+    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount, uint256) external {
         // onlyNativeTokenVault {
 
         uint256 currentSettlementLayer = _bridgeHub().settlementLayer(_chainId);
@@ -174,7 +169,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             toChainId = data.chainId;
         }
 
-        _migrateFunds(fromChainId, toChainId, data.assetId, data.amount, data.tokenOriginChainId);
+        _migrateFunds({
+            _fromChainId: fromChainId,
+            _toChainId: toChainId,
+            _assetId: data.assetId,
+            _amount: data.amount,
+            _tokenOriginChainId: data.tokenOriginChainId
+        });
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
         _sendToChain(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,

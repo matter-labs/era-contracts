@@ -172,7 +172,10 @@ contract ChainAssetHandler is
         address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
 
         if (block.chainid == L1_CHAIN_ID) {
-            bytes memory data = abi.encodeCall(IL2AssetTracker.setIsL1ToL2DepositProcessed, (migrationNumber[bridgehubBurnData.chainId]));
+            bytes memory data = abi.encodeCall(
+                IL2AssetTracker.setIsL1ToL2DepositProcessed,
+                (migrationNumber[bridgehubBurnData.chainId])
+            );
             IZKChain(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
         }
 

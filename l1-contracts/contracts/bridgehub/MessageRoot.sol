@@ -150,7 +150,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
 
     function initializeV30Upgrade() external initializer {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
-        for (uint256 i = 0; i < allZKChains.length; i++) {
+        uint256 allZKChainsLength = allZKChains.length;
+        for (uint256 i = 0; i < allZKChainsLength; ++i) {
             v30UpgradeBatchNumber[allZKChains[i]] = IGetters(BRIDGE_HUB.getZKChain(allZKChains[i]))
                 .getTotalBatchesExecuted();
         }

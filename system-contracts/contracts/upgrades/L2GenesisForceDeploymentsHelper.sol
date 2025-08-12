@@ -111,7 +111,6 @@ library L2GenesisForceDeploymentsHelper {
             }
         }
 
-
         bytes memory assetTrackerConstructorData = abi.encodeCall(
             L2_ASSET_TRACKER.setAddresses,
             (
