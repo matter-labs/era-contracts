@@ -322,7 +322,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 IL1AssetRouter(IInteropCenter(s.interopCenter).assetRouter()).nativeTokenVault()
             );
 
-            (assetId, amount) = (assetTracker.getBalanceChange(s.chainId));
+            (assetId, amount) = (assetTracker.getBalanceChange(s.chainId, _chainId));
             balanceChange.assetId = assetId;
             balanceChange.amount = amount;
             balanceChange.tokenOriginChainId = nativeTokenVault.originChainId(assetId);

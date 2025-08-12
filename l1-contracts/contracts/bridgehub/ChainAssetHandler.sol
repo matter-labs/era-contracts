@@ -305,11 +305,8 @@ contract ChainAssetHandler is
         uint256 _previousSettlementLayerChainId,
         uint256 _currentSettlementLayerChainId
     ) external onlySystemContext {
-        if (_previousSettlementLayerChainId == 0) {
-            if (block.chainid == L1_CHAIN_ID) {
-                migrationNumber[block.chainid] = 1;
-            }
-            /// For the initial call, we return, as there is no real migration.
+        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == L1_CHAIN_ID) {
+            /// For the initial call if we are settling on L1, we return, as there is no real migration.
             return;
         }
         if (_previousSettlementLayerChainId != _currentSettlementLayerChainId) {

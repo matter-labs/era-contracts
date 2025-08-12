@@ -17,3 +17,5 @@ error InvalidSender();
 error InvalidWithdrawalChainId();
 // 0x8dfed13a
 error NotMigratedChain();
+// 0x43cca996
+error OnlyWhitelistedSettlmentLayer(address, address);

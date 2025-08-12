@@ -31,7 +31,7 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) internal assetMigrationNumber;
     function _l1ChainId() internal view virtual returns (uint256);
 
-    function _bridgeHub() internal view virtual returns (IBridgehub);
+    function _bridgehub() internal view virtual returns (IBridgehub);
 
     function _nativeTokenVault() internal view virtual returns (INativeTokenVault);
 
@@ -106,6 +106,6 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
     function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
-        return IChainAssetHandler(IBridgehub(_bridgeHub()).chainAssetHandler()).getMigrationNumber(_chainId);
+        return IChainAssetHandler(IBridgehub(_bridgehub()).chainAssetHandler()).getMigrationNumber(_chainId);
     }
 }

@@ -55,13 +55,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function setAddresses(
         uint256 _l1ChainId,
-        address _bridgeHub,
+        address _bridgehub,
         address,
         address _nativeTokenVault,
         address _messageRoot
     ) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
-        BRIDGE_HUB = IBridgehub(_bridgeHub);
+        BRIDGE_HUB = IBridgehub(_bridgehub);
         NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
     }
@@ -69,7 +69,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return L1_CHAIN_ID;
     }
 
-    function _bridgeHub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (IBridgehub) {
         return BRIDGE_HUB;
     }
 

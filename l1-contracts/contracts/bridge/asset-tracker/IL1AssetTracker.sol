@@ -21,5 +21,8 @@ interface IL1AssetTracker {
 
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
-    function getBalanceChange(uint256 _chainId) external returns (bytes32 assetId, uint256 amount);
+    function getBalanceChange(
+        uint256 _callerChainId,
+        uint256 _chainId
+    ) external returns (bytes32 assetId, uint256 amount);
 }
