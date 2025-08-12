@@ -37,6 +37,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) internal totalSupply;
 
+    /// used only on L2 to track if the L1->L2 deposits have been processed or not.
+    mapping(uint256 migrationNumber => bool isL1ToL2DepositProcessed) internal isL1ToL2DepositProcessed;
+
     mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
 
     /// used only on Gateway.
@@ -115,9 +118,14 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function handleFinalizeBridgingOnL2(bytes32 _assetId) external {
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
-        if (totalSupply[migrationNumber][_assetId] == 0) {
+        bool allDepositsBeforeMigrationStarted = isL1ToL2DepositProcessed[migrationNumber];
+        if (totalSupply[migrationNumber][_assetId] == 0 && allDepositsBeforeMigrationStarted) {
             totalSupply[migrationNumber][_assetId] = IERC20(L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId)).totalSupply();
         }
+    }
+
+    function setIsL1ToL2DepositProcessed(uint256 _migrationNumber) external onlyServiceTransactionSender {
+        isL1ToL2DepositProcessed[_migrationNumber] = true;
     }
 
     /*//////////////////////////////////////////////////////////////

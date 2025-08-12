@@ -21,6 +21,7 @@ import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
+import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -168,8 +169,13 @@ contract ChainAssetHandler is
         if (_assetId != BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
             revert IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId));
         }
+        address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
 
-        address zkChain;
+        if (block.chainid == L1_CHAIN_ID) {
+            bytes memory data = abi.encodeCall(IL2AssetTracker.setIsL1ToL2DepositProcessed, (migrationNumber[bridgehubBurnData.chainId]));
+            IZKChain(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
+        }
+
         bytes memory ctmMintData;
         // to avoid stack too deep
         {
