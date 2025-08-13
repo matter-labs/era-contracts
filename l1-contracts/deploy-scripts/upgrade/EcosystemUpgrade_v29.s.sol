@@ -283,10 +283,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
         uint256 oldProtocolVersion = newConfig.v28ProtocolVersion;
-        Diamond.DiamondCutData memory upgradeCut = abi.decode(
-            gatewayConfig.upgradeCutData,
-            (Diamond.DiamondCutData)
-        );
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(gatewayConfig.upgradeCutData, (Diamond.DiamondCutData));
 
         bytes memory l2Calldata = abi.encodeCall(
             IChainTypeManager.setUpgradeDiamondCut,
