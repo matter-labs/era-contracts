@@ -152,7 +152,7 @@ interface IAdmin is IZKChainBase {
         address _settlementLayer,
         address _originalCaller,
         bytes calldata _data
-    ) external payable returns (bytes memory _bridgeMintData);
+    ) external returns (bytes memory _bridgeMintData);
 
     /// @dev Similar to IL1AssetHandler interface, used to claim failed chain transfers.
     function forwardedBridgeRecoverFailedTransfer(

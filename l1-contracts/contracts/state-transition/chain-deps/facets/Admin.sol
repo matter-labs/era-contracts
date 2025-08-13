@@ -292,7 +292,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         address _settlementLayer,
         address _originalCaller,
         bytes calldata _data
-    ) external payable override onlyChainAssetHandler returns (bytes memory chainBridgeMintData) {
+    ) external override onlyChainAssetHandler returns (bytes memory chainBridgeMintData) {
         if (s.settlementLayer != address(0)) {
             revert AlreadyMigrated();
         }
