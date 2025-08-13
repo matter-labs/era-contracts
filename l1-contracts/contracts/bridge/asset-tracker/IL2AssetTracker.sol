@@ -22,7 +22,11 @@ interface IL2AssetTracker {
 
     function handleInitiateBridgingOnL2(bytes32 _assetId) external;
 
-    function handleFinalizeBridgingOnL2(bytes32 _assetId) external;
+    function handleInitiateBaseTokenBridgingOnL2() external view;
+
+    function handleFinalizeBaseTokenBridgingOnL2() external;
+
+    function handleFinalizeBridgingOnL2(bytes32 _assetId, address _tokenAddress) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
 

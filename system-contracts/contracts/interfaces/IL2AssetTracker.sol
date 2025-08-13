@@ -15,4 +15,8 @@ interface IL2AssetTracker {
         address _nativeTokenVault,
         address _messageRoot
     ) external;
+
+    function handleInitiateBaseTokenBridgingOnL2() external view;
+
+    function handleFinalizeBaseTokenBridgingOnL2() external;
 }

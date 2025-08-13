@@ -11,6 +11,7 @@ import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
+import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
 import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 
@@ -80,6 +81,7 @@ IBridgehub constant L2_BRIDGEHUB = IBridgehub(L2_BRIDGEHUB_ADDR);
 
 /// @dev the address of the l2 asset router.
 address constant L2_ASSET_ROUTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x03);
+IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
 
 /// @dev An l2 system contract address, used in the assetId calculation for native assets.
 /// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,

@@ -17,7 +17,7 @@ import {IAssetTrackerBase, TokenBalanceMigrationData} from "contracts/bridge/ass
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {BroadcastUtils} from "../provider/BroadcastUtils.s.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
@@ -65,10 +65,11 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     function getBridgedTokenAssetIds() public returns (uint256 bridgedTokenCount, bytes32[] memory assetIds) {
         // Get all registered tokens
         bridgedTokenCount = l2NativeTokenVault.bridgedTokensCount();
-        assetIds = new bytes32[](bridgedTokenCount);
+        assetIds = new bytes32[](bridgedTokenCount + 1);
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             assetIds[i] = l2NativeTokenVault.bridgedTokens(i);
         }
+        assetIds[bridgedTokenCount] = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
     }
 
     function finishMigrationOnL1(

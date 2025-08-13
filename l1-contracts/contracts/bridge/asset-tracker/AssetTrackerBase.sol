@@ -14,7 +14,6 @@ import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 
 abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable, AssetHandlerModifiers {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -105,7 +104,5 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
-    function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
-        return IChainAssetHandler(IBridgehub(_bridgehub()).chainAssetHandler()).getMigrationNumber(_chainId);
-    }
+    function _getMigrationNumber(uint256 _chainId) internal view virtual returns (uint256);
 }

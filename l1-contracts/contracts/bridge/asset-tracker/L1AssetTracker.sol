@@ -19,6 +19,7 @@ import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     uint256 public immutable L1_CHAIN_ID;
@@ -236,5 +237,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (!success) {
             revert InvalidProof();
         }
+    }
+
+    function _getMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
+        return IChainAssetHandler(IBridgehub(_bridgehub()).chainAssetHandler()).getMigrationNumber(_chainId);
     }
 }
