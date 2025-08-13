@@ -282,7 +282,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        uint256 oldProtocoVersion = newConfig.v28ProtocolVersion;
+        uint256 oldProtocolVersion = newConfig.v28ProtocolVersion;
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             newlyGeneratedData.upgradeCutData,
             (Diamond.DiamondCutData)
@@ -290,7 +290,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
         bytes memory l2Calldata = abi.encodeCall(
             IChainTypeManager.setUpgradeDiamondCut,
-            (upgradeCut, oldProtocoVersion)
+            (upgradeCut, oldProtocolVersion)
         );
 
         calls = _prepareL1ToGatewayCall(
@@ -328,7 +328,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     function prepareSetUpgradeDiamondCutOnL1Call() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
-        uint256 oldProtocoVersion = newConfig.v28ProtocolVersion;
+        uint256 oldProtocolVersion = newConfig.v28ProtocolVersion;
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             newlyGeneratedData.upgradeCutData,
             (Diamond.DiamondCutData)
@@ -336,7 +336,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
         calls[0] = Call({
             target: addresses.stateTransition.chainTypeManagerProxy,
-            data: abi.encodeCall(ChainTypeManager.setUpgradeDiamondCut, (upgradeCut, oldProtocoVersion)),
+            data: abi.encodeCall(ChainTypeManager.setUpgradeDiamondCut, (upgradeCut, oldProtocolVersion)),
             value: 0
         });
     }
