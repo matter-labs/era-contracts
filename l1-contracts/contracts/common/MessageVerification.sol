@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.24;
 
-import {L2Log, L2Message} from "../../../common/Messaging.sol";
-import {IMessageVerification} from "../../chain-interfaces/IMessageVerification.sol";
-import {MessageHashing} from "../../../common/libraries/MessageHashing.sol";
+import {L2Log, L2Message, TxStatus} from "./Messaging.sol";
+import {IMessageVerification} from "./interfaces/IMessageVerification.sol";
+import {MessageHashing} from "./libraries/MessageHashing.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @dev This contract is abstract and is inherited by the Mailbox and L2MessageVerification contracts.
@@ -97,6 +97,27 @@ abstract contract MessageVerification is IMessageVerification {
                 _index: _index,
                 _log: _log,
                 _proof: _proof
+            });
+    }
+
+    /// @inheritdoc IMessageVerification
+    function proveL1ToL2TransactionStatusShared(
+        uint256 _chainId,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof,
+        TxStatus _status
+    ) public view returns (bool) {
+        L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(_l2TxNumberInBatch, _l2TxHash, _status);
+        return
+            _proveL2LogInclusion({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _l2BatchNumber,
+                _index: _l2MessageIndex,
+                _log: l2Log,
+                _proof: _merkleProof
             });
     }
 }

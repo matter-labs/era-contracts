@@ -8,12 +8,13 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain} from "./L1BridgehubErrors.sol";
+import {ChainBatchRootAlreadyExists, ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyPreV30Chain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 
-import {MessageVerification} from "../state-transition/chain-deps/facets/MessageVerification.sol";
+import {MessageVerification} from "../common/MessageVerification.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -58,6 +59,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
+    uint256 public immutable L1_CHAIN_ID;
+
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
@@ -82,9 +85,11 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
-    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainRoots;
+    mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
     address public assetTracker;
+
+    mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeBatchNumber;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
@@ -107,9 +112,27 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _;
     }
 
-    modifier onlyAssetTracker() {
-        if (msg.sender != assetTracker) {
-            revert OnlyAssetTracker(msg.sender, assetTracker);
+    /// On L1, the chain can add it directly.
+    /// On GW, the asset tracker should add it,
+    /// except for PreV30 chains, which can add it directly.
+    modifier addChainBatchRootRestriction(uint256 _chainId) {
+        if (block.chainid != L1_CHAIN_ID) {
+            if (msg.sender == assetTracker) {
+                // this case is valid.
+            } else if (v30UpgradeBatchNumber[_chainId] != 0) {
+                address chain = BRIDGE_HUB.getZKChain(_chainId);
+                uint32 minor;
+                (, minor, ) = IGetters(chain).getSemverProtocolVersion();
+                /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v30 quickly.
+                require(msg.sender == chain, OnlyChain(msg.sender, chain));
+                require(minor < 30, OnlyPreV30Chain(_chainId));
+            } else {
+                revert OnlyAssetTracker(msg.sender, assetTracker);
+            }
+        } else {
+            if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
+                revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+            }
         }
         _;
     }
@@ -127,6 +150,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @param _bridgehub Address of the Bridgehub.
     constructor(IBridgehub _bridgehub) {
         BRIDGE_HUB = _bridgehub;
+        L1_CHAIN_ID = BRIDGE_HUB.L1_CHAIN_ID();
         _initialize();
         _disableInitializers();
     }
@@ -134,6 +158,15 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
     function initialize() external initializer {
         _initialize();
+    }
+
+    function initializeV30Upgrade() external initializer {
+        uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+        uint256 allZKChainsLength = allZKChains.length;
+        for (uint256 i = 0; i < allZKChainsLength; ++i) {
+            v30UpgradeBatchNumber[allZKChains[i]] = IGetters(BRIDGE_HUB.getZKChain(allZKChains[i]))
+                .getTotalBatchesExecuted();
+        }
     }
 
     function setAddresses(address _assetTracker) external onlyBridgehubOwner {
@@ -161,12 +194,20 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyAssetTracker {
+    ) external addChainBatchRootRestriction(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
         }
+        require(
+            chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
+            ChainBatchRootAlreadyExists(_chainId, _batchNumber)
+        );
 
+        chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
+        if (block.chainid == L1_CHAIN_ID) {
+            return;
+        }
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
         bytes32 chainRoot;
         // slither-disable-next-line unused-return
@@ -181,7 +222,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
 
         _emitRoot(sharedTreeRoot);
-        chainRoots[_chainId][_batchNumber] = _chainBatchRoot;
         historicalRoot[block.number] = sharedTreeRoot;
     }
 
@@ -250,6 +290,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         emit AddedChain(_chainId, cachedChainCount);
     }
 
+    //////////////////////////////
+    //// IMessageVerification ////
+    //////////////////////////////
+
     function _proveL2LeafInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -266,7 +310,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         });
         if (proofData.finalProofNode) {
             // For proof based interop this is the SL InteropRoot at block number _batchNumber
-            bytes32 correctBatchRoot = chainRoots[_chainId][_batchNumber];
+            bytes32 correctBatchRoot = _getChainBatchRoot(_chainId, _batchNumber);
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
 
@@ -278,5 +322,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
                 _leaf: proofData.chainIdLeaf,
                 _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
             });
+    }
+
+    /// @notice Internal to get the historical batch root for chains before the v30 upgrade.
+    function _getChainBatchRoot(uint256 _chainId, uint256 _batchNumber) internal view returns (bytes32) {
+        if (v30UpgradeBatchNumber[_chainId] >= _batchNumber) {
+            return IGetters(BRIDGE_HUB.getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
+        }
+        return chainBatchRoots[_chainId][_batchNumber];
     }
 }

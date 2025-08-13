@@ -639,6 +639,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    /// @notice Appends the batch message root to the global message.
+    /// @param _batchNumber The number of the batch
+    /// @param _messageRoot The root of the merkle tree of the messages to L1.
+    /// @dev We only call this function on L1.
+    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
+        // Once the batch is executed, we include its message to the message root.
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
+    }
+
     /// @inheritdoc IExecutor
     function executeBatchesSharedBridge(
         address, // _chainAddress
@@ -665,8 +675,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidBatchesDataLength(batchesData.length, messages.length);
         }
 
-        // Interop is only allowed on GW currently, so we never append messages to message root on L1.
-        // kl todo. Is this what we want?
+        // Interop is only allowed on GW currently, so we go through the Asset Tracker when on Gateway.
+        // When on L1, we append directly to the Message Root, though interop is not allowed there, it is only used for
+        // message verification.
         if (block.chainid != L1_CHAIN_ID) {
             uint256 messagesLength = messages.length;
             for (uint256 i = 0; i < messagesLength; i = i.uncheckedInc()) {
@@ -680,6 +691,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 });
                 IL2AssetTracker assetTracker = IL2AssetTracker(address(IInteropCenter(s.interopCenter).assetTracker()));
                 assetTracker.processLogsAndMessages(processLogsInput);
+            }
+        } else {
+            uint256 batchesDataLength = batchesData.length;
+            for (uint256 i = 0; i < batchesDataLength; i = i.uncheckedInc()) {
+                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
             }
         }
 

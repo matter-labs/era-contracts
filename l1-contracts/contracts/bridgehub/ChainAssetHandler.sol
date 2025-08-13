@@ -15,12 +15,13 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberMismatch, NotAssetRouter, OnlyAssetTracker, OnlyChain} from "./L1BridgehubErrors.sol";
+import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTracker, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
+import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -83,7 +84,6 @@ contract ChainAssetHandler is
         _;
     }
 
-    error NotSystemContext(address _sender);
     modifier onlySystemContext() {
         if (msg.sender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
             revert NotSystemContext(msg.sender);
@@ -132,9 +132,6 @@ contract ChainAssetHandler is
         _;
     }
 
-    error MigrationNumberAlreadySet();
-    error OnlyOnGateway();
-
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
         if (migrationNumber[_chainId] != 0) {
             revert MigrationNumberAlreadySet();
@@ -172,8 +169,16 @@ contract ChainAssetHandler is
         if (_assetId != BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
             revert IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId));
         }
+        address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
 
-        address zkChain;
+        if (block.chainid == L1_CHAIN_ID) {
+            bytes memory data = abi.encodeCall(
+                IL2AssetTracker.setIsL1ToL2DepositProcessed,
+                (migrationNumber[bridgehubBurnData.chainId])
+            );
+            IZKChain(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
+        }
+
         bytes memory ctmMintData;
         // to avoid stack too deep
         {
@@ -300,11 +305,8 @@ contract ChainAssetHandler is
         uint256 _previousSettlementLayerChainId,
         uint256 _currentSettlementLayerChainId
     ) external onlySystemContext {
-        if (_previousSettlementLayerChainId == 0) {
-            if (block.chainid == L1_CHAIN_ID) {
-                migrationNumber[block.chainid] = 1;
-            }
-            /// For the initial call, we return, as there is no real migration.
+        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == L1_CHAIN_ID) {
+            /// For the initial call if we are settling on L1, we return, as there is no real migration.
             return;
         }
         if (_previousSettlementLayerChainId != _currentSettlementLayerChainId) {

@@ -5,11 +5,26 @@ pragma solidity ^0.8.21;
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
 
 interface IL1AssetTracker {
-    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
+    function handleChainBalanceIncreaseOnL1(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId
+    ) external;
 
-    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external;
+    function handleChainBalanceDecreaseOnL1(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId
+    ) external;
 
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
-    function getBalanceChange(uint256 _chainId) external returns (bytes32 assetId, uint256 amount);
+    function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external;
+
+    function getBalanceChange(
+        uint256 _callerChainId,
+        uint256 _chainId
+    ) external returns (bytes32 assetId, uint256 amount);
 }

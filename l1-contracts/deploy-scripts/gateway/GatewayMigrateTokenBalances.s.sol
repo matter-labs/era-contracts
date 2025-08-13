@@ -11,11 +11,13 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IAssetTracker, TokenBalanceMigrationData} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
+import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
+import {IAssetTrackerBase, TokenBalanceMigrationData} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {BroadcastUtils} from "../provider/BroadcastUtils.s.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
@@ -27,7 +29,8 @@ import {Utils} from "../Utils.sol";
 contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     using stdJson for string;
 
-    IAssetTracker l2AssetTracker = IAssetTracker(L2_ASSET_TRACKER_ADDR);
+    IAssetTrackerBase l2AssetTrackerBase = IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
+    IL2AssetTracker l2AssetTracker = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
     INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     function startTokenMigrationOnL2OrGateway(
@@ -62,10 +65,11 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     function getBridgedTokenAssetIds() public returns (uint256 bridgedTokenCount, bytes32[] memory assetIds) {
         // Get all registered tokens
         bridgedTokenCount = l2NativeTokenVault.bridgedTokensCount();
-        assetIds = new bytes32[](bridgedTokenCount);
+        assetIds = new bytes32[](bridgedTokenCount + 1);
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             assetIds[i] = l2NativeTokenVault.bridgedTokens(i);
         }
+        assetIds[bridgedTokenCount] = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
     }
 
     function finishMigrationOnL1(
@@ -78,7 +82,6 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         bool onlyWaitForFinalization
     ) public {
         IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
-        IAssetTracker l1AssetTracker = IAssetTracker(interopCenter.assetTracker());
 
         uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
         bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile(toGateway ? chainId : gatewayChainId);
@@ -111,13 +114,16 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             return;
         }
 
+        IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(interopCenter.assetTracker()));
+        IAssetTrackerBase l1AssetTrackerBase = IAssetTrackerBase(address(l1AssetTracker));
+
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             // console.logBytes(abi.encodeCall(l1AssetTracker.receiveMigrationOnL1, (finalizeL1DepositParams[i])));
             TokenBalanceMigrationData memory data = abi.decode(
                 finalizeL1DepositParams[i].message,
                 (TokenBalanceMigrationData)
             );
-            if (!l1AssetTracker.tokenMigrated(data.chainId, data.assetId)) {
+            if (!l1AssetTrackerBase.tokenMigrated(data.chainId, data.assetId)) {
                 vm.broadcast();
                 l1AssetTracker.receiveMigrationOnL1(finalizeL1DepositParams[i]);
             }
@@ -128,7 +134,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             bytes32 assetId = assetIds[i];
-            bool migrated = l2AssetTracker.tokenMigratedThisChain(assetId);
+            bool migrated = l2AssetTrackerBase.tokenMigratedThisChain(assetId);
             require(migrated, "Token not migrated");
         }
     }

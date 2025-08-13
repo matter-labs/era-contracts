@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {TokenBalanceMigrationData} from "./IAssetTrackerBase.sol";
+import {BalanceChange, TokenBalanceMigrationData} from "./IAssetTrackerBase.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log, TxStatus} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -17,9 +17,10 @@ import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncr
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {InvalidAmount, InvalidAssetId, InvalidAssetMigrationNumber, NotMigratedChain} from "./AssetTrackerErrors.sol";
-import {AssetTrackerBase, BalanceChange} from "./AssetTrackerBase.sol";
+import {InvalidAmount, InvalidAssetId, TokenBalanceNotMigratedToGateway, InvalidCanonicalTxHash, NotMigratedChain} from "./AssetTrackerErrors.sol";
+import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
+import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
@@ -32,7 +33,18 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     IMessageRoot public MESSAGE_ROOT;
 
-    address public L1_ASSET_TRACKER;
+    mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) internal totalSupply;
+
+    /// used only on L2 to track if the L1->L2 deposits have been processed or not.
+    mapping(uint256 migrationNumber => bool isL1ToL2DepositProcessed) internal isL1ToL2DepositProcessed;
+
+    mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
+
+    /// used only on Gateway.
+    mapping(bytes32 assetId => address originToken) internal originToken;
+
+    /// used only on Gateway.
+    mapping(bytes32 assetId => uint256 originChainId) internal tokenOriginChainId;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -41,24 +53,44 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
+    modifier onlyL2NativeTokenVault() {
+        if (msg.sender != L2_NATIVE_TOKEN_VAULT_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyBaseTokenSystemContract() {
+        if (msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyChain(uint256 _chainId) {
+        if (msg.sender != L2_BRIDGEHUB.getZKChain(_chainId)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     function setAddresses(
         uint256 _l1ChainId,
-        address _bridgeHub,
+        address _bridgehub,
         address,
         address _nativeTokenVault,
         address _messageRoot
     ) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
-        BRIDGE_HUB = IBridgehub(_bridgeHub);
+        BRIDGE_HUB = IBridgehub(_bridgehub);
         NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
-        // kl todo add L1_ASSET_TRACKER
     }
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 
-    function _bridgeHub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (IBridgehub) {
         return BRIDGE_HUB;
     }
 
@@ -68,10 +100,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function _messageRoot() internal view override returns (IMessageRoot) {
         return MESSAGE_ROOT;
-    }
-
-    function _l1AssetTracker() internal view override returns (address) {
-        return L1_ASSET_TRACKER;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -86,37 +114,55 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         if (_balanceChange.amount > 0) {
             chainBalance[_chainId][_balanceChange.assetId] += _balanceChange.amount;
         }
-        if (_balanceChange.baseTokenAmount > 0) {
+        if (_balanceChange.baseTokenAmount > 0 && _balanceChange.tokenOriginChainId != _chainId) {
             chainBalance[_chainId][_balanceChange.baseTokenAssetId] += _balanceChange.baseTokenAmount;
         }
-        if (
-            _balanceChange.tokenOriginChainId != 0 &&
-            _balanceChange.assetId != bytes32(0) &&
-            !isMinterChain[_balanceChange.tokenOriginChainId][_balanceChange.assetId]
-        ) {
-            isMinterChain[_balanceChange.tokenOriginChainId][_balanceChange.assetId] = true;
-        }
+        _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
 
         /// A malicious chain can cause a collision for the canonical tx hash.
-        /// This will only decrease the chain's balance, so it is not a security issue.
+        require(balanceChange[_chainId][_canonicalTxHash].amount == 0, InvalidCanonicalTxHash(_canonicalTxHash));
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
-    function handleInitiateBridgingOnL2(bytes32 _assetId) external view {
+    function handleInitiateBridgingOnL2(bytes32 _assetId) public view {
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         require(
             savedAssetMigrationNumber == migrationNumber ||
                 L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId(),
-            InvalidAssetMigrationNumber(savedAssetMigrationNumber, migrationNumber)
+            TokenBalanceNotMigratedToGateway(_assetId, savedAssetMigrationNumber, migrationNumber)
         );
     }
 
-    function handleFinalizeBridgingOnL2(bytes32 _assetId) external {
+    function handleInitiateBaseTokenBridgingOnL2() external view {
+        bytes32 baseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
+        handleInitiateBridgingOnL2(baseTokenAssetId);
+    }
+
+    function handleFinalizeBridgingOnL2(bytes32 _assetId, address _tokenAddress) public onlyL2NativeTokenVault {
+        _handleFinalizeBridgingOnL2Inner(_assetId, _tokenAddress);
+    }
+
+    function _handleFinalizeBridgingOnL2Inner(bytes32 _assetId, address _tokenAddress) internal {
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
-        if (totalSupply[migrationNumber][_assetId] == 0) {
-            totalSupply[migrationNumber][_assetId] = IERC20(L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId)).totalSupply();
+        bool allDepositsBeforeMigrationStarted = isL1ToL2DepositProcessed[migrationNumber];
+        if (totalSupply[migrationNumber][_assetId] == 0 && allDepositsBeforeMigrationStarted) {
+            totalSupply[migrationNumber][_assetId] = IERC20(_tokenAddress).totalSupply();
         }
+    }
+
+    function handleFinalizeBaseTokenBridgingOnL2() external onlyBaseTokenSystemContract {
+        bytes32 baseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
+        if (baseTokenAssetId == bytes32(0)) {
+            /// this means we are before the genesis upgrade, where we don't transfer value, so we can skip.
+            /// if we don't skip we use incorrect asset id.
+            return;
+        }
+        _handleFinalizeBridgingOnL2Inner(baseTokenAssetId, address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
+    }
+
+    function setIsL1ToL2DepositProcessed(uint256 _migrationNumber) external onlyServiceTransactionSender {
+        isL1ToL2DepositProcessed[_migrationNumber] = true;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -125,8 +171,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// note we don't process L1 txs here, since we can do that when accepting the tx.
     // kl todo: estimate the txs size, and how much we can handle on GW.
-    function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external {
-        /// add onlyChain(processLogsInput.chainId)
+    function processLogsAndMessages(
+        ProcessLogsInput calldata _processLogsInputs
+    ) external onlyChain(_processLogsInputs.chainId) {
         uint256 msgCount = 0;
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkleMemory
             .Bytes32PushTree({
@@ -140,14 +187,17 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         // slither-disable-next-line unused-return
         reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
         uint256 logsLength = _processLogsInputs.logs.length;
+        bytes32 baseTokenAssetId = _bridgehub().baseTokenAssetId(_processLogsInputs.chainId);
         for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
             L2Log memory log = _processLogsInputs.logs[logCount];
-            bytes32 hashedLog = keccak256(
-                // solhint-disable-next-line func-named-parameters
-                abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
-            );
-            // slither-disable-next-line unused-return
-            reconstructedLogsTree.pushLazy(hashedLog);
+            {
+                bytes32 hashedLog = keccak256(
+                    // solhint-disable-next-line func-named-parameters
+                    abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
+                );
+                // slither-disable-next-line unused-return
+                reconstructedLogsTree.pushLazy(hashedLog);
+            }
             if (log.sender == L2_BOOTLOADER_ADDRESS && log.value == bytes32(uint256(TxStatus.Failure))) {
                 _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key);
             }
@@ -172,11 +222,19 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
             InteropBundle memory interopBundle = this.parseInteropBundle(message);
 
-            // handle msg.value call separately
             InteropCall memory interopCall = interopBundle.calls[0];
             uint256 callsLength = interopBundle.calls.length;
+
             for (uint256 callCount = 1; callCount < callsLength; ++callCount) {
                 interopCall = interopBundle.calls[callCount];
+
+                if (interopCall.value > 0) {
+                    require(
+                        chainBalance[_processLogsInputs.chainId][baseTokenAssetId] >= interopCall.value,
+                        InvalidAmount()
+                    );
+                    chainBalance[_processLogsInputs.chainId][baseTokenAssetId] -= interopCall.value;
+                }
 
                 // e.g. for direct calls we just skip
                 if (interopCall.from != L2_ASSET_ROUTER_ADDR) {
@@ -190,22 +248,23 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                     interopCall.data
                 );
                 // slither-disable-next-line unused-return
-                (, , , uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(transferData);
+                (, , address originalToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding
+                    .decodeBridgeMintData(transferData);
                 // slither-disable-next-line unused-return
-                (uint256 tokenOriginChainId, , , ) = this.parseTokenData(erc20Metadata);
-                isMinterChain[tokenOriginChainId][assetId] = true;
+                (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
+                DataEncoding.assetIdCheck(tokenOriginalChainId, assetId, originalToken);
+                if (originToken[assetId] == address(0)) {
+                    originToken[assetId] = originalToken;
+                    tokenOriginChainId[assetId] = tokenOriginalChainId;
+                }
 
-                // if (!isMinterChain[fromChainId][assetId]) {
-                if (tokenOriginChainId != fromChainId) {
+                if (tokenOriginalChainId != fromChainId) {
                     chainBalance[fromChainId][assetId] -= amount;
                 }
-                // if (!isMinterChain[interopBundle.destinationChainId][assetId]) {
-                if (tokenOriginChainId != interopBundle.destinationChainId) {
+                if (tokenOriginalChainId != interopBundle.destinationChainId) {
                     chainBalance[interopBundle.destinationChainId][assetId] += amount;
                 }
             }
-
-            // kl todo add change minter role here
         }
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
@@ -235,28 +294,43 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Migrates the token balance from L2 to L1.
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
+    /// @dev This function is permissionless, it does not affect the state.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
         address tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
 
         if (tokenAddress == address(0)) {
-            return;
+            if (_assetId == L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID()) {
+                tokenAddress = address(L2_BASE_TOKEN_SYSTEM_CONTRACT);
+            } else {
+                return;
+            }
         }
 
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
         uint256 amount;
-        uint256 savedTotalSupply = totalSupply[migrationNumber][_assetId];
-        if (savedTotalSupply == 0) {
-            amount = IERC20(tokenAddress).totalSupply();
+        {
+            uint256 savedTotalSupply = totalSupply[migrationNumber][_assetId];
+            if (savedTotalSupply == 0) {
+                amount = IERC20(tokenAddress).totalSupply();
+            } else {
+                amount = savedTotalSupply;
+            }
+        }
+        uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
+        address originalToken;
+        if (originChainId == block.chainid) {
+            originalToken = tokenAddress;
         } else {
-            amount = savedTotalSupply;
+            originalToken = IBridgedStandardToken(tokenAddress).originToken();
         }
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             chainId: block.chainid,
             assetId: _assetId,
-            tokenOriginChainId: L2_NATIVE_TOKEN_VAULT.originChainId(_assetId),
+            tokenOriginChainId: originChainId,
             amount: amount,
             migrationNumber: migrationNumber,
+            originToken: originalToken,
             isL1ToGateway: true
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
@@ -264,6 +338,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Migrates the token balance from Gateway to L1.
     /// @dev This function can be called multiple times on the Gateway as it does not have a direct effect.
+    /// @dev This function is permissionless, it does not affect the state.
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
@@ -277,9 +352,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             chainId: _chainId,
             assetId: _assetId,
-            tokenOriginChainId: 0,
+            tokenOriginChainId: tokenOriginChainId[_assetId],
             amount: chainBalance[_chainId][_assetId],
             migrationNumber: migrationNumber,
+            originToken: originToken[_assetId],
             isL1ToGateway: false
         });
 
@@ -314,6 +390,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
+    function _registerToken(bytes32 _assetId, address _originalToken, uint256 _tokenOriginChainId) internal {
+        if (originToken[_assetId] == address(0)) {
+            originToken[_assetId] = _originalToken;
+            tokenOriginChainId[_assetId] = _tokenOriginChainId;
+        }
+    }
+
     function parseInteropBundle(bytes calldata _bundleData) external pure returns (InteropBundle memory interopBundle) {
         interopBundle = abi.decode(_bundleData[1:], (InteropBundle));
     }
@@ -337,5 +420,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// message root aggregation only on non-L1 settlement layers for ease for migration.
     function _appendChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _messageRootToAppend) internal {
         _messageRoot().addChainBatchRoot(_chainId, _batchNumber, _messageRootToAppend);
+    }
+
+    function _getMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
+        return L2_CHAIN_ASSET_HANDLER.getMigrationNumber(_chainId);
     }
 }

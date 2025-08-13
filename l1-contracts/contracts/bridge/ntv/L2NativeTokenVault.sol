@@ -164,7 +164,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         address _expectedToken,
         address _l1LegacyToken
     ) internal {
-        _assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
+        DataEncoding.assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
 
         /// token is a legacy token, no need to deploy
         require(_l1LegacyToken == _originToken, AddressMismatch(_originToken, _l1LegacyToken));
@@ -267,7 +267,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
-        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(_assetId);
+        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(_assetId, tokenAddress[_assetId]);
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {

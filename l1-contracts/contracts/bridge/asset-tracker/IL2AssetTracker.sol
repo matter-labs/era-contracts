@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {TokenBalanceMigrationData, BalanceChange} from "./IAssetTrackerBase.sol";
+import {BalanceChange, TokenBalanceMigrationData} from "./IAssetTrackerBase.sol";
 
 interface IL2AssetTracker {
     function setAddresses(
@@ -22,7 +22,11 @@ interface IL2AssetTracker {
 
     function handleInitiateBridgingOnL2(bytes32 _assetId) external;
 
-    function handleFinalizeBridgingOnL2(bytes32 _assetId) external;
+    function handleInitiateBaseTokenBridgingOnL2() external view;
+
+    function handleFinalizeBaseTokenBridgingOnL2() external;
+
+    function handleFinalizeBridgingOnL2(bytes32 _assetId, address _tokenAddress) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
 
@@ -33,4 +37,6 @@ interface IL2AssetTracker {
     function confirmMigrationOnL2(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
     function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
+
+    function setIsL1ToL2DepositProcessed(uint256 _migrationNumber) external;
 }

@@ -19,7 +19,7 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {BridgeHelper} from "../BridgeHelper.sol";
 
-import {EmptyToken} from "../L1BridgeContractErrors.sol";
+import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractErrors.sol";
 import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotLegacy, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
@@ -67,6 +67,9 @@ abstract contract NativeTokenVault is
 
     /// @dev The mapping of bridged tokens, count => assetId
     mapping(uint256 count => bytes32 assetId) public bridgedTokens;
+
+    /// @dev Used to record the index of the bridged token in the bridgedTokens array.
+    mapping(bytes32 assetId => uint256 tokenIndex) public tokenIndex;
 
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
@@ -130,7 +133,11 @@ abstract contract NativeTokenVault is
         if (tokenAssetId == bytes32(0)) {
             revert TokenNotLegacy();
         }
+        if (tokenIndex[tokenAssetId] != 0) {
+            revert TokenAlreadyInBridgedTokensList();
+        }
         bridgedTokens[bridgedTokensCount] = tokenAssetId;
+        tokenIndex[tokenAssetId] = bridgedTokensCount;
         ++bridgedTokensCount;
     }
 
@@ -458,15 +465,6 @@ abstract contract NativeTokenVault is
         }
     }
 
-    /// @notice Checks that the assetId is correct for the origin token and chain.
-    function _assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal view {
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_tokenOriginChainId, _originToken);
-        if (_assetId != expectedAssetId) {
-            // Make sure that a NativeTokenVault sent the message
-            revert AssetIdMismatch(expectedAssetId, _assetId);
-        }
-    }
-
     function _ensureAndSaveTokenDeployedInner(
         uint256 _tokenOriginChainId,
         bytes32 _assetId,
@@ -474,7 +472,7 @@ abstract contract NativeTokenVault is
         bytes memory _erc20Data,
         address _expectedToken
     ) internal {
-        _assetIdCheck(_tokenOriginChainId, _assetId, _originToken);
+        DataEncoding.assetIdCheck(_tokenOriginChainId, _assetId, _originToken);
 
         address deployedToken = _deployBridgedToken(_tokenOriginChainId, _assetId, _originToken, _erc20Data);
         require(deployedToken == _expectedToken, AddressMismatch(_expectedToken, deployedToken));
@@ -487,6 +485,7 @@ abstract contract NativeTokenVault is
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
         bridgedTokens[bridgedTokensCount] = _assetId;
+        tokenIndex[_assetId] = bridgedTokensCount;
         ++bridgedTokensCount;
         _assetTracker().registerNewToken(_assetId, _originChainId);
     }

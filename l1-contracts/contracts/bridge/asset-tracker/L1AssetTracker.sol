@@ -14,10 +14,12 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidChainMigrationNumber, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlmentLayer} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
+import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
+import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     uint256 public immutable L1_CHAIN_ID;
@@ -27,24 +29,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     INativeTokenVault public immutable NATIVE_TOKEN_VAULT;
 
     IMessageRoot public immutable MESSAGE_ROOT;
-
-    address public immutable L1_ASSET_TRACKER;
-
-    constructor(uint256 _l1ChainId, address _bridgeHub, address, address _nativeTokenVault, address _messageRoot) {
-        L1_CHAIN_ID = _l1ChainId;
-        BRIDGE_HUB = IBridgehub(_bridgeHub);
-        NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
-        MESSAGE_ROOT = IMessageRoot(_messageRoot);
-    }
-
-    function initialize() external {
-        // TODO: implement
-    }
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 
-    function _bridgeHub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (IBridgehub) {
         return BRIDGE_HUB;
     }
 
@@ -56,8 +45,33 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         return MESSAGE_ROOT;
     }
 
-    function _l1AssetTracker() internal view override returns (address) {
-        return L1_ASSET_TRACKER;
+    modifier onlyWhitelistedSettlmentLayer(uint256 _callerChainId) {
+        require(
+            _bridgehub().whitelistedSettlementLayers(_callerChainId) &&
+                _bridgehub().getZKChain(_callerChainId) == msg.sender,
+            OnlyWhitelistedSettlmentLayer(_bridgehub().getZKChain(_callerChainId), msg.sender)
+        );
+        _;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                    Initialization
+    //////////////////////////////////////////////////////////////*/
+
+    constructor(uint256 _l1ChainId, address _bridgehub, address, address _nativeTokenVault, address _messageRoot) {
+        L1_CHAIN_ID = _l1ChainId;
+        BRIDGE_HUB = IBridgehub(_bridgehub);
+        NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
+        MESSAGE_ROOT = IMessageRoot(_messageRoot);
+    }
+
+    function initialize() external {
+        // TODO: implement
+    }
+
+    function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external {
+        IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
+        chainBalance[_chainId][_assetId] = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -67,25 +81,31 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Called on the L1 when a deposit to the chain happens.
     /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceIncreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
-        // onlyNativeTokenVault {
-
-        uint256 currentSettlementLayer = _bridgeHub().settlementLayer(_chainId);
+    function handleChainBalanceIncreaseOnL1(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId
+    ) external onlyNativeTokenVault {
+        uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
             uint256 key = uint256(keccak256(abi.encode(_chainId)));
+            /// A malicious transactionFilterer can do multiple deposits, but this will make the chainBalance smaller on the Gateway.
             TransientPrimitivesLib.set(key, uint256(_assetId));
             TransientPrimitivesLib.set(key + 1, _amount);
         }
-        if (!isMinterChain[chainToUpdate][_assetId]) {
+        if (_tokenOriginChainId != _chainId) {
             chainBalance[chainToUpdate][_assetId] += _amount;
         }
     }
 
-    /// @notice Called on the L1 by the chain's mailbox when a deposit happens
+    /// @notice Called on the L1 by the gateway's mailbox when a deposit happens
     /// @notice Used for deposits via Gateway.
-    function getBalanceChange(uint256 _chainId) external returns (bytes32 assetId, uint256 amount) {
-        // kl todo add only whitelisted settlement layers.
+    function getBalanceChange(
+        uint256 _callerChainId,
+        uint256 _chainId
+    ) external onlyWhitelistedSettlmentLayer(_callerChainId) returns (bytes32 assetId, uint256 amount) {
         uint256 key = uint256(keccak256(abi.encode(_chainId)));
         assetId = bytes32(TransientPrimitivesLib.getUint256(key));
         amount = TransientPrimitivesLib.getUint256(key + 1);
@@ -95,18 +115,15 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// @notice Called on the L1 when a withdrawal from the chain happens, or when a failed deposit is undone.
     /// @dev As the chain does not update its balance when settling on L1.
-    function handleChainBalanceDecreaseOnL1(uint256 _chainId, bytes32 _assetId, uint256 _amount) external {
-        // onlyNativeTokenVault
+    function handleChainBalanceDecreaseOnL1(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId
+    ) external onlyNativeTokenVault {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
-        if (chainToUpdate != _chainId) {
-            uint256 _tokenOriginChainId = _nativeTokenVault().originChainId(_assetId);
-            if (_chainId == _tokenOriginChainId && chainToUpdate != _chainId) {
-                _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
-            }
-        }
-
-        if (isMinterChain[chainToUpdate][_assetId]) {
+        if (_isChainMinter(chainToUpdate, _tokenOriginChainId)) {
             return;
         }
         // Check that the chain has sufficient balance
@@ -122,23 +139,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
     }
 
-    /// we need this function to make sure the settlement layer is up to date.
-    function _ensureTokenIsRegistered(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
-        if (!isMinterChain[_tokenOriginChainId][_assetId]) {
-            isMinterChain[_tokenOriginChainId][_assetId] = true;
-        }
-        if (_tokenOriginChainId != _l1ChainId()) {
-            _ensureSettlementLayerIsMinter(_assetId, _tokenOriginChainId);
-        }
-    }
-
-    function _ensureSettlementLayerIsMinter(bytes32 _assetId, uint256 _tokenOriginChainId) internal {
-        uint256 settlementLayer = _bridgeHub().settlementLayer(_tokenOriginChainId);
-        if (settlementLayer != block.chainid && settlementLayer != 0) {
-            isMinterChain[settlementLayer][_assetId] = true;
-        }
-    }
-
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
@@ -149,42 +149,67 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _proveMessageInclusion(_finalizeWithdrawalParams);
         require(_finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR, InvalidSender());
 
-        // solhint-disable-next-line no-unused-vars
-
         TokenBalanceMigrationData memory data = abi.decode(
             _finalizeWithdrawalParams.message,
             (TokenBalanceMigrationData)
         );
         require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId());
 
-        uint256 currentSettlementLayer = _bridgeHub().settlementLayer(data.chainId);
-        // require(_getMigrationNumber(chainId) == migrationNumber, InvalidMigrationNumber());
+        uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
+        require(
+            _getMigrationNumber(data.chainId) == data.migrationNumber,
+            InvalidChainMigrationNumber(_getMigrationNumber(data.chainId), data.migrationNumber)
+        );
+        uint256 fromChainId;
+        uint256 toChainId;
+
         if (data.isL1ToGateway) {
+            /// In this case the TokenBalanceMigrationData data might be malicious.
+            /// We check the chainId to match the finalizeWithdrawalParams.chainId.
+            /// We check the assetId, tokenOriginChainId, originToken with an assetIdCheck.
+            /// The amount might be malicious, but that poses a restriction on users of the chain, not other chains.
+            /// The AssetTracker cannot protect individual users only other chains. Individual users rely on the proof system.
+            /// The last field is migrationNumber, which cannot be abused.
+
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
             uint256 chainMigrationNumber = _getMigrationNumber(data.chainId);
 
             // we check parity here to make sure that we migrated back to L1 from Gateway.
-            // In the future we might initalize chains on GW. So we subtract from chainMigrationNumber.
+            // In the future we might initialize chains on GW. So we subtract from chainMigrationNumber.
             require(
                 (chainMigrationNumber - assetMigrationNumber[data.chainId][data.assetId]) % 2 == 1,
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
             );
 
-            _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
-            // if (data.tokenOriginChainId != data.chainId) {
-            _migrateFunds(data.chainId, currentSettlementLayer, data.assetId, data.amount);
-            // }
+            /// We check the assetId to make sure the chain is not lying about it.
+            DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+
+            fromChainId = data.chainId;
+            toChainId = currentSettlementLayer;
         } else {
+            /// In this case we trust the TokenBalanceMigrationData data and the settlement layer = Gateway to be honest.
+            /// If the settlement layer is compromised, other chains settling on L1 are not compromised, only chains settling on Gateway.
+
             require(currentSettlementLayer == block.chainid, NotMigratedChain());
             require(
-                _bridgeHub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
+                _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
             );
 
-            _ensureTokenIsRegistered(data.assetId, data.tokenOriginChainId);
-            _migrateFunds(_finalizeWithdrawalParams.chainId, data.chainId, data.assetId, data.amount);
+            /// We trust the settlement layer to provide the correct assetId.
+
+            fromChainId = _finalizeWithdrawalParams.chainId;
+            toChainId = data.chainId;
         }
+
+        _migrateFunds({
+            _fromChainId: fromChainId,
+            _toChainId: toChainId,
+            _assetId: data.assetId,
+            _amount: data.amount,
+            _tokenOriginChainId: data.tokenOriginChainId
+        });
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
         _sendToChain(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
@@ -193,16 +218,27 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _sendToChain(data.chainId, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
     }
 
-    function _migrateFunds(uint256 _fromChainId, uint256 _toChainId, bytes32 _assetId, uint256 _amount) internal {
-        if (!isMinterChain[_fromChainId][_assetId]) {
-            // && data.tokenOriginChainId != _fromChainId) { kl todo can probably remove
+    function _migrateFunds(
+        uint256 _fromChainId,
+        uint256 _toChainId,
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId
+    ) internal {
+        if (!_isChainMinter(_fromChainId, _tokenOriginChainId)) {
             chainBalance[_fromChainId][_assetId] -= _amount;
+        }
+        if (!_isChainMinter(_toChainId, _tokenOriginChainId)) {
             chainBalance[_toChainId][_assetId] += _amount;
         }
     }
 
+    function _isChainMinter(uint256 _chainId, uint256 _tokenOriginChainId) internal view returns (bool) {
+        return _tokenOriginChainId == _chainId || _bridgehub().settlementLayer(_tokenOriginChainId) == _chainId;
+    }
+
     function _sendToChain(uint256 _chainId, bytes memory _data) internal {
-        address zkChain = _bridgeHub().getZKChain(_chainId);
+        address zkChain = _bridgehub().getZKChain(_chainId);
         // slither-disable-next-line unused-return
         IMailbox(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, _data);
     }
@@ -214,7 +250,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             data: _finalizeWithdrawalParams.message
         });
 
-        bool success = _bridgeHub().proveL2MessageInclusion({
+        bool success = _bridgehub().proveL2MessageInclusion({
             _chainId: _finalizeWithdrawalParams.chainId,
             _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
             _index: _finalizeWithdrawalParams.l2MessageIndex,
@@ -222,9 +258,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _proof: _finalizeWithdrawalParams.merkleProof
         });
 
-        // withdrawal wrong proof
         if (!success) {
             revert InvalidProof();
         }
+    }
+
+    function _getMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
+        return IChainAssetHandler(IBridgehub(_bridgehub()).chainAssetHandler()).getMigrationNumber(_chainId);
     }
 }

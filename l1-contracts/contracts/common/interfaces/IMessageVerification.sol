@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Log, L2Message} from "../../common/Messaging.sol";
+import {L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @author Matter Labs
@@ -54,5 +54,24 @@ interface IMessageVerification {
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
+    ) external view returns (bool);
+
+    /// @notice Prove that the L1 -> L2 transaction was processed with the specified status.
+    /// @param _l2TxHash The L2 canonical transaction hash.
+    /// @param _l2BatchNumber The L2 batch number where the transaction was processed.
+    /// @param _l2MessageIndex The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
+    /// @param _l2TxNumberInBatch The L2 transaction number in the batch, in which the log was sent.
+    /// @param _merkleProof The Merkle proof of the processing L1 -> L2 transaction.
+    /// @param _status The execution status of the L1 -> L2 transaction (true - success & 0 - fail).
+    /// @return Whether the proof is correct and the transaction was actually executed with provided status.
+    /// NOTE: It may return `false` for incorrect proof, but it doesn't mean that the L1 -> L2 transaction has an opposite status!
+    function proveL1ToL2TransactionStatusShared(
+        uint256 _chainId,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof,
+        TxStatus _status
     ) external view returns (bool);
 }

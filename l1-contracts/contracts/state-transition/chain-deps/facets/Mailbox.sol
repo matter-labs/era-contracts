@@ -30,10 +30,11 @@ import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlemen
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {IMessageVerification, MessageVerification} from "./MessageVerification.sol";
+import {IMessageVerification, MessageVerification} from "../../../common/MessageVerification.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {BalanceChange} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVault} from "../../../bridge/ntv/INativeTokenVault.sol";
+import {IBridgedStandardToken} from "../../../bridge/BridgedStandardERC20.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -156,14 +157,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) public view returns (bool) {
-        L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(_l2TxNumberInBatch, _l2TxHash, _status);
         return
-            _proveL2LogInclusion({
+            proveL1ToL2TransactionStatusShared({
                 _chainId: s.chainId,
-                _blockOrBatchNumber: _l2BatchNumber,
-                _index: _l2MessageIndex,
-                _log: l2Log,
-                _proof: _merkleProof
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _status: _status
             });
     }
 
@@ -321,10 +323,23 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 IL1AssetRouter(IInteropCenter(s.interopCenter).assetRouter()).nativeTokenVault()
             );
 
-            (assetId, amount) = (assetTracker.getBalanceChange(s.chainId));
-            balanceChange.assetId = assetId;
-            balanceChange.amount = amount;
-            balanceChange.tokenOriginChainId = nativeTokenVault.originChainId(assetId);
+            (assetId, amount) = (assetTracker.getBalanceChange(s.chainId, _chainId));
+            uint256 tokenOriginChainId = nativeTokenVault.originChainId(assetId);
+            address originToken;
+            address tokenAddress = nativeTokenVault.tokenAddress(assetId);
+            if (tokenOriginChainId == block.chainid) {
+                originToken = tokenAddress;
+            } else {
+                originToken = IBridgedStandardToken(tokenAddress).originToken();
+            }
+            balanceChange = BalanceChange({
+                baseTokenAssetId: bytes32(0),
+                baseTokenAmount: 0,
+                assetId: assetId,
+                amount: amount,
+                tokenOriginChainId: tokenOriginChainId,
+                originToken: originToken
+            });
         }
 
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({

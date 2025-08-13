@@ -3,13 +3,14 @@
 pragma solidity 0.8.28;
 
 import {IBridgehub} from "./IBridgehub.sol";
+import {IMessageVerification} from "../common/interfaces/IMessageVerification.sol";
 
 /**
  * @author Matter Labs
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
  * @custom:security-contact security@matterlabs.dev
  */
-interface IMessageRoot {
+interface IMessageRoot is IMessageVerification {
     function BRIDGE_HUB() external view returns (IBridgehub);
 
     function setAddresses(address _assetTracker) external;
