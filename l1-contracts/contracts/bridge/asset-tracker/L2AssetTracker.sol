@@ -33,7 +33,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     IMessageRoot public MESSAGE_ROOT;
 
-    mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) internal totalSupply;
+    mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply))
+        internal savedTotalSupply;
 
     /// used only on L2 to track if the L1->L2 deposits have been processed or not.
     mapping(uint256 migrationNumber => bool isL1ToL2DepositProcessed) internal isL1ToL2DepositProcessed;
@@ -146,8 +147,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function _handleFinalizeBridgingOnL2Inner(bytes32 _assetId, address _tokenAddress) internal {
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
         bool allDepositsBeforeMigrationStarted = isL1ToL2DepositProcessed[migrationNumber];
-        if (totalSupply[migrationNumber][_assetId] == 0 && allDepositsBeforeMigrationStarted) {
-            totalSupply[migrationNumber][_assetId] = IERC20(_tokenAddress).totalSupply();
+        if (!savedTotalSupply[migrationNumber][_assetId].isSaved && allDepositsBeforeMigrationStarted) {
+            savedTotalSupply[migrationNumber][_assetId] = SavedTotalSupply({
+                isSaved: true,
+                amount: IERC20(_tokenAddress).totalSupply()
+            });
         }
     }
 
@@ -309,19 +313,22 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 migrationNumber = _getMigrationNumber(block.chainid);
         uint256 amount;
         {
-            uint256 savedTotalSupply = totalSupply[migrationNumber][_assetId];
-            if (savedTotalSupply == 0) {
+            SavedTotalSupply memory totalSupply = savedTotalSupply[migrationNumber][_assetId];
+            if (!totalSupply.isSaved) {
                 amount = IERC20(tokenAddress).totalSupply();
             } else {
-                amount = savedTotalSupply;
+                amount = totalSupply.amount;
             }
         }
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
         address originalToken;
         if (originChainId == block.chainid) {
             originalToken = tokenAddress;
-        } else {
+        } else if (originChainId != 0) {
             originalToken = IBridgedStandardToken(tokenAddress).originToken();
+        } else {
+            /// this is the base token case. We don't have the L1 token for it.
+            originChainId = L1_CHAIN_ID;
         }
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({

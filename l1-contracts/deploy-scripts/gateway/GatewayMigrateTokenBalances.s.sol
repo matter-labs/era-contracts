@@ -62,10 +62,11 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         }
     }
 
-    function getBridgedTokenAssetIds() public returns (uint256 bridgedTokenCount, bytes32[] memory assetIds) {
+    function getBridgedTokenAssetIds() public returns (uint256 bridgedTokenCountPlusOne, bytes32[] memory assetIds) {
         // Get all registered tokens
-        bridgedTokenCount = l2NativeTokenVault.bridgedTokensCount();
-        assetIds = new bytes32[](bridgedTokenCount + 1);
+        uint256 bridgedTokenCount = l2NativeTokenVault.bridgedTokensCount();
+        bridgedTokenCountPlusOne = bridgedTokenCount + 1;
+        assetIds = new bytes32[](bridgedTokenCountPlusOne);
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             assetIds[i] = l2NativeTokenVault.bridgedTokens(i);
         }
