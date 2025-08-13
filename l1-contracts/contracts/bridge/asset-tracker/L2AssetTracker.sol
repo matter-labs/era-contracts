@@ -130,7 +130,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         require(
             savedAssetMigrationNumber == migrationNumber ||
                 L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId(),
-                TokenBalanceNotMigratedToGateway(_assetId, savedAssetMigrationNumber, migrationNumber)
+            TokenBalanceNotMigratedToGateway(_assetId, savedAssetMigrationNumber, migrationNumber)
         );
     }
 
@@ -171,7 +171,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// note we don't process L1 txs here, since we can do that when accepting the tx.
     // kl todo: estimate the txs size, and how much we can handle on GW.
-    function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external onlyChain(_processLogsInputs.chainId) {
+    function processLogsAndMessages(
+        ProcessLogsInput calldata _processLogsInputs
+    ) external onlyChain(_processLogsInputs.chainId) {
         uint256 msgCount = 0;
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkleMemory
             .Bytes32PushTree({
@@ -226,7 +228,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 interopCall = interopBundle.calls[callCount];
 
                 if (interopCall.value > 0) {
-                    require(chainBalance[_processLogsInputs.chainId][baseTokenAssetId] >= interopCall.value, InvalidAmount());
+                    require(
+                        chainBalance[_processLogsInputs.chainId][baseTokenAssetId] >= interopCall.value,
+                        InvalidAmount()
+                    );
                     chainBalance[_processLogsInputs.chainId][baseTokenAssetId] -= interopCall.value;
                 }
 
