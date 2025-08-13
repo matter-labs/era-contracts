@@ -6,10 +6,14 @@ pragma solidity ^0.8.21;
 error ClaimFailedDepositFailed();
 // 0x066f53b1
 error EmptyToken();
+// 0x82b0de47
+error EthAlreadyMigratedToL1NTV();
 // 0x6d963f88
 error EthTransferFailed();
 // 0x1c55230b
 error NativeTokenVaultAlreadySet();
+// 0x84204265
+error TokenAlreadyInBridgedTokensList();
 // 0xb4aeddbc
 error WrongCounterpart();
 // 0x636c90db

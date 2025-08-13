@@ -86,8 +86,8 @@ import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol"
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 
-/// @notice Script used for v29 upgrade flow
-contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
+/// @notice Script used for v30 upgrade flow
+contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     /// @notice E2e upgrade generation
@@ -97,6 +97,25 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
         prepareDefaultGovernanceCalls();
     }
+
+    // function saveAllBridgedTokens(address _bridgehub) public {
+    //     //// We need to save all bridged tokens
+    // }
+
+    function registerBridgedTokensInNTV(address _bridgehub) public {
+        INativeTokenVault ntv = INativeTokenVault(IBridgehub(_bridgehub).assetRouter().nativeTokenVault());
+        address[] memory savedBridgedTokens;
+        /// todo get save bridged tokens.
+        /// for tokens in the bridged token list
+        for (uint256 i = 0; i < savedBridgedTokens.length; ++i) {
+            address token = ntv.bridgedTokens(i);
+            ntv.addLegacyTokenToBridgedTokensList(token);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          Internal functions
+    //////////////////////////////////////////////////////////////*/
 
     function _getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments

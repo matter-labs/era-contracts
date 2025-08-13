@@ -83,14 +83,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
     /// @notice The information about the virtual blocks upgrade, which tracks when the migration to the L2 blocks has started and finished.
     VirtualBlockUpgradeInfo internal virtualBlockUpgradeInfo;
 
-    // todo make private
-    uint256 public currentSettlementLayerChainId;
-
-    // kl todo remove this. just for debugging
-    mapping(uint256 index => uint256 chainId) public settlementLayerChainIds;
-
-    // kl todo remove this. just for debugging
-    uint256 public numberOfHistoricalSettlementLayerChainIds;
+    uint256 internal currentSettlementLayerChainId;
 
     error OnlyL2AssetTracker();
 
@@ -109,8 +102,6 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
 
     function setSettlementLayerChainId(uint256 _newSettlementLayerChainId) external onlyCallFromBootloader {
         if (currentSettlementLayerChainId != _newSettlementLayerChainId) {
-            settlementLayerChainIds[numberOfHistoricalSettlementLayerChainIds] = _newSettlementLayerChainId;
-            ++numberOfHistoricalSettlementLayerChainIds;
             L2_CHAIN_ASSET_HANDLER.setSettlementLayerChainId(currentSettlementLayerChainId, _newSettlementLayerChainId);
             currentSettlementLayerChainId = _newSettlementLayerChainId;
         }

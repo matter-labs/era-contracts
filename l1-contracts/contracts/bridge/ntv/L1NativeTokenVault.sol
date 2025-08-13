@@ -55,6 +55,21 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return DEPRECATED_chainBalance[_chainId][_assetId];
     }
 
+    function _assetTracker() internal view override returns (IAssetTrackerBase) {
+        return IAssetTrackerBase(address(l1AssetTracker));
+    }
+
+    modifier onlyAssetTracker() {
+        if (msg.sender != address(l1AssetTracker)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Initialization
+    //////////////////////////////////////////////////////////////*/
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _l1WethAddress Address of WETH on deployed chain
@@ -73,15 +88,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         )
     {
         L1_NULLIFIER = _l1Nullifier;
-    }
-
-    /// @dev Accepts ether only from the contract that was the shared Bridge.
-    receive() external payable {
-        require(address(L1_NULLIFIER) == msg.sender, Unauthorized(msg.sender));
-    }
-
-    function _assetTracker() internal view override returns (IAssetTrackerBase) {
-        return IAssetTrackerBase(address(l1AssetTracker));
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
@@ -104,6 +110,23 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function setAssetTracker(address _l1AssetTracker) external onlyOwner {
         l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            V30 migration
+    //////////////////////////////////////////////////////////////*/
+
+    function migrateTokenBalanceToAssetTracker(
+        uint256 _chainId,
+        bytes32 _assetId
+    ) external onlyAssetTracker returns (uint256) {
+        uint256 amount = DEPRECATED_chainBalance[_chainId][_assetId];
+        DEPRECATED_chainBalance[_chainId][_assetId] = 0;
+        return amount;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Check counterpart Functions
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
