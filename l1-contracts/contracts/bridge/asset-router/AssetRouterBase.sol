@@ -139,7 +139,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         uint256 _value,
         bytes calldata _data,
         address _nativeTokenVault
-    ) internal virtual whenNotPaused returns (L2TransactionRequestTwoBridgesInner memory request) {
+    ) internal returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes1 encodingVersion = _data[0];
         if (encodingVersion == NEW_ENCODING_VERSION) {
             return
