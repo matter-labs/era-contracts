@@ -22,6 +22,11 @@ import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
 
+struct SavedTotalSupply {
+    bool isSaved;
+    uint256 amount;
+}
+
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
