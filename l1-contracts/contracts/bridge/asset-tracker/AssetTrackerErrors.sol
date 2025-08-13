@@ -8,7 +8,7 @@ error InvalidAmount();
 // 0xfafca5a0
 error InvalidAssetId();
 // 0x61c1fbf6
-error InvalidAssetMigrationNumber(uint256, uint256);
+error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x7ad8c2c9
 error InvalidCanonicalTxHash(bytes32);
 // 0x05208b6d

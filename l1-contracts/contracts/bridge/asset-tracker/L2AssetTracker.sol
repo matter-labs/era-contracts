@@ -17,7 +17,7 @@ import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncr
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {InvalidAmount, InvalidAssetId, InvalidAssetMigrationNumber, InvalidCanonicalTxHash, NotMigratedChain} from "./AssetTrackerErrors.sol";
+import {InvalidAmount, InvalidAssetId, TokenBalanceNotMigratedToGateway, InvalidCanonicalTxHash, NotMigratedChain} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
@@ -62,6 +62,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     modifier onlyBaseTokenSystemContract() {
         if (msg.sender != address(L2_BASE_TOKEN_SYSTEM_CONTRACT)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyChain(uint256 _chainId) {
+        if (msg.sender != L2_BRIDGEHUB.getZKChain(_chainId)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -123,7 +130,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         require(
             savedAssetMigrationNumber == migrationNumber ||
                 L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId(),
-            InvalidAssetMigrationNumber(savedAssetMigrationNumber, migrationNumber)
+                TokenBalanceNotMigratedToGateway(_assetId, savedAssetMigrationNumber, migrationNumber)
         );
     }
 
@@ -164,8 +171,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// note we don't process L1 txs here, since we can do that when accepting the tx.
     // kl todo: estimate the txs size, and how much we can handle on GW.
-    function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external {
-        /// add onlyChain(processLogsInput.chainId)
+    function processLogsAndMessages(ProcessLogsInput calldata _processLogsInputs) external onlyChain(_processLogsInputs.chainId) {
         uint256 msgCount = 0;
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkleMemory
             .Bytes32PushTree({
@@ -181,12 +187,14 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         bytes32 baseTokenAssetId = _bridgehub().baseTokenAssetId(_processLogsInputs.chainId);
         for (uint256 logCount = 0; logCount < logsLength; ++logCount) {
             L2Log memory log = _processLogsInputs.logs[logCount];
-            bytes32 hashedLog = keccak256(
-                // solhint-disable-next-line func-named-parameters
-                abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
-            );
-            // slither-disable-next-line unused-return
-            reconstructedLogsTree.push(hashedLog);
+            {
+                bytes32 hashedLog = keccak256(
+                    // solhint-disable-next-line func-named-parameters
+                    abi.encodePacked(log.l2ShardId, log.isService, log.txNumberInBatch, log.sender, log.key, log.value)
+                );
+                // slither-disable-next-line unused-return
+                reconstructedLogsTree.push(hashedLog);
+            }
             if (log.sender == L2_BOOTLOADER_ADDRESS && log.value == bytes32(uint256(TxStatus.Failure))) {
                 _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key);
             }
