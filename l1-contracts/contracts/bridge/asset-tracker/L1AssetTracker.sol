@@ -14,7 +14,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidChainMigrationNumber, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlmentLayer} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidBaseTokenAssetId, InvalidChainMigrationNumber, InvalidMigrationNumber, InvalidOriginChainId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlmentLayer} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
@@ -183,7 +183,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             );
 
             /// We check the assetId to make sure the chain is not lying about it.
-            DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+            if (data.originToken != address(0)) {
+                DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+            } else {
+                require(data.tokenOriginChainId == L1_CHAIN_ID, InvalidOriginChainId());
+                require(BRIDGE_HUB.baseTokenAssetId(data.chainId) == data.assetId, InvalidBaseTokenAssetId());
+            }
 
             fromChainId = data.chainId;
             toChainId = currentSettlementLayer;

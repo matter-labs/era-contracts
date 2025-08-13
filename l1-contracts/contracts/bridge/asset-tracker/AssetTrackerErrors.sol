@@ -7,12 +7,16 @@ error InsufficientChainBalanceAssetTracker(uint256 chainId, bytes32 assetId, uin
 error InvalidAmount();
 // 0xfafca5a0
 error InvalidAssetId();
+// 0x019cd955
+error InvalidBaseTokenAssetId();
 // 0x7ad8c2c9
 error InvalidCanonicalTxHash(bytes32);
 // 0x05208b6d
 error InvalidChainMigrationNumber(uint256, uint256);
 // 0x9530c5e1
 error InvalidMigrationNumber(uint256, uint256);
+// 0xc5ac5599
+error InvalidOriginChainId();
 // 0xddb5de5e
 error InvalidSender();
 // 0xf76b228a
