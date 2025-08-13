@@ -120,7 +120,6 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     function saveOutputVersionSpecific() internal override {
-        console.log("Actually writing output here");
         vm.serializeBytes("v29", "encoded_old_gateway_validator_timelocks", abi.encode(oldGatewayValidatorTimelocks));
         string memory oldValidatorTimelocksSerialized = vm.serializeBytes(
             "v29",

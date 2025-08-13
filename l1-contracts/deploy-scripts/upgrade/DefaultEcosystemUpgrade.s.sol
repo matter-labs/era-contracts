@@ -1014,6 +1014,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
         vm.serializeAddress("root", "owner_address", config.ownerAddress);
+        vm.serializeAddress("root", "transparent_proxy_admin", addresses.transparentProxyAdmin);
         vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
