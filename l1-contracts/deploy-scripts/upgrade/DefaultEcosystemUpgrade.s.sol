@@ -121,6 +121,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
         uint256 oldProtocolVersion;
+        uint256 v28ProtocolVersion;
         address oldValidatorTimelock;
         uint256 priorityTxsL2GasLimit;
         uint256 maxExpectedL1GasPrice;
@@ -260,9 +261,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
     }
 
-    function deployGWTuppWithContract(string memory contractName) internal returns (address proxyAddress) {
+    function deployGWTuppWithContract(
+        string memory contractName
+    ) internal returns (address implementationAddress, address proxyAddress) {
         bytes memory creationCalldata = getCreationCalldata(contractName, true);
-        address implementation = Utils.deployThroughL1Deterministic(
+        address implementationAddress = Utils.deployThroughL1Deterministic(
             getCreationCode(contractName, true),
             creationCalldata,
             0,
@@ -272,10 +275,10 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             addresses.bridgehub.bridgehubProxy,
             addresses.bridges.l1AssetRouterProxy
         );
-        notifyAboutDeployment(implementation, contractName, creationCalldata, contractName, true);
+        notifyAboutDeployment(implementationAddress, contractName, creationCalldata, contractName, true);
 
         bytes memory proxyCreationCalldata = abi.encode(
-            implementation,
+            implementationAddress,
             gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin,
             getInitializeCalldata(contractName, true)
         );
@@ -527,6 +530,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
         newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
+        newConfig.v28ProtocolVersion = toml.readUint("$.v28_protocol_version");
 
         newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
         newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
@@ -603,6 +607,9 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
         addresses.bridges.l1NullifierProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
+        );
+        addresses.bridges.erc20BridgeProxy = address(
+            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
         );
 
         addresses.bridgehub.ctmDeploymentTrackerProxy = address(
@@ -815,6 +822,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         );
         vm.serializeAddress(
             "gateway_state_transition",
+            "validator_timelock_implementation_addr",
+            gatewayConfig.gatewayStateTransition.validatorTimelockImplementation
+        );
+        vm.serializeAddress(
+            "gateway_state_transition",
             "validator_timelock_addr",
             gatewayConfig.gatewayStateTransition.validatorTimelock
         );
@@ -937,6 +949,11 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             addresses.bridges.l1AssetRouterProxy
         );
 
+        vm.serializeAddress(
+            "deployed_addresses",
+            "validator_timelock_implementation_addr",
+            addresses.stateTransition.validatorTimelockImplementation
+        );
         vm.serializeAddress(
             "deployed_addresses",
             "validator_timelock_addr",

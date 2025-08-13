@@ -7,6 +7,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 // solhint-disable no-console, gas-custom-errors
 
@@ -414,7 +415,13 @@ library SystemContractsProcessing {
             newAddress: L2_CHAIN_ASSET_HANDLER_ADDR,
             callConstructor: true,
             value: 0,
-            input: abi.encode(l1ChainId, owner, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR)
+            input: abi.encode(
+                l1ChainId,
+                AddressAliasHelper.applyL1ToL2Alias(owner),
+                L2_BRIDGEHUB_ADDR,
+                L2_ASSET_ROUTER_ADDR,
+                L2_MESSAGE_ROOT_ADDR
+            )
         });
     }
 
