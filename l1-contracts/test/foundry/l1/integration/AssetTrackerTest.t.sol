@@ -243,6 +243,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
                 abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
                 abi.encode(migrationNumber)
             );
+            vm.mockCall(
+                address(L2_CHAIN_ASSET_HANDLER_ADDR),
+                abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+                abi.encode(migrationNumber)
+            );
         }
 
         l2AssetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);

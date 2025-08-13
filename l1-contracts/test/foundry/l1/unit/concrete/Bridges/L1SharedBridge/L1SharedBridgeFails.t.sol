@@ -115,11 +115,12 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         sharedBridge.bridgehubDeposit(eraChainId, owner, 0, data);
     }
 
+    error EthAlreadyMigratedToL1NTV();
     function test_transferFundsToSharedBridge_Eth_CallFailed() public {
         bytes memory emptyData = "";
         vm.mockCallRevert(address(nativeTokenVault), emptyData, "eth transfer failed");
         vm.prank(address(nativeTokenVault));
-        vm.expectRevert(abi.encodeWithSelector(EthTransferFailed.selector));
+        vm.expectRevert(abi.encodeWithSelector(EthAlreadyMigratedToL1NTV.selector));
         l1Nullifier.transferTokenToNTV(ETH_TOKEN_ADDRESS);
     }
 

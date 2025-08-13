@@ -27,7 +27,7 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {FinalizeL1DepositParams, L1Nullifier, IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IZKChain, IGetters} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -356,6 +356,7 @@ contract L1GatewayTests is
         DefaultUpgrade upgradeImpl = new DefaultUpgrade();
         uint256 currentProtocolVersion = migratingChain.getProtocolVersion();
         (uint32 major, uint32 minor, uint32 patch) = SemVer.unpackSemVer(uint96(currentProtocolVersion));
+        uint256 newProtocolVersion = SemVer.packSemVer(major, minor + 1, patch);
 
         ProposedUpgrade memory upgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
@@ -371,7 +372,7 @@ contract L1GatewayTests is
             l1ContractsUpgradeCalldata: hex"",
             postUpgradeCalldata: hex"",
             upgradeTimestamp: 0,
-            newProtocolVersion: SemVer.packSemVer(major, minor + 1, patch)
+            newProtocolVersion: newProtocolVersion
         });
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -384,6 +385,11 @@ contract L1GatewayTests is
             ctm,
             abi.encodeCall(IChainTypeManager.upgradeCutHash, (currentProtocolVersion)),
             abi.encode(keccak256(abi.encode(diamondCut)))
+        );
+        vm.mockCall(
+            address(gatewayChain),
+            abi.encodeCall(IGetters.getProtocolVersion, ()),
+            abi.encode(newProtocolVersion)
         );
 
         vm.startBroadcast(migratingChain.getAdmin());

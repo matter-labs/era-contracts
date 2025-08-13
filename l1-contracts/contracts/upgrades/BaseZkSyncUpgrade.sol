@@ -87,7 +87,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
         bool isOnSettlementLayer = s.settlementLayer == address(0);
 
-        if (isOnSettlementLayer) {
+        if (!isOnSettlementLayer) {
             require(
                 _proposedUpgrade.newProtocolVersion <= IZKChain(s.settlementLayer).getProtocolVersion(),
                 SettlementLayerUpgradeMustPrecedeChainUpgrade()
