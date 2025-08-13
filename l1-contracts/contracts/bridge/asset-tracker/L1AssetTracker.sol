@@ -91,6 +91,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
             uint256 key = uint256(keccak256(abi.encode(_chainId)));
+            /// A malicious transactionFilterer can do multiple deposits, but this will make the chainBalance smaller on the Gateway.
             TransientPrimitivesLib.set(key, uint256(_assetId));
             TransientPrimitivesLib.set(key + 1, _amount);
         }

@@ -10,9 +10,10 @@ import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
 import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
-import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMajorVersionNotZero, PatchCantSetUpgradeTxn, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetEvmEmulator, PreviousProtocolMajorVersionNotZero, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, ProtocolVersionMinorDeltaTooBig, ProtocolVersionTooSmall} from "./ZkSyncUpgradeErrors.sol";
+import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMajorVersionNotZero, PatchCantSetUpgradeTxn, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetEvmEmulator, PreviousProtocolMajorVersionNotZero, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, ProtocolVersionMinorDeltaTooBig, ProtocolVersionTooSmall, SettlementLayerUpgradeMustPrecedeChainUpgrade} from "./ZkSyncUpgradeErrors.sol";
 import {TimeNotReached, TooManyFactoryDeps} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
+import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
@@ -85,6 +86,13 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         }
         // If settlement layer is 0, it means that this diamond proxy is located on the settlement layer.
         bool isOnSettlementLayer = s.settlementLayer == address(0);
+
+        if (isOnSettlementLayer) {
+            require(
+                _proposedUpgrade.newProtocolVersion <= IZKChain(s.settlementLayer).getProtocolVersion(),
+                SettlementLayerUpgradeMustPrecedeChainUpgrade()
+            );
+        }
 
         (uint32 newMinorVersion, bool isPatchOnly) = _setNewProtocolVersion(
             _proposedUpgrade.newProtocolVersion,

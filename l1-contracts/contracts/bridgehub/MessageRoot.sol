@@ -122,9 +122,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             } else if (v30UpgradeBatchNumber[_chainId] != 0) {
                 address chain = BRIDGE_HUB.getZKChain(_chainId);
                 uint32 minor;
-                (, minor,) =IGetters(chain).getSemverProtocolVersion();
-                require (msg.sender == chain, OnlyChain(msg.sender, chain));
-                require (minor < 30, OnlyPreV30Chain(_chainId));
+                (, minor, ) = IGetters(chain).getSemverProtocolVersion();
+                /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v30 quickly.
+                require(msg.sender == chain, OnlyChain(msg.sender, chain));
+                require(minor < 30, OnlyPreV30Chain(_chainId));
             } else {
                 revert OnlyAssetTracker(msg.sender, assetTracker);
             }
