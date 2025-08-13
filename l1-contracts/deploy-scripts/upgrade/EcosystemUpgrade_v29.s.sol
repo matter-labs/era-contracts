@@ -284,7 +284,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     ) public virtual returns (Call[] memory calls) {
         uint256 oldProtocolVersion = newConfig.v28ProtocolVersion;
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
-            newlyGeneratedData.upgradeCutData,
+            gatewayConfig.upgradeCutData,
             (Diamond.DiamondCutData)
         );
 
