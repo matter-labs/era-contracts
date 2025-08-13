@@ -8,7 +8,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainBatchRootAlreadyExists, ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain} from "./L1BridgehubErrors.sol";
+import {ChainBatchRootAlreadyExists, ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyPreV30Chain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
@@ -112,9 +112,20 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _;
     }
 
-    modifier onlyAssetTrackerOnGwAndChainOnL1(uint256 _chainId) {
+    /// On L1, the chain can add it directly.
+    /// On GW, the asset tracker should add it,
+    /// except for PreV30 chains, which can add it directly.
+    modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (block.chainid != L1_CHAIN_ID) {
-            if (msg.sender != assetTracker) {
+            if (msg.sender == assetTracker) {
+                // this case is valid.
+            } else if (v30UpgradeBatchNumber[_chainId] != 0) {
+                address chain = BRIDGE_HUB.getZKChain(_chainId);
+                uint32 minor;
+                (, minor,) =IGetters(chain).getSemverProtocolVersion();
+                require (msg.sender == chain, OnlyChain(msg.sender, chain));
+                require (minor < 30, OnlyPreV30Chain(_chainId));
+            } else {
                 revert OnlyAssetTracker(msg.sender, assetTracker);
             }
         } else {
@@ -182,7 +193,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyAssetTrackerOnGwAndChainOnL1(_chainId) {
+    ) external addChainBatchRootRestriction(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();

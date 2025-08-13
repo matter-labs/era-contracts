@@ -52,6 +52,8 @@ error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
 error OnlyChain(address msgSender, address zkChainAddress);
 // 0x52013f4d
 error OnlyOnGateway();
+// 0x26d10385
+error OnlyPreV30Chain(uint256 chainId);
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1
