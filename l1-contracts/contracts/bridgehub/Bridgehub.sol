@@ -90,6 +90,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     mapping(address ctmAddress => bytes32 ctmAssetId) public ctmAssetIdFromAddress;
 
     /// @dev used to indicate the currently active settlement layer for a given chainId
+    /// TODO: why do we store settlementLayer both here and in DiamondProxy?
     mapping(uint256 chainId => uint256 activeSettlementLayerChainId) public settlementLayer;
 
     /// @notice shows whether the given chain can be used as a settlement layer.
