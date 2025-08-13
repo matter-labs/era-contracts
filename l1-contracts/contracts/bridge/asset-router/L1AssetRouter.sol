@@ -205,8 +205,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     )
         external
         payable
-        virtual
-        override
         onlyBridgehub
         whenNotPaused
         returns (L2TransactionRequestTwoBridgesInner memory request)
