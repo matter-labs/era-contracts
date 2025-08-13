@@ -124,7 +124,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
 
         return
             MessageInclusionProof({
-                chainId: 271,
+                chainId: ERA_CHAIN_ID,
                 l1BatchNumber: 31,
                 l2MessageIndex: 0,
                 message: L2Message(
@@ -346,6 +346,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         });
         InteropBundle memory interopBundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: ERA_CHAIN_ID,
             destinationChainId: 31337,
             interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,

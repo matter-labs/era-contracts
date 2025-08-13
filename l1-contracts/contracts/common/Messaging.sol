@@ -242,6 +242,7 @@ enum CallStatus {
 /// @param bundleAttributes Bundle execution and unbundling attributes.
 struct InteropBundle {
     bytes1 version;
+    uint256 sourceChainId;
     uint256 destinationChainId;
     bytes32 interopBundleSalt;
     InteropCall[] calls;

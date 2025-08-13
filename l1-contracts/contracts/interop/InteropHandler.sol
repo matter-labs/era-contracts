@@ -10,8 +10,9 @@ import {BUNDLE_IDENTIFIER, BundleStatus, CallStatus, InteropBundle, InteropCall,
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId} from "./InteropErrors.sol";
+import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId} from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
+import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -36,6 +37,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
             _proof.chainId
+        );
+
+        // Verify that the source chainId of the bundle matches the proof's chainId
+        require(
+            interopBundle.sourceChainId == _proof.chainId,
+            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, _proof.chainId)
         );
 
         // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get executed
@@ -88,7 +95,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         // Since we provide the flag `_executeAllCalls` to be true, if either of the calls fail,
         // the `_executeCalls` will fail as well, thus making the whole flow revert, no changes will be applied to the state.
         _executeCalls({
-            _sourceChainId: _proof.chainId,
+            _sourceChainId: interopBundle.sourceChainId,
             _bundleHash: bundleHash,
             _interopBundle: interopBundle,
             _executeAllCalls: true,
@@ -108,6 +115,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
             _proof.chainId
+        );
+
+        // Verify that the source chainId of the bundle matches the proof's chainId
+        require(
+            interopBundle.sourceChainId == _proof.chainId,
+            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, _proof.chainId)
         );
 
         // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get verified
@@ -143,6 +156,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         (InteropBundle memory interopBundle, bytes32 bundleHash, BundleStatus status) = _getBundleData(
             _bundle,
             _sourceChainId
+        );
+
+        // Verify that the source chainId of the bundle matches the provided source chainId
+        require(
+            interopBundle.sourceChainId == _sourceChainId,
+            WrongSourceChainId(bundleHash, interopBundle.sourceChainId, _sourceChainId)
         );
 
         // Verify that the destination chainId of the bundle is equal to the chainId where it's trying to get unbundled

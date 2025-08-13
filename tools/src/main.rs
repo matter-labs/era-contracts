@@ -47,9 +47,6 @@ struct Opt {
     #[structopt(long = "plonk_output_path", default_value = "data/VerifierPlonk.sol")]
     plonk_output_path: String,
 
-    /// The Verifier is to be compiled for an L2 network, where modexp precompile is not available.
-    #[structopt(short = "l2", long = "l2_mode")]
-    l2_mode: bool,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -65,22 +62,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         fs::read_to_string("data/plonk_verifier_contract_template.txt")?;
     let fflonk_verifier_contract_template =
         fs::read_to_string("data/fflonk_verifier_contract_template.txt")?;
-
-    let plonk_verifier_contract_template = if opt.l2_mode {
-        plonk_verifier_contract_template
-            .replace("contract VerifierPlonk", "contract L2VerifierPlonk")
-    } else {
-        plonk_verifier_contract_template
-            .replace("contract VerifierPlonk", "contract L1VerifierPlonk")
-    };
-
-    let fflonk_verifier_contract_template = if opt.l2_mode {
-        fflonk_verifier_contract_template
-            .replace("contract VerifierFflonk", "contract L2VerifierFflonk")
-    } else {
-        fflonk_verifier_contract_template
-            .replace("contract VerifierFflonk", "contract L1VerifierFflonk")
-    };
 
     let plonk_verification_key = fs::read_to_string(&opt.plonk_input_path)
         .unwrap_or_else(|_| panic!("Unable to read from {}", &opt.plonk_input_path));
@@ -104,14 +85,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         &plonk_verifier_contract_template,
         &plonk_vk,
         &plonk_vk_hash,
-        opt.l2_mode,
     )?;
 
     let fflonk_verifier_contract_template = fflonk_insert_residue_elements_and_commitments(
         &fflonk_verifier_contract_template,
         &fflonk_vk,
         &fflonk_vk_hash,
-        opt.l2_mode,
     )?;
 
     let mut plonk_file = File::create(opt.plonk_output_path)?;

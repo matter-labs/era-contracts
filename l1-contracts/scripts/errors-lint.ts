@@ -2,6 +2,85 @@ import { Command } from "commander";
 import * as fs from "fs";
 import * as path from "path";
 import { ethers } from "ethers";
+import * as https from "https";
+
+// Helper function to query the signature database
+async function querySignatureDatabase(signature: string): Promise<number> {
+  const url = `https://www.4byte.directory/api/v1/signatures/?text_signature=${encodeURIComponent(
+    signature
+  )}&_=${Date.now()}`; // add a timestamp to avoid caching
+  return new Promise((resolve, reject) => {
+    https
+      .get(url, (res) => {
+        let data = "";
+        res.on("data", (chunk) => {
+          data += chunk;
+        });
+        res.on("end", () => {
+          try {
+            const parsedData = JSON.parse(data);
+            if (typeof parsedData.count === "number") {
+              resolve(parsedData.count);
+            } else {
+              reject(new Error(`Invalid response from signature database: "count" is not a number. Response: ${data}`));
+            }
+          } catch (e) {
+            reject(new Error(`Failed to parse response from signature database: ${data}`));
+          }
+        });
+      })
+      .on("error", (err) => {
+        reject(new Error(`Error querying signature database: ${err.message}`));
+      });
+  });
+}
+
+// Helper function to submit a signature to the database
+async function submitSignatureToDatabase(signature: string): Promise<void> {
+  const postData = JSON.stringify({
+    text_signature: signature,
+  });
+
+  const options = {
+    hostname: "www.4byte.directory",
+    path: "/api/v1/signatures/",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(postData),
+    },
+  };
+
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      let responseBody = "";
+      res.on("data", (chunk) => (responseBody += chunk));
+
+      res.on("end", () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          console.log(`Signature "${signature}" submitted successfully.`);
+          resolve();
+        } else if (res.statusCode === 400 && responseBody.includes("already exists")) {
+          console.log(
+            `Signature "${signature}" already exists in the database (race condition?). Treating as success.`
+          );
+          resolve();
+        } else {
+          reject(
+            new Error(`Failed to submit signature "${signature}". Status: ${res.statusCode}, Body: ${responseBody}`)
+          );
+        }
+      });
+    });
+
+    req.on("error", (e) => {
+      reject(new Error(`Error submitting signature "${signature}": ${e.message}`));
+    });
+
+    req.write(postData);
+    req.end();
+  });
+}
 
 // Constant arrays
 const CONTRACTS_DIRECTORIES = {
@@ -85,7 +164,11 @@ function sortErrorBlocks(lines: string[]): string[] {
 }
 
 // Process a file: handle selector insertion, multiline parsing, and sorting
-function processFile(filePath: string, fix: boolean, collectedErrors: Map<string, [string, string]>): boolean {
+async function processFile(
+  filePath: string,
+  fix: boolean,
+  collectedErrors: Map<string, [string, string]>
+): Promise<boolean> {
   const content = fs.readFileSync(filePath, "utf8");
 
   // Find all enum definitions in the file
@@ -141,6 +224,16 @@ function processFile(filePath: string, fix: boolean, collectedErrors: Map<string
         if (prev && prev.trim().startsWith("//")) output[output.length - 1] = comment;
         else output.push(comment);
         modified = true;
+      }
+
+      // Submit signature to https://www4byte.directory/ if --fix is provided
+      if (fix) {
+        const count = await querySignatureDatabase(sig);
+        if (count === 0) {
+          await submitSignatureToDatabase(sig);
+        } else {
+          console.log(`Signature "${sig}" already exists in the database.`);
+        }
       }
 
       // Push block
@@ -200,7 +293,7 @@ async function main() {
     const usedErrors = new Set<string>();
     for (const customErrorFile of errorsPaths) {
       const absolutePath = path.resolve(contractsPath + "/" + customErrorFile);
-      const result = processFile(absolutePath, options.fix, declaredErrors);
+      const result = await processFile(absolutePath, options.fix, declaredErrors);
       if (result && options.check) hasErrors = true;
     }
     if (options.check && hasErrors) {
