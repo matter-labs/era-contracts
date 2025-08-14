@@ -138,13 +138,7 @@ library L2UtilsBase {
             address l2AssetTrackerAddress = address(new L2AssetTracker());
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(
-                _args.l1ChainId,
-                L2_BRIDGEHUB_ADDR,
-                L2_ASSET_ROUTER_ADDR,
-                L2_NATIVE_TOKEN_VAULT_ADDR,
-                L2_MESSAGE_ROOT_ADDR
-            );
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
         }
         {
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());

@@ -3,8 +3,11 @@
 pragma solidity ^0.8.21;
 
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
+import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 interface IL1AssetTracker {
+    function BRIDGE_HUB() external view returns (IBridgehub);
+
     function handleChainBalanceIncreaseOnL1(
         uint256 _chainId,
         bytes32 _assetId,

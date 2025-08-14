@@ -58,16 +58,22 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                     Initialization
     //////////////////////////////////////////////////////////////*/
 
-    constructor(uint256 _l1ChainId, address _bridgehub, address, address _nativeTokenVault, address _messageRoot) {
+    constructor(
+        uint256 _l1ChainId,
+        address _bridgehub,
+        address,
+        address _nativeTokenVault,
+        address _messageRoot
+    ) reentrancyGuardInitializer {
+        _disableInitializers();
+
         L1_CHAIN_ID = _l1ChainId;
         BRIDGE_HUB = IBridgehub(_bridgehub);
         NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
     }
 
-    function initialize() external {
-        // TODO: implement
-    }
+    function initialize() external reentrancyGuardInitializer {}
 
     function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));

@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {BalanceChange, TokenBalanceMigrationData} from "./IAssetTrackerBase.sol";
 import {BUNDLE_IDENTIFIER, InteropBundle, InteropCall, L2Log, TxStatus} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER, L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -31,12 +31,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
     uint256 public L1_CHAIN_ID;
-
-    IBridgehub public BRIDGE_HUB;
-
-    INativeTokenVault public NATIVE_TOKEN_VAULT;
-
-    IMessageRoot public MESSAGE_ROOT;
 
     mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply))
         internal savedTotalSupply;
@@ -80,32 +74,23 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
-    function setAddresses(
-        uint256 _l1ChainId,
-        address _bridgehub,
-        address,
-        address _nativeTokenVault,
-        address _messageRoot
-    ) external onlyUpgrader {
+    function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
-        BRIDGE_HUB = IBridgehub(_bridgehub);
-        NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
-        MESSAGE_ROOT = IMessageRoot(_messageRoot);
     }
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 
     function _bridgehub() internal view override returns (IBridgehub) {
-        return BRIDGE_HUB;
+        return L2_BRIDGEHUB;
     }
 
     function _nativeTokenVault() internal view override returns (INativeTokenVault) {
-        return NATIVE_TOKEN_VAULT;
+        return L2_NATIVE_TOKEN_VAULT;
     }
 
     function _messageRoot() internal view override returns (IMessageRoot) {
-        return MESSAGE_ROOT;
+        return L2_MESSAGE_ROOT;
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -14,6 +14,7 @@ import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
 import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
+import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
@@ -91,6 +92,7 @@ IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(L2_NATI
 
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
+IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(L2_MESSAGE_ROOT_ADDR);
 
 /// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
 address constant SLOAD_CONTRACT_ADDR = address(USER_CONTRACTS_OFFSET + 0x06);

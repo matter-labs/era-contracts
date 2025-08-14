@@ -3,6 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
 import {L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -14,7 +15,12 @@ import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable, AssetHandlerModifiers {
+abstract contract AssetTrackerBase is
+    IAssetTrackerBase,
+    Ownable2StepUpgradeable,
+    AssetHandlerModifiers,
+    ReentrancyGuard
+{
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
@@ -75,26 +81,15 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
                     Register token
     //////////////////////////////////////////////////////////////*/
 
-    function registerLegacyTokenOnChain(bytes32 _assetId) external {
+    function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
         _registerTokenOnL2(_assetId);
     }
 
-    function registerNewToken(bytes32 _assetId, uint256) external {
-        // isMinterChain[_originChainId][_assetId] = true;
-        /// todo call from ntv only probably
-        /// todo figure out L1 vs L2 differences
-        if (block.chainid == _l1ChainId()) {
-            // _registerTokenOnL1(_assetId);
-        } else {
+    function registerNewToken(bytes32 _assetId, uint256) external onlyNativeTokenVault {
+        if (block.chainid != _l1ChainId()) {
             _registerTokenOnL2(_assetId);
         }
     }
-
-    // function _registerTokenOnL1(bytes32 _assetId) internal {
-    // }
-
-    // function _registerTokenOnGateway(bytes32 _assetId) internal {
-    // }
 
     function _registerTokenOnL2(bytes32 _assetId) internal {
         assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);

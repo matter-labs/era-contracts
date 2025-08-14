@@ -6,13 +6,7 @@ import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecuto
 import {BalanceChange, TokenBalanceMigrationData} from "./IAssetTrackerBase.sol";
 
 interface IL2AssetTracker {
-    function setAddresses(
-        uint256 _l1ChainId,
-        address _bridgeHub,
-        address,
-        address _nativeTokenVault,
-        address _messageRoot
-    ) external;
+    function setAddresses(uint256 _l1ChainId) external;
 
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,

@@ -98,13 +98,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
         l2AssetTracker = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2AssetTracker.setAddresses(
-            block.chainid,
-            address(addresses.bridgehub),
-            address(addresses.ecosystemAddresses.bridges.l1AssetRouterProxy),
-            address(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy),
-            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy)
-        );
+        l2AssetTracker.setAddresses(block.chainid);
     }
 
     function setUp() public {

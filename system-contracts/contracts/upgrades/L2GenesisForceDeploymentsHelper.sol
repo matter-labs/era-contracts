@@ -113,13 +113,7 @@ library L2GenesisForceDeploymentsHelper {
 
         bytes memory assetTrackerConstructorData = abi.encodeCall(
             L2_ASSET_TRACKER.setAddresses,
-            (
-                fixedForceDeploymentsData.l1ChainId,
-                address(L2_BRIDGE_HUB),
-                address(L2_ASSET_ROUTER),
-                L2_NATIVE_TOKEN_VAULT_ADDR,
-                address(L2_MESSAGE_ROOT)
-            )
+            (fixedForceDeploymentsData.l1ChainId)
         );
 
         (bool success4, bytes memory returnData4) = SystemContractHelper.mimicCall(
