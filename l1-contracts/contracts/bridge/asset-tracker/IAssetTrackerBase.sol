@@ -2,23 +2,29 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
+
+bytes1 constant BALANCE_CHANGE_VERSION = bytes1(uint8(1));
+bytes1 constant TOKEN_BALANCE_MIGRATION_DATA_VERSION = bytes1(uint8(1));
+
 struct TokenBalanceMigrationData {
+    bytes1 version;
+    bool isL1ToGateway;
+    address originToken;
     uint256 chainId;
     bytes32 assetId;
     uint256 tokenOriginChainId;
     uint256 amount;
     uint256 migrationNumber;
-    address originToken;
-    bool isL1ToGateway;
 }
 
 struct BalanceChange {
+    bytes1 version;
+    address originToken;
     bytes32 baseTokenAssetId;
     uint256 baseTokenAmount;
     bytes32 assetId;
     uint256 amount;
     uint256 tokenOriginChainId;
-    address originToken;
 }
 
 interface IAssetTrackerBase {

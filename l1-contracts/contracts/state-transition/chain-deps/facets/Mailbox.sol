@@ -32,7 +32,7 @@ import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlemen
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {IMessageVerification, MessageVerification} from "../../../common/MessageVerification.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
-import {BalanceChange} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BalanceChange, BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVault} from "../../../bridge/ntv/INativeTokenVault.sol";
 import {IBridgedStandardToken} from "../../../bridge/BridgedStandardERC20.sol";
 
@@ -333,6 +333,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 originToken = IBridgedStandardToken(tokenAddress).originToken();
             }
             balanceChange = BalanceChange({
+                version: BALANCE_CHANGE_VERSION,
                 baseTokenAssetId: bytes32(0),
                 baseTokenAmount: 0,
                 assetId: assetId,

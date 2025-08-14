@@ -32,7 +32,7 @@ import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IAssetTrackerBase, TokenBalanceMigrationData} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L2_BRIDGEHUB, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {IAssetTrackerBase, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 import {L2AssetTracker, IL2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
@@ -144,6 +144,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         // );
         // assetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
         TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
+            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: eraZKChainId,
             assetId: assetId,
             tokenOriginChainId: block.chainid,
@@ -247,6 +248,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         l2AssetTracker.initiateGatewayToL1MigrationOnGateway(eraZKChainId, assetId);
 
         TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
+            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: eraZKChainId,
             assetId: assetId,
             tokenOriginChainId: block.chainid,

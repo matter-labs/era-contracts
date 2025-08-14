@@ -19,6 +19,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 import {InvalidAmount, InvalidAssetId, TokenBalanceNotMigratedToGateway, InvalidCanonicalTxHash, NotMigratedChain} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
+import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
 
@@ -320,6 +321,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
+            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: block.chainid,
             assetId: _assetId,
             tokenOriginChainId: originChainId,
@@ -345,6 +347,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         require(assetMigrationNumber[_chainId][_assetId] < migrationNumber, InvalidAssetId());
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
+            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: _chainId,
             assetId: _assetId,
             tokenOriginChainId: tokenOriginChainId[_assetId],

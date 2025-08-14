@@ -33,7 +33,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {SystemContractsArgs} from "./Utils.sol";
-import {BalanceChange} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BalanceChange, BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -66,6 +66,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
         BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
             baseTokenAssetId: bytes32(0),
             baseTokenAmount: 0,
             assetId: bytes32(0),
