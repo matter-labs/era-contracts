@@ -84,7 +84,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                 reserved: [uint256(0), 0, 0, 0],
                 data: complexUpgraderCalldata,
                 signature: new bytes(0),
-                factoryDeps: L2ContractHelper.hashFactoryDeps(_factoryDeps),
+                factoryDeps: new uint256[](0),
                 paymasterInput: new bytes(0),
                 reservedDynamic: new bytes(0)
             });
