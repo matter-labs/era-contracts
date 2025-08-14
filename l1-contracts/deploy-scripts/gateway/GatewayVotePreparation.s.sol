@@ -223,6 +223,9 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
                 diamondInit: expectedGatewayContracts.stateTransition.diamondInit,
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
+                validatorTimelockImplementation: expectedGatewayContracts
+                    .stateTransition
+                    .validatorTimelockImplementation,
                 validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
                 serverNotifierProxy: expectedGatewayContracts.stateTransition.serverNotifierProxy,
                 serverNotifierImplementation: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
