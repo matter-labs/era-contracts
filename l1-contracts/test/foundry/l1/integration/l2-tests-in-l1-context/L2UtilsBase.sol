@@ -121,6 +121,7 @@ library L2UtilsBase {
                     _args.aliasedOwner,
                     IBridgehub(L2_BRIDGEHUB_ADDR),
                     L2_ASSET_ROUTER_ADDR,
+                    L2_ASSET_TRACKER_ADDR,
                     IMessageRoot(L2_MESSAGE_ROOT_ADDR)
                 )
             );

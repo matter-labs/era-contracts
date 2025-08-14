@@ -33,31 +33,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
-    /// @notice Emitted when a new chain is added to the MessageRoot.
-    /// @param chainId The ID of the chain that is being added to the MessageRoot.
-    /// @param chainIndex The index of the chain that is being added. Note, that chain where
-    /// the MessageRoot contract was deployed has chainIndex of 0, and this event is not emitted for it.
-    event AddedChain(uint256 indexed chainId, uint256 indexed chainIndex);
-
-    /// @notice Emitted when a new chain batch root is appended to the chainTree.
-    /// @param chainId The ID of the chain whose chain batch root is being added to the chainTree.
-    /// @param batchNumber The number of the batch to which chain batch root belongs.
-    /// @param chainBatchRoot The value of chain batch root which is being added.
-    event AppendedChainBatchRoot(uint256 indexed chainId, uint256 indexed batchNumber, bytes32 chainBatchRoot);
-
-    /// @notice Emitted when a new chainTree root is produced and its corresponding leaf in sharedTree is updated.
-    /// @param chainId The ID of the chain whose chainTree root is being updated.
-    /// @param chainRoot The updated Merkle root of the chainTree after appending the latest batch root.
-    /// @param chainIdLeafHash The Merkle leaf value computed from `chainRoot` and the chain’s ID, used to update the shared tree.
-    event NewChainRoot(uint256 indexed chainId, bytes32 chainRoot, bytes32 chainIdLeafHash);
-
-    /// @notice Emitted whenever the sharedTree is updated, and the new InteropRoot (root of the sharedTree) is generated.
-    /// @param chainId The ID of the chain where the sharedTree was updated.
-    /// @param blockNumber The block number of the block in which the sharedTree was updated.
-    /// @param logId The ID of the log emitted when a new InteropRoot. In this release always equal to 0.
-    /// @param sides The "sides" of the interop root. In this release which uses proof-based interop the sides is an array
-    /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
-    event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
     uint256 public immutable L1_CHAIN_ID;
 
@@ -85,10 +60,17 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
+    /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
+    /// @dev These are the same values as the leaves of the chainTree.
+    /// @dev We store these values for message verification on L1 and Gateway.
+    /// @dev We only update the chainTree on GW as of V30.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
+    /// @notice The address of the asset tracker.
     address public assetTracker;
 
+    /// @notice The mapping storing the batch number at the moment the MessageRoot was updated to V30.
+    /// @notice We store this, as we did not store chainBatchRoots prior to V30, so we need to get them from the diamond proxies of the chains.
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeBatchNumber;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
@@ -160,6 +142,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _initialize();
     }
 
+    /// @dev The initialized used for the V30 upgrade.
     function initializeV30Upgrade() external initializer {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
@@ -206,6 +189,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         if (block.chainid == L1_CHAIN_ID) {
+            /// On L1 we only store the chainBatchRoot, but don't update the chainTree or sharedTree.
             return;
         }
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
