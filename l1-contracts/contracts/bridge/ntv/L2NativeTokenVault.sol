@@ -255,7 +255,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
 
-    function _handleChainBalanceIncrease(uint256, bytes32 _assetId, uint256) internal override {
+    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256) internal override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
@@ -263,7 +263,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_assetId);
     }
 
-    function _handleChainBalanceDecrease(uint256, bytes32 _assetId, uint256) internal override {
+    function _handleBridgeFromChain(uint256, bytes32 _assetId, uint256) internal override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.

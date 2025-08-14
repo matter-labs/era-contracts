@@ -124,12 +124,13 @@ interface IL1Nullifier {
         bytes32[] calldata _merkleProof
     ) external;
 
-    /// When verifying recursive proofs, we mark the transient settlement layer.
-    /// This function retrieves the currently stored transient settlement layer chain ID.
+    /// @notice When verifying recursive proofs, we mark the transient settlement layer,
+    /// this function retrieves the currently stored transient settlement layer chain ID.
     /// @dev The transient settlement layer is cleared at the end of each transaction.
     /// @return The chain ID of the settlement layer that processed the current proof, or 0 if none is set.
     function getTransientSettlementLayer() external view returns (uint256);
 
+    /// @dev Used to parse the merkle proof data, this function calls a library function.
     function getProofData(
         uint256 _chainId,
         uint256 _batchNumber,
