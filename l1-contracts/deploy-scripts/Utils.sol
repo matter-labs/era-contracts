@@ -24,7 +24,7 @@ import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
@@ -312,7 +312,7 @@ library Utils {
         }
 
         vm.broadcast();
-        (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
+        (bool success, bytes memory data) = _factory.call{gas: 20_000_000}(abi.encodePacked(_salt, _bytecode));
         contractAddress = bytesToAddress(data);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
@@ -971,6 +971,15 @@ library Utils {
         return bytecode;
     }
 
+    function readFoundryDeployedBytecodeL1(
+        string memory fileName,
+        string memory contractName
+    ) internal view returns (bytes memory) {
+        string memory path = string.concat("/../l1-contracts/out/", fileName, "/", contractName, ".json");
+        bytes memory bytecode = readFoundryDeployedBytecode(path);
+        return bytecode;
+    }
+
     function readZKFoundryBytecodeL2(
         string memory fileName,
         string memory contractName
@@ -998,6 +1007,16 @@ library Utils {
         string memory json = vm.readFile(path);
         bytes memory bytecode = vm.parseJsonBytes(json, ".deployedBytecode.object");
         return bytecode;
+    }
+
+    function blakeHashBytecode(bytes memory bytecode) internal returns (bytes32 hashedBytecode) {
+        string[] memory input = new string[](5);
+        input[0] = "yarn";
+        input[1] = "--silent";
+        input[2] = "ts-node";
+        input[3] = "./scripts/blake2s256.ts";
+        input[4] = vm.toString(bytecode);
+        hashedBytecode = bytes32(vm.ffi(input));
     }
 
     function executeUpgrade(
@@ -1271,10 +1290,10 @@ library Utils {
         address _bridgehub,
         uint256 _chainId
     ) internal view returns (ChainInfoFromBridgehub memory info) {
-        info.l1AssetRouterProxy = Bridgehub(_bridgehub).assetRouter();
-        info.diamondProxy = Bridgehub(_bridgehub).getZKChain(_chainId);
+        info.l1AssetRouterProxy = L1Bridgehub(_bridgehub).assetRouter();
+        info.diamondProxy = L1Bridgehub(_bridgehub).getZKChain(_chainId);
         info.admin = IGetters(info.diamondProxy).getAdmin();
-        info.ctm = Bridgehub(_bridgehub).chainTypeManager(_chainId);
+        info.ctm = L1Bridgehub(_bridgehub).chainTypeManager(_chainId);
         info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
     }
 
@@ -1288,6 +1307,20 @@ library Utils {
 
     function readDummyAvailBridgeBytecode() internal view returns (bytes memory bytecode) {
         bytecode = readFoundryBytecode("/../da-contracts/out/DummyAvailBridge.sol/DummyAvailBridge.json");
+    }
+
+    function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
+        bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
+        bytes32 observableBytecodeBlakeHash = keccak256(bytecode);
+        bytecodeInfo = abi.encode(bytecodeBlakeHash, bytecode.length, observableBytecodeBlakeHash);
+    }
+
+    function getZKOSBytecodeInfoForContract(
+        string memory fileName,
+        string memory contractName
+    ) internal returns (bytes memory bytecodeInfo) {
+        bytes memory bytecode = readFoundryDeployedBytecodeL1(fileName, contractName);
+        bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
