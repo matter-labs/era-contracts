@@ -15,13 +15,13 @@ If this fails you have some issues with foundry or your setup. Try cleaning your
 2. Simulate the deployment (Runs EcosystemUpgrade, simulates transactions, outputs the upgrade data, i.e. required addresses, config addresses, protocol version and the Diamond Cuts)
 
    ```sh
-   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --private-key 0x1e3273afc83535c5bacf772f961b33fdeca520833941c116421d13e4d9fc5cea
+   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --private-key $PRIVATE_KEY
    ```
 
 3. Run the following to prepare the ecosystem (Similar to the above, broadcasts all the txs, and saves them in run-latest.json). This step only has to be ran once. The private key has to be provided for this step.
 
    ```sh
-   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --slow
+   UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.0-precompiles/stage.toml UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28-ecosystem.toml forge script --sig "run()" EcosystemUpgrade --ffi --rpc-url $SEPOLIA --gas-limit 20000000000 --broadcast --slow --private-key $PRIVATE_KEY
    ```
 
 4. Verify contracts based on logs
@@ -29,13 +29,13 @@ If this fails you have some issues with foundry or your setup. Try cleaning your
 5. Generate the yaml file for the upgrade (generating calldata)
 
 ```sh
-UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/<CHAIN_ID>/run-latest.json yarn upgrade-yaml-output-generator
+UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/<CHAIN_ID>/run-latest.json YAML_OUTPUT_FILE=script-out/yaml-output.yaml yarn upgrade-yaml-output-generator
 ```
 
 e.g.:
 
 ```sh
-UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json yarn upgrade-yaml-output-generator
+UPGRADE_ECOSYSTEM_OUTPUT=script-out/v27-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade.s.sol/11155111/run-latest.json YAML_OUTPUT_FILE=script-out/yaml-output.yaml yarn upgrade-yaml-output-generator
 ```
 
 ## Finalization of the upgrade

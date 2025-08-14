@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {PriorityQueueTest, PriorityOperation} from "contracts/dev-contracts/test/PriorityQueueTest.sol";
+import {PriorityOperation, PriorityQueueTest} from "contracts/dev-contracts/test/PriorityQueueTest.sol";
 
 contract PriorityQueueSharedTest is Test {
     PriorityQueueTest internal priorityQueue;
