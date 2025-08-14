@@ -424,6 +424,26 @@ contract AdminFunctions is Script {
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
     }
+
+    function setDAValidatorPair(
+        address _bridgehub,
+        uint256 _chainId,
+        address _l1DaValidator,
+        address _l2DaValidator,
+        bool _shouldSend
+    ) public {
+        ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({
+            target: chainInfo.diamondProxy,
+            value: 0,
+            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
+        });
+
+        saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
+    }
+
     struct MigrateChainToGatewayParams {
         address bridgehub;
         uint256 l1GasPrice;
