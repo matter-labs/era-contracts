@@ -17,7 +17,7 @@ import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncr
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {InvalidAmount, InvalidAssetId, TokenBalanceNotMigratedToGateway, InvalidCanonicalTxHash, NotMigratedChain} from "./AssetTrackerErrors.sol";
+import {InvalidAmount, InvalidAssetId, TokenBalanceNotMigratedToGateway, InvalidCanonicalTxHash, NotMigratedChain, L1ToL2DepositsNotFinalized} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
@@ -33,6 +33,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     uint256 public L1_CHAIN_ID;
 
+    /// @notice We save the total supply of the token at the "moment" of chain migration. See _handleFinalizeBridgingOnL2Inner for details.
+    /// We need this to be able to migrate token balance to Gateway AssetTracker from the L1AssetTracker.
     mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply))
         internal savedTotalSupply;
 
@@ -117,7 +119,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     function handleInitiateBridgingOnL2(bytes32 _assetId) public view {
-        uint256 migrationNumber = _getMigrationNumber(block.chainid);
+        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         require(
             savedAssetMigrationNumber == migrationNumber ||
@@ -136,9 +138,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     function _handleFinalizeBridgingOnL2Inner(bytes32 _assetId, address _tokenAddress) internal {
-        uint256 migrationNumber = _getMigrationNumber(block.chainid);
-        bool allDepositsBeforeMigrationStarted = isL1ToL2DepositProcessed[migrationNumber];
-        if (!savedTotalSupply[migrationNumber][_assetId].isSaved && allDepositsBeforeMigrationStarted) {
+        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
+        bool allDepositsBeforeMigrationStartedAreFinalized = isL1ToL2DepositProcessed[migrationNumber];
+        if (!savedTotalSupply[migrationNumber][_assetId].isSaved && allDepositsBeforeMigrationStartedAreFinalized) {
+            /// This function saves the token supply before the first deposit after the chain migration is processed.
+            /// This totalSupply is the chain's total supply at the moment of chain migration.
             savedTotalSupply[migrationNumber][_assetId] = SavedTotalSupply({
                 isSaved: true,
                 amount: IERC20(_tokenAddress).totalSupply()
@@ -299,7 +303,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             }
         }
 
-        uint256 migrationNumber = _getMigrationNumber(block.chainid);
+        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
+        require(isL1ToL2DepositProcessed[migrationNumber], L1ToL2DepositsNotFinalized());
         uint256 amount;
         {
             SavedTotalSupply memory totalSupply = savedTotalSupply[migrationNumber][_assetId];
@@ -343,7 +348,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 settlementLayer = L2_BRIDGEHUB.settlementLayer(_chainId);
         require(settlementLayer != block.chainid, NotMigratedChain());
 
-        uint256 migrationNumber = _getMigrationNumber(_chainId);
+        uint256 migrationNumber = _getChainMigrationNumber(_chainId);
         require(assetMigrationNumber[_chainId][_assetId] < migrationNumber, InvalidAssetId());
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
@@ -420,7 +425,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _messageRoot().addChainBatchRoot(_chainId, _batchNumber, _messageRootToAppend);
     }
 
-    function _getMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
+    function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.getMigrationNumber(_chainId);
     }
 }

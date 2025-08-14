@@ -21,6 +21,8 @@ error InvalidOriginChainId();
 error InvalidSender();
 // 0xf76b228a
 error InvalidWithdrawalChainId();
+// 0x2ef97090
+error L1ToL2DepositsNotFinalized();
 // 0x8dfed13a
 error NotMigratedChain();
 // 0x43cca996

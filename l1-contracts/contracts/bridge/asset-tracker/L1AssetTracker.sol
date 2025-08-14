@@ -163,8 +163,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         require(
-            _getMigrationNumber(data.chainId) == data.migrationNumber,
-            InvalidChainMigrationNumber(_getMigrationNumber(data.chainId), data.migrationNumber)
+            _getChainMigrationNumber(data.chainId) == data.migrationNumber,
+            InvalidChainMigrationNumber(_getChainMigrationNumber(data.chainId), data.migrationNumber)
         );
         uint256 fromChainId;
         uint256 toChainId;
@@ -179,9 +179,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
-            uint256 chainMigrationNumber = _getMigrationNumber(data.chainId);
+            uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
 
-            // we check parity here to make sure that we migrated back to L1 from Gateway.
+            // we check parity here to make sure that we migrated the token balance back to L1 from Gateway.
+            // this is needed to ensure that the chainBalance on the Gateway AssetTracker is currently 0.
             // In the future we might initialize chains on GW. So we subtract from chainMigrationNumber.
             require(
                 (chainMigrationNumber - assetMigrationNumber[data.chainId][data.assetId]) % 2 == 1,
@@ -274,7 +275,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         }
     }
 
-    function _getMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
+    function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
         return IChainAssetHandler(IBridgehub(_bridgehub()).chainAssetHandler()).getMigrationNumber(_chainId);
     }
 }

@@ -74,7 +74,7 @@ abstract contract AssetTrackerBase is
     }
 
     function tokenMigrated(uint256 _chainId, bytes32 _assetId) public view returns (bool) {
-        return assetMigrationNumber[_chainId][_assetId] == _getMigrationNumber(_chainId);
+        return assetMigrationNumber[_chainId][_assetId] == _getChainMigrationNumber(_chainId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -98,5 +98,5 @@ abstract contract AssetTrackerBase is
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
-    function _getMigrationNumber(uint256 _chainId) internal view virtual returns (uint256);
+    function _getChainMigrationNumber(uint256 _chainId) internal view virtual returns (uint256);
 }

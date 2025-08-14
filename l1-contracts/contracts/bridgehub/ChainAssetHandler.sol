@@ -302,6 +302,7 @@ contract ChainAssetHandler is
                             L2 functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice This function is called at the start of each batch.
     function setSettlementLayerChainId(
         uint256 _previousSettlementLayerChainId,
         uint256 _currentSettlementLayerChainId
