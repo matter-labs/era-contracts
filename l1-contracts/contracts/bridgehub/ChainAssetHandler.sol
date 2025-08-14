@@ -48,6 +48,8 @@ contract ChainAssetHandler is
 
     address internal immutable ASSET_ROUTER;
 
+    address internal immutable ASSET_TRACKER;
+
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
@@ -76,10 +78,9 @@ contract ChainAssetHandler is
     }
 
     modifier onlyAssetTracker() {
-        // kl todo add contract discoverability, simplify this.
         require(
-            msg.sender == L2_ASSET_TRACKER_ADDR || msg.sender == address(BRIDGE_HUB.interopCenter().assetTracker()),
-            OnlyAssetTracker(msg.sender, address(BRIDGE_HUB.interopCenter().assetTracker()))
+            msg.sender == ASSET_TRACKER,
+            OnlyAssetTracker(msg.sender, ASSET_TRACKER)
         );
         _;
     }
@@ -97,6 +98,7 @@ contract ChainAssetHandler is
         address _owner,
         IBridgehub _bridgehub,
         address _assetRouter,
+        address _assetTracker,
         IMessageRoot _messageRoot
     ) reentrancyGuardInitializer {
         _disableInitializers();
@@ -104,6 +106,7 @@ contract ChainAssetHandler is
         L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
+        ASSET_TRACKER = _assetTracker;
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
@@ -115,6 +118,7 @@ contract ChainAssetHandler is
                             Getters
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the migration number for a chain.
     function getMigrationNumber(uint256 _chainId) external view onlyAssetTracker returns (uint256) {
         return migrationNumber[_chainId];
     }
@@ -132,10 +136,9 @@ contract ChainAssetHandler is
         _;
     }
 
+    /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
-        if (migrationNumber[_chainId] != 0) {
-            revert MigrationNumberAlreadySet();
-        }
+        require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
         require(block.chainid != L1_CHAIN_ID, OnlyOnGateway());
         migrationNumber[_chainId] = 1;
     }
@@ -166,9 +169,7 @@ contract ChainAssetHandler is
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        if (_assetId != BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
-            revert IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId));
-        }
+        require(_assetId == BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId), IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)));
         address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
 
         if (block.chainid == L1_CHAIN_ID) {

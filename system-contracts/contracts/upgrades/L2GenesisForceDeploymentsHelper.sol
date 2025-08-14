@@ -250,6 +250,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.aliasedL1Governance,
                 address(L2_BRIDGE_HUB),
                 address(L2_ASSET_ROUTER),
+                address(L2_ASSET_TRACKER_ADDRESS),
                 address(L2_MESSAGE_ROOT)
             )
         });

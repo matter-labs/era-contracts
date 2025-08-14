@@ -163,8 +163,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/
 
-    /// note we don't process L1 txs here, since we can do that when accepting the tx.
-    // kl todo: estimate the txs size, and how much we can handle on GW.
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
