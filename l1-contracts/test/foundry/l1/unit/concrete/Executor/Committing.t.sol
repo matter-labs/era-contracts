@@ -662,7 +662,7 @@ contract CommittingTest is ExecutorTest {
         vm.prank(validator);
         // SYSCOIN
         vm.expectRevert(
-            abi.encodeWithSelector(OperatorDAInputTooSmall.selector, operatorDAInput.length, BLOB_DATA_OFFSET - 1)
+            abi.encodeWithSelector(OperatorDAInputTooSmall.selector, operatorDAInput.length, 64)
         );
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
