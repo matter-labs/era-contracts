@@ -18,6 +18,7 @@ struct ZKChainSpecificForceDeploymentsData {
 /// @dev Note, that for simplicity, the same struct is used both for upgrading to the
 /// Gateway version and for the Genesis. Some fields may not be used in either of those.
 // solhint-disable-next-line gas-struct-packing
+// FIXME: not in sync with L1.
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     uint256 eraChainId;

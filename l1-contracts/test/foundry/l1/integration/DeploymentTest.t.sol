@@ -27,7 +27,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -115,7 +115,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
         assertEq(addresses.bridgehub.settlementLayer(randomChainId), block.chainid);
 
         address messageRoot = address(addresses.bridgehub.messageRoot());
-        assertTrue(MessageRoot(messageRoot).chainIndex(randomChainId) != 0);
+        assertTrue(L1MessageRoot(messageRoot).chainIndex(randomChainId) != 0);
     }
 
     function test_registerAlreadyDeployedZKChain() public {

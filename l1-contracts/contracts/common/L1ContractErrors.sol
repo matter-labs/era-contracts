@@ -364,6 +364,8 @@ error UnknownVerifierType();
 // 0x456f8f7a
 error EmptyProofLength();
 
+error InvalidChainId();
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,
