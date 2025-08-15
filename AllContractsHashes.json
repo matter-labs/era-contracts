@@ -529,7 +529,7 @@
   },
   {
     "contractName": "l2-contracts/RollupL2DAValidator",
-    "zkBytecodeHash": "0x010001132cb925b07c9f64caec3a0617f1c9e17a33b0085eeb241b14a30ddaea",
+    "zkBytecodeHash": "0x010001137885e34b66d0f6207f8bace4de91b926c275f73753e8107cfb58e398",
     "zkBytecodePath": "/l2-contracts/zkout/RollupL2DAValidator.sol/RollupL2DAValidator.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
