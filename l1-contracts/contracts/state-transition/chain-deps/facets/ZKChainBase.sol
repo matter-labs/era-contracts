@@ -8,6 +8,7 @@ import {PriorityQueue} from "../../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -44,6 +45,13 @@ contract ZKChainBase is ReentrancyGuard {
 
     modifier onlyBridgehub() {
         if (msg.sender != s.bridgehub) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyChainAssetHandler() {
+        if (msg.sender != IBridgehub(s.bridgehub).chainAssetHandler()) {
             revert Unauthorized(msg.sender);
         }
         _;
