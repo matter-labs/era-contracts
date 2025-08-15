@@ -78,10 +78,7 @@ contract ChainAssetHandler is
     }
 
     modifier onlyAssetTracker() {
-        require(
-            msg.sender == ASSET_TRACKER,
-            OnlyAssetTracker(msg.sender, ASSET_TRACKER)
-        );
+        require(msg.sender == ASSET_TRACKER, OnlyAssetTracker(msg.sender, ASSET_TRACKER));
         _;
     }
 
@@ -169,7 +166,10 @@ contract ChainAssetHandler is
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        require(_assetId == BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId), IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)));
+        require(
+            _assetId == BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId),
+            IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId))
+        );
         address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
 
         if (block.chainid == L1_CHAIN_ID) {

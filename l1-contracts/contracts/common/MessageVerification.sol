@@ -3,7 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {L2Log, L2Message, TxStatus} from "./Messaging.sol";
-import {IMessageVerification} from "./interfaces/IMessageVerification.sol";
+import {IMessageVerification, FinalizeL1DepositParams} from "./interfaces/IMessageVerification.sol";
 import {MessageHashing} from "./libraries/MessageHashing.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
@@ -119,5 +119,24 @@ abstract contract MessageVerification is IMessageVerification {
                 _log: l2Log,
                 _proof: _merkleProof
             });
+    }
+
+    function proveL1DepositParamsInclusion(
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams,
+        address _sender
+    ) public view returns (bool success) {
+        L2Message memory l2ToL1Message = L2Message({
+            txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
+            sender: _sender,
+            data: _finalizeWithdrawalParams.message
+        });
+
+        success = this.proveL2MessageInclusionShared({
+            _chainId: _finalizeWithdrawalParams.chainId,
+            _blockOrBatchNumber: _finalizeWithdrawalParams.l2BatchNumber,
+            _index: _finalizeWithdrawalParams.l2MessageIndex,
+            _message: l2ToL1Message,
+            _proof: _finalizeWithdrawalParams.merkleProof
+        });
     }
 }

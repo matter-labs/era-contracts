@@ -2,7 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-
 bytes1 constant BALANCE_CHANGE_VERSION = bytes1(uint8(1));
 bytes1 constant TOKEN_BALANCE_MIGRATION_DATA_VERSION = bytes1(uint8(1));
 

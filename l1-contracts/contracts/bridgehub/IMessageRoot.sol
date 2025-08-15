@@ -11,7 +11,6 @@ import {IMessageVerification} from "../common/interfaces/IMessageVerification.so
  * @custom:security-contact security@matterlabs.dev
  */
 interface IMessageRoot is IMessageVerification {
-
     /// @notice Emitted when a new chain is added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
     /// @param chainIndex The index of the chain that is being added. Note, that chain where

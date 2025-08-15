@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {TokenBalanceMigrationData} from "./IAssetTrackerBase.sol";
-import {L2Message} from "../../common/Messaging.sol";
 import {L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {InvalidProof} from "../../common/L1ContractErrors.sol";
@@ -256,20 +255,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
-            sender: L2_ASSET_TRACKER_ADDR,
-            data: _finalizeWithdrawalParams.message
-        });
-
-        bool success = _bridgehub().proveL2MessageInclusion({
-            _chainId: _finalizeWithdrawalParams.chainId,
-            _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
-            _index: _finalizeWithdrawalParams.l2MessageIndex,
-            _message: l2ToL1Message,
-            _proof: _finalizeWithdrawalParams.merkleProof
-        });
-
+        bool success = MESSAGE_ROOT.proveL1DepositParamsInclusion(_finalizeWithdrawalParams, L2_ASSET_TRACKER_ADDR);
         if (!success) {
             revert InvalidProof();
         }

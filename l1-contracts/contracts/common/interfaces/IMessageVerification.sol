@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Log, L2Message, TxStatus} from "../../common/Messaging.sol";
+import {L2Log, L2Message, TxStatus, FinalizeL1DepositParams} from "../Messaging.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @author Matter Labs
@@ -74,4 +74,10 @@ interface IMessageVerification {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view returns (bool);
+
+    /// @notice Prove that the L2 -> L1 transaction was processed with the specified status.
+    function proveL1DepositParamsInclusion(
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams,
+        address _sender
+    ) external view returns (bool success);
 }

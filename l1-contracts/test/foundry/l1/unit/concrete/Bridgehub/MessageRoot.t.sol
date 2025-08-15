@@ -28,6 +28,11 @@ contract MessageRootTest is Test {
     function setUp() public {
         bridgehub = makeAddr("bridgehub");
         vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehub.L1_CHAIN_ID.selector), abi.encode(1));
+        uint256[] memory allZKChainChainIDs = new uint256[](1);
+        allZKChainChainIDs[0] = 271;
+        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehub.getAllZKChainChainIDs.selector), abi.encode(allZKChainChainIDs));
+        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehub.chainTypeManager.selector), abi.encode(makeAddr("chainTypeManager")));
+
         assetTracker = makeAddr("assetTracker");
         messageRoot = new MessageRoot(IBridgehub(bridgehub));
         vm.mockCall(address(bridgehub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
