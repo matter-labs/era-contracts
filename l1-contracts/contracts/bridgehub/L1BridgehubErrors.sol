@@ -14,6 +14,8 @@ error ChainExists();
 error HyperchainNotRegistered();
 // 0x48857c1d
 error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
+// 0xdb495273
+error IncorrectFunctionSignature();
 // 0xf5e39c1f
 error IncorrectSender(address prevMsgSender, address chainAdmin);
 // 0x913183d8
@@ -40,6 +42,8 @@ error NotOwnerViaRouter(address msgSender, address originalCaller);
 error NotRelayedSender(address msgSender, address settlementLayerRelaySender);
 // 0xb35a7373
 error NotSystemContext(address _sender);
+// 0xb30ebfd8
+error NotWhitelistedSettlementLayer(uint256 chainId);
 // 0x3db511f4
 error OnlyAssetTracker(address, address);
 // 0x527b87c7
@@ -50,6 +54,8 @@ error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, addres
 error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
+// 0x8d14ca84
+error OnlyL1();
 // 0x52013f4d
 error OnlyOnGateway();
 // 0x26d10385
@@ -58,5 +64,7 @@ error OnlyPreV30Chain(uint256 chainId);
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1
 error SLNotWhitelisted();
+// 0x29bc3a3c
+error V30UpgradeGatewayBlockNumberAlreadySet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);

@@ -350,7 +350,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             );
 
             bytes32 leaf = MessageHashing.getLeafHashFromLog(l2Log);
-            ProofData memory proofData = this.getProofData({
+            ProofData memory proofData = MESSAGE_ROOT.getProofData({
                 _chainId: _chainId,
                 _batchNumber: _l2BatchNumber,
                 _leafProofMask: _l2MessageIndex,
@@ -530,7 +530,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _proof: _finalizeWithdrawalParams.merkleProof
         });
         bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
-        ProofData memory proofData = this.getProofData({
+        ProofData memory proofData = MESSAGE_ROOT.getProofData({
             _chainId: _finalizeWithdrawalParams.chainId,
             _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
             _leafProofMask: _finalizeWithdrawalParams.l2MessageIndex,
@@ -541,31 +541,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
         // withdrawal wrong proof
         require(success, InvalidProof());
-    }
-
-    /// @notice Extracts and returns proof data for settlement layer verification.
-    /// @dev Wrapper function around MessageHashing._getProofData for public access.
-    /// @param _chainId The chain ID where the proof was generated.
-    /// @param _batchNumber The batch number containing the proof.
-    /// @param _leafProofMask The leaf proof mask for merkle verification.
-    /// @param _leaf The leaf hash to verify.
-    /// @param _proof The merkle proof array.
-    /// @return The extracted proof data including settlement layer information.
-    function getProofData(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _leafProofMask,
-        bytes32 _leaf,
-        bytes32[] calldata _proof
-    ) public pure returns (ProofData memory) {
-        return
-            MessageHashing._getProofData({
-                _chainId: _chainId,
-                _batchNumber: _batchNumber,
-                _leafProofMask: _leafProofMask,
-                _leaf: _leaf,
-                _proof: _proof
-            });
     }
 
     /// @inheritdoc IL1Nullifier

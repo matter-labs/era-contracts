@@ -6,14 +6,22 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
+import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
+
 import {IBridgehub} from "./IBridgehub.sol";
+
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainBatchRootAlreadyExists, ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyPreV30Chain} from "./L1BridgehubErrors.sol";
+import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
+import {ChainBatchRootAlreadyExists, ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyPreV30Chain, NotWhitelistedSettlementLayer, OnlyL1, IncorrectFunctionSignature, V30UpgradeGatewayBlockNumberAlreadySet} from "./L1BridgehubErrors.sol";
+import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
+import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 
 import {MessageVerification} from "../common/MessageVerification.sol";
+import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
+
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
@@ -32,7 +40,6 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
-
 
     uint256 public immutable L1_CHAIN_ID;
 
@@ -71,7 +78,16 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
 
     /// @notice The mapping storing the batch number at the moment the MessageRoot was updated to V30.
     /// @notice We store this, as we did not store chainBatchRoots prior to V30, so we need to get them from the diamond proxies of the chains.
-    mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeBatchNumber;
+    mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
+
+    /// @notice The block number at the moment the MessageRoot was updated to V30.
+    /// @notice We store this, as it is used on the L2s to filter out old interop roots.
+    uint256 public v30UpgradeGatewayBlockNumber;
+
+    /// @dev The chain type manager for EraVM chains. EraVM chains are upgraded directly by governance,
+    /// @dev so they can be trusted more than ZKsync OS chains, or chains from other CTMs.
+    /// @dev Introduced with V30.
+    address public eraVmChainTypeManager;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
@@ -101,12 +117,14 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         if (block.chainid != L1_CHAIN_ID) {
             if (msg.sender == assetTracker) {
                 // this case is valid.
-            } else if (v30UpgradeBatchNumber[_chainId] != 0) {
+            } else if (v30UpgradeChainBatchNumber[_chainId] != 0) {
                 address chain = BRIDGE_HUB.getZKChain(_chainId);
                 uint32 minor;
                 (, minor, ) = IGetters(chain).getSemverProtocolVersion();
                 /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v30 quickly.
                 require(msg.sender == chain, OnlyChain(msg.sender, chain));
+                /// we only allow direct addChainBatchRoots for EraVM chains, as only they are governed directly by governance.
+                require(BRIDGE_HUB.chainTypeManager(_chainId) == eraVmChainTypeManager, OnlyChain(msg.sender, chain));
                 require(minor < 30, OnlyPreV30Chain(_chainId));
             } else {
                 revert OnlyAssetTracker(msg.sender, assetTracker);
@@ -126,6 +144,11 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _;
     }
 
+    modifier onlyServiceTransactionSender() {
+        require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
@@ -133,6 +156,16 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     constructor(IBridgehub _bridgehub) {
         BRIDGE_HUB = _bridgehub;
         L1_CHAIN_ID = BRIDGE_HUB.L1_CHAIN_ID();
+        if (L1_CHAIN_ID != block.chainid) {
+            /// On Gateway we save the chain type manager for EraVM chains.
+            uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+            if (allZKChains.length > 0) {
+                // On non-local environments we need to save the eraVM chain type manager to allow v29 chains to finalize.
+                eraVmChainTypeManager = BRIDGE_HUB.chainTypeManager(allZKChains[0]);
+            }
+            /// On Gateway we save the upgrade block number
+            v30UpgradeGatewayBlockNumber = block.number;
+        }
         _initialize();
         _disableInitializers();
     }
@@ -147,9 +180,53 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            v30UpgradeBatchNumber[allZKChains[i]] = IGetters(BRIDGE_HUB.getZKChain(allZKChains[i]))
+            v30UpgradeChainBatchNumber[allZKChains[i]] = IGetters(BRIDGE_HUB.getZKChain(allZKChains[i]))
                 .getTotalBatchesExecuted();
         }
+        /// If there are no chains, that means we are using the contracts locally.
+        if (allZKChainsLength == 0) {
+            v30UpgradeGatewayBlockNumber = 1;
+        }
+    }
+
+    function sendV30UpgradeGatewayBlockNumberFromGateway(uint256) external {
+        // Send the message corresponding to the relevant InteropBundle to L1.
+        // slither-disable-next-line unused-return
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(this.sendV30UpgradeGatewayBlockNumber, (v30UpgradeGatewayBlockNumber))
+        );
+    }
+
+    function saveV30UpgradeGatewayBlockNumberOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
+        bool success = proveL1DepositParamsInclusion(_finalizeWithdrawalParams, L2_MESSAGE_ROOT_ADDR);
+        if (!success) {
+            revert InvalidProof();
+        }
+
+        require(
+            BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
+            NotWhitelistedSettlementLayer(_finalizeWithdrawalParams.chainId)
+        );
+        require(block.chainid == L1_CHAIN_ID, OnlyL1());
+
+        (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_finalizeWithdrawalParams.message, 0);
+        require(
+            bytes4(functionSignature) == this.sendV30UpgradeGatewayBlockNumber.selector,
+            IncorrectFunctionSignature()
+        );
+
+        require(v30UpgradeGatewayBlockNumber == 0, V30UpgradeGatewayBlockNumberAlreadySet());
+        (uint256 receivedV30UpgradeGatewayBlockNumber, ) = UnsafeBytes.readUint256(
+            _finalizeWithdrawalParams.message,
+            offset
+        );
+        v30UpgradeGatewayBlockNumber = receivedV30UpgradeGatewayBlockNumber;
+    }
+
+    function saveV30UpgradeGatewayBlockNumberOnL2(
+        uint256 _v30UpgradeGatewayBlockNumber
+    ) external onlyServiceTransactionSender {
+        v30UpgradeGatewayBlockNumber = _v30UpgradeGatewayBlockNumber;
     }
 
     function setAddresses(address _assetTracker) external onlyBridgehubOwner {
@@ -310,9 +387,35 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
 
     /// @notice Internal to get the historical batch root for chains before the v30 upgrade.
     function _getChainBatchRoot(uint256 _chainId, uint256 _batchNumber) internal view returns (bytes32) {
-        if (v30UpgradeBatchNumber[_chainId] >= _batchNumber) {
+        if (v30UpgradeChainBatchNumber[_chainId] >= _batchNumber) {
             return IGetters(BRIDGE_HUB.getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
         }
         return chainBatchRoots[_chainId][_batchNumber];
+    }
+
+
+    /// @notice Extracts and returns proof data for settlement layer verification.
+    /// @dev Wrapper function around MessageHashing._getProofData for public access.
+    /// @param _chainId The chain ID where the proof was generated.
+    /// @param _batchNumber The batch number containing the proof.
+    /// @param _leafProofMask The leaf proof mask for merkle verification.
+    /// @param _leaf The leaf hash to verify.
+    /// @param _proof The merkle proof array.
+    /// @return The extracted proof data including settlement layer information.
+    function getProofData(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) public pure returns (ProofData memory) {
+        return
+            MessageHashing._getProofData({
+                _chainId: _chainId,
+                _batchNumber: _batchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof
+            });
     }
 }

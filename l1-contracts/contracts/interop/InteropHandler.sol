@@ -10,9 +10,9 @@ import {BUNDLE_IDENTIFIER, BundleStatus, CallStatus, InteropBundle, InteropCall,
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId} from "./InteropErrors.sol";
+import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId, SettlmentLayerBatchNumberTooLow} from "./InteropErrors.sol";
+import {V30UpgradeGatewayBlockNumberNotSet} from "../state-transition/L1StateTransitionErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
-import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -311,6 +311,27 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         });
 
         require(isIncluded, MessageNotIncluded());
+
+        L2Message memory l2ToL1Message = L2Message({
+            txNumberInBatch: _proof.message.txNumberInBatch,
+            sender: _proof.message.sender,
+            data: _proof.message.data
+        });
+
+        bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
+
+        ProofData memory proofData = L2_MESSAGE_ROOT.getProofData({
+            _chainId: _proof.chainId,
+            _batchNumber: _proof.l1BatchNumber,
+            _leafProofMask: _proof.l2MessageIndex,
+            _leaf: leaf,
+            _proof: _proof.proof
+        });
+
+        /// We need to make sure that the proof belongs to a batch that settled on GW after the v30 upgrade.
+        uint256 v30UpgradeGatewayBlockNumber = MESSAGE_ROOT.v30UpgradeGatewayBlockNumber();
+        require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
+        require(proofData.settlementLayerBatchNumber > v30UpgradeGatewayBlockNumber, SettlmentLayerBatchNumberTooLow());
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
 

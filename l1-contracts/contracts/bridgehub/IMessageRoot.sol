@@ -4,6 +4,8 @@ pragma solidity 0.8.28;
 
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageVerification} from "../common/interfaces/IMessageVerification.sol";
+import {ProofData} from "../common/libraries/MessageHashing.sol";
+
 
 /**
  * @author Matter Labs
@@ -46,4 +48,16 @@ interface IMessageRoot is IMessageVerification {
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
+
+    function v30UpgradeGatewayBlockNumber() external view returns (uint256);
+
+    function saveV30UpgradeGatewayBlockNumberOnL2(uint256 _v30UpgradeGatewayBlockNumber) external;
+
+    function getProofData(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof
+    ) public pure returns (ProofData memory);
 }
