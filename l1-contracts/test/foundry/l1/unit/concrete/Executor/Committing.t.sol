@@ -661,9 +661,7 @@ contract CommittingTest is ExecutorTest {
 
         vm.prank(validator);
         // SYSCOIN
-        vm.expectRevert(
-            abi.encodeWithSelector(OperatorDAInputTooSmall.selector, operatorDAInput.length, 64)
-        );
+        vm.expectRevert(abi.encodeWithSelector(OperatorDAInputTooSmall.selector, operatorDAInput.length, 64));
         (uint256 commitBatchFrom, uint256 commitBatchTo, bytes memory commitData) = Utils.encodeCommitBatchesData(
             genesisStoredBatchInfo,
             correctCommitBatchInfoArray
@@ -786,7 +784,6 @@ contract CommittingTest is ExecutorTest {
     }
     // SYSCOIN
     function skip_RevertWhen_BlobDoesNotExist() public {
-
         bytes[] memory correctL2Logs = Utils.createSystemLogs(l2DAValidatorOutputHash);
         correctL2Logs[uint256(SystemLogKey.PACKED_BATCH_AND_L2_BLOCK_TIMESTAMP_KEY)] = Utils.constructL2Log(
             true,
