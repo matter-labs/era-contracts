@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {StdStorage, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {DeployL1IntegrationScript} from "./deploy-scripts/DeployL1Integration.s.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
@@ -12,7 +11,7 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {DeployedAddresses, Config} from "deploy-scripts/DeployUtils.s.sol";
+import {Config, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
 
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;

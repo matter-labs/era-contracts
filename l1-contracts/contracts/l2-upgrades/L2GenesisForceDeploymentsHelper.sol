@@ -2,10 +2,9 @@
 
 pragma solidity 0.8.28;
 
-import {L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/L2ContractAddresses.sol";
+import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {IL2SharedBridgeLegacy} from "../bridge/interfaces/IL2SharedBridgeLegacy.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -15,39 +14,18 @@ import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
 import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
+import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
 import {ICTMDeploymentTracker} from "../bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 
-import {MessageRootBase} from "../bridgehub/MessageRootBase.sol";
-
 import {UpgradeableBeaconDeployer} from "../bridge/ntv/UpgradeableBeaconDeployer.sol";
 
-address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(0x0000000000000000000000000000000000010008);
+import {FixedForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-struct FixedForceDeploymentsData {
-    uint256 l1ChainId;
-    uint256 eraChainId;
-    address l1AssetRouter;
-    bytes32 l2TokenProxyBytecodeHash;
-    address aliasedL1Governance;
-    uint256 maxNumberOfZKChains;
-    bytes bridgehubBytecodeOrInfo;
-    bytes l2AssetRouterBytecodeOrInfo;
-    bytes l2NtvBytecodeOrInfo;
-    bytes messageRootBytecodeOrInfo;
-    bytes beaconDeployerInfo;
-    // TODO: remove
-    address l2SharedBridgeLegacyImpl;
-    // TODO: remove
-    address l2BridgedStandardERC20Impl;
-    // The forced beacon address. It is needed only for internal testing.
-    // MUST be equal to 0 in production.
-    // It will be the job of the governance to ensure that this value is set correctly.
-    address dangerousTestOnlyForcedBeacon;
-}
+address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(0x000000000000000000000000000000000001000b);
 
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
@@ -125,7 +103,7 @@ library L2GenesisForceDeploymentsHelper {
 
         forceDeployOnAddress(
             _isZKsyncOS,
-            fixedForceDeploymentsData.messageRootBytecodeOrInfo,
+            fixedForceDeploymentsData.messageRootBytecodeInfo,
             address(L2_MESSAGE_ROOT_ADDR)
         );
         // If this is a genesis upgrade, we need to initialize the MessageRoot contract.
@@ -134,11 +112,7 @@ library L2GenesisForceDeploymentsHelper {
             L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2();
         }
 
-        forceDeployOnAddress(
-            _isZKsyncOS,
-            fixedForceDeploymentsData.bridgehubBytecodeOrInfo,
-            address(L2_BRIDGEHUB_ADDR)
-        );
+        forceDeployOnAddress(_isZKsyncOS, fixedForceDeploymentsData.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
         if (_isGenesisUpgrade) {
             L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
@@ -160,7 +134,7 @@ library L2GenesisForceDeploymentsHelper {
 
         forceDeployOnAddress(
             _isZKsyncOS,
-            fixedForceDeploymentsData.l2AssetRouterBytecodeOrInfo,
+            fixedForceDeploymentsData.l2AssetRouterBytecodeInfo,
             address(L2_ASSET_ROUTER_ADDR)
         );
         if (_isGenesisUpgrade) {
@@ -200,7 +174,7 @@ library L2GenesisForceDeploymentsHelper {
         });
 
         // Now initialiazing the upgradeable token beacon
-        forceDeployOnAddress(_isZKsyncOS, fixedForceDeploymentsData.l2NtvBytecodeOrInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
+        forceDeployOnAddress(_isZKsyncOS, fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
 
         if (_isGenesisUpgrade) {
             address deployedTokenBeacon;
@@ -241,13 +215,36 @@ library L2GenesisForceDeploymentsHelper {
             );
         }
 
+        forceDeployOnAddress(
+            _isZKsyncOS,
+            fixedForceDeploymentsData.chainAssetHandlerBytecodeInfo,
+            address(L2_CHAIN_ASSET_HANDLER_ADDR)
+        );
+        if (_isGenesisUpgrade) {
+            L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
+                fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.aliasedL1Governance,
+                L2Bridgehub(L2_BRIDGEHUB_ADDR),
+                L2_ASSET_ROUTER_ADDR,
+                L2MessageRoot(L2_MESSAGE_ROOT_ADDR)
+            );
+        } else {
+            L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2(
+                fixedForceDeploymentsData.l1ChainId,
+                L2Bridgehub(L2_BRIDGEHUB_ADDR),
+                L2_ASSET_ROUTER_ADDR,
+                L2MessageRoot(L2_MESSAGE_ROOT_ADDR)
+            );
+        }
+
         // It is expected that either through the force deployments above
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
         // However, there is still some follow-up finalization that needs to be done.
         L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_ctmDeployer),
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            L2_CHAIN_ASSET_HANDLER_ADDR
         );
     }
 

@@ -3,28 +3,10 @@
 pragma solidity 0.8.28;
 
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
-import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {Create2} from "@openzeppelin/contracts-v4/utils/Create2.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
-
-import {INativeTokenVault} from "./INativeTokenVault.sol";
-import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
-import {NativeTokenVault} from "./NativeTokenVault.sol";
-
-import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
-import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
-import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
-
-import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR} from "../../common/L2ContractAddresses.sol";
-import {L2ContractHelper, IContractDeployer} from "../../common/libraries/L2ContractHelper.sol";
-
-import {SystemContractsCaller} from "../../common/libraries/SystemContractsCaller.sol";
-import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
-
-import {AssetIdAlreadyRegistered, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy, EmptyAddress, EmptyBytes32, AddressMismatch, DeployFailed, AssetIdNotSupported} from "../../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVault} from "./L2NativeTokenVault.sol";
 
@@ -32,7 +14,7 @@ import {L2NativeTokenVault} from "./L2NativeTokenVault.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-/// @dev Important: L2 contracts are not allowed to have any immutable variables. This is needed for compatibility with ZKsyncOS.
+/// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
 /// @dev For the ease of future use of ZKOS, this contract should not have ANY storage variables and all of those should be part of the
 /// parent `L2NativeTokenVault` contract.
 contract L2NativeTokenVaultZKOS is L2NativeTokenVault {

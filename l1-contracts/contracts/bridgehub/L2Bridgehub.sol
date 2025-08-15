@@ -2,29 +2,9 @@
 
 pragma solidity 0.8.28;
 
-import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
-
-import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
-
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestTwoBridgesInner, BridgehubMintCTMAssetData, BridgehubBurnCTMAssetData} from "./IBridgehub.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
-import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
-import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
-import {ETH_TOKEN_ADDRESS, TWO_BRIDGES_MAGIC_VALUE, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
-import {BridgehubL2TransactionRequest, L2Message, L2Log, TxStatus} from "../common/Messaging.sol";
-import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {NotL1, NotRelayedSender, NotAssetRouter, ChainIdAlreadyPresent, ChainNotPresentInCTM, SecondBridgeAddressTooLow, NotInGatewayMode, SLNotWhitelisted, IncorrectChainAssetId, NotCurrentSL, HyperchainNotRegistered, IncorrectSender, AlreadyCurrentSL, ChainNotLegacy} from "./L1BridgehubErrors.sol";
-import {NoCTMForAssetId, SettlementLayersMustSettleOnL1, MigrationPaused, AssetIdAlreadyRegistered, ChainIdNotRegistered, AssetHandlerNotRegistered, ZKChainLimitReached, CTMAlreadyRegistered, CTMNotRegistered, ZeroChainId, ChainIdTooBig, BridgeHubAlreadyRegistered, MsgValueMismatch, ZeroAddress, Unauthorized, SharedBridgeNotSet, WrongMagicValue, ChainIdAlreadyExists, ChainIdMismatch, ChainIdCantBeCurrentChain, EmptyAssetId, AssetIdNotSupported, IncorrectBridgeHubAddress} from "../common/L1ContractErrors.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../common/L2ContractAddresses.sol";
-import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
+import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
 
 /// @author Matter Labs
@@ -34,7 +14,7 @@ import {BridgehubBase} from "./BridgehubBase.sol";
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
-/// @dev Important: L2 contracts are not allowed to have any immutable variables. This is needed for compatibility with ZKsyncOS.
+/// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
 contract L2Bridgehub is BridgehubBase {
     /// @notice the asset id of Eth. This is only used on L1.
     bytes32 internal ETH_TOKEN_ASSET_ID;

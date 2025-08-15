@@ -13,7 +13,7 @@ import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {Utils, ChainInfoFromBridgehub} from "./Utils.sol";
+import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -26,7 +26,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2_ASSET_ROUTER_ADDR} from "contracts/common/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
@@ -204,9 +204,9 @@ contract AdminFunctions is Script {
         bytes memory data;
         // The interface should be compatible with both the new and the old ValidatorTimelock
         if (addValidator) {
-            data = abi.encodeCall(ValidatorTimelock.addValidator, (chainId, validatorAddress));
+            data = abi.encodeCall(ValidatorTimelock.addValidatorForChainId, (chainId, validatorAddress));
         } else {
-            data = abi.encodeCall(ValidatorTimelock.removeValidator, (chainId, validatorAddress));
+            data = abi.encodeCall(ValidatorTimelock.removeValidatorForChainId, (chainId, validatorAddress));
         }
 
         Utils.adminExecute(adminAddr, accessControlRestriction, validatorTimelock, data, 0);
@@ -593,7 +593,10 @@ contract AdminFunctions is Script {
             data.bridgehub,
             data.l2ChainId
         );
-        bytes memory callData = abi.encodeCall(ValidatorTimelock.addValidator, (data.l2ChainId, data.validatorAddress));
+        bytes memory callData = abi.encodeCall(
+            ValidatorTimelock.addValidatorForChainId,
+            (data.l2ChainId, data.validatorAddress)
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             callData,

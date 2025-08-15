@@ -14,7 +14,7 @@ import {L1AssetRouter} from "contracts/bridge/L1AssetRouter.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {Utils, ADDRESS_ONE} from "./Utils.sol";
+import {ADDRESS_ONE, Utils} from "./Utils.sol";
 
 /**
  * @title Prepare ZKChain Registration Calldata
