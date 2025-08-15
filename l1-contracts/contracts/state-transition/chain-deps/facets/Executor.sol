@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
-import {EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, PACKED_L2_PRECOMMITMENT_LENGTH} from "../../../common/Config.sol";
+import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_PRECOMMITMENT_LENGTH, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, ProcessLogsInput, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
@@ -24,14 +24,15 @@ import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.s
 /// DEBUG SUPPORT END
 ///
 import {L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, HashMismatch, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
+import {BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
 import {DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
+/// SettlementLayerChainIdMismatch
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
-import {IAssetTracker} from "../../../bridge/asset-tracker/IAssetTracker.sol";
+import {IL2AssetTracker} from "../../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
@@ -330,6 +331,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     revert InvalidLogSender(logSender, logKey);
                 }
                 logOutput.dependencyRootsRollingHash = logValue;
+            } else if (logKey == uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY)) {
+                if (logSender != L2_BOOTLOADER_ADDRESS) {
+                    revert InvalidLogSender(logSender, logKey);
+                }
+                // uint256 settlementLayerChainId = uint256(logValue);
+                // kl todo the server migrates incorrectly sometimes.
+                // require(settlementLayerChainId == block.chainid, SettlementLayerChainIdMismatch());
             } else if (logKey > MAX_LOG_KEY) {
                 revert UnexpectedSystemLog(logKey);
             }
@@ -631,6 +639,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    /// @notice Appends the batch message root to the global message.
+    /// @param _batchNumber The number of the batch
+    /// @param _messageRoot The root of the merkle tree of the messages to L1.
+    /// @dev We only call this function on L1.
+    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
+        // Once the batch is executed, we include its message to the message root.
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
+    }
+
     /// @inheritdoc IExecutor
     function executeBatchesSharedBridge(
         address, // _chainAddress
@@ -657,8 +675,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidBatchesDataLength(batchesData.length, messages.length);
         }
 
-        // Interop is only allowed on GW currently, so we never append messages to message root on L1.
-        // kl todo. Is this what we want?
+        // Interop is only allowed on GW currently, so we go through the Asset Tracker when on Gateway.
+        // When on L1, we append directly to the Message Root, though interop is not allowed there, it is only used for
+        // message verification.
         if (block.chainid != L1_CHAIN_ID) {
             uint256 messagesLength = messages.length;
             for (uint256 i = 0; i < messagesLength; i = i.uncheckedInc()) {
@@ -670,8 +689,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
                     messageRoot: messageRoots[i]
                 });
-                IAssetTracker assetTracker = IInteropCenter(s.interopCenter).assetTracker();
+                IL2AssetTracker assetTracker = IL2AssetTracker(address(IInteropCenter(s.interopCenter).assetTracker()));
                 assetTracker.processLogsAndMessages(processLogsInput);
+            }
+        } else {
+            uint256 batchesDataLength = batchesData.length;
+            for (uint256 i = 0; i < batchesDataLength; i = i.uncheckedInc()) {
+                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
             }
         }
 

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {IMailboxImpl} from "./interfaces/IMailboxImpl.sol";
 import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
 
@@ -66,6 +66,7 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @param _account The address which to mint the funds to.
     /// @param _amount The amount of ETH in wei to be minted.
     function mint(address _account, uint256 _amount) external override onlyCallFromBootloaderOrInteropHandler {
+        L2_ASSET_TRACKER.handleFinalizeBaseTokenBridgingOnL2();
         totalSupply += _amount;
         balance[_account] += _amount;
         emit Mint(_account, _amount);
@@ -101,6 +102,8 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// the sent `msg.value` is added to the `this` balance before the call.
     /// So the balance of `address(this)` is always bigger or equal to the `msg.value`!
     function _burnMsgValue() internal returns (uint256 amount) {
+        _checkTokenWithdrawable();
+
         amount = msg.value;
 
         // Silent burning of the ether
@@ -110,6 +113,11 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
             balance[address(this)] -= amount;
             totalSupply -= amount;
         }
+    }
+
+    /// @dev This function is called to check if the token is withdrawable.
+    function _checkTokenWithdrawable() internal view {
+        L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2();
     }
 
     function burnMsgValue() external payable override onlyCallFromInteropCenter {

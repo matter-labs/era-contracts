@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {MessageRoot, IMessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
@@ -27,6 +27,20 @@ contract MessageRootTest is Test {
 
     function setUp() public {
         bridgehub = makeAddr("bridgehub");
+        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehub.L1_CHAIN_ID.selector), abi.encode(1));
+        uint256[] memory allZKChainChainIDs = new uint256[](1);
+        allZKChainChainIDs[0] = 271;
+        vm.mockCall(
+            bridgehub,
+            abi.encodeWithSelector(IBridgehub.getAllZKChainChainIDs.selector),
+            abi.encode(allZKChainChainIDs)
+        );
+        vm.mockCall(
+            bridgehub,
+            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector),
+            abi.encode(makeAddr("chainTypeManager"))
+        );
+
         assetTracker = makeAddr("assetTracker");
         messageRoot = new MessageRoot(IBridgehub(bridgehub));
         vm.mockCall(address(bridgehub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
@@ -72,7 +86,7 @@ contract MessageRootTest is Test {
 
         vm.prank(bridgehub);
         vm.expectEmit(true, false, false, false);
-        emit MessageRoot.AddedChain(alphaChainId, 0);
+        emit IMessageRoot.AddedChain(alphaChainId, 0);
         messageRoot.addNewChain(alphaChainId);
 
         assertTrue(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
@@ -109,9 +123,9 @@ contract MessageRootTest is Test {
 
         vm.prank(assetTracker);
         vm.expectEmit(true, false, false, false);
-        emit MessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        emit IMessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
         vm.expectEmit(true, false, false, false);
-        emit MessageRoot.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
+        emit IMessageRoot.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
 

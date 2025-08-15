@@ -4,11 +4,17 @@ pragma solidity ^0.8.21;
 
 import {IL2ToL1Messenger} from "./IL2ToL1Messenger.sol";
 import {IL2InteropRootStorage} from "../interfaces/IL2InteropRootStorage.sol";
-import {IMessageVerification} from "../../state-transition/chain-interfaces/IMessageVerification.sol";
+import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
 import {IBaseToken} from "./IBaseToken.sol";
 import {IL2ContractDeployer} from "../interfaces/IL2ContractDeployer.sol";
 import {IL2NativeTokenVault} from "../../bridge/ntv/IL2NativeTokenVault.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
+import {IInteropCenter} from "../../interop/IInteropCenter.sol";
+import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
+import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
+import {ISystemContext} from "../interfaces/ISystemContext.sol";
+import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 
 /// @dev the offset for the system contracts
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
@@ -52,6 +58,7 @@ IBaseToken constant L2_BASE_TOKEN_SYSTEM_CONTRACT = IBaseToken(L2_BASE_TOKEN_SYS
 
 /// @dev The address of the context system contract
 address constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0b);
+ISystemContext constant L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT = ISystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR);
 
 /// @dev The address of the pubdata chunk publisher contract
 address constant L2_PUBDATA_CHUNK_PUBLISHER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x11);
@@ -75,6 +82,7 @@ IBridgehub constant L2_BRIDGEHUB = IBridgehub(L2_BRIDGEHUB_ADDR);
 
 /// @dev the address of the l2 asset router.
 address constant L2_ASSET_ROUTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x03);
+IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
 
 /// @dev An l2 system contract address, used in the assetId calculation for native assets.
 /// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
@@ -84,6 +92,7 @@ IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(L2_NATI
 
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
+IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(L2_MESSAGE_ROOT_ADDR);
 
 /// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
 address constant SLOAD_CONTRACT_ADDR = address(USER_CONTRACTS_OFFSET + 0x06);
@@ -99,12 +108,15 @@ IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(add
 
 /// @dev The address of the L2 chain handler system contract
 address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
+IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
 
 /// @dev the address of the L2 interop center
 address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
+IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
 /// @dev the address of the L2 interop handler
 address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
 
 /// @dev the address of the L2 asset tracker
 address constant L2_ASSET_TRACKER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
+IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);

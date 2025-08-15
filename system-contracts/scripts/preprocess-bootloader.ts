@@ -82,6 +82,7 @@ const params = {
   RIGHT_PADDED_SEND_L2_TO_L1_LOG_SELECTOR: getPaddedSelector("L1Messenger", "sendL2ToL1Log"),
   PUBLISH_PUBDATA_SELECTOR: getSelector("L1Messenger", "publishPubdataAndClearState"),
   RIGHT_PADDED_SET_NEW_BATCH_SELECTOR: getPaddedSelector("SystemContext", "setNewBatch"),
+  RIGHT_PADDED_SET_SETTLEMENT_LAYER_CHAIN_ID_SELECTOR: getPaddedSelector("SystemContext", "setSettlementLayerChainId"),
   RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR: getPaddedSelector("SystemContext", "unsafeOverrideBatch"),
   // Error
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
@@ -99,6 +100,7 @@ const params = {
   SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),
   PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector("Compressor", "publishCompressedBytecode"),
   GET_MARKER_PADDED_SELECTOR: getPaddedSelector("KnownCodesStorage", "getMarker"),
+  GET_CODE_SIZE_SELECTOR: getPaddedSelector("AccountCodeStorage", "getCodeSize"),
   RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "setL2Block"),
   RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR: getPaddedSelector(
     "SystemContext",

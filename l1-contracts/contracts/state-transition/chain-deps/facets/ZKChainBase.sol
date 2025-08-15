@@ -94,10 +94,12 @@ contract ZKChainBase is ReentrancyGuard {
     }
 
     modifier onlyServiceTransaction() {
+        IBridgehub bridgehub = IBridgehub(s.bridgehub);
         if (
             msg.sender != address(this) &&
-            msg.sender != IBridgehub(s.bridgehub).chainRegistrationSender() &&
-            msg.sender != address(IInteropCenter(IBridgehub(s.bridgehub).interopCenter()).assetTracker())
+            msg.sender != bridgehub.chainRegistrationSender() &&
+            msg.sender != address(IInteropCenter(bridgehub.interopCenter()).assetTracker()) &&
+            msg.sender != address(bridgehub.chainAssetHandler())
         ) {
             revert Unauthorized(msg.sender);
         }

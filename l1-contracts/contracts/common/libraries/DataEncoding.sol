@@ -6,6 +6,7 @@ import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol"
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
 import {IncorrectTokenAddressFromNTV, InvalidNTVBurnData, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
+import {AssetIdMismatch} from "../L1ContractErrors.sol";
 
 /**
  * @author Matter Labs
@@ -237,5 +238,17 @@ library DataEncoding {
         )
     {
         return abi.decode(_data, (uint256, bytes32, uint256, bool, bool, uint256));
+    }
+
+    /// @notice Checks if the assetId is correct.
+    /// @param _tokenOriginChainId The chain id of the token origin.
+    /// @param _assetId The asset id to check.
+    /// @param _originToken The origin token address.
+    function assetIdCheck(uint256 _tokenOriginChainId, bytes32 _assetId, address _originToken) internal pure {
+        bytes32 expectedAssetId = encodeNTVAssetId(_tokenOriginChainId, _originToken);
+        if (_assetId != expectedAssetId) {
+            // Make sure that a NativeTokenVault sent the message
+            revert AssetIdMismatch(expectedAssetId, _assetId);
+        }
     }
 }

@@ -45,7 +45,7 @@ library ContractsBytecodesLib {
         // These are handled by the generic L1 case in getCreationCode.
         string[39] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
-            "AssetTracker",
+            "L2AssetTracker",
             "BeaconProxy",
             "BridgedStandardERC20",
             "BridgedTokenBeacon",

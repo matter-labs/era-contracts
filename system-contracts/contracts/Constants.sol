@@ -11,6 +11,7 @@ import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {IBridgehub} from "./interfaces/IBridgehub.sol";
 import {IL1Messenger} from "./interfaces/IL1Messenger.sol";
 import {IMessageVerification} from "./interfaces/IMessageVerification.sol";
+import {IChainAssetHandler} from "./interfaces/IChainAssetHandler.sol";
 import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {ICompressor} from "./interfaces/ICompressor.sol";
 import {IComplexUpgrader} from "./interfaces/IComplexUpgrader.sol";
@@ -20,6 +21,7 @@ import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
 import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
 import {IEvmHashesStorage} from "./interfaces/IEvmHashesStorage.sol";
 import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
+import {IL2AssetTracker} from "./interfaces/IL2AssetTracker.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 import {IInteropHandler} from "./interfaces/IInteropHandler.sol";
 import {IInteropCenter} from "./interfaces/IInteropCenter.sol";
@@ -125,10 +127,12 @@ address constant SLOAD_CONTRACT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x06);
 address constant WRAPPED_BASE_TOKEN_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
 IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
 IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
-address constant L2_CHAIN_ASSET_HANDLER = address(USER_CONTRACTS_OFFSET + 0x0a);
+address constant L2_CHAIN_ASSET_HANDLER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0a);
+IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDRESS);
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(address(USER_CONTRACTS_OFFSET + 0x0b));
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x0c));
 address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0d);
+IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(address(L2_ASSET_TRACKER_ADDRESS));
 
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR

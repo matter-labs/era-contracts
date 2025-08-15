@@ -10,6 +10,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
+import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
 import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -30,11 +31,12 @@ import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
 import {BridgedStandardERC20, IBridgedStandardToken, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {IAssetTracker} from "contracts/bridge/asset-tracker/IAssetTracker.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
@@ -87,7 +89,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         bytes32 ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(eraZKChainId, ETH_TOKEN_ADDRESS);
         stdstore
             .target(address(addresses.ecosystemAddresses.bridgehub.assetTrackerProxy))
-            .sig(IAssetTracker.chainBalance.selector)
+            .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(eraZKChainId)
             .with_key(ETH_TOKEN_ASSET_ID)
             .checked_write(100);
@@ -97,9 +99,30 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
     function depositToL1(address _tokenAddress) public {
         vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
+        );
+        vm.mockCall(
+            address(addresses.bridgehub),
+            abi.encodeWithSelector(IBridgehub.settlementLayer.selector),
+            abi.encode(506)
+        );
+        vm.mockCall(
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
+            abi.encode(
+                ProofData({
+                    settlementLayerChainId: 506,
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 0,
+                    batchLeafProofLen: 0,
+                    batchSettlementRoot: 0,
+                    chainIdLeaf: 0,
+                    ptr: 0,
+                    finalProofNode: false
+                })
+            )
         );
         uint256 chainId = eraZKChainId;
         l2TokenAssetId = DataEncoding.encodeNTVAssetId(chainId, _tokenAddress);

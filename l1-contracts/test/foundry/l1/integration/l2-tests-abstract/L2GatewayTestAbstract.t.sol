@@ -33,6 +33,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {SystemContractsArgs} from "./Utils.sol";
+import {BalanceChange, BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -64,7 +65,16 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         // todo fix this test
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
-        l2InteropCenter.forwardTransactionOnGatewayWithBalanceChange(mintChainId, bytes32(0), 0, 0, 0, 0);
+        BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
+            baseTokenAssetId: bytes32(0),
+            baseTokenAmount: 0,
+            assetId: bytes32(0),
+            amount: 0,
+            tokenOriginChainId: 0,
+            originToken: address(0)
+        });
+        l2InteropCenter.forwardTransactionOnGatewayWithBalanceChange(mintChainId, bytes32(0), 0, balanceChange);
     }
 
     function test_withdrawFromGateway() public {
@@ -102,7 +112,8 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             chainId: mintChainId,
             baseTokenAssetId: baseTokenAssetId,
             ctmData: ctmData,
-            chainData: chainData
+            chainData: chainData,
+            migrationNumber: 0
         });
         vm.prank(aliasedL1AssetRouter);
         l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
