@@ -85,6 +85,7 @@
     "migrate-governance": "ts-node scripts/migrate-governance.ts",
     "display-governance": "ts-node scripts/display-governance.ts",
     "upgrade-system": "ts-node upgrade-system/index.ts",
+    "upgrade-scripts": "ts-node scripts/upgrade-scripts.ts",
     "token-migration": "ts-node scripts/token-migration.ts",
     "setup-legacy-bridge-era": "ts-node scripts/setup-legacy-bridge-era.ts",
     "upgrade-consistency-checker": "ts-node scripts/upgrade-consistency-checker.ts",

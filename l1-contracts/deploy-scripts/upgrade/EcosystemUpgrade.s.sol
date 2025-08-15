@@ -556,11 +556,12 @@ contract EcosystemUpgrade is Script, DeployL1Script {
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
-        bytes[] memory additionalDependencies = new bytes[](4); // Deps after Gateway upgrade
+        bytes[] memory additionalDependencies = new bytes[](5); // Deps after Gateway upgrade
         additionalDependencies[0] = L2ContractsBytecodesLib.readL2LegacySharedBridgeBytecode();
         additionalDependencies[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
         additionalDependencies[2] = L2ContractsBytecodesLib.readRollupL2DAValidatorBytecode();
         additionalDependencies[3] = L2ContractsBytecodesLib.readNoDAL2DAValidatorBytecode();
+        additionalDependencies[4] = L2ContractsBytecodesLib.readDiamondProxyBytecode();
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
