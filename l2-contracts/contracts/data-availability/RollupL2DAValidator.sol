@@ -6,7 +6,7 @@ import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
 
 import {EfficientCall} from "@matterlabs/zksync-contracts/l2/system-contracts/libraries/EfficientCall.sol";
-import {ReconstructionMismatch, PubdataField} from "./DAErrors.sol";
+import {PubdataField, ReconstructionMismatch} from "./DAErrors.sol";
 
 /// BitcoinDA validator. It will publish inclusion data that would allow to verify the inclusion.
 contract RollupL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
