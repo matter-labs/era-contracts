@@ -173,6 +173,12 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
     function initialize() external initializer {
         _initialize();
+        uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+        uint256 allZKChainsLength = allZKChains.length;
+        /// If there are no chains, that means we are using the contracts locally.
+        if (allZKChainsLength == 0) {
+            v30UpgradeGatewayBlockNumber = 1;
+        }
     }
 
     /// @dev The initialized used for the V30 upgrade.
@@ -193,7 +199,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         // Send the message corresponding to the relevant InteropBundle to L1.
         // slither-disable-next-line unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(this.sendV30UpgradeGatewayBlockNumber, (v30UpgradeGatewayBlockNumber))
+            abi.encodeCall(this.sendV30UpgradeGatewayBlockNumberFromGateway, (v30UpgradeGatewayBlockNumber))
         );
     }
 
@@ -211,7 +217,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_finalizeWithdrawalParams.message, 0);
         require(
-            bytes4(functionSignature) == this.sendV30UpgradeGatewayBlockNumber.selector,
+            bytes4(functionSignature) == this.sendV30UpgradeGatewayBlockNumberFromGateway.selector,
             IncorrectFunctionSignature()
         );
 
@@ -392,7 +398,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         }
         return chainBatchRoots[_chainId][_batchNumber];
     }
-
 
     /// @notice Extracts and returns proof data for settlement layer verification.
     /// @dev Wrapper function around MessageHashing._getProofData for public access.

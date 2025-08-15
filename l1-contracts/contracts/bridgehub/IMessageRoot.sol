@@ -6,7 +6,6 @@ import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageVerification} from "../common/interfaces/IMessageVerification.sol";
 import {ProofData} from "../common/libraries/MessageHashing.sol";
 
-
 /**
  * @author Matter Labs
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
@@ -53,11 +52,12 @@ interface IMessageRoot is IMessageVerification {
 
     function saveV30UpgradeGatewayBlockNumberOnL2(uint256 _v30UpgradeGatewayBlockNumber) external;
 
+    /// @dev Used to parse the merkle proof data, this function calls a library function.
     function getProofData(
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
-    ) public pure returns (ProofData memory);
+    ) external pure returns (ProofData memory);
 }

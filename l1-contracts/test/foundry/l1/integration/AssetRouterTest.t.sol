@@ -109,8 +109,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             abi.encode(506)
         );
         vm.mockCall(
-            address(addresses.l1Nullifier),
-            abi.encodeWithSelector(IL1Nullifier.getProofData.selector),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
             abi.encode(
                 ProofData({
                     settlementLayerChainId: 506,

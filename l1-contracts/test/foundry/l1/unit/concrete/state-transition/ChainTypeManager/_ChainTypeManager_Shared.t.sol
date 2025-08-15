@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.21;
 
-import {Test} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -17,6 +17,7 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
@@ -38,6 +39,8 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract ChainTypeManagerTest is Test {
+    using stdStorage for StdStorage;
+
     ChainTypeManager internal chainTypeManager;
     ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
@@ -66,6 +69,8 @@ contract ChainTypeManagerTest is Test {
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
         messageroot = new MessageRoot(bridgehub);
+        stdstore
+            .target(address(messageroot)).sig(IMessageRoot.v30UpgradeGatewayBlockNumber.selector).checked_write(uint256(1));
         vm.prank(governor);
         bridgehub.setAddresses(
             sharedBridge,
@@ -119,6 +124,14 @@ contract ChainTypeManagerTest is Test {
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getGettersSelectors()
+            })
+        );
+        facetCuts.push(
+            Diamond.FacetCut({
+                facet: address(new MailboxFacet(eraChainId, block.chainid)),
+                action: Diamond.Action.Add,
+                isFreezable: false,
+                selectors: Utils.getMailboxSelectors()
             })
         );
 

@@ -308,8 +308,8 @@ contract L1AssetRouterTest is Test {
             abi.encode(0)
         );
         vm.mockCall(
-            address(l1NullifierProxy),
-            abi.encodeWithSelector(IL1Nullifier.getProofData.selector),
+            address(messageRootAddress),
+            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
             abi.encode(
                 ProofData({
                     settlementLayerChainId: 0,

@@ -129,13 +129,4 @@ interface IL1Nullifier {
     /// @dev The transient settlement layer is cleared at the end of each transaction.
     /// @return The chain ID of the settlement layer that processed the current proof, or 0 if none is set.
     function getTransientSettlementLayer() external view returns (uint256);
-
-    /// @dev Used to parse the merkle proof data, this function calls a library function.
-    function getProofData(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _leafProofMask,
-        bytes32 _leaf,
-        bytes32[] calldata _proof
-    ) external view returns (ProofData memory);
 }

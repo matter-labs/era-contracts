@@ -46,7 +46,7 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
-import {IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
+import {IMessageVerification, IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,
@@ -116,8 +116,8 @@ contract L1GatewayTests is
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
         vm.mockCall(
-            address(addresses.l1Nullifier),
-            abi.encodeWithSelector(IL1Nullifier.getProofData.selector),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
             abi.encode(
                 ProofData({
                     settlementLayerChainId: 0,
