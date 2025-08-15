@@ -144,10 +144,8 @@ contract RollupL2DAValidatorTest is Test {
         vm.mockCall(address(PUBDATA_CHUNK_PUBLISHER), chunkPubdataToBlobsData, abi.encode(blobHashes));
 
         bytes32 operatorDAHash = finalizeAndCall(new bytes(0));
-
-        bytes32 expectedOperatorDAHash = keccak256(
-            abi.encodePacked(stateDiffsHash, keccak256(totalPubdata), uint8(blobHashes.length), blobHashes)
-        );
+        // SYSCOIN
+        bytes32 expectedOperatorDAHash = keccak256(abi.encodePacked(stateDiffsHash, keccak256(totalPubdata)));
 
         assertEq(operatorDAHash, expectedOperatorDAHash);
     }

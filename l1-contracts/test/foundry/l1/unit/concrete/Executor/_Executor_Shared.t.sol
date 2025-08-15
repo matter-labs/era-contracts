@@ -190,6 +190,10 @@ contract ExecutorTest is Test {
             abi.encode()
         );
 
+        // SYSCOIN: mock Bitcoin DA precompile (address 0x63) so that RollupL1DAValidator.checkDA
+        // does not revert inside _verifyBitcoinDA.
+        vm.mockCall(address(0x63), bytes(""), abi.encode(bytes32(uint256(1))));
+
         eraChainId = 9;
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
