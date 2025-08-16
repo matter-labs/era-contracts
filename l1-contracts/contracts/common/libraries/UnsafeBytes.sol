@@ -16,6 +16,43 @@ pragma solidity ^0.8.21;
  * Using data in inline assembly can lead to unexpected behavior!
  */
 library UnsafeBytes {
+    /// @dev Local helper to copy `len` bytes from `src` at `srcOffset` into `dest` at `destOffset`.
+    /// Correct for non-overlapping regions and handles the tail without over-write.
+    function copy(
+        bytes memory dest,
+        uint256 destOffset,
+        bytes memory src,
+        uint256 srcOffset,
+        uint256 len
+    ) internal pure {
+        if (len == 0) return;
+        assembly {
+            let dstPtr := add(add(dest, 0x20), destOffset)
+            let srcPtr := add(add(src, 0x20), srcOffset)
+
+            let chunks := and(len, not(31))
+            for {
+                let i := 0
+            } lt(i, chunks) {
+                i := add(i, 0x20)
+            } {
+                mstore(add(dstPtr, i), mload(add(srcPtr, i)))
+            }
+
+            // tail
+            let rem := and(len, 31)
+            if rem {
+                let tailDst := add(dstPtr, chunks)
+                let tailSrc := add(srcPtr, chunks)
+
+                let remBits := shl(3, rem)
+                let keepMask := shr(remBits, not(0))
+                let keep := and(mload(tailDst), keepMask)
+                let put := and(mload(tailSrc), not(keepMask))
+                mstore(tailDst, or(put, keep))
+            }
+        }
+    }
     function readUint32(bytes memory _bytes, uint256 _start) internal pure returns (uint32 result, uint256 offset) {
         assembly {
             offset := add(_start, 4)
@@ -47,9 +84,6 @@ library UnsafeBytes {
     function readRemainingBytes(bytes memory _bytes, uint256 _start) internal pure returns (bytes memory result) {
         uint256 arrayLen = _bytes.length - _start;
         result = new bytes(arrayLen);
-
-        assembly {
-            mcopy(add(result, 0x20), add(_bytes, add(0x20, _start)), arrayLen)
-        }
+        copy({dest: result, destOffset: 0, src: _bytes, srcOffset: _start, len: arrayLen});
     }
 }
