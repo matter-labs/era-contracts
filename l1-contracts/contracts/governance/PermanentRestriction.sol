@@ -32,6 +32,30 @@ uint256 constant MAX_ALLOWED_NONCE = (1 << 48);
 /// @dev To be deployed as a transparent upgradable proxy, owned by a trusted decentralized governance.
 /// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
 contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2StepUpgradeable {
+    /// @dev Local helper to copy `len` bytes from `src` at `srcOffset` into `dest` at `destOffset`.
+    function _copyBytes(bytes memory dest, uint256 destOffset, bytes memory src, uint256 srcOffset, uint256 len) internal pure {
+        if (len == 0) return;
+        assembly {
+            let dstPtr := add(add(dest, 0x20), destOffset)
+            let srcPtr := add(add(src, 0x20), srcOffset)
+
+            let chunks := and(len, not(31))
+            for { let i := 0 } lt(i, chunks) { i := add(i, 0x20) } {
+                mstore(add(dstPtr, i), mload(add(srcPtr, i)))
+            }
+
+            let rem := and(len, 31)
+            if rem {
+                let tailDst := add(dstPtr, chunks)
+                let tailSrc := add(srcPtr, chunks)
+                let remBits := shl(3, rem)
+                let keepMask := shr(remBits, not(0))
+                let keep := and(mload(tailDst), keepMask)
+                let put := and(mload(tailSrc), not(keepMask))
+                mstore(tailDst, or(put, keep))
+            }
+        }
+    }
     /// @notice The address of the Bridgehub contract.
     IBridgehub public immutable BRIDGE_HUB;
 
@@ -316,29 +340,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
         bytes memory encodedData = new bytes(secondBridgeData.length - 1);
-        assembly {
-            let len := mload(encodedData)
-            let src := add(secondBridgeData, 0x21)
-            let dest := add(encodedData, 0x20)
-            let end := add(src, len)
-            
-            // Copy in 32-byte chunks
-            for { } lt(src, end) { } {
-                mstore(dest, mload(src))
-                src := add(src, 0x20)
-                dest := add(dest, 0x20)
-            }
-            
-            // Handle remaining bytes if any
-            let remaining := mod(len, 0x20)
-            if remaining {
-                let lastSrc := sub(end, remaining)
-                let lastDest := sub(add(encodedData, add(0x20, len)), remaining)
-                let mask := sub(shl(mul(remaining, 8), 1), 1)
-                let lastData := and(mload(lastSrc), mask)
-                mstore(lastDest, lastData)
-            }
-        }
+        _copyBytes(encodedData, 0, secondBridgeData, 1, encodedData.length);
 
 
         // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
