@@ -10,7 +10,7 @@ contract PermanentRestrictionHarness is PermanentRestriction {
 
     function copyNew(bytes memory src, uint256 srcOffset, uint256 len) external pure returns (bytes memory out) {
         out = new bytes(len);
-        _copyBytes({ dest: out, destOffset: 0, src: src, srcOffset: srcOffset, len: len });
+        _copyBytes({dest: out, destOffset: 0, src: src, srcOffset: srcOffset, len: len});
     }
 }
 
