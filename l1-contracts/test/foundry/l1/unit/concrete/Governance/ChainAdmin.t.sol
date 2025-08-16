@@ -10,7 +10,8 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {DummyRestriction} from "contracts/dev-contracts/DummyRestriction.sol";
-import {NotARestriction, NoCallsProvided, RestrictionWasAlreadyPresent, RestrictionWasNotPresent, AccessToFallbackDenied, AccessToFunctionDenied} from "contracts/common/L1ContractErrors.sol";
+import {AccessToFallbackDenied, AccessToFunctionDenied, NoCallsProvided, NotARestriction, RestrictionWasAlreadyPresent, RestrictionWasNotPresent} from "contracts/common/L1ContractErrors.sol";
+import {ChainAdmin as ChainAdminContract} from "contracts/governance/ChainAdmin.sol";
 import {Utils} from "test/foundry/l1/unit/concrete/Utils/Utils.sol";
 
 contract ChainAdminTest is Test {
@@ -36,6 +37,37 @@ contract ChainAdminTest is Test {
 
         gettersFacet = new GettersFacet();
         dummyRestriction = new DummyRestriction(true);
+    }
+
+    function test_multicall_reverts_without_restrictions_unless_bootstrap() public {
+        // Deploy a fresh ChainAdmin with NO restrictions
+        address[] memory empty = new address[](0);
+        ChainAdminContract fresh = new ChainAdminContract(empty);
+
+        // Prepare an arbitrary call that is NOT addRestriction
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
+
+        // Expect revert due to NoActiveRestrictions (custom error)
+        vm.expectRevert(ChainAdminContract.NoActiveRestrictions.selector);
+        fresh.multicall(calls, true);
+
+        // Now try bootstrap path: only addRestriction(address) targeting self is allowed
+        DummyRestriction r = new DummyRestriction(true);
+        Call[] memory bootstrap = new Call[](1);
+        bootstrap[0] = Call({
+            target: address(fresh),
+            value: 0,
+            data: abi.encodeCall(fresh.addRestriction, (address(r)))
+        });
+
+        // Should succeed (no revert)
+        fresh.multicall(bootstrap, true);
+
+        // After bootstrap, arbitrary admin calls can be validated by restrictions (dummy does nothing)
+        Call[] memory post = new Call[](1);
+        post[0] = Call({target: address(gettersFacet), value: 0, data: abi.encodeCall(gettersFacet.getAdmin, ())});
+        fresh.multicall(post, true);
     }
 
     function test_getRestrictions() public {
