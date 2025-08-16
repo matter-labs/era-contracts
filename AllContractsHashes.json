@@ -1033,11 +1033,11 @@
   },
   {
     "contractName": "l1-contracts/GatewayUpgrade",
-    "zkBytecodeHash": "0x010005812e0bb9acc0f11f712e34dde228d58df902432560c8f6d1a78206446b",
+    "zkBytecodeHash": "0x01000581f5d8cd9829098861d0a151b57c71d5d30e8e5120d4ad50bf52fa5f9f",
     "zkBytecodePath": "/l1-contracts/zkout/GatewayUpgrade.sol/GatewayUpgrade.json",
-    "evmBytecodeHash": "0x7cbac2777063ac4b382f33f674bfaaec27db5296405371d8e01101236aeab164",
+    "evmBytecodeHash": "0xb3f5b751e7326261c21e208e71639dfe380dc01c83e08178c12ea974c4d8915b",
     "evmBytecodePath": "/l1-contracts/out/GatewayUpgrade.sol/GatewayUpgrade.json",
-    "evmDeployedBytecodeHash": "0x8ca6be659ca9128ec4364bfe164ce038e645432e87f6cf5f6d876a71c6882abf"
+    "evmDeployedBytecodeHash": "0x15cb7d6a539c63711c6099ffa4adbcd0646355438cbb380b69c3e1adb515c120"
   },
   {
     "contractName": "l1-contracts/GettersFacet",
