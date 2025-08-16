@@ -29,7 +29,11 @@ contract UnsafeBytes_CopyTest is Test {
             let dst := add(out, 0x20)
             let s := add(add(src, 0x20), srcOffset)
             let chunks := and(len, not(31))
-            for { let i := 0 } lt(i, chunks) { i := add(i, 0x20) } {
+            for {
+                let i := 0
+            } lt(i, chunks) {
+                i := add(i, 0x20)
+            } {
                 mstore(add(dst, i), mload(add(s, i)))
             }
             let rem := and(len, 31)
@@ -103,5 +107,3 @@ contract UnsafeBytes_CopyTest is Test {
         assertEq(dst, ref, "copy != reference");
     }
 }
-
-

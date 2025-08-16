@@ -19,5 +19,3 @@ contract UnsafeBytes_MCopyOracle is Test {
         assertEq(a, b, "readRemainingBytes != mcopy");
     }
 }
-
-

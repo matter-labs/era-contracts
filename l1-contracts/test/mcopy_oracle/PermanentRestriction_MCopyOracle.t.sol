@@ -19,7 +19,11 @@ contract PermanentRestriction_MCopyOracle is Test {
             let dstPtr := add(out, 0x20)
             let srcPtr := add(add(src, 0x20), srcOffset)
             let chunks := and(len, not(31))
-            for { let i := 0 } lt(i, chunks) { i := add(i, 0x20) } {
+            for {
+                let i := 0
+            } lt(i, chunks) {
+                i := add(i, 0x20)
+            } {
                 mstore(add(dstPtr, i), mload(add(srcPtr, i)))
             }
             let rem := and(len, 31)
@@ -43,5 +47,3 @@ contract PermanentRestriction_MCopyOracle is Test {
         assertEq(a, b, "_copyBytes != mcopy");
     }
 }
-
-

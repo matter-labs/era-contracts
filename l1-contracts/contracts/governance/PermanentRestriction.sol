@@ -33,14 +33,24 @@ uint256 constant MAX_ALLOWED_NONCE = (1 << 48);
 /// @dev Once of the instances of such contract is to ensure that a ZkSyncHyperchain is a rollup forever.
 contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2StepUpgradeable {
     /// @dev Local helper to copy `len` bytes from `src` at `srcOffset` into `dest` at `destOffset`.
-    function _copyBytes(bytes memory dest, uint256 destOffset, bytes memory src, uint256 srcOffset, uint256 len) internal pure {
+    function _copyBytes(
+        bytes memory dest,
+        uint256 destOffset,
+        bytes memory src,
+        uint256 srcOffset,
+        uint256 len
+    ) internal pure {
         if (len == 0) return;
         assembly {
             let dstPtr := add(add(dest, 0x20), destOffset)
             let srcPtr := add(add(src, 0x20), srcOffset)
 
             let chunks := and(len, not(31))
-            for { let i := 0 } lt(i, chunks) { i := add(i, 0x20) } {
+            for {
+                let i := 0
+            } lt(i, chunks) {
+                i := add(i, 0x20)
+            } {
                 mstore(add(dstPtr, i), mload(add(srcPtr, i)))
             }
 
@@ -341,7 +351,6 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
         }
         bytes memory encodedData = new bytes(secondBridgeData.length - 1);
         _copyBytes(encodedData, 0, secondBridgeData, 1, encodedData.length);
-
 
         // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
         // supported only in the new protocol version with Gateway support, so we can assume
