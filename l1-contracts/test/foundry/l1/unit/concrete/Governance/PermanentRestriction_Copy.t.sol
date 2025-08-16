@@ -27,26 +27,7 @@ contract PermanentRestriction_CopyTest is Test {
     function _reference(bytes memory src, uint256 srcOffset, uint256 len) internal pure returns (bytes memory out) {
         out = new bytes(len);
         assembly {
-            let dst := add(out, 0x20)
-            let s := add(add(src, 0x20), srcOffset)
-            let chunks := and(len, not(31))
-            for {
-                let i := 0
-            } lt(i, chunks) {
-                i := add(i, 0x20)
-            } {
-                mstore(add(dst, i), mload(add(s, i)))
-            }
-            let rem := and(len, 31)
-            if rem {
-                let tailDst := add(dst, chunks)
-                let tailSrc := add(s, chunks)
-                let remBits := shl(3, rem)
-                let keepMask := shr(remBits, not(0))
-                let keep := and(mload(tailDst), keepMask)
-                let put := and(mload(tailSrc), not(keepMask))
-                mstore(tailDst, or(put, keep))
-            }
+            mcopy(add(out, 0x20), add(add(src, 0x20), srcOffset), len)
         }
     }
 
