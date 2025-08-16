@@ -84,6 +84,6 @@ library UnsafeBytes {
     function readRemainingBytes(bytes memory _bytes, uint256 _start) internal pure returns (bytes memory result) {
         uint256 arrayLen = _bytes.length - _start;
         result = new bytes(arrayLen);
-        copy(result, 0, _bytes, _start, arrayLen);
+        copy({dest: result, destOffset: 0, src: _bytes, srcOffset: _start, len: arrayLen});
     }
 }

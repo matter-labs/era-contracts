@@ -350,7 +350,7 @@ contract PermanentRestriction is Restriction, IPermanentRestriction, Ownable2Ste
             return (address(0), false);
         }
         bytes memory encodedData = new bytes(secondBridgeData.length - 1);
-        _copyBytes(encodedData, 0, secondBridgeData, 1, encodedData.length);
+        _copyBytes({dest: encodedData, destOffset: 0, src: secondBridgeData, srcOffset: 1, len: encodedData.length});
 
         // From now on, we know that the used encoding version is `NEW_ENCODING_VERSION` that is
         // supported only in the new protocol version with Gateway support, so we can assume
