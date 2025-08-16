@@ -31,6 +31,12 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     /// @notice The set of active restrictions.
     EnumerableSet.AddressSet internal activeRestrictions;
 
+    /// @notice Reverted when attempting to execute admin calls without any active restrictions.
+    /// @dev The contract is intentionally deployed without built-in access control and relies on `IRestriction`
+    /// contracts to enforce policy. Blocking arbitrary calls when there are no active restrictions prevents
+    /// accidentally deploying a permissionless admin.
+    error NoActiveRestrictions();
+
     /// @notice Ensures that only the `ChainAdmin` contract itself can call the function.
     /// @dev All functions that require access-control should use `onlySelf` modifier, while the access control logic
     /// should be implemented in the restriction contracts.
@@ -90,6 +96,19 @@ contract ChainAdmin is IChainAdmin, ReentrancyGuard {
     function multicall(Call[] calldata _calls, bool _requireSuccess) external payable nonReentrant {
         if (_calls.length == 0) {
             revert NoCallsProvided();
+        }
+        // If there are no active restrictions, allow only bootstrap calls that add restrictions.
+        // This prevents accidental permissionless deployments while preserving the ability to arm
+        // the admin by calling `addRestriction` via `multicall`.
+        if (activeRestrictions.length() == 0) {
+            for (uint256 i = 0; i < _calls.length; ++i) {
+                // Only allow calls that target this contract and invoke addRestriction(address).
+                if (
+                    _calls[i].target != address(this) || bytes4(_calls[i].data) != this.addRestriction.selector
+                ) {
+                    revert NoActiveRestrictions();
+                }
+            }
         }
         for (uint256 i = 0; i < _calls.length; ++i) {
             _validateCall(_calls[i]);
