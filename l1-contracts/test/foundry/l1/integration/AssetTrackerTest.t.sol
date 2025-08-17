@@ -38,6 +38,7 @@ import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 import {L2AssetTracker, IL2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {L1AssetTracker, IL1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
@@ -165,8 +166,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         });
         vm.chainId(originalChainId);
         vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
         vm.mockCall(
@@ -270,8 +271,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         vm.chainId(originalChainId);
         vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
         // vm.mockCall(
