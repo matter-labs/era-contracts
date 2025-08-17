@@ -3,7 +3,7 @@
 pragma solidity ^0.8.24;
 
 import {L2Log, L2Message, TxStatus} from "./Messaging.sol";
-import {IMessageVerification, FinalizeL1DepositParams} from "./interfaces/IMessageVerification.sol";
+import {FinalizeL1DepositParams, IMessageVerification} from "./interfaces/IMessageVerification.sol";
 import {MessageHashing} from "./libraries/MessageHashing.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.

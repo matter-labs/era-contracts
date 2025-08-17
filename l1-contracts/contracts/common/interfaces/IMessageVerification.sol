@@ -2,7 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {L2Log, L2Message, TxStatus, FinalizeL1DepositParams} from "../Messaging.sol";
+import {FinalizeL1DepositParams, L2Log, L2Message, TxStatus} from "../Messaging.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @author Matter Labs
