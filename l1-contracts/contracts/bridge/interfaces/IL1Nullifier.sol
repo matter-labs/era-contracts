@@ -7,7 +7,6 @@ import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
-import {ProofData} from "../../common/libraries/MessageHashing.sol";
 
 /// @dev Transient storage slot for storing the settlement layer chain ID during proof verification.
 /// @dev This slot is used to temporarily store which settlement layer is processing the current proof,
