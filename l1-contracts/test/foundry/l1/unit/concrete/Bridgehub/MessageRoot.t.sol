@@ -106,7 +106,7 @@ contract MessageRootTest is Test {
         vm.expectEmit(true, false, false, false);
         emit MessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
         vm.expectEmit(true, false, false, false);
-        emit MessageRoot.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
+        emit MessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
 
