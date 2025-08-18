@@ -12,7 +12,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {MessageVerification} from "contracts/state-transition/chain-deps/facets/MessageVerification.sol";
+import {MessageVerification} from "contracts/common/MessageVerification.sol";
 import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -65,7 +65,7 @@ library Utils {
     }
 
     function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](9);
+        bytes[] memory logs = new bytes[](10);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -119,6 +119,12 @@ library Utils {
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
             bytes32("")
+        );
+        logs[9] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY),
+            bytes32(uint256(uint160(block.chainid)))
         );
 
         return logs;
@@ -335,7 +341,7 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](9);
         uint256 i = 0;
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
@@ -345,6 +351,7 @@ library Utils {
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
+        selectors[i++] = MailboxFacet.requestL2ServiceTransaction.selector;
         return selectors;
     }
 

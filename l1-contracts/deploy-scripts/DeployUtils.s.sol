@@ -372,12 +372,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     config.ownerAddress,
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridgehub.assetTrackerProxy,
                     addresses.bridgehub.messageRootProxy
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return
                 abi.encode(
                     addresses.bridgehub.bridgehubProxy,
+                    addresses.bridgehub.messageRootProxy,
                     addresses.bridgehub.interopCenterProxy,
                     config.eraChainId,
                     addresses.stateTransition.diamondProxy
@@ -466,7 +468,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "DiamondInit")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "AssetTracker")) {
+        } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(
                     config.l1ChainId,

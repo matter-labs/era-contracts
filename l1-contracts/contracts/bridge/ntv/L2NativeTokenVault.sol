@@ -16,8 +16,9 @@ import {NativeTokenVault} from "./NativeTokenVault.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
+import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
@@ -78,6 +79,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
+    function _assetTracker() internal view override returns (IAssetTrackerBase) {
+        return IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
+    }
+
     function _registerTokenIfBridgedLegacy(address _tokenAddress) internal override returns (bytes32) {
         // In zkEVM immutables are stored in a storage of a system contract,
         // so it makes sense to cache them for efficiency.
@@ -114,11 +119,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     ) internal returns (bytes32 newAssetId) {
         newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(newAssetId);
-        tokenAddress[newAssetId] = _l2TokenAddress;
-        assetId[_l2TokenAddress] = newAssetId;
-        originChainId[newAssetId] = L1_CHAIN_ID;
-        bridgedTokens[bridgedTokensCount] = newAssetId;
-        ++bridgedTokensCount;
+        _setLegacyTokenData(newAssetId, _l2TokenAddress);
     }
 
     /// @notice Ensures that the token is deployed.
@@ -163,16 +164,20 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         address _expectedToken,
         address _l1LegacyToken
     ) internal {
-        _assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
+        DataEncoding.assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
 
         /// token is a legacy token, no need to deploy
         require(_l1LegacyToken == _originToken, AddressMismatch(_originToken, _l1LegacyToken));
+        _setLegacyTokenData(_assetId, _expectedToken);
+    }
 
+    function _setLegacyTokenData(bytes32 _assetId, address _expectedToken) internal {
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
         originChainId[_assetId] = L1_CHAIN_ID;
         bridgedTokens[bridgedTokensCount] = _assetId;
         ++bridgedTokensCount;
+        _assetTracker().registerLegacyTokenOnChain(_assetId);
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
@@ -250,27 +255,19 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
             : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
 
-    function _handleChainBalanceIncrease(
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) internal override {
+    function _handleBridgeToChain(uint256, bytes32 _assetId, uint256) internal override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
+        // We need to check the migration number.
+        L2_ASSET_TRACKER.handleInitiateBridgingOnL2(_assetId);
     }
 
-    function _handleChainBalanceDecrease(
-        uint256 _tokenOriginChainId,
-        uint256 _chainId,
-        bytes32 _assetId,
-        uint256 _amount,
-        bool _isNative
-    ) internal override {
+    function _handleBridgeFromChain(uint256, bytes32 _assetId, uint256) internal override {
         // on L2s we don't track the balance.
         // Note GW->L2 txs are not allowed. Even for GW, transactions go through L1,
         // so L2NativeTokenVault doesn't have to handle balance changes on GW.
+        L2_ASSET_TRACKER.handleFinalizeBridgingOnL2(_assetId, tokenAddress[_assetId]);
     }
 
     function _registerToken(address _nativeToken) internal override returns (bytes32) {

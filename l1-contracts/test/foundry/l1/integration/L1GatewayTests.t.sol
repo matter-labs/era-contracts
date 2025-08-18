@@ -25,9 +25,9 @@ import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contract
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {FinalizeL1DepositParams, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {FinalizeL1DepositParams, L1Nullifier, IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IZKChain, IGetters} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -44,6 +44,9 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {IMessageVerification, IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,
@@ -111,6 +114,23 @@ contract L1GatewayTests is
         gatewayChain = IZKChain(IBridgehub(addresses.bridgehub).getZKChain(gatewayChainId));
         vm.deal(migratingChain.getAdmin(), 100000000000000000000000000000000000);
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
+
+        vm.mockCall(
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageRoot.getProofData.selector),
+            abi.encode(
+                ProofData({
+                    settlementLayerChainId: 0,
+                    settlementLayerBatchNumber: 0,
+                    settlementLayerBatchRootMask: 0,
+                    batchLeafProofLen: 0,
+                    batchSettlementRoot: 0,
+                    chainIdLeaf: 0,
+                    ptr: 0,
+                    finalProofNode: false
+                })
+            )
+        );
 
         // vm.deal(msg.sender, 100000000000000000000000000000000000);
         // vm.deal(bridgehub, 100000000000000000000000000000000000);
@@ -204,16 +224,16 @@ contract L1GatewayTests is
 
         // Mock Call for Msg Inclusion
         vm.mockCall(
-            address(addresses.bridgehub),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
-                migratingChainId,
-                l2TxHash,
-                l2BatchNumber,
-                l2MessageIndex,
-                l2TxNumberInBatch,
-                merkleProof,
-                TxStatus.Failure
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector
+                // migratingChainId,
+                // l2TxHash,
+                // l2BatchNumber,
+                // l2MessageIndex,
+                // l2TxNumberInBatch,
+                // merkleProof,
+                // TxStatus.Failure
             ),
             abi.encode(true)
         );
@@ -263,8 +283,8 @@ contract L1GatewayTests is
         // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
         vm.chainId(migratingChainId);
         vm.mockCall(
-            address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.proveL2MessageInclusion.selector),
+            address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
         vm.mockCall(
@@ -276,6 +296,11 @@ contract L1GatewayTests is
             address(addresses.chainTypeManager),
             abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
             abi.encode(addresses.chainTypeManager.protocolVersion())
+        );
+        vm.mockCall(
+            address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encode(2)
         );
 
         uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
@@ -291,7 +316,9 @@ contract L1GatewayTests is
             chainId: migratingChainId,
             baseTokenAssetId: baseTokenAssetId,
             ctmData: ctmData,
-            chainData: chainData
+            chainData: chainData,
+            migrationNumber: IChainAssetHandler(address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
+                .getMigrationNumber(migratingChainId)
         });
         bytes memory bridgehubMintData = abi.encode(data);
         bytes memory message = abi.encodePacked(
@@ -329,6 +356,7 @@ contract L1GatewayTests is
         DefaultUpgrade upgradeImpl = new DefaultUpgrade();
         uint256 currentProtocolVersion = migratingChain.getProtocolVersion();
         (uint32 major, uint32 minor, uint32 patch) = SemVer.unpackSemVer(uint96(currentProtocolVersion));
+        uint256 newProtocolVersion = SemVer.packSemVer(major, minor + 1, patch);
 
         ProposedUpgrade memory upgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: Utils.makeEmptyL2CanonicalTransaction(),
@@ -344,7 +372,7 @@ contract L1GatewayTests is
             l1ContractsUpgradeCalldata: hex"",
             postUpgradeCalldata: hex"",
             upgradeTimestamp: 0,
-            newProtocolVersion: SemVer.packSemVer(major, minor + 1, patch)
+            newProtocolVersion: newProtocolVersion
         });
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -357,6 +385,11 @@ contract L1GatewayTests is
             ctm,
             abi.encodeCall(IChainTypeManager.upgradeCutHash, (currentProtocolVersion)),
             abi.encode(keccak256(abi.encode(diamondCut)))
+        );
+        vm.mockCall(
+            address(gatewayChain),
+            abi.encodeCall(IGetters.getProtocolVersion, ()),
+            abi.encode(newProtocolVersion)
         );
 
         vm.startBroadcast(migratingChain.getAdmin());

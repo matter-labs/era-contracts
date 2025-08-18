@@ -28,7 +28,8 @@ contract IncrementalMerkleTestTest is Test {
             new bytes32[](14),
             new bytes32[](14),
             0,
-            0
+            0,
+            false
         );
         merkleTestMemory.setup(zero);
     }
@@ -154,7 +155,7 @@ contract IncrementalMerkleTestTest is Test {
     function testFromServer() public {
         uint256 length = 15;
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMemory = DynamicIncrementalMerkleMemory
-            .Bytes32PushTree(0, new bytes32[](length), new bytes32[](length), 0, 0);
+            .Bytes32PushTree(0, new bytes32[](length), new bytes32[](length), 0, 0, false);
         merkleTestMemory.setup(zero);
         merkleTestMemory.push(bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd"));
         merkleTestMemory.push(bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12"));
@@ -168,5 +169,107 @@ contract IncrementalMerkleTestTest is Test {
         // console.logBytes32(keccak256(bytes.concat(merkleTestMemory.rootMemory(), aggregatedRootHash)));
 
         merkleTestMemory.root();
+    }
+
+    function testPushLazySingleElement() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestRegular = setUpMemory();
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestLazy = setUpMemory();
+
+        // Regular push
+        merkleTestRegular.push(bytes32(uint256(0)));
+
+        // Lazy push
+        merkleTestLazy.pushLazy(bytes32(uint256(0)));
+
+        // Both should produce the same root
+        assertEq(merkleTestRegular.root(), merkleTestLazy.root());
+        assertEq(merkleTestRegular._nextLeafIndex, merkleTestLazy._nextLeafIndex);
+        assertEq(merkleTestRegular.height(), merkleTestLazy.height());
+    }
+
+    function testPushLazyMultipleElements() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestRegular = setUpMemory();
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestLazy = setUpMemory();
+
+        // Regular pushes
+        merkleTestRegular.push(bytes32(uint256(0)));
+        merkleTestRegular.push(bytes32(uint256(1)));
+        merkleTestRegular.push(bytes32(uint256(2)));
+
+        // Lazy pushes
+        merkleTestLazy.pushLazy(bytes32(uint256(0)));
+        merkleTestLazy.pushLazy(bytes32(uint256(1)));
+        merkleTestLazy.pushLazy(bytes32(uint256(2)));
+
+        // Both should produce the same root
+        assertEq(merkleTestRegular.root(), merkleTestLazy.root());
+        assertEq(merkleTestRegular._nextLeafIndex, merkleTestLazy._nextLeafIndex);
+        assertEq(merkleTestRegular.height(), merkleTestLazy.height());
+    }
+
+    function testPushLazyMixedOperations() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestRegular = setUpMemory();
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestMixed = setUpMemory();
+
+        // Regular pushes
+        merkleTestRegular.push(bytes32(uint256(0)));
+        merkleTestRegular.push(bytes32(uint256(1)));
+        merkleTestRegular.push(bytes32(uint256(2)));
+        merkleTestRegular.push(bytes32(uint256(3)));
+
+        // Mixed pushes - some lazy, some regular
+        merkleTestMixed.pushLazy(bytes32(uint256(0)));
+        merkleTestMixed.pushLazy(bytes32(uint256(1)));
+        merkleTestMixed.push(bytes32(uint256(2))); // This should process pending leaves
+        merkleTestMixed.push(bytes32(uint256(3)));
+
+        // Both should produce the same root
+        assertEq(merkleTestRegular.root(), merkleTestMixed.root());
+        assertEq(merkleTestRegular._nextLeafIndex, merkleTestMixed._nextLeafIndex);
+        assertEq(merkleTestRegular.height(), merkleTestMixed.height());
+    }
+
+    function testPushLazyBatchProcessing() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestRegular = setUpMemory();
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestLazy = setUpMemory();
+
+        uint256 numElements = 42;
+
+        // Regular pushes
+        for (uint256 i = 0; i < numElements; i++) {
+            merkleTestRegular.push(bytes32(i));
+        }
+
+        // Lazy pushes
+        for (uint256 i = 0; i < numElements; i++) {
+            merkleTestLazy.pushLazy(bytes32(i));
+        }
+
+        // Both should produce the same root
+        assertEq(merkleTestRegular.root(), merkleTestLazy.root());
+        assertEq(merkleTestRegular._nextLeafIndex, merkleTestLazy._nextLeafIndex);
+        assertEq(merkleTestRegular.height(), merkleTestLazy.height());
+    }
+
+    function testPushLazySmallBatch() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestRegular = setUpMemory();
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleTestLazy = setUpMemory();
+
+        uint256 numElements = 4;
+
+        // Regular pushes
+        for (uint256 i = 0; i < numElements; i++) {
+            merkleTestRegular.push(bytes32(i));
+        }
+
+        // Lazy pushes
+        for (uint256 i = 0; i < numElements; i++) {
+            merkleTestLazy.pushLazy(bytes32(i));
+        }
+
+        // Both should produce the same root
+        assertEq(merkleTestRegular.root(), merkleTestLazy.root());
+        assertEq(merkleTestRegular._nextLeafIndex, merkleTestLazy._nextLeafIndex);
+        assertEq(merkleTestRegular.height(), merkleTestLazy.height());
     }
 }

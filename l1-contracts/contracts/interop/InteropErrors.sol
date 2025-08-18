@@ -21,10 +21,14 @@ error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executi
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0x32c2e156
 error MessageNotIncluded();
+// 0x9fb22a6f
+error SettlmentLayerBatchNumberTooLow();
 // 0x89fd2c76
 error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281
 error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbundlerAddress);
+// 0xe1c9e479
+error UnsupportedAttribute(bytes4 selector);
 // 0x801534e9
 error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
 // 0x4534e972
