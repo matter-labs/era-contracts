@@ -541,6 +541,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
         emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
+        emit NewPriorityRequestId(_transaction.nonce);
     }
 
     // solhint-disable-next-line no-unused-vars
