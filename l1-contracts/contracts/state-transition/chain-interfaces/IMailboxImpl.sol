@@ -168,6 +168,10 @@ interface IMailboxImpl is IZKChainBase {
         bytes[] factoryDeps
     );
 
+    event NewPriorityRequestId(
+        uint256 indexed txId
+    );
+
     /// @notice New relayed priority request event. It is emitted on a chain that is deployed
     /// on top of the gateway when it receives a request relayed via the Bridgehub.
     /// @dev IMPORTANT: this event most likely will be removed in the future, so

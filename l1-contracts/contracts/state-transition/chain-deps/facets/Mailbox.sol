@@ -80,12 +80,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         }
         return
             super.proveL2MessageInclusionShared({
-                _chainId: _chainId,
-                _blockOrBatchNumber: _blockOrBatchNumber,
-                _index: _index,
-                _message: _message,
-                _proof: _proof
-            });
+            _chainId: _chainId,
+            _blockOrBatchNumber: _blockOrBatchNumber,
+            _index: _index,
+            _message: _message,
+            _proof: _proof
+        });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -97,12 +97,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) public view returns (bool) {
         return
             _proveL2LogInclusion({
-                _chainId: s.chainId,
-                _blockOrBatchNumber: _batchNumber,
-                _index: _index,
-                _log: _l2MessageToLog(_message),
-                _proof: _proof
-            });
+            _chainId: s.chainId,
+            _blockOrBatchNumber: _batchNumber,
+            _index: _index,
+            _log: _l2MessageToLog(_message),
+            _proof: _proof
+        });
     }
 
     /// @inheritdoc IMessageVerification
@@ -118,12 +118,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         }
         return
             super.proveL2LogInclusionShared({
-                _chainId: _chainId,
-                _blockOrBatchNumber: _blockOrBatchNumber,
-                _index: _index,
-                _log: _log,
-                _proof: _proof
-            });
+            _chainId: _chainId,
+            _blockOrBatchNumber: _blockOrBatchNumber,
+            _index: _index,
+            _log: _log,
+            _proof: _proof
+        });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -135,12 +135,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) external view returns (bool) {
         return
             _proveL2LogInclusion({
-                _chainId: s.chainId,
-                _blockOrBatchNumber: _batchNumber,
-                _index: _index,
-                _log: _log,
-                _proof: _proof
-            });
+            _chainId: s.chainId,
+            _blockOrBatchNumber: _batchNumber,
+            _index: _index,
+            _log: _log,
+            _proof: _proof
+        });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -172,12 +172,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         });
         return
             _proveL2LogInclusion({
-                _chainId: s.chainId,
-                _blockOrBatchNumber: _l2BatchNumber,
-                _index: _l2MessageIndex,
-                _log: l2Log,
-                _proof: _merkleProof
-            });
+            _chainId: s.chainId,
+            _blockOrBatchNumber: _l2BatchNumber,
+            _index: _l2MessageIndex,
+            _log: l2Log,
+            _proof: _merkleProof
+        });
     }
 
     /// @inheritdoc IMessageVerification
@@ -193,12 +193,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         }
         return
             super.proveL2LeafInclusionShared({
-                _chainId: _chainId,
-                _blockOrBatchNumber: _blockOrBatchNumber,
-                _leafProofMask: _leafProofMask,
-                _leaf: _leaf,
-                _proof: _proof
-            });
+            _chainId: _chainId,
+            _blockOrBatchNumber: _blockOrBatchNumber,
+            _leafProofMask: _leafProofMask,
+            _leaf: _leaf,
+            _proof: _proof
+        });
     }
 
     /// @inheritdoc IMailboxImpl
@@ -210,12 +210,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) external view returns (bool) {
         return
             _proveL2LeafInclusion({
-                _chainId: s.chainId,
-                _batchNumber: _batchNumber,
-                _leafProofMask: _leafProofMask,
-                _leaf: _leaf,
-                _proof: _proof
-            });
+            _chainId: s.chainId,
+            _batchNumber: _batchNumber,
+            _leafProofMask: _leafProofMask,
+            _leaf: _leaf,
+            _proof: _proof
+        });
     }
 
     function _proveL2LeafInclusion(
@@ -262,11 +262,11 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         return
             IMailbox(settlementLayerAddress).proveL2LeafInclusion(
-                proofData.settlementLayerBatchNumber,
-                proofData.settlementLayerBatchRootMask,
-                proofData.chainIdLeaf,
-                MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
-            );
+            proofData.settlementLayerBatchNumber,
+            proofData.settlementLayerBatchRootMask,
+            proofData.chainIdLeaf,
+            MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
+        );
     }
 
     /// @inheritdoc IMailboxImpl
@@ -289,7 +289,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             revert BaseTokenGasPriceDenominatorNotSet();
         }
         uint256 l1GasPriceConverted = (_l1GasPrice * s.baseTokenGasPriceMultiplierNominator) /
-            s.baseTokenGasPriceMultiplierDenominator;
+                        s.baseTokenGasPriceMultiplierDenominator;
         uint256 pubdataPriceBaseToken;
         if (feeParams.pubdataPricingMode == PubdataPricingMode.Rollup) {
             // slither-disable-next-line divide-before-multiply
@@ -350,19 +350,19 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         );
         return
             BridgehubL2TransactionRequest({
-                /// There is no sender for the wrapping, we use a virtual address.
-                sender: SETTLEMENT_LAYER_RELAY_SENDER,
-                contractL2: L2_BRIDGEHUB_ADDR,
-                mintValue: 0,
-                l2Value: 0,
-                // Very large amount
-                l2GasLimit: 72_000_000,
-                l2Calldata: data,
-                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                factoryDeps: new bytes[](0),
-                // Tx is free, no so refund recipient needed
-                refundRecipient: address(0)
-            });
+        /// There is no sender for the wrapping, we use a virtual address.
+            sender: SETTLEMENT_LAYER_RELAY_SENDER,
+            contractL2: L2_BRIDGEHUB_ADDR,
+            mintValue: 0,
+            l2Value: 0,
+        // Very large amount
+            l2GasLimit: 72_000_000,
+            l2Calldata: data,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            factoryDeps: new bytes[](0),
+        // Tx is free, no so refund recipient needed
+            refundRecipient: address(0)
+        });
     }
 
     ///  @inheritdoc IMailboxImpl
@@ -376,12 +376,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 contractL2: _contractL2,
                 mintValue: 0,
                 l2Value: 0,
-                // Very large amount
+            // Very large amount
                 l2GasLimit: 72_000_000,
                 l2Calldata: _l2Calldata,
                 l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
                 factoryDeps: new bytes[](0),
-                // Tx is free, so no refund recipient needed
+            // Tx is free, so no refund recipient needed
                 refundRecipient: address(0)
             })
         );
@@ -403,13 +403,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (s.transactionFilterer != address(0)) {
             if (
                 !ITransactionFilterer(s.transactionFilterer).isTransactionAllowed({
-                    sender: _request.sender,
-                    contractL2: _request.contractL2,
-                    mintValue: _request.mintValue,
-                    l2Value: _request.l2Value,
-                    l2Calldata: _request.l2Calldata,
-                    refundRecipient: _request.refundRecipient
-                })
+                sender: _request.sender,
+                contractL2: _request.contractL2,
+                mintValue: _request.mintValue,
+                l2Value: _request.l2Value,
+                l2Calldata: _request.l2Calldata,
+                refundRecipient: _request.refundRecipient
+            })
             ) {
                 revert TransactionNotAllowed();
             }
@@ -503,7 +503,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             maxFeePerGas: uint256(_priorityOpParams.l2GasPrice),
             maxPriorityFeePerGas: uint256(0),
             paymaster: uint256(0),
-            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
+        // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
             nonce: uint256(_priorityOpParams.txId),
             value: request.l2Value,
             reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
@@ -541,6 +541,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
         emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
+        emit NewPriorityRequestId(_transaction.nonce);
     }
 
     // solhint-disable-next-line no-unused-vars
