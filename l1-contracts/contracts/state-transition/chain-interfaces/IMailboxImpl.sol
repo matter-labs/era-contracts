@@ -168,6 +168,13 @@ interface IMailboxImpl is IZKChainBase {
         bytes[] factoryDeps
     );
 
+    /// @notice Indexed new priority request event. Emitted when a request is placed into the priority queue.
+    /// @dev We define a new event similar to NewPriorityRequest, as modifying it could break existing indexers.
+    /// The indexed txId and txHash helps to simplify EN implementation for fast finality.
+    /// @param txId Serial number of the priority operation.
+    /// @param txHash keccak256 hash of encoded transaction representation.
+    event NewPriorityRequestId(uint256 indexed txId, bytes32 indexed txHash);
+
     /// @notice New relayed priority request event. It is emitted on a chain that is deployed
     /// on top of the gateway when it receives a request relayed via the Bridgehub.
     /// @dev IMPORTANT: this event most likely will be removed in the future, so
