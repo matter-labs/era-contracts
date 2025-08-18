@@ -23,10 +23,10 @@ error UnsupportedChainIdForMockVerifier();
 /// needed for the smooth transition from PLONK based verifier to the FFLONK verifier.
 contract DualVerifier is IVerifier {
     /// @notice The latest FFLONK verifier contract.
-    IVerifierV2 public immutable FFLONK_VERIFIER;
+    //IVerifierV2 public immutable FFLONK_VERIFIER;
 
     /// @notice PLONK verifier contract.
-    IVerifier public immutable PLONK_VERIFIER;
+    //IVerifier public immutable PLONK_VERIFIER;
 
     /// @notice Type of verification for FFLONK verifier.
     uint256 internal constant FFLONK_VERIFICATION_TYPE = 0;
@@ -39,11 +39,39 @@ contract DualVerifier is IVerifier {
     // @notice This is test only verifier (mock), and must be removed before prod.
     uint256 internal constant OHBENDER_MOCK_VERIFICATION_TYPE = 3;
 
+
+    address public ctmOwner;
+
+    mapping(uint32 => IVerifierV2) public fflonkVerifiers;
+    mapping(uint32 => IVerifier) public plonkVerifiers;
+
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
-        FFLONK_VERIFIER = _fflonkVerifier;
-        PLONK_VERIFIER = _plonkVerifier;
+    constructor(
+        IVerifierV2 _fflonkVerifier,
+        IVerifier _plonkVerifier,
+        address _ctmOwner
+    ) {
+        ctmOwner = _ctmOwner;
+        fflonkVerifiers[0] = _fflonkVerifier;
+        plonkVerifiers[0] = _plonkVerifier;
+    }
+
+    function addVerifier(
+        uint32 version,
+        IVerifierV2 _fflonkVerifier,
+        IVerifier _plonkVerifier
+    ) external {
+        require(msg.sender == ctmOwner, "Only ctmOwner can add verifiers");
+        // Add logic to add verifiers
+        fflonkVerifiers[version] = _fflonkVerifier;
+        plonkVerifiers[version] = _plonkVerifier;
+    }
+
+    function removeVerifier(uint32 version) external {
+        require(msg.sender == ctmOwner, "Only ctmOwner can remove verifiers");
+        delete fflonkVerifiers[version];
+        delete plonkVerifiers[version];
     }
 
     /// @notice Routes zk-SNARK proof verification to the appropriate verifier (FFLONK or PLONK) based on the proof type.
@@ -61,16 +89,17 @@ contract DualVerifier is IVerifier {
         }
 
         // The first element of `_proof` determines the verifier type (either FFLONK or PLONK).
-        uint256 verifierType = _proof[0];
+        uint256 verifierType = _proof[0] & 255;
+        uint32 verifierVersion = uint32(_proof[0] >> 8);
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
-            return FFLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
+            return fflonkVerifiers[verifierVersion].verify(_publicInputs, _extractProof(_proof));
         } else if (verifierType == PLONK_VERIFICATION_TYPE) {
-            return PLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
+            return plonkVerifiers[verifierVersion].verify(_publicInputs, _extractProof(_proof));
         } else if (verifierType == OHBENDER_PLONK_VERIFICATION_TYPE) {
             uint256[] memory args = new uint256[](1);
             args[0] = computeOhBenderHash(_proof[1], _publicInputs);
 
-            return PLONK_VERIFIER.verify(args, _extractOhBenderProof(_proof));
+            return plonkVerifiers[verifierVersion].verify(args, _extractOhBenderProof(_proof));
         } else if (verifierType == OHBENDER_MOCK_VERIFICATION_TYPE) {
             // just for safety - only allowing default anvil chain and sepolia testnet
             if (block.chainid != 31337 && block.chainid != 11155111) {
