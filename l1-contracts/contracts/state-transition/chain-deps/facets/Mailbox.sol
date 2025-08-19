@@ -336,6 +336,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) external override onlyBridgehub {
         _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
         emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
+        emit NewPriorityRequestId(_getTotalPriorityTxs(), _canonicalTxHash);
     }
 
     function _wrapRequest(
@@ -541,6 +542,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
         emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
+        emit NewPriorityRequestId(_transaction.nonce, _canonicalTxHash);
     }
 
     // solhint-disable-next-line no-unused-vars
