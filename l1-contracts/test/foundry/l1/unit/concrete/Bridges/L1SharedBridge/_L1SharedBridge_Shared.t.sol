@@ -246,6 +246,11 @@ contract L1AssetRouterTest is Test {
             .checked_write(100);
         stdstore
             .target(address(l1AssetTracker))
+            .sig(IAssetTrackerBase.totalSupplyAcrossAllChains.selector)
+            .with_key(ETH_TOKEN_ASSET_ID)
+            .checked_write(100);
+        stdstore
+            .target(address(l1AssetTracker))
             .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(chainId)
             .with_key(ETH_TOKEN_ASSET_ID)
@@ -254,6 +259,11 @@ contract L1AssetRouterTest is Test {
             .target(address(l1AssetTracker))
             .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(chainId)
+            .with_key(tokenAssetId)
+            .checked_write(100);
+        stdstore
+            .target(address(l1AssetTracker))
+            .sig(IAssetTrackerBase.totalSupplyAcrossAllChains.selector)
             .with_key(tokenAssetId)
             .checked_write(100);
 

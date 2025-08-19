@@ -20,7 +20,10 @@ import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 uint160 constant SYSTEM_CONTRACTS_OFFSET = 0x8000; // 2^15
 
 /// @dev The offset from which the built-in, but user space contracts are located.
-uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
+uint160 constant BUILT_IN_CONTRACTS_OFFSET = 0x10000; // 2^16
+
+/// @dev The maximum address of the built-in contracts.
+uint160 constant MAX_BUILT_IN_CONTRACT_ADDR = BUILT_IN_CONTRACTS_OFFSET + 0x1ffff;
 
 /// @dev The formal address of the initial program of the system: the bootloader
 address constant L2_BOOTLOADER_ADDRESS = address(SYSTEM_CONTRACTS_OFFSET + 0x01);
@@ -67,56 +70,56 @@ address constant L2_PUBDATA_CHUNK_PUBLISHER_ADDR = address(SYSTEM_CONTRACTS_OFFS
 address constant L2_COMPLEX_UPGRADER_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x0f);
 
 /// @dev The address of the create2 factory contract
-address constant L2_CREATE2_FACTORY_ADDR = address(USER_CONTRACTS_OFFSET + 0x00);
+address constant L2_CREATE2_FACTORY_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x00);
 
 /// @dev The address used to execute the genesis upgrade
-address constant L2_GENESIS_UPGRADE_ADDR = address(USER_CONTRACTS_OFFSET + 0x01);
+address constant L2_GENESIS_UPGRADE_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x01);
 
 /// @dev The genesis upgrade address is reused for all version specific upgrades
 address constant L2_VERSION_SPECIFIC_UPGRADER_ADDR = L2_GENESIS_UPGRADE_ADDR;
 
 /// @dev The address of the L2 bridge hub system contract, used to start L1->L2 transactions
-address constant L2_BRIDGEHUB_ADDR = address(USER_CONTRACTS_OFFSET + 0x02);
+address constant L2_BRIDGEHUB_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x02);
 
 IBridgehub constant L2_BRIDGEHUB = IBridgehub(L2_BRIDGEHUB_ADDR);
 
 /// @dev the address of the l2 asset router.
-address constant L2_ASSET_ROUTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x03);
+address constant L2_ASSET_ROUTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x03);
 IL2AssetRouter constant L2_ASSET_ROUTER = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
 
 /// @dev An l2 system contract address, used in the assetId calculation for native assets.
 /// This is needed for automatic bridging, i.e. without deploying the AssetHandler contract,
 /// if the assetId can be calculated with this address then it is in fact an NTV asset
-address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x04);
+address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x04);
 IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
 /// @dev the address of the l2 asset router.
-address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
+address constant L2_MESSAGE_ROOT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x05);
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(L2_MESSAGE_ROOT_ADDR);
 
 /// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
-address constant SLOAD_CONTRACT_ADDR = address(USER_CONTRACTS_OFFSET + 0x06);
+address constant SLOAD_CONTRACT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x06);
 
 /// @dev The address of the WETH implementation contract
-address constant L2_WETH_IMPL_ADDR = address(USER_CONTRACTS_OFFSET + 0x07);
+address constant L2_WETH_IMPL_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x07);
 
 /// @dev The address of the L2 interop root storage system contract
-IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(USER_CONTRACTS_OFFSET + 0x08));
+IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(BUILT_IN_CONTRACTS_OFFSET + 0x08));
 
 /// @dev The address of the L2 message verification system contract
-IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(USER_CONTRACTS_OFFSET + 0x09));
+IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(BUILT_IN_CONTRACTS_OFFSET + 0x09));
 
 /// @dev The address of the L2 chain handler system contract
-address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0a);
+address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0a);
 IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
 
 /// @dev the address of the L2 interop center
-address constant L2_INTEROP_CENTER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
+address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0b);
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
+address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0c);
 
 /// @dev the address of the L2 asset tracker
-address constant L2_ASSET_TRACKER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0d);
+address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0d);
 IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);

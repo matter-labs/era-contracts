@@ -122,7 +122,8 @@ library L2UtilsBase {
                     IBridgehub(L2_BRIDGEHUB_ADDR),
                     L2_ASSET_ROUTER_ADDR,
                     L2_ASSET_TRACKER_ADDR,
-                    IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+                    IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+                    address(0)
                 )
             );
             vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);

@@ -10,7 +10,9 @@ pragma solidity ^0.8.20;
 interface IL2AssetTracker {
     function setAddresses(uint256 _l1ChainId) external;
 
-    function handleInitiateBaseTokenBridgingOnL2() external view;
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external;
 
-    function handleFinalizeBaseTokenBridgingOnL2() external;
+    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external;
+
+    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 }

@@ -26,8 +26,8 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../interop/IInteropCenter.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender, WrongMsgLength} from "./L1BridgeContractErrors.sol";
+import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {IMessageRoot} from "../bridgehub/MessageRoot.sol";
@@ -567,14 +567,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 amount;
         address l1Receiver;
 
-        (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        (uint32 functionSignature,) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailboxImpl.finalizeEthWithdrawal.selector) {
-            // The data is expected to be at least 56 bytes long.
-            require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-            // this message is a base token withdrawal
-            (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            // slither-disable-next-line unused-return
-            (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            (l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             transferData = DataEncoding.encodeBridgeMintData({
                 _originalCaller: address(0),
@@ -589,36 +584,16 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             });
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // this message is a token withdrawal
-
-            // Check that the message length is correct.
-            // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
-            // 76 (bytes).
-            require(_l2ToL1message.length == 76, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-            (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
             address l1Token;
-            (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            // slither-disable-next-line unused-return
-            (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            (l1Token, transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(_l2ToL1message);
 
             assetId = l1NativeTokenVault.ensureTokenIsRegistered(l1Token);
             bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             // This method is only expected to use L1-based tokens.
             require(assetId == expectedAssetId, TokenNotLegacy());
-            transferData = DataEncoding.encodeBridgeMintData({
-                _originalCaller: address(0),
-                _remoteReceiver: l1Receiver,
-                _originToken: l1Token,
-                _amount: amount,
-                _erc20Metadata: new bytes(0)
-            });
         } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
-            // The data is expected to be at least 68 bytes long to contain assetId.
-            require(_l2ToL1message.length >= 68, WrongMsgLength(68, _l2ToL1message.length));
             // slither-disable-next-line unused-return
-            (, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
-            (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
-            transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+            (,assetId, transferData) = DataEncoding.decodeAssetRouterFinalizeDepositData(_l2ToL1message);
         } else {
             revert InvalidSelector(bytes4(functionSignature));
         }

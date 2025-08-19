@@ -373,7 +373,8 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridges.l1AssetRouterProxy,
                     addresses.bridgehub.assetTrackerProxy,
-                    addresses.bridgehub.messageRootProxy
+                    addresses.bridgehub.messageRootProxy,
+                    addresses.bridges.l1NullifierProxy
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return

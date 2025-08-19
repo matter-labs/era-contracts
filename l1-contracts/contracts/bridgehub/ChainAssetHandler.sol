@@ -22,6 +22,7 @@ import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -49,6 +50,8 @@ contract ChainAssetHandler is
     address internal immutable ASSET_ROUTER;
 
     address internal immutable ASSET_TRACKER;
+
+    IL1Nullifier internal immutable L1_NULLIFIER;
 
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
@@ -96,7 +99,8 @@ contract ChainAssetHandler is
         IBridgehub _bridgehub,
         address _assetRouter,
         address _assetTracker,
-        IMessageRoot _messageRoot
+        IMessageRoot _messageRoot,
+        address _l1Nullifier
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
@@ -104,6 +108,7 @@ contract ChainAssetHandler is
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
         ASSET_TRACKER = _assetTracker;
+        L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
@@ -172,12 +177,22 @@ contract ChainAssetHandler is
         );
         address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
 
+        /// We set the isL1ToL2DepositProcessed flag on the asset tracker to demarcate deposits happening before and after the migration.
         if (block.chainid == L1_CHAIN_ID) {
             bytes memory data = abi.encodeCall(
                 IL2AssetTracker.setIsL1ToL2DepositProcessed,
                 (migrationNumber[bridgehubBurnData.chainId])
             );
             IZKChain(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
+        }
+        /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
+        if (block.chainid == L1_CHAIN_ID) {
+            bytes memory data = abi.encodeCall(
+                IL2AssetTracker.setLegacySharedBridgeAddress,
+                (bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(bridgehubBurnData.chainId))
+            );
+            address settlementZkChain = BRIDGE_HUB.getZKChain(_settlementChainId);
+            IZKChain(settlementZkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
         }
 
         bytes memory ctmMintData;

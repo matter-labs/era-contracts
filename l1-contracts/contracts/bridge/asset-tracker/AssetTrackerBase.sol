@@ -32,7 +32,10 @@ abstract contract AssetTrackerBase is
     /// @notice Used on the L2 instead of the settlement layer
     /// @dev Maps the migration number for each asset on the L2.
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) internal assetMigrationNumber;
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
+
+    mapping(bytes32 assetId => uint256 totalSupplyAcrossAllChains) public totalSupplyAcrossAllChains;
+
     function _l1ChainId() internal view virtual returns (uint256);
 
     function _bridgehub() internal view virtual returns (IBridgehub);

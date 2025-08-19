@@ -14,13 +14,13 @@ interface IL2AssetTracker {
         BalanceChange calldata _balanceChange
     ) external;
 
-    function handleInitiateBridgingOnL2(bytes32 _assetId) external;
+    function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) external;
 
-    function handleInitiateBaseTokenBridgingOnL2() external view;
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external;
 
-    function handleFinalizeBaseTokenBridgingOnL2() external;
+    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external;
 
-    function handleFinalizeBridgingOnL2(bytes32 _assetId, address _tokenAddress) external;
+    function handleFinalizeBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId, address _tokenAddress) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
 
@@ -33,4 +33,6 @@ interface IL2AssetTracker {
     function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
     function setIsL1ToL2DepositProcessed(uint256 _migrationNumber) external;
+
+    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 }

@@ -29,3 +29,5 @@ error NotMigratedChain();
 error OnlyWhitelistedSettlmentLayer(address, address);
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
+error InvalidBuiltInContractMessage(uint256 logCount, uint256 msgCount, bytes32 key);
+error InvalidEmptyMessageRoot();

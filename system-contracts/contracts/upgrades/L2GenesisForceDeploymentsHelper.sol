@@ -251,7 +251,8 @@ library L2GenesisForceDeploymentsHelper {
                 address(L2_BRIDGE_HUB),
                 address(L2_ASSET_ROUTER),
                 address(L2_ASSET_TRACKER_ADDRESS),
-                address(L2_MESSAGE_ROOT)
+                address(L2_MESSAGE_ROOT),
+                address(0) // l1Nullifier, only used on L1.
             )
         });
 

@@ -28,6 +28,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     INativeTokenVault public immutable NATIVE_TOKEN_VAULT;
 
     IMessageRoot public immutable MESSAGE_ROOT;
+
+    // mapping(uint256 chainId => mapping(address l1Token => bool)) internal l1TokenToAssetIdMessageSent;
+
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
@@ -92,6 +95,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) external onlyNativeTokenVault {
+        if (_tokenOriginChainId == _chainId) {
+            totalSupplyAcrossAllChains[_assetId] -= _amount;
+        } else if (_tokenOriginChainId == block.chainid) {
+            totalSupplyAcrossAllChains[_assetId] += _amount;
+        }
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
@@ -126,6 +134,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) external onlyNativeTokenVault {
+        if (_tokenOriginChainId == _chainId) {
+            totalSupplyAcrossAllChains[_assetId] += _amount;
+        } else if (_tokenOriginChainId == block.chainid) {
+            totalSupplyAcrossAllChains[_assetId] -= _amount;
+        }
+
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
         if (_isChainMinter(chainToUpdate, _tokenOriginChainId)) {
@@ -143,6 +157,17 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             .getTransientSettlementLayer();
         chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
     }
+
+    // error MessageAlreadySent();
+    // error InvalidSettlementChainId();
+
+    // function sendSetL1TokenToAssetId(uint256 _settlementChainId, address _l1Token) external {
+    //     require(!l1TokenToAssetIdMessageSent[_settlementChainId][_l1Token], MessageAlreadySent());
+    //     require(BRIDGE_HUB.whitelistedSettlementLayers(_settlementChainId), InvalidSettlementChainId());
+
+    //     bytes32 assetId = NATIVE_TOKEN_VAULT.assetId(_l1Token);
+    //     _sendToChain(_settlementChainId, abi.encodeCall(IL2AssetTracker.setL1TokenToAssetId, (_l1Token, assetId)));
+    // }
 
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration 
