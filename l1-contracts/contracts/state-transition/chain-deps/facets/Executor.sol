@@ -20,7 +20,6 @@ import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1T
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {InteropRoot} from "../../../common/Messaging.sol";
-import {IL2ToL1Messenger} from "../../../common/l2-helpers/IL2ToL1Messenger.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -180,7 +179,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _newBatch.numberOfLayer1Txs,
                 _newBatch.priorityOperationsHash,
                 _newBatch.l2LogsTreeRoot,
-                _expectedSystemContractUpgradeTxHash
+                _expectedSystemContractUpgradeTxHash,
+                _newBatch.dependencyRootsRollingHash
             )
         );
 
@@ -191,8 +191,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
             priorityOperationsHash: _newBatch.priorityOperationsHash,
             l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
-            // TODO: for now, zksync os does not support dependency roots rolling hash
-            dependencyRootsRollingHash: bytes32(0),
+            dependencyRootsRollingHash: _newBatch.dependencyRootsRollingHash,
             timestamp: 0,
             commitment: batchOutputsHash
         });

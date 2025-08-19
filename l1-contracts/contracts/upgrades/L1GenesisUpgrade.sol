@@ -18,7 +18,6 @@ import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
-import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol";
 
 /// @author Matter Labs
