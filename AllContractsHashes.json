@@ -1273,11 +1273,11 @@
   },
   {
     "contractName": "l1-contracts/MessageRoot",
-    "zkBytecodeHash": "0x010003d3031ff0bda8448894225efa8f11f046807025c74abd2a20329214f138",
+    "zkBytecodeHash": "0x010003d3b9f073b39725d848b09ef4c447e29180f349edeaea397af4bd44db3f",
     "zkBytecodePath": "/l1-contracts/zkout/MessageRoot.sol/MessageRoot.json",
-    "evmBytecodeHash": "0xccdbe501e2c6dabdab06f9bd6fe277602154d7bd3bd7b94595302ddc2650b914",
+    "evmBytecodeHash": "0x1d0eb09b58371dae05b83f55470a50414d668d0da26402a80693a4a589fc1794",
     "evmBytecodePath": "/l1-contracts/out/MessageRoot.sol/MessageRoot.json",
-    "evmDeployedBytecodeHash": "0x7b2a0cb6f529499fc9c2363a3e363726d64883d121d702fb88f15044a07e52b7"
+    "evmDeployedBytecodeHash": "0x03306b58d60e035db0a834f32eacee59b67a98fb5345fa675ebbab5c942f31c4"
   },
   {
     "contractName": "l1-contracts/PermanentRestriction",

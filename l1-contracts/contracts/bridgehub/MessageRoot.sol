@@ -105,8 +105,7 @@ contract MessageRoot is IMessageRoot, Initializable {
     }
 
     /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
-    /// @param _chainId The ID of the chain to add chain batch root.
-    modifier onlyL2Chain(uint256 _chainId) {
+    modifier onlyL2Chain() {
         if (block.chainid == L1_CHAIN_ID) {
             revert OnlyL2();
         }
@@ -151,7 +150,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) onlyL2Chain(_chainId) {
+    ) external onlyChain(_chainId) onlyL2Chain {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
