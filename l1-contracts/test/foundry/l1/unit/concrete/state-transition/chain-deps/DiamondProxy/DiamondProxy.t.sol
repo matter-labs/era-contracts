@@ -58,7 +58,7 @@ contract DiamondProxyTest is Test {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit()),
+            initAddress: address(new DiamondInit(false)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -71,7 +71,7 @@ contract DiamondProxyTest is Test {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit()),
+            initAddress: address(new DiamondInit(false)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -87,7 +87,7 @@ contract DiamondProxyTest is Test {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit()),
+            initAddress: address(new DiamondInit(false)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -103,7 +103,7 @@ contract DiamondProxyTest is Test {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
-            initAddress: address(new DiamondInit()),
+            initAddress: address(new DiamondInit(false)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -119,7 +119,7 @@ contract DiamondProxyTest is Test {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit()),
+            initAddress: address(new DiamondInit(false)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -138,7 +138,7 @@ contract DiamondProxyTest is Test {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
-            initAddress: address(new DiamondInit()),
+            initAddress: address(new DiamondInit(false)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 
@@ -163,7 +163,7 @@ contract DiamondProxyTest is Test {
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: cuts,
-            initAddress: address(new DiamondInit()),
+            initAddress: address(new DiamondInit(false)),
             initCalldata: abi.encodeWithSelector(DiamondInit.initialize.selector, initializeData)
         });
 

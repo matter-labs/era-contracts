@@ -19,8 +19,8 @@ import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {GatewayUpgrade} from "contracts/upgrades/GatewayUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -99,10 +99,11 @@ struct FixedForceDeploymentsData {
     bytes32 l2TokenProxyBytecodeHash;
     address aliasedL1Governance;
     uint256 maxNumberOfZKChains;
-    bytes32 bridgehubBytecodeHash;
-    bytes32 l2AssetRouterBytecodeHash;
-    bytes32 l2NtvBytecodeHash;
-    bytes32 messageRootBytecodeHash;
+    bytes bridgehubBytecodeOrInfo;
+    bytes l2AssetRouterBytecodeOrInfo;
+    bytes l2NtvBytecodeOrInfo;
+    bytes messageRootBytecodeOrInfo;
+    bytes beaconDeployerInfo;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.
@@ -409,7 +410,7 @@ contract EcosystemUpgrade_v26_1 is Script {
         ) {
             ctmAddress = addr;
         } catch {
-            ctmAddress = Bridgehub(config.contracts.bridgehubProxyAddress).chainTypeManager(config.eraChainId);
+            ctmAddress = L1Bridgehub(config.contracts.bridgehubProxyAddress).chainTypeManager(config.eraChainId);
         }
         config.contracts.stateTransitionManagerAddress = ctmAddress;
         config.contracts.eraDiamondProxy = ChainTypeManager(config.contracts.stateTransitionManagerAddress)
@@ -417,7 +418,7 @@ contract EcosystemUpgrade_v26_1 is Script {
 
         config.contracts.transparentProxyAdmin = toml.readAddress("$.contracts.transparent_proxy_admin");
 
-        config.ecosystemAdminAddress = Bridgehub(config.contracts.bridgehubProxyAddress).admin();
+        config.ecosystemAdminAddress = L1Bridgehub(config.contracts.bridgehubProxyAddress).admin();
     }
 
     function instantiateCreate2Factory() internal {

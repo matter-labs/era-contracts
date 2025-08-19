@@ -494,11 +494,12 @@ contract RegisterZKChainScript is Script {
     }
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
-        bytes[] memory factoryDeps = new bytes[](4);
-        factoryDeps[0] = L2ContractsBytecodesLib.readBeaconProxyBytecode();
-        factoryDeps[1] = L2ContractsBytecodesLib.readStandardERC20Bytecode();
-        factoryDeps[2] = L2ContractsBytecodesLib.readUpgradeableBeaconBytecode();
-        factoryDeps[3] = L2ContractsBytecodesLib.readTransparentUpgradeableProxyBytecodeFromSystemContracts();
+        bytes[] memory factoryDeps = new bytes[](5);
+        factoryDeps[0] = Utils.readFoundryDeployedBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
+        factoryDeps[1] = Utils.readFoundryDeployedBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
+        factoryDeps[2] = Utils.readFoundryDeployedBytecodeL1("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS");
+        factoryDeps[3] = Utils.readFoundryDeployedBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
+        factoryDeps[4] = Utils.readFoundryDeployedBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer");
         return factoryDeps;
     }
 
