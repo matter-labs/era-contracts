@@ -101,7 +101,6 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     address[] internal oldValidatorTimelocks;
     address[] internal oldGatewayValidatorTimelocks;
     address protocolUpgradeHandlerImplementationAddress;
-    address protocolUpgradeHandlerProxyAddress;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
