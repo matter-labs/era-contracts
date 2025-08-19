@@ -53,7 +53,13 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                 );
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (_chainId, _l1CtmDeployerAddress, _fixedForceDeploymentsData, additionalForceDeploymentsData)
+                    (
+                        s.boojumOS,
+                        _chainId,
+                        _l1CtmDeployerAddress,
+                        _fixedForceDeploymentsData,
+                        additionalForceDeploymentsData
+                    )
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,
@@ -78,7 +84,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                 reserved: [uint256(0), 0, 0, 0],
                 data: complexUpgraderCalldata,
                 signature: new bytes(0),
-                factoryDeps: L2ContractHelper.hashFactoryDeps(_factoryDeps),
+                factoryDeps: new uint256[](0),
                 paymasterInput: new bytes(0),
                 reservedDynamic: new bytes(0)
             });

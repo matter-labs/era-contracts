@@ -127,7 +127,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     function _commitOneBoojumOSBatch(
         StoredBatchInfo memory _previousBatch,
         CommitBoojumOSBatchInfo memory _newBatch,
-        // TODO: l2 upgrade is not handled
         bytes32 _expectedSystemContractUpgradeTxHash
     ) internal returns (StoredBatchInfo memory storedBatchInfo) {
         // only commit next batch
@@ -168,7 +167,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _newBatch.numberOfLayer1Txs,
                 _newBatch.priorityOperationsHash,
                 _newBatch.l2LogsTreeRoot,
-                bytes32(0) // upgrade tx hash
+                _expectedSystemContractUpgradeTxHash
             )
         );
 
@@ -339,6 +338,72 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    function _commitBatchesSharedBridgeZKOS(
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
+    ) internal {
+        (StoredBatchInfo memory lastCommittedBatchData, CommitBoojumOSBatchInfo[] memory newBatchesData) = BatchDecoder
+            .decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
+        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
+        // and so the range checked in the `decodeAndCheckCommitData` is enough.
+        if (newBatchesData.length != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
+        // Check that we commit batches after last committed batch
+        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(
+                s.storedBatchHashes[s.totalBatchesCommitted],
+                _hashStoredBatchInfo(lastCommittedBatchData)
+            );
+        }
+
+        bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
+        bool processSystemUpgradeTx = systemContractsUpgradeTxHash != bytes32(0) && s.l2SystemContractsUpgradeBatchNumber == 0;
+        _commitBoojumOSBatches(lastCommittedBatchData, newBatchesData, processSystemUpgradeTx);
+
+        s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+    }
+
+    function _commitBatchesSharedBridgeEra(
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
+    ) internal {
+        (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
+            .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
+        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
+        // and so the range checked in the `decodeAndCheckCommitData` is enough.
+        if (newBatchesData.length != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
+        // Check that we commit batches after last committed batch
+        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(
+                s.storedBatchHashes[s.totalBatchesCommitted],
+                _hashStoredBatchInfo(lastCommittedBatchData)
+            );
+        }
+
+        bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
+        // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
+        if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBatchNumber != 0) {
+            _commitBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
+        } else {
+            _commitBatchesWithSystemContractsUpgrade(
+                lastCommittedBatchData,
+                newBatchesData,
+                systemContractsUpgradeTxHash
+            );
+        }
+
+        s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+    }
+
     /// @inheritdoc IExecutor
     function commitBatchesSharedBridge(
         uint256, // _chainId
@@ -357,60 +422,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert InvalidProtocolVersion();
         }
         if (s.boojumOS) {
-            (
-                StoredBatchInfo memory lastCommittedBatchData,
-                CommitBoojumOSBatchInfo[] memory newBatchesData
-            ) = BatchDecoder.decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
-            // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
-            // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
-            // and so the range checked in the `decodeAndCheckCommitData` is enough.
-            if (newBatchesData.length != 1) {
-                revert CanOnlyProcessOneBatch();
-            }
-            // Check that we commit batches after last committed batch
-            if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
-                // incorrect previous batch data
-                revert BatchHashMismatch(
-                    s.storedBatchHashes[s.totalBatchesCommitted],
-                    _hashStoredBatchInfo(lastCommittedBatchData)
-                );
-            }
-
-            // TODO: handle l2 upgrade
-            _commitBoojumOSBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
-
-            s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+            _commitBatchesSharedBridgeZKOS(_processFrom, _processTo, _commitData);
         } else {
-            (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
-                .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
-            // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
-            // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
-            // and so the range checked in the `decodeAndCheckCommitData` is enough.
-            if (newBatchesData.length != 1) {
-                revert CanOnlyProcessOneBatch();
-            }
-            // Check that we commit batches after last committed batch
-            if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
-                // incorrect previous batch data
-                revert BatchHashMismatch(
-                    s.storedBatchHashes[s.totalBatchesCommitted],
-                    _hashStoredBatchInfo(lastCommittedBatchData)
-                );
-            }
-
-            bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
-            // Upgrades are rarely done so we optimize a case with no active system contracts upgrade.
-            if (systemContractsUpgradeTxHash == bytes32(0) || s.l2SystemContractsUpgradeBatchNumber != 0) {
-                _commitBatchesWithoutSystemContractsUpgrade(lastCommittedBatchData, newBatchesData);
-            } else {
-                _commitBatchesWithSystemContractsUpgrade(
-                    lastCommittedBatchData,
-                    newBatchesData,
-                    systemContractsUpgradeTxHash
-                );
-            }
-
-            s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+            _commitBatchesSharedBridgeEra(_processFrom, _processTo, _commitData);
         }
     }
 
@@ -435,14 +449,28 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    function _commitBoojumOSBatchesWithoutSystemContractsUpgrade(
+    function _commitBoojumOSBatches(
         StoredBatchInfo memory _lastCommittedBatchData,
-        CommitBoojumOSBatchInfo[] memory _newBatchesData
+        CommitBoojumOSBatchInfo[] memory _newBatchesData,
+        bool _processSystemUpgradeTx
     ) internal {
+        bytes32 upgradeTxHash;
+        if (_processSystemUpgradeTx) {
+            // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when _processSystemUpgradeTx is true,
+            // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
+            if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+                revert UpgradeBatchNumberIsNotZero();
+            }
+
+            // Save the batch number where the upgrade transaction was executed.
+            s.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
+            upgradeTxHash = s.l2SystemContractsUpgradeTxHash;
+        }
+
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
-            _lastCommittedBatchData = _commitOneBoojumOSBatch(_lastCommittedBatchData, _newBatchesData[i], bytes32(0));
+            _lastCommittedBatchData = _commitOneBoojumOSBatch(_lastCommittedBatchData, _newBatchesData[i], upgradeTxHash);
 
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
             emit BlockCommit(
@@ -450,6 +478,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
+
+
+            if (i == 0) {
+                // reset upgradeTxHash after the first batch
+                upgradeTxHash = bytes32(0);
+            }
         }
     }
 
