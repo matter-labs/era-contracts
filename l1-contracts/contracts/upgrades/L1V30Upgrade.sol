@@ -5,9 +5,8 @@ pragma solidity 0.8.28;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {L2_CHAIN_ASSET_HANDLER} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_CHAIN_ASSET_HANDLER, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
-import {L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_ROOT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();

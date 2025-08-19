@@ -12,8 +12,8 @@ import {IBridgehub} from "./IBridgehub.sol";
 
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
-import {ChainBatchRootAlreadyExists, ChainExists, MessageRootNotRegistered, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyPreV30Chain, NotWhitelistedSettlementLayer, OnlyL1, IncorrectFunctionSignature, V30UpgradeGatewayBlockNumberAlreadySet} from "./L1BridgehubErrors.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {ChainBatchRootAlreadyExists, ChainExists, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet} from "./L1BridgehubErrors.sol";
+import {L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 
