@@ -128,7 +128,6 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         protocolUpgradeHandlerImplementationAddress = toml.readAddress(
             "$.contracts.protocol_upgrade_handler_implementation_address"
         );
-        protocolUpgradeHandlerProxyAddress = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
     }
 
     function saveOutputVersionSpecific() internal override {
@@ -155,6 +154,17 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
             abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgrade,
                 (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+            )
+        );
+    }
+
+    function getProxyAdmin(address _proxyAddr) internal view returns (address proxyAdmin) {
+        // the constant is the proxy admin storage slot
+        proxyAdmin = address(
+            uint160(
+                uint256(
+                    vm.load(_proxyAddr, bytes32(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103))
+                )
             )
         );
     }
@@ -240,7 +250,12 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         allCalls[1] = prepareSetChainAssetHandlerOnBridgehubCall();
         allCalls[2] = prepareSetCtmAssetHandlerAddressOnL1Call();
         allCalls[3] = prepareSetUpgradeDiamondCutOnL1Call();
-        allCalls[3] = prepareUpgradePUHImplementationOnL1Call();
+        calls = mergeCallsArray(allCalls);
+    }
+
+    function prepareVersionSpecificStage2GovernanceCallsL1() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](1);
+        allCalls[0] = prepareUpgradePUHImplementationOnL1Call();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -354,11 +369,13 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     function prepareUpgradePUHImplementationOnL1Call() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
+        address transparentProxyAdmin = getProxyAdmin(config.ownerAddress);
+
         calls[0] = Call({
-            target: config.ownerAddress,
+            target: transparentProxyAdmin,
             data: abi.encodeCall(
                 ProxyAdminV5.upgradeAndCall,
-                (protocolUpgradeHandlerProxyAddress, protocolUpgradeHandlerImplementationAddress, hex"")
+                (config.ownerAddress, protocolUpgradeHandlerImplementationAddress, hex"")
             ),
             value: 0
         });
