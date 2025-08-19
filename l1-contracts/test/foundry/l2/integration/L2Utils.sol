@@ -54,7 +54,7 @@ library L2Utils {
 
     function forceDeployMessageRoot() internal {
         new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), L1_CHAIN_ID);
-        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR));
+        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR, L1_CHAIN_ID));
     }
 
     function forceDeployBridgehub(SystemContractsArgs memory _args) internal {
