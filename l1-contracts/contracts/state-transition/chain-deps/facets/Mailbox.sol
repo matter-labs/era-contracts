@@ -336,6 +336,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) external override onlyBridgehub {
         _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
         emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
+        emit NewPriorityRequestId(_getTotalPriorityTxs(), _canonicalTxHash);
     }
 
     function _wrapRequest(
