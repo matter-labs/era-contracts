@@ -9,10 +9,14 @@ error InvalidAmount();
 error InvalidAssetId();
 // 0x019cd955
 error InvalidBaseTokenAssetId();
+// 0xd24c490f
+error InvalidBuiltInContractMessage(uint256 logCount, uint256 msgCount, bytes32 key);
 // 0x7ad8c2c9
 error InvalidCanonicalTxHash(bytes32);
 // 0x05208b6d
 error InvalidChainMigrationNumber(uint256, uint256);
+// 0x1debd83e
+error InvalidEmptyMessageRoot();
 // 0x9530c5e1
 error InvalidMigrationNumber(uint256, uint256);
 // 0xc5ac5599
@@ -29,5 +33,3 @@ error NotMigratedChain();
 error OnlyWhitelistedSettlmentLayer(address, address);
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
-error InvalidBuiltInContractMessage(uint256 logCount, uint256 msgCount, bytes32 key);
-error InvalidEmptyMessageRoot();

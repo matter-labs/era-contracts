@@ -104,7 +104,9 @@ address constant SLOAD_CONTRACT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x06)
 address constant L2_WETH_IMPL_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x07);
 
 /// @dev The address of the L2 interop root storage system contract
-IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(address(BUILT_IN_CONTRACTS_OFFSET + 0x08));
+IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(
+    address(BUILT_IN_CONTRACTS_OFFSET + 0x08)
+);
 
 /// @dev The address of the L2 message verification system contract
 IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(address(BUILT_IN_CONTRACTS_OFFSET + 0x09));

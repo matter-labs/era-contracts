@@ -666,7 +666,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             require(messages.length == 0, InvalidBatchesDataLength(0, messages.length));
         } else {
             require(batchesData.length == logs.length, InvalidBatchesDataLength(batchesData.length, logs.length));
-            require(batchesData.length == messages.length, InvalidBatchesDataLength(batchesData.length, messages.length));
+            require(
+                batchesData.length == messages.length,
+                InvalidBatchesDataLength(batchesData.length, messages.length)
+            );
         }
 
         // Interop is only allowed on GW currently, so we go through the Asset Tracker when on Gateway.

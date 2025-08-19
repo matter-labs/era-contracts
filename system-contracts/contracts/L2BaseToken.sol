@@ -102,7 +102,6 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// the sent `msg.value` is added to the `this` balance before the call.
     /// So the balance of `address(this)` is always bigger or equal to the `msg.value`!
     function _burnMsgValue() internal returns (uint256 amount) {
-
         amount = msg.value;
         /// @dev This function is called to check if the token is withdrawable.
         L2_ASSET_TRACKER.handleInitiateBaseTokenBridgingOnL2(amount);
@@ -115,7 +114,6 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
             totalSupply -= amount;
         }
     }
-
 
     function burnMsgValue() external payable override onlyCallFromInteropCenter {
         _burnMsgValue();

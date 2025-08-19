@@ -253,8 +253,10 @@ library DataEncoding {
         }
     }
 
-    function decodeBaseTokenFinalizeWithdrawalData(bytes memory _l2ToL1message) internal pure returns (address l1Receiver, uint256 amount) {
-        uint256 offset = 4;// we already read the function signature
+    function decodeBaseTokenFinalizeWithdrawalData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (address l1Receiver, uint256 amount) {
+        uint256 offset = 4; // we already read the function signature
         // The data is expected to be at least 56 bytes long.
         require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
         // this message is a base token withdrawal
@@ -263,8 +265,10 @@ library DataEncoding {
         (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
     }
 
-    function decodeLegacyFinalizeWithdrawalData(bytes memory _l2ToL1message) internal pure returns (address l1Token, bytes memory transferData) {
-        uint256 offset = 4;// we already read the function signature
+    function decodeLegacyFinalizeWithdrawalData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (address l1Token, bytes memory transferData) {
+        uint256 offset = 4; // we already read the function signature
 
         // Check that the message length is correct.
         // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
@@ -285,11 +289,13 @@ library DataEncoding {
             _originToken: l1Token,
             _amount: amount,
             _erc20Metadata: new bytes(0)
-        }); 
+        });
     }
-    
-    function decodeAssetRouterFinalizeDepositData(bytes memory _l2ToL1message) internal pure returns (uint256 originChainId, bytes32 assetId, bytes memory transferData) {
-        uint256 offset = 4;// we already read the function signature
+
+    function decodeAssetRouterFinalizeDepositData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (uint256 originChainId, bytes32 assetId, bytes memory transferData) {
+        uint256 offset = 4; // we already read the function signature
 
         // The data is expected to be at least 68 bytes long to contain assetId.
         require(_l2ToL1message.length >= 68, WrongMsgLength(68, _l2ToL1message.length));

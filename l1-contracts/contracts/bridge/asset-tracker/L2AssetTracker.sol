@@ -52,7 +52,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// used only on Gateway.
     mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
 
-
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
@@ -109,12 +108,18 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         bytes32 _canonicalTxHash,
         BalanceChange calldata _balanceChange
     ) external {
-        updateTotalSupplyOnGateway(L1_CHAIN_ID, _chainId, _balanceChange.tokenOriginChainId, _balanceChange.assetId, _balanceChange.amount);
-        // we increase the chain balance of the token. 
+        updateTotalSupplyOnGateway({
+            _sourceChainId: L1_CHAIN_ID,
+            _destinationChainId: _chainId,
+            _tokenOriginChainId: _balanceChange.tokenOriginChainId,
+            _assetId: _balanceChange.assetId,
+            _amount: _balanceChange.amount
+        });
+        // we increase the chain balance of the token.
         if (_balanceChange.amount > 0) {
             chainBalance[_chainId][_balanceChange.assetId] += _balanceChange.amount;
         }
-        // we increase the chain balance of the base token. 
+        // we increase the chain balance of the base token.
         if (_balanceChange.baseTokenAmount > 0 && _balanceChange.tokenOriginChainId != _chainId) {
             chainBalance[_chainId][_balanceChange.baseTokenAssetId] += _balanceChange.baseTokenAmount;
         }
@@ -129,7 +134,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) public {
         if (_tokenOriginChainId == block.chainid) {
-            // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances. 
+            // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
             totalSupplyAcrossAllChains[_assetId] -= _amount;
             return;
         }
@@ -144,16 +149,26 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external {
         bytes32 baseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
-        /// Note the tokenOriginChainId, might not be the L1 chain Id, but the base token is bridged from L1, 
+        /// Note the tokenOriginChainId, might not be the L1 chain Id, but the base token is bridged from L1,
         /// and we only use the token origin chain id to increase the totalSupplyAcrossAllChains.
         handleInitiateBridgingOnL2(baseTokenAssetId, _amount, tokenOriginChainId[baseTokenAssetId]);
     }
 
-    function handleFinalizeBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId, address _tokenAddress) public onlyL2NativeTokenVault {
+    function handleFinalizeBridgingOnL2(
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) public onlyL2NativeTokenVault {
         _handleFinalizeBridgingOnL2Inner(_assetId, _amount, _tokenOriginChainId, _tokenAddress);
     }
 
-    function _handleFinalizeBridgingOnL2Inner(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId, address _tokenAddress) internal {
+    function _handleFinalizeBridgingOnL2Inner(
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) internal {
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         bool allDepositsBeforeMigrationStartedAreFinalized = isL1ToL2DepositProcessed[migrationNumber];
         if (!savedTotalSupply[migrationNumber][_assetId].isSaved && allDepositsBeforeMigrationStartedAreFinalized) {
@@ -165,7 +180,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             });
         }
         if (_tokenOriginChainId == block.chainid) {
-            // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances. 
+            // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
             totalSupplyAcrossAllChains[_assetId] += _amount;
         }
     }
@@ -177,7 +192,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             /// if we don't skip we use incorrect asset id.
             return;
         }
-        _handleFinalizeBridgingOnL2Inner(baseTokenAssetId, _amount, L1_CHAIN_ID, address(L2_BASE_TOKEN_SYSTEM_CONTRACT));
+        _handleFinalizeBridgingOnL2Inner(
+            baseTokenAssetId,
+            _amount,
+            L1_CHAIN_ID,
+            address(L2_BASE_TOKEN_SYSTEM_CONTRACT)
+        );
     }
 
     function setIsL1ToL2DepositProcessed(uint256 _migrationNumber) external onlyServiceTransactionSender {
@@ -186,7 +206,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
-    }    
+    }
     /*//////////////////////////////////////////////////////////////
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/
@@ -223,7 +243,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 }
                 continue;
             } else if (log.sender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
-
                 ++msgCount;
                 bytes memory message = _processLogsInputs.messages[msgCount - 1];
 
@@ -238,7 +257,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 } else if (log.key == bytes32(uint256(uint160(L2_ASSET_ROUTER_ADDR)))) {
                     handleAssetRouterMessage(_processLogsInputs.chainId, message);
                 } else if (uint256(log.key) <= MAX_BUILT_IN_CONTRACT_ADDR) {
-                    revert InvalidBuiltInContractMessage(logCount, msgCount-1, log.key);
+                    revert InvalidBuiltInContractMessage(logCount, msgCount - 1, log.key);
                 } else {
                     address legacySharedBridge = legacySharedBridgeAddress[block.chainid];
                     if (log.key == bytes32(uint256(uint160(legacySharedBridge))) && legacySharedBridge != address(0)) {
@@ -289,10 +308,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             interopCall = interopBundle.calls[callCount];
 
             if (interopCall.value > 0) {
-                require(
-                    chainBalance[_chainId][_baseTokenAssetId] >= interopCall.value,
-                    InvalidAmount()
-                );
+                require(chainBalance[_chainId][_baseTokenAssetId] >= interopCall.value, InvalidAmount());
                 chainBalance[_chainId][_baseTokenAssetId] -= interopCall.value;
             }
 
@@ -304,9 +320,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             if (bytes4(interopCall.data) != IAssetRouterBase.finalizeDeposit.selector) {
                 revert InvalidInteropCalldata(bytes4(interopCall.data));
             }
-            (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(
-                interopCall.data
-            );
+            (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(interopCall.data);
             require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, interopBundle.destinationChainId));
 
             _handleAssetRouterMessageInner(_chainId, interopBundle.destinationChainId, assetId, transferData);
@@ -326,10 +340,16 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @param _transferData The transfer data of the asset.
     /// @dev This function is used to handle the logic of the AssetRouter message.
 
-    function _handleAssetRouterMessageInner(uint256 _sourceChainId, uint256 _destinationChainId, bytes32 _assetId, bytes memory _transferData) internal {
+    function _handleAssetRouterMessageInner(
+        uint256 _sourceChainId,
+        uint256 _destinationChainId,
+        bytes32 _assetId,
+        bytes memory _transferData
+    ) internal {
         // slither-disable-next-line unused-return
-        (, , address originalToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding
-            .decodeBridgeMintData(_transferData);
+        (, , address originalToken, uint256 amount, bytes memory erc20Metadata) = DataEncoding.decodeBridgeMintData(
+            _transferData
+        );
         // slither-disable-next-line unused-return
         (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
         DataEncoding.assetIdCheck(tokenOriginalChainId, _assetId, originalToken);
@@ -340,12 +360,18 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
         if (tokenOriginalChainId != _sourceChainId) {
             chainBalance[_sourceChainId][_assetId] -= amount;
-        } 
+        }
         if (tokenOriginalChainId != _destinationChainId) {
             chainBalance[_destinationChainId][_assetId] += amount;
         }
 
-        updateTotalSupplyOnGateway(_sourceChainId, _destinationChainId, tokenOriginalChainId, _assetId, amount);
+        updateTotalSupplyOnGateway({
+            _sourceChainId: _sourceChainId,
+            _destinationChainId: _destinationChainId,
+            _tokenOriginChainId: tokenOriginalChainId,
+            _assetId: _assetId,
+            _amount: amount
+        });
     }
 
     function handleLegacySharedBridgeMessage(uint256 _chainId, bytes memory _message) internal {
@@ -357,15 +383,31 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     /// @notice L2->L1 base token withdrawals go through the L2BaseTokenSystemContract directly.
-    function handleBaseTokenSystemContractMessage(uint256 _chainId, bytes32 _baseTokenAssetId, bytes memory _message) internal {
+    function handleBaseTokenSystemContractMessage(
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId,
+        bytes memory _message
+    ) internal {
         uint256 amount;
         (, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_message);
         chainBalance[_chainId][_baseTokenAssetId] -= amount;
-        updateTotalSupplyOnGateway(_chainId, L1_CHAIN_ID, tokenOriginChainId[_baseTokenAssetId], _baseTokenAssetId, amount);
+        updateTotalSupplyOnGateway({
+            _sourceChainId: _chainId,
+            _destinationChainId: L1_CHAIN_ID,
+            _tokenOriginChainId: tokenOriginChainId[_baseTokenAssetId],
+            _assetId: _baseTokenAssetId,
+            _amount: amount
+        });
     }
 
-    /// we track the total supply on the gateway to make sure the chain and token are not maliciously overflowing the sum of chainBalances. 
-    function updateTotalSupplyOnGateway(uint256 _sourceChainId, uint256 _destinationChainId, uint256 _tokenOriginChainId, bytes32 _assetId, uint256 _amount) internal {
+    /// we track the total supply on the gateway to make sure the chain and token are not maliciously overflowing the sum of chainBalances.
+    function updateTotalSupplyOnGateway(
+        uint256 _sourceChainId,
+        uint256 _destinationChainId,
+        uint256 _tokenOriginChainId,
+        bytes32 _assetId,
+        uint256 _amount
+    ) internal {
         if (_tokenOriginChainId == _sourceChainId) {
             totalSupplyAcrossAllChains[_assetId] += _amount;
         } else if (_tokenOriginChainId == _destinationChainId) {

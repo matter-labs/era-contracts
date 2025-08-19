@@ -250,7 +250,6 @@ contract ExperimentalBridgeTest is Test {
     function _useFullSharedBridge() internal {
         ntv = _deployNTV(address(sharedBridge));
 
-
         secondBridgeAddress = address(sharedBridge);
     }
 

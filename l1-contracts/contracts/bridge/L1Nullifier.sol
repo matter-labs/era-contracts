@@ -567,7 +567,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 amount;
         address l1Receiver;
 
-        (uint32 functionSignature,) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        (uint32 functionSignature, ) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailboxImpl.finalizeEthWithdrawal.selector) {
             (l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
@@ -593,7 +593,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             require(assetId == expectedAssetId, TokenNotLegacy());
         } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
             // slither-disable-next-line unused-return
-            (,assetId, transferData) = DataEncoding.decodeAssetRouterFinalizeDepositData(_l2ToL1message);
+            (, assetId, transferData) = DataEncoding.decodeAssetRouterFinalizeDepositData(_l2ToL1message);
         } else {
             revert InvalidSelector(bytes4(functionSignature));
         }

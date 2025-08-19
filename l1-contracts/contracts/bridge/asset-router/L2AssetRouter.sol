@@ -270,7 +270,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @param _assetId The asset id of the withdrawn asset
     /// @param _assetData The data that is passed to the asset handler contract
     /// @param _sender The address of the sender of the message
-    /// @param _alwaysNewMessageFormat Whether to use the new message format compatible with Custom Asset Handlers. 
+    /// @param _alwaysNewMessageFormat Whether to use the new message format compatible with Custom Asset Handlers.
     /// We use the new message format if we don't have the legacy shared bridge, and only for l1 native tokens.
     function _withdrawSender(
         bytes32 _assetId,
