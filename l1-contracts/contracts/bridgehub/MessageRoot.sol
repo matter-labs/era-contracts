@@ -107,7 +107,7 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
     /// @param _chainId The ID of the chain to add chain batch root.
     modifier onlyL2Chain(uint256 _chainId) {
-        if (_chainId == L1_CHAIN_ID) {
+        if (block.chainid == L1_CHAIN_ID) {
             revert OnlyL2();
         }
         _;

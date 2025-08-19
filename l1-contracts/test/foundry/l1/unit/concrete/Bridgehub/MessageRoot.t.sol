@@ -26,7 +26,7 @@ contract MessageRootTest is Test {
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
-        L1_CHAIN_ID = 1;
+        L1_CHAIN_ID = 5;
         messageRoot = new MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID);
     }
 
@@ -99,6 +99,7 @@ contract MessageRootTest is Test {
             abi.encode(alphaChainSender)
         );
 
+        vm.chainId(L1_CHAIN_ID);
         vm.prank(alphaChainSender);
         vm.expectRevert(OnlyL2.selector);
         messageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
