@@ -26,7 +26,7 @@ struct SystemContract {
 }
 
 /// @dev The number of built-in contracts that reside within the "system-contracts" folder
-uint256 constant SYSTEM_CONTRACTS_COUNT = 32;
+uint256 constant SYSTEM_CONTRACTS_COUNT = 33;
 /// @dev The number of built-in contracts that reside within the `l1-contracts` folder
 uint256 constant OTHER_BUILT_IN_CONTRACTS_COUNT = 7;
 
@@ -259,6 +259,12 @@ library SystemContractsProcessing {
         systemContracts[31] = SystemContract({
             addr: 0x0000000000000000000000000000000000010008,
             codeName: "L2InteropRootStorage",
+            lang: Language.Solidity,
+            isPrecompile: false
+        });
+        systemContracts[32] = SystemContract({
+            addr: 0x0000000000000000000000000000000000010008,
+            codeName: "ProxyAdmin",
             lang: Language.Solidity,
             isPrecompile: false
         });
