@@ -56,7 +56,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         instantiateCreate2Factory();
         addresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
         addresses.stateTransition.verifier = address(
-            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
+            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE), address(0))
         );
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         addresses.stateTransition.validatorTimelock = address(
