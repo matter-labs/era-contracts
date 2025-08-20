@@ -63,6 +63,8 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
 
+address constant L2_WRAPPED_BASE_TOKEN_IMPL_ADDR = address(USER_CONTRACTS_OFFSET + 0x07);
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
