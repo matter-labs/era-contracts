@@ -125,14 +125,14 @@ contract DualVerifier is IVerifier {
     /// @inheritdoc IVerifier
     /// @dev Used for backward compatibility with older Verifier implementation. Returns PLONK verification key hash.
     function verificationKeyHash() external view returns (bytes32) {
-        return PLONK_VERIFIER.verificationKeyHash();
+        return plonkVerifiers[0].verificationKeyHash();
     }
 
     /// @notice Calculates a keccak256 hash of the runtime loaded verification keys from the selected verifier.
     /// @return The keccak256 hash of the loaded verification keys based on the verifier.
     function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
-        uint256 verifierType = _proof[0] & 255;
-        uint32 verifierVersion = uint32(_proof[0] >> 8);
+        uint256 verifierType = _verifierType & 255;
+        uint32 verifierVersion = uint32(verifierType >> 8);
 
         require(
             fflonkVerifiers[verifierVersion] != IVerifierV2(address(0)) ||

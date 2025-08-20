@@ -290,7 +290,7 @@ contract GatewayCTMDeployer {
         bytes32 _salt,
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts,
-        address _verifierOwner,
+        address _verifierOwner
     ) internal {
         L1VerifierFflonk fflonkVerifier = new L1VerifierFflonk{salt: _salt}();
         _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);

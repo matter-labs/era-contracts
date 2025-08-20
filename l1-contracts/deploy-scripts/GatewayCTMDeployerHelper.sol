@@ -180,7 +180,7 @@ library GatewayCTMDeployerHelper {
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
-        address _verifierOwner,
+        address _verifierOwner
     ) internal returns (DeployedContracts memory) {
         address verifierFflonk = _deployInternal("L1VerifierFflonk", "L1VerifierFflonk.sol", hex"", innerConfig);
 
