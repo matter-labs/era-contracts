@@ -68,7 +68,7 @@ contract ChainTypeManagerTest is Test {
 
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new MessageRoot(bridgehub);
+        messageroot = new MessageRoot(bridgehub, block.chainid);
         stdstore.target(address(messageroot)).sig(IMessageRoot.v30UpgradeGatewayBlockNumber.selector).checked_write(
             uint256(1)
         );

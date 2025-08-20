@@ -7,6 +7,10 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
+import {IBridgehub} from "./IBridgehub.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL2} from "./L1BridgehubErrors.sol";
+import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {IBridgehub} from "./IBridgehub.sol";
 
@@ -41,10 +45,12 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
-    uint256 public immutable L1_CHAIN_ID;
-
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
+
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 public immutable L1_CHAIN_ID;
 
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
@@ -137,6 +143,14 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _;
     }
 
+    /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
+    modifier onlyL2Chain() {
+        if (block.chainid == L1_CHAIN_ID) {
+            revert OnlyL2();
+        }
+        _;
+    }
+
     modifier onlyBridgehubOwner() {
         if (msg.sender != Ownable(address(BRIDGE_HUB)).owner()) {
             revert OnlyBridgehubOwner(msg.sender, Ownable(address(BRIDGE_HUB)).owner());
@@ -153,9 +167,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _bridgehub Address of the Bridgehub.
-    constructor(IBridgehub _bridgehub) {
+    /// @param _l1ChainId Chain ID of L1.
+    constructor(IBridgehub _bridgehub, uint256 _l1ChainId) {
         BRIDGE_HUB = _bridgehub;
-        L1_CHAIN_ID = BRIDGE_HUB.L1_CHAIN_ID();
+        L1_CHAIN_ID = _l1ChainId;
         if (L1_CHAIN_ID != block.chainid) {
             /// On Gateway we save the chain type manager for EraVM chains.
             uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
@@ -260,7 +275,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external addChainBatchRootRestriction(_chainId) {
+    ) external addChainBatchRootRestriction(_chainId) onlyChain(_chainId) onlyL2Chain {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();

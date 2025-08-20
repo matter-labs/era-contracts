@@ -60,6 +60,8 @@ error OnlyL1();
 error OnlyOnGateway();
 // 0x26d10385
 error OnlyPreV30Chain(uint256 chainId);
+// 0xa7a05e40
+error OnlyL2();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1

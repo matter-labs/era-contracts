@@ -91,7 +91,7 @@ library L2UtilsBase {
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
 
-        address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR)));
+        address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId));
         vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
         MessageRoot(L2_MESSAGE_ROOT_ADDR).initialize();
         uint256 prevChainId = block.chainid;

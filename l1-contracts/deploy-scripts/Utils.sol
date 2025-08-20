@@ -66,6 +66,7 @@ struct StateTransitionDeployedAddresses {
     address diamondInit;
     address genesisUpgrade;
     address defaultUpgrade;
+    address validatorTimelockImplementation;
     address validatorTimelock;
     address diamondProxy;
     address bytecodesSupplier;

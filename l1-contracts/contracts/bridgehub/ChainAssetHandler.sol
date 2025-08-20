@@ -41,12 +41,15 @@ contract ChainAssetHandler is
     /// @notice the asset id of Eth. This is only used on L1.
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
+    /// @notice The chain id of the L1.
     uint256 internal immutable L1_CHAIN_ID;
 
     IBridgehub internal immutable BRIDGE_HUB;
 
+    /// @notice The message root contract.
     IMessageRoot internal immutable MESSAGE_ROOT;
 
+    /// @notice The asset router contract.
     address internal immutable ASSET_ROUTER;
 
     address internal immutable ASSET_TRACKER;
@@ -59,6 +62,7 @@ contract ChainAssetHandler is
     /// @notice used to track the number of times each chain has migrated.
     mapping(uint256 chainId => uint256 migrationNumber) internal migrationNumber;
 
+    /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
         if (msg.sender != ASSET_ROUTER) {
             revert NotAssetRouter(msg.sender, ASSET_ROUTER);
@@ -66,6 +70,7 @@ contract ChainAssetHandler is
         _;
     }
 
+    /// @notice Only when migrations are not paused.
     modifier whenMigrationsNotPaused() {
         if (migrationPaused) {
             revert MigrationPaused();
@@ -73,6 +78,7 @@ contract ChainAssetHandler is
         _;
     }
 
+    /// @notice Only when the contract is deployed on L1.
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert NotL1(L1_CHAIN_ID, block.chainid);

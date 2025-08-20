@@ -175,6 +175,7 @@ contract ExecutorTest is Test {
     }
 
     constructor() {
+        uint256 l1ChainID = 1;
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
@@ -193,7 +194,7 @@ contract ExecutorTest is Test {
             abi.encode(makeAddr("chainTypeManager"))
         );
         address interopCenter = makeAddr("interopCenter");
-        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
+        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
 

@@ -38,6 +38,8 @@ library L2Utils {
 
     /// rich account on era_test_node
     address internal constant RANDOM_ADDRESS = address(0xBC989fDe9e54cAd2aB4392Af6dF60f04873A033A);
+    address internal constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
+    uint256 internal constant L1_CHAIN_ID = 1;
 
     /**
      * @dev Initializes the system contracts.
@@ -67,8 +69,13 @@ library L2Utils {
 
     function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
-        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR));
-        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR), _args.broadcast);
+        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), L1_CHAIN_ID);
+        forceDeployWithConstructor(
+            "MessageRoot",
+            L2_MESSAGE_ROOT_ADDR,
+            abi.encode(L2_BRIDGEHUB_ADDR, L1_CHAIN_ID),
+            _args.broadcast
+        );
     }
 
     function forceDeployBridgehub(SystemContractsArgs memory _args) internal {
