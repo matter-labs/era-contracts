@@ -191,7 +191,7 @@ contract GatewayCTMDeployer {
             _isZKsyncOS: _config.isZKsyncOS,
             _deployedContracts: contracts
         });
-        _deployVerifier(salt, _config.testnetVerifier, contracts);
+        _deployVerifier(salt, _config.testnetVerifier, contracts, _config.aliasedGovernanceAddress);
 
         ValidatorTimelock timelock = new ValidatorTimelock{salt: salt}(address(this), 0);
         contracts.stateTransition.validatorTimelock = address(timelock);
@@ -284,11 +284,13 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _testnetVerifier Whether testnet verifier should be used.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// @param _verifierOwner The owner that can add additional verification keys.
     /// in the process of the execution of this function.
     function _deployVerifier(
         bytes32 _salt,
         bool _testnetVerifier,
-        DeployedContracts memory _deployedContracts
+        DeployedContracts memory _deployedContracts,
+        address _verifierOwner
     ) internal {
         L1VerifierFflonk fflonkVerifier = new L1VerifierFflonk{salt: _salt}();
         _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);
@@ -296,11 +298,11 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, _verifierOwner)
             );
         } else {
             _deployedContracts.stateTransition.verifier = address(
-                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, _verifierOwner)
             );
         }
     }
