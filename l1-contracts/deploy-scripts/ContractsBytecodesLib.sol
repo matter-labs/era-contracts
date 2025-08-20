@@ -25,7 +25,7 @@ library ContractsBytecodesLib {
         }
     }
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
-        string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
+        string[4] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge", "EigenDAL1DAValidator"];
 
         uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
@@ -84,13 +84,14 @@ library ContractsBytecodesLib {
             "L1V29Upgrade"
         ];
 
-        string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[7] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
             "ForceDeployUpgrader",
             "RollupL2DAValidator",
             "ConsensusRegistry",
             "AvailL2DAValidator",
             "ValidiumL2DAValidator",
-            "TimestampAsserter"
+            "TimestampAsserter",
+            "EigenDAL2DAValidator"
         ];
 
         string[3] memory SYSTEM_CONTRACT_IDENTIFIERS = [
