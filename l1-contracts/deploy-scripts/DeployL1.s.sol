@@ -242,7 +242,7 @@ contract DeployL1Script is Script, DeployUtils {
         if (config.contracts.eigenDAL1DAValidator == address(0)) {
             if (config.contracts.eigenDARiscZeroVerifier == address(0)) {
                 console.log("EigenDARiscZeroVerifier not deployed, do not use for production");
-                }
+            }
             addresses.daAddresses.eigenDARiscZeroVerifier = config.contracts.eigenDARiscZeroVerifier;
             addresses.daAddresses.eigenDAL1DAValidator = deploySimpleContract("EigenDAL1DAValidator", false);
         } else {
@@ -580,7 +580,11 @@ contract DeployL1Script is Script, DeployUtils {
             getL2ValidatorAddress("ValidiumL2DAValidator")
         );
         vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getL2ValidatorAddress("AvailL2DAValidator"));
-        vm.serializeAddress("root", "expected_eigenda_l2_validator_addr", getL2ValidatorAddress("EigenDAL2DAValidator"));
+        vm.serializeAddress(
+            "root",
+            "expected_eigenda_l2_validator_addr",
+            getL2ValidatorAddress("EigenDAL2DAValidator")
+        );
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
