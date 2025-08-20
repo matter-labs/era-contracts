@@ -2,12 +2,12 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {MAX_SYSTEM_CONTRACT_ADDRESS, ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, FORCE_DEPLOYER, KNOWN_CODE_STORAGE_CONTRACT, SLOAD_CONTRACT_ADDRESS} from "../Constants.sol";
+import {ACCOUNT_CODE_STORAGE_SYSTEM_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, FORCE_DEPLOYER, KNOWN_CODE_STORAGE_CONTRACT, MAX_SYSTEM_CONTRACT_ADDRESS, SLOAD_CONTRACT_ADDRESS} from "../Constants.sol";
 import {ForceDeployment, IContractDeployer} from "../interfaces/IContractDeployer.sol";
 import {SloadContract} from "../SloadContract.sol";
 
-import {CalldataForwardingMode, SystemContractsCaller, MIMIC_CALL_CALL_ADDRESS, CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, EVENT_WRITE_ADDRESS, EVENT_INITIALIZE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_SHARD_ID_OFFSET, META_AUX_HEAP_SIZE_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
-import {IndexOutOfBounds, FailedToChargeGas, SloadContractBytecodeUnknown, PreviousBytecodeUnknown} from "../SystemContractErrors.sol";
+import {CALLFLAGS_CALL_ADDRESS, CODE_ADDRESS_CALL_ADDRESS, CalldataForwardingMode, EVENT_INITIALIZE_ADDRESS, EVENT_WRITE_ADDRESS, GET_EXTRA_ABI_DATA_ADDRESS, LOAD_CALLDATA_INTO_ACTIVE_PTR_CALL_ADDRESS, META_AUX_HEAP_SIZE_OFFSET, META_CALLER_SHARD_ID_OFFSET, META_CALL_ADDRESS, META_CODE_SHARD_ID_OFFSET, META_HEAP_SIZE_OFFSET, META_PUBDATA_PUBLISHED_OFFSET, META_SHARD_ID_OFFSET, MIMIC_CALL_CALL_ADDRESS, PRECOMPILE_CALL_ADDRESS, PTR_ADD_INTO_ACTIVE_CALL_ADDRESS, PTR_CALLDATA_CALL_ADDRESS, PTR_PACK_INTO_ACTIVE_CALL_ADDRESS, PTR_SHRINK_INTO_ACTIVE_CALL_ADDRESS, SET_CONTEXT_VALUE_CALL_ADDRESS, SystemContractsCaller, TO_L1_CALL_ADDRESS} from "./SystemContractsCaller.sol";
+import {FailedToChargeGas, IndexOutOfBounds, PreviousBytecodeUnknown, SloadContractBytecodeUnknown} from "../SystemContractErrors.sol";
 
 uint256 constant UINT32_MASK = type(uint32).max;
 uint256 constant UINT64_MASK = type(uint64).max;
@@ -452,7 +452,7 @@ library SystemContractHelper {
             sloadContractBytecodeHash := extcodehash(sloadContractAddress)
         }
 
-        // Just in case, that the `sloadContractBytecodeHash` is known
+        // Just in case, checking that the `sloadContractBytecodeHash` is known.
         if (KNOWN_CODE_STORAGE_CONTRACT.getMarker(sloadContractBytecodeHash) == 0) {
             revert SloadContractBytecodeUnknown();
         }
