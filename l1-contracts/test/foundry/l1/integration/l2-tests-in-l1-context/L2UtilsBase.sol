@@ -51,7 +51,7 @@ library L2UtilsBase {
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         address wethToken = address(0x1);
         // we deploy the code to get the contract code with immutables which we then vm.etch
-        address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR)));
+        address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId));
         address bridgehub = address(new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100));
         address assetRouter = address(
             new L2AssetRouter(
