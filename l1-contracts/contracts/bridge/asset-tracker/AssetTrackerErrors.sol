@@ -30,6 +30,6 @@ error L1ToL2DepositsNotFinalized();
 // 0x8dfed13a
 error NotMigratedChain();
 // 0x43cca996
-error OnlyWhitelistedSettlmentLayer(address, address);
+error OnlyWhitelistedSettlementLayer(address, address);
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);

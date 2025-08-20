@@ -10,7 +10,7 @@ import {BUNDLE_IDENTIFIER, BundleStatus, CallStatus, InteropBundle, InteropCall,
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, SettlmentLayerBatchNumberTooLow, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId} from "./InteropErrors.sol";
+import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, SettlementLayerBatchNumberTooLow, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId} from "./InteropErrors.sol";
 import {V30UpgradeGatewayBlockNumberNotSet} from "../state-transition/L1StateTransitionErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
@@ -332,7 +332,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         /// We need to make sure that the proof belongs to a batch that settled on GW after the v30 upgrade.
         uint256 v30UpgradeGatewayBlockNumber = L2_MESSAGE_ROOT.v30UpgradeGatewayBlockNumber();
         require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
-        require(proofData.settlementLayerBatchNumber > v30UpgradeGatewayBlockNumber, SettlmentLayerBatchNumberTooLow());
+        require(proofData.settlementLayerBatchNumber > v30UpgradeGatewayBlockNumber, SettlementLayerBatchNumberTooLow());
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
 

@@ -13,7 +13,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidBaseTokenAssetId, InvalidChainMigrationNumber, InvalidMigrationNumber, InvalidOriginChainId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlmentLayer} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidBaseTokenAssetId, InvalidChainMigrationNumber, InvalidMigrationNumber, InvalidOriginChainId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
@@ -47,11 +47,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         return MESSAGE_ROOT;
     }
 
-    modifier onlyWhitelistedSettlmentLayer(uint256 _callerChainId) {
+    modifier onlyWhitelistedSettlementLayer(uint256 _callerChainId) {
         require(
             _bridgehub().whitelistedSettlementLayers(_callerChainId) &&
                 _bridgehub().getZKChain(_callerChainId) == msg.sender,
-            OnlyWhitelistedSettlmentLayer(_bridgehub().getZKChain(_callerChainId), msg.sender)
+            OnlyWhitelistedSettlementLayer(_bridgehub().getZKChain(_callerChainId), msg.sender)
         );
         _;
     }
@@ -118,7 +118,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function getBalanceChange(
         uint256 _callerChainId,
         uint256 _chainId
-    ) external onlyWhitelistedSettlmentLayer(_callerChainId) returns (bytes32 assetId, uint256 amount) {
+    ) external onlyWhitelistedSettlementLayer(_callerChainId) returns (bytes32 assetId, uint256 amount) {
         uint256 key = uint256(keccak256(abi.encode(_chainId)));
         assetId = bytes32(TransientPrimitivesLib.getUint256(key));
         amount = TransientPrimitivesLib.getUint256(key + 1);
