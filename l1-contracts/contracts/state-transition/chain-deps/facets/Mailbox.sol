@@ -32,7 +32,8 @@ import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlemen
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {IMessageVerification, MessageVerification} from "../../../common/MessageVerification.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
-import {BALANCE_CHANGE_VERSION, BalanceChange} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BalanceChange} from "../../../common/Messaging.sol";
 import {INativeTokenVault} from "../../../bridge/ntv/INativeTokenVault.sol";
 import {IBridgedStandardToken} from "../../../bridge/BridgedStandardERC20.sol";
 

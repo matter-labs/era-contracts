@@ -6,7 +6,7 @@ import {Merkle} from "./Merkle.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, SUPPORTED_PROOF_METADATA_VERSION} from "../Config.sol";
 import {MerklePathEmpty} from "../L1ContractErrors.sol";
 import {UncheckedMath} from "./UncheckedMath.sol";
-import {L2Log, L2Message, TxStatus} from "../Messaging.sol";
+import {L2Log, L2Message, ProofData, TxStatus} from "../Messaging.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 
 import {UnsupportedProofMetadataVersion} from "../../state-transition/L1StateTransitionErrors.sol";
@@ -14,17 +14,6 @@ import {HashedLogIsDefault, InvalidProofLengthForFinalNode} from "../../common/L
 
 bytes32 constant BATCH_LEAF_PADDING = keccak256("zkSync:BatchLeaf");
 bytes32 constant CHAIN_ID_LEAF_PADDING = keccak256("zkSync:ChainIdLeaf");
-
-struct ProofData {
-    uint256 settlementLayerChainId;
-    uint256 settlementLayerBatchNumber;
-    uint256 settlementLayerBatchRootMask;
-    uint256 batchLeafProofLen;
-    bytes32 batchSettlementRoot;
-    bytes32 chainIdLeaf;
-    uint256 ptr;
-    bool finalProofNode;
-}
 
 library MessageHashing {
     using UncheckedMath for uint256;

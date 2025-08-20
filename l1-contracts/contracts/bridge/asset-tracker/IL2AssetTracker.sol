@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {BalanceChange, TokenBalanceMigrationData} from "./IAssetTrackerBase.sol";
+import {BalanceChange, TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 interface IL2AssetTracker {
     function setAddresses(uint256 _l1ChainId) external;

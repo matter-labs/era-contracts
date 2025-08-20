@@ -4,7 +4,17 @@ pragma solidity 0.8.28;
 
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageVerification} from "../common/interfaces/IMessageVerification.sol";
-import {ProofData} from "../common/libraries/MessageHashing.sol";
+import {ProofData} from "../common/Messaging.sol";
+
+// Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
+bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
+    0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
+);
+
+// The single shared tree consists of the roots of chain trees as its leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
+bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
+    0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
+);
 
 /**
  * @author Matter Labs

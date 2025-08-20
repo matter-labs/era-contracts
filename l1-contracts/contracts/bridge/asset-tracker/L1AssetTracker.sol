@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {TokenBalanceMigrationData} from "./IAssetTrackerBase.sol";
+import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {InvalidProof} from "../../common/L1ContractErrors.sol";

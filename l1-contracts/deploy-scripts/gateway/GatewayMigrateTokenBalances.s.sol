@@ -13,7 +13,8 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
-import {IAssetTrackerBase, TokenBalanceMigrationData} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 

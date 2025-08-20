@@ -15,8 +15,8 @@ error InvalidBuiltInContractMessage(uint256 logCount, uint256 msgCount, bytes32 
 error InvalidCanonicalTxHash(bytes32);
 // 0x05208b6d
 error InvalidChainMigrationNumber(uint256, uint256);
-// 0x1debd83e
-error InvalidEmptyMessageRoot();
+// 0x24ef4f8a
+error InvalidEmptyMessageRoot(bytes32, bytes32);
 // 0x9530c5e1
 error InvalidMigrationNumber(uint256, uint256);
 // 0xc5ac5599
