@@ -75,7 +75,15 @@ import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKO
 
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2NativeTokenVaultZKOS} from "contracts/bridge/ntv/L2NativeTokenVaultZKOS.sol";
+
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+
+import {Utils} from "./Utils.sol";
 
 contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
@@ -807,7 +815,31 @@ contract DeployL1Script is Script, DeployUtils {
                 return type(UpgradeStageValidator).creationCode;
             }
         } else {
-            if (compareStrings(contractName, "Verifier")) {
+            if (compareStrings(contractName, "ChainRegistrar")) {
+                return Utils.readZKFoundryBytecodeL1("ChainRegistrar.sol", "ChainRegistrar");
+            } else if (compareStrings(contractName, "L2Bridgehub")) {
+                return Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
+            } else if (compareStrings(contractName, "L2MessageRoot")) {
+                return Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
+            } else if (compareStrings(contractName, "ICTMDeploymentTracker")) {
+                return Utils.readZKFoundryBytecodeL1("ICTMDeploymentTracker.sol", "ICTMDeploymentTracker");
+            } else if (compareStrings(contractName, "L2AssetRouter")) {
+                return Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return Utils.readZKFoundryBytecodeL1("L1ERC20Bridge.sol", "L1ERC20Bridge");
+            } else if (compareStrings(contractName, "L2NativeTokenVault")) {
+                return Utils.readZKFoundryBytecodeL1("L2NativeTokenVault.sol", "L2NativeTokenVault");
+            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+                return Utils.readZKFoundryBytecodeL1("BridgedStandardERC20.sol", "BridgedStandardERC20");
+            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+                return Utils.readZKFoundryBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
+            } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+                return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+            } else if (compareStrings(contractName, "RollupDAManager")) {
+                return Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
+            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+                return Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
+            } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
                     return getCreationCode("TestnetVerifier", true);
                 } else {

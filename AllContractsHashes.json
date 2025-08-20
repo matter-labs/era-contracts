@@ -1754,7 +1754,7 @@
   {
     "contractName": "EvmEmulator",
     "zkBytecodePath": "/system-contracts/zkout/EvmEmulator.yul/EvmEmulator.json",
-    "zkBytecodeHash": "0x01000d8bae37b82f311186426184866498b357f41d7a02ced11f3e3fbfbacd63",
+    "zkBytecodeHash": "0x010005f72e443c94460f4583fb38ef5d0c5cd9897021c41df840f91465c0392e",
     "evmBytecodePath": null,
     "evmBytecodeHash": null,
     "evmDeployedBytecodeHash": null

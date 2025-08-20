@@ -24,7 +24,7 @@ import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidC
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-/// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
+/// @dev Important: L2 contracts are not allowed to have any immutable variables. This is needed for compatibility with ZKsyncOS.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -58,7 +58,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {
-        if (_originChainId == L1_CHAIN_ID) {
+        if (_originChainId == _l1ChainId()) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             if (AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) {
                 revert InvalidCaller(msg.sender);
@@ -71,7 +71,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpartOrSelf(uint256 _chainId) {
-        if (_chainId == L1_CHAIN_ID) {
+        if (_chainId == _l1ChainId()) {
             // Only the L1 Asset Router counterpart can initiate and finalize the deposit.
             if ((AddressAliasHelper.undoL1ToL2Alias(msg.sender) != L1_ASSET_ROUTER) && (msg.sender != address(this))) {
                 revert InvalidCaller(msg.sender);
@@ -191,15 +191,15 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         public
         payable
         override(AssetRouterBase, IAssetRouterBase)
-        onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
+        onlyAssetRouterCounterpartOrSelf(_l1ChainId())
         nonReentrant
     {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
-        _finalizeDeposit(L1_CHAIN_ID, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
+        _finalizeDeposit(_l1ChainId(), _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
-        emit DepositFinalizedAssetRouter(L1_CHAIN_ID, _assetId, _transferData);
+        emit DepositFinalizedAssetRouter(_l1ChainId(), _assetId, _transferData);
     }
 
     /// @notice Initiates a withdrawal by burning funds on the contract and sending the message to L1
@@ -232,7 +232,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         bool _alwaysNewMessageFormat
     ) internal returns (bytes32 txHash) {
         bytes memory l1bridgeMintData = _burn({
-            _chainId: L1_CHAIN_ID,
+            _chainId: _l1ChainId(),
             _nextMsgValue: 0,
             _assetId: _assetId,
             _originalCaller: _sender,
@@ -259,7 +259,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
             txHash = IL2SharedBridgeLegacy(L2_LEGACY_SHARED_BRIDGE).sendMessageToL1(message);
         }
 
-        emit WithdrawalInitiatedAssetRouter(L1_CHAIN_ID, _sender, _assetId, _assetData);
+        emit WithdrawalInitiatedAssetRouter(_l1ChainId(), _sender, _assetId, _assetData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
@@ -420,6 +420,10 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
 
     function _bridgehub() internal view override returns (IBridgehub) {
         return BRIDGE_HUB;
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
     }
 
     function _eraChainId() internal view override returns (uint256) {

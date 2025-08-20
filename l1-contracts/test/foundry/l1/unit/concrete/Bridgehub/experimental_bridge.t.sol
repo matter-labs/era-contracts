@@ -525,7 +525,7 @@ contract ExperimentalBridgeTest is Test {
         vm.assume(randomCaller != bridgeOwner);
 
         vm.prank(randomCaller);
-        vm.expectRevert(bytes("Ownable: caller is not the owner"));
+        vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
         bridgeHub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
