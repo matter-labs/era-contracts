@@ -259,7 +259,9 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     }
 
     /// @notice Get facet cuts that should be removed
-    function getFacetCutsForDeletion() internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
+    function getFacetCutsForDeletion(
+        StateTransitionDeployedAddresses memory
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
         address diamondProxy = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy).getHyperchain(
             config.gatewayChainId
         );
@@ -336,7 +338,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
 
-        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
+        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion(stateTransition);
 
         Diamond.FacetCut[] memory facetCuts;
         facetCuts = formatFacetCuts(getFacetCuts(stateTransition));

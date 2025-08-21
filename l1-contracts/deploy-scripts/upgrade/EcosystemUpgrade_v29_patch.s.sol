@@ -7,6 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Call} from "contracts/governance/Common.sol";
 
@@ -40,14 +41,16 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
     }
 
     /// @notice Get facet cuts that should be removed
-    function getFacetCutsForDeletion() internal override returns (Diamond.FacetCut[] memory facetCuts) {
+    function getFacetCutsForDeletion(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal override returns (Diamond.FacetCut[] memory facetCuts) {
         // Remove the old MailboxFacet
         facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(0),
             action: Diamond.Action.Remove,
             isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+            selectors: Utils.getAllSelectors(stateTransition.mailboxFacet.code)
         });
     }
 
