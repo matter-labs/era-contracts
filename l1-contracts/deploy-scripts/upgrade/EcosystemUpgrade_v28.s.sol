@@ -414,13 +414,6 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
         addresses.transparentProxyAdmin = address(
             uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
         );
-        addresses.protocolUpgradeHandlerProxy = toml.readAddress("$.contracts.protocol_upgrade_handler_proxy_address");
-
-        require(
-            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() ==
-                addresses.protocolUpgradeHandlerProxy,
-            "Incorrect ProtocolUpgradeHandlerProxy"
-        );
         require(
             Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
             "Incorrect owner"
@@ -552,11 +545,12 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     function getFullListOfFactoryDependencies() internal virtual returns (bytes[] memory factoryDeps) {
         bytes[] memory basicDependencies = SystemContractsProcessing.getBaseListOfDependencies();
 
-        bytes[] memory additionalDependencies = new bytes[](4); // Deps after Gateway upgrade
+        bytes[] memory additionalDependencies = new bytes[](5); // Deps after Gateway upgrade
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
         additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+        additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
 
         factoryDeps = SystemContractsProcessing.mergeBytesArrays(basicDependencies, additionalDependencies);
         factoryDeps = SystemContractsProcessing.deduplicateBytecodes(factoryDeps);
@@ -872,7 +866,6 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
         vm.serializeString("root", "gateway", gateway);
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
-        vm.serializeAddress("root", "protocol_upgrade_handler_proxy_address", addresses.protocolUpgradeHandlerProxy);
         vm.serializeUint(
             "root",
             "governance_upgrade_timer_initial_delay",

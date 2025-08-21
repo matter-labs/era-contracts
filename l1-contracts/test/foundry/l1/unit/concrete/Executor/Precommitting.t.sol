@@ -12,7 +12,7 @@ import {IExecutor} from "contracts/state-transition/chain-interfaces/IExecutor.s
 contract PrecommittingTest is ExecutorTest {
     uint256 constant TOTAL_TRANSACTIONS = 100;
     uint256 batchNumber = 1;
-    uint256 miniblockNumber = 18;
+    uint256 l2BlockNumber = 18;
 
     function precommitData() internal view returns (bytes memory) {
         bytes memory packedTxsCommitments = hex"";
@@ -25,7 +25,7 @@ contract PrecommittingTest is ExecutorTest {
 
         IExecutor.PrecommitInfo memory precommitInfo = IExecutor.PrecommitInfo({
             packedTxsCommitments: packedTxsCommitments,
-            untrustedLastMiniblockNumberHint: miniblockNumber
+            untrustedLastL2BlockNumberHint: l2BlockNumber
         });
 
         return abi.encodePacked(BatchDecoder.SUPPORTED_ENCODING_VERSION, abi.encode(precommitInfo));
@@ -42,7 +42,7 @@ contract PrecommittingTest is ExecutorTest {
         assertEq(entries.length, 1);
         assertEq(entries[0].topics[0], keccak256("BatchPrecommitmentSet(uint256,uint256,bytes32)"));
         assertEq(entries[0].topics[1], bytes32(batchNumber));
-        assertEq(entries[0].topics[2], bytes32(miniblockNumber));
+        assertEq(entries[0].topics[2], bytes32(l2BlockNumber));
     }
 
     // For accurate measuring of gas usage via snapshot cheatcodes, isolation mode has to be enabled.

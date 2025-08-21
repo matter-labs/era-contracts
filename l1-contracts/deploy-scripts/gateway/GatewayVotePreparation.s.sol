@@ -225,6 +225,9 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
                 diamondInit: expectedGatewayContracts.stateTransition.diamondInit,
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
+                validatorTimelockImplementation: expectedGatewayContracts
+                    .stateTransition
+                    .validatorTimelockImplementation,
                 validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
                 serverNotifierProxy: expectedGatewayContracts.stateTransition.serverNotifierProxy,
                 serverNotifierImplementation: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
@@ -366,6 +369,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             "validator_timelock_addr",
             output.gatewayStateTransition.validatorTimelock
         );
+        vm.serializeAddress("gateway_state_transition", "rollup_da_manager_addr", output.rollupDAManager);
         string memory gatewayStateTransition = vm.serializeAddress(
             "gateway_state_transition",
             "diamond_proxy_addr",

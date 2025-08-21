@@ -90,7 +90,7 @@ contract EcosystemUpgrade_v27_1 is Script, DeployL1Script {
             (DiamondInitializeDataNewChain)
         );
 
-        // We only change blobVerionedHashRetriever
+        // We only change blobVersionedHashRetriever
         oldInitializeData.blobVersionedHashRetriever = addresses.blobVersionedHashRetriever;
         Diamond.DiamondCutData memory newDiamondCut = Diamond.DiamondCutData({
             facetCuts: oldDiamondCut.facetCuts,

@@ -106,7 +106,9 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         revert("Not implemented");
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(
+        string memory contractName
+    ) internal virtual override returns (bytes memory) {
         return ("Not implemented initialize calldata");
     }
 

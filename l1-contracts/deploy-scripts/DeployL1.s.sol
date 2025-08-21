@@ -939,7 +939,7 @@ contract DeployL1Script is Script, DeployUtils {
                     (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
                 );
         } else {
-            revert(string.concat("Contract ", contractName, " initialize calldata not set"));
+            revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));
         }
     }
 

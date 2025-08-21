@@ -216,6 +216,13 @@ abstract contract BridgehubBase is
         chainAssetHandler = _chainAssetHandler;
     }
 
+    /// @notice Used to set the chain asset handler address.
+    /// @dev Called during v29 upgrade.
+    /// @param _chainAssetHandler the chain asset handler address
+    function setChainAssetHandler(address _chainAssetHandler) external onlyOwner {
+        chainAssetHandler = _chainAssetHandler;
+    }
+
     /// @notice Used to set the legacy chain data for the upgrade.
     /// @param _chainId The chainId of the legacy chain we are migrating.
     function registerLegacyChain(uint256 _chainId) external override onlyL1 {
@@ -382,7 +389,6 @@ abstract contract BridgehubBase is
 
     /// @notice This function is used to register a new zkChain in the system.
     /// @notice see external counterpart for full natspec.
-
     function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {
         // slither-disable-next-line unused-return
         zkChainMap.set(_chainId, _zkChain);
@@ -858,6 +864,7 @@ abstract contract BridgehubBase is
     }
 
     /// @notice Pauses migration functions.
+    /// @dev Remove this with V30, the functionality was moved to the ChainAssetHandler in V29.
     function pauseMigration() external onlyOwner {
         migrationPaused = true;
     }

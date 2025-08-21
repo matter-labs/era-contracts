@@ -33,6 +33,7 @@ library L2Utils {
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     address internal constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
+    uint256 internal constant L1_CHAIN_ID = 1;
 
     /**
      * @dev Initializes the system contracts.

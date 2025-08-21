@@ -168,6 +168,9 @@ contract GatewayCTMFromL1 is Script {
                 gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
                 diamondInit: expectedGatewayContracts.stateTransition.diamondInit,
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
+                validatorTimelockImplementation: expectedGatewayContracts
+                    .stateTransition
+                    .validatorTimelockImplementation,
                 validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
                 serverNotifierProxy: expectedGatewayContracts.stateTransition.serverNotifierProxy,
                 serverNotifierImplementation: expectedGatewayContracts.stateTransition.serverNotifierImplementation,
@@ -399,10 +402,7 @@ contract GatewayCTMFromL1 is Script {
 
         if (config.testnetVerifier) {
             verifier = address(
-                _deployInternal(
-                    ContractsBytecodesLib.getCreationCode("L2TestnetVerifier"),
-                    abi.encode(config.l1ChainId)
-                )
+                _deployInternal(ContractsBytecodesLib.getCreationCode("TestnetVerifier"), abi.encode(config.l1ChainId))
             );
         } else {
             verifier = address(
