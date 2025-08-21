@@ -168,6 +168,10 @@ struct ZKChainCommitment {
     bool isPermanentRollup;
     /// @notice The precommitment to the transactions of the latest batch.
     bytes32 precommitmentForTheLatestBatch;
+    /// @notice The address of the L1 data availability validator.
+    address l1DAValidator;
+    /// @notice The scheme of L2 DA commitment. Different L1 validators may use different schemes.
+    L2DACommitmentScheme l2DACommitmentScheme;
 }
 
 /// @dev Used as the `msg.sender` for system service transactions.

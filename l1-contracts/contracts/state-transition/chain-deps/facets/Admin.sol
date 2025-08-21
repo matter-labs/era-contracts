@@ -402,7 +402,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // Set the settlement to 0 - as this is the current settlement chain.
         s.settlementLayer = address(0);
 
-        _setDAValidatorPair(address(0), L2DACommitmentScheme.NONE);
+        _setDAValidatorPair(_commitment.l1DAValidator, _commitment.l2DACommitmentScheme);
 
         emit MigrationComplete();
     }
@@ -440,6 +440,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
         commitment.priorityTree = s.priorityTree.getCommitment();
         commitment.isPermanentRollup = s.isPermanentRollup;
         commitment.precommitmentForTheLatestBatch = s.precommitmentForTheLatestBatch;
+        commitment.l1DAValidator = s.l1DAValidator;
+        commitment.l2DACommitmentScheme = s.l2DACommitmentScheme;
 
         // just in case
         if (commitment.totalBatchesExecuted > commitment.totalBatchesVerified) {
