@@ -89,12 +89,18 @@ import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
+// Note that the `ProtocolUpgradeHandler` uses `OpenZeppeling v5`.
+interface ProxyAdminV5 {
+    function upgradeAndCall(address proxy, address implementation, bytes memory data) external;
+}
+
 /// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     address[] internal oldValidatorTimelocks;
     address[] internal oldGatewayValidatorTimelocks;
+    address protocolUpgradeHandlerImplementationAddress;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
@@ -117,6 +123,10 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
             "$.V29.encoded_old_gateway_validator_timelocks"
         );
         oldGatewayValidatorTimelocks = abi.decode(encodedOldGatewayValidatorTimelocks, (address[]));
+
+        protocolUpgradeHandlerImplementationAddress = toml.readAddress(
+            "$.contracts.protocol_upgrade_handler_implementation_address"
+        );
     }
 
     function saveOutputVersionSpecific() internal override {
@@ -143,6 +153,17 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
             abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgrade,
                 (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+            )
+        );
+    }
+
+    function getProxyAdmin(address _proxyAddr) internal view returns (address proxyAdmin) {
+        // the constant is the proxy admin storage slot
+        proxyAdmin = address(
+            uint160(
+                uint256(
+                    vm.load(_proxyAddr, bytes32(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103))
+                )
             )
         );
     }
@@ -228,6 +249,12 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         allCalls[1] = prepareSetChainAssetHandlerOnBridgehubCall();
         allCalls[2] = prepareSetCtmAssetHandlerAddressOnL1Call();
         allCalls[3] = prepareSetUpgradeDiamondCutOnL1Call();
+        calls = mergeCallsArray(allCalls);
+    }
+
+    function prepareVersionSpecificStage2GovernanceCallsL1() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](1);
+        allCalls[0] = prepareUpgradePUHImplementationOnL1Call();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -333,6 +360,22 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         calls[0] = Call({
             target: addresses.stateTransition.chainTypeManagerProxy,
             data: abi.encodeCall(ChainTypeManager.setUpgradeDiamondCut, (upgradeCut, oldProtocolVersion)),
+            value: 0
+        });
+    }
+
+    /// @notice Upgrades the implementation of protocol upgrade handler.
+    function prepareUpgradePUHImplementationOnL1Call() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+
+        address transparentProxyAdmin = getProxyAdmin(config.ownerAddress);
+
+        calls[0] = Call({
+            target: transparentProxyAdmin,
+            data: abi.encodeCall(
+                ProxyAdminV5.upgradeAndCall,
+                (config.ownerAddress, protocolUpgradeHandlerImplementationAddress, hex"")
+            ),
             value: 0
         });
     }
