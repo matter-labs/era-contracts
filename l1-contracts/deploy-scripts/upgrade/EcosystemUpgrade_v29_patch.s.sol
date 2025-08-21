@@ -41,7 +41,14 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
 
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal override returns (Diamond.FacetCut[] memory facetCuts) {
-        // Overrides existing function to avoid facet deletion
+        // Remove the old MailboxFacet
+        facetCuts = new Diamond.FacetCut[](1);
+        facetCuts[0] = Diamond.FacetCut({
+            facet: address(0),
+            action: Diamond.Action.Remove,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+        });
     }
 
     /// @notice Get new facet cuts
