@@ -81,12 +81,11 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](4);
+        Call[][] memory allCalls = new Call[][](3);
 
         allCalls[0] = prepareUpgradeProxiesCalls();
         allCalls[1] = prepareNewChainCreationParamsCall();
-        allCalls[2] = prepareVersionSpecificStage1GovernanceCallsL1();
-        allCalls[3] = prepareGatewaySpecificStage1GovernanceCalls();
+        allCalls[2] = prepareGatewaySpecificStage1GovernanceCalls();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -104,15 +103,13 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
     function prepareGatewaySpecificStage1GovernanceCalls() public override returns (Call[] memory calls) {
         if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
 
-        Call[][] memory allCalls = new Call[][](3);
+        Call[][] memory allCalls = new Call[][](1);
 
         // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
         uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
         uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
 
         allCalls[0] = prepareNewChainCreationParamsCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[1] = prepareCTMImplementationUpgrade(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[2] = prepareVersionSpecificStage1GovernanceCallsGW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = mergeCallsArray(allCalls);
     }
