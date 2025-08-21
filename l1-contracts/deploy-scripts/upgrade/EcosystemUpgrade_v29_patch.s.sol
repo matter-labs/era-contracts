@@ -62,7 +62,7 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
     function prepareDefaultGovernanceCalls()
         public
         override
-        returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
+        returns (Call[] memory, Call[] memory stage1Calls, Call[] memory)
     {
         // We perform just the upgrade stage
         stage1Calls = prepareStage1GovernanceCalls();
