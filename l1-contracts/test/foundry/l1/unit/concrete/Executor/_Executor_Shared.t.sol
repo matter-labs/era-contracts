@@ -174,11 +174,12 @@ contract ExecutorTest is Test {
     }
 
     constructor() {
+        uint256 l1ChainID = 1;
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
-        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
+        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
 

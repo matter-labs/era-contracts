@@ -167,6 +167,9 @@ contract GatewayCTMFromL1 is Script {
                 gettersFacet: expectedGatewayContracts.stateTransition.gettersFacet,
                 diamondInit: expectedGatewayContracts.stateTransition.diamondInit,
                 genesisUpgrade: expectedGatewayContracts.stateTransition.genesisUpgrade,
+                validatorTimelockImplementation: expectedGatewayContracts
+                    .stateTransition
+                    .validatorTimelockImplementation,
                 validatorTimelock: expectedGatewayContracts.stateTransition.validatorTimelock,
                 serverNotifierProxy: expectedGatewayContracts.stateTransition.serverNotifierProxy,
                 serverNotifierImplementation: expectedGatewayContracts.stateTransition.serverNotifierImplementation,

@@ -44,6 +44,8 @@ error OnlyBridgehub(address msgSender, address bridgehub);
 error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
+// 0xa7a05e40
+error OnlyL2();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1

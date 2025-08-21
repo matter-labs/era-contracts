@@ -43,7 +43,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[36] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[38] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
@@ -79,7 +79,9 @@ library ContractsBytecodesLib {
             "TransparentUpgradeableProxy",
             "ServerNotifier", // ???
             "ValidatorTimelock",
-            "ValidiumL1DAValidator" // ???
+            "ValidiumL1DAValidator", // ???
+            "L2MessageVerification",
+            "L1V29Upgrade"
         ];
 
         string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
@@ -122,9 +124,9 @@ library ContractsBytecodesLib {
             // Original: Getters.sol
             return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
         } else if (Utils.compareStrings(contractIdentifier, "VerifierFflonk")) {
-            return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
+            return Utils.readZKFoundryBytecodeL1("VerifierFflonk.sol", "VerifierFflonk");
         } else if (Utils.compareStrings(contractIdentifier, "VerifierPlonk")) {
-            return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
+            return Utils.readZKFoundryBytecodeL1("VerifierPlonk.sol", "VerifierPlonk");
         }
 
         // --- General Cases ---

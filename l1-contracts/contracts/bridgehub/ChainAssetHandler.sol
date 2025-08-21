@@ -10,10 +10,9 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "./IBridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
-import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused} from "../common/L1ContractErrors.sol";
@@ -35,20 +34,22 @@ contract ChainAssetHandler is
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    /// @notice the asset id of Eth. This is only used on L1.
-    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
-
+    /// @notice The chain id of the L1.
     uint256 internal immutable L1_CHAIN_ID;
 
+    /// @notice The bridgehub contract.
     IBridgehub internal immutable BRIDGEHUB;
 
+    /// @notice The message root contract.
     IMessageRoot internal immutable MESSAGE_ROOT;
 
+    /// @notice The asset router contract.
     address internal immutable ASSET_ROUTER;
 
-    /// @notice used to pause the migrations of chains. Used for upgrades.
+    /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
+    /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
         if (msg.sender != ASSET_ROUTER) {
             revert NotAssetRouter(msg.sender, ASSET_ROUTER);
@@ -56,6 +57,7 @@ contract ChainAssetHandler is
         _;
     }
 
+    /// @notice Only when migrations are not paused.
     modifier whenMigrationsNotPaused() {
         if (migrationPaused) {
             revert MigrationPaused();
@@ -63,6 +65,7 @@ contract ChainAssetHandler is
         _;
     }
 
+    /// @notice Only when the contract is deployed on L1.
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert NotL1(L1_CHAIN_ID, block.chainid);
@@ -83,10 +86,12 @@ contract ChainAssetHandler is
         L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
-        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
-        // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
-        // We will change this with interop.
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+        _transferOwnership(_owner);
+    }
+
+    /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
+    /// @param _owner the owner of the contract
+    function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }
 

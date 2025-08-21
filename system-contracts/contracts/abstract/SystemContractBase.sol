@@ -53,7 +53,7 @@ abstract contract SystemContractBase {
     }
 
     /// @notice Modifier that makes sure that the method
-    /// can only be called from the EVM emulator using system call (unaccessible from EVM environment)
+    /// can only be called from the EVM emulator using system call (inaccessible from EVM environment)
     modifier onlySystemCallFromEvmEmulator() {
         if (!SystemContractHelper.isSystemCallFromEvmEmulator()) {
             revert CallerMustBeEvmContract();
