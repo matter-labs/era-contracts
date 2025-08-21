@@ -2,31 +2,27 @@
 
 pragma solidity ^0.8.20;
 
-// solhint-disable gas-custom-errors
-
 import {Test} from "forge-std/Test.sol";
 
 import {TestStateDiffComposer} from "./TestStateDiffComposer.sol";
 
-import {RollupL2DAValidator} from "contracts/data-availability/RollupL2DAValidator.sol";
-import {STATE_DIFF_ENTRY_SIZE} from "contracts/data-availability/StateDiffL2DAValidator.sol";
-import {PubdataField, ReconstructionMismatch} from "contracts/data-availability/DAErrors.sol";
+import {L2DAValidatorTester} from "contracts/test-contracts/L2DAValidatorTester.sol";
 
-import {COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER} from "contracts/L2ContractHelper.sol";
+import {STATE_DIFF_ENTRY_SIZE, COMPRESSOR_CONTRACT, PUBDATA_CHUNK_PUBLISHER, L2DACommitmentScheme} from "contracts/Constants.sol";
+import {ReconstructionMismatch, PubdataField, InvalidDACommitmentScheme} from "contracts/SystemContractErrors.sol";
 
-import {console2 as console} from "forge-std/Script.sol";
-
-contract RollupL2DAValidatorTest is Test {
-    RollupL2DAValidator internal l2DAValidator;
+contract L2DAValidatorTest is Test {
+    L2DAValidatorTester internal l2DAValidator;
     TestStateDiffComposer internal composer;
 
     function setUp() public {
-        l2DAValidator = new RollupL2DAValidator();
+        l2DAValidator = new L2DAValidatorTester();
         composer = new TestStateDiffComposer();
 
         bytes memory emptyArray = new bytes(0);
 
         // Setting dummy state diffs, so it works fine.
+        // solhint-disable-next-line func-named-parameters
         composer.setDummyStateDiffs(1, 0, 64, emptyArray, 0, emptyArray);
 
         bytes memory verifyCompressedStateDiffsData = abi.encodeCall(
@@ -42,7 +38,10 @@ contract RollupL2DAValidatorTest is Test {
         vm.mockCall(address(PUBDATA_CHUNK_PUBLISHER), chunkPubdataToBlobsData, new bytes(32));
     }
 
-    function finalizeAndCall(bytes memory revertMessage) internal returns (bytes32) {
+    function finalizeAndCall(
+        L2DACommitmentScheme commitmentScheme,
+        bytes memory revertMessage
+    ) internal returns (bytes32) {
         bytes32 rollingMessagesHash = composer.correctRollingMessagesHash();
         bytes32 rollingBytecodeHash = composer.correctRollingBytecodesHash();
         bytes memory totalL2ToL1PubdataAndStateDiffs = composer.generateTotalStateDiffsAndPubdata();
@@ -52,8 +51,7 @@ contract RollupL2DAValidatorTest is Test {
         }
         return
             l2DAValidator.validatePubdata(
-                bytes32(0),
-                bytes32(0),
+                commitmentScheme,
                 rollingMessagesHash,
                 rollingBytecodeHash,
                 totalL2ToL1PubdataAndStateDiffs
@@ -69,7 +67,7 @@ contract RollupL2DAValidatorTest is Test {
             composer.correctRollingMessagesHash(),
             composer.currentRollingMessagesHash()
         );
-        finalizeAndCall(revertMessage);
+        finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, revertMessage);
     }
 
     function test_incorrectChainBytecodeHash() public {
@@ -81,10 +79,11 @@ contract RollupL2DAValidatorTest is Test {
             composer.correctRollingBytecodesHash(),
             composer.currentRollingBytecodesHash()
         );
-        finalizeAndCall(revertMessage);
+        finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, revertMessage);
     }
 
     function test_incorrectStateDiffVersion() public {
+        // solhint-disable-next-line func-named-parameters
         composer.setDummyStateDiffs(2, 0, 64, new bytes(0), 0, new bytes(0));
 
         bytes memory revertMessage = abi.encodeWithSelector(
@@ -93,10 +92,11 @@ contract RollupL2DAValidatorTest is Test {
             bytes32(uint256(1)),
             bytes32(uint256(2))
         );
-        finalizeAndCall(revertMessage);
+        finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, revertMessage);
     }
 
     function test_nonZeroLeftOver() public {
+        // solhint-disable-next-line func-named-parameters
         composer.setDummyStateDiffs(1, 0, 64, new bytes(0), 0, new bytes(32));
 
         bytes memory revertMessage = abi.encodeWithSelector(
@@ -105,7 +105,7 @@ contract RollupL2DAValidatorTest is Test {
             bytes32(0),
             bytes32(uint256(32))
         );
-        finalizeAndCall(revertMessage);
+        finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, revertMessage);
     }
 
     function test_fullCorrectCompression() public {
@@ -117,6 +117,7 @@ contract RollupL2DAValidatorTest is Test {
         bytes memory compressedStateDiffs = new bytes(12);
         bytes memory uncompressedStateDiffs = new bytes(STATE_DIFF_ENTRY_SIZE * numberOfStateDiffs);
 
+        // solhint-disable-next-line func-named-parameters
         composer.setDummyStateDiffs(
             1,
             uint24(compressedStateDiffs.length),
@@ -143,12 +144,61 @@ contract RollupL2DAValidatorTest is Test {
         );
         vm.mockCall(address(PUBDATA_CHUNK_PUBLISHER), chunkPubdataToBlobsData, abi.encode(blobHashes));
 
-        bytes32 operatorDAHash = finalizeAndCall(new bytes(0));
+        bytes32 operatorDAHash = finalizeAndCall(L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256, new bytes(0));
 
         bytes32 expectedOperatorDAHash = keccak256(
             abi.encodePacked(stateDiffsHash, keccak256(totalPubdata), uint8(blobHashes.length), blobHashes)
         );
 
         assertEq(operatorDAHash, expectedOperatorDAHash);
+    }
+
+    function test_fullCorrectCompression_keccak_commitment() public {
+        composer.appendAMessage("message", true, true);
+        composer.appendBytecode(new bytes(32), true, true);
+
+        uint256 numberOfStateDiffs = 1;
+        // Just some non-zero array, the structure does not matter here.
+        bytes memory compressedStateDiffs = new bytes(12);
+        bytes memory uncompressedStateDiffs = new bytes(STATE_DIFF_ENTRY_SIZE * numberOfStateDiffs);
+
+        // solhint-disable-next-line func-named-parameters
+        composer.setDummyStateDiffs(
+            1,
+            uint24(compressedStateDiffs.length),
+            64,
+            compressedStateDiffs,
+            uint32(numberOfStateDiffs),
+            uncompressedStateDiffs
+        );
+
+        bytes32 stateDiffsHash = keccak256(uncompressedStateDiffs);
+        bytes memory verifyCompressedStateDiffsData = abi.encodeCall(
+            COMPRESSOR_CONTRACT.verifyCompressedStateDiffs,
+            (numberOfStateDiffs, 64, uncompressedStateDiffs, compressedStateDiffs)
+        );
+        vm.mockCall(address(COMPRESSOR_CONTRACT), verifyCompressedStateDiffsData, abi.encodePacked(stateDiffsHash));
+
+        bytes32 operatorDAHash = finalizeAndCall(L2DACommitmentScheme.PUBDATA_KECCAK256, new bytes(0));
+
+        bytes memory totalPubdata = composer.getTotalPubdata();
+        bytes32 expectedOperatorDAHash = keccak256(abi.encodePacked(stateDiffsHash, keccak256(totalPubdata)));
+
+        assertEq(operatorDAHash, expectedOperatorDAHash);
+    }
+
+    function test_callValidiumDAValidator() public {
+        bytes32 operatorDAHash = finalizeAndCall(L2DACommitmentScheme.EMPTY_NO_DA, new bytes(0));
+
+        assertEq(operatorDAHash, bytes32(0));
+    }
+
+    function test_invalidCommitmentScheme() public {
+        bytes memory revertMessage = abi.encodeWithSelector(
+            InvalidDACommitmentScheme.selector,
+            uint256(L2DACommitmentScheme.NONE)
+        );
+
+        finalizeAndCall(L2DACommitmentScheme.NONE, revertMessage);
     }
 }

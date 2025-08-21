@@ -166,6 +166,10 @@ struct ZKChainCommitment {
     PriorityTreeCommitment priorityTree;
     /// @notice Whether a chain is a permanent rollup.
     bool isPermanentRollup;
+    /// @notice The address of the L1 data availability validator.
+    address l1DAValidator;
+    /// @notice The scheme of L2 DA commitment. Different L1 validators may use different schemes.
+    L2DACommitmentScheme l2DACommitmentScheme;
     /// @notice The precommitment to the transactions of the latest batch.
     bytes32 precommitmentForTheLatestBatch;
 }
@@ -179,3 +183,18 @@ bytes32 constant DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH = bytes32(uint256(1));
 
 /// @dev The length of a packed transaction precommitment in bytes. It consists of two parts: 32-byte tx hash and 1-byte status (0 or 1).
 uint256 constant PACKED_L2_PRECOMMITMENT_LENGTH = 33;
+
+/// @dev Pubdata commitment scheme used for DA.
+/// @param NONE Invalid option.
+/// @param EMPTY_NO_DA No DA commitment, used by Validiums.
+/// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
+/// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
+enum L2DACommitmentScheme {
+    NONE,
+    EMPTY_NO_DA,
+    PUBDATA_KECCAK256,
+    BLOBS_AND_PUBDATA_KECCAK256
+}
+
+/// @dev The L2 data availability commitment scheme that permanent rollups are expected to use.
+L2DACommitmentScheme constant ROLLUP_L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256;
