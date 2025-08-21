@@ -62,7 +62,7 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
             facet: stateTransition.mailboxFacet,
             action: Action.Add,
             isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+            selectors: Utils.getAllSelectors(stateTransition.mailboxFacet.code)
         });
     }
 
