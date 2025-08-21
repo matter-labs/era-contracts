@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainExists, MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "./L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL2} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -58,6 +58,10 @@ contract MessageRoot is IMessageRoot, Initializable {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
+    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 public immutable L1_CHAIN_ID;
+
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
 
@@ -100,12 +104,22 @@ contract MessageRoot is IMessageRoot, Initializable {
         _;
     }
 
+    /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
+    modifier onlyL2Chain() {
+        if (block.chainid == L1_CHAIN_ID) {
+            revert OnlyL2();
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _bridgehub Address of the Bridgehub.
-    constructor(IBridgehub _bridgehub) {
+    /// @param _l1ChainId Chain ID of L1.
+    constructor(IBridgehub _bridgehub, uint256 _l1ChainId) {
         BRIDGE_HUB = _bridgehub;
+        L1_CHAIN_ID = _l1ChainId;
         _initialize();
         _disableInitializers();
     }
@@ -136,7 +150,7 @@ contract MessageRoot is IMessageRoot, Initializable {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
+    ) external onlyChain(_chainId) onlyL2Chain {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
