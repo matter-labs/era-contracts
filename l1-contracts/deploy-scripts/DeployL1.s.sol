@@ -239,6 +239,15 @@ contract DeployL1Script is Script, DeployUtils {
         } else {
             addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
         }
+        if (config.contracts.eigenDAL1DAValidator == address(0)) {
+            if (config.contracts.eigenDARiscZeroVerifier == address(0)) {
+                console.log("EigenDARiscZeroVerifier not deployed, do not use for production");
+            }
+            addresses.daAddresses.eigenDARiscZeroVerifier = config.contracts.eigenDARiscZeroVerifier;
+            addresses.daAddresses.eigenDAL1DAValidator = deploySimpleContract("EigenDAL1DAValidator", false);
+        } else {
+            addresses.daAddresses.eigenDAL1DAValidator = config.contracts.eigenDAL1DAValidator;
+        }
         vm.startBroadcast(msg.sender);
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(
@@ -534,6 +543,18 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.daAddresses.availL1DAValidator
         );
 
+        vm.serializeAddress(
+            "deployed_addresses",
+            "eigenda_l1_validator_addr",
+            addresses.daAddresses.eigenDAL1DAValidator
+        );
+
+        vm.serializeAddress(
+            "deployed_addresses",
+            "eigenda_risc_zero_verifier_addr",
+            addresses.daAddresses.eigenDARiscZeroVerifier
+        );
+
         string memory deployedAddresses = vm.serializeAddress(
             "deployed_addresses",
             "native_token_vault_addr",
@@ -559,6 +580,11 @@ contract DeployL1Script is Script, DeployUtils {
             getL2ValidatorAddress("ValidiumL2DAValidator")
         );
         vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getL2ValidatorAddress("AvailL2DAValidator"));
+        vm.serializeAddress(
+            "root",
+            "expected_eigenda_l2_validator_addr",
+            getL2ValidatorAddress("EigenDAL2DAValidator")
+        );
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
