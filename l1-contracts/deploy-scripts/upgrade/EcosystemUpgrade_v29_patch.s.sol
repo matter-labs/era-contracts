@@ -18,7 +18,7 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     function run() public virtual override {
-        initialize(vm.envString("V29_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(vm.envString("V29_PATCH_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_PATCH_UPGRADE_ECOSYSTEM_OUTPUT"));
 
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
