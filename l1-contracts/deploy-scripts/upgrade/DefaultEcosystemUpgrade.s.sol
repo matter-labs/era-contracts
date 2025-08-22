@@ -121,6 +121,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         address ecosystemAdminAddress;
         uint256 governanceUpgradeTimerInitialDelay;
         uint256 oldProtocolVersion;
+        uint256 v28ProtocolVersion;
         address oldValidatorTimelock;
         uint256 priorityTxsL2GasLimit;
         uint256 maxExpectedL1GasPrice;
@@ -529,6 +530,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
 
         newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
+        newConfig.v28ProtocolVersion = toml.readUint("$.v28_protocol_version");
 
         newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
         newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
