@@ -1,4 +1,4 @@
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 interface ISP1Verifier {
     /// @notice Verifies a proof with given public values and vkey.

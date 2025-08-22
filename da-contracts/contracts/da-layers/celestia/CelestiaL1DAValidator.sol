@@ -1,4 +1,4 @@
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {IL1DAValidator, L1DAValidatorOutput} from "../../IL1DAValidator.sol";
 import {IDAOracle} from "./IDAOracle.sol";
