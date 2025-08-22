@@ -472,6 +472,14 @@
     "evmDeployedBytecodeHash": null
   },
   {
+    "contractName": "l2-contracts/EigenDAL2DAValidator",
+    "zkBytecodeHash": "0x01000105a3d2a0eacf9b8963c07f295bb18512b9ddda82dc5227940236e721bb",
+    "zkBytecodePath": "/l2-contracts/zkout/EigenDAL2DAValidator.sol/EigenDAL2DAValidator.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
     "contractName": "l2-contracts/ForceDeployUpgrader",
     "zkBytecodeHash": "0x0100005b5811383bd367c1657c94134aad2dd42bbf4766415e5d0b3c2e3c6595",
     "zkBytecodePath": "/l2-contracts/zkout/ForceDeployUpgrader.sol/ForceDeployUpgrader.json",
@@ -1636,6 +1644,14 @@
     "evmBytecodeHash": "0x7f5bc76b7895b147a103a5e4e935175cb2063d31771b939c7d543738f348a09a",
     "evmBytecodePath": "/da-contracts/out/DummyVectorX.sol/DummyVectorX.json",
     "evmDeployedBytecodeHash": "0x3f74633a1d483023aad57cc4c73d875861bbaf998c3df1d30dc1bfa11978084c",
+    "zkBytecodeHash": null,
+    "zkBytecodePath": null
+  },
+  {
+    "contractName": "da-contracts/EigenDAL1DAValidator",
+    "evmBytecodeHash": "0xa1e7cbd137a359480621c05bca5b5c580499bc01f83bebfbd7baff5c25183fca",
+    "evmBytecodePath": "/da-contracts/out/EigenDAL1DAValidator.sol/EigenDAL1DAValidator.json",
+    "evmDeployedBytecodeHash": "0x84c3b1c2aa617e8bf16d5a97482956749dc055ab4a7f0bc407124a0daf1ef4b2",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },
