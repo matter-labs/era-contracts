@@ -36,3 +36,8 @@ struct BinaryMerkleProof {
     // The number of leaves in the tree
     uint256 numLeaves;
 }
+
+error CelestiaTooManyBlobs(uint256 len);
+error CelestiaInvalidPublicValuesLength(uint256 len);
+error CelestiaBatchNumberMismatch(uint256 actual, uint256 fromProof);
+error CelestiaChainIdMismatch(uint256 actual, uint256 fromProof);

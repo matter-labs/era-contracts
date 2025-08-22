@@ -5,6 +5,8 @@ pragma solidity 0.8.24;
 import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
 
+error CelestiaL2DAValidatorInvalidLeftoverSuffixLen(uint256 len);
+
 /// Avail L2 DA validator. It will create a commitment to the pubdata that can later be verified during settlement.
 contract CelestiaL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
     function validatePubdata(
@@ -19,12 +21,12 @@ contract CelestiaL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
         // Operator data, that is related to the DA itself
         bytes calldata _totalL2ToL1PubdataAndStateDiffs
     ) external returns (bytes32 outputHash) {
-        (bytes32 stateDiffHash, bytes calldata _totalPubdata, bytes calldata _leftoverSuffix) = _produceStateDiffPubdata(
-            _chainedMessagesHash,
-            _chainedBytecodesHash,
-            _totalL2ToL1PubdataAndStateDiffs
-        );
-        require(_leftoverSuffix.length == 0, "CelestiaL2DAValidator: leftoverSuffix must be empty");
+        (
+            bytes32 stateDiffHash,
+            bytes calldata _totalPubdata,
+            bytes calldata _leftoverSuffix
+        ) = _produceStateDiffPubdata(_chainedMessagesHash, _chainedBytecodesHash, _totalL2ToL1PubdataAndStateDiffs);
+        if (_leftoverSuffix.length != 0) revert(CelestiaL2DAValidatorInvalidLeftoverSuffixLen(_leftoverSuffix.length));
 
         bytes32 fullPubdataHash = keccak256(_totalPubdata);
         outputHash = keccak256(abi.encodePacked(stateDiffHash, fullPubdataHash));
