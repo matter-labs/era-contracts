@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity 0.8.24;
+pragma solidity 0.8.28;
 
 import {IL2DAValidator} from "../interfaces/IL2DAValidator.sol";
 import {StateDiffL2DAValidator} from "./StateDiffL2DAValidator.sol";
@@ -26,7 +26,7 @@ contract CelestiaL2DAValidator is IL2DAValidator, StateDiffL2DAValidator {
             bytes calldata _totalPubdata,
             bytes calldata _leftoverSuffix
         ) = _produceStateDiffPubdata(_chainedMessagesHash, _chainedBytecodesHash, _totalL2ToL1PubdataAndStateDiffs);
-        if (_leftoverSuffix.length != 0) revert(CelestiaL2DAValidatorInvalidLeftoverSuffixLen(_leftoverSuffix.length));
+        if (_leftoverSuffix.length != 0) revert CelestiaL2DAValidatorInvalidLeftoverSuffixLen(_leftoverSuffix.length);
 
         bytes32 fullPubdataHash = keccak256(_totalPubdata);
         outputHash = keccak256(abi.encodePacked(stateDiffHash, fullPubdataHash));

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
 import {IL1DAValidator, L1DAValidatorOutput} from "../../IL1DAValidator.sol";
@@ -26,11 +27,11 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         bytes32 l2DAValidatorOutputHash,
         bytes calldata operatorDAInput,
         uint256 _maxBlobsSupported
-    ) external returns (L1DAValidatorOutput memory output) {
+    ) external view returns (L1DAValidatorOutput memory output) {
         // _maxBlobsSupported is unused by the Celestia integration
         // just to be safe, we enforce a maximum to prevent accidental failures due to misconfiguration.
         // see audit issue N-01
-        if (_maxBlobsSupported > 256) revert(CelestiaTooManyBlobs(_maxBlobsSupported));
+        if (_maxBlobsSupported > 256) revert CelestiaTooManyBlobs(_maxBlobsSupported);
 
         CelestiaZKStackInput memory input = abi.decode(operatorDAInput[32:], (CelestiaZKStackInput));
 
@@ -40,7 +41,7 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         uint32 eqBatchNumber;
         uint64 eqChainId;
         // The public values must be exactly 4 x 32 bytes for keccak hash, data root, batch number, and chain id
-        if (publicValues.length != 76) revert(CelestiaInvalidPublicValuesLength(publicValues.length));
+        if (publicValues.length != 76) revert CelestiaInvalidPublicValuesLength(publicValues.length);
         assembly {
             let ptr := add(publicValues, 32) // skip length prefix
             eqKeccakHash := mload(ptr) // first bytes32
@@ -50,8 +51,8 @@ contract CelestiaL1DAValidator is IL1DAValidator {
         }
 
         // Verify that the batch number and chain ID match the values in the equivalence proof
-        if (batchNumber != eqBatchNumber) revert(CelestiaBatchNumberMismatch(batchNumber, eqBatchNumber));
-        if (chainId != eqChainId) revert(CelestiaChainIdMismatch(chainId, eqChainId));
+        if (batchNumber != eqBatchNumber) revert CelestiaBatchNumberMismatch(batchNumber, eqBatchNumber);
+        if (chainId != eqChainId) revert CelestiaChainIdMismatch(chainId, eqChainId);
 
         // First verify the equivalency proof using low-level staticcall
         (bool success, bytes memory returnData) = SP1_GROTH_16_VERIFIER.staticcall(
