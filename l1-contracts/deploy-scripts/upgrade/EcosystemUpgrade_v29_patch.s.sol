@@ -23,6 +23,14 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         prepareDefaultGovernanceCalls();
     }
 
+    function initializeConfig(string memory newConfigPath) internal override {
+        super.initializeConfig(newConfigPath);
+        string memory toml = vm.readFile(newConfigPath);
+
+        addresses.stateTransition.verifier = toml.readAddress("$.state_transition.verifier_addr");
+        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress("$.gateway.gateway_state_transition.verifier_addr");
+    }
+
     function deployNewEcosystemContractsL1() public override {
         require(upgradeConfig.initialized, "Not initialized");
 
