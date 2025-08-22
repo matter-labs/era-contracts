@@ -317,7 +317,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
         }
-        if (IChainTypeManager(s.chainTypeManager).getZKChain(_chainId) != msg.sender) {
+        if (IBridgehub(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
 
