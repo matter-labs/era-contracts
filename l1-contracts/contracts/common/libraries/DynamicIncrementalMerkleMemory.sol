@@ -45,6 +45,18 @@ library DynamicIncrementalMerkleMemory {
         bool _needsRootRecalculation;
     }
 
+    /// @dev The function used to allocate memory for a tree with a given depth.
+    function createTree(uint256 _treeDepth) internal pure returns (Bytes32PushTree memory) {
+        return Bytes32PushTree({
+            _nextLeafIndex: 0,
+            _sides: new bytes32[](_treeDepth),
+            _zeros: new bytes32[](_treeDepth),
+            _sidesLengthMemory: 0,
+            _zerosLengthMemory: 0,
+            _needsRootRecalculation: false
+        });
+    }
+
     /**
      * @dev Initialize a {Bytes32PushTree} using {Hashes-Keccak256} to hash internal nodes.
      * The capacity of the tree (i.e. number of leaves) is set to `2**levels`.

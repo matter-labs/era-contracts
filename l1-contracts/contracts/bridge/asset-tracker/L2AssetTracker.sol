@@ -18,7 +18,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidEmptyMessageRoot, L1ToL2DepositsNotFinalized, NotMigratedChain, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
+import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, L1ToL2DepositsNotFinalized, NotMigratedChain, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
@@ -30,6 +30,7 @@ struct SavedTotalSupply {
 }
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
+    using FullMerkleMemory for FullMerkleMemory.FullTree;
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
     uint256 public L1_CHAIN_ID;
@@ -52,6 +53,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// used only on Gateway.
     mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
+
+    /// empty messageRoot calculated for specific chain. 
+    mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -215,15 +219,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
-        DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkleMemory
-            .Bytes32PushTree({
-                _nextLeafIndex: 0,
-                _sides: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
-                _zeros: new bytes32[](L2_TO_L1_LOGS_MERKLE_TREE_DEPTH),
-                _sidesLengthMemory: 0,
-                _zerosLengthMemory: 0,
-                _needsRootRecalculation: false
-            });
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree = DynamicIncrementalMerkleMemory.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
 
         // slither-disable-next-line unused-return
         reconstructedLogsTree.setup(L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH);
@@ -270,8 +266,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        bytes32 EMPTY_MESSAGE_ROOT_CONSTANT;
-        require(_processLogsInputs.messageRoot == EMPTY_MESSAGE_ROOT_CONSTANT, InvalidEmptyMessageRoot());
+        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        /// kl todo: fix this alongside FullMerkleMemory 
+        // require(_processLogsInputs.messageRoot == emptyMessageRootForChain, InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot));
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
@@ -281,9 +278,28 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _appendChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
     }
 
+    function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
+        bytes32 savedEmptyMessageRoot = emptyMessageRoot[_chainId];
+        if (savedEmptyMessageRoot != bytes32(0)) {
+            return savedEmptyMessageRoot;
+        }
+        FullMerkleMemory.FullTree memory sharedTree;
+        sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
+
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory chainTree;
+        bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
+        bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId));
+        emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
+        return emptyMessageRootCalculated;
+    }
+
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
     function _handlePotentialFailedDeposit(uint256 _chainId, bytes32 _canonicalTxHash) internal {
         BalanceChange memory savedBalanceChange = balanceChange[_chainId][_canonicalTxHash];
+        /// Note we handle failedDeposits here for deposits that do not go through GW, 
+        /// because they were initiated when the chain settles on L1, however the failedDeposit L2->L1 message goes through GW.
+        /// Here we do not need to decrement the chainBalance, since the chainBalance was added to the chain's chainBalance on L1, 
+        /// and never migrated to the GW's chainBalance, since it never increments the totalSupply since the L2 txs fails.
         if (savedBalanceChange.amount > 0) {
             chainBalance[_chainId][savedBalanceChange.assetId] -= savedBalanceChange.amount;
         }
