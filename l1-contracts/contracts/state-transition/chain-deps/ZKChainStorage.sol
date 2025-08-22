@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
-// import {IChainTypeManager} from "../IChainTypeManager.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
 
@@ -90,7 +89,7 @@ struct ZKChainStorage {
     /// @dev Stored root hashes of L2 -> L1 logs
     mapping(uint256 batchNumber => bytes32 l2LogsRootHash) l2LogsRootHashes;
     /// @dev Container that stores transactions requested from L1
-    PriorityQueue.Queue priorityQueue;
+    PriorityQueue.Queue __DEPRECATED_priorityQueue;
     /// @dev The smart contract that manages the list with permission to call contract functions
     address __DEPRECATED_allowList;
     VerifierParams __DEPRECATED_verifierParams;
@@ -138,8 +137,7 @@ struct ZKChainStorage {
     /// charged at that level.
     FeeParams feeParams;
     /// @dev Address of the blob versioned hash getter smart contract used for EIP-4844 versioned hashes.
-    /// @dev Used only for testing.
-    address blobVersionedHashRetriever;
+    address __DEPRECATED_blobVersionedHashRetriever;
     /// @dev The chainId of the chain
     uint256 chainId;
     /// @dev The address of the bridgehub
@@ -175,6 +173,11 @@ struct ZKChainStorage {
     /// @notice Bytecode hash of evm emulator.
     /// @dev Used as an input to zkp-circuit.
     bytes32 l2EvmEmulatorBytecodeHash;
+    /// @notice The precommitment for the latest uncommitted batch (i.e. totalBatchesCommitted + 1).
+    /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
+    /// (the value of the constant can be found in Config.sol).
+    /// @dev Note, that precommitments are only supported for Era VM.
+    bytes32 precommitmentForTheLatestBatch;
     /// @dev Boojum OS flag, if `true` settlement done using Boojum OS state transition, otherwise Era VM
     bool boojumOS;
 }

@@ -6,7 +6,7 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {EcosystemUpgrade} from "deploy-scripts/upgrade/EcosystemUpgrade.s.sol";
+import {EcosystemUpgrade_v28} from "deploy-scripts/upgrade/EcosystemUpgrade_v28.s.sol";
 import {ChainUpgrade} from "deploy-scripts/upgrade/ChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {Test} from "forge-std/Test.sol";
@@ -18,11 +18,11 @@ string constant CHAIN_INPUT = "/upgrade-envs/v0.27.0-evm/stage-era.toml";
 string constant CHAIN_OUTPUT = "/test/foundry/l1/integration/upgrade-envs/script-out/stage-era.toml";
 
 contract UpgradeIntegrationTest is Test {
-    EcosystemUpgrade ecosystemUpgrade;
+    EcosystemUpgrade_v28 ecosystemUpgrade;
     ChainUpgrade chainUpgrade;
 
     function setUp() public {
-        ecosystemUpgrade = new EcosystemUpgrade();
+        ecosystemUpgrade = new EcosystemUpgrade_v28();
         ecosystemUpgrade.initialize(ECOSYSTEM_INPUT, ECOSYSTEM_OUTPUT);
 
         chainUpgrade = new ChainUpgrade();

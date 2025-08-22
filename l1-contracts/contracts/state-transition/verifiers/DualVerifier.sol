@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {UnknownVerifierType, EmptyProofLength} from "../../common/L1ContractErrors.sol";
+import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
 
 // 0xd08a97e6
 error InvalidMockProofLength();

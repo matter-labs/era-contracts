@@ -15,6 +15,7 @@ interface IComplexUpgrader {
     /// @param isZKsyncOS whether the deployment is for ZKsyncOS or Era.
     /// @param deployedBytecodeInfo the bytecode information for deployment.
     /// @param newAddress the address where the contract should be deployed.
+    // solhint-disable-next-line gas-struct-packing
     struct UniversalForceDeploymentInfo {
         bool isZKsyncOS;
         bytes deployedBytecodeInfo;
