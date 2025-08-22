@@ -17,7 +17,10 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     function run() public virtual override {
-        initialize(vm.envString("V29_PATCH_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_PATCH_UPGRADE_ECOSYSTEM_OUTPUT"));
+        initialize(
+            vm.envString("V29_PATCH_UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("V29_PATCH_UPGRADE_ECOSYSTEM_OUTPUT")
+        );
 
         prepareEcosystemUpgrade();
         prepareDefaultGovernanceCalls();
@@ -28,7 +31,9 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         string memory toml = vm.readFile(newConfigPath);
 
         addresses.stateTransition.verifier = toml.readAddress("$.state_transition.verifier_addr");
-        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress("$.gateway.gateway_state_transition.verifier_addr");
+        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
+            "$.gateway.gateway_state_transition.verifier_addr"
+        );
     }
 
     function deployNewEcosystemContractsL1() public override {
