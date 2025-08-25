@@ -20,8 +20,6 @@ error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batch
 error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
 // 0xfbd630b8
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
-// 0x7a47c9a2
-error InvalidChainId();
 // 0xc06789fa
 error InvalidCommitment();
 // 0xd2531c15
@@ -82,8 +80,12 @@ error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protoco
 error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 totalBlobsCommitmentSize);
 // 0x9044dff9
 error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
+// 0x89935a14
+error SettlementLayerChainIdMismatch();
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
+// 0x7aee4b86
+error V30UpgradeGatewayBlockNumberNotSet();
 // 0x52595598
 error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
 // 0x712d02d2

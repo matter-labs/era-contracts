@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../libraries/Diamond.sol";
 import {ZKChainBase} from "./facets/ZKChainBase.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH} from "../../common/Config.sol";
+import {DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, L2_TO_L1_LOG_SERIALIZE_SIZE, MAX_GAS_PER_TRANSACTION} from "../../common/Config.sol";
 import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol";
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
@@ -42,6 +42,9 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         if (_initializeData.chainTypeManager == address(0)) {
             revert ZeroAddress();
         }
+        if (_initializeData.interopCenter == address(0)) {
+            revert ZeroAddress();
+        }
         if (_initializeData.baseTokenAssetId == bytes32(0)) {
             revert EmptyAssetId();
         }
@@ -61,6 +64,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.chainId = _initializeData.chainId;
         s.bridgehub = _initializeData.bridgehub;
         s.chainTypeManager = _initializeData.chainTypeManager;
+        s.interopCenter = _initializeData.interopCenter;
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.protocolVersion = _initializeData.protocolVersion;
 

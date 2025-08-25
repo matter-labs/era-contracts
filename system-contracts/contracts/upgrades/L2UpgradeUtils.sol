@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
+import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
 import {ITransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 

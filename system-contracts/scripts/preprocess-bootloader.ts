@@ -82,6 +82,7 @@ const params = {
   RIGHT_PADDED_SEND_L2_TO_L1_LOG_SELECTOR: getPaddedSelector("L1Messenger", "sendL2ToL1Log"),
   PUBLISH_PUBDATA_SELECTOR: getSelector("L1Messenger", "publishPubdataAndClearState"),
   RIGHT_PADDED_SET_NEW_BATCH_SELECTOR: getPaddedSelector("SystemContext", "setNewBatch"),
+  RIGHT_PADDED_SET_SETTLEMENT_LAYER_CHAIN_ID_SELECTOR: getPaddedSelector("SystemContext", "setSettlementLayerChainId"),
   RIGHT_PADDED_OVERRIDE_BATCH_SELECTOR: getPaddedSelector("SystemContext", "unsafeOverrideBatch"),
   // Error
   REVERT_ERROR_SELECTOR: padZeroRight(getRevertSelector(), PADDED_SELECTOR_LENGTH),
@@ -99,6 +100,7 @@ const params = {
   SUCCESSFUL_PAYMASTER_VALIDATION_MAGIC_VALUE: getPaddedSelector("IPaymaster", "validateAndPayForPaymasterTransaction"),
   PUBLISH_COMPRESSED_BYTECODE_SELECTOR: getSelector("Compressor", "publishCompressedBytecode"),
   GET_MARKER_PADDED_SELECTOR: getPaddedSelector("KnownCodesStorage", "getMarker"),
+  GET_CODE_SIZE_SELECTOR: getPaddedSelector("AccountCodeStorage", "getCodeSize"),
   RIGHT_PADDED_SET_L2_BLOCK_SELECTOR: getPaddedSelector("SystemContext", "setL2Block"),
   RIGHT_PADDED_APPEND_TRANSACTION_TO_L2_BLOCK_SELECTOR: getPaddedSelector(
     "SystemContext",
@@ -211,6 +213,19 @@ async function main() {
     BOOTLOADER_TYPE: "playground_batch",
   });
 
+  // For impersonating block start
+  console.log("Preprocessing production impersonating bootloader");
+  const provedBatchImpersonatingBootloader = preprocess.preprocess(bootloader, {
+    BOOTLOADER_TYPE: "proved_batch",
+    ACCOUNT_IMPERSONATING: true,
+  });
+  console.log("Preprocessing fee estimation impersonating bootloader");
+  const feeEstimationImpersonatingBootloader = preprocess.preprocess(bootloader, {
+    BOOTLOADER_TYPE: "playground_batch",
+    ACCOUNT_IMPERSONATING: true,
+  });
+  // For impersonating block end
+
   console.log("Preprocessing bootloader tests");
   const bootloaderTests = await renderFile("bootloader/tests/bootloader/bootloader_test.yul", {});
 
@@ -254,6 +269,13 @@ async function main() {
   writeFileSync(`${OUTPUT_DIR_2}/fee_estimate.yul`, feeEstimationBootloader);
   writeFileSync(`${OUTPUT_DIR_2}/dummy.yul`, dummy);
   writeFileSync(`${OUTPUT_DIR_2}/transfer_test.yul`, transferTest);
+
+  // For impersonating block start
+  writeFileSync(`${OUTPUT_DIR_1}/proved_batch_impersonating.yul`, provedBatchImpersonatingBootloader);
+  writeFileSync(`${OUTPUT_DIR_1}/fee_estimate_impersonating.yul`, feeEstimationImpersonatingBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/proved_batch_impersonating.yul`, provedBatchImpersonatingBootloader);
+  writeFileSync(`${OUTPUT_DIR_2}/fee_estimate_impersonating.yul`, feeEstimationImpersonatingBootloader);
+  // For impersonating block end
 
   console.log("Bootloader preprocessing done!");
 }

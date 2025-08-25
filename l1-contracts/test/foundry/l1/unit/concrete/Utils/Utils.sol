@@ -12,11 +12,12 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {MessageVerification} from "contracts/common/MessageVerification.sol";
 import {FeeParams, IVerifier, PubdataPricingMode, VerifierParams} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";
 import {InitializeData, InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, SystemLogKey} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
-import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.sol";
+import {InteropRoot, L2CanonicalTransaction, L2Log} from "contracts/common/Messaging.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
@@ -32,6 +33,8 @@ address constant L2_DA_VALIDATOR_ADDRESS = 0x2f3Bc0cB46C9780990afbf86A60bdf6439D
 
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
+
+uint256 constant EVENT_INDEX = 0;
 
 library Utils {
     function packBatchTimestampAndBlockTimestamp(
@@ -62,7 +65,7 @@ library Utils {
     }
 
     function createSystemLogs(bytes32 _outputHash) public returns (bytes[] memory) {
-        bytes[] memory logs = new bytes[](9);
+        bytes[] memory logs = new bytes[](10);
         logs[0] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -116,6 +119,12 @@ library Utils {
             L2_BOOTLOADER_ADDRESS,
             uint256(SystemLogKey.L2_TXS_STATUS_ROLLING_HASH_KEY),
             bytes32("")
+        );
+        logs[9] = constructL2Log(
+            true,
+            L2_BOOTLOADER_ADDRESS,
+            uint256(SystemLogKey.SETTLEMENT_LAYER_CHAIN_ID_KEY),
+            bytes32(uint256(uint160(block.chainid)))
         );
 
         return logs;
@@ -247,12 +256,16 @@ library Utils {
         PriorityOpsBatchInfo[] memory _priorityOpsData
     ) internal pure returns (uint256, uint256, bytes memory) {
         InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
+        L2Log[] memory l2Logs = new L2Log[](_batchesData.length);
+        bytes[] memory messages = new bytes[](_batchesData.length);
+        bytes32[] memory messageRoots = new bytes32[](_batchesData.length);
+
         return (
             _batchesData[0].batchNumber,
             _batchesData[_batchesData.length - 1].batchNumber,
             bytes.concat(
                 bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
-                abi.encode(_batchesData, _priorityOpsData, dependencyRoots)
+                abi.encode(_batchesData, _priorityOpsData, dependencyRoots, l2Logs, messages, messageRoots)
             )
         );
     }
@@ -328,7 +341,7 @@ library Utils {
     }
 
     function getMailboxSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](9);
         uint256 i = 0;
         selectors[i++] = MailboxFacet.proveL2MessageInclusion.selector;
         selectors[i++] = MailboxFacet.proveL2LogInclusion.selector;
@@ -338,17 +351,19 @@ library Utils {
         selectors[i++] = MailboxFacet.bridgehubRequestL2Transaction.selector;
         selectors[i++] = MailboxFacet.l2TransactionBaseCost.selector;
         selectors[i++] = MailboxFacet.proveL2LeafInclusion.selector;
+        selectors[i++] = MailboxFacet.requestL2ServiceTransaction.selector;
         return selectors;
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](44);
+        bytes4[] memory selectors = new bytes4[](45);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
         selectors[i++] = UtilsFacet.util_getChainId.selector;
         selectors[i++] = UtilsFacet.util_setBridgehub.selector;
         selectors[i++] = UtilsFacet.util_getBridgehub.selector;
+        selectors[i++] = UtilsFacet.util_setInteropCenter.selector;
         selectors[i++] = UtilsFacet.util_setBaseToken.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenAssetId.selector;
         selectors[i++] = UtilsFacet.util_setVerifier.selector;
@@ -422,6 +437,7 @@ library Utils {
                 chainId: 1,
                 bridgehub: address(dummyBridgehub),
                 chainTypeManager: address(0x1234567890876543567890),
+                interopCenter: address(0x1234567890876543567890),
                 protocolVersion: 0,
                 admin: address(0x32149872498357874258787),
                 validatorTimelock: address(0x85430237648403822345345),

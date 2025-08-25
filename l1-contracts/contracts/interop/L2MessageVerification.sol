@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.24;
 
-import {MessageVerification} from "../state-transition/chain-deps/facets/MessageVerification.sol";
+import {MessageVerification} from "../common/MessageVerification.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {L2_INTEROP_ROOT_STORAGE} from "../common/l2-helpers/L2ContractAddresses.sol";
 

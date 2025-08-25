@@ -4,6 +4,8 @@ pragma solidity ^0.8.21;
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface ISystemContext {
-    function setChainId(uint256 _newChainId) external;
+interface IChainRegistrationSender {
+    function initialize(address _owner) external;
+
+    function registerChain(uint256 chainToBeRegistered, uint256 chainRegisteredOn) external;
 }

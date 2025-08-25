@@ -6,10 +6,6 @@ import {Test} from "forge-std/Test.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 
-import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
-
-import {DeployIntegrationUtils} from "../../l1/integration/deploy-scripts/DeployIntegrationUtils.s.sol";
-
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {L2WethTestAbstract} from "../../l1/integration/l2-tests-abstract/L2WethTestAbstract.t.sol";
 

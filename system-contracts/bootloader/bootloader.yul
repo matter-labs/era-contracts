@@ -435,6 +435,18 @@ object "Bootloader" {
                 ret := mul(INTEROP_ROOT_ROLLING_HASH_SLOT(), 32)
             }
 
+            function SETTLEMENT_LAYER_CHAIN_ID_SLOT() -> ret {
+                ret := add(INTEROP_ROOT_ROLLING_HASH_SLOT(), 1)
+            }
+
+            function SETTLEMENT_LAYER_CHAIN_ID_BYTE() -> ret {
+                ret := mul(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 32)
+            }
+
+            function getSettlementLayerChainId() -> ret {
+                ret := mload(SETTLEMENT_LAYER_CHAIN_ID_BYTE())
+            }
+
             /// @dev The slot starting from which the compressed bytecodes are located in the bootloader's memory.
             /// Each compressed bytecode is provided in the following format:
             /// - 32 byte formatted bytecode hash
@@ -446,7 +458,7 @@ object "Bootloader" {
             /// At the start of the bootloader, the value stored at the `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT` is equal to
             /// `TX_OPERATOR_TRUSTED_GAS_LIMIT_BEGIN_SLOT + 32`, where the hash of the first compressed bytecode to publish should be stored.
             function COMPRESSED_BYTECODES_BEGIN_SLOT() -> ret {
-                ret := add(INTEROP_ROOT_ROLLING_HASH_SLOT(), 1)
+                ret := add(SETTLEMENT_LAYER_CHAIN_ID_SLOT(), 1)
             }
 
             /// @dev The byte starting from which the compressed bytecodes are located in the bootloader's memory.
@@ -586,6 +598,24 @@ object "Bootloader" {
                 ret := sub(MAX_MEM_SIZE(), mul(MAX_TRANSACTIONS_IN_BATCH(), 32))
             }
 
+            ///
+            /// DEBUG SUPPORT START
+            ///
+
+            /// Position of the first byte that can be used for debugging.
+            function DEBUG_BEGIN_BYTE() -> ret {
+                ret := sub(VM_HOOK_PARAMS_OFFSET(), mul(MAX_DEBUG_SLOTS(), 32)
+            }
+
+            /// @dev Number of debug slots to use (each one has 32 bytes)
+            function MAX_DEBUG_SLOTS() -> ret {
+                ret := 32
+            }
+
+            ///
+            /// DEBUG SUPPORT END.
+            ///
+
             /// @dev The pointer writing to which invokes the VM hooks
             function VM_HOOK_PTR() -> ret {
                 ret := sub(RESULT_START_PTR(), 32)
@@ -604,7 +634,8 @@ object "Bootloader" {
             function LAST_FREE_SLOT() -> ret {
                 // The slot right before the vm hooks is the last slot that
                 // can be used for transaction's descriptions
-                ret := sub(VM_HOOK_PARAMS_OFFSET(), 32)
+                /// DEBUG SUPPORT: use DEBUG_BEGIN_BYTE (as we reserve some bytes at the end of memory).
+                ret := sub(DEBUG_BEGIN_BYTE(), 32)
             }
 
             /// @dev The formal address of the bootloader
@@ -662,6 +693,10 @@ object "Bootloader" {
 
             function L2_INTEROP_ROOT_STORAGE() -> ret {
                 ret := 0x0000000000000000000000000000000000010008
+            }
+
+            function L2_INTEROP_CENTER_ADDR() -> ret {
+                ret := 0x000000000000000000000000000000000001000b
             }
 
             /// @dev The minimal allowed distance in bytes between the pointer to the compressed data
@@ -1339,6 +1374,31 @@ object "Bootloader" {
                     L2_TX_INTRINSIC_PUBDATA()
                 )
 
+                ///
+                /// DEBUG SUPPORT START
+                ///
+
+                let totalGasLimit := getGasLimit(innerTxDataOffset)
+
+                // Sentinel value for Debug information for the in-memory node.
+                mstore(DEBUG_BEGIN_BYTE(), 1337)
+
+                // We start with total gas limit from user.
+                mstore(add(DEBUG_BEGIN_BYTE(), 32), totalGasLimit)
+                // This is the amount of gas that will never be used.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 2)), reservedGas)
+
+                // Amount of gas per each pubdata byte.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 3)), gasPerPubdata)
+
+                // This is the amount of gas that is left after we removed the minimum amount of gas that will be consumed
+                // by the transaction itself (INTRINSIC GAS).
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 4)), gasLimitForTx)
+
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
                 let gasPrice := getGasPrice(getMaxFeePerGas(innerTxDataOffset), getMaxPriorityFeePerGas(innerTxDataOffset))
 
                 debugLog("gasLimitForTx", gasLimitForTx)
@@ -1352,19 +1412,46 @@ object "Bootloader" {
                     gasPerPubdata
                 )
 
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                // This is the amount of gas that is left after validation.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 5)), gasLeft)
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
                 debugLog("validation finished", 0)
 
                 let gasSpentOnExecute := 0
                 let success := 0
                 success, gasSpentOnExecute := l2TxExecution(txDataOffset, gasLeft, basePubdataSpent, reservedGas, gasPerPubdata)
 
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                // Amount of gas spent on execute.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 6)), gasSpentOnExecute)
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
                 debugLog("execution finished", 0)
 
                 let refund := 0
                 let gasToRefund := saturatingSub(gasLeft, gasSpentOnExecute)
 
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 8)), gasToRefund)
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
                 // Note, that we pass reservedGas from the refundGas separately as it should not be used
                 // during the postOp execution.
+                <!-- @ifndef ACCOUNT_IMPERSONATING -->
                 refund := refundCurrentL2Transaction(
                     txDataOffset,
                     transactionIndex,
@@ -1375,7 +1462,14 @@ object "Bootloader" {
                     basePubdataSpent,
                     gasPerPubdata
                 )
-
+                <!-- @endif -->
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 9)), refund)
+                ///
+                /// DEBUG SUPPORT END
+                ///
                 notifyAboutRefund(refund)
                 mstore(resultPtr, success)
             }
@@ -1428,6 +1522,16 @@ object "Bootloader" {
                     safeMul(intrinsicPubdata, gasPerPubdata, "qw"),
                     "fj"
                 )
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 11)), operatorOverheadForTransaction)
+
+                // Fixed overhead.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 10)), intrinsicOverhead)
+                ///
+                /// DEBUG SUPPORT END
+                ///
 
                 switch lt(gasLimitForTx, intrinsicOverhead)
                 case 1 {
@@ -1478,8 +1582,12 @@ object "Bootloader" {
                     let validateABI := getNearCallABI(gasLimitForTx)
 
                     debugLog("validateABI", validateABI)
-
+                    <!-- @ifndef ACCOUNT_IMPERSONATING -->
                     isValid := ZKSYNC_NEAR_CALL_validateTx(validateABI, txDataOffset, gasPrice)
+                    <!-- @endif -->
+                    <!-- @ifdef ACCOUNT_IMPERSONATING -->
+                    isValid := 1
+                    <!-- @endif -->
                 }
 
                 debugLog("isValid", isValid)
@@ -1534,6 +1642,17 @@ object "Bootloader" {
                     gasSpentOnFactoryDeps := sub(gasBeforeFactoryDeps, gas())
                 }
 
+                ///
+                /// DEBUG SUPPORT START
+                ///
+
+                // Gas spent on fetching and unpacking the bytecodes.
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 7)), gasSpentOnFactoryDeps)
+
+                ///
+                /// DEBUG SUPPORT END
+                ///
+
                 // If marking of factory dependencies has been unsuccessful, 0 value is returned.
                 // Otherwise, all the previous dependencies have been successfully published, so
                 // we need to move the pointer.
@@ -1557,6 +1676,7 @@ object "Bootloader" {
 
                     let gasBeforeExecute := gas()
                     // for this one, we don't care whether or not it fails.
+                    <!-- @ifndef ACCOUNT_IMPERSONATING -->
                     success := ZKSYNC_NEAR_CALL_executeL2Tx(
                         executeABI,
                         txDataOffset,
@@ -1564,7 +1684,16 @@ object "Bootloader" {
                         reservedGas,
                         gasPerPubdata
                     )
-
+                    <!-- @endif -->
+                    <!-- @ifdef ACCOUNT_IMPERSONATING -->
+                    success := ZKSYNC_NEAR_CALL_executeL2TxImpersonating(
+                        executeABI,
+                        txDataOffset,
+                        basePubdataSpent,
+                        reservedGas,
+                        gasPerPubdata
+                    )
+                    <!-- @endif -->
                     gasSpentOnExecute := add(gasSpentOnFactoryDeps, sub(gasBeforeExecute, gas()))
                 }
 
@@ -1642,7 +1771,46 @@ object "Bootloader" {
 
                 debugLog("Executing L2 ret", success)
             }
-
+            <!-- @ifdef ACCOUNT_IMPERSONATING -->
+            function ZKSYNC_NEAR_CALL_executeL2TxImpersonating(
+                abi,
+                txDataOffset,
+                basePubdataSpent,
+                reservedGas,
+                gasPerPubdata
+            ) -> success {
+                let innerTxDataOffset := add(txDataOffset, 32)
+                let to := getTo(innerTxDataOffset)
+                let from := getFrom(innerTxDataOffset)
+                let value := getValue(innerTxDataOffset)
+                let dataPtr := getDataPtr(innerTxDataOffset)
+                debugLog("Executing L2 tx", 0)
+                switch isEOA(from)
+                case true {
+                    setTxOrigin(from)
+                }
+                default {
+                    setTxOrigin(0)
+                }
+                success := msgValueSimulatorMimicCall(
+                    to,
+                    from,
+                    value,
+                    dataPtr
+                )
+                if isNotEnoughGasForPubdata(
+                    basePubdataSpent,
+                    gas(),
+                    reservedGas,
+                    gasPerPubdata
+                ) {
+                    // If not enough gas for pubdata was provided, we revert all the state diffs / messages
+                    // that caused the pubdata to be published
+                    nearCallPanic()
+                }
+                debugLog("Executing L2 ret", success)
+            }
+            <!-- @endif -->
             /// @dev Sets factory dependencies for an L2 transaction with possible usage of packed bytecodes.
             /// @param abi The nearCall ABI. It is implicitly used as gasLimit for the call of this function.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
@@ -1725,6 +1893,25 @@ object "Bootloader" {
                 ret := mload(0)
             }
 
+            function getCodeSize(address) -> ret {
+                mstore(0, {{GET_CODE_SIZE_SELECTOR}})
+                mstore(4, address)
+                let success := call(
+                    gas(),
+                    KNOWN_CODES_CONTRACT_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    32
+                )
+
+                if iszero(success) {
+                    nearCallPanic()
+                }
+
+                ret := mload(0)
+            }
 
             /// @dev Used to refund the current transaction.
             /// @param txDataOffset The offset to the ABI-encoded Transaction struct.
@@ -1965,6 +2152,13 @@ object "Bootloader" {
                 }
 
                 let requiredOverhead := getTransactionUpfrontOverhead(txEncodeLen)
+                ///
+                /// DEBUG SUPPORT START
+                ///
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 12)), requiredOverhead)
+                ///
+                /// DEBUG SUPPORT END
+                ///
 
                 debugLog("txTotalGasLimit", txTotalGasLimit)
                 debugLog("requiredOverhead", requiredOverhead)
@@ -2230,6 +2424,16 @@ object "Bootloader" {
                     safeMul(txEncodeLen, MEMORY_OVERHEAD_GAS(), "iot"),
                     TX_SLOT_OVERHEAD_GAS()
                 )
+                ///
+                /// DEBUG SUPPORT START
+                ///
+
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 13)), safeMul(txEncodeLen, MEMORY_OVERHEAD_GAS(), "iot"))
+                mstore(add(DEBUG_BEGIN_BYTE(), mul(32, 14)), TX_SLOT_OVERHEAD_GAS())
+
+                ///
+                /// DEBUG SUPPORT END
+                ///
             }
 
             /// @dev A method where all panics in the nearCalls get to.
@@ -3055,6 +3259,38 @@ object "Bootloader" {
                 }
             }
 
+            function setSettlementLayerChainId(currentSettlementLayerChainId) {
+                mstore(0, {{RIGHT_PADDED_SET_SETTLEMENT_LAYER_CHAIN_ID_SELECTOR}})
+                mstore(4, currentSettlementLayerChainId)
+
+                debugLog("Setting settlement layer chain id: ", currentSettlementLayerChainId)
+
+                let success := call(
+                    gas(),
+                    SYSTEM_CONTEXT_ADDR(),
+                    0,
+                    0,
+                    36,
+                    0,
+                    0
+                )
+
+                if iszero(success) {
+                    debugLog("Failed to set new settlement layer chain id: ", currentSettlementLayerChainId)
+
+                    /// here during the upgrade the setting of the settlement layer chain will fail, as the system context is not yet upgraded.
+                    /// todo remove after v30 upgrade.
+                    /// We want to check if the interop center is deployed or not, i.e. did we execute V30 upgrade.
+                    let codeSize := getCodeSize(L2_INTEROP_CENTER_ADDR())
+                    debugLog("codeSize", codeSize)
+                    /// nothing is deployed at this address.
+                    let codeSize2 := getCodeSize(add(L2_INTEROP_ROOT_STORAGE(), 10))
+                    if iszero(eq(codeSize, codeSize2)) {
+                        revertWithReason(FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE(), 1)
+                    }
+                }
+            }
+
             /// @notice Sets the context information for the current L2 block.
             /// @param txId The index of the transaction in the batch for which to get the L2 block information.
             function setL2Block(txId) {
@@ -3457,7 +3693,9 @@ object "Bootloader" {
 
                         let from := getFrom(innerTxDataOffset)
                         let iseoa := isEOA(from)
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+                        <!-- @endif -->
 
                         <!-- @endif -->
 
@@ -3467,7 +3705,9 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
                         <!-- @endif -->
 
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -3485,7 +3725,9 @@ object "Bootloader" {
 
                         let from := getFrom(innerTxDataOffset)
                         let iseoa := isEOA(from)
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+                        <!-- @endif -->
 
                         <!-- @endif -->
 
@@ -3493,8 +3735,11 @@ object "Bootloader" {
                         assertEq(getPaymaster(innerTxDataOffset), 0, "paymaster non zero")
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
                         <!-- @endif -->
+                        <!-- @endif -->
+
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         // reserved1 used as marker that tx doesn't have field "to"
                         assertEq(getReserved2(innerTxDataOffset), 0, "reserved2 non zero")
@@ -3510,12 +3755,16 @@ object "Bootloader" {
 
                         let from := getFrom(innerTxDataOffset)
                         let iseoa := isEOA(from)
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(iseoa, true, "Only EIP-712 can use non-EOA")
+                        <!-- @endif -->
 
                         <!-- @endif -->
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
                         <!-- @endif -->
 
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
@@ -3535,7 +3784,9 @@ object "Bootloader" {
                         }
 
                         <!-- @if BOOTLOADER_TYPE=='proved_batch' -->
+                        <!-- @ifndef ACCOUNT_IMPERSONATING -->
                         assertEq(gt(getFrom(innerTxDataOffset), MAX_SYSTEM_CONTRACT_ADDR()), 1, "from in kernel space")
+                        <!-- @endif -->
                         <!-- @endif -->
                         assertEq(getReserved0(innerTxDataOffset), 0, "reserved0 non zero")
                         // reserved1 used as marker that tx doesn't have field "to"
@@ -4104,6 +4355,10 @@ object "Bootloader" {
                 ret := 37
             }
 
+            function FAILED_TO_SET_NEW_SETTLEMENT_LAYER_CHAIN_ID_ERR_CODE() -> ret {
+                ret := 38
+            }
+
             /// @dev Accepts a 1-word literal and returns its length in bytes
             /// @param str A string literal
             function getStrLen(str) -> len {
@@ -4286,8 +4541,13 @@ object "Bootloader" {
             }
 
             /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
-            function protocolUpgradeTxHashKey() -> ret {
+            function settlementLayerChainIdLogKey() -> ret {
                 ret := 9
+            }
+
+            /// @dev Log key used by Executor.sol for processing. See Constants.sol::SystemLogKey enum
+            function protocolUpgradeTxHashKey() -> ret {
+                ret := 10
             }
 
             ////////////////////////////////////////////////////////////////////////////
@@ -4327,6 +4587,9 @@ object "Bootloader" {
                 /// the operator still provides it to make sure that its data is in sync.
                 let EXPECTED_BASE_FEE := mload(192)
 
+                /// @notice The settlement layer chain id.
+                let SETTLEMENT_LAYER_CHAIN_ID := getSettlementLayerChainId()
+
                 validateOperatorProvidedPrices(FAIR_L2_GAS_PRICE, FAIR_PUBDATA_PRICE)
 
 
@@ -4351,6 +4614,9 @@ object "Bootloader" {
 
                 setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
 
+
+                setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
+
                 <!-- @endif -->
 
                 <!-- @if BOOTLOADER_TYPE=='playground_batch' -->
@@ -4364,6 +4630,8 @@ object "Bootloader" {
                 default {
                     setNewBatch(PREV_BATCH_HASH, NEW_BATCH_TIMESTAMP, NEW_BATCH_NUMBER, EXPECTED_BASE_FEE)
                 }
+
+                setSettlementLayerChainId(SETTLEMENT_LAYER_CHAIN_ID)
 
                 GAS_PRICE_PER_PUBDATA := gasPerPubdataFromBaseFee(EXPECTED_BASE_FEE, FAIR_PUBDATA_PRICE)
 
@@ -4505,7 +4773,8 @@ object "Bootloader" {
             sendToL1Native(true, chainedPriorityTxnHashLogKey(), mload(PRIORITY_TXS_L1_DATA_BEGIN_BYTE()))
             sendToL1Native(true, numberOfLayer1TxsLogKey(), mload(add(PRIORITY_TXS_L1_DATA_BEGIN_BYTE(), 32)))
             sendToL1Native(true, txsStatusRollingHashKey(), mload(TXS_STATUS_ROLLING_HASH_BEGIN_BYTE()))
-            
+            sendToL1Native(true, settlementLayerChainIdLogKey(), getSettlementLayerChainId())
+
             // After all of the interop roots are processed, sending hash to L1.
             let rollingHashOfProcessedRoots := mload(INTEROP_ROOT_ROLLING_HASH_BYTE())
             sendToL1Native(true, interopRootRollingHashLogKey(), rollingHashOfProcessedRoots)

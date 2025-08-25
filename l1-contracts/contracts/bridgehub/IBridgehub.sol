@@ -5,6 +5,7 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IInteropCenter} from "../interop/IInteropCenter.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -43,6 +44,7 @@ struct BridgehubMintCTMAssetData {
     bytes32 baseTokenAssetId;
     bytes ctmData;
     bytes chainData;
+    uint256 migrationNumber;
 }
 
 struct BridgehubBurnCTMAssetData {
@@ -92,6 +94,10 @@ interface IBridgehub {
 
     function messageRoot() external view returns (IMessageRoot);
 
+    function interopCenter() external view returns (IInteropCenter);
+
+    // function assetTracker() external view returns (IAssetTracker);
+
     function getZKChain(uint256 _chainId) external view returns (address);
 
     function getAllZKChains() external view returns (address[] memory);
@@ -103,6 +109,8 @@ interface IBridgehub {
     function admin() external view returns (address);
 
     function assetRouter() external view returns (address);
+
+    function chainRegistrationSender() external view returns (address);
 
     /// Mailbox forwarder
 
@@ -169,7 +177,9 @@ interface IBridgehub {
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler
+        address _chainAssetHandler,
+        address _interopCenter,
+        address _chainRegistrationSender
     ) external;
 
     function setChainAssetHandler(address _chainAssetHandler) external;
@@ -198,12 +208,6 @@ interface IBridgehub {
     //     bytes calldata _diamondCut
     // ) external;
 
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
-
     function ctmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
 
     function ctmAssetIdFromAddress(address _ctmAddress) external view returns (bytes32);
@@ -219,8 +223,6 @@ interface IBridgehub {
     function chainAssetHandler() external view returns (address);
 
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
-
-    function registerLegacyChain(uint256 _chainId) external;
 
     function pauseMigration() external;
 
@@ -240,4 +242,12 @@ interface IBridgehub {
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
 
     function forwardedBridgeRecoverFailedTransfer(uint256 _chainId) external returns (address zkChain, address ctm);
+
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
+    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external;
 }

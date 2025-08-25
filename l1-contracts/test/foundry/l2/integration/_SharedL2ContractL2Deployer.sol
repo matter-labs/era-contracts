@@ -5,7 +5,7 @@ import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_INTEROP_CENTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
@@ -36,7 +36,8 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         L2Utils.initSystemContracts(_args);
     }
 
-    // note this is duplicate code, but the inheritance is already complex
+    /// @notice this is duplicate code, but the inheritance is already complex
+    /// here we have to deploy contracts manually with new Contract(), because that can be handled by the compiler.
     function deployL2Contracts(uint256 _l1ChainId) public virtual override {
         string memory root = vm.projectRoot();
         string memory inputPath = string.concat(
@@ -48,6 +49,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
         addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
+        addresses.bridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
@@ -72,7 +74,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.diamondInit = address(new DiamondInit());
         // Deploy ChainTypeManager implementation
         addresses.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager(addresses.bridgehub.bridgehubProxy)
+            new ChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)
         );
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
