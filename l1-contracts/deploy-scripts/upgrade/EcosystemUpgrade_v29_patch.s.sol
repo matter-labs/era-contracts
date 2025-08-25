@@ -86,7 +86,9 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
     {
         // We perform just the upgrade stage
         stage1Calls = prepareStage1GovernanceCalls();
-        vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
+        string memory governanceCallsSerialized = vm.serializeBytes("governance_calls", "stage1_calls", abi.encode(stage1Calls));
+
+        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
     }
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
