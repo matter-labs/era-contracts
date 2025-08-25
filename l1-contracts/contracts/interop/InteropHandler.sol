@@ -332,7 +332,10 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         /// We need to make sure that the proof belongs to a batch that settled on GW after the v30 upgrade.
         uint256 v30UpgradeGatewayBlockNumber = L2_MESSAGE_ROOT.v30UpgradeGatewayBlockNumber();
         require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
-        require(proofData.settlementLayerBatchNumber > v30UpgradeGatewayBlockNumber, SettlementLayerBatchNumberTooLow());
+        require(
+            proofData.settlementLayerBatchNumber > v30UpgradeGatewayBlockNumber,
+            SettlementLayerBatchNumberTooLow()
+        );
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
 

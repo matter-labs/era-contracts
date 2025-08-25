@@ -59,6 +59,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
 
     uint256 internal constant L1_CHAIN_ID = 10; // it cannot be 9, the default block.chainid
     uint256 internal ERA_CHAIN_ID = 270;
+    uint256 internal GATEWAY_CHAIN_ID = 506;
     uint256 internal mintChainId = 300;
     address internal l1AssetRouter = makeAddr("l1AssetRouter");
     address internal aliasedL1AssetRouter = AddressAliasHelper.applyL1ToL2Alias(l1AssetRouter);
@@ -253,6 +254,37 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         weth = L2WrappedBaseToken(payable(wethProxy));
         weth.initializeV3("Wrapped Ether", "WETH", L2_ASSET_ROUTER_ADDR, l1WethAddress, baseTokenAssetId);
         return weth;
+    }
+
+    function finalizeDeposit() public {
+        finalizeDepositWithCustomCommitment(exampleChainCommitment);
+    }
+
+    function finalizeDepositWithChainId(uint256 _chainId) public {
+        finalizeDepositWithCustomCommitmentAndChainId(_chainId, exampleChainCommitment);
+    }
+
+    function finalizeDepositWithCustomCommitment(bytes memory chainCommitment) public {
+        finalizeDepositWithCustomCommitmentAndChainId(mintChainId, chainCommitment);
+    }
+
+    function finalizeDepositWithCustomCommitmentAndChainId(uint256 _chainId, bytes memory chainCommitment) public {
+        bytes memory chainData = chainCommitment;
+        bytes memory ctmData = abi.encode(
+            baseTokenAssetId,
+            ownerWallet,
+            chainTypeManager.protocolVersion(),
+            config.contracts.diamondCutData
+        );
+        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
+            chainId: _chainId,
+            baseTokenAssetId: baseTokenAssetId,
+            ctmData: ctmData,
+            chainData: chainData,
+            migrationNumber: 0
+        });
+        vm.prank(aliasedL1AssetRouter);
+        l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
     }
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;

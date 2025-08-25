@@ -6,7 +6,6 @@ import {UncheckedMath} from "../../common/libraries/UncheckedMath.sol";
 import {Merkle} from "./Merkle.sol";
 import {MerkleWrongIndex, MerkleWrongLength} from "../L1ContractErrors.sol";
 
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 library FullMerkleMemory {
@@ -23,32 +22,31 @@ library FullMerkleMemory {
 
     error InvalidMaxLeafNumber(uint256 _maxLeafNumber);
 
-    function createTree(uint256 _maxLeafNumber) internal view returns (FullTree memory) {
+    function createTree(FullTree memory self, uint256 _maxLeafNumber) internal view {
         uint256 height;
         uint256 tempLeafNumber = _maxLeafNumber;
-        for (uint256 i = 0; i < _maxLeafNumber; i++) {
+
+        for (uint256 i = 0; i < _maxLeafNumber; ++i) {
+            ++height;
             if (tempLeafNumber == 1) {
                 break;
             }
             if (tempLeafNumber == 0) {
                 revert InvalidMaxLeafNumber(0);
             }
-            ++height;
             tempLeafNumber = tempLeafNumber / 2;
         }
 
-        bytes32[][] memory nodes = new bytes32[][](height + 1);
+        bytes32[][] memory nodes = new bytes32[][](height);
         nodes[0] = new bytes32[](_maxLeafNumber);
-        bytes32[] memory zeros = new bytes32[](height + 1);
+        bytes32[] memory zeros = new bytes32[](height);
 
-        return FullTree({
-            _height: height,
-            _leafNumber: 0,
-            _nodesLengthMemory: height,
-            _zerosLengthMemory: height,
-            _nodes: nodes,
-            _zeros: zeros
-        });
+        self._zeros = zeros;
+        self._nodes = nodes;
+        self._height = height;
+        self._leafNumber = 0;
+        self._nodesLengthMemory = height;
+        self._zerosLengthMemory = height;
     }
 
     /**
@@ -60,8 +58,6 @@ library FullMerkleMemory {
      * @param zero The zero value to be used in the tree.
      */
     function setup(FullTree memory self, bytes32 zero) internal view returns (bytes32 initialRoot) {
-
-
         // Store depth in the dynamic array
         self._zeros[0] = zero;
         self._zerosLengthMemory = 1;
@@ -91,28 +87,22 @@ library FullMerkleMemory {
             self._nodes[self._nodesLengthMemory] = newLevelZero;
             ++self._nodesLengthMemory;
         }
-        
-        
-        
-        
+
         if (index != 0) {
             uint256 oldMaxNodeNumber = index - 1;
             uint256 maxNodeNumber = index;
+
             for (uint256 i; i < self._height; i = i.uncheckedInc()) {
                 if (oldMaxNodeNumber == maxNodeNumber) {
                     break;
                 }
-                
-                
+
                 if (self._nodes[i].length == 0) {
                     self._nodes[i] = new bytes32[](self._nodes[i - 1].length / 2 + 1);
                 }
-                
-                
-                
-                
+
                 self._nodes[i][maxNodeNumber] = self._zeros[i];
-                
+
                 maxNodeNumber /= 2;
                 oldMaxNodeNumber /= 2;
             }
@@ -130,9 +120,7 @@ library FullMerkleMemory {
         if (_index > maxNodeNumber) {
             revert MerkleWrongIndex(_index, maxNodeNumber);
         }
-        
-        
-        
+
         self._nodes[0][_index] = _itemHash;
         bytes32 currentHash = _itemHash;
         for (uint256 i; i < self._height; i = i.uncheckedInc()) {
@@ -146,14 +134,11 @@ library FullMerkleMemory {
             }
             _index /= 2;
             maxNodeNumber /= 2;
-            
-            
-            
-            
+
             if (self._nodes[i + 1].length == 0) {
                 self._nodes[i + 1] = new bytes32[](self._nodes[i].length / 2 + 1);
             }
-            
+
             self._nodes[i + 1][_index] = currentHash;
         }
         return currentHash;

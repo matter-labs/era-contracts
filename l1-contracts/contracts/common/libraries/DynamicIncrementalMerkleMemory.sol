@@ -46,15 +46,12 @@ library DynamicIncrementalMerkleMemory {
     }
 
     /// @dev The function used to allocate memory for a tree with a given depth.
-    function createTree(uint256 _treeDepth) internal pure returns (Bytes32PushTree memory) {
-        return Bytes32PushTree({
-            _nextLeafIndex: 0,
-            _sides: new bytes32[](_treeDepth),
-            _zeros: new bytes32[](_treeDepth),
-            _sidesLengthMemory: 0,
-            _zerosLengthMemory: 0,
-            _needsRootRecalculation: false
-        });
+    function createTree(Bytes32PushTree memory self, uint256 _treeDepth) internal pure {
+        self._sides = new bytes32[](_treeDepth);
+        self._zeros = new bytes32[](_treeDepth);
+        self._sidesLengthMemory = 0;
+        self._zerosLengthMemory = 0;
+        self._needsRootRecalculation = false;
     }
 
     /**

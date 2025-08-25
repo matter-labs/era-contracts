@@ -160,7 +160,7 @@ library L2GenesisForceDeploymentsHelper {
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
-            input: abi.encode(address(L2_BRIDGE_HUB))
+            input: abi.encode(address(L2_BRIDGE_HUB), fixedForceDeploymentsData.l1ChainId)
         });
 
         // Configure the BridgeHub deployment.

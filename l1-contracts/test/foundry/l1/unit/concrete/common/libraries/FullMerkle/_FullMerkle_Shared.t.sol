@@ -7,7 +7,6 @@ import {FullMerkleTest as FullMerkleTestContract} from "contracts/dev-contracts/
 import {FullMerkleMemory} from "contracts/common/libraries/FullMerkleMemory.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
-
 contract FullMerkleTest is Test {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
 
@@ -27,8 +26,8 @@ contract FullMerkleTest is Test {
     }
 
     function _setupMemoryTree(uint256 _maxLeafNumber) internal view returns (FullMerkleMemory.FullTree memory) {
-
-        FullMerkleMemory.FullTree memory memoryTree = FullMerkleMemory.createTree(_maxLeafNumber);
+        FullMerkleMemory.FullTree memory memoryTree;
+        memoryTree.createTree(_maxLeafNumber);
         memoryTree.setup(zeroHash);
         return memoryTree;
     }

@@ -97,29 +97,6 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
     }
 
-    function finalizeDeposit() public {
-        finalizeDepositWithCustomCommitment(exampleChainCommitment);
-    }
-
-    function finalizeDepositWithCustomCommitment(bytes memory chainCommitment) public {
-        bytes memory chainData = chainCommitment;
-        bytes memory ctmData = abi.encode(
-            baseTokenAssetId,
-            ownerWallet,
-            chainTypeManager.protocolVersion(),
-            config.contracts.diamondCutData
-        );
-        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
-            chainId: mintChainId,
-            baseTokenAssetId: baseTokenAssetId,
-            ctmData: ctmData,
-            chainData: chainData,
-            migrationNumber: 0
-        });
-        vm.prank(aliasedL1AssetRouter);
-        l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
-    }
-
     function test_finalizeDepositWithRealChainData() public {
         // Note: get this from real local txs
         // Note: if the contracts were changed, this test might fail. Just comment it out.
