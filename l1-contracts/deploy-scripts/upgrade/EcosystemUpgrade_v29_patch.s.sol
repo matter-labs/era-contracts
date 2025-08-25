@@ -31,8 +31,12 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         string memory toml = vm.readFile(newConfigPath);
 
         addresses.stateTransition.verifier = toml.readAddress("$.state_transition.verifier_addr");
+        addresses.stateTransition.genesisUpgrade = toml.readAddress("$.state_transition.genesis_upgrade_addr");
         gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
             "$.gateway.gateway_state_transition.verifier_addr"
+        );
+        gatewayConfig.gatewayStateTransition.genesisUpgrade = toml.readAddress(
+            "$.gateway.gateway_state_transition.genesis_upgrade_addr"
         );
     }
 
