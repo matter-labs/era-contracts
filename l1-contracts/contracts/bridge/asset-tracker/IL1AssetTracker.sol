@@ -26,7 +26,7 @@ interface IL1AssetTracker {
 
     function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external;
 
-    function getBalanceChange(
+    function consumeBalanceChange(
         uint256 _callerChainId,
         uint256 _chainId
     ) external returns (bytes32 assetId, uint256 amount);

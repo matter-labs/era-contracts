@@ -4,10 +4,14 @@ pragma solidity ^0.8.21;
 
 // 0x587df426
 error AlreadyCurrentSL(uint256 blockChainId);
+// 0xa695b1ef
+error BatchZeroNotAllowed();
 // 0xb0b5006f
 error ChainAlreadyRegistered();
 // 0xbe263463
 error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
+// 0x655c373c
+error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
 // 0xeab895aa
@@ -56,12 +60,12 @@ error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
 error OnlyChain(address msgSender, address zkChainAddress);
 // 0x8d14ca84
 error OnlyL1();
+// 0xa7a05e40
+error OnlyL2();
 // 0x52013f4d
 error OnlyOnGateway();
 // 0x26d10385
 error OnlyPreV30Chain(uint256 chainId);
-// 0xa7a05e40
-error OnlyL2();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1

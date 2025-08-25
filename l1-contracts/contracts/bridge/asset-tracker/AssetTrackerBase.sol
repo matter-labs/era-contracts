@@ -34,6 +34,9 @@ abstract contract AssetTrackerBase is
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
 
+    /// @notice This is used to store the total supply of the token bridged out from the token's origin chain.
+    /// This is used to prevent malicious chains from overflowing the sum of chainBalances.
+    /// We track it both on the origin L2, Gateway and the L1.
     mapping(bytes32 assetId => uint256 totalSupplyAcrossAllChains) public totalSupplyAcrossAllChains;
 
     function _l1ChainId() internal view virtual returns (uint256);

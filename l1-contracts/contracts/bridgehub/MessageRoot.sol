@@ -16,7 +16,7 @@ import {IBridgehub} from "./IBridgehub.sol";
 
 import {IMessageRoot, CHAIN_TREE_EMPTY_ENTRY_HASH, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
-import {ChainBatchRootAlreadyExists, ChainExists, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet} from "./L1BridgehubErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet} from "./L1BridgehubErrors.sol";
 import {L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
@@ -31,6 +31,8 @@ import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
+/// @dev From V30 onwards it is also used for L2->L1 message verification, this allows bypassing the Mailbox of individual chains.
+/// This is especially useful for chains settling on Gateway.
 contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
@@ -187,7 +189,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     }
 
     /// @dev The initialized used for the V30 upgrade.
-    function initializeV30Upgrade() external initializer {
+    function initializeV30Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
@@ -270,6 +272,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
         }
+        require(_chainBatchRoot != bytes32(0), ChainBatchRootZero());
         require(
             chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
@@ -386,6 +389,11 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
 
+        require(
+            BRIDGE_HUB.whitelistedSettlementLayers(proofData.settlementLayerChainId),
+            NotWhitelistedSettlementLayer(proofData.settlementLayerChainId)
+        );
+
         return
             this.proveL2LeafInclusionShared({
                 _chainId: proofData.settlementLayerChainId,
@@ -398,6 +406,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
 
     /// @notice Internal to get the historical batch root for chains before the v30 upgrade.
     function _getChainBatchRoot(uint256 _chainId, uint256 _batchNumber) internal view returns (bytes32) {
+        /// In current server the zeroth batch does not have L2->L1 logs.
+        require(_batchNumber > 0, BatchZeroNotAllowed());
         if (v30UpgradeChainBatchNumber[_chainId] >= _batchNumber) {
             return IGetters(BRIDGE_HUB.getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
         }

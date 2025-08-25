@@ -115,7 +115,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// @notice Called on the L1 by the gateway's mailbox when a deposit happens
     /// @notice Used for deposits via Gateway.
-    function getBalanceChange(
+    function consumeBalanceChange(
         uint256 _callerChainId,
         uint256 _chainId
     ) external onlyWhitelistedSettlementLayer(_callerChainId) returns (bytes32 assetId, uint256 amount) {
@@ -247,6 +247,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _tokenOriginChainId: data.tokenOriginChainId
         });
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
+
+        /// We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
+        /// Note: the confirmMigrationOnL2 is a L1->GW->L2 txs.
         _sendToChain(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
             abi.encodeCall(IL2AssetTracker.confirmMigrationOnGateway, (data))

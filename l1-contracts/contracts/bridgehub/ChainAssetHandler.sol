@@ -229,6 +229,7 @@ contract ChainAssetHandler is
             _originalCaller,
             bridgehubBurnData.chainData
         );
+        ++migrationNumber[bridgehubBurnData.chainId];
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
             baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(bridgehubBurnData.chainId),
@@ -237,7 +238,6 @@ contract ChainAssetHandler is
             migrationNumber: migrationNumber[bridgehubBurnData.chainId]
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
-        ++migrationNumber[bridgehubBurnData.chainId];
 
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }

@@ -21,7 +21,7 @@ error ExecutingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes executi
 error IndirectCallValueMismatch(uint256 expected, uint256 actual);
 // 0x32c2e156
 error MessageNotIncluded();
-// 0x9fb22a6f
+// 0x8ad61a4c
 error SettlementLayerBatchNumberTooLow();
 // 0x89fd2c76
 error UnauthorizedMessageSender(address expected, address actual);

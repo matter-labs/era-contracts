@@ -137,6 +137,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
+    /// @notice This function is called for outgoing bridging from the L2, i.e. L2->L1 withdrawals and outgoing L2->L2 interop.
     function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) public {
         if (_tokenOriginChainId == block.chainid) {
             // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
@@ -145,6 +146,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
+        /// Note we always allow initiation of bridging when settling on L1.
+        /// On Gateway we require that the tokenBalance be migrated to Gateway from L1,
+        /// otherwise withdrawals might fail in the Gateway L2AssetTracker when the chain settles.
         require(
             savedAssetMigrationNumber == migrationNumber ||
                 L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId(),
