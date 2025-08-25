@@ -175,12 +175,26 @@ contract ExecutorTest is Test {
     }
 
     constructor() {
+        uint256 l1ChainID = 1;
         owner = makeAddr("owner");
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         dummyBridgehub = new DummyBridgehub();
+        vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IBridgehub.L1_CHAIN_ID.selector), abi.encode(1));
+        uint256[] memory allZKChainChainIDs = new uint256[](1);
+        allZKChainChainIDs[0] = 271;
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehub.getAllZKChainChainIDs.selector),
+            abi.encode(allZKChainChainIDs)
+        );
+        vm.mockCall(
+            address(dummyBridgehub),
+            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector),
+            abi.encode(makeAddr("chainTypeManager"))
+        );
         address interopCenter = makeAddr("interopCenter");
-        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)));
+        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
 

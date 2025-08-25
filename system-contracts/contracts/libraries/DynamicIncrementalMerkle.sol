@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.28;
 
 import {Merkle} from "./Merkle.sol";
 import {Arrays} from "@openzeppelin/contracts-v4/utils/Arrays.sol";
@@ -43,6 +43,7 @@ library DynamicIncrementalMerkle {
         bytes32[] _zeros;
         uint256 _sidesLengthMemory;
         uint256 _zerosLengthMemory;
+        bool _needsRootRecalculation;
     }
 
     /**
@@ -59,7 +60,8 @@ library DynamicIncrementalMerkle {
         return bytes32(0);
     }
 
-    function setupMemory(Bytes32PushTree memory self, bytes32 zero) internal returns (bytes32 initialRoot) {
+    /// @dev Same as above, but for memory tree.
+    function setupMemory(Bytes32PushTree memory self, bytes32 zero) internal pure returns (bytes32 initialRoot) {
         self._nextLeafIndex = 0;
         self._zeros[0] = zero;
         self._zerosLengthMemory = 1;
@@ -71,8 +73,6 @@ library DynamicIncrementalMerkle {
     /**
      * @dev Resets the tree to a blank state.
      * Calling this function on MerkleTree that was already setup and used will reset it to a blank state.
-     * @param zero The value that represents an empty leaf.
-     * @return initialRoot The initial root of the tree.
      */
     function reset(Bytes32PushTree storage self, bytes32 zero) internal returns (bytes32 initialRoot) {
         clear(self);
@@ -91,7 +91,8 @@ library DynamicIncrementalMerkle {
         }
     }
 
-    function clearMemory(Bytes32PushTree memory self) internal {
+    /// @dev Same as above, but for memory tree.
+    function clearMemory(Bytes32PushTree memory self) internal pure {
         self._nextLeafIndex = 0;
         uint256 length = self._zerosLengthMemory;
         for (uint256 i = length; 0 < i; --i) {
@@ -104,13 +105,14 @@ library DynamicIncrementalMerkle {
     }
 
     /**
-     * @dev Insert a new leaf in the tree, and compute the new root. Returns the position of the inserted leaf in the
-     * tree, and the resulting root.
-     *
-     * Hashing the leaf before calling this function is recommended as a protection against
-     * second pre-image attacks.
+     * @dev Internal function that handles both lazy and non-lazy push operations for storage.
+     * Returns the index and optionally the new root (if not lazy).
      */
-    function push(Bytes32PushTree storage self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
+    function _pushInner(
+        Bytes32PushTree storage self,
+        bytes32 leaf,
+        bool isLazy
+    ) internal returns (uint256 index, bytes32 newRoot) {
         // Cache read
         uint256 levels = self._zeros.length - 1;
 
@@ -139,6 +141,12 @@ library DynamicIncrementalMerkle {
             if (isLeft && !updatedSides) {
                 Arrays.unsafeAccess(self._sides, i).value = currentLevelHash;
                 updatedSides = true;
+                if (isLazy) {
+                    // Mark that root needs recalculation due to lazy update
+                    self._needsRootRecalculation = true;
+                    // Early return when sides are updated - we don't need to continue
+                    return (index, bytes32(0));
+                }
             }
 
             // Compute the current node hash by using the hash function
@@ -153,10 +161,42 @@ library DynamicIncrementalMerkle {
         }
 
         Arrays.unsafeAccess(self._sides, levels).value = currentLevelHash;
+        self._needsRootRecalculation = false;
         return (index, currentLevelHash);
     }
 
-    function pushMemory(Bytes32PushTree memory self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
+    /**
+     * @dev Insert a new leaf in the tree lazily. Returns the position of the inserted leaf in the
+     * tree. This is the lazy version that updates only the needed side array entry and defers
+     * root computation until root() is called.
+     *
+     * Hashing the leaf before calling this function is recommended as a protection against
+     * second pre-image attacks.
+     */
+    function pushLazy(Bytes32PushTree storage self, bytes32 leaf) internal returns (uint256 index) {
+        (index, ) = _pushInner(self, leaf, true);
+    }
+
+    /**
+     * @dev Insert a new leaf in the tree, and compute the new root. Returns the position of the inserted leaf in the
+     * tree, and the resulting root.
+     *
+     * Hashing the leaf before calling this function is recommended as a protection against
+     * second pre-image attacks.
+     */
+    function push(Bytes32PushTree storage self, bytes32 leaf) internal returns (uint256 index, bytes32 newRoot) {
+        return _pushInner(self, leaf, false);
+    }
+
+    /**
+     * @dev Internal function that handles both lazy and non-lazy push operations for memory.
+     * Returns the index and optionally the new root (if not lazy).
+     */
+    function _pushInnerMemory(
+        Bytes32PushTree memory self,
+        bytes32 leaf,
+        bool isLazy
+    ) internal pure returns (uint256 index, bytes32 newRoot) {
         // Cache read
         uint256 levels = self._zerosLengthMemory - 1;
 
@@ -186,8 +226,14 @@ library DynamicIncrementalMerkle {
             // If so, next time we will come from the right, so we need to save it
             if (isLeft && !updatedSides) {
                 self._sides[i] = currentLevelHash;
-                // Note: in order to update the sides we should stop here. We continue in order to store the new root.
                 updatedSides = true;
+                if (isLazy) {
+                    // Mark that root needs recalculation due to lazy update
+                    self._needsRootRecalculation = true;
+                    // Early return when sides are updated - we don't need to continue
+                    return (index, bytes32(0));
+                }
+                // Note: in order to update the sides we should stop here. We continue in order to store the new root.
             }
 
             // Compute the current node hash by using the hash function
@@ -202,13 +248,33 @@ library DynamicIncrementalMerkle {
         }
         // Note this is overloading the sides array with the root.
         self._sides[levels] = currentLevelHash;
+        self._needsRootRecalculation = false;
         return (index, currentLevelHash);
     }
+
+    /// @dev Same as above, but for memory tree.
+    function pushMemory(
+        Bytes32PushTree memory self,
+        bytes32 leaf
+    ) internal pure returns (uint256 index, bytes32 newRoot) {
+        return _pushInnerMemory(self, leaf, false);
+    }
+
+    /**
+     * @dev Insert a new leaf in the memory tree lazily. Returns the position of the inserted leaf in the
+     * tree. This is the lazy version that updates only the needed side array entry and defers
+     * root computation until rootMemory() is called.
+     *
+     * Hashing the leaf before calling this function is recommended as a protection against
+     * second pre-image attacks.
+     */
+    function pushLazyMemory(Bytes32PushTree memory self, bytes32 leaf) internal pure returns (uint256 index) {
+        (index, ) = _pushInnerMemory(self, leaf, true);
+    }
+
     /**
      * @dev Extend until end.
      */
-
-    /// @dev here we can extend the array, so the depth is not predetermined.
     function extendUntilEnd(Bytes32PushTree storage self, uint256 finalDepth) internal {
         bytes32 currentZero = self._zeros[self._zeros.length - 1];
         if (self._nextLeafIndex == 0) {
@@ -222,9 +288,10 @@ library DynamicIncrementalMerkle {
             self._zeros.push(currentZero);
             self._sides.push(currentSide);
         }
+        self._needsRootRecalculation = false;
     }
 
-    /// @dev
+    /// @dev Same as above, but for memory tree.
     function extendUntilEndMemory(Bytes32PushTree memory self) internal pure {
         bytes32 currentZero = self._zeros[self._zerosLengthMemory - 1];
         if (self._nextLeafIndex == 0) {
@@ -240,17 +307,89 @@ library DynamicIncrementalMerkle {
         }
         self._sidesLengthMemory = self._sides.length;
         self._zerosLengthMemory = self._zeros.length;
+        self._needsRootRecalculation = false;
+    }
+
+    /**
+     * @dev Recalculate the root from current tree state when lazy updates have been made.
+     */
+    function _recalculateRoot(Bytes32PushTree storage self) internal view returns (bytes32) {
+        uint256 levels = self._zeros.length - 1;
+        uint256 leafCount = self._nextLeafIndex;
+
+        if (leafCount == 0) {
+            return bytes32(0);
+        }
+
+        uint256 currentIndex = leafCount - 1;
+
+        bytes32 currentLevelHash = Arrays.unsafeAccess(self._sides, 0).value;
+
+        for (uint32 i = 0; i < levels; ++i) {
+            bool isLeft = (currentIndex % 2) == 0;
+
+            currentLevelHash = Merkle.efficientHash(
+                isLeft ? currentLevelHash : Arrays.unsafeAccess(self._sides, i).value,
+                isLeft ? Arrays.unsafeAccess(self._zeros, i).value : currentLevelHash
+            );
+
+            currentIndex >>= 1;
+        }
+
+        return currentLevelHash;
     }
 
     /**
      * @dev Tree's root.
      */
-    function root(Bytes32PushTree storage self) internal view returns (bytes32) {
+    function root(Bytes32PushTree storage self) internal returns (bytes32) {
+        if (self._needsRootRecalculation) {
+            bytes32 newRoot = _recalculateRoot(self);
+            Arrays.unsafeAccess(self._sides, self._sides.length - 1).value = newRoot;
+            self._needsRootRecalculation = false;
+            return newRoot;
+        }
         return Arrays.unsafeAccess(self._sides, self._sides.length - 1).value;
     }
 
-    function rootMemory(Bytes32PushTree memory self) internal view returns (bytes32) {
-        // note the last element of the sides array is the root, and is not really a side.
+    /**
+     * @dev Recalculate the root from current tree state when lazy updates have been made.
+     * This simulates what a complete pushes sequence would have computed.
+     */
+    function _recalculateRootMemory(Bytes32PushTree memory self) internal pure returns (bytes32) {
+        uint256 levels = self._zerosLengthMemory - 1;
+        uint256 leafCount = self._nextLeafIndex;
+
+        if (leafCount == 0) {
+            return bytes32(0);
+        }
+
+        uint256 currentIndex = leafCount - 1;
+
+        bytes32 currentLevelHash = self._sides[0];
+
+        for (uint32 i = 0; i < levels; ++i) {
+            bool isLeft = (currentIndex % 2) == 0;
+
+            currentLevelHash = Merkle.efficientHash(
+                isLeft ? currentLevelHash : self._sides[i],
+                isLeft ? self._zeros[i] : currentLevelHash
+            );
+
+            currentIndex >>= 1;
+        }
+
+        return currentLevelHash;
+    }
+
+    /// @dev Same as above, but for memory tree.
+    function rootMemory(Bytes32PushTree memory self) internal pure returns (bytes32) {
+        if (self._needsRootRecalculation) {
+            bytes32 newRoot = _recalculateRootMemory(self);
+            self._sides[self._sidesLengthMemory - 1] = newRoot;
+            self._needsRootRecalculation = false;
+            return newRoot;
+        }
         return self._sides[self._sidesLengthMemory - 1];
     }
 
@@ -261,7 +400,8 @@ library DynamicIncrementalMerkle {
         return self._sides.length - 1;
     }
 
-    function heightMemory(Bytes32PushTree memory self) internal view returns (uint256) {
+    /// @dev Same as above, but for memory tree.
+    function heightMemory(Bytes32PushTree memory self) internal pure returns (uint256) {
         return self._sidesLengthMemory - 1;
     }
 }

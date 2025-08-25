@@ -21,6 +21,7 @@ import {IMessageRoot} from "./interfaces/IMessageRoot.sol";
 import {ICreate2Factory} from "./interfaces/ICreate2Factory.sol";
 import {IEvmHashesStorage} from "./interfaces/IEvmHashesStorage.sol";
 import {IL2AssetRouter} from "./interfaces/IL2AssetRouter.sol";
+import {IL2AssetTracker} from "./interfaces/IL2AssetTracker.sol";
 import {IL2NativeTokenVault} from "./interfaces/IL2NativeTokenVault.sol";
 import {IInteropHandler} from "./interfaces/IInteropHandler.sol";
 import {IInteropCenter} from "./interfaces/IInteropCenter.sol";
@@ -131,6 +132,7 @@ IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(address(USER_CONTRACTS_OFFSET + 0x0b));
 IInteropHandler constant L2_INTEROP_HANDLER = IInteropHandler(address(USER_CONTRACTS_OFFSET + 0x0c));
 address constant L2_ASSET_TRACKER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x0d);
+IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(address(L2_ASSET_TRACKER_ADDRESS));
 
 
 /// @dev If the bitwise AND of the extraAbi[2] param when calling the MSG_VALUE_SIMULATOR

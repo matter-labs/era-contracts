@@ -18,19 +18,18 @@ import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.s
 ///
 // import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, PACKED_L2_BLOCK_TIMESTAMP_MASK } from "../../../common/Config.sol";
 // import {IL1DAValidator} from "../../chain-interfaces/IL1DAValidator.sol";
-// import {CommitBasedInteropNotSupported, MismatchL2DAValidator} from "../../L1StateTransitionErrors.sol";
+// import {MismatchL2DAValidator} from "../../L1StateTransitionErrors.sol";
 // import {BatchHashMismatch, InvalidProof, L2TimestampTooBig, TimeNotReached } from "../../../common/L1ContractErrors.sol";
 ///
 /// DEBUG SUPPORT END
 ///
 import {L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
-import {DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
+import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
 /// SettlementLayerChainIdMismatch
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
 import {IL2AssetTracker} from "../../../bridge/asset-tracker/IL2AssetTracker.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
@@ -613,13 +612,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 // release, import and export only happens on GW, so this is the only case we have to cover.
                 correctRootHash = messageRootContract.historicalRoot(uint256(interopRoot.blockOrBatchNumber));
             } else {
-                // @notice: here we will verify against the Diamond proxy contract of the sender directly.
-                // This means the receiving chain has to trust the sender chain's CTM.
-                // For now we will not allow permissionless CTMs to be added, so the ecosystem is secure.
-                // revert CommitBasedInteropNotSupported();
-                correctRootHash = IGetters(IBridgehub(s.bridgehub).getZKChain(interopRoot.chainId)).l2LogsRootHash(
-                    interopRoot.blockOrBatchNumber
-                );
+                revert CommitBasedInteropNotSupported();
             }
             if (correctRootHash == bytes32(0)) {
                 revert MessageRootIsZero();
@@ -637,6 +630,16 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 )
             );
         }
+    }
+
+    /// @notice Appends the batch message root to the global message.
+    /// @param _batchNumber The number of the batch
+    /// @param _messageRoot The root of the merkle tree of the messages to L1.
+    /// @dev We only call this function on L1.
+    function _appendMessageRoot(uint256 _batchNumber, bytes32 _messageRoot) internal {
+        // Once the batch is executed, we include its message to the message root.
+        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
     }
 
     /// @inheritdoc IExecutor
@@ -658,15 +661,20 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (batchesData.length != priorityOpsData.length) {
             revert InvalidBatchesDataLength(batchesData.length, priorityOpsData.length);
         }
-        if (batchesData.length != logs.length && block.chainid != L1_CHAIN_ID) {
-            revert InvalidBatchesDataLength(batchesData.length, logs.length);
-        }
-        if (batchesData.length != messages.length && block.chainid != L1_CHAIN_ID) {
-            revert InvalidBatchesDataLength(batchesData.length, messages.length);
+        if (block.chainid == L1_CHAIN_ID) {
+            require(logs.length == 0, InvalidBatchesDataLength(0, logs.length));
+            require(messages.length == 0, InvalidBatchesDataLength(0, messages.length));
+        } else {
+            require(batchesData.length == logs.length, InvalidBatchesDataLength(batchesData.length, logs.length));
+            require(
+                batchesData.length == messages.length,
+                InvalidBatchesDataLength(batchesData.length, messages.length)
+            );
         }
 
-        // Interop is only allowed on GW currently, so we never append messages to message root on L1.
-        // kl todo. Is this what we want?
+        // Interop is only allowed on GW currently, so we go through the Asset Tracker when on Gateway.
+        // When on L1, we append directly to the Message Root, though interop is not allowed there, it is only used for
+        // message verification.
         if (block.chainid != L1_CHAIN_ID) {
             uint256 messagesLength = messages.length;
             for (uint256 i = 0; i < messagesLength; i = i.uncheckedInc()) {
@@ -680,6 +688,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 });
                 IL2AssetTracker assetTracker = IL2AssetTracker(address(IInteropCenter(s.interopCenter).assetTracker()));
                 assetTracker.processLogsAndMessages(processLogsInput);
+            }
+        } else {
+            uint256 batchesDataLength = batchesData.length;
+            for (uint256 i = 0; i < batchesDataLength; i = i.uncheckedInc()) {
+                _appendMessageRoot(batchesData[i].batchNumber, batchesData[i].l2LogsTreeRoot);
             }
         }
 

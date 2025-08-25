@@ -30,10 +30,12 @@ import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlemen
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {IMessageVerification, MessageVerification} from "./MessageVerification.sol";
+import {IMessageVerification, MessageVerification} from "../../../common/MessageVerification.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
-import {BalanceChange} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BalanceChange} from "../../../common/Messaging.sol";
 import {INativeTokenVault} from "../../../bridge/ntv/INativeTokenVault.sol";
+import {IBridgedStandardToken} from "../../../bridge/BridgedStandardERC20.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -156,14 +158,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) public view returns (bool) {
-        L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(_l2TxNumberInBatch, _l2TxHash, _status);
         return
-            _proveL2LogInclusion({
+            proveL1ToL2TransactionStatusShared({
                 _chainId: s.chainId,
-                _blockOrBatchNumber: _l2BatchNumber,
-                _index: _l2MessageIndex,
-                _log: l2Log,
-                _proof: _merkleProof
+                _l2TxHash: _l2TxHash,
+                _l2BatchNumber: _l2BatchNumber,
+                _l2MessageIndex: _l2MessageIndex,
+                _l2TxNumberInBatch: _l2TxNumberInBatch,
+                _merkleProof: _merkleProof,
+                _status: _status
             });
     }
 
@@ -321,10 +324,24 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 IL1AssetRouter(IInteropCenter(s.interopCenter).assetRouter()).nativeTokenVault()
             );
 
-            (assetId, amount) = (assetTracker.getBalanceChange(s.chainId));
-            balanceChange.assetId = assetId;
-            balanceChange.amount = amount;
-            balanceChange.tokenOriginChainId = nativeTokenVault.originChainId(assetId);
+            (assetId, amount) = (assetTracker.getBalanceChange(s.chainId, _chainId));
+            uint256 tokenOriginChainId = nativeTokenVault.originChainId(assetId);
+            address originToken;
+            address tokenAddress = nativeTokenVault.tokenAddress(assetId);
+            if (tokenOriginChainId == block.chainid) {
+                originToken = tokenAddress;
+            } else {
+                originToken = IBridgedStandardToken(tokenAddress).originToken();
+            }
+            balanceChange = BalanceChange({
+                version: BALANCE_CHANGE_VERSION,
+                baseTokenAssetId: bytes32(0),
+                baseTokenAmount: 0,
+                assetId: assetId,
+                amount: amount,
+                tokenOriginChainId: tokenOriginChainId,
+                originToken: originToken
+            });
         }
 
         BridgehubL2TransactionRequest memory wrappedRequest = _wrapRequest({
@@ -343,6 +360,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) external override onlyBridgehubOrInteropCenter {
         _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
         emit NewRelayedPriorityTransaction(_getTotalPriorityTxs(), _canonicalTxHash, _expirationTimestamp);
+        emit NewPriorityRequestId(_getTotalPriorityTxs(), _canonicalTxHash);
     }
 
     function _wrapRequest(
@@ -565,6 +583,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters
         emit NewPriorityRequest(_transaction.nonce, _canonicalTxHash, _expirationTimestamp, _transaction, _factoryDeps);
+        emit NewPriorityRequestId(_transaction.nonce, _canonicalTxHash);
     }
 
     // solhint-disable-next-line no-unused-vars

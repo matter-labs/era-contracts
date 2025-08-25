@@ -3,16 +3,10 @@
 pragma solidity ^0.8.21;
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {TokenBalanceMigrationData, BalanceChange} from "./IAssetTrackerBase.sol";
+import {BalanceChange, TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 interface IL2AssetTracker {
-    function setAddresses(
-        uint256 _l1ChainId,
-        address _bridgeHub,
-        address,
-        address _nativeTokenVault,
-        address _messageRoot
-    ) external;
+    function setAddresses(uint256 _l1ChainId) external;
 
     function handleChainBalanceIncreaseOnGateway(
         uint256 _chainId,
@@ -20,9 +14,18 @@ interface IL2AssetTracker {
         BalanceChange calldata _balanceChange
     ) external;
 
-    function handleInitiateBridgingOnL2(bytes32 _assetId) external;
+    function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) external;
 
-    function handleFinalizeBridgingOnL2(bytes32 _assetId) external;
+    function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external;
+
+    function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external;
+
+    function handleFinalizeBridgingOnL2(
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) external;
 
     function processLogsAndMessages(ProcessLogsInput calldata) external;
 
@@ -33,4 +36,8 @@ interface IL2AssetTracker {
     function confirmMigrationOnL2(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
     function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
+
+    function setIsL1ToL2DepositProcessed(uint256 _migrationNumber) external;
+
+    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 }

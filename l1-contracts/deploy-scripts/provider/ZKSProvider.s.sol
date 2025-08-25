@@ -13,6 +13,7 @@ import {Utils} from "../Utils.sol";
 import {L2ToL1LogProof, Log, TransactionReceipt, AltTransactionReceipt, AltLog, AltL2ToL1Log, L2ToL1Log} from "./ReceipTypes.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -60,9 +61,10 @@ contract ZKSProvider is Script {
         FinalizeL1DepositParams memory params
     ) public {
         IBridgehub bridgehub = IBridgehub(l1Bridgehub);
-        IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
-        IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
-        ProofData memory proofData = nullifier.getProofData(
+        // IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
+        // IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
+        IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
+        ProofData memory proofData = messageRoot.getProofData(
             params.chainId,
             params.l2BatchNumber,
             params.l2MessageIndex,

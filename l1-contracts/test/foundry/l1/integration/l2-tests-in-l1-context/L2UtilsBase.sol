@@ -61,7 +61,6 @@ library L2UtilsBase {
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         address wethToken = address(0x1);
         // we deploy the code to get the contract code with immutables which we then vm.etch
-        address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR)));
         address bridgehub = address(new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100));
         address interopCenter = address(
             new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId, _args.aliasedOwner)
@@ -88,11 +87,13 @@ library L2UtilsBase {
                 baseTokenAssetId
             )
         );
-        vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
-        MessageRoot(L2_MESSAGE_ROOT_ADDR).initialize();
 
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
+
+        address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId));
+        vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
+        MessageRoot(L2_MESSAGE_ROOT_ADDR).initialize();
         uint256 prevChainId = block.chainid;
         vm.chainId(_args.l1ChainId);
         Bridgehub(L2_BRIDGEHUB_ADDR).initialize(_args.aliasedOwner);
@@ -120,7 +121,9 @@ library L2UtilsBase {
                     _args.aliasedOwner,
                     IBridgehub(L2_BRIDGEHUB_ADDR),
                     L2_ASSET_ROUTER_ADDR,
-                    IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+                    L2_ASSET_TRACKER_ADDR,
+                    IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+                    address(0)
                 )
             );
             vm.etch(L2_CHAIN_ASSET_HANDLER_ADDR, l2ChainAssetHandler.code);
@@ -137,13 +140,7 @@ library L2UtilsBase {
             address l2AssetTrackerAddress = address(new L2AssetTracker());
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-            L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(
-                _args.l1ChainId,
-                L2_BRIDGEHUB_ADDR,
-                L2_ASSET_ROUTER_ADDR,
-                L2_NATIVE_TOKEN_VAULT_ADDR,
-                L2_MESSAGE_ROOT_ADDR
-            );
+            L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
         }
         {
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());

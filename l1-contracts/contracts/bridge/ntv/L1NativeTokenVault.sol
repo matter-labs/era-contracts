@@ -55,6 +55,22 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return DEPRECATED_chainBalance[_chainId][_assetId];
     }
 
+    /// @dev Returns the AssetTracker component address on L1.
+    function _assetTracker() internal view override returns (IAssetTrackerBase) {
+        return IAssetTrackerBase(address(l1AssetTracker));
+    }
+
+    modifier onlyAssetTracker() {
+        if (msg.sender != address(l1AssetTracker)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Initialization
+    //////////////////////////////////////////////////////////////*/
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _l1WethAddress Address of WETH on deployed chain
@@ -73,15 +89,6 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         )
     {
         L1_NULLIFIER = _l1Nullifier;
-    }
-
-    /// @dev Accepts ether only from the contract that was the shared Bridge.
-    receive() external payable {
-        require(address(L1_NULLIFIER) == msg.sender, Unauthorized(msg.sender));
-    }
-
-    function _assetTracker() internal view override returns (IAssetTrackerBase) {
-        return IAssetTrackerBase(address(l1AssetTracker));
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy
@@ -104,6 +111,23 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function setAssetTracker(address _l1AssetTracker) external onlyOwner {
         l1AssetTracker = IL1AssetTracker(_l1AssetTracker);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            V30 migration
+    //////////////////////////////////////////////////////////////*/
+
+    function migrateTokenBalanceToAssetTracker(
+        uint256 _chainId,
+        bytes32 _assetId
+    ) external onlyAssetTracker returns (uint256) {
+        uint256 amount = DEPRECATED_chainBalance[_chainId][_assetId];
+        DEPRECATED_chainBalance[_chainId][_assetId] = 0;
+        return amount;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            Check counterpart Functions
+    //////////////////////////////////////////////////////////////*/
 
     /// @notice Used to register the Asset Handler asset in L2 AssetRouter.
     /// @param _assetHandlerAddressOnCounterpart the address of the asset handler on the counterpart chain.
@@ -180,7 +204,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address l1Token = tokenAddress[_assetId];
         require(_amount != 0, NoFundsTransferred());
 
-        _handleChainBalanceDecrease({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
+        _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
 
         if (l1Token == ETH_TOKEN_ADDRESS) {
             bool callSuccess;
@@ -249,14 +273,19 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return BeaconProxy(payable(proxyAddress));
     }
 
-    function _handleChainBalanceIncrease(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
+    function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
         // Note, that we do not update balances for chains where the assetId comes from,
         // since these chains can mint new instances of the token.
-        l1AssetTracker.handleChainBalanceIncreaseOnL1(_chainId, _assetId, _amount);
+        l1AssetTracker.handleChainBalanceIncreaseOnL1(_chainId, _assetId, _amount, originChainId[_assetId]);
     }
 
-    function _handleChainBalanceDecrease(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
+    function _handleBridgeFromChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal override {
         // On L1 the asset tracker is triggered when the user withdraws.
-        l1AssetTracker.handleChainBalanceDecreaseOnL1({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
+        l1AssetTracker.handleChainBalanceDecreaseOnL1({
+            _chainId: _chainId,
+            _assetId: _assetId,
+            _amount: _amount,
+            _tokenOriginChainId: originChainId[_assetId]
+        });
     }
 }

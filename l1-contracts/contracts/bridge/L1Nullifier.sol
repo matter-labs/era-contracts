@@ -13,7 +13,6 @@ import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
-
 import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} from "./interfaces/IL1Nullifier.sol";
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
@@ -27,10 +26,11 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../interop/IInteropCenter.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
-import {EthTransferFailed, NativeTokenVaultAlreadySet, WrongL2Sender, WrongMsgLength} from "./L1BridgeContractErrors.sol";
+import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
+import {IMessageRoot} from "../bridgehub/MessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -51,6 +51,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev The address of ZKsync Era diamond proxy contract.
     address internal immutable ERA_DIAMOND_PROXY;
+
+    /// @dev MessageRoot smart contract that is used to prove message inclusion.
+    IMessageRoot public immutable MESSAGE_ROOT;
 
     /// @dev Stores the first batch number on the ZKsync Era Diamond Proxy that was settled after Diamond proxy upgrade.
     /// This variable is used to differentiate between pre-upgrade and post-upgrade Eth withdrawals. Withdrawals from batches older
@@ -137,12 +140,14 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
         IBridgehub _bridgehub,
+        IMessageRoot _messageRoot,
         IInteropCenter _interopCenter,
         uint256 _eraChainId,
         address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
+        MESSAGE_ROOT = _messageRoot;
         INTEROP_CENTER = _interopCenter;
         ERA_CHAIN_ID = _eraChainId;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
@@ -179,13 +184,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     function transferTokenToNTV(address _token) external onlyL1NTV {
         address ntvAddress = address(l1NativeTokenVault);
         if (ETH_TOKEN_ADDRESS == _token) {
-            uint256 amount = address(this).balance;
-            bool callSuccess;
-            // Low-level assembly call, to avoid any memory copying (save gas)
-            assembly {
-                callSuccess := call(gas(), ntvAddress, amount, 0, 0, 0, 0)
-            }
-            require(callSuccess, EthTransferFailed());
+            revert EthAlreadyMigratedToL1NTV();
         } else {
             IERC20(_token).safeTransfer(ntvAddress, IERC20(_token).balanceOf(address(this)));
         }
@@ -208,8 +207,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @notice Legacy function used for migration, do not use!
+    /// @dev Returns the deprecated chain balance for backwards compatibility.
     /// @param _chainId The chain id we want to get the balance for.
     /// @param _token The address of the token.
+    /// @return The balance of the token on the specified chain (deprecated).
     // slither-disable-next-line uninitialized-state-variables
     function chainBalance(uint256 _chainId, address _token) external view returns (uint256) {
         // slither-disable-next-line uninitialized-state-variables
@@ -258,7 +259,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         emit BridgehubDepositFinalized(_chainId, _txDataHash, _txHash);
     }
 
-    /// @dev Calls the library `encodeTxDataHash`. Used as a wrapped for try / catch case.
+    /// @dev Calls the library `encodeTxDataHash`. Used as a wrapper for try / catch case.
     /// @dev Encodes the transaction data hash using either the latest encoding standard or the legacy standard.
     /// @param _encodingVersion EncodingVersion.
     /// @param _originalCaller The address of the entity that initiated the deposit.
@@ -309,6 +310,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     }
 
     /// @dev Withdraw funds from the initiated deposit, that failed when finalizing on L2.
+    /// @param _checkedInLegacyBridge Whether the deposit was already checked in the legacy bridge system.
     /// @param _chainId The ZK chain id to which deposit was initiated.
     /// @param _depositSender The address of the entity that initiated the deposit.
     /// @param _assetId The unique identifier of the deposited L1 token.
@@ -332,7 +334,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         bytes32[] calldata _merkleProof
     ) internal whenNotPaused {
         {
-            bool proofValid = BRIDGE_HUB.proveL1ToL2TransactionStatus({
+            bool proofValid = MESSAGE_ROOT.proveL1ToL2TransactionStatusShared({
                 _chainId: _chainId,
                 _l2TxHash: _l2TxHash,
                 _l2BatchNumber: _l2BatchNumber,
@@ -348,7 +350,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             );
 
             bytes32 leaf = MessageHashing.getLeafHashFromLog(l2Log);
-            ProofData memory proofData = this.getProofData({
+            ProofData memory proofData = MESSAGE_ROOT.getProofData({
                 _chainId: _chainId,
                 _batchNumber: _l2BatchNumber,
                 _leafProofMask: _l2MessageIndex,
@@ -356,6 +358,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _proof: _merkleProof
             });
             TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
+            emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
             require(proofValid, InvalidProof());
         }
 
@@ -519,15 +522,15 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             });
         }
 
-        bool success = BRIDGE_HUB.proveL2MessageInclusion({
+        bool success = MESSAGE_ROOT.proveL2MessageInclusionShared({
             _chainId: _finalizeWithdrawalParams.chainId,
-            _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
+            _blockOrBatchNumber: _finalizeWithdrawalParams.l2BatchNumber,
             _index: _finalizeWithdrawalParams.l2MessageIndex,
             _message: l2ToL1Message,
             _proof: _finalizeWithdrawalParams.merkleProof
         });
         bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
-        ProofData memory proofData = this.getProofData({
+        ProofData memory proofData = MESSAGE_ROOT.getProofData({
             _chainId: _finalizeWithdrawalParams.chainId,
             _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,
             _leafProofMask: _finalizeWithdrawalParams.l2MessageIndex,
@@ -535,25 +538,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _proof: _finalizeWithdrawalParams.merkleProof
         });
         TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
+        emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
         // withdrawal wrong proof
         require(success, InvalidProof());
-    }
-
-    function getProofData(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _leafProofMask,
-        bytes32 _leaf,
-        bytes32[] calldata _proof
-    ) public pure returns (ProofData memory) {
-        return
-            MessageHashing._getProofData({
-                _chainId: _chainId,
-                _batchNumber: _batchNumber,
-                _leafProofMask: _leafProofMask,
-                _leaf: _leaf,
-                _proof: _proof
-            });
     }
 
     /// @inheritdoc IL1Nullifier
@@ -567,7 +554,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     /// @param _chainId The ZK chain ID.
     /// @param _l2ToL1message The encoded L2 -> L1 message.
     /// @return assetId The ID of the bridged asset.
-    /// @return transferData The transfer data used to finalize withdawal.
+    /// @return transferData The transfer data used to finalize withdrawal.
     function _parseL2WithdrawalMessage(
         uint256 _chainId,
         bytes memory _l2ToL1message
@@ -580,14 +567,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 amount;
         address l1Receiver;
 
-        (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        (uint32 functionSignature, ) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         if (bytes4(functionSignature) == IMailboxImpl.finalizeEthWithdrawal.selector) {
-            // The data is expected to be at least 56 bytes long.
-            require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-            // this message is a base token withdrawal
-            (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            // slither-disable-next-line unused-return
-            (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            (l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             transferData = DataEncoding.encodeBridgeMintData({
                 _originalCaller: address(0),
@@ -602,36 +584,16 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             });
         } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // this message is a token withdrawal
-
-            // Check that the message length is correct.
-            // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
-            // 76 (bytes).
-            require(_l2ToL1message.length == 76, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
-            (l1Receiver, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            // We use the IL1ERC20Bridge for backward compatibility with old withdrawals.
             address l1Token;
-            (l1Token, offset) = UnsafeBytes.readAddress(_l2ToL1message, offset);
-            // slither-disable-next-line unused-return
-            (amount, ) = UnsafeBytes.readUint256(_l2ToL1message, offset);
+            (l1Token, transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(_l2ToL1message);
 
             assetId = l1NativeTokenVault.ensureTokenIsRegistered(l1Token);
             bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             // This method is only expected to use L1-based tokens.
             require(assetId == expectedAssetId, TokenNotLegacy());
-            transferData = DataEncoding.encodeBridgeMintData({
-                _originalCaller: address(0),
-                _remoteReceiver: l1Receiver,
-                _originToken: l1Token,
-                _amount: amount,
-                _erc20Metadata: new bytes(0)
-            });
         } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
-            // The data is expected to be at least 68 bytes long to contain assetId.
-            require(_l2ToL1message.length >= 68, WrongMsgLength(68, _l2ToL1message.length));
             // slither-disable-next-line unused-return
-            (, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
-            (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
-            transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+            (, assetId, transferData) = DataEncoding.decodeAssetRouterFinalizeDepositData(_l2ToL1message);
         } else {
             revert InvalidSelector(bytes4(functionSignature));
         }

@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {console2 as console} from "forge-std/Script.sol";
+
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
@@ -35,6 +37,7 @@ import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistere
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {L1AssetTracker, IL1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
+import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -107,6 +110,7 @@ contract ExperimentalBridgeTest is Test {
         dummyBridgehub = new DummyBridgehubSetter(l1ChainId, bridgeOwner, type(uint256).max);
         bridgehub = Bridgehub(address(dummyBridgehub));
         interopCenter = new InteropCenter(bridgehub, l1ChainId, bridgeOwner);
+        messageRoot = new MessageRoot(bridgehub, l1ChainId);
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
         mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid);
@@ -116,7 +120,7 @@ contract ExperimentalBridgeTest is Test {
         address mockL1WethAddress = makeAddr("Weth");
         address eraDiamondProxy = makeAddr("eraDiamondProxy");
 
-        l1Nullifier = new L1Nullifier(bridgehub, interopCenter, eraChainId, eraDiamondProxy);
+        l1Nullifier = new L1Nullifier(bridgehub, messageRoot, interopCenter, eraChainId, eraDiamondProxy);
         l1NullifierAddress = address(l1Nullifier);
 
         mockSharedBridge = new DummySharedBridge(keccak256("0xabc"));
@@ -142,8 +146,6 @@ contract ExperimentalBridgeTest is Test {
         testTokenAddress = address(testToken);
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
-
-        messageRoot = new MessageRoot(bridgehub);
 
         sharedBridge = new L1AssetRouter(
             mockL1WethAddress,
@@ -231,21 +233,22 @@ contract ExperimentalBridgeTest is Test {
         vm.prank(bridgeOwner);
         addr.setAssetTracker(address(assetTracker));
 
+        L1AssetTracker assetTracker2 = new L1AssetTracker(
+            block.chainid,
+            address(bridgehub),
+            address(mockSharedBridge),
+            address(addr),
+            address(0)
+        );
+
+        vm.etch(address(assetTracker), address(assetTracker2).code);
+        console.log(address(ntv));
+
         addr.registerEthToken();
     }
 
     function _useFullSharedBridge() internal {
         ntv = _deployNTV(address(sharedBridge));
-        assetTracker = new L1AssetTracker(
-            block.chainid,
-            address(bridgehub),
-            address(mockSharedBridge),
-            address(ntv),
-            address(0)
-        );
-
-        vm.prank(bridgeOwner);
-        ntv.setAssetTracker(address(assetTracker));
 
         secondBridgeAddress = address(sharedBridge);
     }

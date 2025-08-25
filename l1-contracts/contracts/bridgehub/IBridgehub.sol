@@ -182,6 +182,8 @@ interface IBridgehub {
         address _chainRegistrationSender
     ) external;
 
+    function setChainAssetHandler(address _chainAssetHandler) external;
+
     event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
 
     event ChainTypeManagerAdded(address indexed chainTypeManager);

@@ -7,8 +7,10 @@ import {IL1AssetRouter} from "../asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "./IL1ERC20Bridge.sol";
 import {FinalizeL1DepositParams} from "../../common/Messaging.sol";
-import {ProofData} from "../../common/libraries/MessageHashing.sol";
 
+/// @dev Transient storage slot for storing the settlement layer chain ID during proof verification.
+/// @dev This slot is used to temporarily store which settlement layer is processing the current proof,
+/// @dev and is cleared at the end of each transaction.
 uint256 constant TRANSIENT_SETTLEMENT_LAYER_SLOT = uint256(keccak256("TRANSIENT_SETTLEMENT_LAYER_SLOT")) - 1;
 
 /// @title L1 Bridge contract interface
@@ -20,6 +22,8 @@ interface IL1Nullifier {
         bytes32 indexed txDataHash,
         bytes32 indexed l2DepositTxHash
     );
+
+    event TransientSettlementLayerSet(uint256 indexed settlementLayerChainId);
 
     function isWithdrawalFinalized(
         uint256 _chainId,
@@ -119,15 +123,9 @@ interface IL1Nullifier {
         bytes32[] calldata _merkleProof
     ) external;
 
-    /// When verifying recursive proofs, we mark the transient settlement layer.
-    /// Calling this clears the transient settlement layer.
+    /// @notice When verifying recursive proofs, we mark the transient settlement layer,
+    /// this function retrieves the currently stored transient settlement layer chain ID.
+    /// @dev The transient settlement layer is cleared at the end of each transaction.
+    /// @return The chain ID of the settlement layer that processed the current proof, or 0 if none is set.
     function getTransientSettlementLayer() external view returns (uint256);
-
-    function getProofData(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        uint256 _leafProofMask,
-        bytes32 _leaf,
-        bytes32[] calldata _proof
-    ) external view returns (ProofData memory);
 }

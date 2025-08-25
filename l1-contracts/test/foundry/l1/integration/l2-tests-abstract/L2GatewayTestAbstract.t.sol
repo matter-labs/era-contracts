@@ -33,7 +33,8 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {SystemContractsArgs} from "./Utils.sol";
-import {BalanceChange} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {BalanceChange} from "contracts/common/Messaging.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -66,11 +67,13 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
         BalanceChange memory balanceChange = BalanceChange({
+            version: BALANCE_CHANGE_VERSION,
             baseTokenAssetId: bytes32(0),
             baseTokenAmount: 0,
             assetId: bytes32(0),
             amount: 0,
-            tokenOriginChainId: 0
+            tokenOriginChainId: 0,
+            originToken: address(0)
         });
         l2InteropCenter.forwardTransactionOnGatewayWithBalanceChange(mintChainId, bytes32(0), 0, balanceChange);
     }
@@ -92,29 +95,6 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes(""))
         );
         l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
-    }
-
-    function finalizeDeposit() public {
-        finalizeDepositWithCustomCommitment(exampleChainCommitment);
-    }
-
-    function finalizeDepositWithCustomCommitment(bytes memory chainCommitment) public {
-        bytes memory chainData = chainCommitment;
-        bytes memory ctmData = abi.encode(
-            baseTokenAssetId,
-            ownerWallet,
-            chainTypeManager.protocolVersion(),
-            config.contracts.diamondCutData
-        );
-        BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
-            chainId: mintChainId,
-            baseTokenAssetId: baseTokenAssetId,
-            ctmData: ctmData,
-            chainData: chainData,
-            migrationNumber: 0
-        });
-        vm.prank(aliasedL1AssetRouter);
-        l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
     }
 
     function test_finalizeDepositWithRealChainData() public {

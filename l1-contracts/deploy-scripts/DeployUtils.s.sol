@@ -28,7 +28,6 @@ struct DeployedAddresses {
     address accessControlRestrictionAddress;
     address create2Factory;
     address chainRegistrar;
-    address protocolUpgradeHandlerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -362,7 +361,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "InteropCenter")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.ownerAddress);
         } else if (compareStrings(contractName, "MessageRoot")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy);
+            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
         } else if (compareStrings(contractName, "ChainAssetHandler")) {
@@ -372,12 +371,15 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     config.ownerAddress,
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridges.l1AssetRouterProxy,
-                    addresses.bridgehub.messageRootProxy
+                    addresses.bridgehub.assetTrackerProxy,
+                    addresses.bridgehub.messageRootProxy,
+                    addresses.bridges.l1NullifierProxy
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return
                 abi.encode(
                     addresses.bridgehub.bridgehubProxy,
+                    addresses.bridgehub.messageRootProxy,
                     addresses.bridgehub.interopCenterProxy,
                     config.eraChainId,
                     addresses.stateTransition.diamondProxy
@@ -480,7 +482,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
         }
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory);
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual returns (bytes memory);
 
     function test() internal virtual {}
 }

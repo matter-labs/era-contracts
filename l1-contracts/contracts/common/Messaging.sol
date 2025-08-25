@@ -244,6 +244,7 @@ enum CallStatus {
 /// @param bundleAttributes Bundle execution and unbundling attributes.
 struct InteropBundle {
     bytes1 version;
+    uint256 sourceChainId;
     uint256 destinationChainId;
     bytes32 interopBundleSalt;
     InteropCall[] calls;
@@ -302,4 +303,36 @@ struct LeafInclusionProof {
     uint256 l2LeafProofMask;
     bytes32 leaf;
     bytes32[] proof;
+}
+
+struct ProofData {
+    uint256 settlementLayerChainId;
+    uint256 settlementLayerBatchNumber;
+    uint256 settlementLayerBatchRootMask;
+    uint256 batchLeafProofLen;
+    bytes32 batchSettlementRoot;
+    bytes32 chainIdLeaf;
+    uint256 ptr;
+    bool finalProofNode;
+}
+
+struct TokenBalanceMigrationData {
+    bytes1 version;
+    bool isL1ToGateway;
+    address originToken;
+    uint256 chainId;
+    bytes32 assetId;
+    uint256 tokenOriginChainId;
+    uint256 amount;
+    uint256 migrationNumber;
+}
+
+struct BalanceChange {
+    bytes1 version;
+    address originToken;
+    bytes32 baseTokenAssetId;
+    uint256 baseTokenAmount;
+    bytes32 assetId;
+    uint256 amount;
+    uint256 tokenOriginChainId;
 }

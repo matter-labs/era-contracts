@@ -42,7 +42,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SharedL2ContractDeployer, SystemContractsArgs} from "./_SharedL2ContractDeployer.sol";
 import {BUNDLE_IDENTIFIER, BridgehubL2TransactionRequest, InteropBundle, InteropCall, InteropCallStarter, L2CanonicalTransaction, L2Log, L2Message, MessageInclusionProof, TxStatus, BundleAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION} from "contracts/common/Messaging.sol";
 import {DummyL2StandardTriggerAccount} from "../../../../../contracts/dev-contracts/test/DummyL2StandardTriggerAccount.sol";
-import {IMessageVerification} from "contracts/state-transition/chain-interfaces/IMessageVerification.sol";
+import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "./Utils.sol";
 import {GasFields, InteropTrigger, TRIGGER_IDENTIFIER} from "contracts/dev-contracts/test/Utils.sol";
 import {InteropDataEncoding} from "contracts/interop/InteropDataEncoding.sol";
@@ -124,7 +124,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
 
         return
             MessageInclusionProof({
-                chainId: 271,
+                chainId: ERA_CHAIN_ID,
                 l1BatchNumber: 31,
                 l2MessageIndex: 0,
                 message: L2Message(
@@ -346,6 +346,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         });
         InteropBundle memory interopBundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
+            sourceChainId: ERA_CHAIN_ID,
             destinationChainId: 31337,
             interopBundleSalt: keccak256(abi.encodePacked(depositor, bytes32(0))),
             calls: calls,

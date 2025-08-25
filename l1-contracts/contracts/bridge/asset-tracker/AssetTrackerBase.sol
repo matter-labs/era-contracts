@@ -3,8 +3,9 @@
 pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
+import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {IAssetTrackerBase, BalanceChange} from "./IAssetTrackerBase.sol";
+import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
 import {L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
@@ -14,10 +15,12 @@ import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
-import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
-
-abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable, AssetHandlerModifiers {
+abstract contract AssetTrackerBase is
+    IAssetTrackerBase,
+    Ownable2StepUpgradeable,
+    AssetHandlerModifiers,
+    ReentrancyGuard
+{
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
@@ -26,31 +29,20 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
     /// @dev Only used on settlement layers
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
-    mapping(uint256 chainId => mapping(bytes32 assetId => bool isMinter)) public isMinterChain;
-
     /// @notice Used on the L2 instead of the settlement layer
     /// @dev Maps the migration number for each asset on the L2.
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
-    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) internal assetMigrationNumber;
+    mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
 
-    mapping(uint256 migrationNumber => mapping(bytes32 assetId => uint256 totalSupply)) internal totalSupply;
+    mapping(bytes32 assetId => uint256 totalSupplyAcrossAllChains) public totalSupplyAcrossAllChains;
 
-    mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
     function _l1ChainId() internal view virtual returns (uint256);
 
-    function _bridgeHub() internal view virtual returns (IBridgehub);
+    function _bridgehub() internal view virtual returns (IBridgehub);
 
     function _nativeTokenVault() internal view virtual returns (INativeTokenVault);
 
     function _messageRoot() internal view virtual returns (IMessageRoot);
-
-    function _l1AssetTracker() internal view virtual returns (address);
-
-    /// @notice Checks that the message sender is the L1 asset tracker.
-    modifier onlyL1AssetTracker() {
-        require(msg.sender == AddressAliasHelper.applyL1ToL2Alias(_l1AssetTracker()), Unauthorized(msg.sender));
-        _;
-    }
 
     modifier onlyL1() {
         require(block.chainid == _l1ChainId(), Unauthorized(msg.sender));
@@ -85,33 +77,22 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
     }
 
     function tokenMigrated(uint256 _chainId, bytes32 _assetId) public view returns (bool) {
-        return assetMigrationNumber[_chainId][_assetId] == _getMigrationNumber(_chainId);
+        return assetMigrationNumber[_chainId][_assetId] == _getChainMigrationNumber(_chainId);
     }
 
     /*//////////////////////////////////////////////////////////////
                     Register token
     //////////////////////////////////////////////////////////////*/
 
-    function registerLegacyTokenOnChain(bytes32 _assetId) external {
+    function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
         _registerTokenOnL2(_assetId);
     }
 
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) external {
-        isMinterChain[_originChainId][_assetId] = true;
-        /// todo call from ntv only probably
-        /// todo figure out L1 vs L2 differences
-        if (block.chainid == _l1ChainId()) {
-            // _registerTokenOnL1(_assetId);
-        } else {
+    function registerNewToken(bytes32 _assetId, uint256) external onlyNativeTokenVault {
+        if (block.chainid != _l1ChainId()) {
             _registerTokenOnL2(_assetId);
         }
     }
-
-    // function _registerTokenOnL1(bytes32 _assetId) internal {
-    // }
-
-    // function _registerTokenOnGateway(bytes32 _assetId) internal {
-    // }
 
     function _registerTokenOnL2(bytes32 _assetId) internal {
         assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
@@ -120,8 +101,5 @@ abstract contract AssetTrackerBase is IAssetTrackerBase, Ownable2StepUpgradeable
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
-    function _getMigrationNumber(uint256 _chainId) internal view returns (uint256) {
-        // return 1 + _chainId - _chainId;
-        return IChainAssetHandler(IBridgehub(_bridgeHub()).chainAssetHandler()).getMigrationNumber(_chainId);
-    }
+    function _getChainMigrationNumber(uint256 _chainId) internal view virtual returns (uint256);
 }

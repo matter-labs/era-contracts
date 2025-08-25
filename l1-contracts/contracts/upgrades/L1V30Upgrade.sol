@@ -5,9 +5,11 @@ pragma solidity 0.8.28;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {L2_CHAIN_ASSET_HANDLER} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_CHAIN_ASSET_HANDLER, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 
 error PriorityQueueNotReady();
+error V30UpgradeGatewayBlockNumberNotSet();
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -21,6 +23,14 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
             L2_CHAIN_ASSET_HANDLER.setMigrationNumberForV30(s.chainId);
         }
         super.upgrade(_proposedUpgrade);
+
+        uint256 v30UpgradeGatewayBlockNumber = (IBridgehub(s.bridgehub).messageRoot()).v30UpgradeGatewayBlockNumber();
+        require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
+        IMailbox(address(this)).requestL2ServiceTransaction(
+            L2_MESSAGE_ROOT_ADDR,
+            abi.encodeCall(L2_MESSAGE_ROOT.saveV30UpgradeGatewayBlockNumberOnL2, v30UpgradeGatewayBlockNumber)
+        );
+
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }

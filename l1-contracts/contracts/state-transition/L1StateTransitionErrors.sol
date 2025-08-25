@@ -84,6 +84,8 @@ error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
 error SettlementLayerChainIdMismatch();
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
+// 0x7aee4b86
+error V30UpgradeGatewayBlockNumberNotSet();
 // 0x52595598
 error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
 // 0x712d02d2

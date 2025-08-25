@@ -2,28 +2,10 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-
-struct TokenBalanceMigrationData {
-    uint256 chainId;
-    bytes32 assetId;
-    uint256 tokenOriginChainId;
-    uint256 amount;
-    uint256 migrationNumber;
-    bool isL1ToGateway;
-}
-
-struct BalanceChange {
-    bytes32 baseTokenAssetId;
-    uint256 baseTokenAmount;
-    bytes32 assetId;
-    uint256 amount;
-    uint256 tokenOriginChainId;
-}
+bytes1 constant BALANCE_CHANGE_VERSION = bytes1(uint8(1));
+bytes1 constant TOKEN_BALANCE_MIGRATION_DATA_VERSION = bytes1(uint8(1));
 
 interface IAssetTrackerBase {
-    function BRIDGE_HUB() external view returns (IBridgehub);
-
     function tokenMigratedThisChain(bytes32 _assetId) external view returns (bool);
 
     function tokenMigrated(uint256 _chainId, bytes32 _assetId) external view returns (bool);
@@ -33,4 +15,6 @@ interface IAssetTrackerBase {
     function registerLegacyTokenOnChain(bytes32 _assetId) external;
 
     function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
+
+    function totalSupplyAcrossAllChains(bytes32 _assetId) external view returns (uint256);
 }

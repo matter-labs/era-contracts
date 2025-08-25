@@ -15,12 +15,14 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberMismatch, NotAssetRouter, OnlyAssetTracker, OnlyChain} from "./L1BridgehubErrors.sol";
+import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTracker, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
+import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -39,13 +41,20 @@ contract ChainAssetHandler is
     /// @notice the asset id of Eth. This is only used on L1.
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
+    /// @notice The chain id of the L1.
     uint256 internal immutable L1_CHAIN_ID;
 
     IBridgehub internal immutable BRIDGE_HUB;
 
+    /// @notice The message root contract.
     IMessageRoot internal immutable MESSAGE_ROOT;
 
+    /// @notice The asset router contract.
     address internal immutable ASSET_ROUTER;
+
+    address internal immutable ASSET_TRACKER;
+
+    IL1Nullifier internal immutable L1_NULLIFIER;
 
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
@@ -53,6 +62,7 @@ contract ChainAssetHandler is
     /// @notice used to track the number of times each chain has migrated.
     mapping(uint256 chainId => uint256 migrationNumber) internal migrationNumber;
 
+    /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
         if (msg.sender != ASSET_ROUTER) {
             revert NotAssetRouter(msg.sender, ASSET_ROUTER);
@@ -60,6 +70,7 @@ contract ChainAssetHandler is
         _;
     }
 
+    /// @notice Only when migrations are not paused.
     modifier whenMigrationsNotPaused() {
         if (migrationPaused) {
             revert MigrationPaused();
@@ -67,6 +78,7 @@ contract ChainAssetHandler is
         _;
     }
 
+    /// @notice Only when the contract is deployed on L1.
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert NotL1(L1_CHAIN_ID, block.chainid);
@@ -75,15 +87,10 @@ contract ChainAssetHandler is
     }
 
     modifier onlyAssetTracker() {
-        // kl todo add contract discoverability, simplify this.
-        require(
-            msg.sender == L2_ASSET_TRACKER_ADDR || msg.sender == address(BRIDGE_HUB.interopCenter().assetTracker()),
-            OnlyAssetTracker(msg.sender, address(BRIDGE_HUB.interopCenter().assetTracker()))
-        );
+        require(msg.sender == ASSET_TRACKER, OnlyAssetTracker(msg.sender, ASSET_TRACKER));
         _;
     }
 
-    error NotSystemContext(address _sender);
     modifier onlySystemContext() {
         if (msg.sender != L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR) {
             revert NotSystemContext(msg.sender);
@@ -97,13 +104,17 @@ contract ChainAssetHandler is
         address _owner,
         IBridgehub _bridgehub,
         address _assetRouter,
-        IMessageRoot _messageRoot
+        address _assetTracker,
+        IMessageRoot _messageRoot,
+        address _l1Nullifier
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
+        ASSET_TRACKER = _assetTracker;
+        L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
@@ -115,6 +126,7 @@ contract ChainAssetHandler is
                             Getters
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Returns the migration number for a chain.
     function getMigrationNumber(uint256 _chainId) external view onlyAssetTracker returns (uint256) {
         return migrationNumber[_chainId];
     }
@@ -132,13 +144,9 @@ contract ChainAssetHandler is
         _;
     }
 
-    error MigrationNumberAlreadySet();
-    error OnlyOnGateway();
-
+    /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
-        if (migrationNumber[_chainId] != 0) {
-            revert MigrationNumberAlreadySet();
-        }
+        require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
         require(block.chainid != L1_CHAIN_ID, OnlyOnGateway());
         migrationNumber[_chainId] = 1;
     }
@@ -169,11 +177,30 @@ contract ChainAssetHandler is
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
-        if (_assetId != BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
-            revert IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId));
+        require(
+            _assetId == BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId),
+            IncorrectChainAssetId(_assetId, BRIDGE_HUB.ctmAssetIdFromChainId(bridgehubBurnData.chainId))
+        );
+        address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
+
+        /// We set the isL1ToL2DepositProcessed flag on the asset tracker to demarcate deposits happening before and after the migration.
+        if (block.chainid == L1_CHAIN_ID) {
+            bytes memory data = abi.encodeCall(
+                IL2AssetTracker.setIsL1ToL2DepositProcessed,
+                (migrationNumber[bridgehubBurnData.chainId])
+            );
+            IZKChain(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
+        }
+        /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
+        if (block.chainid == L1_CHAIN_ID) {
+            bytes memory data = abi.encodeCall(
+                IL2AssetTracker.setLegacySharedBridgeAddress,
+                (bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(bridgehubBurnData.chainId))
+            );
+            address settlementZkChain = BRIDGE_HUB.getZKChain(_settlementChainId);
+            IZKChain(settlementZkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
         }
 
-        address zkChain;
         bytes memory ctmMintData;
         // to avoid stack too deep
         {
@@ -296,15 +323,13 @@ contract ChainAssetHandler is
                             L2 functions
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice This function is called at the start of each batch.
     function setSettlementLayerChainId(
         uint256 _previousSettlementLayerChainId,
         uint256 _currentSettlementLayerChainId
     ) external onlySystemContext {
-        if (_previousSettlementLayerChainId == 0) {
-            if (block.chainid == L1_CHAIN_ID) {
-                migrationNumber[block.chainid] = 1;
-            }
-            /// For the initial call, we return, as there is no real migration.
+        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == L1_CHAIN_ID) {
+            /// For the initial call if we are settling on L1, we return, as there is no real migration.
             return;
         }
         if (_previousSettlementLayerChainId != _currentSettlementLayerChainId) {

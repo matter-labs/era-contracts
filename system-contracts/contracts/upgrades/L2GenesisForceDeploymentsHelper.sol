@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS, L2_BRIDGE_HUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, WRAPPED_BASE_TOKEN_IMPL_ADDRESS, L2_INTEROP_HANDLER} from "../Constants.sol";
+import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS, L2_ASSET_TRACKER, L2_BRIDGE_HUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, WRAPPED_BASE_TOKEN_IMPL_ADDRESS, L2_INTEROP_HANDLER, COMPLEX_UPGRADER_CONTRACT} from "../Constants.sol";
 import {ForceDeployment, IContractDeployer} from "../interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../interfaces/IL2GenesisUpgrade.sol";
@@ -110,6 +110,23 @@ library L2GenesisForceDeploymentsHelper {
                 revert(add(returnData3, 0x20), returndatasize())
             }
         }
+
+        bytes memory assetTrackerConstructorData = abi.encodeCall(
+            L2_ASSET_TRACKER.setAddresses,
+            (fixedForceDeploymentsData.l1ChainId)
+        );
+
+        (bool success4, bytes memory returnData4) = SystemContractHelper.mimicCall(
+            L2_ASSET_TRACKER_ADDRESS,
+            address(COMPLEX_UPGRADER_CONTRACT),
+            assetTrackerConstructorData
+        );
+        if (!success4) {
+            // Progapatate revert reason
+            assembly {
+                revert(add(returnData4, 0x20), returndatasize())
+            }
+        }
     }
 
     /// @notice Retrieves and constructs the force deployments array.
@@ -143,7 +160,7 @@ library L2GenesisForceDeploymentsHelper {
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
-            input: abi.encode(address(L2_BRIDGE_HUB))
+            input: abi.encode(address(L2_BRIDGE_HUB), fixedForceDeploymentsData.l1ChainId)
         });
 
         // Configure the BridgeHub deployment.
@@ -233,7 +250,9 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.aliasedL1Governance,
                 address(L2_BRIDGE_HUB),
                 address(L2_ASSET_ROUTER),
-                address(L2_MESSAGE_ROOT)
+                address(L2_ASSET_TRACKER_ADDRESS),
+                address(L2_MESSAGE_ROOT),
+                address(0) // l1Nullifier, only used on L1.
             )
         });
 
@@ -252,16 +271,9 @@ library L2GenesisForceDeploymentsHelper {
         forceDeployments[6] = ForceDeployment({
             bytecodeHash: fixedForceDeploymentsData.assetTrackerBytecodeHash,
             newAddress: L2_ASSET_TRACKER_ADDRESS,
-            callConstructor: true,
+            callConstructor: false,
             value: 0,
-            // solhint-disable-next-line func-named-parameters
-            input: abi.encode(
-                fixedForceDeploymentsData.l1ChainId,
-                address(L2_BRIDGE_HUB),
-                address(L2_ASSET_ROUTER),
-                L2_NATIVE_TOKEN_VAULT_ADDR,
-                address(L2_MESSAGE_ROOT)
-            )
+            input: abi.encode()
         });
 
         forceDeployments[7] = ForceDeployment({
