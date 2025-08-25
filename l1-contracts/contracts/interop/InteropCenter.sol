@@ -267,6 +267,8 @@ contract InteropCenter is
         BundleAttributes memory _bundleAttributes,
         bytes[][] memory _originalCallAttributes
     ) internal returns (bytes32 bundleHash) {
+        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+
         // This will calculate how much value does all of the calls use cumulatively.
         uint256 totalCallsValue;
 

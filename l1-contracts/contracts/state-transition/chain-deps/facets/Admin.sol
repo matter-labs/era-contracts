@@ -316,12 +316,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert ProtocolVersionNotUpToDate(currentProtocolVersion, protocolVersion);
         }
 
-        if (block.chainid != L1_CHAIN_ID) {
-            // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
-            // That's why we need to bound the gas that can be consumed during such a migration.
-            if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
-                revert NotAllBatchesExecuted();
-            }
+        // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
+        // That's why we need to bound the gas that can be consumed during such a migration.
+        // We also require all committed batches to be executed, since each batch has a predefined settlement layer. 
+        if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
+            revert NotAllBatchesExecuted();
         }
 
         s.settlementLayer = _settlementLayer;
