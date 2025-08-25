@@ -265,7 +265,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external addChainBatchRootRestriction(_chainId) onlyChain(_chainId) onlyL2Chain {
+    ) external addChainBatchRootRestriction(_chainId) onlyChain(_chainId) { // onlyL2Chain {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();

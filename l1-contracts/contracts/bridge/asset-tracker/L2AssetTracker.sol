@@ -140,7 +140,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) public {
         if (_tokenOriginChainId == block.chainid) {
             // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
+            totalSupplyAcrossAllChains[_assetId] += _amount;
             return;
         }
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
@@ -296,14 +296,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
     function _handlePotentialFailedDeposit(uint256 _chainId, bytes32 _canonicalTxHash) internal {
         BalanceChange memory savedBalanceChange = balanceChange[_chainId][_canonicalTxHash];
-        /// Note we handle failedDeposits here for deposits that do not go through GW, 
+        /// Note we handle failedDeposits here for deposits that do not go through GW during chainMigration, 
         /// because they were initiated when the chain settles on L1, however the failedDeposit L2->L1 message goes through GW.
         /// Here we do not need to decrement the chainBalance, since the chainBalance was added to the chain's chainBalance on L1, 
         /// and never migrated to the GW's chainBalance, since it never increments the totalSupply since the L2 txs fails.
-        if (savedBalanceChange.amount > 0) {
+        if (savedBalanceChange.amount > 0 && savedBalanceChange.tokenOriginChainId != _chainId) {
             chainBalance[_chainId][savedBalanceChange.assetId] -= savedBalanceChange.amount;
         }
-        if (savedBalanceChange.baseTokenAmount > 0) {
+        /// Note the base token is never native to the chain as of V30. 
+        if (savedBalanceChange.baseTokenAmount > 0 ) {
             chainBalance[_chainId][savedBalanceChange.baseTokenAssetId] -= savedBalanceChange.baseTokenAmount;
         }
     }
@@ -375,12 +376,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             tokenOriginChainId[_assetId] = tokenOriginalChainId;
         }
 
-        if (tokenOriginalChainId != _sourceChainId) {
-            chainBalance[_sourceChainId][_assetId] -= amount;
-        }
-        if (tokenOriginalChainId != _destinationChainId) {
-            chainBalance[_destinationChainId][_assetId] += amount;
-        }
+        _handleChainBalanceChangeOnGateway(_sourceChainId, _destinationChainId, tokenOriginalChainId, _assetId, amount);
 
         updateTotalSupplyOnGateway({
             _sourceChainId: _sourceChainId,
@@ -389,6 +385,24 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             _assetId: _assetId,
             _amount: amount
         });
+    }
+
+    error NotEnoughChainBalance(uint256 _sourceChainId, bytes32 _assetId, uint256 _amount);
+
+    function _handleChainBalanceChangeOnGateway(
+        uint256 _sourceChainId,
+        uint256 _destinationChainId,
+        uint256 _tokenOriginalChainId,
+        bytes32 _assetId,
+        uint256 _amount
+    ) internal {
+        if (_tokenOriginalChainId != _sourceChainId && _amount > 0) {
+            require(chainBalance[_sourceChainId][_assetId] >= _amount, NotEnoughChainBalance(_sourceChainId, _assetId, _amount));
+            chainBalance[_sourceChainId][_assetId] -= _amount;
+        }
+        if (_tokenOriginalChainId != _destinationChainId && _amount > 0) {
+            chainBalance[_destinationChainId][_assetId] += _amount;
+        }
     }
 
     function handleLegacySharedBridgeMessage(uint256 _chainId, bytes memory _message) internal {
