@@ -379,7 +379,7 @@ contract InteropCenter is
 
         if (_callStarter.callAttributes.indirectCall) {
             // slither-disable-next-line arbitrary-send-eth
-            InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateBridging{
+            InteropCallStarter memory actualCallStarter = IL2CrossChainSender(recipientAddress).initiateIndirectCall{
                 value: _callStarter.callAttributes.indirectCallMessageValue
             }(_destinationChainId, _sender, _callStarter.callAttributes.interopCallValue, _callStarter.data);
             // solhint-disable-next-line no-unused-vars
