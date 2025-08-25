@@ -42,9 +42,6 @@ latest_protocol_version = 0x1d00000001
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 
-state_transition_verifier_addr = "0x2877aDa176A0ef998D3E7b7E1Bf6F61aF23cF911"
-gateway_state_transition_verifier_addr = "0x2AE9dD0DC9b5F0535CAA0ED81Fe711f22f2F6Ba2"
-
 [tokens]
 token_weth_address = "0x7b79995e5f793a07bc00c21412e50ecae098e7f9"
 
