@@ -43,7 +43,7 @@ interface IInteropCenter {
     ) external;
 
     function sendBundle(
-        uint256 _destinationChainId,
+        bytes calldata _destinationChainId,
         InteropCallStarter[] calldata _callStarters,
         bytes[] calldata _bundleAttributes
     ) external payable returns (bytes32);
