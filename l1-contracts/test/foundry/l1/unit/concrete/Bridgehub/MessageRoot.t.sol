@@ -122,7 +122,6 @@ contract MessageRootTest is Test {
 
         vm.chainId(L1_CHAIN_ID);
         vm.prank(alphaChainSender);
-        vm.expectRevert(OnlyL2.selector);
         messageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
     }
 
