@@ -8,17 +8,13 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IBridgehub} from "./IBridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainExists, MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL2} from "./L1BridgehubErrors.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
-import {IBridgehub} from "./IBridgehub.sol";
 
-import {IMessageRoot, CHAIN_TREE_EMPTY_ENTRY_HASH, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet} from "./L1BridgehubErrors.sol";
 import {L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";

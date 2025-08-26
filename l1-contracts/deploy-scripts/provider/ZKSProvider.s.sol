@@ -3,21 +3,21 @@ pragma solidity ^0.8.0;
 
 // solhint-disable no-console, gas-custom-errors, reason-string
 
-import {Vm} from "forge-std/Vm.sol";
+
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {stdToml} from "forge-std/StdToml.sol";
+
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
 import {Utils} from "../Utils.sol";
-import {L2ToL1LogProof, Log, TransactionReceipt, AltTransactionReceipt, AltLog, AltL2ToL1Log, L2ToL1Log} from "./ReceipTypes.sol";
+import {AltL2ToL1Log, AltLog, AltTransactionReceipt, L2ToL1Log, L2ToL1LogProof, Log, TransactionReceipt} from "./ReceipTypes.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 
 contract ZKSProvider is Script {
     function finalizeWithdrawal(
