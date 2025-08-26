@@ -105,11 +105,12 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
+        Call[][] memory allCalls = new Call[][](4);
 
         allCalls[0] = prepareUpgradeProxiesCalls();
         allCalls[1] = prepareNewChainCreationParamsCall();
-        allCalls[2] = prepareGatewaySpecificStage1GovernanceCalls();
+        allCalls[2] = provideSetNewVersionUpgradeCall();
+        allCalls[3] = prepareGatewaySpecificStage1GovernanceCalls();
 
         calls = mergeCallsArray(allCalls);
     }
