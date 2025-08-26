@@ -85,22 +85,6 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         });
     }
 
-    function prepareDefaultGovernanceCalls()
-        public
-        override
-        returns (Call[] memory, Call[] memory stage1Calls, Call[] memory)
-    {
-        // We perform just the upgrade stage
-        stage1Calls = prepareStage1GovernanceCalls();
-        string memory governanceCallsSerialized = vm.serializeBytes(
-            "governance_calls",
-            "stage1_calls",
-            abi.encode(stage1Calls)
-        );
-
-        vm.writeToml(governanceCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
-    }
-
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
         Call[][] memory allCalls = new Call[][](4);
