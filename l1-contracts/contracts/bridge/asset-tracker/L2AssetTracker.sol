@@ -18,7 +18,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, L1ToL2DepositsNotFinalized, NotMigratedChain, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
+import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, L1ToL2DepositsNotFinalized, NotEnoughChainBalance, NotMigratedChain, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
@@ -320,8 +320,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
     }
 
-    error InvalidInteropChainId(uint256 fromChainId, uint256 toChainId);
-
     function handleInteropMessage(uint256 _chainId, bytes memory _message, bytes32 _baseTokenAssetId) internal {
         if (_message[0] != BUNDLE_IDENTIFIER) {
             // This should not be possible in V30. In V31 this will be a trigger.
@@ -404,7 +402,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         });
     }
 
-    error NotEnoughChainBalance(uint256 _sourceChainId, bytes32 _assetId, uint256 _amount);
 
     function _handleChainBalanceChangeOnGateway(
         uint256 _sourceChainId,

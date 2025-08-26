@@ -17,6 +17,8 @@ error InvalidCanonicalTxHash(bytes32);
 error InvalidChainMigrationNumber(uint256, uint256);
 // 0x24ef4f8a
 error InvalidEmptyMessageRoot(bytes32, bytes32);
+// 0x203d8be5
+error InvalidInteropChainId(uint256 fromChainId, uint256 toChainId);
 // 0x9530c5e1
 error InvalidMigrationNumber(uint256, uint256);
 // 0xc5ac5599
@@ -27,6 +29,8 @@ error InvalidSender();
 error InvalidWithdrawalChainId();
 // 0x2ef97090
 error L1ToL2DepositsNotFinalized();
+// 0x1d16d015
+error NotEnoughChainBalance(uint256 _sourceChainId, bytes32 _assetId, uint256 _amount);
 // 0x8dfed13a
 error NotMigratedChain();
 // 0x0fd3385e
