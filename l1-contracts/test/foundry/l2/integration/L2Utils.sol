@@ -33,6 +33,7 @@ library L2Utils {
     Vm internal constant vm = Vm(VM_ADDRESS);
 
     address internal constant L2_FORCE_DEPLOYER_ADDR = address(0x8007);
+    uint256 internal constant L1_CHAIN_ID = 1;
 
     /**
      * @dev Initializes the system contracts.
@@ -54,7 +55,7 @@ library L2Utils {
 
     function forceDeployMessageRoot() internal {
         new L2MessageRoot();
-        forceDeployWithConstructor("L2MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR));
+        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR, L1_CHAIN_ID));
     }
 
     function forceDeployBridgehub(SystemContractsArgs memory _args) internal {

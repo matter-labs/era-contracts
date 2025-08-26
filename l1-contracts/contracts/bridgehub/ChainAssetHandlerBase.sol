@@ -45,9 +45,10 @@ abstract contract ChainAssetHandlerBase is
     function _messageRoot() internal view virtual returns (IMessageRoot);
     function _assetRouter() internal view virtual returns (address);
 
-    /// @notice used to pause the migrations of chains. Used for upgrades.
+    /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
+    /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
         if (msg.sender != _assetRouter()) {
             revert NotAssetRouter(msg.sender, _assetRouter());
@@ -55,6 +56,7 @@ abstract contract ChainAssetHandlerBase is
         _;
     }
 
+    /// @notice Only when migrations are not paused.
     modifier whenMigrationsNotPaused() {
         if (migrationPaused) {
             revert MigrationPaused();
@@ -62,6 +64,7 @@ abstract contract ChainAssetHandlerBase is
         _;
     }
 
+    /// @notice Only when the contract is deployed on L1.
     modifier onlyL1() {
         if (_l1ChainId() != block.chainid) {
             revert NotL1(_l1ChainId(), block.chainid);

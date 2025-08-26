@@ -62,8 +62,8 @@ contract ChainTypeManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
-        bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        L1MessageRoot messageroot = new L1MessageRoot(bridgehub);
+        bridgehub = new L1Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
+        messageroot = new L1MessageRoot(bridgehub, block.chainid);
         vm.prank(governor);
         bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageroot, address(0));
 

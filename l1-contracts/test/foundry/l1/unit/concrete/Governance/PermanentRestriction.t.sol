@@ -366,7 +366,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
-            new L1MessageRoot(bridgehub),
+            new L1MessageRoot(bridgehub, block.chainid),
             address(0)
         );
         vm.stopPrank();

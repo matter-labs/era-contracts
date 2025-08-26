@@ -56,6 +56,30 @@ library L2UtilsBase {
         address bridgehub = address(new L2Bridgehub());
         address assetRouter = address(new L2AssetRouter());
         address ntv = address(new L2NativeTokenVaultDev());
+        // address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId));
+        // address bridgehub = address(new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100));
+        // address assetRouter = address(
+        //     new L2AssetRouter(
+        //         _args.l1ChainId,
+        //         _args.eraChainId,
+        //         _args.l1AssetRouter,
+        //         _args.legacySharedBridge,
+        //         baseTokenAssetId,
+        //         _args.aliasedOwner
+        //     )
+        // );
+        // address ntv = address(
+        //     new L2NativeTokenVaultDev(
+        //         _args.l1ChainId,
+        //         _args.aliasedOwner,
+        //         _args.l2TokenProxyBytecodeHash,
+        //         _args.legacySharedBridge,
+        //         _args.l2TokenBeacon,
+        //         _args.contractsDeployedAlready,
+        //         wethToken,
+        //         baseTokenAssetId
+        //     )
+        // );
 
         vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
         // FIXME: init
