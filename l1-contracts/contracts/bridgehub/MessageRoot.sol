@@ -12,7 +12,6 @@ import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} 
 import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
-
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
 import {L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";

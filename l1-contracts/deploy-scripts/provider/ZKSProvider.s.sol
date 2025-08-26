@@ -3,7 +3,6 @@ pragma solidity ^0.8.0;
 
 // solhint-disable no-console, gas-custom-errors, reason-string
 
-
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {stdJson} from "forge-std/StdJson.sol";

@@ -6,80 +6,28 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-
-
-
-
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-
-
-
-
-
-
 
 import {Governance} from "contracts/governance/Governance.sol";
 
-
-
-
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-
-
-
-
-
-
-
-
-
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
-
-
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-
-
-
-
 
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-
-
-
-
-
-
 import {Call} from "contracts/governance/Common.sol";
-
-
-
-
-
 
 import {L2_COMPLEX_UPGRADER_ADDR, L2_VERSION_SPECIFIC_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
