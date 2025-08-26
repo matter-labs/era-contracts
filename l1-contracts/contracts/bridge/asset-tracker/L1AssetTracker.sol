@@ -266,9 +266,15 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     ) internal {
         if (!_isChainMinter(_fromChainId, _tokenOriginChainId)) {
             chainBalance[_fromChainId][_assetId] -= _amount;
+        } else {
+            /// if the source chain is a minter, we are increasing the totalSupply.
+            totalSupplyAcrossAllChains[_assetId] += _amount;
         }
         if (!_isChainMinter(_toChainId, _tokenOriginChainId)) {
             chainBalance[_toChainId][_assetId] += _amount;
+        } else {
+            /// If the destination chain is a minter, we are decreasing the totalSupply.
+            totalSupplyAcrossAllChains[_assetId] -= _amount;
         }
     }
 

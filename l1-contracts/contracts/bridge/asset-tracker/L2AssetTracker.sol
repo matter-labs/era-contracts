@@ -551,9 +551,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         if (data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[data.chainId][data.assetId] += data.amount;
+            totalSupplyAcrossAllChains[data.assetId] += data.amount;
         } else {
             require(data.amount == chainBalance[data.chainId][data.assetId], InvalidAmount());
             chainBalance[data.chainId][data.assetId] = 0;
+            totalSupplyAcrossAllChains[data.assetId] -= data.amount;
         }
     }
 
