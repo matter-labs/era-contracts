@@ -33,6 +33,10 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         addresses.stateTransition.verifier = toml.readAddress("$.state_transition.verifier_addr");
         addresses.stateTransition.genesisUpgrade = toml.readAddress("$.state_transition.genesis_upgrade_addr");
         addresses.stateTransition.diamondInit = toml.readAddress("$.state_transition.diamond_init_addr");
+        addresses.stateTransition.adminFacet = toml.readAddress("$.state_transition.admin_facet_addr");
+        addresses.stateTransition.gettersFacet = toml.readAddress("$.state_transition.getters_facet_addr");
+        addresses.stateTransition.executorFacet = toml.readAddress("$.state_transition.executor_facet_addr");
+
         gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
             "$.gateway.gateway_state_transition.verifier_addr"
         );
@@ -41,6 +45,15 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         );
         gatewayConfig.gatewayStateTransition.diamondInit = toml.readAddress(
             "$.gateway.gateway_state_transition.diamond_init_addr"
+        );
+        gatewayConfig.gatewayStateTransition.adminFacet = toml.readAddress(
+            "$.gateway.gateway_state_transition.admin_facet_addr"
+        );
+        gatewayConfig.gatewayStateTransition.gettersFacet = toml.readAddress(
+            "$.gateway.gateway_state_transition.getters_facet_addr"
+        );
+        gatewayConfig.gatewayStateTransition.executorFacet = toml.readAddress(
+            "$.gateway.gateway_state_transition.executor_facet_addr"
         );
     }
 
@@ -68,21 +81,6 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
             facet: address(0),
             action: Diamond.Action.Remove,
             isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
-        });
-    }
-
-    /// @notice Get new facet cuts
-    function getFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override returns (FacetCut[] memory facetCuts) {
-        // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
-        // If we start to use different selectors for Gateway, we should change this.
-        facetCuts = new FacetCut[](1);
-        facetCuts[0] = FacetCut({
-            facet: stateTransition.mailboxFacet,
-            action: Action.Add,
-            isFreezable: true,
             selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
         });
     }
