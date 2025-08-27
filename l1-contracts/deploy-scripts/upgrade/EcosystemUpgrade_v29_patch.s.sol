@@ -30,30 +30,30 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
 
-        addresses.stateTransition.verifier = toml.readAddress("$.state_transition.verifier_addr");
-        addresses.stateTransition.genesisUpgrade = toml.readAddress("$.state_transition.genesis_upgrade_addr");
-        addresses.stateTransition.diamondInit = toml.readAddress("$.state_transition.diamond_init_addr");
         addresses.stateTransition.adminFacet = toml.readAddress("$.state_transition.admin_facet_addr");
-        addresses.stateTransition.gettersFacet = toml.readAddress("$.state_transition.getters_facet_addr");
+        addresses.stateTransition.diamondInit = toml.readAddress("$.state_transition.diamond_init_addr");
         addresses.stateTransition.executorFacet = toml.readAddress("$.state_transition.executor_facet_addr");
+        addresses.stateTransition.genesisUpgrade = toml.readAddress("$.state_transition.genesis_upgrade_addr");
+        addresses.stateTransition.gettersFacet = toml.readAddress("$.state_transition.getters_facet_addr");
+        addresses.stateTransition.verifier = toml.readAddress("$.state_transition.verifier_addr");
 
-        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
-            "$.gateway.gateway_state_transition.verifier_addr"
-        );
-        gatewayConfig.gatewayStateTransition.genesisUpgrade = toml.readAddress(
-            "$.gateway.gateway_state_transition.genesis_upgrade_addr"
+        gatewayConfig.gatewayStateTransition.adminFacet = toml.readAddress(
+            "$.gateway.gateway_state_transition.admin_facet_addr"
         );
         gatewayConfig.gatewayStateTransition.diamondInit = toml.readAddress(
             "$.gateway.gateway_state_transition.diamond_init_addr"
         );
-        gatewayConfig.gatewayStateTransition.adminFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.admin_facet_addr"
+        gatewayConfig.gatewayStateTransition.executorFacet = toml.readAddress(
+            "$.gateway.gateway_state_transition.executor_facet_addr"
+        );
+        gatewayConfig.gatewayStateTransition.genesisUpgrade = toml.readAddress(
+            "$.gateway.gateway_state_transition.genesis_upgrade_addr"
         );
         gatewayConfig.gatewayStateTransition.gettersFacet = toml.readAddress(
             "$.gateway.gateway_state_transition.getters_facet_addr"
         );
-        gatewayConfig.gatewayStateTransition.executorFacet = toml.readAddress(
-            "$.gateway.gateway_state_transition.executor_facet_addr"
+        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
+            "$.gateway.gateway_state_transition.verifier_addr"
         );
     }
 
