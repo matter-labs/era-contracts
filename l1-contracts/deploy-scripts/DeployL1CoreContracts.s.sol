@@ -358,6 +358,16 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridgehub.messageRootImplementation
         );
 
+        vm.serializeAddress(
+            "state_transition",
+            "state_transition_proxy_addr",
+            address(0)
+        );
+        vm.serializeAddress(
+            "state_transition",
+            "state_transition_implementation_addr",
+            address(0)
+        );
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
         vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
         vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);

@@ -132,54 +132,77 @@ contract RegisterCTM is Script, DeployUtils {
     }
 
     function registerChainTypeManager() internal {
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        // IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
 
-        vm.startBroadcast(msg.sender);
-        console.log("BH address: ", addresses.bridgehub.bridgehubProxy);
-        console.log(addresses.governance);
-        console.log(addresses.stateTransition.chainTypeManagerProxy);
-        IGovernance governance = IGovernance(IOwnable(address(bridgehub)).owner()); // Owner of BH
-        console.log("Governance: ", address(governance));
-        Call[] memory calls = new Call[](3);
-        calls[0] = Call({
-            target: address(bridgehub),
-            value: 0,
-            data: abi.encodeCall(bridgehub.addChainTypeManager, (addresses.stateTransition.chainTypeManagerProxy))
-        });
-        ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        calls[1] = Call({
-            target: address(sharedBridge),
-            value: 0,
-            data: abi.encodeCall(
-                sharedBridge.setAssetDeploymentTracker,
-                (bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))), address(ctmDT))
-            )
-        });
-        calls[2] = Call({
-            target: address(ctmDT),
-            value: 0,
-            data: abi.encodeCall(ctmDT.registerCTMAssetOnL1, (addresses.stateTransition.chainTypeManagerProxy))
-        });
+        // vm.startBroadcast(msg.sender);
+        // console.log("BH address: ", addresses.bridgehub.bridgehubProxy);
+        // console.log(addresses.governance);
+        // console.log(addresses.stateTransition.chainTypeManagerProxy);
+        // IGovernance governance = IGovernance(IOwnable(address(bridgehub)).owner()); // Owner of BH
+        // console.log("Governance: ", address(governance));
+        // Call[] memory calls = new Call[](3);
+        // calls[0] = Call({
+        //     target: address(bridgehub),
+        //     value: 0,
+        //     data: abi.encodeCall(bridgehub.addChainTypeManager, (addresses.stateTransition.chainTypeManagerProxy))
+        // });
+        // ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
+        // IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
+        // calls[1] = Call({
+        //     target: address(sharedBridge),
+        //     value: 0,
+        //     data: abi.encodeCall(
+        //         sharedBridge.setAssetDeploymentTracker,
+        //         (bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))), address(ctmDT))
+        //     )
+        // });
+        // calls[2] = Call({
+        //     target: address(ctmDT),
+        //     value: 0,
+        //     data: abi.encodeCall(ctmDT.registerCTMAssetOnL1, (addresses.stateTransition.chainTypeManagerProxy))
+        // });
 
-        IGovernance.Operation memory operation = IGovernance.Operation({
-            calls: calls,
-            predecessor: bytes32(0),
-            salt: bytes32(0)
-        });
+        // IGovernance.Operation memory operation = IGovernance.Operation({
+        //     calls: calls,
+        //     predecessor: bytes32(0),
+        //     salt: bytes32(0)
+        // });
 
-        governance.scheduleTransparent(operation, 0);
-        // We assume that the total value is 0
-        governance.execute{value: 0}(operation);
+        // governance.scheduleTransparent(operation, 0);
+        // // We assume that the total value is 0
+        // governance.execute{value: 0}(operation);
 
-        console.log("CTM DT whitelisted");
-        vm.stopBroadcast();
+        // console.log("CTM DT whitelisted");
+        // vm.stopBroadcast();
 
-        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
-        console.log(
-            "CTM in router 1",
-            sharedBridge.assetHandlerAddress(assetId),
-            bridgehub.ctmAssetIdToAddress(assetId)
+        // bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
+        // console.log(
+        //     "CTM in router 1",
+        //     sharedBridge.assetHandlerAddress(assetId),
+        //     bridgehub.ctmAssetIdToAddress(assetId)
+        // );
+
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);	
+        vm.startBroadcast(msg.sender);	
+        bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);	
+        console.log("ChainTypeManager registered");	
+        ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);	
+        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);	
+        sharedBridge.setAssetDeploymentTracker(	
+            bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),	
+            address(ctmDT)	
+        );	
+        console.log("CTM DT whitelisted");	
+
+        ctmDT.registerCTMAssetOnL1(addresses.stateTransition.chainTypeManagerProxy);	
+        vm.stopBroadcast();	
+        console.log("CTM registered in CTMDeploymentTracker");	
+
+        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);	
+        console.log(	
+            "CTM in router 1",	
+            sharedBridge.assetHandlerAddress(assetId),	
+            bridgehub.ctmAssetIdToAddress(assetId)	
         );
     }
 
