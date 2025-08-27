@@ -61,7 +61,9 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         require(upgradeConfig.initialized, "Not initialized");
 
         instantiateCreate2Factory();
+        deployUpgradeStageValidator();
 
+        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
         addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
         addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
 
