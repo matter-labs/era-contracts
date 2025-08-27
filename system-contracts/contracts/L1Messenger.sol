@@ -322,6 +322,11 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             revert ReconstructionMismatch(PubdataField.InputLogsRootHash, localLogsRootHash, inputChainedLogsRootHash);
         }
 
+        // Pubdata-related input, includes logs, messages, bytecodes, compressed and uncompressed state diffs
+        // encoded as `bytes`, so it has offset and length
+        uint256 operatorDataOffset = 4 + uint256(bytes32(_operatorInput[4 + 32 * 4:4 + 32 * 4 + 32]));
+        uint256 operatorDataLength = uint256(bytes32(_operatorInput[operatorDataOffset:operatorDataOffset + 32]));
+
         // Validate pubdata and make commitment. Logs are not checked since we already checked them above.
         // Does nothing if commitment scheme is EMPTY_NO_DA.
         // It is expected that operator data includes logs, messages, bytecodes and compressed state diffs.
@@ -330,7 +335,7 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
             _l2DACommitmentScheme,
             inputChainedMsgsHash,
             inputChainedBytecodesHash,
-            _operatorInput[4 + 32 * 4 + 64:] // Operator data offset (as bytes slice)
+            _operatorInput[operatorDataOffset + 32:operatorDataOffset + 32 + operatorDataLength] // Operator data
         );
 
         /// Native (VM) L2 to L1 log
@@ -353,3 +358,22 @@ contract L1Messenger is IL1Messenger, SystemContractBase {
         chainedL1BytecodesRevealDataHash = bytes32(0);
     }
 }
+
+/*
+
+0x3bf3386b
+0000000000000000000000000000000000000000000000000000000000000002
+0000000000000000000000000000000000000000000000000000000000000040
+0000000000000000000000000000000000000000000000000000000000000178
+
+89f9a072
+e73a47a255bd93a4150375097dd5a7237fb8094d03a53ae4805e91364fad69ec
+666413b829f0cf3627b5b254011a747a6c34a6f54455fac7b6be6a4aac9a3ff2
+73f368ebe858acf94c48e851e2407ab31b2e4a5c3bfc12c9c94eb75ff6cdeaed
+0000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000a0
+00000000000000000000000000000000000000000000000000000000000000b4
+
+000000020001000100000000000000000000000000000000000090080101010101010101010101010101010101010101010101010101010101010101020202020202020202020202020202020202020202020202020202020202020200010001000000000000000000000000000000000000900800000000000000000000000000000000000000000000000000000000000090084a7a4de37def8e10861261f58e1003e6086df449b615bb411c39669548e19dba0000000000000000
+
+*/
