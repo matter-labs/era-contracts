@@ -35,5 +35,7 @@ error NotEnoughChainBalance(uint256 _sourceChainId, bytes32 _assetId, uint256 _a
 error NotMigratedChain();
 // 0x0fd3385e
 error OnlyWhitelistedSettlementLayer(address, address);
+// 0xd4f29820
+error OnlyWithdrawalsAllowedForPreV30Chains();
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);

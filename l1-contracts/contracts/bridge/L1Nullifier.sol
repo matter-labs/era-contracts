@@ -538,14 +538,15 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _proof: _finalizeWithdrawalParams.merkleProof
         });
         TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
+        TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _finalizeWithdrawalParams.l2BatchNumber);
         emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
         // withdrawal wrong proof
         require(success, InvalidProof());
     }
 
     /// @inheritdoc IL1Nullifier
-    function getTransientSettlementLayer() external view returns (uint256) {
-        return TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT);
+    function getTransientSettlementLayer() external view returns (uint256, uint256) {
+        return (TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT), TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1));
     }
 
     /// @notice Parses the withdrawal message and returns withdrawal details.

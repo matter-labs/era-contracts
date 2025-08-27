@@ -8,8 +8,8 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IBridgehub} from "./IBridgehub.sol";
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet} from "./L1BridgehubErrors.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "./IMessageRoot.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
@@ -70,7 +70,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     address public assetTracker;
 
     /// @notice The mapping storing the batch number at the moment the MessageRoot was updated to V30.
-    /// @notice We store this, as we did not store chainBatchRoots prior to V30, so we need to get them from the diamond proxies of the chains.
+    /// @notice We store this, as we did not store chainBatchRoots prior to V30 on L1, so we need to get them from the diamond proxies of the chains.
+    /// @notice We fill the mapping with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE for deployed chains until the chain upgrades to V30.
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
 
     /// @notice The block number at the moment the MessageRoot was updated to V30.
@@ -188,8 +189,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            v30UpgradeChainBatchNumber[allZKChains[i]] = IGetters(BRIDGE_HUB.getZKChain(allZKChains[i]))
-                .getTotalBatchesExecuted();
+            v30UpgradeChainBatchNumber[allZKChains[i]] = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE;
         }
         /// If there are no chains, that means we are using the contracts locally.
         if (allZKChainsLength == 0) {
@@ -197,11 +197,17 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         }
     }
 
-    function sendV30UpgradeGatewayBlockNumberFromGateway(uint256) external {
-        // Send the message corresponding to the relevant InteropBundle to L1.
+    function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external {
+        uint256 sentBlockNumber;
+        if (_chainId != block.chainid) {
+            sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];
+            require(sentBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE, V30UpgradeChainBatchNumberNotSet());
+        } else {
+            sentBlockNumber = v30UpgradeGatewayBlockNumber;
+        }
         // slither-disable-next-line unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(this.sendV30UpgradeGatewayBlockNumberFromGateway, (v30UpgradeGatewayBlockNumber))
+            abi.encodeCall(this.sendV30UpgradeBlockNumberFromGateway, (_chainId, sentBlockNumber))
         );
     }
 
@@ -219,22 +225,41 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_finalizeWithdrawalParams.message, 0);
         require(
-            bytes4(functionSignature) == this.sendV30UpgradeGatewayBlockNumberFromGateway.selector,
+            bytes4(functionSignature) == this.sendV30UpgradeBlockNumberFromGateway.selector,
             IncorrectFunctionSignature()
         );
 
         require(v30UpgradeGatewayBlockNumber == 0, V30UpgradeGatewayBlockNumberAlreadySet());
+        (uint256 chainId, ) = UnsafeBytes.readUint256(_finalizeWithdrawalParams.message, offset);
         (uint256 receivedV30UpgradeGatewayBlockNumber, ) = UnsafeBytes.readUint256(
             _finalizeWithdrawalParams.message,
             offset
         );
-        v30UpgradeGatewayBlockNumber = receivedV30UpgradeGatewayBlockNumber;
+        if (chainId == _finalizeWithdrawalParams.chainId) {
+            v30UpgradeGatewayBlockNumber = receivedV30UpgradeGatewayBlockNumber;
+        } else {
+            v30UpgradeChainBatchNumber[chainId] = receivedV30UpgradeGatewayBlockNumber;
+        }
     }
 
     function saveV30UpgradeGatewayBlockNumberOnL2(
         uint256 _v30UpgradeGatewayBlockNumber
     ) external onlyServiceTransactionSender {
         v30UpgradeGatewayBlockNumber = _v30UpgradeGatewayBlockNumber;
+    }
+
+    function saveV30UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
+        uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
+        require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
+        require(
+            totalBatchesExecuted != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
+            TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber()
+        );
+        require(
+            v30UpgradeChainBatchNumber[_chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
+            V30UpgradeChainBatchNumberAlreadySet()
+        );
+        v30UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted;
     }
 
     function setAddresses(address _assetTracker) external onlyBridgehubOwner {

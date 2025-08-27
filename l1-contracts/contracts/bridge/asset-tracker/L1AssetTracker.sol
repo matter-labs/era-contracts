@@ -6,7 +6,7 @@ import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {InvalidProof} from "../../common/L1ContractErrors.sol";
-import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
+import {IMessageRoot, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
@@ -14,6 +14,7 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidBaseTokenAssetId, InvalidChainMigrationNumber, InvalidMigrationNumber, InvalidOriginChainId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer} from "./AssetTrackerErrors.sol";
+import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
@@ -28,6 +29,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     INativeTokenVault public immutable NATIVE_TOKEN_VAULT;
 
     IMessageRoot public immutable MESSAGE_ROOT;
+
+    IL1Nullifier public immutable L1_NULLIFIER;
 
     // mapping(uint256 chainId => mapping(address l1Token => bool)) internal l1TokenToAssetIdMessageSent;
 
@@ -73,6 +76,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         BRIDGE_HUB = IBridgehub(_bridgehub);
         NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
+        L1_NULLIFIER = IL1Nullifier(IL1NativeTokenVault(_nativeTokenVault).L1_NULLIFIER());
     }
 
     function initialize() external reentrancyGuardInitializer {}
@@ -153,9 +157,16 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
-        uint256 settlementLayer = IL1Nullifier(IL1NativeTokenVault(address(_nativeTokenVault())).L1_NULLIFIER())
-            .getTransientSettlementLayer();
-        chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
+        (uint256 settlementLayer, uint256 l2BatchNumber) = L1_NULLIFIER.getTransientSettlementLayer();
+        uint256 v30UpgradeGatewayBlockNumber = MESSAGE_ROOT.v30UpgradeGatewayBlockNumber();
+        /// We need to wait for the proper v30UpgradeGatewayBlockNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
+        require(v30UpgradeGatewayBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE, V30UpgradeChainBatchNumberNotSet());
+        if (v30UpgradeGatewayBlockNumber != 0) {
+            /// For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
+            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeGatewayBlockNumber ? _chainId : settlementLayer;
+        } else {
+            chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
+        }
     }
 
     // error MessageAlreadySent();

@@ -127,5 +127,5 @@ interface IL1Nullifier {
     /// this function retrieves the currently stored transient settlement layer chain ID.
     /// @dev The transient settlement layer is cleared at the end of each transaction.
     /// @return The chain ID of the settlement layer that processed the current proof, or 0 if none is set.
-    function getTransientSettlementLayer() external view returns (uint256);
+    function getTransientSettlementLayer() external view returns (uint256, uint256);
 }

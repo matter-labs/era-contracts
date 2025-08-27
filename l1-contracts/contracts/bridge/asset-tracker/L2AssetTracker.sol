@@ -11,18 +11,19 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "../../bridgehub/IMessageRoot.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, L1ToL2DepositsNotFinalized, NotEnoughChainBalance, NotMigratedChain, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
+import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, L1ToL2DepositsNotFinalized, NotEnoughChainBalance, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
+import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 
 struct SavedTotalSupply {
     bool isSaved;
@@ -220,9 +221,22 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/
 
+    error InvalidV30UpgradeChainBatchNumber(uint256 _chainId);
+
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
+        (, uint32 minor, ) = IZKChain(msg.sender).getSemverProtocolVersion();
+        /// If a chain is pre v30, we only allow withdrawals, and don't keep track of chainBalance.
+        bool onlyWithdrawals = minor < 30;
+        /// We check that the chain has not upgraded to V30 for onlyWithdrawals case.
+        require(
+            !onlyWithdrawals ||
+                L2_MESSAGE_ROOT.v30UpgradeChainBatchNumber(_processLogsInputs.chainId) ==
+                V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE,
+            InvalidV30UpgradeChainBatchNumber(_processLogsInputs.chainId)
+        );
+
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
         reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
 
@@ -253,6 +267,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 }
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
+                    require(!onlyWithdrawals, OnlyWithdrawalsAllowedForPreV30Chains());
                     handleInteropMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
                     handleBaseTokenSystemContractMessage(_processLogsInputs.chainId, baseTokenAssetId, message);
@@ -401,7 +416,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             _amount: amount
         });
     }
-
 
     function _handleChainBalanceChangeOnGateway(
         uint256 _sourceChainId,

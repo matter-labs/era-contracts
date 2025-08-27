@@ -318,6 +318,11 @@ contract L1AssetRouterTest is Test {
             abi.encode(0)
         );
         vm.mockCall(
+            messageRootAddress,
+            abi.encodeWithSelector(IMessageRoot.v30UpgradeGatewayBlockNumber.selector),
+            abi.encode(0)
+        );
+        vm.mockCall(
             address(messageRootAddress),
             abi.encodeWithSelector(IMessageRoot.getProofData.selector),
             abi.encode(
