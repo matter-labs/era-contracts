@@ -181,29 +181,6 @@ contract RegisterCTM is Script, DeployUtils {
             sharedBridge.assetHandlerAddress(assetId),
             bridgehub.ctmAssetIdToAddress(assetId)
         );
-
-        // IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
-        // vm.startBroadcast(msg.sender);
-        // bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
-        // console.log("ChainTypeManager registered");
-        // ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        // IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        // sharedBridge.setAssetDeploymentTracker(
-        //     bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
-        //     address(ctmDT)
-        // );
-        // console.log("CTM DT whitelisted");
-
-        // ctmDT.registerCTMAssetOnL1(addresses.stateTransition.chainTypeManagerProxy);
-        // vm.stopBroadcast();
-        // console.log("CTM registered in CTMDeploymentTracker");
-
-        // bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
-        // console.log(
-        //     "CTM in router 1",
-        //     sharedBridge.assetHandlerAddress(assetId),
-        //     bridgehub.ctmAssetIdToAddress(assetId)
-        // );
     }
 
     function deployTuppWithContract(

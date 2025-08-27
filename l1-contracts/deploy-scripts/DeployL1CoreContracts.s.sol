@@ -176,12 +176,6 @@ contract DeployL1Script is Script, DeployUtils {
         initializeGeneratedData();
 
         deployStateTransitionDiamondFacets();
-        (
-            addresses.stateTransition.chainTypeManagerImplementation,
-            addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", false);
-        registerChainTypeManager();
-        setChainTypeManagerInServerNotifier();
 
         updateOwners();
 
@@ -215,13 +209,6 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
         (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
-    }
-
-    function setChainTypeManagerInServerNotifier() internal {
-        ServerNotifier serverNotifier = ServerNotifier(addresses.stateTransition.serverNotifierProxy);
-        vm.broadcast(msg.sender);
-        serverNotifier.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
-        console.log("ChainTypeManager set in ServerNotifier");
     }
 
     function deployDAValidators() internal {
@@ -259,31 +246,6 @@ contract DeployL1Script is Script, DeployUtils {
                 require(rollupDAManager.owner() == config.ownerAddress, "Ownership was not set correctly");
             }
         }
-    }
-
-    function registerChainTypeManager() internal {
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.startBroadcast(msg.sender);
-        bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
-        console.log("ChainTypeManager registered");
-        ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        sharedBridge.setAssetDeploymentTracker(
-            bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
-            address(ctmDT)
-        );
-        console.log("CTM DT whitelisted");
-
-        ctmDT.registerCTMAssetOnL1(addresses.stateTransition.chainTypeManagerProxy);
-        vm.stopBroadcast();
-        console.log("CTM registered in CTMDeploymentTracker");
-
-        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
-        console.log(
-            "CTM in router 1",
-            sharedBridge.assetHandlerAddress(assetId),
-            bridgehub.ctmAssetIdToAddress(assetId)
-        );
     }
 
     function deployDiamondProxy() internal {
@@ -396,17 +358,6 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridgehub.messageRootImplementation
         );
 
-        // TODO(EVM-744): this has to be renamed to chain type manager
-        vm.serializeAddress(
-            "state_transition",
-            "state_transition_proxy_addr",
-            addresses.stateTransition.chainTypeManagerProxy
-        );
-        vm.serializeAddress(
-            "state_transition",
-            "state_transition_implementation_addr",
-            addresses.stateTransition.chainTypeManagerImplementation
-        );
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
         vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
         vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);

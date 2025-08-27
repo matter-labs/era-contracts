@@ -114,7 +114,7 @@ contract DeployL1Script is Script, DeployUtils {
         instantiateCreate2Factory();
 
         if (bridgehub == address(0)) {
-            initializeConfigIfEcosystemDeployedLocally(outputPath); // We use the output from previous script run TODO: get the argument passed
+            initializeConfigIfEcosystemDeployedLocally(outputPath);
         } else {
             console.log("Initializing dynamically main contracts");
             IBridgehub bridgehubProxy = IBridgehub(bridgehub);
@@ -139,7 +139,7 @@ contract DeployL1Script is Script, DeployUtils {
 
             addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
             updateRollupDAManager();
-            addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false); // We could pass it instead, if we want the same validator for ecosystem
+            addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
 
             vm.startBroadcast(msg.sender);
             IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
@@ -150,7 +150,7 @@ contract DeployL1Script is Script, DeployUtils {
             );
             vm.stopBroadcast();
 
-            deployIfNeededMulticall3(); // We can also forward it
+            deployIfNeededMulticall3();
         }
 
         addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
@@ -184,7 +184,6 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
         ) = deployTuppWithContract("ChainTypeManager", false);
-        // registerChainTypeManager();
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
@@ -263,51 +262,6 @@ contract DeployL1Script is Script, DeployUtils {
                 require(rollupDAManager.owner() == config.ownerAddress, "Ownership was not set correctly");
             }
         }
-    }
-
-    function registerChainTypeManager() internal {
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.startBroadcast(msg.sender);
-        IGovernance governance = IGovernance(addresses.governance); // Owner of BH
-        Call[] memory calls = new Call[](3);
-        calls[0] = Call({
-            target: address(bridgehub),
-            value: 0,
-            data: abi.encodeCall(bridgehub.addChainTypeManager, (addresses.stateTransition.chainTypeManagerProxy))
-        });
-        console.log("ChainTypeManager registered");
-        ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        calls[1] = Call({
-            target: address(sharedBridge),
-            value: 0,
-            data: abi.encodeCall(
-                sharedBridge.setAssetDeploymentTracker,
-                (bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))), address(ctmDT))
-            )
-        });
-        calls[2] = Call({
-            target: address(ctmDT),
-            value: 0,
-            data: abi.encodeCall(ctmDT.registerCTMAssetOnL1, (addresses.stateTransition.chainTypeManagerProxy))
-        });
-
-        IGovernance.Operation memory operation = IGovernance.Operation({
-            calls: calls,
-            predecessor: bytes32(0),
-            salt: bytes32(0)
-        });
-
-        governance.scheduleTransparent(operation, 0);
-        // We assume that the total value is 0
-        governance.execute{value: 0}(operation);
-
-        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
-        console.log(
-            "CTM in router 1",
-            sharedBridge.assetHandlerAddress(assetId),
-            bridgehub.ctmAssetIdToAddress(assetId)
-        );
     }
 
     function deployDiamondProxy() internal {
