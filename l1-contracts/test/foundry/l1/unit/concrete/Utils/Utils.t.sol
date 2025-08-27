@@ -5,6 +5,10 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_DA_VALIDATOR_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils} from "./Utils.sol";
 
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+
 // solhint-enable max-line-length
 
 contract UtilsTest is Test {
@@ -144,6 +148,20 @@ contract UtilsTest is Test {
             ),
             "log[8] should be correct"
         );
+    }
+
+    function mockDiamondInitInteropCenterCalls() public {
+        mockDiamondInitInteropCenterCallsWithAddress(address(0x1234567890876543567890));
+    }
+
+    function mockDiamondInitInteropCenterCallsWithAddress(address interopCenter) public {
+        address assetTracker = address(0x1234567890876543567890);
+        address assetRouter = address(0x1234567890876543567890);
+        address nativeTokenVault = address(0x1234567890876543567890);
+
+        vm.mockCall(interopCenter, abi.encodeWithSelector(IInteropCenter.assetTracker.selector), abi.encode(assetTracker));
+        vm.mockCall(interopCenter, abi.encodeWithSelector(IInteropCenter.assetRouter.selector), abi.encode(assetRouter));
+        vm.mockCall(assetRouter, abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector), abi.encode(nativeTokenVault));  
     }
 
     // add this to be excluded from coverage report

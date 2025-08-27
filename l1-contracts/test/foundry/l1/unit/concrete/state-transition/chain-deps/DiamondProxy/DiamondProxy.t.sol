@@ -4,6 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -25,7 +26,7 @@ contract TestFacet is ZKChainBase {
     function test() internal virtual {}
 }
 
-contract DiamondProxyTest is Test {
+contract DiamondProxyTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
@@ -51,6 +52,7 @@ contract DiamondProxyTest is Test {
                 selectors: Utils.getUtilsFacetSelectors()
             })
         );
+        mockDiamondInitInteropCenterCalls();
     }
 
     function test_revertWhen_chainIdDiffersFromBlockChainId() public {

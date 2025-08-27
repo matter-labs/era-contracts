@@ -13,8 +13,9 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-contract MailboxTest is Test {
+contract MailboxTest is UtilsTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
     IGetters internal gettersFacet;
@@ -51,6 +52,7 @@ contract MailboxTest is Test {
             selectors: Utils.getGettersSelectors()
         });
 
+        mockDiamondInitInteropCenterCalls();
         proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);
@@ -69,5 +71,5 @@ contract MailboxTest is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal override virtual {}
 }

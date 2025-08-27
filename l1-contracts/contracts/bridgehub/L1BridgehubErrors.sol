@@ -76,8 +76,9 @@ error TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber();
 error TotalBatchesExecutedZero();
 // 0x246de5b7
 error V30UpgradeChainBatchNumberAlreadySet();
+// 0x862f0039
+error V30UpgradeChainBatchNumberNotSet();
 // 0x29bc3a3c
 error V30UpgradeGatewayBlockNumberAlreadySet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
-error V30UpgradeChainBatchNumberNotSet();

@@ -32,7 +32,6 @@ import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, Inva
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
 import {IL2AssetTracker} from "../../../bridge/asset-tracker/IL2AssetTracker.sol";
-import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -686,7 +685,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
                     messageRoot: messageRoots[i]
                 });
-                IL2AssetTracker assetTracker = IL2AssetTracker(address(IInteropCenter(s.interopCenter).assetTracker()));
+                IL2AssetTracker assetTracker = IL2AssetTracker(s.assetTracker);
                 assetTracker.processLogsAndMessages(processLogsInput);
             }
         } else {

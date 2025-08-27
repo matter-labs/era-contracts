@@ -15,8 +15,9 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Config, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-contract L1ContractDeployer is Test {
+contract L1ContractDeployer is UtilsTest {
     using stdStorage for StdStorage;
 
     DeployL1IntegrationScript l1Script;
@@ -140,5 +141,5 @@ contract L1ContractDeployer is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal override virtual {}
 }

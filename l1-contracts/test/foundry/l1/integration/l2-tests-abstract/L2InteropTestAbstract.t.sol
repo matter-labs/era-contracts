@@ -444,6 +444,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         address newAssetRouter = makeAddr("newAssetRouter");
         address newAssetTracker = makeAddr("newAssetTracker");
 
+        vm.clearMockedCalls();
         address oldAssetRouter = InteropCenter(L2_INTEROP_CENTER_ADDR).assetRouter();
         address oldAssetTracker = address(InteropCenter(L2_INTEROP_CENTER_ADDR).assetTracker());
 

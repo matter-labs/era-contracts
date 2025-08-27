@@ -11,6 +11,7 @@ import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/Admin.so
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
 contract TestBaseFacet is ZKChainBase {
     function functionWithOnlyAdminModifier() external onlyAdmin {}
@@ -36,7 +37,7 @@ bytes constant ERROR_ONLY_BRIDGEHUB = "ZKChain: not bridgehub";
 bytes constant ERROR_ONLY_ADMIN_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by admin or state transition manager";
 bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only by validator or state transition manager";
 
-contract ZKChainBaseTest is Test {
+contract ZKChainBaseTest is UtilsTest {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
@@ -66,11 +67,13 @@ contract ZKChainBaseTest is Test {
             selectors: Utils.getUtilsFacetSelectors()
         });
 
+
+        mockDiamondInitInteropCenterCalls();
         address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         testBaseFacet = TestBaseFacet(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal override virtual {}
 }

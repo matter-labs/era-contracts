@@ -10,8 +10,9 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-contract DiamondInitTest is Test {
+contract DiamondInitTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
 
@@ -24,8 +25,9 @@ contract DiamondInitTest is Test {
                 selectors: Utils.getUtilsFacetSelectors()
             })
         );
+        mockDiamondInitInteropCenterCalls();
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal override virtual {}
 }

@@ -117,6 +117,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: diamondInitCalldata
         });
 
+        mockDiamondInitInteropCenterCallsWithAddress(interopCenter);
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         proxyAsAdmin = AdminFacet(address(diamondProxy));
         proxyAsGetters = GettersFacet(address(diamondProxy));

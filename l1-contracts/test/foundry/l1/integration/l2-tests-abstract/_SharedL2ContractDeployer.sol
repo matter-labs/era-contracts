@@ -39,8 +39,9 @@ import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
+abstract contract SharedL2ContractDeployer is UtilsTest, DeployIntegrationUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
 
@@ -166,6 +167,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         );
 
         vm.prank(L2_BRIDGEHUB_ADDR);
+        mockDiamondInitInteropCenterCallsWithAddress(L2_INTEROP_CENTER_ADDR);
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,
             baseTokenAssetId,
@@ -290,5 +292,5 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;
     function deployL2Contracts(uint256 _l1ChainId) public virtual;
 
-    function test() internal virtual override {}
+    function test() internal virtual override(DeployIntegrationUtils, UtilsTest) {}
 }

@@ -179,4 +179,6 @@ struct ZKChainStorage {
     bytes32 precommitmentForTheLatestBatch;
     /// @dev Interop Center, responsible for starting L1->L2 messages
     address interopCenter;
+    address assetTracker;
+    address nativeTokenVault;
 }

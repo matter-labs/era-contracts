@@ -37,8 +37,9 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-contract ChainTypeManagerTest is Test {
+contract ChainTypeManagerTest is UtilsTest {
     using stdStorage for StdStorage;
 
     ChainTypeManager internal chainTypeManager;
@@ -224,6 +225,7 @@ contract ChainTypeManagerTest is Test {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
+        mockDiamondInitInteropCenterCallsWithAddress(interopCenterAddress);
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,
