@@ -50,6 +50,7 @@ chain_id = 123
 
 [state_transition]
 admin_facet_addr = "0xf5E3Cc431EdfaA8E704E4c6f543ea28a892b9231"
+default_upgrade_addr = "0x6f1c50934d7a6a405d066fc78391f9ce93c29F04"
 diamond_init_addr = "0x721035F2420fEc7EF12229ceF4A55DC0C7CB19EA"
 executor_facet_addr = "0xDdFB1d1403fA94c7bA810e4Abf790fC73b5A3B9D"
 genesis_upgrade_addr = "0x65dAd0914338b7b99bB70CD2c62A3BC7BcC26a81"
@@ -62,6 +63,7 @@ rollup_da_manager = "0x064ac968CCad1948fceE025fD59c20b153c88072"
 chain_type_manager_proxy_admin = "0x0f7bef9694575a0e149dad6808d69f678746608b"
 rollup_sl_da_validator = "0x719A5aE8dF7468C7E1C22278eD3fD472e9904604"
 admin_facet_addr = "0x59a4cA43876eAC75177d3681873cF14578122641"
+default_upgrade_addr = "0x74B08b16935E0bDBb182dC4F956B07983B738BFf"
 diamond_init_addr = "0x793cbd3E57A5B0Bf5dc1CaEDc2390C738A45c9a1"
 executor_facet_addr = "0x1099487f403574BF163A60A1bE5e9a2D025964Bb"
 genesis_upgrade_addr = "0xE7b5f9f47A0Bb9Dd3C11bfD30fE251D50D04A2D6"

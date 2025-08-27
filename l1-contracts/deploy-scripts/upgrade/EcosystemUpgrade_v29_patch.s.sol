@@ -31,6 +31,7 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         string memory toml = vm.readFile(newConfigPath);
 
         addresses.stateTransition.adminFacet = toml.readAddress("$.state_transition.admin_facet_addr");
+        addresses.stateTransition.defaultUpgrade = toml.readAddress("$.state_transition.default_upgrade_addr");
         addresses.stateTransition.diamondInit = toml.readAddress("$.state_transition.diamond_init_addr");
         addresses.stateTransition.executorFacet = toml.readAddress("$.state_transition.executor_facet_addr");
         addresses.stateTransition.genesisUpgrade = toml.readAddress("$.state_transition.genesis_upgrade_addr");
@@ -39,6 +40,9 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
 
         gatewayConfig.gatewayStateTransition.adminFacet = toml.readAddress(
             "$.gateway.gateway_state_transition.admin_facet_addr"
+        );
+        gatewayConfig.gatewayStateTransition.defaultUpgrade = toml.readAddress(
+            "$.gateway.gateway_state_transition.default_upgrade_addr"
         );
         gatewayConfig.gatewayStateTransition.diamondInit = toml.readAddress(
             "$.gateway.gateway_state_transition.diamond_init_addr"
