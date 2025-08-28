@@ -16,7 +16,7 @@ import {DualVerifier} from "../verifiers/DualVerifier.sol";
 import {L1VerifierFflonk} from "../verifiers/L1VerifierFflonk.sol";
 import {L1VerifierPlonk} from "../verifiers/L1VerifierPlonk.sol";
 
-import {VerifierParams, IVerifier} from "../chain-interfaces/IVerifier.sol";
+import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
@@ -27,12 +27,12 @@ import {Diamond} from "../libraries/Diamond.sol";
 
 import {ChainTypeManager} from "../ChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "../../common/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../chain-interfaces/IDiamondInit.sol";
-import {ChainTypeManagerInitializeData, ChainCreationParams, IChainTypeManager} from "../IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../IChainTypeManager.sol";
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
@@ -111,6 +111,8 @@ struct StateTransitionContracts {
     address diamondInit;
     /// @notice Address of the GenesisUpgrade contract.
     address genesisUpgrade;
+    /// @notice Address of the implementation of the ValidatorTimelock contract.
+    address validatorTimelockImplementation;
     /// @notice Address of the ValidatorTimelock contract.
     address validatorTimelock;
     /// @notice Address of the ProxyAdmin for ChainTypeManager.
@@ -143,11 +145,6 @@ struct DeployedContracts {
     /// @notice Encoded data for the diamond cut operation.
     bytes diamondCutData;
 }
-
-/// @dev The constant address to be used for the blobHashRetriever inside the contracts.
-/// At the time of this writing the blob hash retriever is not used at all, but the zero-address
-/// check is still yet present, so we use address one as the substitution.
-address constant BLOB_HASH_RETRIEVER_ADDR = address(uint160(1));
 
 /// @title GatewayCTMDeployer
 /// @author Matter Labs
@@ -193,15 +190,13 @@ contract GatewayCTMDeployer {
         });
         _deployVerifier(salt, _config.testnetVerifier, contracts, _config.aliasedGovernanceAddress);
 
-        ValidatorTimelock timelock = new ValidatorTimelock{salt: salt}(address(this), 0);
-        contracts.stateTransition.validatorTimelock = address(timelock);
-
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
+
+        _deployValidatorTimelock(salt, _config.aliasedGovernanceAddress, contracts);
 
         _deployServerNotifier(salt, contracts);
 
         _deployCTM(salt, _config, contracts);
-        _setChainTypeManagerInValidatorTimelock(_config.aliasedGovernanceAddress, timelock, contracts);
         _setChainTypeManagerInServerNotifier(
             _config.aliasedGovernanceAddress,
             ServerNotifier(contracts.stateTransition.serverNotifierProxy),
@@ -262,6 +257,26 @@ contract GatewayCTMDeployer {
         ProxyAdmin proxyAdmin = new ProxyAdmin{salt: _salt}();
         proxyAdmin.transferOwnership(_aliasedGovernanceAddress);
         _deployedContracts.stateTransition.chainTypeManagerProxyAdmin = address(proxyAdmin);
+    }
+
+    /// @notice Deploys the ValidatorTimelock contract.
+    /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// in the process of the execution of this function.
+    function _deployValidatorTimelock(
+        bytes32 _salt,
+        address _aliasedGovernanceAddress,
+        DeployedContracts memory _deployedContracts
+    ) internal {
+        address timelockImplementation = address(new ValidatorTimelock{salt: _salt}(L2_BRIDGEHUB_ADDR));
+        _deployedContracts.stateTransition.validatorTimelockImplementation = timelockImplementation;
+        _deployedContracts.stateTransition.validatorTimelock = address(
+            new TransparentUpgradeableProxy{salt: _salt}(
+                timelockImplementation,
+                address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
+                abi.encodeCall(ValidatorTimelock.initialize, (_aliasedGovernanceAddress, 0))
+            )
+        );
     }
 
     /// @notice Deploys a ServerNotifier contract.
@@ -383,8 +398,7 @@ contract GatewayCTMDeployer {
             l2DefaultAccountBytecodeHash: _config.defaultAccountHash,
             l2EvmEmulatorBytecodeHash: _config.evmEmulatorHash,
             priorityTxMaxGasLimit: _config.priorityTxMaxGasLimit,
-            feeParams: _config.feeParams,
-            blobVersionedHashRetriever: BLOB_HASH_RETRIEVER_ADDR
+            feeParams: _config.feeParams
         });
 
         Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
@@ -420,23 +434,6 @@ contract GatewayCTMDeployer {
                 abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
             )
         );
-    }
-
-    /// @notice Sets the previously deployed CTM inside the ValidatorTimelock
-    /// @param _aliasedGovernanceAddress The aliased address of the governnace.
-    /// @param _timelock The address of the validator timelock
-    /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
-    /// in the process of the execution of this function.
-    function _setChainTypeManagerInValidatorTimelock(
-        address _aliasedGovernanceAddress,
-        ValidatorTimelock _timelock,
-        DeployedContracts memory _deployedContracts
-    ) internal {
-        _timelock.setChainTypeManager(IChainTypeManager(_deployedContracts.stateTransition.chainTypeManagerProxy));
-
-        // Note, that the governance still has to accept it.
-        // It will happen in a separate voting after the deployment is done.
-        _timelock.transferOwnership(_aliasedGovernanceAddress);
     }
 
     /// @notice Sets the previously deployed CTM inside the ServerNotifier
