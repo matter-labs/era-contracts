@@ -50,6 +50,8 @@ error NotSystemContext(address _sender);
 error NotWhitelistedSettlementLayer(uint256 chainId);
 // 0x3db511f4
 error OnlyAssetTracker(address, address);
+// 0x30eeb60a
+error OnlyAssetTrackerOrChain(address, uint256);
 // 0x527b87c7
 error OnlyBridgehub(address msgSender, address bridgehub);
 // 0x2d396674
@@ -82,3 +84,4 @@ error V30UpgradeChainBatchNumberNotSet();
 error V30UpgradeGatewayBlockNumberAlreadySet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
+

@@ -38,6 +38,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 
 contract ChainTypeManagerTest is UtilsTest {
     using stdStorage for StdStorage;
@@ -46,6 +47,7 @@ contract ChainTypeManagerTest is UtilsTest {
     ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     Bridgehub internal bridgehub;
+    ChainAssetHandler internal chainAssetHandler;
     address internal interopCenterAddress = address(0x1010101);
     MessageRoot internal messageroot;
     address internal rollupL1DAValidator;
@@ -70,6 +72,15 @@ contract ChainTypeManagerTest is UtilsTest {
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
         messageroot = new MessageRoot(bridgehub, block.chainid);
+        chainAssetHandler = new ChainAssetHandler(
+            block.chainid,
+            governor,
+            bridgehub,
+            address(0),
+            address(0),
+            messageroot,
+            address(0)
+        );
         stdstore.target(address(messageroot)).sig(IMessageRoot.v30UpgradeGatewayBlockNumber.selector).checked_write(
             uint256(1)
         );
@@ -78,7 +89,7 @@ contract ChainTypeManagerTest is UtilsTest {
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
             messageroot,
-            address(0),
+            address(chainAssetHandler),
             address(0),
             address(0x000000000000000000000000000000000002000a)
         );

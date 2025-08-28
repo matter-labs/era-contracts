@@ -20,13 +20,13 @@ import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {L2ContractHelper} from "../../../common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "../../../vendor/AddressAliasHelper.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, PRIORITY_OPERATION_L2_TX_TYPE, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER} from "../../../common/Config.sol";
+import {L1_GAS_PER_PUBDATA_BYTE, MAX_NEW_FACTORY_DEPS, PRIORITY_EXPIRATION, PRIORITY_OPERATION_L2_TX_TYPE, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, PAUSE_DEPOSITS_TIME_WINDOW_START, PAUSE_DEPOSITS_TIME_WINDOW_END} from "../../../common/Config.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
 import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
-import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -35,6 +35,8 @@ import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol
 import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVault} from "../../../bridge/ntv/INativeTokenVault.sol";
 import {IBridgedStandardToken} from "../../../bridge/BridgedStandardERC20.sol";
+import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
+import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../../bridgehub/IMessageRoot.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -311,6 +313,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (IChainTypeManager(s.chainTypeManager).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
+        /// We pause L1->GW->L2 deposits.
+        require(_checkV30UpgradeProcessed(_chainId), DepositsPaused());
 
         (bytes32 assetId, uint256 amount) = (bytes32(0), 0);
         BalanceChange memory balanceChange;
@@ -568,6 +572,24 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         canonicalTxHash = keccak256(transactionEncoding);
     }
 
+    function _depositsPaused() internal view returns (bool) {
+        uint256 chainId = s.chainId;
+        IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        uint256 chainMigrationNumber = IChainAssetHandler(bridgehub.chainAssetHandler()).getMigrationNumber(chainId);
+        uint256 timestamp = s.pausedDepositsTimestamp[chainMigrationNumber];
+        /// we provide 3.5 days window to process all deposits.
+        return timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START < block.timestamp && block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
+    }
+
+    function _checkV30UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
+        IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        if (bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY) {
+            /// We pause deposits until the chain has upgraded on GW
+            return false;
+        }
+        return true;
+    }
+
     /// @notice Stores a transaction record in storage & send event about that
     function _writePriorityOp(
         L2CanonicalTransaction memory _transaction,
@@ -576,6 +598,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint64 _expirationTimestamp
     ) internal {
         _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
+
+        require(!_depositsPaused(), DepositsPaused());
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters

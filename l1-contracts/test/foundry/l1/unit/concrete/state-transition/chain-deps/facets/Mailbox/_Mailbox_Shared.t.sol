@@ -14,6 +14,8 @@ import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerif
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 contract MailboxTest is UtilsTest {
     IMailbox internal mailboxFacet;
@@ -24,11 +26,13 @@ contract MailboxTest is UtilsTest {
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     address diamondProxy;
     address bridgehub;
+    address chainAssetHandler;
     address interopCenter;
 
     function deployDiamondProxy() internal returns (address proxy) {
         sender = makeAddr("sender");
         bridgehub = makeAddr("bridgehub");
+        chainAssetHandler = makeAddr("chainAssetHandler");
         interopCenter = makeAddr("interopCenter");
         vm.deal(sender, 100 ether);
 
@@ -53,6 +57,16 @@ contract MailboxTest is UtilsTest {
         });
 
         mockDiamondInitInteropCenterCalls();
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encode(1)
+        );
         proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);

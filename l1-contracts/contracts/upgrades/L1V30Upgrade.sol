@@ -21,9 +21,8 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
-        uint256 l1ChainId = bridgehub.L1_CHAIN_ID();
-        /// This is called on the GW.
-        if (block.chainid != l1ChainId) {
+        /// This is called only at the settlement of the chain.
+        if (s.settlementLayer == address(0)) {
             L2_CHAIN_ASSET_HANDLER.setMigrationNumberForV30(s.chainId);
         }
         super.upgrade(_proposedUpgrade);
