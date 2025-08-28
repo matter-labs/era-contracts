@@ -453,7 +453,7 @@ library Utils {
     }
 
     function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier) public returns (address) {
-        DiamondInit diamondInit = new DiamondInit(false);
+        DiamondInit diamondInit = new DiamondInit();
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
             makeInitializeData(testnetVerifier)

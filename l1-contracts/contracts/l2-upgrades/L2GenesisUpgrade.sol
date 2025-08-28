@@ -21,7 +21,6 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
     /// @param _fixedForceDeploymentsData the force deployments data
     /// @param _additionalForceDeploymentsData the additional force deployments data
     function genesisUpgrade(
-        bool _isZKsyncOS,
         uint256 _chainId,
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,
@@ -31,14 +30,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
             revert InvalidChainId();
         }
 
-        // On ZKsyncOS, the chain Id is a part of implicit block properties
-        // and so does not need to set inside the genesis upgrade.
-        if (!_isZKsyncOS) {
-            ISystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR).setChainId(_chainId);
-        }
-
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
-            _isZKsyncOS,
             _ctmDeployer,
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData,

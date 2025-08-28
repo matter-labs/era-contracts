@@ -1302,20 +1302,6 @@ library Utils {
         info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
     }
 
-    function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
-        bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
-        bytes32 observableBytecodeBlakeHash = keccak256(bytecode);
-        bytecodeInfo = abi.encode(bytecodeBlakeHash, bytecode.length, observableBytecodeBlakeHash);
-    }
-
-    function getZKOSBytecodeInfoForContract(
-        string memory fileName,
-        string memory contractName
-    ) internal returns (bytes memory bytecodeInfo) {
-        bytes memory bytecode = readFoundryDeployedBytecodeL1(fileName, contractName);
-        bytecodeInfo = getZKOSBytecodeInfo(bytecode);
-    }
-
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {
         result = new Call[](a.length + b.length);
         for (uint256 i = 0; i < a.length; i++) {

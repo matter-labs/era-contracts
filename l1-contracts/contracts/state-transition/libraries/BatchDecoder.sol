@@ -45,30 +45,6 @@ library BatchDecoder {
         }
     }
 
-    function _decodeBoojumOSCommitData(
-        bytes calldata _commitData
-    )
-        private
-        pure
-        returns (
-            IExecutor.StoredBatchInfo memory lastCommittedBatchData,
-            IExecutor.CommitBoojumOSBatchInfo[] memory newBatchesData
-        )
-    {
-        if (_commitData.length == 0) {
-            revert EmptyData();
-        }
-
-        // TODO: different version?
-        uint8 encodingVersion = uint8(_commitData[0]);
-        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
-            (lastCommittedBatchData, newBatchesData) = abi.decode(
-                _commitData[1:],
-                (IExecutor.StoredBatchInfo, IExecutor.CommitBoojumOSBatchInfo[])
-            );
-        }
-    }
-
     /// @notice Decodes and validates precommit data for a batch, ensuring the encoding version is supported.
     /// @dev The first byte of `_precommitData` is interpreted as the encoding version and must equal `SUPPORTED_ENCODING_VERSION`.
     ///      If it does, the remainder of the data is decoded into an `IExecutor.PrecommitInfo` struct. Otherwise, this call reverts.
@@ -106,37 +82,6 @@ library BatchDecoder {
         )
     {
         (lastCommittedBatchData, newBatchesData) = _decodeCommitData(_commitData);
-
-        if (newBatchesData.length == 0) {
-            revert EmptyData();
-        }
-
-        if (
-            newBatchesData[0].batchNumber != _processBatchFrom ||
-            newBatchesData[newBatchesData.length - 1].batchNumber != _processBatchTo
-        ) {
-            revert IncorrectBatchBounds(
-                _processBatchFrom,
-                _processBatchTo,
-                newBatchesData[0].batchNumber,
-                newBatchesData[newBatchesData.length - 1].batchNumber
-            );
-        }
-    }
-
-    function decodeAndCheckBoojumOSCommitData(
-        bytes calldata _commitData,
-        uint256 _processBatchFrom,
-        uint256 _processBatchTo
-    )
-        internal
-        pure
-        returns (
-            IExecutor.StoredBatchInfo memory lastCommittedBatchData,
-            IExecutor.CommitBoojumOSBatchInfo[] memory newBatchesData
-        )
-    {
-        (lastCommittedBatchData, newBatchesData) = _decodeBoojumOSCommitData(_commitData);
 
         if (newBatchesData.length == 0) {
             revert EmptyData();

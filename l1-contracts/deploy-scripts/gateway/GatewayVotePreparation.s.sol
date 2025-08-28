@@ -135,9 +135,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             genesisRollupLeafIndex: uint64(config.contracts.genesisRollupLeafIndex),
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
             forceDeploymentsData: forceDeploymentsData,
-            protocolVersion: config.contracts.latestProtocolVersion,
-            // TODO: for now, zksync os on gateway is not supported
-            isZKsyncOS: false
+            protocolVersion: config.contracts.latestProtocolVersion
         });
     }
 

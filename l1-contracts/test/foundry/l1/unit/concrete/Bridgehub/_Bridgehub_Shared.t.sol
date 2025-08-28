@@ -17,7 +17,7 @@ contract BridgehubTest is Test {
 
     constructor() {
         vm.chainId(31337);
-        bridgehubDiamondInit = new DiamondInit(false);
+        bridgehubDiamondInit = new DiamondInit();
 
         bridgehub = new DiamondProxy(block.chainid, getDiamondCutData(address(bridgehubDiamondInit)));
     }
