@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 import {Test} from "forge-std/Test.sol";
 import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.sol";
-import {ZeroAddress, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 
 contract L2WrappedBaseTokenStoreTest is Test {
     L2WrappedBaseTokenStore store;

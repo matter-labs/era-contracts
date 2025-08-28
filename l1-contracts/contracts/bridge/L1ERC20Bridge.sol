@@ -6,14 +6,14 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
-import {IL1Nullifier, FinalizeL1DepositParams} from "./interfaces/IL1Nullifier.sol";
+import {FinalizeL1DepositParams, IL1Nullifier} from "./interfaces/IL1Nullifier.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 import {IL1AssetRouter} from "./asset-router/IL1AssetRouter.sol";
 
-import {L2ContractHelper} from "../common/libraries/L2ContractHelper.sol";
+import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-import {AssetRouterAllowanceNotZero, EmptyDeposit, WithdrawalAlreadyFinalized, TokensWithFeesNotSupported, ETHDepositNotSupported} from "../common/L1ContractErrors.sol";
+import {AssetRouterAllowanceNotZero, ETHDepositNotSupported, EmptyDeposit, TokensWithFeesNotSupported, WithdrawalAlreadyFinalized} from "../common/L1ContractErrors.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 
 /// @author Matter Labs

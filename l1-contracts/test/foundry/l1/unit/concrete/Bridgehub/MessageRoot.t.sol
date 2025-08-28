@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {OnlyBridgehub, MessageRootNotRegistered} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyL2} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
@@ -23,10 +23,12 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 contract MessageRootTest is Test {
     address bridgeHub;
     L1MessageRoot messageRoot;
+    uint256 L1_CHAIN_ID;
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
         messageRoot = new L1MessageRoot(IBridgehub(bridgeHub));
+        L1_CHAIN_ID = 5;
     }
 
     function test_init() public {
@@ -39,7 +41,20 @@ contract MessageRootTest is Test {
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 1");
 
-        vm.expectRevert(abi.encodeWithSelector(OnlyBridgehub.selector, address(this), bridgeHub));
+        address chainAssetHandler = makeAddr("chainAssetHandler");
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OnlyBridgehubOrChainAssetHandler.selector,
+                address(this),
+                bridgeHub,
+                chainAssetHandler
+            )
+        );
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
         messageRoot.addNewChain(alphaChainId);
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
@@ -77,6 +92,20 @@ contract MessageRootTest is Test {
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
 
+    function test_RevertWhen_ChainNotL2() public {
+        address alphaChainSender = makeAddr("alphaChainSender");
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector, L1_CHAIN_ID),
+            abi.encode(alphaChainSender)
+        );
+
+        vm.chainId(L1_CHAIN_ID);
+        vm.prank(alphaChainSender);
+        vm.expectRevert(OnlyL2.selector);
+        messageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
+    }
+
     function test_addChainBatchRoot() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
@@ -91,9 +120,9 @@ contract MessageRootTest is Test {
 
         vm.prank(alphaChainSender);
         vm.expectEmit(true, false, false, false);
-        emit MessageRootBase.Preimage(bytes32(0), bytes32(0));
-        vm.expectEmit(true, false, false, false);
         emit MessageRootBase.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
+        vm.expectEmit(true, false, false, false);
+        emit MessageRootBase.NewChainRoot(alphaChainId, bytes32(0), bytes32(0));
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
 

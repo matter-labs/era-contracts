@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {TransactionFailed, NotEnoughGas, TooMuchGas} from "contracts/SystemContractErrors.sol";
+import {NotEnoughGas, TooMuchGas, TransactionFailed} from "contracts/SystemContractErrors.sol";
 
 contract TransferTest {
     function transfer(address payable to, uint256 amount, bool warmUpRecipient) public payable {
