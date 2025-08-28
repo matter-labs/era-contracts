@@ -177,7 +177,7 @@ contract DefaultAccountNoSecurity is IAccount {
                         value,
                         abi.encodeCall(DEPLOYER_SYSTEM_CONTRACT.createEVM, (data))
                     );
-                    return;
+                    return bytes("");
                 }
             }
         }
