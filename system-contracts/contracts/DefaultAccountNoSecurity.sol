@@ -171,13 +171,12 @@ contract DefaultAccountNoSecurity is IAccount {
             if (_transaction.txType != EIP_712_TX_TYPE && _transaction.txType != L1_TO_L2_TX_TYPE) {
                 if (_transaction.reserved[1] == 1) {
                     // Note, that createEVM can only be called with "isSystem" flag.
-                    SystemContractsCaller.systemCallWithPropagatedRevert(
+                    return SystemContractsCaller.systemCallWithPropagatedRevert(
                         gas,
                         address(DEPLOYER_SYSTEM_CONTRACT),
                         value,
                         abi.encodeCall(DEPLOYER_SYSTEM_CONTRACT.createEVM, (data))
                     );
-                    return bytes("");
                 }
             }
         }
