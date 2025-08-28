@@ -69,7 +69,7 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-contract DeployL1Script is Script, DeployUtils {
+contract DeployL1CoreContractsScript is Script, DeployUtils {
     using stdToml for string;
 
     function run() public virtual {
