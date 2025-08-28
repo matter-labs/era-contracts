@@ -9,6 +9,7 @@ import {IDiamondInit, InitializeData} from "../chain-interfaces/IDiamondInit.sol
 import {PriorityQueue} from "../libraries/PriorityQueue.sol";
 import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, TooMuchGas, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 
@@ -67,8 +68,13 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
         s.bridgehub = _initializeData.bridgehub;
         s.chainTypeManager = _initializeData.chainTypeManager;
         s.interopCenter = _initializeData.interopCenter;
-        s.nativeTokenVault = address(IL1AssetRouter(IInteropCenter(s.interopCenter).assetRouter()).nativeTokenVault());
-        s.assetTracker = address(IInteropCenter(s.interopCenter).assetTracker());
+        if (s.interopCenter == L2_INTEROP_CENTER_ADDR) {
+            s.nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
+            s.assetTracker = L2_ASSET_TRACKER_ADDR;
+        } else {
+            s.nativeTokenVault = address(IL1AssetRouter(IInteropCenter(s.interopCenter).assetRouter()).nativeTokenVault());
+            s.assetTracker = address(IInteropCenter(s.interopCenter).assetTracker());
+        }
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.protocolVersion = _initializeData.protocolVersion;
 
