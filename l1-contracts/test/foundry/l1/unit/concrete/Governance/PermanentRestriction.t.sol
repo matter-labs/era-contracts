@@ -407,6 +407,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
+        mockDiamondInitInteropCenterCallsWithAddress(interopCenterAddress);
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,
