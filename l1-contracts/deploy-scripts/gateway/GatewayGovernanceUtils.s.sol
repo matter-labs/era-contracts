@@ -114,7 +114,7 @@ abstract contract GatewayGovernanceUtils is Script {
         }
 
         {
-            if (prepareGWGovCallsStruct._ctmChainId == 0) {
+            if (prepareGWGovCallsStruct._ctmChainId == _gatewayGovernanceConfig.gatewayChainId) {
                 calls = Utils.mergeCalls(calls, _getRegisterSettlementLayerCalls());
             }
         }
