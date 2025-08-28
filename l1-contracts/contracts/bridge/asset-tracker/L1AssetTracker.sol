@@ -99,11 +99,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) external onlyNativeTokenVault {
-        if (_tokenOriginChainId == _chainId) {
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
-        } else if (_tokenOriginChainId == block.chainid) {
-            totalSupplyAcrossAllChains[_assetId] += _amount;
-        }
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
@@ -111,6 +106,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             /// A malicious transactionFilterer can do multiple deposits, but this will make the chainBalance smaller on the Gateway.
             TransientPrimitivesLib.set(key, uint256(_assetId));
             TransientPrimitivesLib.set(key + 1, _amount);
+        }
+
+        /// We increase/decrease the totalSupply
+        if (_tokenOriginChainId == _chainId) {
+            totalSupplyAcrossAllChains[_assetId] -= _amount;
+        } else if (_tokenOriginChainId == block.chainid) {
+            totalSupplyAcrossAllChains[_assetId] += _amount;
         }
         if (_tokenOriginChainId != _chainId) {
             chainBalance[chainToUpdate][_assetId] += _amount;
