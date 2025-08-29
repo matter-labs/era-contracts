@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
+import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
 
+import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1CoreContractsIntegration.s.sol";
 import {DeployL1IntegrationScript} from "./deploy-scripts/DeployL1Integration.s.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {RegisterCTM} from "deploy-scripts/RegisterCTM.s.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -16,7 +18,9 @@ import {Config, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
 contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;
 
+    DeployL1CoreContractsIntegrationScript l1CoreContractsScript;
     DeployL1IntegrationScript l1Script;
+    RegisterCTM registerCTMScript;
     struct AllAddresses {
         DeployedAddresses ecosystemAddresses;
         address bridgehubProxyAddress;
@@ -32,6 +36,16 @@ contract L1ContractDeployer is Test {
     Config public ecosystemConfig;
 
     AllAddresses public addresses;
+
+    function deployEcosystem() public {
+        l1CoreContractsScript = new DeployL1CoreContractsIntegrationScript();
+        l1CoreContractsScript.runForTest();
+    }
+
+    function registerCTM() public {
+        registerCTMScript = new RegisterCTM();
+        registerCTMScript.runForTest();
+    }
 
     function _deployL1Contracts() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
@@ -49,8 +63,10 @@ contract L1ContractDeployer is Test {
             "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml"
         );
 
+        deployEcosystem();
         l1Script = new DeployL1IntegrationScript();
         l1Script.runForTest();
+        registerCTM();
 
         addresses.ecosystemAddresses = l1Script.getAddresses();
         ecosystemConfig = l1Script.getConfig();

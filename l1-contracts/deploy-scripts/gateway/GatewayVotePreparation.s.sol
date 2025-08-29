@@ -78,6 +78,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     address internal rollupL2DAValidator;
     address internal oldRollupL2DAValidator;
 
+    uint256 internal eraChainId;
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
@@ -86,7 +87,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
-    function initializeConfig(string memory configPath) internal virtual override {
+    function initializeConfig(string memory configPath, uint256 ctmChainId) internal virtual {
         super.initializeConfig(configPath);
         string memory toml = vm.readFile(configPath);
 
@@ -97,10 +98,11 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         rollupL2DAValidator = toml.readAddress("$.rollup_l2_da_validator");
         oldRollupL2DAValidator = toml.readAddress("$.old_rollup_l2_da_validator");
 
+        eraChainId = toml.readUint("$.era_chain_id");
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
-        setAddressesBasedOnBridgehub();
+        setAddressesBasedOnBridgehub(ctmChainId);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
@@ -141,9 +143,14 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         });
     }
 
-    function setAddressesBasedOnBridgehub() internal {
+    function setAddressesBasedOnBridgehub(uint256 ctmChainId) internal {
         config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
+        address ctm;
+        if (ctmChainId != 0) {
+            ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmChainId);
+        } else {
+            ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
+        }
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
@@ -248,12 +255,16 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     }
 
     function run() public override {
+        prepareForGWVoting(0);
+    }
+
+    function prepareForGWVoting(uint256 ctmChainId) public {
         console.log("Setting up the Gateway script");
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
 
-        initializeConfig(configPath);
+        initializeConfig(configPath, ctmChainId);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: addresses.bridgehub.bridgehubProxy,
@@ -293,12 +304,15 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         deployGatewayCTM();
 
         Call[] memory governanceCalls = _prepareGatewayGovernanceCalls(
-            EXPECTED_MAX_L1_GAS_PRICE,
-            output.gatewayStateTransition.chainTypeManagerProxy,
-            output.rollupDAManager,
-            output.gatewayStateTransition.validatorTimelock,
-            output.gatewayStateTransition.serverNotifierProxy,
-            refundRecipient
+            PrepareGatewayGovernanceCalls({
+                _l1GasPrice: EXPECTED_MAX_L1_GAS_PRICE,
+                _gatewayCTMAddress: output.gatewayStateTransition.chainTypeManagerProxy,
+                _gatewayRollupDAManager: output.rollupDAManager,
+                _gatewayValidatorTimelock: output.gatewayStateTransition.validatorTimelock,
+                _gatewayServerNotifier: output.gatewayStateTransition.serverNotifierProxy,
+                _refundRecipient: refundRecipient,
+                _ctmChainId: ctmChainId
+            })
         );
 
         // We need to also whitelist the old L2 rollup address

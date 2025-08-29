@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.28;
 
 // solhint-disable no-console, gas-custom-errors
 
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {DeployL1CoreContractsScript} from "deploy-scripts/DeployL1CoreContracts.s.sol";
 import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
-abstract contract DeployIntegrationUtils is Script, DeployUtils {
+contract DeployL1CoreContractsIntegrationScript is Script, DeployL1CoreContractsScript {
     using stdToml for string;
 
     function test() internal virtual override {}
-
-    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory);
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
