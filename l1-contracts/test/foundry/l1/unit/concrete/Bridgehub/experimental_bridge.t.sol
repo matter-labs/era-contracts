@@ -124,7 +124,7 @@ contract ExperimentalBridgeTest is Test {
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
-        messageRoot = new L1MessageRoot(bridgeHub, l1ChainId);
+        messageRoot = new L1MessageRoot(bridgeHub);
 
         sharedBridge = new L1AssetRouter(
             mockL1WethAddress,

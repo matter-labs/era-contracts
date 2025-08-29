@@ -181,17 +181,18 @@ contract ExecutorTest is Test {
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         DummyBridgehub dummyBridgehub = new DummyBridgehub();
-        messageRoot = new L1MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID);
+        messageRoot = new L1MessageRoot(IBridgehub(address(dummyBridgehub)));
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 
-        vm.mockCall(
-            address(messageRoot),
-            abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
-            abi.encode()
-        );
+        // FIXME: amend the tests as appending chain batch roots is not allowed on L1.
+        // vm.mockCall(
+        //     address(messageRoot),
+        //     abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
+        //     abi.encode()
+        // );
 
         eraChainId = 9;
 

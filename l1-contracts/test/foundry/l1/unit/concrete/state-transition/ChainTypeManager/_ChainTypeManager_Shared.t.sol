@@ -42,6 +42,7 @@ contract ChainTypeManagerTest is Test {
     ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
+    L1MessageRoot internal messageRoot;
     address internal rollupL1DAValidator;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
@@ -62,10 +63,10 @@ contract ChainTypeManagerTest is Test {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
-        bridgehub = new L1Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new L1MessageRoot(bridgehub, block.chainid);
+        bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
+        messageRoot = new L1MessageRoot(bridgehub);
         vm.prank(governor);
-        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageroot, address(0));
+        bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageRoot, address(0));
 
         vm.mockCall(
             address(sharedBridge),
