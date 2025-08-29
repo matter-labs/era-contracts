@@ -103,7 +103,7 @@ contract RegisterCTM is Script, DeployUtils {
     }
 
     function runForTest() public {
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
+        runInnerForTest(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"));
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -123,6 +123,17 @@ contract RegisterCTM is Script, DeployUtils {
         initializeConfigIfEcosystemDeployedLocally(outputPath);
 
         registerChainTypeManager();
+    }
+
+    function runInnerForTest(string memory inputPath, string memory outputPath) internal {
+        string memory root = vm.projectRoot();
+        inputPath = string.concat(root, inputPath);
+        outputPath = string.concat(root, outputPath);
+
+        initializeConfig(inputPath);
+        initializeConfigIfEcosystemDeployedLocally(outputPath);
+
+        registerChainTypeManagerForTest();
     }
 
     function registerChainTypeManager() internal {
@@ -164,6 +175,30 @@ contract RegisterCTM is Script, DeployUtils {
 
         console.log("CTM DT whitelisted");
         vm.stopBroadcast();
+
+        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
+        console.log(
+            "CTM in router 1",
+            sharedBridge.assetHandlerAddress(assetId),
+            bridgehub.ctmAssetIdToAddress(assetId)
+        );
+    }
+    function registerChainTypeManagerForTest() internal {
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        vm.startBroadcast(msg.sender);
+        bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
+        console.log("ChainTypeManager registered");
+        ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
+        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
+        sharedBridge.setAssetDeploymentTracker(
+            bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
+            address(ctmDT)
+        );
+        console.log("CTM DT whitelisted");
+
+        ctmDT.registerCTMAssetOnL1(addresses.stateTransition.chainTypeManagerProxy);
+        vm.stopBroadcast();
+        console.log("CTM registered in CTMDeploymentTracker");
 
         bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
         console.log(
