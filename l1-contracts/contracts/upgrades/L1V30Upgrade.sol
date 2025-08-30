@@ -5,11 +5,12 @@ pragma solidity 0.8.28;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {L2_CHAIN_ASSET_HANDLER, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IInteropCenter} from "../interop/IInteropCenter.sol";
+import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
 
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();
@@ -21,9 +22,10 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         /// This is called only at the settlement of the chain.
         if (s.settlementLayer == address(0)) {
-            L2_CHAIN_ASSET_HANDLER.setMigrationNumberForV30(s.chainId);
+            chainAssetHandler.setMigrationNumberForV30(s.chainId);
         }
         super.upgrade(_proposedUpgrade);
 

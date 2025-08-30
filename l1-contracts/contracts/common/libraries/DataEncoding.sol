@@ -8,6 +8,7 @@ import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
 import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
+import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 /**
  * @author Matter Labs
@@ -255,8 +256,10 @@ library DataEncoding {
 
     function decodeBaseTokenFinalizeWithdrawalData(
         bytes memory _l2ToL1message
-    ) internal pure returns (address l1Receiver, uint256 amount) {
-        uint256 offset = 4; // we already read the function signature
+    ) internal pure returns (bytes4 functionSignature, address l1Receiver, uint256 amount) {
+        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        functionSignature = bytes4(functionSignatureUint);
+        
         // The data is expected to be at least 56 bytes long.
         require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
         // this message is a base token withdrawal
@@ -267,9 +270,9 @@ library DataEncoding {
 
     function decodeLegacyFinalizeWithdrawalData(
         bytes memory _l2ToL1message
-    ) internal pure returns (address l1Token, bytes memory transferData) {
-        uint256 offset = 4; // we already read the function signature
-
+    ) internal pure returns (bytes4 functionSignature, address l1Token, bytes memory transferData) {
+        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        functionSignature = bytes4(functionSignatureUint);
         // Check that the message length is correct.
         // It should be equal to the length of the function signature + address + address + uint256 = 4 + 20 + 20 + 32 =
         // 76 (bytes).
@@ -294,8 +297,9 @@ library DataEncoding {
 
     function decodeAssetRouterFinalizeDepositData(
         bytes memory _l2ToL1message
-    ) internal pure returns (uint256 originChainId, bytes32 assetId, bytes memory transferData) {
-        uint256 offset = 4; // we already read the function signature
+    ) internal pure returns (bytes4 functionSignature, uint256 originChainId, bytes32 assetId, bytes memory transferData) {
+        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        functionSignature = bytes4(functionSignatureUint);
 
         // The data is expected to be at least 68 bytes long to contain assetId.
         require(_l2ToL1message.length >= 68, WrongMsgLength(68, _l2ToL1message.length));
@@ -303,5 +307,19 @@ library DataEncoding {
         (originChainId, offset) = UnsafeBytes.readUint256(_l2ToL1message, offset); // originChainId, not used for L2->L1 txs
         (assetId, offset) = UnsafeBytes.readBytes32(_l2ToL1message, offset);
         transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+    }
+
+    function decodeTokenBalanceMigrationData(
+        bytes memory _l2ToL1message
+    ) internal pure returns (bytes4 functionSignature, TokenBalanceMigrationData memory data) {
+        (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
+        functionSignature = bytes4(functionSignatureUint);
+        bytes memory transferData = UnsafeBytes.readRemainingBytes(_l2ToL1message, offset);
+        data = abi.decode(transferData, (TokenBalanceMigrationData));
+    }
+
+    function getSelector(bytes memory _data) internal pure returns (bytes4) {
+        (uint32 functionSignatureUint, ) = UnsafeBytes.readUint32(_data, 0);
+        return bytes4(functionSignatureUint);
     }
 }

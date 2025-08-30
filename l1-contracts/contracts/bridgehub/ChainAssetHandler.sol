@@ -186,13 +186,6 @@ contract ChainAssetHandler is
         address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
 
         /// We set the isL1ToL2DepositProcessed flag on the asset tracker to demarcate deposits happening before and after the migration.
-        if (block.chainid == L1_CHAIN_ID) {
-            bytes memory data = abi.encodeCall(
-                IL2AssetTracker.setIsL1ToL2DepositProcessed,
-                (migrationNumber[bridgehubBurnData.chainId])
-            );
-            IZKChain(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
-        }
         /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
         if (block.chainid == L1_CHAIN_ID) {
             bytes memory data = abi.encodeCall(

@@ -13,13 +13,14 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidBaseTokenAssetId, InvalidChainMigrationNumber, InvalidMigrationNumber, InvalidOriginChainId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidBaseTokenAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidOriginChainId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
+import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     uint256 public immutable L1_CHAIN_ID;
@@ -31,8 +32,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IMessageRoot public immutable MESSAGE_ROOT;
 
     IL1Nullifier public immutable L1_NULLIFIER;
-
-    // mapping(uint256 chainId => mapping(address l1Token => bool)) internal l1TokenToAssetIdMessageSent;
 
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
@@ -99,9 +98,16 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) external onlyNativeTokenVault {
+        
+        uint256 savedAssetMigrationNumber = assetMigrationNumber[_chainId][_assetId];
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
-        /// We require that the asset is migrated, deposits are paused until then.
-        require(currentSettlementLayer == block.chainid || assetMigrationNumber[_chainId][_assetId] == _getChainMigrationNumber(_chainId), InvalidAssetId());
+        if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
+            _forceSetAssetMigrationNumber(_chainId, _assetId);
+        } else {
+            /// We require that the asset is migrated, deposits are paused until then.
+            require(currentSettlementLayer == block.chainid || savedAssetMigrationNumber == _getChainMigrationNumber(_chainId), InvalidAssetId(_assetId));
+        }
+        
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
             uint256 key = uint256(keccak256(abi.encode(_chainId)));
@@ -183,11 +189,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _proveMessageInclusion(_finalizeWithdrawalParams);
         require(_finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR, InvalidSender());
 
-        TokenBalanceMigrationData memory data = abi.decode(
-            _finalizeWithdrawalParams.message,
-            (TokenBalanceMigrationData)
-        );
-        require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId());
+        (bytes4 functionSignature, TokenBalanceMigrationData memory data) = DataEncoding.decodeTokenBalanceMigrationData(_finalizeWithdrawalParams.message);
+        require(functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector, InvalidFunctionSignature(functionSignature));
+
+        require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
 
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         require(

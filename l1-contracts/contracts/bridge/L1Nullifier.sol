@@ -18,7 +18,6 @@ import {FinalizeL1DepositParams, IL1Nullifier, TRANSIENT_SETTLEMENT_LAYER_SLOT} 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 import {IMailboxImpl} from "../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
-import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -568,9 +567,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         uint256 amount;
         address l1Receiver;
 
-        (uint32 functionSignature, ) = UnsafeBytes.readUint32(_l2ToL1message, 0);
-        if (bytes4(functionSignature) == IMailboxImpl.finalizeEthWithdrawal.selector) {
-            (l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
+        bytes4 functionSignature = DataEncoding.getSelector(_l2ToL1message);
+        if (functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector) {
+            (,l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             transferData = DataEncoding.encodeBridgeMintData({
                 _originalCaller: address(0),
@@ -583,18 +582,18 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _amount: amount,
                 _erc20Metadata: new bytes(0)
             });
-        } else if (bytes4(functionSignature) == IL1ERC20Bridge.finalizeWithdrawal.selector) {
+        } else if (functionSignature == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // this message is a token withdrawal
             address l1Token;
-            (l1Token, transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(_l2ToL1message);
+            (,l1Token, transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(_l2ToL1message);
 
             assetId = l1NativeTokenVault.ensureTokenIsRegistered(l1Token);
             bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);
             // This method is only expected to use L1-based tokens.
             require(assetId == expectedAssetId, TokenNotLegacy());
-        } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
+        } else if (functionSignature == IAssetRouterBase.finalizeDeposit.selector) {
             // slither-disable-next-line unused-return
-            (, assetId, transferData) = DataEncoding.decodeAssetRouterFinalizeDepositData(_l2ToL1message);
+            (, , assetId, transferData) = DataEncoding.decodeAssetRouterFinalizeDepositData(_l2ToL1message);
         } else {
             revert InvalidSelector(bytes4(functionSignature));
         }

@@ -83,6 +83,18 @@ abstract contract AssetTrackerBase is
         return assetMigrationNumber[_chainId][_assetId] == _getChainMigrationNumber(_chainId);
     }
 
+    /// If we are bridging the token for the first time, then we are allowed to bridge it, and set the assetMigrationNumber.
+    /// Note it might be the case that the token was deposited and all the supply was withdrawn, and the token balance was never migrated.
+    /// It is still ok to bridge in this case, since the chainBalance does not need to be migrated, and we set the assetMigrationNumber manually on the GW and the L2 manually.
+    function _tokenCanSkipMigrationOnSettlementLayer(uint256 _chainId, bytes32 _assetId) internal view returns (bool) {
+        uint256 savedAssetMigrationNumber = assetMigrationNumber[_chainId][_assetId];
+        return savedAssetMigrationNumber == 0 && chainBalance[_chainId][_assetId] == 0;
+    }
+
+    function _forceSetAssetMigrationNumber(uint256 _chainId, bytes32 _assetId) internal {
+        assetMigrationNumber[_chainId][_assetId] = _getChainMigrationNumber(_chainId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Register token
     //////////////////////////////////////////////////////////////*/

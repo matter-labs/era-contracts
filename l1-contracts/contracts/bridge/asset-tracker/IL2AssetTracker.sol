@@ -37,7 +37,5 @@ interface IL2AssetTracker {
 
     function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
-    function setIsL1ToL2DepositProcessed(uint256 _migrationNumber) external;
-
     function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 }
