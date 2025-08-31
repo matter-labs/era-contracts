@@ -545,7 +545,10 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @inheritdoc IL1Nullifier
     function getTransientSettlementLayer() external view returns (uint256, uint256) {
-        return (TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT), TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1));
+        return (
+            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT),
+            TransientPrimitivesLib.getUint256(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1)
+        );
     }
 
     /// @notice Parses the withdrawal message and returns withdrawal details.
@@ -569,7 +572,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
         bytes4 functionSignature = DataEncoding.getSelector(_l2ToL1message);
         if (functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector) {
-            (,l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
+            (, l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             transferData = DataEncoding.encodeBridgeMintData({
                 _originalCaller: address(0),
@@ -585,7 +588,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         } else if (functionSignature == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // this message is a token withdrawal
             address l1Token;
-            (,l1Token, transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(_l2ToL1message);
+            (, l1Token, transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(_l2ToL1message);
 
             assetId = l1NativeTokenVault.ensureTokenIsRegistered(l1Token);
             bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(block.chainid, l1Token);

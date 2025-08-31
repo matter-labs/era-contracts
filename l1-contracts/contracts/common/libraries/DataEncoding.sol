@@ -259,7 +259,7 @@ library DataEncoding {
     ) internal pure returns (bytes4 functionSignature, address l1Receiver, uint256 amount) {
         (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         functionSignature = bytes4(functionSignatureUint);
-        
+
         // The data is expected to be at least 56 bytes long.
         require(_l2ToL1message.length >= 56, L2WithdrawalMessageWrongLength(_l2ToL1message.length));
         // this message is a base token withdrawal
@@ -297,7 +297,11 @@ library DataEncoding {
 
     function decodeAssetRouterFinalizeDepositData(
         bytes memory _l2ToL1message
-    ) internal pure returns (bytes4 functionSignature, uint256 originChainId, bytes32 assetId, bytes memory transferData) {
+    )
+        internal
+        pure
+        returns (bytes4 functionSignature, uint256 originChainId, bytes32 assetId, bytes memory transferData)
+    {
         (uint32 functionSignatureUint, uint256 offset) = UnsafeBytes.readUint32(_l2ToL1message, 0);
         functionSignature = bytes4(functionSignatureUint);
 

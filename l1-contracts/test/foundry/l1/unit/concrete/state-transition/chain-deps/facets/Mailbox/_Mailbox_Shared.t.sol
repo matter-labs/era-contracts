@@ -85,5 +85,5 @@ contract MailboxTest is UtilsTest {
     }
 
     // add this to be excluded from coverage report
-    function test() internal override virtual {}
+    function test() internal virtual override {}
 }

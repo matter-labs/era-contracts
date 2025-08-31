@@ -159,9 +159,21 @@ contract UtilsTest is Test {
         address assetRouter = address(0x1234567890876543567890);
         address nativeTokenVault = address(0x1234567890876543567890);
 
-        vm.mockCall(interopCenter, abi.encodeWithSelector(IInteropCenter.assetTracker.selector), abi.encode(assetTracker));
-        vm.mockCall(interopCenter, abi.encodeWithSelector(IInteropCenter.assetRouter.selector), abi.encode(assetRouter));
-        vm.mockCall(assetRouter, abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector), abi.encode(nativeTokenVault));  
+        vm.mockCall(
+            interopCenter,
+            abi.encodeWithSelector(IInteropCenter.assetTracker.selector),
+            abi.encode(assetTracker)
+        );
+        vm.mockCall(
+            interopCenter,
+            abi.encodeWithSelector(IInteropCenter.assetRouter.selector),
+            abi.encode(assetRouter)
+        );
+        vm.mockCall(
+            assetRouter,
+            abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
+            abi.encode(nativeTokenVault)
+        );
     }
 
     // add this to be excluded from coverage report

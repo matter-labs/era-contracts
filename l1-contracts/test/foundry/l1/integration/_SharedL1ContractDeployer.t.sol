@@ -141,5 +141,5 @@ contract L1ContractDeployer is UtilsTest {
     }
 
     // add this to be excluded from coverage report
-    function test() internal override virtual {}
+    function test() internal virtual override {}
 }

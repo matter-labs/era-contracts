@@ -129,7 +129,8 @@ contract ChainAssetHandler is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Returns the migration number for a chain.
-    function getMigrationNumber(uint256 _chainId) external view returns (uint256) {// onlyAssetTrackerOrChain(_chainId) returns (uint256) {
+    function getMigrationNumber(uint256 _chainId) external view returns (uint256) {
+        // onlyAssetTrackerOrChain(_chainId) returns (uint256) {
         return migrationNumber[_chainId];
     }
 

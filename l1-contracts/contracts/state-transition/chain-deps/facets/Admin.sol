@@ -6,7 +6,7 @@ import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {MAX_GAS_PER_TRANSACTION,PAUSE_DEPOSITS_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
+import {MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -296,12 +296,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
                             CHAIN MIGRATION
     //////////////////////////////////////////////////////////////*/
 
-
     /// @inheritdoc IAdmin
     function pauseDepositsAndInitiateMigration() external onlyAdmin onlyL1 {
         address chainAssetHandler = IBridgehub(s.bridgehub).chainAssetHandler();
         uint256 migrationNumber = IChainAssetHandler(chainAssetHandler).getMigrationNumber(s.chainId);
-        require(s.pausedDepositsTimestamp[migrationNumber] + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
+        require(
+            s.pausedDepositsTimestamp[migrationNumber] + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp,
+            DepositsAlreadyPaused()
+        );
         s.pausedDepositsTimestamp[migrationNumber] = block.timestamp;
         emit DepositsPaused(migrationNumber, block.timestamp);
     }

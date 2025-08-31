@@ -578,12 +578,17 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 chainMigrationNumber = IChainAssetHandler(bridgehub.chainAssetHandler()).getMigrationNumber(chainId);
         uint256 timestamp = s.pausedDepositsTimestamp[chainMigrationNumber];
         /// we provide 3.5 days window to process all deposits.
-        return timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START < block.timestamp && block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
+        return
+            timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START < block.timestamp &&
+            block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
     }
 
     function _checkV30UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
-        if (bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY) {
+        if (
+            bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) ==
+            V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
+        ) {
             /// We pause deposits until the chain has upgraded on GW
             return false;
         }

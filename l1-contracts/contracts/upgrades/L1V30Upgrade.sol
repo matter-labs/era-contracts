@@ -33,7 +33,6 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
         s.nativeTokenVault = address(IL1AssetRouter(IInteropCenter(s.interopCenter).assetRouter()).nativeTokenVault());
         s.assetTracker = (address(IInteropCenter(s.interopCenter).assetTracker()));
 
-
         uint256 v30UpgradeGatewayBlockNumber = (IBridgehub(s.bridgehub).messageRoot()).v30UpgradeGatewayBlockNumber();
         require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
         IMailbox(address(this)).requestL2ServiceTransaction(

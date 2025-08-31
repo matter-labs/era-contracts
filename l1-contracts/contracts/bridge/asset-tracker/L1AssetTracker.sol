@@ -98,16 +98,19 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) external onlyNativeTokenVault {
-        
         uint256 savedAssetMigrationNumber = assetMigrationNumber[_chainId][_assetId];
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _assetId);
         } else {
             /// We require that the asset is migrated, deposits are paused until then.
-            require(currentSettlementLayer == block.chainid || savedAssetMigrationNumber == _getChainMigrationNumber(_chainId), InvalidAssetId(_assetId));
+            require(
+                currentSettlementLayer == block.chainid ||
+                    savedAssetMigrationNumber == _getChainMigrationNumber(_chainId),
+                InvalidAssetId(_assetId)
+            );
         }
-        
+
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
             uint256 key = uint256(keccak256(abi.encode(_chainId)));
@@ -170,10 +173,15 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         (uint256 settlementLayer, uint256 l2BatchNumber) = L1_NULLIFIER.getTransientSettlementLayer();
         uint256 v30UpgradeGatewayBlockNumber = MESSAGE_ROOT.v30UpgradeGatewayBlockNumber();
         /// We need to wait for the proper v30UpgradeGatewayBlockNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
-        require(v30UpgradeGatewayBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30UpgradeChainBatchNumberNotSet());
+        require(
+            v30UpgradeGatewayBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
+            V30UpgradeChainBatchNumberNotSet()
+        );
         if (v30UpgradeGatewayBlockNumber != 0) {
             /// For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
-            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeGatewayBlockNumber ? _chainId : settlementLayer;
+            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeGatewayBlockNumber
+                ? _chainId
+                : settlementLayer;
         } else {
             chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
         }
@@ -189,8 +197,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _proveMessageInclusion(_finalizeWithdrawalParams);
         require(_finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR, InvalidSender());
 
-        (bytes4 functionSignature, TokenBalanceMigrationData memory data) = DataEncoding.decodeTokenBalanceMigrationData(_finalizeWithdrawalParams.message);
-        require(functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector, InvalidFunctionSignature(functionSignature));
+        (bytes4 functionSignature, TokenBalanceMigrationData memory data) = DataEncoding
+            .decodeTokenBalanceMigrationData(_finalizeWithdrawalParams.message);
+        require(
+            functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector,
+            InvalidFunctionSignature(functionSignature)
+        );
 
         require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
 

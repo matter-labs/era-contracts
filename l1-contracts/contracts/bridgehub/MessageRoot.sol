@@ -206,7 +206,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256 sentBlockNumber;
         if (_chainId != block.chainid) {
             sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];
-            require(sentBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30UpgradeChainBatchNumberNotSet());
+            require(
+                sentBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
+                V30UpgradeChainBatchNumberNotSet()
+            );
         } else {
             sentBlockNumber = v30UpgradeGatewayBlockNumber;
         }
@@ -257,11 +260,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
         require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
-            totalBatchesExecuted != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY && totalBatchesExecuted != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            totalBatchesExecuted != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY &&
+                totalBatchesExecuted != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
             TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber()
         );
         require(
-            v30UpgradeChainBatchNumber[_chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY || v30UpgradeChainBatchNumber[_chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
+            v30UpgradeChainBatchNumber[_chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY ||
+                v30UpgradeChainBatchNumber[_chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
             V30UpgradeChainBatchNumberAlreadySet()
         );
         v30UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted;

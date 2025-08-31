@@ -84,4 +84,3 @@ error V30UpgradeChainBatchNumberNotSet();
 error V30UpgradeGatewayBlockNumberAlreadySet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
-

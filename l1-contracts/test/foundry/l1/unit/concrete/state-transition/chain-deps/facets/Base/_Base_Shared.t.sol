@@ -67,7 +67,6 @@ contract ZKChainBaseTest is UtilsTest {
             selectors: Utils.getUtilsFacetSelectors()
         });
 
-
         mockDiamondInitInteropCenterCalls();
         address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
         testBaseFacet = TestBaseFacet(diamondProxy);
@@ -75,5 +74,5 @@ contract ZKChainBaseTest is UtilsTest {
     }
 
     // add this to be excluded from coverage report
-    function test() internal override virtual {}
+    function test() internal virtual override {}
 }
