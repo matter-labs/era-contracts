@@ -82,6 +82,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes(""))
         );
+        vm.mockCall(
+            L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS,
+            abi.encodeWithSelector(IZKChain(L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS).getChainId.selector),
+            abi.encode(mintChainId)
+        );
         l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
     }
 
