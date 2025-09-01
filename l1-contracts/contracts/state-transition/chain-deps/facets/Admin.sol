@@ -19,6 +19,7 @@ import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerifie
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
