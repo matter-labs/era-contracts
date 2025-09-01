@@ -593,7 +593,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
         // Save root hash of L2 -> L1 logs tree
         s.l2LogsRootHashes[currentBatchNumber] = _storedBatch.l2LogsTreeRoot;
-        _verifyDependencyInteropRoots(_dependencyRoots);
     }
 
     /// @notice Verifies the dependency message roots that the chain relied on.

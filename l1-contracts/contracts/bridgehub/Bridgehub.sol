@@ -106,7 +106,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice the chain asset handler used for chain migration.
     address public chainAssetHandler;
 
-    /// @notice interopCenter used for L1<>L2 communication
+    /// @notice interopCenter used for L2<>L2 communication
     IInteropCenter public override interopCenter;
 
     /// @notice the chain registration sender used for chain registration.
