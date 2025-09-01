@@ -64,6 +64,8 @@ error NotChainAdmin(address prevMsgSender, address admin);
 error NotHistoricalRoot(bytes32);
 // 0x32ddf9a2
 error NotHyperchain();
+// 0x8fd63d21
+error NotEraChain();
 // 0x87470e36
 error NotL1(uint256 blockChainId);
 // 0xd7b2559b
