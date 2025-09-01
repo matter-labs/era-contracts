@@ -171,15 +171,15 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
         (uint256 settlementLayer, uint256 l2BatchNumber) = L1_NULLIFIER.getTransientSettlementLayer();
-        uint256 v30UpgradeGatewayBlockNumber = MESSAGE_ROOT.v30UpgradeGatewayBlockNumber();
-        /// We need to wait for the proper v30UpgradeGatewayBlockNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
+        uint256 v30UpgradeChainBatchNumber = MESSAGE_ROOT.v30UpgradeChainBatchNumber(_chainId);
+        /// We need to wait for the proper v30UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
         require(
-            v30UpgradeGatewayBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
+            v30UpgradeChainBatchNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
             V30UpgradeChainBatchNumberNotSet()
         );
-        if (v30UpgradeGatewayBlockNumber != 0) {
+        if (v30UpgradeChainBatchNumber != 0) {
             /// For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
-            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeGatewayBlockNumber
+            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeChainBatchNumber
                 ? _chainId
                 : settlementLayer;
         } else {
