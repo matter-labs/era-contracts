@@ -304,7 +304,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         uint256 chainId = IZKChain(_settlementLayer).getChainId();
-        if (_settlementLayer != IBridgehub(s.bridgehub).getZKChain(chainId) &&
+        if (
+            _settlementLayer != IBridgehub(s.bridgehub).getZKChain(chainId) &&
             _settlementLayer != L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
         ) {
             revert NotSettlementLayer();
