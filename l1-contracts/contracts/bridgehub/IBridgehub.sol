@@ -96,8 +96,6 @@ interface IBridgehub {
 
     function interopCenter() external view returns (IInteropCenter);
 
-    // function assetTracker() external view returns (IAssetTracker);
-
     function getZKChain(uint256 _chainId) external view returns (address);
 
     function getAllZKChains() external view returns (address[] memory);
