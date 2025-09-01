@@ -18,7 +18,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {AssetIdNotRegistered, InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotEnoughChainBalance, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, TokenBalanceNotMigratedToGateway, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotEnoughChainBalance, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, TokenBalanceNotMigratedToGateway, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidEmptyMessageRoot} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
@@ -273,10 +273,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        // bytes32 emptyMessageRootForChain =
-        _getEmptyMessageRoot(_processLogsInputs.chainId);
-        /// kl todo: fix this alongside FullMerkleMemory
-        // require(_processLogsInputs.messageRoot == emptyMessageRootForChain, InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot));
+        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        require(
+            _processLogsInputs.messageRoot == emptyMessageRootForChain,
+            InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
+        );
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
@@ -299,11 +300,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         chainTree.createTree(1);
         bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
         bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
-        return bytes32(leafHash); // kl todo fix
-        // bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
+        bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
 
-        // emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
-        // return emptyMessageRootCalculated;
+        emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
+        return emptyMessageRootCalculated;
     }
 
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
