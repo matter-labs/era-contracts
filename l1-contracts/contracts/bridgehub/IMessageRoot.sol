@@ -7,7 +7,7 @@ import {IMessageVerification} from "../common/interfaces/IMessageVerification.so
 import {ProofData} from "../common/Messaging.sol";
 
 // TODO fix the value
-bytes32 constant GENESIS_CHAIN_BATCH_ROOT = bytes32(0x0000000000000000000000000000000000000000000000000000000000000000);
+bytes32 constant GENESIS_CHAIN_BATCH_ROOT = keccak256("GENESIS_CHAIN_BATCH_ROOT");
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
