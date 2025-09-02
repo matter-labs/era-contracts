@@ -27,6 +27,8 @@ error SettlementLayerBatchNumberTooLow();
 error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281
 error UnbundlingNotAllowed(bytes32 bundleHash, bytes callerAddress, bytes unbundlerAddress);
+// 0xe1c9e479
+error UnsupportedAttribute(bytes4 selector);
 // 0x801534e9
 error WrongCallStatusLength(uint256 bundleCallsLength, uint256 providedCallStatusLength);
 // 0x4534e972

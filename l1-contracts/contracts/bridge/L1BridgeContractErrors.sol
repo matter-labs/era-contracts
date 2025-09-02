@@ -8,6 +8,8 @@ error ClaimFailedDepositFailed();
 error EmptyToken();
 // 0x82b0de47
 error EthAlreadyMigratedToL1NTV();
+// 0x6d963f88
+error EthTransferFailed();
 // 0x1c55230b
 error NativeTokenVaultAlreadySet();
 // 0x84204265

@@ -10,6 +10,8 @@ error BatchZeroNotAllowed();
 error ChainAlreadyRegistered();
 // 0xbe263463
 error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
+// 0x5dc2df31
+error ChainBatchRootNotSet(uint256 chainId, uint256 batchNumber);
 // 0x655c373c
 error ChainBatchRootZero();
 // 0x65e8a019
@@ -28,6 +30,8 @@ error MessageRootNotRegistered();
 error MigrationNumberAlreadySet();
 // 0xde1362a2
 error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
+// 0xc02b8c3a
+error NextChainBatchRootAlreadySet(uint256 chainId, uint256 batchNumber);
 // 0x7f4316f3
 error NoEthAllowed();
 // 0xf306a770
