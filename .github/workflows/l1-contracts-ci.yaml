@@ -88,9 +88,8 @@ jobs:
       - name: Lint
         run: yarn lint:check
 
-      # TODO: enable later. For now it's commented out so the unit tests are being ran in CI.
-      # - name: Lint errors
-      #   run: yarn l1 errors-lint --check
+      - name: Lint errors
+        run: yarn l1 errors-lint --check
 
   check-hashes:
     needs: [build]
@@ -261,7 +260,7 @@ jobs:
     defaults:
       run:
         working-directory: l1-contracts
-    needs: [build, lint]
+    needs: [build] # TODO return lint into dependencies when it's fully fixed
     runs-on: ubuntu-latest
 
     steps:
