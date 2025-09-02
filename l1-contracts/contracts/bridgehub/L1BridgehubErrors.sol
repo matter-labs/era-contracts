@@ -50,5 +50,7 @@ error OnlyChain(address msgSender, address zkChainAddress);
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1
 error SLNotWhitelisted();
+// 0x36917565
+error SLHasDifferentCTM();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
