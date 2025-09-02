@@ -62,9 +62,11 @@ interface IMessageRoot is IMessageVerification {
 
     function setAddresses(address _assetTracker) external;
 
-    function addNewChain(uint256 _chainId) external;
+    function addNewChain(uint256 _chainId, uint256 _startingBatchNumber) external;
 
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
+
+    function chainBatchRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
 
@@ -84,4 +86,6 @@ interface IMessageRoot is IMessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) external pure returns (ProofData memory);
+
+    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber) external;
 }

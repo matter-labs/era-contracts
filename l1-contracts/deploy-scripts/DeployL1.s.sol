@@ -53,7 +53,7 @@ import {ChainTypeManager, ChainTypeManagerInitializeData, IChainTypeManager} fro
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
+import {L1AssetTracker, IL1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL1ERC20Bridge, L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
@@ -323,6 +323,7 @@ contract DeployL1Script is Script, DeployUtils {
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
         IMessageRoot messageRoot = IMessageRoot(addresses.bridgehub.messageRootProxy);
         IInteropCenter interopCenter = IInteropCenter(addresses.bridgehub.interopCenterProxy);
+        IL1AssetTracker assetTracker = L1AssetTracker(addresses.bridgehub.assetTrackerProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         bridgehub.setAddresses(
@@ -335,6 +336,7 @@ contract DeployL1Script is Script, DeployUtils {
         );
         interopCenter.setAddresses(addresses.bridges.l1AssetRouterProxy, addresses.bridgehub.assetTrackerProxy);
         messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
+        assetTracker.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
     }
@@ -381,6 +383,9 @@ contract DeployL1Script is Script, DeployUtils {
 
         IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
         IOwnable(address(sharedBridge)).transferOwnership(addresses.governance);
+
+        IL1AssetTracker assetTracker = IL1AssetTracker(addresses.bridgehub.assetTrackerProxy);
+        IOwnable(address(assetTracker)).transferOwnership(addresses.governance);
 
         IChainTypeManager ctm = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
         IOwnable(address(ctm)).transferOwnership(addresses.governance);
@@ -904,7 +909,7 @@ contract DeployL1Script is Script, DeployUtils {
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
             } else if (compareStrings(contractName, "L1AssetTracker")) {
-                return abi.encodeCall(L1AssetTracker.initialize, ());
+                return abi.encodeCall(L1AssetTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return
                     abi.encodeCall(

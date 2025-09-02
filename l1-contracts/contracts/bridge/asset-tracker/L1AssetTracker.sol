@@ -15,6 +15,7 @@ import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
 import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidBaseTokenAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidOriginChainId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
+import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
@@ -32,6 +33,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IMessageRoot public immutable MESSAGE_ROOT;
 
     IL1Nullifier public immutable L1_NULLIFIER;
+
+    IChainAssetHandler public chainAssetHandler;
 
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
@@ -77,8 +80,15 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
         L1_NULLIFIER = IL1Nullifier(IL1NativeTokenVault(_nativeTokenVault).L1_NULLIFIER());
     }
-
-    function initialize() external reentrancyGuardInitializer {}
+    
+    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+        require(_owner != address(0), ZeroAddress());
+        _transferOwnership(_owner);
+    }
+    
+    function setAddresses() external onlyOwner {
+        chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler());
+    }
 
     function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
@@ -317,6 +327,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return IChainAssetHandler(IBridgehub(_bridgehub()).chainAssetHandler()).getMigrationNumber(_chainId);
+        return chainAssetHandler.getMigrationNumber(_chainId);
     }
 }

@@ -42,6 +42,7 @@ struct L2TransactionRequestTwoBridgesInner {
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
     bytes32 baseTokenAssetId;
+    uint256 batchNumber;
     bytes ctmData;
     bytes chainData;
     uint256 migrationNumber;

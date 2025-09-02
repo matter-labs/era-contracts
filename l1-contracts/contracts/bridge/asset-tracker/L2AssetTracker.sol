@@ -604,8 +604,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return savedAssetMigrationNumber == 0 && amount == 0;
     }
 
-    function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address) {
-        address tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
+    function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
+        tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
 
         if (tokenAddress == address(0)) {
             if (_assetId == L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID()) {
