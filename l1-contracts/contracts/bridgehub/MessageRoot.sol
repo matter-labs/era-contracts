@@ -69,13 +69,26 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @notice The address of the asset tracker.
     address public assetTracker;
 
-    /// @notice The mapping storing the batch number at the moment the MessageRoot was updated to V30.
-    /// @notice We store this, as we did not store chainBatchRoots prior to V30 on L1, so we need to get them from the diamond proxies of the chains.
-    /// @notice We fill the mapping with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE for deployed chains until the chain upgrades to V30.
+    /// @notice The mapping storing the batch number at the moment the chain was updated to V30. 
+    /// Starting from this batch, if a settlement layer has agreed to a proof, it will be held accountable for the content of the message, e.g.
+    /// if a withdrawal happens, the balance of the settlement layer will be reduced and not the chain.
+    /// @notice Due to the definition above, this mapping will have the default value (0) for newly added chains, so all their batches are under v30 rules.
+    /// For the chains that existed at the moment of the upgrade, it value will be populated either with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE until
+    /// they call this contract to establish the batch when the upgrade has happened.
+    /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
+    /// to ensure balance consistency. 
+    /// @notice We store this, as we did not store chainBatchRoots prior to V30 on L1, so we need to get them from the diamond proxies of the chains. --- ???
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
 
-    /// @notice The block number at the moment the MessageRoot was updated to V30.
+    /// @notice The block number at the moment the MessageRoot was updated to V30. By default the value is unset (0).
     /// @notice We store this, as it is used on the L2s to filter out old interop roots.
+    /// @notice If a message comes from a chain when it settled on Gateway before this batch (i.e. the message is older than the batch 
+    /// when the Gateway upgraded to v30), then this message has not undergone any additional checks, and so the recipient needs to be
+    /// careful to only consume "simple" messages and never accept any asset-bearing messages that are that old.
+    /// @dev Note, that in theory there may be multiple whitelisted settlement layers, but it is assumed
+    /// that before v30 is released, only a single one is present and this variable refers to that single whitelisted settlement layer.
+    /// @dev After v30 release, if the access is granted to all the messages that were ever sent by chains settling on top of Gateway, and
+    /// it is manually checked that no asset bearing messages were sent before this period, this check can be removed. 
     uint256 public v30UpgradeGatewayBlockNumber;
 
     /// @dev The chain type manager for EraVM chains. EraVM chains are upgraded directly by governance,
@@ -159,6 +172,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     constructor(IBridgehub _bridgehub, uint256 _l1ChainId) {
         BRIDGE_HUB = _bridgehub;
         L1_CHAIN_ID = _l1ChainId;
+
+        // TODO: explicitly add a check that exactly Era-based Gateway chain id is used.
         if (L1_CHAIN_ID != block.chainid) {
             /// On Gateway we save the chain type manager for EraVM chains.
             uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
@@ -174,6 +189,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
+    /// @notice It is expected that this function is only used for first-time L1 initialization, i.e. mainly locally.
     function initialize() external initializer {
         _initialize();
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
@@ -184,7 +200,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         }
     }
 
-    /// @dev The initialized used for the V30 upgrade.
+    /// @dev The initializer used for the V30 upgrade.
     function initializeV30Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
