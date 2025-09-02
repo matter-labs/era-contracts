@@ -8,7 +8,7 @@ contract RootTest is FullMerkleTest {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
 
     function test_emptyTree() public view {
-        FullMerkleMemory.FullTree memory merkleTestMemory = _setupMemoryTree(0);
+        FullMerkleMemory.FullTree memory merkleTestMemory = _setupMemoryTree(1);
 
         // Initially tree is empty, root is the zero hash
         assertEq(merkleTest.root(), zeroHash, "Root should be zero hash initially");
