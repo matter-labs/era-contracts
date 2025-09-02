@@ -270,7 +270,7 @@ function collectErrorUsages(directories: string[], usedErrors: Set<string>) {
         } else if (file.endsWith(".sol")) {
           const fileContent = fs.readFileSync(fullPath, "utf8");
           // Remove comments and normalize whitespace for better parsing
-          const normalizedContent = fileContent.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '').replace(/\s+/g, ' ');
+          const normalizedContent = fileContent.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").replace(/\s+/g, " ");
           const revertRegex = /(?:revert\s+([A-Za-z0-9_]+)|(?:require\s*\(.*?,\s*|,\s*)([A-Za-z0-9_]+)\s*\()/g;
           let match: RegExpExecArray | null;
           while ((match = revertRegex.exec(normalizedContent)) !== null) {
