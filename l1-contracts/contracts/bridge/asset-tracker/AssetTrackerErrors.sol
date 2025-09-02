@@ -33,8 +33,6 @@ error InvalidSender();
 error InvalidV30UpgradeChainBatchNumber(uint256 _chainId);
 // 0xf76b228a
 error InvalidWithdrawalChainId();
-// 0x2ef97090
-error L1ToL2DepositsNotFinalized();
 // 0x1d16d015
 error NotEnoughChainBalance(uint256 _sourceChainId, bytes32 _assetId, uint256 _amount);
 // 0x8dfed13a
