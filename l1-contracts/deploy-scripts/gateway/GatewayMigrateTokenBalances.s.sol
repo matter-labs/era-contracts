@@ -15,6 +15,8 @@ import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.so
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
@@ -74,6 +76,8 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         assetIds[bridgedTokenCount] = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
     }
 
+    error InvalidFunctionSignature(bytes4 functionSignature);
+
     function finishMigrationOnL1(
         bool toGateway,
         IBridgehub bridgehub,
@@ -121,9 +125,11 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             // console.logBytes(abi.encodeCall(l1AssetTracker.receiveMigrationOnL1, (finalizeL1DepositParams[i])));
-            TokenBalanceMigrationData memory data = abi.decode(
-                finalizeL1DepositParams[i].message,
-                (TokenBalanceMigrationData)
+            (bytes4 functionSignature, TokenBalanceMigrationData memory data) = DataEncoding
+                .decodeTokenBalanceMigrationData(finalizeL1DepositParams[i].message);
+            require(
+                functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector,
+                InvalidFunctionSignature(functionSignature)
             );
             if (!l1AssetTrackerBase.tokenMigrated(data.chainId, data.assetId)) {
                 vm.broadcast();
