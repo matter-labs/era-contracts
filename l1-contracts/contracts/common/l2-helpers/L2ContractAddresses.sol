@@ -34,7 +34,7 @@ address constant L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CON
 /// @dev The address of the L2 deployer system contract.
 address constant L2_DEPLOYER_SYSTEM_CONTRACT_ADDR = address(SYSTEM_CONTRACTS_OFFSET + 0x06);
 
-IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(address(SYSTEM_CONTRACTS_OFFSET + 0x06));
+IL2ContractDeployer constant L2_CONTRACT_DEPLOYER = IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR);
 
 /// @dev The special reserved L2 address. It is located in the system contracts space but doesn't have deployed
 /// bytecode.

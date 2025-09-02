@@ -404,6 +404,11 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encodeWithSelector(IMessageRoot.v30UpgradeGatewayBlockNumber.selector),
             abi.encode(1)
         );
+        vm.mockCall(
+            address(messageRootNew),
+            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encode(0)
+        );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 

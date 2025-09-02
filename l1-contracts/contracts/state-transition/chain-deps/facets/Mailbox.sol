@@ -318,7 +318,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         (bytes32 assetId, uint256 amount) = (bytes32(0), 0);
         BalanceChange memory balanceChange;
-        /// baseTokenAssetId is set on Gateway.
+        /// baseTokenAssetId is known on Gateway.
         balanceChange.baseTokenAmount = _baseTokenAmount;
 
         if (_getBalanceChange) {
@@ -572,6 +572,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         canonicalTxHash = keccak256(transactionEncoding);
     }
 
+    /// @notice Deposits are paused when a chain migrates to/from GW.
     function _depositsPaused() internal view returns (bool) {
         uint256 chainId = s.chainId;
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
@@ -583,6 +584,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
     }
 
+    /// @notice Returns whether the chain has upgraded to V30 on GW.
+    /// if the chain is on L1 at V30, or is deployed V30 or after, then it returns true.
     function _checkV30UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
         if (

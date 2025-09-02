@@ -143,9 +143,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             totalSupplyAcrossAllChains[_assetId] += _amount;
             return;
         }
+        _checkAssetMigrationNumberOnGateway(_assetId);
+    }
+
+    function _checkAssetMigrationNumberOnGateway(bytes32 _assetId) internal view {
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
-        /// Note we always allow initiation of bridging when settling on L1.
+        /// Note we always allow bridging when settling on L1.
         /// On Gateway we require that the tokenBalance be migrated to Gateway from L1,
         /// otherwise withdrawals might fail in the Gateway L2AssetTracker when the chain settles.
         require(
@@ -179,7 +183,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     ) internal {
         if (_tokenCanSkipMigrationOnL2(_tokenOriginChainId, _assetId)) {
             _forceSetAssetMigrationNumber(_tokenOriginChainId, _assetId);
+        } else {
+            /// Deposits are already paused when the chain migrates to GW, however L2->L2 interop is not.
+            _checkAssetMigrationNumberOnGateway(_assetId);
         }
+
         if (_tokenOriginChainId == block.chainid) {
             // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
             totalSupplyAcrossAllChains[_assetId] += _amount;
@@ -596,8 +604,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return savedAssetMigrationNumber == 0 && amount == 0;
     }
 
-    function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address) {
-        address tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
+    function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
+        tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
 
         if (tokenAddress == address(0)) {
             if (_assetId == L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID()) {

@@ -68,6 +68,9 @@ library DynamicIncrementalMerkle {
         setup(self, zero);
     }
 
+    /**
+     * @dev Clears the trees internal state.
+     */
     function clear(Bytes32PushTree storage self) internal {
         self._nextLeafIndex = 0;
         uint256 length = self._zeros.length;
@@ -135,8 +138,8 @@ library DynamicIncrementalMerkle {
 
     /**
      * @dev Extend until end.
+     * @dev here we can extend the array, so the depth is not predetermined.
      */
-    /// @dev here we can extend the array, so the depth is not predetermined.
     function extendUntilEnd(Bytes32PushTree storage self, uint256 finalDepth) internal {
         bytes32 currentZero = self._zeros[self._zeros.length - 1];
         if (self._nextLeafIndex == 0) {

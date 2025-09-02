@@ -42,6 +42,7 @@ struct L2TransactionRequestTwoBridgesInner {
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
     bytes32 baseTokenAssetId;
+    uint256 batchNumber;
     bytes ctmData;
     bytes chainData;
     uint256 migrationNumber;
@@ -95,8 +96,6 @@ interface IBridgehub {
     function messageRoot() external view returns (IMessageRoot);
 
     function interopCenter() external view returns (IInteropCenter);
-
-    // function assetTracker() external view returns (IAssetTracker);
 
     function getZKChain(uint256 _chainId) external view returns (address);
 

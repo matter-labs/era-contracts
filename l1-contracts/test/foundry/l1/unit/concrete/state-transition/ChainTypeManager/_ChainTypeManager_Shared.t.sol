@@ -84,6 +84,9 @@ contract ChainTypeManagerTest is UtilsTest {
         stdstore.target(address(messageroot)).sig(IMessageRoot.v30UpgradeGatewayBlockNumber.selector).checked_write(
             uint256(1)
         );
+        stdstore.target(address(messageroot)).sig(IMessageRoot.v30UpgradeChainBatchNumber.selector).with_key(chainId).checked_write(
+            uint256(1)
+        );
         vm.prank(governor);
         bridgehub.setAddresses(
             sharedBridge,
