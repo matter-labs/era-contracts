@@ -80,12 +80,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
         L1_NULLIFIER = IL1Nullifier(IL1NativeTokenVault(_nativeTokenVault).L1_NULLIFIER());
     }
-    
+
     function initialize(address _owner) external reentrancyGuardInitializer initializer {
         require(_owner != address(0), ZeroAddress());
         _transferOwnership(_owner);
     }
-    
+
     function setAddresses() external onlyOwner {
         chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler());
     }

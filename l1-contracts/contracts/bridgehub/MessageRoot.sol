@@ -270,7 +270,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             V30UpgradeChainBatchNumberAlreadySet()
         );
         if (totalBatchesExecuted != 0) {
-            require(chainBatchRoots[_chainId][totalBatchesExecuted - 1] == bytes32(0), ChainBatchRootAlreadyExists(_chainId, totalBatchesExecuted));
+            require(
+                chainBatchRoots[_chainId][totalBatchesExecuted - 1] == bytes32(0),
+                ChainBatchRootAlreadyExists(_chainId, totalBatchesExecuted)
+            );
         }
         v30UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted;
     }
@@ -288,10 +291,15 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _addNewChain(_chainId, _startingBatchNumber);
     }
 
-
     /// @notice we set the chainBatchRoot to be nonempty for when a chain migrates.
-    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber) external onlyBridgehubOrChainAssetHandler {
-        require (chainBatchRoots[_chainId][_batchNumber] == bytes32(0), ChainBatchRootAlreadyExists(_chainId, _batchNumber));
+    function setMigratingChainBatchRoot(
+        uint256 _chainId,
+        uint256 _batchNumber
+    ) external onlyBridgehubOrChainAssetHandler {
+        require(
+            chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
+            ChainBatchRootAlreadyExists(_chainId, _batchNumber)
+        );
         chainBatchRoots[_chainId][_batchNumber] = GENESIS_CHAIN_BATCH_ROOT;
     }
 
