@@ -8,24 +8,24 @@
   forge verify-contract 0x7597FED0F435eF2aFFEA8D4b835e4D0db7c4d623 GovernanceUpgradeTimer --constructor-args 0x00000000000000000000000000000000000000000000000000000000000004b000000000000000000000000000000000000000000000000000000000001275000000000000000000000000008f08627524aed610192132a425d6b9c32a1727ef000000000000000000000000a6ed12b87d2e6ea039d27e1ffbdc24915ffd3042
   MessageRoot has been deployed at 0xa3Af9e488D2F89877D2EadCD9b3Eba2a14C17C47
   forge verify-contract 0xa3Af9e488D2F89877D2EadCD9b3Eba2a14C17C47 MessageRoot --constructor-args 0x000000000000000000000000236d1c3ff32bd0ca26b72af287e895627c0478ce0000000000000000000000000000000000000000000000000000000000aa36a7
-  AdminFacet has been deployed at 0x0A24175f29a9aBe4A65abd5fc848c4c1fb86D42c
-  forge verify-contract 0x0A24175f29a9aBe4A65abd5fc848c4c1fb86D42c AdminFacet --constructor-args 0x0000000000000000000000000000000000000000000000000000000000aa36a7000000000000000000000000eb7c0daaddfb52afa05400b489e7497b271d6122
+  AdminFacet has been deployed at 0x55044D82277e3bd4f3aE77f31D031EE2A92A4F91
+  forge verify-contract 0x55044D82277e3bd4f3aE77f31D031EE2A92A4F91 AdminFacet --constructor-args 0x0000000000000000000000000000000000000000000000000000000000aa36a7000000000000000000000000eb7c0daaddfb52afa05400b489e7497b271d6122
   MailboxFacet has been deployed at 0x78e5dCA146b32140b71CB9D5e839DA619CAAB3c4
   forge verify-contract 0x78e5dCA146b32140b71CB9D5e839DA619CAAB3c4 MailboxFacet --constructor-args 0x000000000000000000000000000000000000000000000000000000000000010e0000000000000000000000000000000000000000000000000000000000aa36a7
   Ecosystem contracts are deployed!
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0xbe71aa36fd0ec55d5198a79c1518e66647edb035dadf70d5e0abc1f351bae66e
-  AdminFacet has been deployed at 0x36620Dcb68f23187b0bEF9422f76F2D46eA58021
-  forge verify-contract 0x36620Dcb68f23187b0bEF9422f76F2D46eA58021 AdminFacet --constructor-args 0x0000000000000000000000000000000000000000000000000000000000aa36a7000000000000000000000000064ac968ccad1948fcee025fd59c20b153c88072 --verifier zksync
+  0x55785fa19075edf8cab47f2925702227074fbe9a83770d66144451d4e5831b45
+  AdminFacet has been deployed at 0x6a5c67E399c6eeE0aa864FD3AeC456Ee8EDe9f39
+  forge verify-contract 0x6a5c67E399c6eeE0aa864FD3AeC456Ee8EDe9f39 AdminFacet --constructor-args 0x0000000000000000000000000000000000000000000000000000000000aa36a7000000000000000000000000064ac968ccad1948fcee025fd59c20b153c88072 --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0xed08c051483ccdfb337ba8ce98c3129d01b0f7c060b3fd70acaf3bc1b737bfbb
+  0xd889544436a558b5c72386a694bf10dc647071fa74f2e9803c2471f61fb5811d
   MailboxFacet has been deployed at 0x301FD5FCdBf0880aD4bCB35c9AEfca934cd115ef
   forge verify-contract 0x301FD5FCdBf0880aD4bCB35c9AEfca934cd115ef MailboxFacet --constructor-args 0x000000000000000000000000000000000000000000000000000000000000010e0000000000000000000000000000000000000000000000000000000000aa36a7 --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0xd46572abab71b6b355bb34f6e2e4df69fbbb4fd0aa5d6abd92a74db96cc62a9a
+  0x29ae101edfdb0445133429695d74d57909276a56a8e473f8782fd3af09f50d04
   DefaultUpgrade has been deployed at 0x2403861d4866056561A7C030B5dC37da848916e8
   forge verify-contract 0x2403861d4866056561A7C030B5dC37da848916e8 DefaultUpgrade --verifier zksync
   Ecosystem contracts for GW are deployed!
@@ -97,19 +97,19 @@
   0x0100000f8335ff3253d3d96c7f3de3b62614f0705fc7624b48906355882a0286
   The following bytecode has already been published:
   0x01000049445673297c58de22926bb6cda61343f9ac7eeccab876320dc327883c
-  Publishing the following bytecode:
+  The following bytecode has already been published:
   0x010007c15788418a6066d94137a02907cde36494142a40a0f8c4453f4bfc4d1a
   The following bytecode has already been published:
   0x01000531c83fe0f9b9a51c15402a6d6cfa14b183b1858155e998a9aba78b61db
   The following bytecode has already been published:
   0x0100085351c841bba3d20e7d24bedd69a9b45a7998e8897598d1d63a39978023
-  Publishing the following bytecode:
+  The following bytecode has already been published:
   0x010003d30ea58659608b3abe2f59f04e2fc43d402bb991ac6debf4f1c2be5517
   The following bytecode has already been published:
   0x010003419d0a18dd468d4b8b90ea4c4113bdb2ec2fa58664184c849fffbf5c8a
-  Publishing the following bytecode:
+  The following bytecode has already been published:
   0x01000159e494148733e1a8ecb6553906fde5c77cbe3061b9d92e8c440a343228
-  Publishing the following bytecode:
+  The following bytecode has already been published:
   0x01000387607036a413b0f996c02e69da5b997c2f6647b3285ca7dbbd1d1b9839
   The following bytecode has already been published:
   0x01000195e68debec9c4bccd41c4d02a86f8f9fb8ee2abc63978bc266f8d1bbea
@@ -134,4 +134,3 @@
   Base token not ETH, approving
   Base token not ETH, approving
   Base token not ETH, approving
-  Chain admin: 0x5794bd6Ea382E291E0eB82CBE2F70600DC1bC5f8
