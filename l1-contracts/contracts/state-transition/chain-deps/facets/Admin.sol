@@ -303,15 +303,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert NotChainAdmin(_originalCaller, s.admin);
         }
 
-        uint256 chainId = IZKChain(_settlementLayer).getChainId();
-        if (
-            _settlementLayer != IBridgehub(s.bridgehub).getZKChain(chainId) &&
-            _settlementLayer != L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
-        ) {
-            revert NotSettlementLayer();
-        }
-        if (s.chainTypeManager != IBridgehub(s.bridgehub).chainTypeManager(chainId)) {
-            revert NotEraChain();
+        if (_settlementLayer != L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS) {
+            uint256 chainId = IZKChain(_settlementLayer).getChainId();
+            if (_settlementLayer != IBridgehub(s.bridgehub).getZKChain(chainId)) {
+                revert NotSettlementLayer();
+            }
+            if (s.chainTypeManager != IBridgehub(s.bridgehub).chainTypeManager(chainId)) {
+                revert NotEraChain();
+            }
         }
 
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
