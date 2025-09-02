@@ -120,6 +120,9 @@ contract MessageRootTest is Test {
             abi.encode(alphaChainSender)
         );
 
+        vm.prank(bridgeHub);
+        messageRoot.addNewChain(L1_CHAIN_ID, 0);
+
         vm.chainId(L1_CHAIN_ID);
         vm.prank(alphaChainSender);
         messageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
@@ -187,8 +190,8 @@ contract MessageRootTest is Test {
             1,
             bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd")
         );
-        // vm.prank(assetTracker);
-        // messageRoot.addChainBatchRoot(alphaChainId, 2, bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12"));
+        vm.prank(assetTracker);
+        messageRoot.addChainBatchRoot(alphaChainId, 2, bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12"));
         vm.prank(assetTracker);
         messageRoot.addChainBatchRoot(
             alphaChainId,
