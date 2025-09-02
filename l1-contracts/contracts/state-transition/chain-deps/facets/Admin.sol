@@ -303,6 +303,9 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert NotChainAdmin(_originalCaller, s.admin);
         }
 
+        // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
+        // ie, controlled by the governance, which is currently Era Gateways and Ethereum.
+        // Otherwise a malicious settlement layer could forge an interop message from an Era chain.
         if (_settlementLayer != L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS) {
             uint256 chainId = IZKChain(_settlementLayer).getChainId();
             if (_settlementLayer != IBridgehub(s.bridgehub).getZKChain(chainId)) {
