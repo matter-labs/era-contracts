@@ -281,6 +281,7 @@ abstract contract SharedL2ContractDeployer is UtilsTest, DeployIntegrationUtils 
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: _chainId,
             baseTokenAssetId: baseTokenAssetId,
+            batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
             migrationNumber: 0

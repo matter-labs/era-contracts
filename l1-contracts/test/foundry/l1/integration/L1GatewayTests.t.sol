@@ -315,6 +315,7 @@ contract L1GatewayTests is
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: migratingChainId,
             baseTokenAssetId: baseTokenAssetId,
+            batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
             migrationNumber: IChainAssetHandler(address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy))

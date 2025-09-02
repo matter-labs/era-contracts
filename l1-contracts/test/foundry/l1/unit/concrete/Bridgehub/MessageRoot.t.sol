@@ -75,7 +75,7 @@ contract MessageRootTest is Test {
             abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
             abi.encode(chainAssetHandler)
         );
-        messageRoot.addNewChain(alphaChainId);
+        messageRoot.addNewChain(alphaChainId, 0);
 
         assertFalse(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
     }
@@ -90,7 +90,7 @@ contract MessageRootTest is Test {
         vm.prank(bridgeHub);
         vm.expectEmit(true, false, false, false);
         emit IMessageRoot.AddedChain(alphaChainId, 0);
-        messageRoot.addNewChain(alphaChainId);
+        messageRoot.addNewChain(alphaChainId, 0);
 
         assertTrue(messageRoot.chainRegistered(alphaChainId), "alpha chain 2");
         assertFalse(messageRoot.chainRegistered(betaChainId), "beta chain 2");
@@ -135,7 +135,7 @@ contract MessageRootTest is Test {
         );
 
         vm.prank(bridgeHub);
-        messageRoot.addNewChain(alphaChainId);
+        messageRoot.addNewChain(alphaChainId, 0);
 
         vm.prank(assetTracker);
         vm.expectEmit(true, false, false, false);
@@ -155,7 +155,7 @@ contract MessageRootTest is Test {
         );
 
         vm.prank(bridgeHub);
-        messageRoot.addNewChain(alphaChainId);
+        messageRoot.addNewChain(alphaChainId, 0);
 
         vm.prank(assetTracker);
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
@@ -175,7 +175,7 @@ contract MessageRootTest is Test {
         );
 
         vm.prank(bridgeHub);
-        messageRoot.addNewChain(alphaChainId);
+        messageRoot.addNewChain(alphaChainId, 0);
 
         vm.prank(assetTracker);
         // vm.expectEmit(true, false, false, false);

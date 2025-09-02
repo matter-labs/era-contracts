@@ -572,7 +572,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         canonicalTxHash = keccak256(transactionEncoding);
     }
 
-    /// @notice Deposits are pauseed when a chain migrates to/from GW.
+    /// @notice Deposits are paused when a chain migrates to/from GW.
     function _depositsPaused() internal view returns (bool) {
         uint256 chainId = s.chainId;
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
@@ -585,7 +585,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     /// @notice Returns whether the chain has upgraded to V30 on GW.
-    /// if the chain is on L1 at V30, or is deployed V30 or after, then it returns
+    /// if the chain is on L1 at V30, or is deployed V30 or after, then it returns true.
     function _checkV30UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
         if (

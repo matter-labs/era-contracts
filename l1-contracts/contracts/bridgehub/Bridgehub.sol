@@ -378,7 +378,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _factoryDeps: _factoryDeps
         });
         _registerNewZKChain(_chainId, chainAddress, true);
-        messageRoot.addNewChain(_chainId);
+        messageRoot.addNewChain(_chainId, 0);
 
         emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;
@@ -800,6 +800,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address chainAdmin = IZKChain(_zkChain).getAdmin();
         bytes32 chainBaseTokenAssetId = IZKChain(_zkChain).getBaseTokenAssetId();
         address bridgeHub = IZKChain(_zkChain).getBridgehub();
+        uint256 batchNumber = IZKChain(_zkChain).getTotalBatchesExecuted();
 
         if (bridgeHub != address(this)) {
             revert IncorrectBridgeHubAddress(bridgeHub);
@@ -813,7 +814,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         settlementLayer[_chainId] = block.chainid;
 
         _registerNewZKChain(_chainId, _zkChain, true);
-        messageRoot.addNewChain(_chainId);
+        messageRoot.addNewChain(_chainId, batchNumber);
 
         emit NewChain(_chainId, ctm, chainAdmin);
     }

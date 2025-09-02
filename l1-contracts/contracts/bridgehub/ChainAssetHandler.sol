@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
+import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -226,9 +226,14 @@ contract ChainAssetHandler is
             bridgehubBurnData.chainData
         );
         ++migrationNumber[bridgehubBurnData.chainId];
+
+        uint256 batchNumber = IZKChain(zkChain).getTotalBatchesExecuted();
+        require(MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber) != bytes32(0), ChainBatchRootNotSet(bridgehubBurnData.chainId, batchNumber));
+        require(MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber + 1) == bytes32(0), NextChainBatchRootAlreadySet(bridgehubBurnData.chainId, batchNumber + 1));
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
             baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(bridgehubBurnData.chainId),
+            batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
             migrationNumber: migrationNumber[bridgehubBurnData.chainId]
@@ -266,7 +271,9 @@ contract ChainAssetHandler is
             }
             // We want to allow any chain to be migrated,
             BRIDGE_HUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId);
+            MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
+        } else {
+            MESSAGE_ROOT.setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.migrationNumber);
         }
         if (migrationNumber[bridgehubMintData.chainId] == 0) {
             migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;

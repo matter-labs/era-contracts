@@ -30,4 +30,6 @@ interface IL1AssetTracker {
         uint256 _callerChainId,
         uint256 _chainId
     ) external returns (bytes32 assetId, uint256 amount);
+
+    function setAddresses() external;
 }
