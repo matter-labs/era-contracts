@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {OnlyCtmOwner, UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
@@ -48,14 +49,18 @@ contract DualVerifier is IVerifier {
     }
 
     function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external {
-        require(msg.sender == ctmOwner, "Only ctmOwner can add verifiers");
+        if (msg.sender != ctmOwner) {
+            revert OnlyCtmOwner();
+        }
         // Add logic to add verifiers
         fflonkVerifiers[version] = _fflonkVerifier;
         plonkVerifiers[version] = _plonkVerifier;
     }
 
     function removeVerifier(uint32 version) external {
-        require(msg.sender == ctmOwner, "Only ctmOwner can remove verifiers");
+        if (msg.sender != ctmOwner) {
+            revert OnlyCtmOwner();
+        }
         delete fflonkVerifiers[version];
         delete plonkVerifiers[version];
     }
@@ -77,11 +82,12 @@ contract DualVerifier is IVerifier {
         // The first element of `_proof` determines the verifier type (either FFLONK or PLONK).
         uint256 verifierType = _proof[0] & 255;
         uint32 verifierVersion = uint32(_proof[0] >> 8);
-        require(
-            fflonkVerifiers[verifierVersion] != IVerifierV2(address(0)) ||
-                plonkVerifiers[verifierVersion] != IVerifier(address(0)),
-            "Unknown verifier version"
-        );
+        if (
+            fflonkVerifiers[verifierVersion] == IVerifierV2(address(0)) &&
+            plonkVerifiers[verifierVersion] == IVerifier(address(0))
+        ) {
+            revert UnknownVerifierVersion();
+        }
 
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
             return fflonkVerifiers[verifierVersion].verify(_publicInputs, _extractProof(_proof));
@@ -134,11 +140,12 @@ contract DualVerifier is IVerifier {
         uint256 verifierType = _verifierType & 255;
         uint32 verifierVersion = uint32(verifierType >> 8);
 
-        require(
-            fflonkVerifiers[verifierVersion] != IVerifierV2(address(0)) ||
-                plonkVerifiers[verifierVersion] != IVerifier(address(0)),
-            "Unknown verifier version"
-        );
+        if (
+            fflonkVerifiers[verifierVersion] == IVerifierV2(address(0)) &&
+            plonkVerifiers[verifierVersion] == IVerifier(address(0))
+        ) {
+            revert UnknownVerifierVersion();
+        }
 
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
             return fflonkVerifiers[verifierVersion].verificationKeyHash();
