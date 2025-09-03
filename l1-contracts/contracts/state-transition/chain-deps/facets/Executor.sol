@@ -481,7 +481,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
-        bool processSystemUpgradeTx = systemContractsUpgradeTxHash != bytes32(0) && s.l2SystemContractsUpgradeBatchNumber == 0;
+        bool processSystemUpgradeTx = systemContractsUpgradeTxHash != bytes32(0) &&
+            s.l2SystemContractsUpgradeBatchNumber == 0;
         _commitBoojumOSBatches(lastCommittedBatchData, newBatchesData, processSystemUpgradeTx);
 
         s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
@@ -591,7 +592,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
-            _lastCommittedBatchData = _commitOneBoojumOSBatch(_lastCommittedBatchData, _newBatchesData[i], upgradeTxHash);
+            _lastCommittedBatchData = _commitOneBoojumOSBatch(
+                _lastCommittedBatchData,
+                _newBatchesData[i],
+                upgradeTxHash
+            );
 
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
             emit BlockCommit(
@@ -599,7 +604,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
-
 
             if (i == 0) {
                 // reset upgradeTxHash after the first batch
