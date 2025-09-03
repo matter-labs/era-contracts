@@ -147,6 +147,7 @@ contract ChainAssetHandler is
                 bridgehubBurnData.ctmData
             );
 
+            // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
             if (_settlementChainId != L1_CHAIN_ID && BRIDGEHUB.chainTypeManager(_settlementChainId) != ctm) {
                 revert SLHasDifferentCTM();
             }
