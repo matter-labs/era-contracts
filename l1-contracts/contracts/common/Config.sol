@@ -20,17 +20,17 @@ bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e5202
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = bytes32(0);
 
-/// @dev Denotes the type of the ZKsync transaction that came from L1.
+/// @dev Denotes the type of the ZKsync Era transaction that came from L1.
 uint256 constant PRIORITY_OPERATION_L2_TX_TYPE = 255;
 
-/// @dev Denotes the type of the ZKsync transaction that is used for system upgrades.
+/// @dev Denotes the type of the ZKsync Era transaction that is used for system upgrades.
 uint256 constant SYSTEM_UPGRADE_L2_TX_TYPE = 254;
 
-/// @dev Denotes the type of the ZKsync transaction that came from L1.
-uint256 constant ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE = 42;
+/// @dev Denotes the type of the ZKsync OS transaction that came from L1.
+uint256 constant ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE = 127;
 
-/// @dev Denotes the type of the ZKsync transaction that is used for system upgrades.
-uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 41;
+/// @dev Denotes the type of the ZKsync OS transaction that is used for system upgrades.
+uint256 constant ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE = 126;
 
 /// @dev The maximal allowed difference between protocol minor versions in an upgrade. The 100 gap is needed
 /// in case a protocol version has been tested on testnet, but then not launched on mainnet, e.g.
