@@ -201,6 +201,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             /// if we don't skip we use incorrect asset id.
             return;
         }
+        if (_amount == 0) {
+            return;
+        }
         _handleFinalizeBridgingOnL2Inner(
             baseTokenAssetId,
             _amount,

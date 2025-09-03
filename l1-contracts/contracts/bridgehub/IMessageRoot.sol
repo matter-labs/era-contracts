@@ -26,6 +26,8 @@ uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint2
     keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
 );
 
+bytes32 constant GENESIS_CHAIN_BATCH_ROOT = keccak256("GENESIS_CHAIN_BATCH_ROOT");
+
 /**
  * @author Matter Labs
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
