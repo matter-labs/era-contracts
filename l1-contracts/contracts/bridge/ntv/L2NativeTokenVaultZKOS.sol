@@ -24,7 +24,6 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
     /// @dev This function uses raw call to ContractDeployer to make sure that exactly `L2_TOKEN_PROXY_BYTECODE_HASH` is used
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
-    /// @param _tokenOriginChainId The origin chain id of the token.
     /// @return proxy The beacon proxy, i.e. L2 bridged token.
     function _deployBeaconProxy(
         bytes32 _salt,
