@@ -27,7 +27,7 @@ contract IncrementalMerkleTestTest is Test {
             false,
             bytes32(0)
         );
-        DynamicIncrementalMerkleMemory.setup(merkleTestMemory, zero);
+        merkleTestMemory.setup(zero);
     }
 
     /// @dev Test basic setup and initialization (storage vs memory)
