@@ -57,67 +57,67 @@
   Ecosystem contracts are deployed!
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0xb8fb39291fa7500ce5f4a4b6bc2230f09d287e2ec8b6adfd515e1f9ba8dcf8db
+  0xb2af2c377e50e45124f521a7c2dc4c9322ef193d1b19cf397cc1c7893edf4eb9
   VerifierFflonk has been deployed at 0xBd0a60D20D49Ad957D9B57BA06A3D4F00426DCE0
   forge verify-contract 0xBd0a60D20D49Ad957D9B57BA06A3D4F00426DCE0 VerifierFflonk --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0x4ce6ec13f39368ba8ea075583add3165d6619c3d80ce45f4c5e06c032d84b681
+  0x9eaafa4e4c0426dab456beae2db8e9db16ad1cdfdabb4212c4a09ac9eb983a19
   VerifierPlonk has been deployed at 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717
   forge verify-contract 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717 VerifierPlonk --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0xdef29af72dc47fcaa4e03d370a514f53aa13679858d57b8b17ef3618bd884c4c
+  0x0815052b51c2ce14b61b1f9d2eb45d0b580389263094cbbc4e12ccdc20d832e1
   Verifier has been deployed at 0x2AE9dD0DC9b5F0535CAA0ED81Fe711f22f2F6Ba2
   forge verify-contract 0x2AE9dD0DC9b5F0535CAA0ED81Fe711f22f2F6Ba2 Verifier --constructor-args 0x000000000000000000000000bd0a60d20d49ad957d9b57ba06a3d4f00426dce000000000000000000000000092a9fd0e84354213d9c3d33128edd6ea55ee0717 --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0xd81d496c11878d02b3311e89d82e0e3b8349df6f31ec82c930d675656dc2dbf6
+  0x5d3d154a67a375ef75275beb1f87e36064d57cdfb73ba3325c5bda89307c12a9
   ExecutorFacet has been deployed at 0x227Cbd751F12F97dbFeDb07165676CD16A3b5459
   forge verify-contract 0x227Cbd751F12F97dbFeDb07165676CD16A3b5459 ExecutorFacet --constructor-args 0x0000000000000000000000000000000000000000000000000000000000aa36a7 --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0x00142d6d4b6ff15a7a128ae92539d9fdcc69feeb4abd66dd83b7efb7d6fe3037
+  0x1ce5b6580fa47b6d3590c49f40016b93b19a1006b0288aa6d16aa81139bd4bf8
   AdminFacet has been deployed at 0xd659a6143EA6401Bb1875b23536053eFBe32A1E2
   forge verify-contract 0xd659a6143EA6401Bb1875b23536053eFBe32A1E2 AdminFacet --constructor-args 0x0000000000000000000000000000000000000000000000000000000000aa36a70000000000000000000000005bbebcb4f6fa0b6e05902402ed080fb4c44ec5d3 --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0x249ce6f6793d5cdd90a775a76b690f289496b689b6bac23fb1bf8700bf72f018
+  0x567430dcb4da2d6e6fd3ed1dd6cfca71ecab448820f974c42dc840dc6ad2f31d
   MailboxFacet has been deployed at 0x8aC8705D06CC03d9A02d7429f696d5d73cbc6e7A
   forge verify-contract 0x8aC8705D06CC03d9A02d7429f696d5d73cbc6e7A MailboxFacet --constructor-args 0x000000000000000000000000000000000000000000000000000000000000012c0000000000000000000000000000000000000000000000000000000000aa36a7 --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0xceb4f15117512162bf042bfd48fafe6ff34a09670b57b29e19d09b9fa13aaebb
+  0xcf5cd0f703a27fa4f3585b3f7009e3c7fed3539c69209c280199be28169f9197
   GettersFacet has been deployed at 0xA53748c202D55E2974b1c2d604f6EED913FF0C72
   forge verify-contract 0xA53748c202D55E2974b1c2d604f6EED913FF0C72 GettersFacet --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0x7b4fe670f39ce2a055baa8cc3a69bb209fe7b675cdcc21bc776f4b10e02d4b48
+  0xb8ac95dbe7c27d37b2ff1f607a536ae74f90298faea43d31990902126047bebb
   DiamondInit has been deployed at 0xeCF93EE950Bd492f1896140c7E7A16C99bE11E26
   forge verify-contract 0xeCF93EE950Bd492f1896140c7E7A16C99bE11E26 DiamondInit --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0x2af3e14b00577d1aaaa040d8b02b5215bb9efbf500c03bca3e07b3b0cfa982ce
+  0x2cecdddc3cb65ebc0683f48a46cb837975ab8bff7e6882765c325722dbee0f92
   L1V29Upgrade has been deployed at 0x9A9c11d417cC2347a4d7300964B349CA714951Ae
   forge verify-contract 0x9A9c11d417cC2347a4d7300964B349CA714951Ae L1V29Upgrade --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0x98bc7de5b973c650cdb53ce78955426a60428455fdadd29e7e5c419d17d80192
+  0xe3c4dbae1da4d949e7c029ffe82f4a02fb3d373a528d2f1747d88f40acf5e478
   L1GenesisUpgrade has been deployed at 0x67b069aB0c634B03427ca284F701BE92d84d78ad
   forge verify-contract 0x67b069aB0c634B03427ca284F701BE92d84d78ad L1GenesisUpgrade --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0xdb41f5d4830ec3f905c6ec838641c795974e192dc5ff3566d296fc966a0ebf7e
+  0x658b9a7dcd0f489b587ccdb49ca01dbe8ee65b797b59e04a6882907b7db72682
   ChainTypeManager has been deployed at 0xE169B1AF9C39c97861f91D7C3009E093A681F568
   forge verify-contract 0xE169B1AF9C39c97861f91D7C3009E093A681F568 ChainTypeManager --constructor-args 0x0000000000000000000000000000000000000000000000000000000000010002 --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0xd7ec96c753a48ba752b379719ffd203f0fabc1176cf00a0cee910bb6a1d1c804
+  0x02634fc3c563e351e3b9e68ae96614b1c705ee96d01ee57afa5a4240ac192f33
   ValidatorTimelock has been deployed at 0x717CAC5204650f10b713A06E230829FCC841425e
   forge verify-contract 0x717CAC5204650f10b713A06E230829FCC841425e ValidatorTimelock --constructor-args 0x0000000000000000000000000000000000000000000000000000000000010002 --verifier zksync
   Transaction executed succeassfully! Extracting logs...
   L2 Transaction hash is 
-  0x3810dc862d4bc0debbd0e769b266561557023a95ebc77c0ed683aefbaca76733
+  0xaec698fd75dea1071a1dfc241c0beb868382ab2a84d6360202ec879792a366d7
   ValidatorTimelock Proxy has been deployed at 0x1427f2DEFB1a0cf5b5fBf684A00A079bA4F46b43
   forge verify-contract 0x1427f2DEFB1a0cf5b5fBf684A00A079bA4F46b43 ValidatorTimelock --constructor-args 0x000000000000000000000000717cac5204650f10b713a06e230829fcc841425e0000000000000000000000009f52db4aea9277517c6779d65f90fe03d753373000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000044c5e4c9f9000000000000000000000000f4b715778aeec76df1b368948a1d1614497dc969000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000 --verifier zksync
   Ecosystem contracts for GW are deployed!
@@ -189,26 +189,26 @@
   0x0100000f8335ff3253d3d96c7f3de3b62614f0705fc7624b48906355882a0286
   The following bytecode has already been published:
   0x01000049445673297c58de22926bb6cda61343f9ac7eeccab876320dc327883c
-  The following bytecode has already been published:
-  0x010007c1b24271cfee8214daee04670297fe3bda161b88a8871cba0aaf26012b
+  Publishing the following bytecode:
+  0x010007c1845124aaf94ed994647d91d9b0d4e428d80bfd9a570267f65c24ed7a
   The following bytecode has already been published:
   0x01000531bb72234d84f2629e2bd6db8957b51584ef9f7168f2a2344748c3cfd7
   The following bytecode has already been published:
   0x010008535b849d71a11a1624c551b5f64c00fc036f8a92cc75bc7d82342acf0a
-  The following bytecode has already been published:
-  0x010003d30ba16c5afa8f33b1ffefe9b39a797a1952644d3def025c949a46b2db
+  Publishing the following bytecode:
+  0x010003d3b552606c72509becee7bffee9533885497a11bd48405c45523e8df41
   The following bytecode has already been published:
   0x0100034143abddcabf9e1b6e108badda72ed45ff90e319117fb3595722cc8b6a
   The following bytecode has already been published:
   0x0100015945ae851c1f835d37d5f4617757feb132487e84b156c13ad90a70071b
-  The following bytecode has already been published:
-  0x0100038774fb4ee1a1de31c515d7012544c93c6f03933dd335db58ee32a9d195
+  Publishing the following bytecode:
+  0x0100039f60c7a141b288ce9128e4875b5b26229467a3c713fc41f8f750bbd615
   The following bytecode has already been published:
   0x010001958d1b7ec307cfeae5944b19e56c7f12e633e4109c17c0d5e96e8a43dc
   The following bytecode has already been published:
   0x010004ed850c2062ea78b93325fb4dd654ed27de35423a7d44b3978b47f1aa89
-  The following bytecode has already been published:
-  0x0100014b71adee1c18588b50320637a120674a4b52d784f61898605b9703b70e
+  Publishing the following bytecode:
+  0x0100014b21bb1475aa3215366f4883a85cfb90184e29d0b264bb9dfb14de9632
   The following bytecode has already been published:
   0x0100001514035ffeada9f49d08e3fc7bd1035416a5e7482e05a25137d770ee16
   The following bytecode has already been published:
@@ -217,4 +217,3 @@
   0x0100037bc8659be16661091192229f09db6b91cc69d5ba39df7cb193e7bdb6de
   The following bytecode has already been published:
   0x010000e18d0788d925e16659993ff65cb636c3ed1fd5b90115ee07382b3ce24f
-  Bytecodes published!
