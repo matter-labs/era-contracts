@@ -133,6 +133,11 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     function saveOutputVersionSpecific() internal override {
+        vm.serializeAddress(
+            "deployed_addresses",
+            "protocol_upgrade_handler_address_implementation",
+            protocolUpgradeHandlerImplementationAddress
+        );
         vm.serializeBytes("v29", "encoded_old_gateway_validator_timelocks", abi.encode(oldGatewayValidatorTimelocks));
         string memory oldValidatorTimelocksSerialized = vm.serializeBytes(
             "v29",
