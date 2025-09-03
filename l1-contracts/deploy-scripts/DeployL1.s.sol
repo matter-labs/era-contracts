@@ -626,6 +626,7 @@ contract DeployL1Script is Script, DeployUtils {
 
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
+            gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),

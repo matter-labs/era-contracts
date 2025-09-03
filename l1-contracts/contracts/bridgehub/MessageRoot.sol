@@ -9,7 +9,7 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, GENESIS_CHAIN_BATCH_ROOT, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, PreviousChainBatchRootNotSet, LocallyNoChainsAtGenesis} from "./L1BridgehubErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, PreviousChainBatchRootNotSet, LocallyNoChainsAtGenesis, OnlyGateway} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
@@ -38,6 +38,9 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 public immutable L1_CHAIN_ID;
+
+    /// @notice The chain id of the Gateway chain.
+    uint256 public immutable GATEWAY_CHAIN_ID;
 
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
@@ -139,6 +142,14 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _;
     }
 
+    /// @notice Checks that the Chain ID is the Gateway chain id.
+    modifier onlyGateway() {
+        if (block.chainid != GATEWAY_CHAIN_ID) {
+            revert OnlyGateway();
+        }
+        _;
+    }
+
     modifier onlyBridgehubOwner() {
         address bridgehubOwner = Ownable(address(BRIDGE_HUB)).owner();
         if (msg.sender != bridgehubOwner) {
@@ -154,19 +165,17 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
 
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
+    /// Used for V30 upgrade deployment and local deployments.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _bridgehub Address of the Bridgehub.
     /// @param _l1ChainId Chain ID of L1.
-    constructor(IBridgehub _bridgehub, uint256 _l1ChainId) {
+    constructor(IBridgehub _bridgehub, uint256 _l1ChainId, uint256 _gatewayChainId) {
         BRIDGE_HUB = _bridgehub;
         L1_CHAIN_ID = _l1ChainId;
+        GATEWAY_CHAIN_ID = _gatewayChainId;
+        uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+        _v30InitializeInner(allZKChains);
         if (L1_CHAIN_ID != block.chainid) {
-            /// On Gateway we save the chain type manager for EraVM chains.
-            uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
-            if (allZKChains.length > 0) {
-                // On non-local environments we need to save the eraVM chain type manager to allow v29 chains to finalize.
-                eraVmChainTypeManager = BRIDGE_HUB.chainTypeManager(allZKChains[0]);
-            }
             /// On Gateway we save the upgrade block number
             v30UpgradeGatewayBlockNumber = block.number;
         }
@@ -189,24 +198,31 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     function initializeV30Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
-        for (uint256 i = 0; i < allZKChainsLength; ++i) {
-            uint256 batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY;
-            if (BRIDGE_HUB.settlementLayer(allZKChains[i]) == block.chainid && block.chainid == L1_CHAIN_ID) {
-                /// If we are settling on L1.
-                batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
-            }
-            v30UpgradeChainBatchNumber[allZKChains[i]] = batchNumberToWrite;
-        }
+        _v30InitializeInner(allZKChains);
+
         /// If there are no chains, that means we are using the contracts locally.
         if (allZKChainsLength == 0) {
             v30UpgradeGatewayBlockNumber = 1;
-        } else {
-            // On non-local environments we need to save the eraVM chain type manager to allow v29 chains to finalize.
-            eraVmChainTypeManager = BRIDGE_HUB.chainTypeManager(allZKChains[0]);
         }
     }
 
-    function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external onlyL2 {
+    function _v30InitializeInner(uint256[] memory _allZKChains) internal {
+        uint256 allZKChainsLength = _allZKChains.length;
+        for (uint256 i = 0; i < allZKChainsLength; ++i) {
+            uint256 batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY;
+            if (BRIDGE_HUB.settlementLayer(_allZKChains[i]) == L1_CHAIN_ID) {
+                /// If we are settling on L1.
+                batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
+            }
+            v30UpgradeChainBatchNumber[_allZKChains[i]] = batchNumberToWrite;
+        }
+        if (allZKChainsLength > 0) {
+            // On non-local environments we need to save the eraVM chain type manager to allow v29 chains to finalize.
+            eraVmChainTypeManager = BRIDGE_HUB.chainTypeManager(_allZKChains[0]);
+        }
+    }
+
+    function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external onlyGateway {
         uint256 sentBlockNumber;
         if (_chainId != block.chainid) {
             sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];

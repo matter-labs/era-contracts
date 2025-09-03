@@ -361,7 +361,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "InteropCenter")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.ownerAddress);
         } else if (compareStrings(contractName, "MessageRoot")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId);
+            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.gatewayChainId);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
         } else if (compareStrings(contractName, "ChainAssetHandler")) {

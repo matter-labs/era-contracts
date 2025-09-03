@@ -71,7 +71,7 @@ contract ChainTypeManagerTest is UtilsTest {
 
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new MessageRoot(bridgehub, block.chainid);
+        messageroot = new MessageRoot(bridgehub, block.chainid, 1);
         chainAssetHandler = new ChainAssetHandler(
             block.chainid,
             governor,

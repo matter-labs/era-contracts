@@ -69,7 +69,7 @@ library L2Utils {
 
     function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
-        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), L1_CHAIN_ID);
+        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), L1_CHAIN_ID, 1);
         forceDeployWithConstructor(
             "MessageRoot",
             L2_MESSAGE_ROOT_ADDR,

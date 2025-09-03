@@ -112,7 +112,7 @@ contract ExperimentalBridgeTest is Test {
         dummyBridgehub = new DummyBridgehubSetter(l1ChainId, bridgeOwner, type(uint256).max);
         bridgehub = Bridgehub(address(dummyBridgehub));
         interopCenter = new InteropCenter(bridgehub, l1ChainId, bridgeOwner);
-        messageRoot = new MessageRoot(bridgehub, l1ChainId);
+        messageRoot = new MessageRoot(bridgehub, l1ChainId, 1);
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
         mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid);
