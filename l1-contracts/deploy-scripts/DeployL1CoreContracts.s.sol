@@ -186,17 +186,11 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         ) = deployTuppWithContract("L1ChainAssetHandler", false);
         setBridgehubParams();
 
-        initializeGeneratedData();
-
         deployStateTransitionDiamondFacets();
 
         updateOwners();
 
         saveOutput(outputPath);
-    }
-
-    function initializeGeneratedData() internal {
-        generatedData.forceDeploymentsData = prepareForceDeploymentsData();
     }
 
     function deployIfNeededMulticall3() internal {
@@ -449,12 +443,10 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             "recursion_node_level_vk_hash",
             config.contracts.recursionNodeLevelVkHash
         );
-        vm.serializeBytes("contracts_config", "diamond_cut_data", config.contracts.diamondCutData);
-
         string memory contractsConfig = vm.serializeBytes(
             "contracts_config",
-            "force_deployments_data",
-            generatedData.forceDeploymentsData
+            "diamond_cut_data",
+            config.contracts.diamondCutData
         );
 
         vm.serializeAddress(
@@ -531,53 +523,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
-    }
-
-    function prepareForceDeploymentsData() internal returns (bytes memory) {
-        require(addresses.governance != address(0), "Governance address is not set");
-
-        address dangerousTestOnlyForcedBeacon;
-        if (config.supportL2LegacySharedBridgeTest) {
-            (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
-                addresses.bridges.erc20BridgeProxy,
-                addresses.bridges.l1NullifierProxy,
-                addresses.governance
-            );
-        }
-
-        FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
-            l1ChainId: config.l1ChainId,
-            eraChainId: config.eraChainId,
-            l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
-            l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
-            aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
-            maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2Bridgehub.sol", "L2Bridgehub")
-                : abi.encode(getL2BytecodeHash("L2Bridgehub")),
-            l2AssetRouterBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2AssetRouter.sol", "L2AssetRouter")
-                : abi.encode(getL2BytecodeHash("L2AssetRouter")),
-            l2NtvBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2NativeTokenVaultZKOS.sol", "L2NativeTokenVaultZKOS")
-                : abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
-            messageRootBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2MessageRoot.sol", "L2MessageRoot")
-                : abi.encode(getL2BytecodeHash("L2MessageRoot")),
-            beaconDeployerInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
-                : abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
-            chainAssetHandlerBytecodeInfo: config.isZKsyncOS
-                ? Utils.getZKOSBytecodeInfoForContract("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
-                : abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
-            // For newly created chains it it is expected that the following bridges are not present at the moment
-            // of creation of the chain
-            l2SharedBridgeLegacyImpl: address(0),
-            l2BridgedStandardERC20Impl: address(0),
-            dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
-        });
-
-        return abi.encode(data);
     }
 
     function deployTuppWithContract(
