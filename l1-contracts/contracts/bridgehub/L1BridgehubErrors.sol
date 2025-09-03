@@ -24,6 +24,8 @@ error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 error IncorrectFunctionSignature();
 // 0xf5e39c1f
 error IncorrectSender(address prevMsgSender, address chainAdmin);
+// 0xc3bd3c65
+error LocallyNoChainsAtGenesis();
 // 0x913183d8
 error MessageRootNotRegistered();
 // 0x12b08c62
@@ -90,4 +92,3 @@ error V30UpgradeChainBatchNumberNotSet();
 error V30UpgradeGatewayBlockNumberAlreadySet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
-error LocallyNoChainsAtGenesis();

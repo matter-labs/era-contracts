@@ -9,7 +9,6 @@ import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title Base contract containing functions accessible to the other facets.

@@ -9,7 +9,6 @@ import {L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2Cont
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {IInteropCenter} from "../interop/IInteropCenter.sol";
 import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
 import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 
