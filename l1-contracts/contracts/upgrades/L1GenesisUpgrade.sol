@@ -12,7 +12,7 @@ import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.s
 import {IL1GenesisUpgrade} from "./IL1GenesisUpgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
+import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
@@ -68,9 +68,8 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
 
             // slither-disable-next-line unused-return
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_protocolVersion));
-            uint256 txType = s.boojumOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
             l2ProtocolUpgradeTx = L2CanonicalTransaction({
-                txType: txType,
+                txType: _getUpgradeTxType(),
                 from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
                 to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
                 gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
