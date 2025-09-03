@@ -68,47 +68,26 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
 
             // slither-disable-next-line unused-return
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(_protocolVersion));
-            if (s.boojumOS) {
-                l2ProtocolUpgradeTx = L2CanonicalTransaction({
-                    txType: ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE,
-                    from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-                    to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
-                    gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
-                    gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                    maxFeePerGas: uint256(0),
-                    maxPriorityFeePerGas: uint256(0),
-                    paymaster: uint256(0),
+            uint256 txType = s.boojumOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+            l2ProtocolUpgradeTx = L2CanonicalTransaction({
+                txType: txType,
+                from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
+                to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
+                gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
+                gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                maxFeePerGas: uint256(0),
+                maxPriorityFeePerGas: uint256(0),
+                paymaster: uint256(0),
                 // Note, that the protocol version is used as "nonce" for system upgrade transactions
-                    nonce: minorVersion,
-                    value: 0,
-                    reserved: [uint256(0), 0, 0, 0],
-                    data: complexUpgraderCalldata,
-                    signature: new bytes(0),
-                    factoryDeps: new uint256[](0),
-                    paymasterInput: new bytes(0),
-                    reservedDynamic: new bytes(0)
-                });
-            } else {
-                l2ProtocolUpgradeTx = L2CanonicalTransaction({
-                    txType: SYSTEM_UPGRADE_L2_TX_TYPE,
-                    from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
-                    to: uint256(uint160(L2_COMPLEX_UPGRADER_ADDR)),
-                    gasLimit: PRIORITY_TX_MAX_GAS_LIMIT,
-                    gasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-                    maxFeePerGas: uint256(0),
-                    maxPriorityFeePerGas: uint256(0),
-                    paymaster: uint256(0),
-                    // Note, that the protocol version is used as "nonce" for system upgrade transactions
-                    nonce: minorVersion,
-                    value: 0,
-                    reserved: [uint256(0), 0, 0, 0],
-                    data: complexUpgraderCalldata,
-                    signature: new bytes(0),
-                    factoryDeps: new uint256[](0),
-                    paymasterInput: new bytes(0),
-                    reservedDynamic: new bytes(0)
-                });
-            }
+                nonce: minorVersion,
+                value: 0,
+                reserved: [uint256(0), 0, 0, 0],
+                data: complexUpgraderCalldata,
+                signature: new bytes(0),
+                factoryDeps: new uint256[](0),
+                paymasterInput: new bytes(0),
+                reservedDynamic: new bytes(0)
+            });
         }
         ProposedUpgrade memory proposedUpgrade = ProposedUpgrade({
             l2ProtocolUpgradeTx: l2ProtocolUpgradeTx,

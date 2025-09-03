@@ -494,47 +494,26 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         WritePriorityOpParams memory _priorityOpParams
     ) internal pure returns (L2CanonicalTransaction memory transaction) {
         BridgehubL2TransactionRequest memory request = _priorityOpParams.request;
-        if (s.boojumOS) {
-            transaction = L2CanonicalTransaction({
-                txType: ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE,
-                from: uint256(uint160(request.sender)),
-                to: uint256(uint160(request.contractL2)),
-                gasLimit: request.l2GasLimit,
-                gasPerPubdataByteLimit: request.l2GasPerPubdataByteLimit,
-                maxFeePerGas: uint256(_priorityOpParams.l2GasPrice),
-                maxPriorityFeePerGas: uint256(0),
-                paymaster: uint256(0),
-                // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
-                nonce: uint256(_priorityOpParams.txId),
-                value: request.l2Value,
-                reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
-                data: request.l2Calldata,
-                signature: new bytes(0),
-                factoryDeps: L2ContractHelper.hashFactoryDeps(request.factoryDeps),
-                paymasterInput: new bytes(0),
-                reservedDynamic: new bytes(0)
-            });
-        } else {
-            transaction = L2CanonicalTransaction({
-                txType: PRIORITY_OPERATION_L2_TX_TYPE,
-                from: uint256(uint160(request.sender)),
-                to: uint256(uint160(request.contractL2)),
-                gasLimit: request.l2GasLimit,
-                gasPerPubdataByteLimit: request.l2GasPerPubdataByteLimit,
-                maxFeePerGas: uint256(_priorityOpParams.l2GasPrice),
-                maxPriorityFeePerGas: uint256(0),
-                paymaster: uint256(0),
-                // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
-                nonce: uint256(_priorityOpParams.txId),
-                value: request.l2Value,
-                reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
-                data: request.l2Calldata,
-                signature: new bytes(0),
-                factoryDeps: L2ContractHelper.hashFactoryDeps(request.factoryDeps),
-                paymasterInput: new bytes(0),
-                reservedDynamic: new bytes(0)
-            });
-        }
+        uint256 txType = s.boojumOS ? ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE : PRIORITY_OPERATION_L2_TX_TYPE;
+        transaction = L2CanonicalTransaction({
+            txType: txType,
+            from: uint256(uint160(request.sender)),
+            to: uint256(uint160(request.contractL2)),
+            gasLimit: request.l2GasLimit,
+            gasPerPubdataByteLimit: request.l2GasPerPubdataByteLimit,
+            maxFeePerGas: uint256(_priorityOpParams.l2GasPrice),
+            maxPriorityFeePerGas: uint256(0),
+            paymaster: uint256(0),
+            // Note, that the priority operation id is used as "nonce" for L1->L2 transactions
+            nonce: uint256(_priorityOpParams.txId),
+            value: request.l2Value,
+            reserved: [request.mintValue, uint256(uint160(request.refundRecipient)), 0, 0],
+            data: request.l2Calldata,
+            signature: new bytes(0),
+            factoryDeps: L2ContractHelper.hashFactoryDeps(request.factoryDeps),
+            paymasterInput: new bytes(0),
+            reservedDynamic: new bytes(0)
+        });
     }
 
     function _validateTx(
