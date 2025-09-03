@@ -8,7 +8,7 @@ import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol
 import {IVerifier, VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
-import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
+import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMajorVersionNotZero, PatchCantSetUpgradeTxn, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetEvmEmulator, PreviousProtocolMajorVersionNotZero, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, ProtocolVersionMinorDeltaTooBig, ProtocolVersionTooSmall} from "./ZkSyncUpgradeErrors.sol";
 import {TimeNotReached, TooManyFactoryDeps} from "../common/L1ContractErrors.sol";
@@ -253,8 +253,14 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             return bytes32(0);
         }
 
-        if (_l2ProtocolUpgradeTx.txType != SYSTEM_UPGRADE_L2_TX_TYPE) {
-            revert InvalidTxType(_l2ProtocolUpgradeTx.txType);
+        if (s.boojumOS) {
+            if (_l2ProtocolUpgradeTx.txType != ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE) {
+                revert InvalidTxType(_l2ProtocolUpgradeTx.txType);
+            }
+        } else {
+            if (_l2ProtocolUpgradeTx.txType != SYSTEM_UPGRADE_L2_TX_TYPE) {
+                revert InvalidTxType(_l2ProtocolUpgradeTx.txType);
+            }
         }
         if (_patchOnly) {
             revert PatchCantSetUpgradeTxn();
