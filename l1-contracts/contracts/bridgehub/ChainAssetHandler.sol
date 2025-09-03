@@ -147,7 +147,7 @@ contract ChainAssetHandler is
                 bridgehubBurnData.ctmData
             );
 
-            if (BRIDGEHUB.chainTypeManager(_settlementChainId) != ctm) {
+            if (_settlementChainId != L1_CHAIN_ID && BRIDGEHUB.chainTypeManager(_settlementChainId) != ctm) {
                 revert SLHasDifferentCTM();
             }
         }
