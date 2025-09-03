@@ -41,11 +41,7 @@ contract MessageRootTest is Test {
             abi.encodeWithSelector(IBridgehub.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehub.settlementLayer.selector),
-            abi.encode(0)
-        );
+        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.settlementLayer.selector), abi.encode(0));
 
         assetTracker = makeAddr("assetTracker");
         bridgeHub = makeAddr("bridgeHub");
