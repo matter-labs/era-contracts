@@ -429,13 +429,11 @@ library Utils {
             });
     }
 
-    function makeInitializeData(address testnetVerifier) public returns (InitializeData memory) {
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
-
+    function makeInitializeData(address testnetVerifier, address bridgehub) public returns (InitializeData memory) {
         return
             InitializeData({
                 chainId: 1,
-                bridgehub: address(dummyBridgehub),
+                bridgehub: bridgehub,
                 chainTypeManager: address(0x1234567890876543567890),
                 interopCenter: address(0x1234567890876543567890),
                 protocolVersion: 0,
@@ -468,11 +466,11 @@ library Utils {
             });
     }
 
-    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier) public returns (address) {
+    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier, address bridgehub) public returns (address) {
         DiamondInit diamondInit = new DiamondInit();
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            makeInitializeData(testnetVerifier)
+            makeInitializeData(testnetVerifier, bridgehub)
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

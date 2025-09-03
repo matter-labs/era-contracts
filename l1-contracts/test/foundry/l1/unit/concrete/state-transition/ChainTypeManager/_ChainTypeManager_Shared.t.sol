@@ -239,7 +239,7 @@ contract ChainTypeManagerTest is UtilsTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
-        mockDiamondInitInteropCenterCallsWithAddress(interopCenterAddress);
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge);
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,

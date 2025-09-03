@@ -12,6 +12,7 @@ import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerif
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract TestBaseFacet is ZKChainBase {
     function functionWithOnlyAdminModifier() external onlyAdmin {}
@@ -41,6 +42,7 @@ contract ZKChainBaseTest is UtilsTest {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    DummyBridgehub internal dummyBridgehub;
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](6);
@@ -67,8 +69,9 @@ contract ZKChainBaseTest is UtilsTest {
             selectors: Utils.getUtilsFacetSelectors()
         });
 
-        mockDiamondInitInteropCenterCalls();
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        dummyBridgehub = new DummyBridgehub();
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0));
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
         testBaseFacet = TestBaseFacet(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

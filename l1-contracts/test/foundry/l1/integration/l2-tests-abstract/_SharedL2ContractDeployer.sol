@@ -167,7 +167,7 @@ abstract contract SharedL2ContractDeployer is UtilsTest, DeployIntegrationUtils 
         );
 
         vm.prank(L2_BRIDGEHUB_ADDR);
-        mockDiamondInitInteropCenterCallsWithAddress(L2_INTEROP_CENTER_ADDR);
+        mockDiamondInitInteropCenterCallsWithAddress(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR);
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,
             baseTokenAssetId,

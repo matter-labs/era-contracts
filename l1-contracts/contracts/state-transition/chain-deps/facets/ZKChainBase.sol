@@ -10,6 +10,7 @@ import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
+import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -52,7 +53,7 @@ contract ZKChainBase is ReentrancyGuard {
     }
 
     modifier onlyBridgehubOrInteropCenter() {
-        if ((msg.sender != s.bridgehub) && (msg.sender != s.interopCenter)) {
+        if ((msg.sender != s.bridgehub) && (msg.sender != L2_INTEROP_CENTER_ADDR)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -103,7 +104,7 @@ contract ZKChainBase is ReentrancyGuard {
             /// For registering chains in the L2Bridgehub. This is used for interop initiation.
             msg.sender != bridgehub.chainRegistrationSender() &&
             /// For sending the token balance migration confirmation txs to L2s and the Gateway.
-            msg.sender != address(IInteropCenter(bridgehub.interopCenter()).assetTracker()) &&
+            msg.sender != address(s.assetTracker) &&
             /// 1. For setting the legacy shared bridge in the L2Asset Tracker.
             /// 2. Also for sending the demarcation txs for token balance migration. It might be deleted.
             msg.sender != address(bridgehub.chainAssetHandler())

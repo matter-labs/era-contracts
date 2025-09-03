@@ -131,7 +131,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         /// We increase/decrease the totalSupply
         if (_tokenOriginChainId == _chainId) {
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
         } else if (_tokenOriginChainId == block.chainid) {
             totalSupplyAcrossAllChains[_assetId] += _amount;
         }
@@ -164,7 +164,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (_tokenOriginChainId == _chainId) {
             totalSupplyAcrossAllChains[_assetId] += _amount;
         } else if (_tokenOriginChainId == block.chainid) {
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
         }
 
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
@@ -176,7 +176,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (chainBalance[chainToUpdate][_assetId] < _amount) {
             revert InsufficientChainBalanceAssetTracker(chainToUpdate, _assetId, _amount);
         }
-        chainBalance[chainToUpdate][_assetId] -= _amount;
+        _decreaseChainBalance(chainToUpdate, _assetId, _amount);
     }
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
@@ -296,7 +296,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _tokenOriginChainId
     ) internal {
         if (!_isChainMinter(_fromChainId, _tokenOriginChainId)) {
-            chainBalance[_fromChainId][_assetId] -= _amount;
+            _decreaseChainBalance(_fromChainId, _assetId, _amount);
         } else {
             /// if the source chain is a minter, we are increasing the totalSupply.
             totalSupplyAcrossAllChains[_assetId] += _amount;
@@ -305,7 +305,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             chainBalance[_toChainId][_assetId] += _amount;
         } else {
             /// If the destination chain is a minter, we are decreasing the totalSupply.
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
         }
     }
 

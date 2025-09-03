@@ -16,6 +16,7 @@ import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerif
 import {InvalidSelector, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract TestFacet is ZKChainBase {
     function func() public pure returns (bool) {
@@ -29,6 +30,8 @@ contract TestFacet is ZKChainBase {
 contract DiamondProxyTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    DummyBridgehub internal dummyBridgehub;
+    InitializeData internal initializeData;
 
     function getTestFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](1);
@@ -52,11 +55,13 @@ contract DiamondProxyTest is UtilsTest {
                 selectors: Utils.getUtilsFacetSelectors()
             })
         );
-        mockDiamondInitInteropCenterCalls();
+        dummyBridgehub = new DummyBridgehub();
+        initializeData = Utils.makeInitializeData(testnetVerifier, address(dummyBridgehub));
+
+        mockDiamondInitInteropCenterCallsWithAddress(initializeData.bridgehub, address(0));
     }
 
     function test_revertWhen_chainIdDiffersFromBlockChainId() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -69,7 +74,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_revertWhen_calledWithEmptyMsgData() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -85,7 +89,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_revertWhen_calledWithFullSelectorInMsgData() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -101,7 +104,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_revertWhen_proxyHasNoFacetForSelector() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
@@ -117,7 +119,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_revertWhenFacetIsFrozen() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -136,7 +137,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_successfulExecution() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -161,7 +161,6 @@ contract DiamondProxyTest is UtilsTest {
             selectors: getTestFacetSelectors()
         });
 
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: cuts,

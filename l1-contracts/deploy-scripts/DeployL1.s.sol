@@ -124,10 +124,6 @@ contract DeployL1Script is Script, DeployUtils {
             "Bridgehub",
             false
         );
-        (
-            addresses.bridgehub.interopCenterImplementation,
-            addresses.bridgehub.interopCenterProxy
-        ) = deployTuppWithContract("InteropCenter", false);
         (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
             "MessageRoot",
             false
@@ -322,7 +318,6 @@ contract DeployL1Script is Script, DeployUtils {
     function setBridgehubParams() internal {
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
         IMessageRoot messageRoot = IMessageRoot(addresses.bridgehub.messageRootProxy);
-        IInteropCenter interopCenter = IInteropCenter(addresses.bridgehub.interopCenterProxy);
         IL1AssetTracker assetTracker = L1AssetTracker(addresses.bridgehub.assetTrackerProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
@@ -334,7 +329,6 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridgehub.interopCenterProxy,
             addresses.bridgehub.chainRegistrationSenderProxy
         );
-        interopCenter.setAddresses(addresses.bridges.l1AssetRouterProxy, addresses.bridgehub.assetTrackerProxy);
         messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
         assetTracker.setAddresses();
         vm.stopBroadcast();

@@ -265,7 +265,7 @@ contract ExecutorTest is UtilsTest {
             priorityTxMaxGasLimit: 1000000,
             feeParams: defaultFeeParams()
         });
-        mockDiamondInitInteropCenterCallsWithAddress(interopCenter);
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0));
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 

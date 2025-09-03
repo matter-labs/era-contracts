@@ -12,6 +12,7 @@ import {IExecutor, LogProcessingOutput} from "contracts/state-transition/chain-i
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
@@ -48,6 +49,7 @@ contract ExecutorProofTest is Test {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    DummyBridgehub internal dummyBridgehub;
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](3);
@@ -72,7 +74,7 @@ contract ExecutorProofTest is Test {
             selectors: Utils.getUtilsFacetSelectors()
         });
 
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
         executor = TestExecutorFacet(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }

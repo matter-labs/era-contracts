@@ -11,6 +11,7 @@ import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IInteropCenter} from "../interop/IInteropCenter.sol";
 import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
+import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();
@@ -29,16 +30,17 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
         }
         super.upgrade(_proposedUpgrade);
 
-        s.interopCenter = address(bridgehub.interopCenter());
-        s.nativeTokenVault = address(IL1AssetRouter(IInteropCenter(s.interopCenter).assetRouter()).nativeTokenVault());
-        s.assetTracker = (address(IInteropCenter(s.interopCenter).assetTracker()));
+        s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
+        s.assetTracker = address(INativeTokenVault(s.nativeTokenVault).assetTracker());
 
         uint256 v30UpgradeGatewayBlockNumber = (IBridgehub(s.bridgehub).messageRoot()).v30UpgradeGatewayBlockNumber();
-        require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
-        IMailbox(address(this)).requestL2ServiceTransaction(
-            L2_MESSAGE_ROOT_ADDR,
-            abi.encodeCall(L2_MESSAGE_ROOT.saveV30UpgradeGatewayBlockNumberOnL2, v30UpgradeGatewayBlockNumber)
-        );
+        if (!bridgehub.whitelistedSettlementLayers(s.chainId)) {
+            require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
+            IMailbox(address(this)).requestL2ServiceTransaction(
+                L2_MESSAGE_ROOT_ADDR,
+                abi.encodeCall(L2_MESSAGE_ROOT.saveV30UpgradeGatewayBlockNumberOnL2, v30UpgradeGatewayBlockNumber)
+            );
+        }
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
         messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
 

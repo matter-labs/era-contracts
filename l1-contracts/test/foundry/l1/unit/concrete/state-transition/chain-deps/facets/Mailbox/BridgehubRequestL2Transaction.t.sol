@@ -24,7 +24,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
         vm.deal(interopCenter, 100 ether);
-        vm.prank(address(interopCenter));
+        vm.prank(address(bridgehub));
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
@@ -41,7 +41,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
         vm.deal(interopCenter, 100 ether);
-        vm.prank(address(interopCenter));
+        vm.prank(address(bridgehub));
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
     }
@@ -58,7 +58,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
         vm.deal(interopCenter, 100 ether);
-        vm.prank(address(interopCenter));
+        vm.prank(address(bridgehub));
         vm.expectRevert(TransactionNotAllowed.selector);
         mailboxFacet.bridgehubRequestL2Transaction(req);
     }
@@ -94,6 +94,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         bytes32 oldRootHash = gettersFacet.getPriorityTreeRoot();
         assertEq(oldRootHash, bytes32(0), "root hash should be 0");
 
+        address oldBridgehub = address(bridgehub);
         address bridgehub = makeAddr("bridgehub");
 
         utilsFacet.util_setBridgehub(bridgehub);
@@ -103,7 +104,7 @@ contract MailboxBridgehubRequestL2TransactionTest is MailboxTest {
         BridgehubL2TransactionRequest memory req = getBridgehubRequestL2TransactionRequest();
 
         vm.deal(interopCenter, 100 ether);
-        vm.prank(address(interopCenter));
+        vm.prank(address(oldBridgehub));
         bytes32 canonicalTxHash = mailboxFacet.bridgehubRequestL2Transaction(req);
         assertTrue(canonicalTxHash != bytes32(0), "canonicalTxHash should not be 0");
 

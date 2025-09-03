@@ -8,6 +8,8 @@ import {L2_BOOTLOADER_ADDRESS, L2_DA_VALIDATOR_ADDRESS, L2_SYSTEM_CONTEXT_ADDRES
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 
 // solhint-enable max-line-length
 
@@ -151,28 +153,30 @@ contract UtilsTest is Test {
     }
 
     function mockDiamondInitInteropCenterCalls() public {
-        mockDiamondInitInteropCenterCallsWithAddress(address(0x1234567890876543567890));
+        mockDiamondInitInteropCenterCallsWithAddress(address(0x1234567890876543567890), address(0));
     }
 
-    function mockDiamondInitInteropCenterCallsWithAddress(address interopCenter) public {
+    function mockDiamondInitInteropCenterCallsWithAddress(address bridgehub, address assetRouter) public {
         address assetTracker = address(0x1234567890876543567890);
-        address assetRouter = address(0x1234567890876543567890);
+        if (assetRouter == address(0)) {
+            assetRouter = address(0x1234567890876543567890);
+        }
         address nativeTokenVault = address(0x1234567890876543567890);
 
         vm.mockCall(
-            interopCenter,
-            abi.encodeWithSelector(IInteropCenter.assetTracker.selector),
-            abi.encode(assetTracker)
-        );
-        vm.mockCall(
-            interopCenter,
-            abi.encodeWithSelector(IInteropCenter.assetRouter.selector),
+            bridgehub,
+            abi.encodeWithSelector(IBridgehub.assetRouter.selector),
             abi.encode(assetRouter)
         );
         vm.mockCall(
             assetRouter,
             abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
             abi.encode(nativeTokenVault)
+        );
+        vm.mockCall(
+            nativeTokenVault,
+            abi.encodeWithSelector(INativeTokenVault.assetTracker.selector),
+            abi.encode(assetTracker)
         );
     }
 

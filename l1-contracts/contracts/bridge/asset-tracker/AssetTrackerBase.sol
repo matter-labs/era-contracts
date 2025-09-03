@@ -113,6 +113,22 @@ abstract contract AssetTrackerBase is
         assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
     }
 
+    error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
+    error InsufficientTotalSupply(bytes32 _assetId, uint256 _amount);
+    function _decreaseChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        if (chainBalance[_chainId][_assetId] < _amount) {
+            revert InsufficientChainBalance(_chainId, _assetId, _amount);
+        }
+        chainBalance[_chainId][_assetId] -= _amount;
+    }
+
+    function _decreaseTotalSupplyAcrossAllChains(bytes32 _assetId, uint256 _amount) internal {
+        if (totalSupplyAcrossAllChains[_assetId] < _amount) {
+            revert InsufficientTotalSupply(_assetId, _amount);
+        }
+        totalSupplyAcrossAllChains[_assetId] -= _amount;
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/

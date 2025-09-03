@@ -98,6 +98,8 @@ library L2UtilsBase {
         vm.chainId(_args.l1ChainId);
         Bridgehub(L2_BRIDGEHUB_ADDR).initialize(_args.aliasedOwner);
         vm.prank(_args.aliasedOwner);
+        MessageRoot(L2_MESSAGE_ROOT_ADDR).setAddresses(L2_ASSET_TRACKER_ADDR);
+        vm.prank(_args.aliasedOwner);
         Bridgehub(L2_INTEROP_CENTER_ADDR).initialize(_args.aliasedOwner);
         vm.chainId(prevChainId);
         vm.prank(_args.aliasedOwner);
