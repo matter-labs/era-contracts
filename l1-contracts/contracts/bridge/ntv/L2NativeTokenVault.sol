@@ -65,6 +65,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
         _disableInitializers();
+        // solhint-disable-next-line func-named-parameters
         updateL2(_l1ChainId, _l2TokenProxyBytecodeHash, _legacySharedBridge, _wethToken, _baseTokenAssetId);
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();

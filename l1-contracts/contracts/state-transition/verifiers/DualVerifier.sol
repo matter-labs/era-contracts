@@ -192,11 +192,13 @@ contract DualVerifier is IVerifier {
     ) public pure returns (uint256 result) {
         if (initialHash == 0) {
             initialHash = _publicInputs[0];
-            for (uint256 i = 1; i < _publicInputs.length; i++) {
+            // solhint-disable-next-line gas-length-in-loops
+            for (uint256 i = 1; i < _publicInputs.length; ++i) {
                 initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
             }
         } else {
-            for (uint256 i = 0; i < _publicInputs.length; i++) {
+            // solhint-disable-next-line gas-length-in-loops
+            for (uint256 i = 0; i < _publicInputs.length; ++i) {
                 initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
             }
         }

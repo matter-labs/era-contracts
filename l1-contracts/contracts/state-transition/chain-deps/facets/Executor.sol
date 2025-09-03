@@ -146,8 +146,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
         }
 
-        // TODO: should we use daOutput?
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+        IL1DAValidator(s.l1DAValidator).checkDA({
             _chainId: s.chainId,
             _batchNumber: uint256(_newBatch.batchNumber),
             _l2DAValidatorOutputHash: _newBatch.daCommitment,

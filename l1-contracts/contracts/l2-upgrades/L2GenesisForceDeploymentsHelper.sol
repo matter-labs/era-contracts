@@ -139,6 +139,7 @@ library L2GenesisForceDeploymentsHelper {
             address(L2_ASSET_ROUTER_ADDR)
         );
         if (_isGenesisUpgrade) {
+            // solhint-disable-next-line func-named-parameters
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
@@ -148,6 +149,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.aliasedL1Governance
             );
         } else {
+            // solhint-disable-next-line func-named-parameters
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
@@ -197,6 +199,7 @@ library L2GenesisForceDeploymentsHelper {
                 deployedTokenBeacon = fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
             }
 
+            // solhint-disable-next-line func-named-parameters
             L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
@@ -207,6 +210,7 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.baseTokenAssetId
             );
         } else {
+            // solhint-disable-next-line func-named-parameters
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 previousL2TokenProxyBytecodeHash,
@@ -222,6 +226,7 @@ library L2GenesisForceDeploymentsHelper {
             address(L2_CHAIN_ASSET_HANDLER_ADDR)
         );
         if (_isGenesisUpgrade) {
+            // solhint-disable-next-line func-named-parameters
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
