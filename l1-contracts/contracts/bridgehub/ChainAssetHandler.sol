@@ -228,8 +228,14 @@ contract ChainAssetHandler is
         ++migrationNumber[bridgehubBurnData.chainId];
 
         uint256 batchNumber = IZKChain(zkChain).getTotalBatchesExecuted();
-        require(MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber) != bytes32(0), ChainBatchRootNotSet(bridgehubBurnData.chainId, batchNumber));
-        require(MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber + 1) == bytes32(0), NextChainBatchRootAlreadySet(bridgehubBurnData.chainId, batchNumber + 1));
+        require(
+            MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber) != bytes32(0),
+            ChainBatchRootNotSet(bridgehubBurnData.chainId, batchNumber)
+        );
+        require(
+            MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber + 1) == bytes32(0),
+            NextChainBatchRootAlreadySet(bridgehubBurnData.chainId, batchNumber + 1)
+        );
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
             baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(bridgehubBurnData.chainId),

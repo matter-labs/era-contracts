@@ -33,6 +33,7 @@ import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol"
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev This contract serves as the primary entry point for communication between chains connected to the interop, facilitating interactions between end user and bridges.
+/// @dev as of V30 only deployed on the L2s, not on L1.
 contract InteropCenter is
     IInteropCenter,
     IERC7786GatewaySource,

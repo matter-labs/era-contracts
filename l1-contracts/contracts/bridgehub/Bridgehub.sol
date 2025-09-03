@@ -627,8 +627,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address zkChain = zkChainMap.get(_chainId);
-        return IZKChain(zkChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
+        return
+            messageRoot.proveL2MessageInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _batchNumber,
+                _index: _index,
+                _message: _message,
+                _proof: _proof
+            });
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
@@ -645,8 +651,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address zkChain = zkChainMap.get(_chainId);
-        return IZKChain(zkChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
+        return
+            messageRoot.proveL2LogInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _batchNumber,
+                _index: _index,
+                _log: _log,
+                _proof: _proof
+            });
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
@@ -668,9 +680,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view override returns (bool) {
-        address zkChain = zkChainMap.get(_chainId);
         return
-            IZKChain(zkChain).proveL1ToL2TransactionStatus({
+            messageRoot.proveL1ToL2TransactionStatusShared({
+                _chainId: _chainId,
                 _l2TxHash: _l2TxHash,
                 _l2BatchNumber: _l2BatchNumber,
                 _l2MessageIndex: _l2MessageIndex,

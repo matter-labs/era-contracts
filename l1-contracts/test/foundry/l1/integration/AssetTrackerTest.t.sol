@@ -97,7 +97,9 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
 
-        assetTracker = IL1AssetTracker(address(INativeTokenVault(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy).assetTracker()));
+        assetTracker = IL1AssetTracker(
+            address(INativeTokenVault(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy).assetTracker())
+        );
         address l2AssetTrackerAddress = address(new L2AssetTracker());
         vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
         l2AssetTracker = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);

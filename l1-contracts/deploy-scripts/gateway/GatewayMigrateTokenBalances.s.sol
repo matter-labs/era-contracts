@@ -87,7 +87,8 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         string memory gwRpcUrl,
         bool onlyWaitForFinalization
     ) public {
-        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
+        IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
+        INativeTokenVault nativeTokenVault = INativeTokenVault(assetRouter.nativeTokenVault());
 
         uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
         bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile(toGateway ? chainId : gatewayChainId);
@@ -120,7 +121,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             return;
         }
 
-        IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(interopCenter.assetTracker()));
+        IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(nativeTokenVault.assetTracker()));
         IAssetTrackerBase l1AssetTrackerBase = IAssetTrackerBase(address(l1AssetTracker));
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {

@@ -163,11 +163,7 @@ contract UtilsTest is Test {
         }
         address nativeTokenVault = address(0x1234567890876543567890);
 
-        vm.mockCall(
-            bridgehub,
-            abi.encodeWithSelector(IBridgehub.assetRouter.selector),
-            abi.encode(assetRouter)
-        );
+        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehub.assetRouter.selector), abi.encode(assetRouter));
         vm.mockCall(
             assetRouter,
             abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),

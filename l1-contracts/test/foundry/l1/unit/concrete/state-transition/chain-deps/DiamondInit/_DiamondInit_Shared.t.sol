@@ -20,7 +20,6 @@ contract DiamondInitTest is UtilsTest {
     DummyBridgehub internal dummyBridgehub;
     InitializeData internal initializeData;
 
-
     function setUp() public virtual {
         facetCuts.push(
             Diamond.FacetCut({

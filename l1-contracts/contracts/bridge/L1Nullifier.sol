@@ -335,6 +335,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _merkleProof: _merkleProof,
                 _status: TxStatus.Failure
             });
+            require(proofValid, InvalidProof());
             L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(
                 _l2TxNumberInBatch,
                 _l2TxHash,
@@ -350,8 +351,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _proof: _merkleProof
             });
             TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
+            TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _l2BatchNumber);
             emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
-            require(proofValid, InvalidProof());
         }
 
         bool notCheckedInLegacyBridgeOrWeCanCheckDeposit;

@@ -465,7 +465,11 @@ library Utils {
             });
     }
 
-    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier, address bridgehub) public returns (address) {
+    function makeDiamondProxy(
+        Diamond.FacetCut[] memory facetCuts,
+        address testnetVerifier,
+        address bridgehub
+    ) public returns (address) {
         DiamondInit diamondInit = new DiamondInit();
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,

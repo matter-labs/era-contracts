@@ -16,6 +16,8 @@ error ChainBatchRootNotSet(uint256 chainId, uint256 batchNumber);
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
+// 0x68d91b49
+error DepthMoreThanOneForRecursiveMerkleProof();
 // 0xeab895aa
 error HyperchainNotRegistered();
 // 0x48857c1d

@@ -114,7 +114,6 @@ abstract contract AssetTrackerBase is
         assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
     }
 
-
     function _decreaseChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
         if (chainBalance[_chainId][_assetId] < _amount) {
             revert InsufficientChainBalance(_chainId, _assetId, _amount);

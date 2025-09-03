@@ -9,7 +9,7 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, GENESIS_CHAIN_BATCH_ROOT, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, PreviousChainBatchRootNotSet, LocallyNoChainsAtGenesis} from "./L1BridgehubErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, PreviousChainBatchRootNotSet, LocallyNoChainsAtGenesis} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
@@ -69,7 +69,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @notice The address of the asset tracker.
     address public assetTracker;
 
-    /// @notice The mapping storing the batch number at the moment the MessageRoot was updated to V30.
+    /// @notice The mapping storing the batch number at the moment the chain was updated to V30.
     /// @notice We store this, as we did not store chainBatchRoots prior to V30 on L1, so we need to get them from the diamond proxies of the chains.
     /// @notice We fill the mapping with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE for deployed chains until the chain upgrades to V30.
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
@@ -132,7 +132,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     }
 
     /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
-    modifier onlyL2Chain() {
+    modifier onlyL2() {
         if (block.chainid == L1_CHAIN_ID) {
             revert OnlyL2();
         }
@@ -179,6 +179,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _initialize();
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
+        /// locally there are no chains deployed before.
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
 
         v30UpgradeGatewayBlockNumber = 1;
@@ -199,10 +200,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         /// If there are no chains, that means we are using the contracts locally.
         if (allZKChainsLength == 0) {
             v30UpgradeGatewayBlockNumber = 1;
+        } else {
+            // On non-local environments we need to save the eraVM chain type manager to allow v29 chains to finalize.
+            eraVmChainTypeManager = BRIDGE_HUB.chainTypeManager(allZKChains[0]);
         }
     }
 
-    function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external {
+    function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external onlyL2 {
         uint256 sentBlockNumber;
         if (_chainId != block.chainid) {
             sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];
@@ -270,7 +274,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             V30UpgradeChainBatchNumberAlreadySet()
         );
         if (totalBatchesExecuted != 0) {
-            require(chainBatchRoots[_chainId][totalBatchesExecuted - 1] == bytes32(0), ChainBatchRootAlreadyExists(_chainId, totalBatchesExecuted));
+            require(
+                chainBatchRoots[_chainId][totalBatchesExecuted - 1] == bytes32(0),
+                ChainBatchRootAlreadyExists(_chainId, totalBatchesExecuted)
+            );
         }
         v30UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted;
     }
@@ -288,10 +295,15 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _addNewChain(_chainId, _startingBatchNumber);
     }
 
-
     /// @notice we set the chainBatchRoot to be nonempty for when a chain migrates.
-    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber) external onlyBridgehubOrChainAssetHandler {
-        require (chainBatchRoots[_chainId][_batchNumber] == bytes32(0), ChainBatchRootAlreadyExists(_chainId, _batchNumber));
+    function setMigratingChainBatchRoot(
+        uint256 _chainId,
+        uint256 _batchNumber
+    ) external onlyBridgehubOrChainAssetHandler {
+        require(
+            chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
+            ChainBatchRootAlreadyExists(_chainId, _batchNumber)
+        );
         chainBatchRoots[_chainId][_batchNumber] = GENESIS_CHAIN_BATCH_ROOT;
     }
 
@@ -414,12 +426,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     //// IMessageVerification ////
     //////////////////////////////
 
-    function _proveL2LeafInclusion(
+    function _proveL2LeafInclusionRecursive(
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
-        bytes32[] calldata _proof
+        bytes32[] calldata _proof,
+        uint256 _depth
     ) internal view override returns (bool) {
         ProofData memory proofData = MessageHashing._getProofData({
             _chainId: _chainId,
@@ -433,6 +446,9 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             bytes32 correctBatchRoot = _getChainBatchRoot(_chainId, _batchNumber);
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
+        if (_depth == 1) {
+            revert DepthMoreThanOneForRecursiveMerkleProof();
+        }
 
         require(
             BRIDGE_HUB.whitelistedSettlementLayers(proofData.settlementLayerChainId),
@@ -440,12 +456,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         );
 
         return
-            this.proveL2LeafInclusionShared({
+            this.proveL2LeafInclusionSharedRecursive({
                 _chainId: proofData.settlementLayerChainId,
                 _blockOrBatchNumber: proofData.settlementLayerBatchNumber, // SL block number
                 _leafProofMask: proofData.settlementLayerBatchRootMask,
                 _leaf: proofData.chainIdLeaf,
-                _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr)
+                _proof: MessageHashing.extractSliceUntilEnd(_proof, proofData.ptr),
+                _depth: _depth + 1
             });
     }
 
@@ -453,10 +470,11 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     function _getChainBatchRoot(uint256 _chainId, uint256 _batchNumber) internal view returns (bytes32) {
         /// In current server the zeroth batch does not have L2->L1 logs.
         require(_batchNumber > 0, BatchZeroNotAllowed());
-        if (v30UpgradeChainBatchNumber[_chainId] >= _batchNumber) {
-            return IGetters(BRIDGE_HUB.getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
+        bytes32 savedChainBatchRoot = chainBatchRoots[_chainId][_batchNumber];
+        if (savedChainBatchRoot != bytes32(0)) {
+            return savedChainBatchRoot;
         }
-        return chainBatchRoots[_chainId][_batchNumber];
+        return IGetters(BRIDGE_HUB.getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
     }
 
     /// @notice Extracts and returns proof data for settlement layer verification.

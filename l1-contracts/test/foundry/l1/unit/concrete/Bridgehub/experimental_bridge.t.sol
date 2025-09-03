@@ -38,6 +38,8 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {L1AssetTracker, IL1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+import {IMessageVerification} from "contracts/common/MessageVerification.sol";
 
 contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
@@ -888,7 +890,7 @@ contract ExperimentalBridgeTest is Test {
         assertTrue(bridgehub.getZKChain(chainId) == newChainAddress);
     }
 
-    function test_proveL2MessageInclusion(
+    function test_proveL2MessageInclusion_new(
         uint256 mockChainId,
         uint256 mockBatchNumber,
         uint256 mockIndex,
@@ -897,6 +899,7 @@ contract ExperimentalBridgeTest is Test {
         address randomSender,
         bytes memory randomData
     ) public {
+        _initializeBridgehub();
         mockChainId = _setUpZKChainForChainId(mockChainId);
 
         // Now the following statements should be true as well:
@@ -909,15 +912,9 @@ contract ExperimentalBridgeTest is Test {
         // Since we have used random data for the `InteropCenter.proveL2MessageInclusion` function which basically forwards the call
         // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
         vm.mockCall(
-            address(mockChainContract),
+            address(messageRoot),
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                mockChainContract.proveL2MessageInclusion.selector,
-                mockBatchNumber,
-                mockIndex,
-                l2Message,
-                mockProof
-            ),
+            abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
             abi.encode(true)
         );
 
@@ -933,7 +930,7 @@ contract ExperimentalBridgeTest is Test {
         vm.clearMockedCalls();
     }
 
-    function test_proveL2LogInclusion(
+    function test_proveL2LogInclusion_new(
         uint256 mockChainId,
         uint256 mockBatchNumber,
         uint256 mockIndex,
@@ -945,6 +942,7 @@ contract ExperimentalBridgeTest is Test {
         bytes32 randomKey,
         bytes32 randomValue
     ) public {
+        _initializeBridgehub();
         mockChainId = _setUpZKChainForChainId(mockChainId);
 
         // Now the following statements should be true as well:
@@ -964,15 +962,9 @@ contract ExperimentalBridgeTest is Test {
         // Since we have used random data for the `interopCenter.proveL2LogInclusion` function which basically forwards the call
         // to the same function in the mailbox, we will mock the call to the mailbox to return true and see if it works.
         vm.mockCall(
-            address(mockChainContract),
+            address(messageRoot),
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                mockChainContract.proveL2LogInclusion.selector,
-                mockBatchNumber,
-                mockIndex,
-                l2Log,
-                mockProof
-            ),
+            abi.encodeWithSelector(IMessageVerification.proveL2LogInclusionShared.selector),
             abi.encode(true)
         );
 
@@ -988,7 +980,7 @@ contract ExperimentalBridgeTest is Test {
         vm.clearMockedCalls();
     }
 
-    function test_proveL1ToL2TransactionStatus(
+    function test_proveL1ToL2TransactionStatus_new(
         uint256 randomChainId,
         bytes32 randomL2TxHash,
         uint256 randomL2BatchNumber,
@@ -998,6 +990,7 @@ contract ExperimentalBridgeTest is Test {
         bool randomResultantBool,
         bool txStatusBool
     ) public {
+        _initializeBridgehub();
         randomChainId = _setUpZKChainForChainId(randomChainId);
 
         TxStatus txStatus;
@@ -1009,17 +1002,9 @@ contract ExperimentalBridgeTest is Test {
         }
 
         vm.mockCall(
-            address(mockChainContract),
+            address(messageRoot),
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(
-                mockChainContract.proveL1ToL2TransactionStatus.selector,
-                randomL2TxHash,
-                randomL2BatchNumber,
-                randomL2MessageIndex,
-                randomL2TxNumberInBatch,
-                randomMerkleProof,
-                txStatus
-            ),
+            abi.encodeWithSelector(IMessageVerification.proveL1ToL2TransactionStatusShared.selector),
             abi.encode(randomResultantBool)
         );
 

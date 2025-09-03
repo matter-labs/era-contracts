@@ -62,7 +62,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_revertWhen_chainIdDiffersFromBlockChainId() public {
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
@@ -74,7 +73,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_revertWhen_calledWithEmptyMsgData() public {
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
@@ -89,7 +87,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_revertWhen_calledWithFullSelectorInMsgData() public {
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
@@ -104,7 +101,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_revertWhen_proxyHasNoFacetForSelector() public {
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: new Diamond.FacetCut[](0),
             initAddress: address(new DiamondInit()),
@@ -119,7 +115,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_revertWhenFacetIsFrozen() public {
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
@@ -137,7 +132,6 @@ contract DiamondProxyTest is UtilsTest {
     }
 
     function test_successfulExecution() public {
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),
@@ -160,7 +154,6 @@ contract DiamondProxyTest is UtilsTest {
             isFreezable: true,
             selectors: getTestFacetSelectors()
         });
-
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: cuts,
