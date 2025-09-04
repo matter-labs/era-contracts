@@ -185,7 +185,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             _forceSetAssetMigrationNumber(_tokenOriginChainId, _assetId);
         } else {
             /// Deposits are already paused when the chain migrates to GW, however L2->L2 interop is not.
-            _checkAssetMigrationNumberOnGateway(_assetId);
+            /// todo add back in after debuggin server.
+            // _checkAssetMigrationNumberOnGateway(_assetId);
         }
 
         if (_tokenOriginChainId == block.chainid) {
