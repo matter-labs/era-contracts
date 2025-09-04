@@ -104,6 +104,9 @@ uint256 constant L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS = 72500;
 /// @dev The encoding cost per keccak256 round(136 bytes) of the L1->l2 transaction in native resource for ZKsync OS.
 uint256 constant L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS = 17500;
 
+/// @dev The cost of calldata byte for the L1->L2 transaction in native resource for ZKsync OS.
+uint256 constant L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS = 1;
+
 /// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
 uint256 constant L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS = 88;
 

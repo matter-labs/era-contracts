@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
-import {L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_DELTA_FACTORY_DEPS_PUBDATA, L1_TX_INTRINSIC_L2_GAS, L1_TX_INTRINSIC_PUBDATA, L1_TX_MIN_L2_GAS_BASE, MEMORY_OVERHEAD_GAS, TX_SLOT_OVERHEAD_L2_GAS, ZKSYNC_OS_L1_TX_NATIVE_PRICE, L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS, L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS, L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS, L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS, L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS, L1_TX_MINIMAL_GAS_LIMIT_ZSKYNC_OS} from "../../common/Config.sol";
+import {L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_DELTA_FACTORY_DEPS_PUBDATA, L1_TX_INTRINSIC_L2_GAS, L1_TX_INTRINSIC_PUBDATA, L1_TX_MIN_L2_GAS_BASE, MEMORY_OVERHEAD_GAS, TX_SLOT_OVERHEAD_L2_GAS, ZKSYNC_OS_L1_TX_NATIVE_PRICE, L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS, L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS, L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS, L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS, L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS, L1_TX_MINIMAL_GAS_LIMIT_ZSKYNC_OS, L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS} from "../../common/Config.sol";
 import {InvalidUpgradeTxn, PubdataGreaterThanLimit, TooMuchGas, TxnBodyGasLimitNotEnoughGas, UpgradeTxVerifyParam, ValidateTxnNotEnoughGas} from "../../common/L1ContractErrors.sol";
 
 /// @title ZKsync Library for validating L1 -> L2 transactions
@@ -118,14 +118,16 @@ library TransactionValidator {
             // we are always a bit overcharging for zero bytes
             gasCost += L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS * _calldataLength;
 
-            uint256 nativeComputationalCost = L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS
-                + Math.max(1, Math.ceilDiv(_encodingLength, 136)) * L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS;
+            uint256 nativeComputationalCost = L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS; // static computational native part
+            nativeComputationalCost += Math.max(1, Math.ceilDiv(_encodingLength, 136)) * L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS; // dynamic computational native part for hashing
+            nativeComputationalCost += _calldataLength * L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS; // dynamic computational part for calldata
             uint256 gasNeededToCoverComputationalNative = nativeComputationalCost * ZKSYNC_OS_L1_TX_NATIVE_PRICE / _maxFeePerGas;
 
             uint256 pubdataGasCost = L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS * _l2GasPricePerPubdata;
 
             uint256 totalGasForNative = gasNeededToCoverComputationalNative + pubdataGasCost;
 
+            // We have `L1_TX_MINIMAL_GAS_LIMIT_ZSKYNC_OS` to be extra safe
             return Math.max(Math.max(gasCost, totalGasForNative), L1_TX_MINIMAL_GAS_LIMIT_ZSKYNC_OS);
         } else {
             uint256 costForComputation;
