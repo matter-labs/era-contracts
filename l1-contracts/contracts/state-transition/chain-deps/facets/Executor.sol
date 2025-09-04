@@ -195,7 +195,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // We are using same stored batch info structure as was used for Era VM state transition.
         // But we set some fields differently:
         // `batchHash` commitments now contains full commitment to the state and `indexRepeatedStorageChanges` not used(always set to 0)
-        // `timestamp` is not used anymore(set to 0), for Era we used it to validate that commited batch timestamp is consistent with last stored,
+        // `timestamp` is not used anymore(set to 0), for Era we used it to validate that committed batch timestamp is consistent with last stored,
         // but in ZKsync OS we are validating it within the state transition program
         storedBatchInfo = StoredBatchInfo({
             batchNumber: _newBatch.batchNumber,
