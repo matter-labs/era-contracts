@@ -266,7 +266,8 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             _l2ProtocolUpgradeTx,
             encodedTransaction,
             s.priorityTxMaxGasLimit,
-            s.feeParams.priorityTxMaxPubdata
+            s.feeParams.priorityTxMaxPubdata,
+            s.zksyncOS
         );
 
         TransactionValidator.validateUpgradeTransaction(_l2ProtocolUpgradeTx);

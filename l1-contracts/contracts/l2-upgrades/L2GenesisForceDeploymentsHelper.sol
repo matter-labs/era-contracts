@@ -181,7 +181,7 @@ library L2GenesisForceDeploymentsHelper {
             // In production, the `fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon` must always
             // be equal to 0. It is only for simplifying testing.
             if (fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
-                // We need to deploy tbe beacon, we will use a separate contract for that to save
+                // We need to deploy the beacon, we will use a separate contract for that to save
                 // up on size of this contract.
                 forceDeployOnAddress(
                     _isZKsyncOS,
