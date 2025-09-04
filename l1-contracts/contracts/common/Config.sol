@@ -113,6 +113,10 @@ uint256 constant L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS = 88;
 /// @dev The minimal L1->L2 transaction gas limit in ZKsync OS to be extra safe
 uint256 constant L1_TX_MINIMAL_GAS_LIMIT_ZSKYNC_OS = 200_000;
 
+/// @dev The native per gas ratio for upgrade transactions in ZKsync OS.
+uint256 constant UPGRADE_TX_NATIVE_PER_GAS = 10_000;
+
+
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
 uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;

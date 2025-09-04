@@ -5,8 +5,8 @@ pragma solidity ^0.8.21;
 import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {L2CanonicalTransaction} from "../../common/Messaging.sol";
-import {L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_DELTA_FACTORY_DEPS_PUBDATA, L1_TX_INTRINSIC_L2_GAS, L1_TX_INTRINSIC_PUBDATA, L1_TX_MIN_L2_GAS_BASE, MEMORY_OVERHEAD_GAS, TX_SLOT_OVERHEAD_L2_GAS, ZKSYNC_OS_L1_TX_NATIVE_PRICE, L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS, L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS, L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS, L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS, L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS, L1_TX_MINIMAL_GAS_LIMIT_ZSKYNC_OS, L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS} from "../../common/Config.sol";
-import {InvalidUpgradeTxn, PubdataGreaterThanLimit, TooMuchGas, TxnBodyGasLimitNotEnoughGas, UpgradeTxVerifyParam, ValidateTxnNotEnoughGas} from "../../common/L1ContractErrors.sol";
+import {L1_TX_DELTA_544_ENCODING_BYTES, L1_TX_DELTA_FACTORY_DEPS_L2_GAS, L1_TX_DELTA_FACTORY_DEPS_PUBDATA, L1_TX_INTRINSIC_L2_GAS, L1_TX_INTRINSIC_PUBDATA, L1_TX_MIN_L2_GAS_BASE, MEMORY_OVERHEAD_GAS, TX_SLOT_OVERHEAD_L2_GAS, ZKSYNC_OS_L1_TX_NATIVE_PRICE, L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS, L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS, L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS, L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS, L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS, L1_TX_MINIMAL_GAS_LIMIT_ZSKYNC_OS, L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS, UPGRADE_TX_NATIVE_PER_GAS, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "../../common/Config.sol";
+import {InvalidUpgradeTxn, PubdataGreaterThanLimit, TooMuchGas, TxnBodyGasLimitNotEnoughGas, UpgradeTxVerifyParam, ValidateTxnNotEnoughGas, ZeroGasPriceL1TxZKSyncOS} from "../../common/L1ContractErrors.sol";
 
 /// @title ZKsync Library for validating L1 -> L2 transactions
 /// @author Matter Labs
@@ -34,6 +34,13 @@ library TransactionValidator {
         // Ensuring that the transaction cannot output more pubdata than is processable
         if (l2GasForTxBody / _transaction.gasPerPubdataByteLimit > _priorityTxMaxPubdata) {
             revert PubdataGreaterThanLimit(_priorityTxMaxPubdata, l2GasForTxBody / _transaction.gasPerPubdataByteLimit);
+        }
+
+        // Currently we don't support L1->L2 transactions with 0 `maxFeePerGas` in ZKSyncOS,
+        // it's allowed only for upgrade transactions.
+        // It should be ensured by constants in FeeParams, although we are double-checking it just in case.
+        if (zksyncOS && _transaction.maxFeePerGas == 0 && _transaction.txType != ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE) {
+            revert ZeroGasPriceL1TxZKSyncOS();
         }
 
         // Ensuring that the transaction covers the minimal costs for its processing:
@@ -121,8 +128,14 @@ library TransactionValidator {
             uint256 nativeComputationalCost = L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS; // static computational native part
             nativeComputationalCost += Math.max(1, Math.ceilDiv(_encodingLength, 136)) * L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS; // dynamic computational native part for hashing
             nativeComputationalCost += _calldataLength * L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS; // dynamic computational part for calldata
-            // currently we don't support 0 gas price in ZKsync OS, minimal gas price in fee params set to non-zero value, so we shouldn't have 0 _maxFeePerGas here
-            uint256 gasNeededToCoverComputationalNative = nativeComputationalCost * ZKSYNC_OS_L1_TX_NATIVE_PRICE / _maxFeePerGas;
+            uint256 gasNeededToCoverComputationalNative;
+            // 0 gas price is possible only for upgrade transactions currently, it's validated before calling this method.
+            // In the future, we may redesign our fee model to support zero gas price for L1->L2 transactions.
+            if (_maxFeePerGas == 0) {
+                gasNeededToCoverComputationalNative = nativeComputationalCost / UPGRADE_TX_NATIVE_PER_GAS;
+            } else {
+                gasNeededToCoverComputationalNative = nativeComputationalCost * ZKSYNC_OS_L1_TX_NATIVE_PRICE / _maxFeePerGas;
+            }
 
             uint256 pubdataGasCost = L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS * _l2GasPricePerPubdata;
 
