@@ -433,7 +433,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
-        if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
+        // currently factory deps are forbidden with ZKsync OS
+        if ((s.zksyncOS && request.factoryDeps.length != 0) ||
+            (!s.zksyncOS && (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS))
+        ) {
             revert TooManyFactoryDeps();
         }
         _params.txId = _nextPriorityTxId();

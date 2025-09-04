@@ -17,13 +17,15 @@ library TransactionValidator {
     /// @param _encoded The abi encoded bytes of the transaction
     /// @param _priorityTxMaxGasLimit The max gas limit, generally provided from Storage.sol
     /// @param _priorityTxMaxPubdata The maximal amount of pubdata that a single L1->L2 transaction can emit
+    /// @param zksyncOS ZKsync OS state transition flag
     function validateL1ToL2Transaction(
         L2CanonicalTransaction memory _transaction,
         bytes memory _encoded,
         uint256 _priorityTxMaxGasLimit,
-        uint256 _priorityTxMaxPubdata
+        uint256 _priorityTxMaxPubdata,
+        bool zksyncOS
     ) internal pure {
-        uint256 l2GasForTxBody = getTransactionBodyGasLimit(_transaction.gasLimit, _encoded.length);
+        uint256 l2GasForTxBody = getTransactionBodyGasLimit(_transaction.gasLimit, _encoded.length, zksyncOS);
 
         // Ensuring that the transaction is provable
         if (l2GasForTxBody > _priorityTxMaxGasLimit) {
@@ -40,7 +42,8 @@ library TransactionValidator {
             getMinimalPriorityTransactionGasLimit(
                 _encoded.length,
                 _transaction.factoryDeps.length,
-                _transaction.gasPerPubdataByteLimit
+                _transaction.gasPerPubdataByteLimit,
+                zksyncOS
             ) > l2GasForTxBody
         ) {
             revert ValidateTxnNotEnoughGas();
@@ -96,15 +99,19 @@ library TransactionValidator {
     /// @param _encodingLength The length of the priority transaction encoding in bytes.
     /// @param _numberOfFactoryDependencies The number of new factory dependencies that will be added.
     /// @param _l2GasPricePerPubdata The L2 gas price for publishing the priority transaction on L2.
+    /// @param zksyncOS ZKsync OS state transition flag
     /// @return The minimum gas limit required to execute the priority transaction.
     /// Note: The calculation includes the main cost of the priority transaction, however, in reality, the operator can spend a little more gas on overheads.
     function getMinimalPriorityTransactionGasLimit(
         uint256 _encodingLength,
         uint256 _numberOfFactoryDependencies,
-        uint256 _l2GasPricePerPubdata
+        uint256 _l2GasPricePerPubdata,
+        bool zksyncOS
     ) internal pure returns (uint256) {
         uint256 costForComputation;
-        {
+        if (zksyncOS) {
+            // TODO: tune constant
+        } else {
             // Adding the intrinsic cost for the transaction, i.e. auxiliary prices which cannot be easily accounted for
             costForComputation = L1_TX_INTRINSIC_L2_GAS;
 
@@ -138,10 +145,16 @@ library TransactionValidator {
     /// @param _totalGasLimit The L2 gas limit that includes both the overhead for processing the batch
     /// and the L2 gas needed to process the transaction itself (i.e. the actual l2GasLimit that will be used for the transaction).
     /// @param _encodingLength The length of the ABI-encoding of the transaction.
+    /// @param zksyncOS ZKsync OS state transition flag
     function getTransactionBodyGasLimit(
         uint256 _totalGasLimit,
-        uint256 _encodingLength
+        uint256 _encodingLength,
+        bool zksyncOS
     ) internal pure returns (uint256 txBodyGasLimit) {
+        // There is no overhead in ZKsync OS
+        if (zksyncOS) {
+            return _totalGasLimit;
+        }
         uint256 overhead = getOverheadForTransaction(_encodingLength);
 
         // provided gas limit doesn't cover transaction overhead

@@ -109,10 +109,10 @@ contract ZKChainBase is ReentrancyGuard {
     }
 
     function _getPriorityTxType() internal view returns (uint256) {
-        return s.boojumOS ? ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE : PRIORITY_OPERATION_L2_TX_TYPE;
+        return s.zksyncOS ? ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE : PRIORITY_OPERATION_L2_TX_TYPE;
     }
 
     function _getUpgradeTxType() internal view returns (uint256) {
-        return s.boojumOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
+        return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 }
