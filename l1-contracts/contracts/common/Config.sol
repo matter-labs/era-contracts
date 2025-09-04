@@ -98,8 +98,9 @@ uint256 constant L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS = 21000;
 /// @dev The cost of calldata byte for the L1->L2 transaction in computational L2 gas for ZKsync OS.
 uint256 constant L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS = 16;
 
-/// @dev The intrinsic cost of the L1->l2 transaction in native resource for ZKsync OS.
-uint256 constant L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS = 132_500;
+/// @dev The static part of the L1->l2 transaction native cost for ZKsync OS.
+/// It includes intrinsic cost(130_000) and static part of hashing cost(2500).
+uint256 constant L1_TX_STATIC_NATIVE_ZKSYNC_OS = 132_500;
 
 /// @dev The encoding cost per keccak256 round(136 bytes) of the L1->l2 transaction in native resource for ZKsync OS.
 uint256 constant L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS = 17500;
