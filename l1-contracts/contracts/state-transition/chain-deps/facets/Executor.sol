@@ -14,7 +14,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 ///
-/// DEBUG SUPPORT START
+/// DEBUG SUPPORT START 
 ///
 // import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, PACKED_L2_BLOCK_TIMESTAMP_MASK } from "../../../common/Config.sol";
 // import {IL1DAValidator} from "../../chain-interfaces/IL1DAValidator.sol";
