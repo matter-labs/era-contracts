@@ -284,8 +284,8 @@ contract L2VerifierPlonk is IVerifier {
     function _loadVerificationKey() internal pure virtual {
         assembly {
             // gate setup commitments
-            mstore(VK_GATE_SETUP_0_X_SLOT, 0x01918c565e0b8b95308aadb6e8e7d06b68bd84cd54821a9fdb5fadb94007209e)
-            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x2dc1c625e2661d27277d0289225406d780efaf5c1531b196299c1425a8f9d942)
+            mstore(VK_GATE_SETUP_0_X_SLOT, 0x115013b5bceb6eb2268a31c0da5897f1af9118615edf48a6aef7a1e79788b98e)
+            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x106e02bf8687b4803b250c32b6a85cbdd275bc770cd65b9be98107316531d727)
             mstore(VK_GATE_SETUP_1_X_SLOT, 0x0feda978f4639d0a725df74c4738bf178adca34e6a4f7cc38d6a9ae9ee49f695)
             mstore(VK_GATE_SETUP_1_Y_SLOT, 0x2f7068beedb881aea392246c33ccc026ea9c8f6ea558a055b6df00ebfdf210a3)
             mstore(VK_GATE_SETUP_2_X_SLOT, 0x06eccb685da5c8cc09a13698b2a22e383025abc75393d68c1da5a7dbacffbd9b)
@@ -296,8 +296,8 @@ contract L2VerifierPlonk is IVerifier {
             mstore(VK_GATE_SETUP_4_Y_SLOT, 0x1ac2f036e3de6e4a9bacd5eacc778fa3fbdf5fd4b06e551038c704adecbeb639)
             mstore(VK_GATE_SETUP_5_X_SLOT, 0x048e2130f16d54d7e07df66330b4d892753b5141ecacb4007573d9ea4a8ff028)
             mstore(VK_GATE_SETUP_5_Y_SLOT, 0x13a3819d4cb80114e51de741a5fb48ce4ba20e82c5d39d16f70ca0461f49a131)
-            mstore(VK_GATE_SETUP_6_X_SLOT, 0x2e39e99f8224c3b38be5c00f3111d4d235cb744e6807a2594265c2c915345de9)
-            mstore(VK_GATE_SETUP_6_Y_SLOT, 0x1f857e15cb40a35fc778fe2f683abe36fd7bd5b171f50608274982f1a60e115d)
+            mstore(VK_GATE_SETUP_6_X_SLOT, 0x2ea3ddc1e70175b18e5700083c5e4bb2dc26003286a68f60e90d3125f4f087bd)
+            mstore(VK_GATE_SETUP_6_Y_SLOT, 0x04e91a7968dc135a99a703c6cb514be7f0f01b64330752a08c8796c42e040118)
             mstore(VK_GATE_SETUP_7_X_SLOT, 0x1affeacdceb1b6f018bbb6762bb5aebcd54c3e24801ce01d06146d1bf0938b2c)
             mstore(VK_GATE_SETUP_7_Y_SLOT, 0x19a277dd9eaac40538f3177e3390ec21d097f88afb04158dd59e963a327fe9da)
 
