@@ -93,6 +93,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
 
     function test_BasicRequestL1L2_ZKsyncOS() public pure {
         L2CanonicalTransaction memory testTx = createTestTransaction();
+        testTx.maxFeePerGas = 100000;
         testTx.gasLimit = 500000;
         validateL1ToL2Transaction(testTx, 500000, 100000, true);
     }
@@ -100,6 +101,7 @@ contract ValidateL1L2TxTest is TransactionValidatorSharedTest {
     function test_RevertWhen_BelowMinimumCost_ZKsyncOS() public {
         L2CanonicalTransaction memory testTx = createTestTransaction();
         uint256 priorityTxMaxGasLimit = 500000;
+        testTx.maxFeePerGas = 1;
         testTx.gasLimit = 199999;
         vm.expectRevert(ValidateTxnNotEnoughGas.selector);
         validateL1ToL2Transaction(testTx, priorityTxMaxGasLimit, 100000, true);

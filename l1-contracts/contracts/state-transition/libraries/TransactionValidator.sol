@@ -121,6 +121,7 @@ library TransactionValidator {
             uint256 nativeComputationalCost = L1_TX_INTRINSIC_NATIVE_ZKSYNC_OS; // static computational native part
             nativeComputationalCost += Math.max(1, Math.ceilDiv(_encodingLength, 136)) * L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS; // dynamic computational native part for hashing
             nativeComputationalCost += _calldataLength * L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS; // dynamic computational part for calldata
+            // currently we don't support 0 gas price in ZKsync OS, minimal gas price in fee params set to non-zero value, so we shouldn't have 0 _maxFeePerGas here
             uint256 gasNeededToCoverComputationalNative = nativeComputationalCost * ZKSYNC_OS_L1_TX_NATIVE_PRICE / _maxFeePerGas;
 
             uint256 pubdataGasCost = L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS * _l2GasPricePerPubdata;
