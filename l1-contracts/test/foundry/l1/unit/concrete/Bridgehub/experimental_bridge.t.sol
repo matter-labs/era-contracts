@@ -152,7 +152,6 @@ contract ExperimentalBridgeTest is Test {
         sharedBridge = new L1AssetRouter(
             mockL1WethAddress,
             address(bridgehub),
-            address(interopCenter),
             l1NullifierAddress,
             eraChainId,
             eraDiamondProxy
@@ -166,7 +165,6 @@ contract ExperimentalBridgeTest is Test {
         secondBridge = new L1AssetRouter(
             mockL1WethAddress,
             address(bridgehub),
-            address(interopCenter),
             l1NullifierAddress,
             eraChainId,
             eraDiamondProxy

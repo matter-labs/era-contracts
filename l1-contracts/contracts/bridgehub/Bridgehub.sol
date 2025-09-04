@@ -23,7 +23,7 @@ import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotRelayedSender, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotRelayedSender, OnlyL2, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdAlreadyExists, ChainIdCantBeCurrentChain, ChainIdMismatch, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, IncorrectBridgeHubAddress, MigrationPaused, MsgValueMismatch, NoCTMForAssetId, NotCurrentSettlementLayer, NotL1, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, WrongMagicValue, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 
@@ -125,6 +125,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert NotL1(L1_CHAIN_ID, block.chainid);
+        }
+        _;
+    }
+
+    modifier onlyL2() {
+        if (L1_CHAIN_ID == block.chainid) {
+            revert OnlyL2();
         }
         _;
     }
@@ -387,7 +394,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice used to register chains on L2 for the purpose of interop.
     /// @param _chainId the chainId of the chain to be registered.
     /// @param _baseTokenAssetId the base token asset id of the chain.
-    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
+    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender onlyL2 {
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
         // kl todo: should we add ctm asset id here?
     }

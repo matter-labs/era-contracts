@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
+import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -207,7 +207,7 @@ contract ChainAssetHandler is
             );
 
             if (zkChain == address(0)) {
-                revert HyperchainNotRegistered();
+                revert ZKChainNotRegistered();
             }
             if (_originalCaller != IZKChain(zkChain).getAdmin()) {
                 revert IncorrectSender(_originalCaller, IZKChain(zkChain).getAdmin());

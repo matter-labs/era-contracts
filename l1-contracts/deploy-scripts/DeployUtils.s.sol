@@ -388,7 +388,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
                 abi.encode(
                     config.tokens.tokenWethAddress,
                     addresses.bridgehub.bridgehubProxy,
-                    addresses.bridgehub.interopCenterProxy,
                     addresses.bridges.l1NullifierProxy,
                     config.eraChainId,
                     addresses.stateTransition.diamondProxy

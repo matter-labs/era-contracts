@@ -295,7 +295,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
                 ChainBatchRootAlreadyExists(_chainId, totalBatchesExecuted)
             );
         }
-        v30UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted;
+        v30UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
     }
 
     function setAddresses(address _assetTracker) external onlyBridgehubOwner {
@@ -495,6 +495,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
 
     /// @notice Extracts and returns proof data for settlement layer verification.
     /// @dev Wrapper function around MessageHashing._getProofData for public access.
+    /// @dev The caller should check that the proof has recursion at most depth 1, i.e. only a single intermediate Gateway between the chain and L1.
+    /// @dev This check is performed when the MessageRoot verifies the proof, so often it can be skipped.
     /// @param _chainId The chain ID where the proof was generated.
     /// @param _batchNumber The batch number containing the proof.
     /// @param _leafProofMask The leaf proof mask for merkle verification.

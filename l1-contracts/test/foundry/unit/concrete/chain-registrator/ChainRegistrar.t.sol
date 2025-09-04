@@ -60,7 +60,6 @@ contract ChainRegistrarTest is Test {
         assetRouter = new L1AssetRouter({
             _l1WethAddress: makeAddr("weth"),
             _bridgehub: address(bridgeHub),
-            _interopCenter: address(interopCenter),
             _l1Nullifier: address(l1NullifierImpl),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")

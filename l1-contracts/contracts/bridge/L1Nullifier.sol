@@ -522,6 +522,9 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _message: l2ToL1Message,
             _proof: _finalizeWithdrawalParams.merkleProof
         });
+        // withdrawal wrong proof
+        require(success, InvalidProof());
+
         bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
         ProofData memory proofData = MESSAGE_ROOT.getProofData({
             _chainId: _finalizeWithdrawalParams.chainId,
@@ -533,8 +536,6 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT, proofData.settlementLayerChainId);
         TransientPrimitivesLib.set(TRANSIENT_SETTLEMENT_LAYER_SLOT + 1, _finalizeWithdrawalParams.l2BatchNumber);
         emit TransientSettlementLayerSet(proofData.settlementLayerChainId);
-        // withdrawal wrong proof
-        require(success, InvalidProof());
     }
 
     /// @inheritdoc IL1Nullifier

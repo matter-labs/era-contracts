@@ -30,10 +30,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     IBridgehub public immutable override BRIDGE_HUB;
 
-    /// @dev InteropCenter smart contract that is used to used as a primary point for communication of chains connected to the interop.
-    /// @dev This is not used but is present for discoverability.
-    IInteropCenter public immutable override INTEROP_CENTER;
-
     /// @dev Chain ID of L1 for bridging reasons
     uint256 public immutable L1_CHAIN_ID;
 
@@ -65,19 +61,12 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         _;
     }
 
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyL2InteropCenter() {
-        require(msg.sender == L2_INTEROP_CENTER_ADDR, Unauthorized(msg.sender));
-        _;
-    }
-
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub, IInteropCenter _interopCenter) {
+    constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub) {
         L1_CHAIN_ID = _l1ChainId;
         ERA_CHAIN_ID = _eraChainId;
         BRIDGE_HUB = _bridgehub;
-        INTEROP_CENTER = _interopCenter;
     }
 
     /// @inheritdoc IAssetRouterBase

@@ -19,7 +19,7 @@ error ChainExists();
 // 0x68d91b49
 error DepthMoreThanOneForRecursiveMerkleProof();
 // 0xeab895aa
-error HyperchainNotRegistered();
+error ZKChainNotRegistered();
 // 0x48857c1d
 error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 // 0xdb495273
