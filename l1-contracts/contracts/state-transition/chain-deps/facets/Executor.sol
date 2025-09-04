@@ -503,8 +503,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processTo,
         bytes calldata _commitData
     ) internal {
-        (StoredBatchInfo memory lastCommittedBatchData, CommitBoojumOSBatchInfo[] memory newBatchesData) = BatchDecoder
-            .decodeAndCheckBoojumOSCommitData(_commitData, _processFrom, _processTo);
+        (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfoZKsyncOS[] memory newBatchesData) = BatchDecoder
+            .decodeAndCheckCommitDataZKsyncOS(_commitData, _processFrom, _processTo);
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
         // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
         // and so the range checked in the `decodeAndCheckCommitData` is enough.
@@ -616,7 +616,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     function _commitBatchesZKsyncOS(
         StoredBatchInfo memory _lastCommittedBatchData,
-        CommitBoojumOSBatchInfo[] memory _newBatchesData,
+        CommitBatchInfoZKsyncOS[] memory _newBatchesData,
         bool _processSystemUpgradeTx
     ) internal {
         bytes32 upgradeTxHash;

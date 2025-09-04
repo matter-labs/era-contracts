@@ -68,7 +68,7 @@ library BatchDecoder {
         if (encodingVersion == SUPPORTED_ENCODING_VERSION_ZKSYNC_OS) {
             (lastCommittedBatchData, newBatchesData) = abi.decode(
                 _commitData[1:],
-                (IExecutor.StoredBatchInfo, IExecutor.CommitBoojumOSBatchInfo[])
+                (IExecutor.StoredBatchInfo, IExecutor.CommitBatchInfoZKsyncOS[])
             );
         } else {
             revert UnsupportedCommitBatchEncoding(encodingVersion);
@@ -142,7 +142,7 @@ library BatchDecoder {
         pure
         returns (
             IExecutor.StoredBatchInfo memory lastCommittedBatchData,
-            IExecutor.CommitBoojumOSBatchInfo[] memory newBatchesData
+            IExecutor.CommitBatchInfoZKsyncOS[] memory newBatchesData
         )
     {
         (lastCommittedBatchData, newBatchesData) = _decodeCommitDataZKsyncOS(_commitData);
