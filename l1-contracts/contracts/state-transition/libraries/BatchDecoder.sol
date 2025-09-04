@@ -48,8 +48,9 @@ library BatchDecoder {
         }
     }
 
-    // exactly the same as regular `decodeAndCheckCommitData`, except for one difference:
-    // uses different structure for the commit batch info
+    // exactly the same as regular `_decodeCommitData`, except for 2 differences:
+    // - encoding version is different
+    // - uses different structure for the commit batch info
     function _decodeCommitDataZKsyncOS(
         bytes calldata _commitData
     )
@@ -130,9 +131,8 @@ library BatchDecoder {
         }
     }
 
-    // exactly the same as regular `decodeAndCheckCommitData`, except for 2 differences:
-    // - encoding version is different
-    // - uses different structure for the commit batch info
+    // exactly the same as regular `decodeAndCheckCommitData`, except for one difference:
+    // uses different structure for the commit batch info
     function decodeAndCheckCommitDataZKsyncOS(
         bytes calldata _commitData,
         uint256 _processBatchFrom,
