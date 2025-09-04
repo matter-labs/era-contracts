@@ -113,7 +113,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _assetId);
         } else {
-            /// We require that the asset is migrated, deposits are paused until then.
+            // We require that the asset is migrated, deposits are paused until then.
             require(
                 currentSettlementLayer == block.chainid ||
                     savedAssetMigrationNumber == _getChainMigrationNumber(_chainId),
@@ -129,7 +129,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             TransientPrimitivesLib.set(key + 1, _amount);
         }
 
-        /// We increase/decrease the totalSupply
+        // `totalSupplyAcrossAllChains` stores the total balance of tokens outside of the origin chain.
+        // There are three possible cases:
+        // 1. We are depositing it back to the origin chain. The balance outside of it decreases and so we decrease
+        // totalSupplyAcrossAllChains.
+        // 2. The token's origin is L1 and so regardless of the destination chain, the total amount outside of L1, i.e. 
+        // inside our ecosystem increases.
+        // 3. (Skipped) Since the token moves between non-origin chains, the totalSupplyAcrossAllChains remains unchanged.
         if (_tokenOriginChainId == _chainId) {
             totalSupplyAcrossAllChains[_assetId] -= _amount;
         } else if (_tokenOriginChainId == block.chainid) {
@@ -181,7 +187,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
         (uint256 settlementLayer, uint256 l2BatchNumber) = L1_NULLIFIER.getTransientSettlementLayer();
+        // This is the batch starting from which it is the responsibility of all the settlement layers to ensure that
+        // all withdrawals coming from the chain are backed inside the balance of this settlement layer.
+        // Note, that since this method is used for claiming failed deposits, it implies that any failed deposit that has been processed
+        // why the chain settled on top of Gateway, has been accredited to Gateway's balance.
+        // For all the batches smaller or equal to that, the responsibility lies with the chain itself.
         uint256 v30UpgradeChainBatchNumber = MESSAGE_ROOT.v30UpgradeChainBatchNumber(_chainId);
+
         /// We need to wait for the proper v30UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
         require(
             v30UpgradeChainBatchNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,

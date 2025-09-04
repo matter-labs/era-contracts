@@ -30,6 +30,10 @@ contract L2MessageVerification is MessageVerification {
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
 
+        // Note, that here we assume that the all settlement layers that the chain has ever settled on are trustworthy, 
+        // i.e. all chains inside the ecosystem trust that they will not accept a message from a chain 
+        // that never happened.
+
         return
             this.proveL2LeafInclusionShared({
                 _chainId: proofData.settlementLayerChainId,

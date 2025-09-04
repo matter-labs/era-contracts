@@ -529,6 +529,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             _proof: _finalizeWithdrawalParams.merkleProof
         });
         bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
+        // Note that this line just unpacks proof without checking its validity at all.
         ProofData memory proofData = MESSAGE_ROOT.getProofData({
             _chainId: _finalizeWithdrawalParams.chainId,
             _batchNumber: _finalizeWithdrawalParams.l2BatchNumber,

@@ -89,6 +89,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// that before v30 is released, only a single one is present and this variable refers to that single whitelisted settlement layer.
     /// @dev After v30 release, if the access is granted to all the messages that were ever sent by chains settling on top of Gateway, and
     /// it is manually checked that no asset bearing messages were sent before this period, this check can be removed. 
+    /// @dev Whenever this variable is used, the user must ensure that it is not zero, as it would imply unknown number.
+    /// @dev Note, that it is an L2 BLOCK number, not a BATCH number.
     uint256 public v30UpgradeGatewayBlockNumber;
 
     /// @dev The chain type manager for EraVM chains. EraVM chains are upgraded directly by governance,
@@ -173,7 +175,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         BRIDGE_HUB = _bridgehub;
         L1_CHAIN_ID = _l1ChainId;
 
-        // TODO: explicitly add a check that exactly Era-based Gateway chain id is used.
+        // TODO: explicitly add a check that exactly Era-based Gateway chain id is used, 
+        // since `v30UpgradeGatewayBlockNumber` must only be set by a service transaction.
         if (L1_CHAIN_ID != block.chainid) {
             /// On Gateway we save the chain type manager for EraVM chains.
             uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
@@ -181,6 +184,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
                 // On non-local environments we need to save the eraVM chain type manager to allow v29 chains to finalize.
                 eraVmChainTypeManager = BRIDGE_HUB.chainTypeManager(allZKChains[0]);
             }
+            // TODO: it should have the same logic as initializeV30.
             /// On Gateway we save the upgrade block number
             v30UpgradeGatewayBlockNumber = block.number;
         }
@@ -219,6 +223,8 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     }
 
     function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external {
+        // TODO: this function should only work for the first ZK GW chain only.
+
         uint256 sentBlockNumber;
         if (_chainId != block.chainid) {
             sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];
@@ -235,6 +241,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         );
     }
 
+    /// @notice Saves the v30 upgrade batch number for chains that settle on top of Gateway.
     function saveV30UpgradeGatewayBlockNumberOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         bool success = proveL1DepositParamsInclusion(_finalizeWithdrawalParams, L2_MESSAGE_ROOT_ADDR);
         if (!success) {
@@ -242,9 +249,11 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         }
 
         require(
+            // We assume that all whitelisted settlement layers are trusted and never lie.
             BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
             NotWhitelistedSettlementLayer(_finalizeWithdrawalParams.chainId)
         );
+        // TODO: split the messageroot into L1MessageRoot and L2MessageRoot
         require(block.chainid == L1_CHAIN_ID, OnlyL1());
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_finalizeWithdrawalParams.message, 0);
@@ -253,15 +262,16 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             IncorrectFunctionSignature()
         );
 
-        require(v30UpgradeGatewayBlockNumber == 0, V30UpgradeGatewayBlockNumberAlreadySet());
         (uint256 chainId, ) = UnsafeBytes.readUint256(_finalizeWithdrawalParams.message, offset);
         (uint256 receivedV30UpgradeGatewayBlockNumber, ) = UnsafeBytes.readUint256(
             _finalizeWithdrawalParams.message,
             offset
         );
         if (chainId == _finalizeWithdrawalParams.chainId) {
+            require(v30UpgradeGatewayBlockNumber == 0, V30UpgradeGatewayBlockNumberAlreadySet());
             v30UpgradeGatewayBlockNumber = receivedV30UpgradeGatewayBlockNumber;
         } else {
+            require(v30UpgradeChainBatchNumber[chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1, V30UpgradeChainBatchNumberAlreadySet());
             v30UpgradeChainBatchNumber[chainId] = receivedV30UpgradeGatewayBlockNumber;
         }
     }
@@ -273,6 +283,14 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     }
 
     function saveV30UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
+        // TODO: redo this function to follow the logic:
+        // - Chains can only set this value on SL. This is needed to ensure that SL is safe from a malicious chain
+        // providing different values on different SL.
+        // - All SLs are trusted and so only a single one would hold the value at the beginning.
+        // - This number is transferred to SLs either through migration on top of those or through SL->L1 message (special case).
+
+        // From the above, as long as all settlement layers are valid, we'll have consistent values on all settlement layers.
+
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
         require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
@@ -450,6 +468,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             return correctBatchRoot == proofData.batchSettlementRoot && correctBatchRoot != bytes32(0);
         }
 
+        // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
+        // to a chain's message root only if the chain has indeed executed its batch on top of it.
+        //
+        // We trust all chains whitelisted by the Bridgehub governance.
         require(
             BRIDGE_HUB.whitelistedSettlementLayers(proofData.settlementLayerChainId),
             NotWhitelistedSettlementLayer(proofData.settlementLayerChainId)
