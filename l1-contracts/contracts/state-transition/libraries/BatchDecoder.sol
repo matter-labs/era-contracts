@@ -15,9 +15,9 @@ import {InteropRoot} from "../../common/Messaging.sol";
 library BatchDecoder {
     /// @notice The currently supported encoding version.
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
-    /// @notice The currently supported encoding version for ZKSync OS.
-    /// We use different versioning to clearly distinguish encoded data.
-    uint8 internal constant SUPPORTED_ENCODING_VERSION_ZKSYNC_OS = 2;
+    /// @notice The currently supported encoding version for ZKSync OS commit data.
+    /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
+    uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 2;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.
     /// @param _commitData The calldata byte array containing the data for committing batches.
@@ -65,7 +65,7 @@ library BatchDecoder {
         }
 
         uint8 encodingVersion = uint8(_commitData[0]);
-        if (encodingVersion == SUPPORTED_ENCODING_VERSION_ZKSYNC_OS) {
+        if (encodingVersion == SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS) {
             (lastCommittedBatchData, newBatchesData) = abi.decode(
                 _commitData[1:],
                 (IExecutor.StoredBatchInfo, IExecutor.CommitBatchInfoZKsyncOS[])
