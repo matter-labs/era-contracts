@@ -15,7 +15,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
@@ -420,10 +420,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         return L1_ASSET_ROUTER;
     }
 
-    // slither-disable-next-line uninitialized-state-variables
-    function _bridgehub() internal view override returns (IBridgehub) {
-        // slither-disable-next-line uninitialized-state-variables
-        return BRIDGE_HUB;
+    function _bridgehub() internal pure override returns (IBridgehub) {
+        return IBridgehub(L2_BRIDGEHUB_ADDR);
     }
 
     function _l1ChainId() internal view override returns (uint256) {
