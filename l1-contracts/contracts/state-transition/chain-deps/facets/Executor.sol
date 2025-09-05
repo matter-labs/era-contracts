@@ -152,6 +152,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // we can just ignore l1 da validator output with ZKsync OS:
         // - used state diffs hash correctness verifier within state transition program
         // - blobs not supported yet, and likely even once it's supported design will allow to ignore blobs related values anyway
+        // slither-disable-next-line unused-return
         IL1DAValidator(s.l1DAValidator).checkDA({
             _chainId: s.chainId,
             _batchNumber: uint256(_newBatch.batchNumber),
@@ -213,6 +214,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // If we are settling on top of Gateway, we always relay the data needed to construct
             // a proof for a new batch (and finalize it) even if the data for Gateway transactions has been fully lost.
             // For ZKsync OS this data includes only `StoredBatchInfo`: that is needed to commit and prove a batch on top of the previous one.
+            // slither-disable-next-line unused-return
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
                 abi.encode(RELAYED_EXECUTOR_VERSION_ZKSYNC_OS, storedBatchInfo)
             );
