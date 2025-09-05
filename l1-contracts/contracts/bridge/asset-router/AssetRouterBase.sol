@@ -13,10 +13,9 @@ import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {AssetHandlerDoesNotExist, AssetIdNotSupported, BadTransferDataLength, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 

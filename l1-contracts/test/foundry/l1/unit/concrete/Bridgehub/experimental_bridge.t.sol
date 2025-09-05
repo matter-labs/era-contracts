@@ -111,7 +111,7 @@ contract ExperimentalBridgeTest is Test {
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         dummyBridgehub = new DummyBridgehubSetter(l1ChainId, bridgeOwner, type(uint256).max);
         bridgehub = Bridgehub(address(dummyBridgehub));
-        interopCenter = new InteropCenter(bridgehub, l1ChainId, bridgeOwner);
+        interopCenter = new InteropCenter(l1ChainId, bridgeOwner);
         messageRoot = new MessageRoot(bridgehub, l1ChainId, 1);
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
@@ -274,7 +274,7 @@ contract ExperimentalBridgeTest is Test {
             address(interopCenter),
             address(0x000000000000000000000000000000000002000a)
         );
-        interopCenter.setAddresses(sharedBridgeAddress, address(assetTracker));
+        // interopCenter.setAddresses(sharedBridgeAddress, address(assetTracker));
         vm.stopPrank();
 
         vm.prank(l1Nullifier.owner());

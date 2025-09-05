@@ -42,7 +42,7 @@ contract ChainRegistrarTest is Test {
 
     constructor() {
         bridgeHub = new DummyBridgehub();
-        interopCenter = new InteropCenter(IBridgehub(address(bridgeHub)), block.chainid, makeAddr("admin"));
+        interopCenter = new InteropCenter(block.chainid, makeAddr("admin"));
         messageRoot = new MessageRoot(IBridgehub(address(bridgeHub)), block.chainid, 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");

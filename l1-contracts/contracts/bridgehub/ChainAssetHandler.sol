@@ -263,6 +263,16 @@ contract ChainAssetHandler is
             (BridgehubMintCTMAssetData)
         );
 
+        uint256 currentMigrationNumber = migrationNumber[bridgehubMintData.chainId];
+        /// If we are not migrating for the first time, we check that the migration number is correct.
+        if (currentMigrationNumber != 0) {
+            require(
+                currentMigrationNumber + 1 == bridgehubMintData.migrationNumber,
+                MigrationNumberMismatch(currentMigrationNumber + 1, bridgehubMintData.migrationNumber)
+            );
+        }
+        migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
+
         (address zkChain, address ctm) = BRIDGE_HUB.forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
@@ -281,15 +291,7 @@ contract ChainAssetHandler is
         } else {
             MESSAGE_ROOT.setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.migrationNumber);
         }
-        if (migrationNumber[bridgehubMintData.chainId] == 0) {
-            migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
-        } else {
-            uint256 newMigrationNumber = ++migrationNumber[bridgehubMintData.chainId];
-            require(
-                newMigrationNumber == bridgehubMintData.migrationNumber,
-                MigrationNumberMismatch(newMigrationNumber, bridgehubMintData.migrationNumber)
-            );
-        }
+
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);

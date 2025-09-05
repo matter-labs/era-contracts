@@ -150,16 +150,16 @@ library L2Utils {
 
     function forceDeployInteropCenter(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
-        new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId, _args.aliasedOwner);
+        new InteropCenter(_args.l1ChainId, _args.aliasedOwner);
         forceDeployWithConstructor(
             "InteropCenter",
             L2_INTEROP_CENTER_ADDR,
-            abi.encode(L2_BRIDGEHUB_ADDR, _args.l1ChainId, _args.aliasedOwner),
+            abi.encode(_args.l1ChainId, _args.aliasedOwner),
             _args.broadcast
         );
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         prankOrBroadcast(_args.broadcast, _args.aliasedOwner);
-        interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
+        // interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {

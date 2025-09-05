@@ -13,6 +13,7 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
 contract TestExecutorFacet is ExecutorFacet {
     constructor() ExecutorFacet(block.chainid) {}
@@ -45,7 +46,7 @@ contract TestExecutorFacet is ExecutorFacet {
     function test() internal virtual {}
 }
 
-contract ExecutorProofTest is Test {
+contract ExecutorProofTest is UtilsTest {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
@@ -73,6 +74,8 @@ contract ExecutorProofTest is Test {
             isFreezable: true,
             selectors: Utils.getUtilsFacetSelectors()
         });
+        dummyBridgehub = new DummyBridgehub();
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0));
 
         address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
         executor = TestExecutorFacet(diamondProxy);
@@ -133,5 +136,5 @@ contract ExecutorProofTest is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal {}
+    function test() internal override  {}
 }

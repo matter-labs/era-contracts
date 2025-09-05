@@ -867,8 +867,6 @@ contract DeployL1Script is Script, DeployUtils {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "Bridgehub")) {
                 return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "InteropCenter")) {
-                return abi.encodeCall(InteropCenter.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "ChainRegistrationSender")) {
                 return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "MessageRoot")) {

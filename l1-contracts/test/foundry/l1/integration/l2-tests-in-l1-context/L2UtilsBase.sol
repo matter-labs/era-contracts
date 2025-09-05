@@ -63,7 +63,7 @@ library L2UtilsBase {
         // we deploy the code to get the contract code with immutables which we then vm.etch
         address bridgehub = address(new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100));
         address interopCenter = address(
-            new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId, _args.aliasedOwner)
+            new InteropCenter(_args.l1ChainId, _args.aliasedOwner)
         );
         address assetRouter = address(
             new L2AssetRouter(
@@ -99,8 +99,6 @@ library L2UtilsBase {
         Bridgehub(L2_BRIDGEHUB_ADDR).initialize(_args.aliasedOwner);
         vm.prank(_args.aliasedOwner);
         MessageRoot(L2_MESSAGE_ROOT_ADDR).setAddresses(L2_ASSET_TRACKER_ADDR);
-        vm.prank(_args.aliasedOwner);
-        Bridgehub(L2_INTEROP_CENTER_ADDR).initialize(_args.aliasedOwner);
         vm.chainId(prevChainId);
         vm.prank(_args.aliasedOwner);
         address aliasedL1ChainRegistrationSender = address(0x000000000000000000000000000000000002000a);
@@ -156,8 +154,6 @@ library L2UtilsBase {
             vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, l2DummyBaseTokenSystemContract.code);
         }
 
-        vm.prank(_args.aliasedOwner);
-        IInteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
 
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);

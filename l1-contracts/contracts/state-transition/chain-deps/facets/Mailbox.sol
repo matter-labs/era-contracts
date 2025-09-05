@@ -311,7 +311,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint64 _expirationTimestamp,
         uint256 _baseTokenAmount,
         bool _getBalanceChange
-    ) external override onlyL1 returns (bytes32 canonicalTxHash) {
+    ) public override onlyL1 returns (bytes32 canonicalTxHash) {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
         }
@@ -359,6 +359,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
 
+    /// @inheritdoc IMailboxImpl
+    function requestL2TransactionToGatewayMailbox(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external override returns (bytes32 canonicalTxHash) {
+        return requestL2TransactionToGatewayMailboxWithBalanceChange(_chainId, _canonicalTxHash, _expirationTimestamp, 0, false);
+    }
+    
     /// @inheritdoc IMailboxImpl
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,

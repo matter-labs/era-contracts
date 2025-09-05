@@ -18,8 +18,6 @@ error ChainBatchRootZero();
 error ChainExists();
 // 0x68d91b49
 error DepthMoreThanOneForRecursiveMerkleProof();
-// 0xeab895aa
-error ZKChainNotRegistered();
 // 0x48857c1d
 error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 // 0xdb495273
@@ -96,3 +94,5 @@ error V30UpgradeChainBatchNumberNotSet();
 error V30UpgradeGatewayBlockNumberAlreadySet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
+// 0x7b968d06
+error ZKChainNotRegistered();
