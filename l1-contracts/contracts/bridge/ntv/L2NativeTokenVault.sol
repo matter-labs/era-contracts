@@ -79,7 +79,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         }
     }
 
-    function _assetTracker() internal view override returns (IAssetTrackerBase) {
+    function assetTracker() public view override(INativeTokenVault, NativeTokenVault) returns (IAssetTrackerBase) {
         return IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
     }
 
@@ -177,7 +177,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         originChainId[_assetId] = L1_CHAIN_ID;
         bridgedTokens[bridgedTokensCount] = _assetId;
         ++bridgedTokensCount;
-        _assetTracker().registerLegacyTokenOnChain(_assetId);
+        assetTracker().registerLegacyTokenOnChain(_assetId);
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.

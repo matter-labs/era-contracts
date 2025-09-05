@@ -27,6 +27,7 @@ import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
 import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../bridgehub/L1BridgehubErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -202,19 +203,20 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         return
             _proveL2LeafInclusion({
                 _chainId: s.chainId,
-                _batchNumber: _batchNumber,
+                _blockOrBatchNumber: _batchNumber,
                 _leafProofMask: _leafProofMask,
                 _leaf: _leaf,
                 _proof: _proof
             });
     }
 
-    function _proveL2LeafInclusion(
+    function _proveL2LeafInclusionRecursive(
         uint256 _chainId,
         uint256 _batchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
-        bytes32[] calldata _proof
+        bytes32[] calldata _proof,
+        uint256 _depth
     ) internal view override returns (bool) {
         ProofData memory proofData = MessageHashing._getProofData({
             _chainId: _chainId,
@@ -237,6 +239,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 revert LocalRootIsZero();
             }
             return correctBatchRoot == proofData.batchSettlementRoot;
+        }
+        if (_depth == 1) {
+            revert DepthMoreThanOneForRecursiveMerkleProof();
         }
 
         if (s.l2LogsRootHashes[_batchNumber] != bytes32(0)) {
@@ -306,7 +311,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint64 _expirationTimestamp,
         uint256 _baseTokenAmount,
         bool _getBalanceChange
-    ) external override onlyL1 returns (bytes32 canonicalTxHash) {
+    ) public override onlyL1 returns (bytes32 canonicalTxHash) {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
         }
@@ -354,6 +359,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         canonicalTxHash = _requestL2TransactionFree(wrappedRequest);
     }
 
+    /// @inheritdoc IMailboxImpl
+    function requestL2TransactionToGatewayMailbox(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external override returns (bytes32 canonicalTxHash) {
+        return requestL2TransactionToGatewayMailboxWithBalanceChange(_chainId, _canonicalTxHash, _expirationTimestamp, 0, false);
+    }
+    
     /// @inheritdoc IMailboxImpl
     function bridgehubRequestL2TransactionOnGateway(
         bytes32 _canonicalTxHash,

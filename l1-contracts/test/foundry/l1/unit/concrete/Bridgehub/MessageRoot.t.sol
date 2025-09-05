@@ -41,11 +41,12 @@ contract MessageRootTest is Test {
             abi.encodeWithSelector(IBridgehub.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
+        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.settlementLayer.selector), abi.encode(0));
 
         assetTracker = makeAddr("assetTracker");
         bridgeHub = makeAddr("bridgeHub");
         L1_CHAIN_ID = 5;
-        messageRoot = new MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID);
+        messageRoot = new MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID, 1);
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
         vm.prank(assetTracker);
         messageRoot.setAddresses(assetTracker);

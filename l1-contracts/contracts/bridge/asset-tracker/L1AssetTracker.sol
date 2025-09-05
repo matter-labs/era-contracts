@@ -102,6 +102,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Called on the L1 when a deposit to the chain happens.
     /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
+    /// @param _chainId The destination chain id of the transfer.
     function handleChainBalanceIncreaseOnL1(
         uint256 _chainId,
         bytes32 _assetId,
@@ -123,21 +124,34 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
-            uint256 key = uint256(keccak256(abi.encode(_chainId)));
-            /// A malicious transactionFilterer can do multiple deposits, but this will make the chainBalance smaller on the Gateway.
-            TransientPrimitivesLib.set(key, uint256(_assetId));
-            TransientPrimitivesLib.set(key + 1, _amount);
+            _setTransientBalanceChange(_chainId, _assetId, _amount);
         }
 
         /// We increase/decrease the totalSupply
+        // `totalSupplyAcrossAllChains` stores the total balance of tokens outside of the origin chain.
+        // There are three possible cases:
+        // 1. We are depositing it back to the origin chain. The balance outside of it decreases and so we decrease
+        // totalSupplyAcrossAllChains.
+        // 2. The token's origin is L1 and so regardless of the destination chain, the total amount outside of L1, i.e. 
+        // inside our ecosystem increases.
+        // 3. (Skipped) Since the token moves between non-origin chains, the totalSupplyAcrossAllChains remains unchanged.
         if (_tokenOriginChainId == _chainId) {
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
         } else if (_tokenOriginChainId == block.chainid) {
             totalSupplyAcrossAllChains[_assetId] += _amount;
         }
         if (_tokenOriginChainId != _chainId) {
             chainBalance[chainToUpdate][_assetId] += _amount;
         }
+    }
+
+    /// @notice We set the transient balance change so the Mailbox can consume it so the Gateway can keep track of the balance change.
+    function _setTransientBalanceChange(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        uint256 key = uint256(keccak256(abi.encode(_chainId)));
+        /// A malicious transactionFilterer can do multiple deposits, but this will make the chainBalance smaller on the Gateway.
+        TransientPrimitivesLib.set(key, uint256(_assetId));
+        TransientPrimitivesLib.set(key + 1, _amount);
+
     }
 
     /// @notice Called on the L1 by the gateway's mailbox when a deposit happens
@@ -164,7 +178,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (_tokenOriginChainId == _chainId) {
             totalSupplyAcrossAllChains[_assetId] += _amount;
         } else if (_tokenOriginChainId == block.chainid) {
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
         }
 
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
@@ -176,7 +190,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (chainBalance[chainToUpdate][_assetId] < _amount) {
             revert InsufficientChainBalanceAssetTracker(chainToUpdate, _assetId, _amount);
         }
-        chainBalance[chainToUpdate][_assetId] -= _amount;
+        _decreaseChainBalance(chainToUpdate, _assetId, _amount);
     }
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
@@ -296,7 +310,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _tokenOriginChainId
     ) internal {
         if (!_isChainMinter(_fromChainId, _tokenOriginChainId)) {
-            chainBalance[_fromChainId][_assetId] -= _amount;
+            _decreaseChainBalance(_fromChainId, _assetId, _amount);
         } else {
             /// if the source chain is a minter, we are increasing the totalSupply.
             totalSupplyAcrossAllChains[_assetId] += _amount;
@@ -305,7 +319,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             chainBalance[_toChainId][_assetId] += _amount;
         } else {
             /// If the destination chain is a minter, we are decreasing the totalSupply.
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
         }
     }
 

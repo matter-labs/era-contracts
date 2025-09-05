@@ -364,7 +364,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
-        MessageRoot messageRootNew = new MessageRoot(bridgehub, block.chainid);
+        MessageRoot messageRootNew = new MessageRoot(bridgehub, block.chainid, 1);
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
@@ -409,10 +409,15 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
             abi.encode(0)
         );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
-        mockDiamondInitInteropCenterCallsWithAddress(interopCenterAddress);
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge);
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,

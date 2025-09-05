@@ -162,7 +162,6 @@ contract L1AssetRouterTest is Test {
         sharedBridgeImpl = new L1AssetRouter({
             _l1WethAddress: l1WethAddress,
             _bridgehub: bridgehubAddress,
-            _interopCenter: interopCenterAddress,
             _l1Nullifier: address(l1Nullifier),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy

@@ -277,7 +277,9 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
             }
             InteropCall memory interopCall = _interopBundle.calls[i];
 
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
+            if (interopCall.value > 0) {
+                L2_BASE_TOKEN_SYSTEM_CONTRACT.mint(address(this), interopCall.value);
+            }
             // slither-disable-next-line arbitrary-send-eth
             bytes4 selector = IERC7786Recipient(interopCall.to).receiveMessage{value: interopCall.value}({
                 receiveId: keccak256(abi.encodePacked(_bundleHash, i)),

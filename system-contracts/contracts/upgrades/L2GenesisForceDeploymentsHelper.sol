@@ -77,23 +77,6 @@ library L2GenesisForceDeploymentsHelper {
             }
         }
 
-        bytes memory interopCenterConstructorData = abi.encodeCall(
-            L2_INTEROP_CENTER.setAddresses,
-            (address(L2_ASSET_ROUTER), address(L2_ASSET_TRACKER_ADDRESS))
-        );
-
-        (bool success2, bytes memory returnData2) = SystemContractHelper.mimicCall(
-            address(L2_INTEROP_CENTER),
-            bridgehubOwner,
-            interopCenterConstructorData
-        );
-        if (!success2) {
-            // Progapatate revert reason
-            assembly {
-                revert(add(returnData2, 0x20), returndatasize())
-            }
-        }
-
         bytes memory messageRootConstructorData = abi.encodeCall(
             L2_MESSAGE_ROOT.setAddresses,
             (L2_ASSET_TRACKER_ADDRESS)
@@ -160,7 +143,11 @@ library L2GenesisForceDeploymentsHelper {
             callConstructor: true,
             value: 0,
             // solhint-disable-next-line func-named-parameters
-            input: abi.encode(address(L2_BRIDGE_HUB), fixedForceDeploymentsData.l1ChainId)
+            input: abi.encode(
+                address(L2_BRIDGE_HUB),
+                fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.gatewayChainId
+            )
         });
 
         // Configure the BridgeHub deployment.
@@ -262,7 +249,6 @@ library L2GenesisForceDeploymentsHelper {
             callConstructor: true,
             value: 0,
             input: abi.encode(
-                L2_BRIDGE_HUB,
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance
             )

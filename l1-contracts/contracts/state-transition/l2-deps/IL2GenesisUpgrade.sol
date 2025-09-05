@@ -33,6 +33,7 @@ struct ZKChainSpecificForceDeploymentsData {
 // solhint-disable-next-line gas-struct-packing
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
+    uint256 gatewayChainId;
     uint256 eraChainId;
     address l1AssetRouter;
     bytes32 l2TokenProxyBytecodeHash;

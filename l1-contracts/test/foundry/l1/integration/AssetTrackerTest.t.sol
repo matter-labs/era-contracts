@@ -40,6 +40,8 @@ import {L2AssetTracker, IL2AssetTracker} from "contracts/bridge/asset-tracker/L2
 import {L1AssetTracker, IL1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
+import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
@@ -95,7 +97,9 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             _addL2ChainContract(zkChainIds[i], contractAddress);
         }
 
-        assetTracker = IL1AssetTracker(address(addresses.interopCenter.assetTracker()));
+        assetTracker = IL1AssetTracker(
+            address(INativeTokenVault(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy).assetTracker())
+        );
         address l2AssetTrackerAddress = address(new L2AssetTracker());
         vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
         l2AssetTracker = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
@@ -155,6 +159,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             originToken: tokenAddress,
             isL1ToGateway: true
         });
+        bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
 
         FinalizeL1DepositParams memory finalizeWithdrawalParamsL1ToGateway = FinalizeL1DepositParams({
             chainId: eraZKChainId,
@@ -162,7 +167,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             l2MessageIndex: 0,
             l2Sender: L2_ASSET_TRACKER_ADDR,
             l2TxNumberInBatch: 0,
-            message: abi.encode(data),
+            message: encodedData,
             merkleProof: new bytes32[](0)
         });
         vm.chainId(originalChainId);
@@ -259,6 +264,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             originToken: tokenAddress,
             isL1ToGateway: false
         });
+        bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
 
         FinalizeL1DepositParams memory finalizeWithdrawalParamsGatewayToL1 = FinalizeL1DepositParams({
             chainId: gwChainId,
@@ -266,7 +272,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             l2MessageIndex: 0,
             l2Sender: L2_ASSET_TRACKER_ADDR,
             l2TxNumberInBatch: 0,
-            message: abi.encode(data),
+            message: encodedData,
             merkleProof: new bytes32[](0)
         });
 

@@ -48,12 +48,50 @@ abstract contract MessageVerification is IMessageVerification {
             });
     }
 
+    function proveL2LeafInclusionSharedRecursive(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof,
+        uint256 _depth
+    ) public view virtual returns (bool) {
+        return
+            _proveL2LeafInclusionRecursive({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof,
+                _depth: _depth
+            });
+    }
+
     function _proveL2LeafInclusion(
         uint256 _chainId,
         uint256 _blockOrBatchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
+    ) internal view virtual returns (bool) {
+        return
+            _proveL2LeafInclusionRecursive({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof,
+                _depth: 0
+            });
+    }
+
+    function _proveL2LeafInclusionRecursive(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof,
+        uint256 _depth
     ) internal view virtual returns (bool);
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number

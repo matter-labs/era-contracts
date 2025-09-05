@@ -26,13 +26,6 @@ interface IInteropCenter {
         CallAndBundleAttributes
     }
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
-
-    function assetTracker() external view returns (IL2AssetTracker);
-
-    function assetRouter() external view returns (address);
-
-    function setAddresses(address assetRouter, address assetTracker) external;
     /// Mailbox forwarder
 
     function forwardTransactionOnGatewayWithBalanceChange(

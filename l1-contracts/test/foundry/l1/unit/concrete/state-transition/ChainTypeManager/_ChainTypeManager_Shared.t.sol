@@ -71,7 +71,7 @@ contract ChainTypeManagerTest is UtilsTest {
 
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new MessageRoot(bridgehub, block.chainid);
+        messageroot = new MessageRoot(bridgehub, block.chainid, 1);
         chainAssetHandler = new ChainAssetHandler(
             block.chainid,
             governor,
@@ -241,7 +241,7 @@ contract ChainTypeManagerTest is UtilsTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
-        mockDiamondInitInteropCenterCallsWithAddress(interopCenterAddress);
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge);
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,

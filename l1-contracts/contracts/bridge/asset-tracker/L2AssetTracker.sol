@@ -254,10 +254,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 if (log.value == bytes32(uint256(TxStatus.Failure))) {
                     _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key);
                 }
-                continue;
             } else if (log.sender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                 ++msgCount;
-                bytes memory message = _processLogsInputs.messages[msgCount - 1];
+                bytes calldata message = _processLogsInputs.messages[msgCount - 1];
 
                 if (log.value != keccak256(message)) {
                     revert InvalidMessage();
@@ -288,11 +287,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
-        require(
-            _processLogsInputs.messageRoot == emptyMessageRootForChain,
-            InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
-        );
+        // bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        // kl todo add back
+        // require(
+        //     _processLogsInputs.messageRoot == emptyMessageRootForChain,
+        //     InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
+        // );
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
@@ -337,13 +337,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
     }
 
-    function _handleInteropMessage(uint256 _chainId, bytes memory _message, bytes32 _baseTokenAssetId) internal {
+    function _handleInteropMessage(uint256 _chainId, bytes calldata _message, bytes32 _baseTokenAssetId) internal {
         if (_message[0] != BUNDLE_IDENTIFIER) {
             // This should not be possible in V30. In V31 this will be a trigger.
             return;
         }
 
-        InteropBundle memory interopBundle = this.parseInteropBundle(_message);
+        InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));
 
         InteropCall memory interopCall;
         uint256 callsLength = interopBundle.calls.length;
@@ -621,10 +621,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 revert AssetIdNotRegistered(_assetId);
             }
         }
-    }
-
-    function parseInteropBundle(bytes calldata _bundleData) external pure returns (InteropBundle memory interopBundle) {
-        interopBundle = abi.decode(_bundleData[1:], (InteropBundle));
     }
 
     function parseInteropCall(

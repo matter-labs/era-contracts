@@ -195,7 +195,7 @@ contract ExecutorTest is UtilsTest {
             abi.encode(makeAddr("chainTypeManager"))
         );
         address interopCenter = makeAddr("interopCenter");
-        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID);
+        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID, 1);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
 
@@ -265,7 +265,7 @@ contract ExecutorTest is UtilsTest {
             priorityTxMaxGasLimit: 1000000,
             feeParams: defaultFeeParams()
         });
-        mockDiamondInitInteropCenterCallsWithAddress(interopCenter);
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0));
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 

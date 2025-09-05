@@ -44,11 +44,21 @@ contract DummyBridgehub {
         return zkChain;
     }
 
+    function getAllZKChainChainIDs() external view returns (uint256[] memory) {
+        uint256[] memory allZKChainChainIDs = new uint256[](0);
+        // allZKChainChainIDs[0] = 271;
+        return allZKChainChainIDs;
+    }
+
     function setSharedBridge(address addr) external {
         sharedBridge = addr;
     }
 
     function assetRouter() external view returns (address) {
         return sharedBridge;
+    }
+
+    function settlementLayer(uint256) external view returns (uint256) {
+        return 0;
     }
 }
