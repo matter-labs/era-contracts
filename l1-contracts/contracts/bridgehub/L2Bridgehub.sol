@@ -17,18 +17,21 @@ import {BridgehubBase} from "./BridgehubBase.sol";
 /// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
 contract L2Bridgehub is BridgehubBase {
     /// @notice the asset id of Eth. This is only used on L1.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     bytes32 internal ETH_TOKEN_ASSET_ID;
 
     /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     uint256 public L1_CHAIN_ID;
 
     /// @notice The total number of ZK chains can be created/connected to this CTM.
     /// This is the temporary security measure.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
-
-    /// @notice to avoid parity hack
-    constructor() {}
 
     /// @notice Initializes the contract
     /// @dev This function is used to initialize the contract with the initial values.

@@ -130,6 +130,8 @@ error IncorrectBatchBounds(
     uint256 processFromProvided,
     uint256 processToProvided
 );
+// 0x55bde247
+error IncorrectBatchChainId();
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
@@ -140,6 +142,8 @@ error InsufficientChainBalance();
 error InvalidBatchNumber(uint256 provided, uint256 expected);
 // 0xcbd9d2e0
 error InvalidCaller(address);
+// 0x7a47c9a2
+error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
 // 0x4fbe5dba
@@ -170,8 +174,6 @@ error InvalidSystemLogsLength();
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
 error L2TimestampTooBig();
-// 0x55bde247
-error IncorrectBatchChainId();
 // 0x97e1359e
 error L2WithdrawalMessageWrongLength(uint256 messageLen);
 // 0x8efef97a
@@ -372,8 +374,6 @@ error ZeroAddress();
 error ZeroChainId();
 // 0x601b6882
 error ZKChainLimitReached();
-
-error InvalidChainId();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

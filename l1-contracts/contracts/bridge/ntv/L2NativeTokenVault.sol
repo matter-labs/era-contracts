@@ -34,17 +34,26 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     address public override WETH_TOKEN;
 
     /// @dev The assetId of the base token.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     bytes32 public BASE_TOKEN_ASSET_ID;
 
     /// @dev Chain ID of L1 for bridging reasons.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     uint256 public override L1_CHAIN_ID;
 
+    /// @dev The address of the L2 legacy shared bridge
     IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
     bytes32 public L2_TOKEN_PROXY_BYTECODE_HASH;
 
     /// @notice Initializes the bridge contract for later use.
@@ -65,6 +74,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
         _disableInitializers();
+        // solhint-disable-next-line func-named-parameters
         updateL2(_l1ChainId, _l2TokenProxyBytecodeHash, _legacySharedBridge, _wethToken, _baseTokenAssetId);
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
@@ -74,6 +84,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
     }
 
+    /// @notice Checks that the message sender is authorized to upgrade the contract.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert InvalidCaller(msg.sender);

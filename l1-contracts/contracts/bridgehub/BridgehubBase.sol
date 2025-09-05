@@ -98,7 +98,7 @@ abstract contract BridgehubBase is IBridgehub, ReentrancyGuard, Ownable2StepUpgr
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[36] private __gap;
+    uint256[32] private __gap;
 
     modifier onlyOwnerOrAdmin() {
         if (msg.sender != admin && msg.sender != owner()) {
@@ -114,6 +114,7 @@ abstract contract BridgehubBase is IBridgehub, ReentrancyGuard, Ownable2StepUpgr
         _;
     }
 
+    /// @notice Checks that the message sender is authorized to upgrade the contract.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);

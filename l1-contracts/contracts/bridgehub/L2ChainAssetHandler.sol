@@ -2,18 +2,40 @@
 
 pragma solidity 0.8.28;
 
-import "./ChainAssetHandlerBase.sol";
-
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-/// @dev L2 version – no immutables; values are stored and set once in `initL2`.
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @dev The ChainAssetHandler contract is used for migrating chains between settlement layers,
+/// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
+/// between different settlement layers (for example from L1 to Gateway).
+/// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
 contract L2ChainAssetHandler is ChainAssetHandlerBase {
-    bytes32 private ethTokenAssetId;
-    uint256 private l1ChainId;
-    IBridgehub private bridgehub;
-    IMessageRoot private messageRoot;
-    address private assetRouter;
+    /// @dev The assetId of the base token.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    bytes32 private ETH_TOKEN_ASSET_ID;
+
+    /// @dev The chain ID of L1.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    uint256 private L1_CHAIN_ID;
+
+    /// @dev The bridgehub contract.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    IBridgehub private BRIDGEHUB;
+
+    /// @dev The message root contract.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    IMessageRoot private MESSAGE_ROOT;
+
+    /// @dev The asset router contract.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    address private ASSET_ROUTER;
 
     /// @notice One-time initializer (replaces constructor on L2).
     function initL2(
@@ -22,7 +44,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         IBridgehub _bridgehub,
         address _assetRouter,
         IMessageRoot _messageRoot
-    ) external reentrancyGuardInitializer {
+    ) external reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
 
         updateL2(_l1ChainId, _bridgehub, _assetRouter, _messageRoot);
@@ -35,7 +57,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         IBridgehub _bridgehub,
         address _assetRouter,
         IMessageRoot _messageRoot
-    ) public {
+    ) external onlyUpgrader {
         bridgehub = _bridgehub;
         l1ChainId = _l1ChainId;
         assetRouter = _assetRouter;

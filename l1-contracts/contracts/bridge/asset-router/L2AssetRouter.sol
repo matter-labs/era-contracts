@@ -97,6 +97,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         _;
     }
 
+    /// @notice Checks that the message sender is authorized to upgrade the contract.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert InvalidCaller(msg.sender);
@@ -122,6 +123,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _aliasedOwner
     ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
+        // solhint-disable-next-line func-named-parameters
         updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, _baseTokenAssetId);
         _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
         _transferOwnership(_aliasedOwner);

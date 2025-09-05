@@ -60,9 +60,10 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         // Note, that we dont use interface, but raw call to avoid Solidity checking for empty bytecode
-        (bool success, bytes memory returnData) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
+        bool success = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
         if (!success) {
-            revert("Failed to call setBytecodeDetailsEVM");
+            // solhint-disable-next-line gas-custom-errors
+            revert("setBytecodeDetailsEVM failed");
         }
     }
 
@@ -138,6 +139,7 @@ library L2GenesisForceDeploymentsHelper {
             address(L2_ASSET_ROUTER_ADDR)
         );
         if (_isGenesisUpgrade) {
+            // solhint-disable-next-line
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
@@ -147,6 +149,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.aliasedL1Governance
             );
         } else {
+            // solhint-disable-next-line
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
@@ -195,7 +198,7 @@ library L2GenesisForceDeploymentsHelper {
             } else {
                 deployedTokenBeacon = fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
             }
-
+            // solhint-disable-next-line
             L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
@@ -206,6 +209,7 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.baseTokenAssetId
             );
         } else {
+            // solhint-disable-next-line
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 previousL2TokenProxyBytecodeHash,
@@ -221,6 +225,7 @@ library L2GenesisForceDeploymentsHelper {
             address(L2_CHAIN_ASSET_HANDLER_ADDR)
         );
         if (_isGenesisUpgrade) {
+            // solhint-disable-next-line
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,

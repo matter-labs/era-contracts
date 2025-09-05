@@ -10,9 +10,5 @@ import {IMessageRoot} from "./IMessageRoot.sol";
  * @custom:security-contact security@matterlabs.dev
  */
 interface IL2MessageRoot is IMessageRoot {
-    function addChainBatchRoot(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes32 _chainBatchRoot
-    ) external;
+    function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
 }

@@ -14,48 +14,8 @@ import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {
-    InvalidSystemLogsLength,
-    MissingSystemLogs,
-    BatchNumberMismatch,
-    TimeNotReached,
-    ValueMismatch,
-    HashMismatch,
-    NonIncreasingTimestamp,
-    TimestampError,
-    InvalidLogSender,
-    TxHashMismatch,
-    UnexpectedSystemLog,
-    LogAlreadyProcessed,
-    InvalidProtocolVersion,
-    CanOnlyProcessOneBatch,
-    BatchHashMismatch,
-    UpgradeBatchNumberIsNotZero,
-    NonSequentialBatch,
-    CantExecuteUnprovenBatches,
-    SystemLogsSizeTooBig,
-    InvalidNumberOfBlobs,
-    VerifiedBatchesExceedsCommittedBatches,
-    InvalidProof,
-    RevertedBatchNotAfterNewLastBatch,
-    CantRevertExecutedBatch,
-    L2TimestampTooBig,
-    PriorityOperationsRollingHashMismatch,
-    IncorrectBatchChainId,
-    InvalidMessageRoot,
-    InvalidBatchNumber,
-    EmptyPrecommitData,
-    PrecommitmentMismatch,
-    InvalidPackedPrecommitmentLength
-} from "../../../common/L1ContractErrors.sol";
-import {
-    InvalidBatchesDataLength,
-    MismatchL2DAValidator,
-    MismatchNumberOfLayer1Txs,
-    CommitBasedInteropNotSupported,
-    DependencyRootsRollingHashMismatch,
-    MessageRootIsZero
-} from "../../L1StateTransitionErrors.sol";
+import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, IncorrectBatchChainId, InvalidMessageRoot, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
+import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, MessageRootIsZero} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -182,7 +142,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         StoredBatchInfo memory _previousBatch,
         CommitBoojumOSBatchInfo memory _newBatch,
         // TODO: l2 upgrade is not handled
-        bytes32 _expectedSystemContractUpgradeTxHash
+        bytes32
     ) internal returns (StoredBatchInfo memory storedBatchInfo) {
         // only commit next batch
         if (_newBatch.batchNumber != _previousBatch.batchNumber + 1) {
@@ -190,13 +150,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // TODO: should we use daOutput?
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
-            _chainId: s.chainId,
-            _batchNumber: uint256(_newBatch.batchNumber),
-            _l2DAValidatorOutputHash: _newBatch.daCommitment,
-            _operatorDAInput: _newBatch.operatorDAInput,
-            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
-        });
+        // L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+        //     _chainId: s.chainId,
+        //     _batchNumber: uint256(_newBatch.batchNumber),
+        //     _l2DAValidatorOutputHash: _newBatch.daCommitment,
+        //     _operatorDAInput: _newBatch.operatorDAInput,
+        //     _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        // });
 
         if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > _newBatch.firstBlockTimestamp) {
             revert TimeNotReached(_newBatch.firstBlockTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);

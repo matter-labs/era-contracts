@@ -37,6 +37,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
             ISystemContext(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR).setChainId(_chainId);
         }
 
+        // solhint-disable-next-line func-named-parameters
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             _isZKsyncOS,
             _ctmDeployer,

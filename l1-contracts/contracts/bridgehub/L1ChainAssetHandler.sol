@@ -2,16 +2,30 @@
 
 pragma solidity 0.8.28;
 
-import "./ChainAssetHandlerBase.sol";
+import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
+/// @author Matter Labs
+/// @custom:security-contact security@matterlabs.dev
+/// @dev The ChainAssetHandler contract is used for migrating chains between settlement layers,
+/// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
+/// between different settlement layers (for example from L1 to Gateway).
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
 contract L1ChainAssetHandler is ChainAssetHandlerBase {
+    /// @dev The assetId of the base token.
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
+
+    /// @dev The chain ID of L1.
     uint256 internal immutable L1_CHAIN_ID;
+
+    /// @dev The bridgehub contract.
     IBridgehub internal immutable BRIDGEHUB;
+
+    /// @dev The message root contract.
     IMessageRoot internal immutable MESSAGE_ROOT;
+
+    /// @dev The asset router contract.
     address internal immutable ASSET_ROUTER;
 
     constructor(
