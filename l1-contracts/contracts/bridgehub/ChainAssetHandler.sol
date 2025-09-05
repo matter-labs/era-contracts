@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
+import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, SLHasDifferentCTM, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
 import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -217,6 +217,11 @@ contract ChainAssetHandler is
                 bridgehubBurnData.chainId,
                 bridgehubBurnData.ctmData
             );
+
+            // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
+            if (_settlementChainId != L1_CHAIN_ID && BRIDGEHUB.chainTypeManager(_settlementChainId) != ctm) {
+                revert SLHasDifferentCTM();
+            }
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == L1_CHAIN_ID

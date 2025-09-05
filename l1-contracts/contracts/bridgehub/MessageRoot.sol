@@ -9,7 +9,7 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, GENESIS_CHAIN_BATCH_ROOT, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, PreviousChainBatchRootNotSet, LocallyNoChainsAtGenesis, OnlyGateway} from "./L1BridgehubErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, NotL2, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, PreviousChainBatchRootNotSet, LocallyNoChainsAtGenesis, OnlyGateway} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
@@ -137,7 +137,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
     modifier onlyL2() {
         if (block.chainid == L1_CHAIN_ID) {
-            revert OnlyL2();
+            revert NotL2();
         }
         _;
     }

@@ -101,6 +101,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     address[] internal oldValidatorTimelocks;
     address[] internal oldGatewayValidatorTimelocks;
     address protocolUpgradeHandlerImplementationAddress;
+    uint256 v28ProtocolVersion;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
@@ -116,6 +117,8 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
 
+        v28ProtocolVersion = toml.readUint("$.v28_protocol_version");
+
         bytes memory encodedOldValidatorTimelocks = toml.readBytes("$.V29.encoded_old_validator_timelocks");
         oldValidatorTimelocks = abi.decode(encodedOldValidatorTimelocks, (address[]));
 
@@ -130,6 +133,11 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     function saveOutputVersionSpecific() internal override {
+        vm.serializeAddress(
+            "deployed_addresses",
+            "protocol_upgrade_handler_address_implementation",
+            protocolUpgradeHandlerImplementationAddress
+        );
         vm.serializeBytes("v29", "encoded_old_gateway_validator_timelocks", abi.encode(oldGatewayValidatorTimelocks));
         string memory oldValidatorTimelocksSerialized = vm.serializeBytes(
             "v29",
@@ -308,7 +316,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        uint256 oldProtocolVersion = newConfig.v28ProtocolVersion;
+        uint256 oldProtocolVersion = v28ProtocolVersion;
         Diamond.DiamondCutData memory upgradeCut = abi.decode(gatewayConfig.upgradeCutData, (Diamond.DiamondCutData));
 
         bytes memory l2Calldata = abi.encodeCall(
@@ -351,7 +359,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     function prepareSetUpgradeDiamondCutOnL1Call() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
-        uint256 oldProtocolVersion = newConfig.v28ProtocolVersion;
+        uint256 oldProtocolVersion = v28ProtocolVersion;
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             newlyGeneratedData.upgradeCutData,
             (Diamond.DiamondCutData)
