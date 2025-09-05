@@ -420,6 +420,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         return L1_ASSET_ROUTER;
     }
 
+    // slither-disable-next-line uninitialized-state-variables
     function _bridgehub() internal view override returns (IBridgehub) {
         // slither-disable-next-line uninitialized-state-variables
         return BRIDGE_HUB;
