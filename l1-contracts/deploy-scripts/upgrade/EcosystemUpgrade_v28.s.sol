@@ -46,7 +46,7 @@ import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -286,8 +286,9 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
 
         bytes memory data = abi.encodeCall(IL2ContractDeployer.forceDeployOnAddresses, (forceDeployments));
 
+        uint256 txType = config.isZKsyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
         transaction = L2CanonicalTransaction({
-            txType: SYSTEM_UPGRADE_L2_TX_TYPE,
+            txType: txType,
             from: uint256(uint160(L2_FORCE_DEPLOYER_ADDR)),
             to: uint256(uint160(address(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR))),
             // TODO: dont use hardcoded values

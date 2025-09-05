@@ -74,8 +74,8 @@ contract GatewayCTMDeployerTest is Test {
         new VerifierFflonk();
         new VerifierPlonk();
 
-        new TestnetVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)));
-        new DualVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)));
+        new TestnetVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
+        new DualVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();

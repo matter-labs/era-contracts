@@ -54,7 +54,7 @@ contract ChainTypeManagerTest is Test {
     address internal constant serverNotifier = address(0x7070707);
     address internal newChainAdmin;
     uint256 chainId = 112;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
     bytes internal forceDeploymentsData = hex"";
 
     uint256 eraChainId = 9;

@@ -39,7 +39,7 @@ bytes constant ERROR_ONLY_VALIDATOR_OR_STATE_TRANSITION_MANAGER = "ZKChain: Only
 contract ZKChainBaseTest is Test {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {
         selectors = new bytes4[](6);

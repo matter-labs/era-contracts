@@ -13,13 +13,20 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// If the proof is not empty, it will verify it using the main verifier contract,
 /// otherwise, it will skip the verification.
 contract TestnetVerifier is DualVerifier {
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) DualVerifier(_fflonkVerifier, _plonkVerifier) {
+    constructor(
+        IVerifierV2 _fflonkVerifier,
+        IVerifier _plonkVerifier,
+        address _ctmOwner
+    ) DualVerifier(_fflonkVerifier, _plonkVerifier, _ctmOwner) {
         assert(block.chainid != 1);
     }
 
     /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
     /// @inheritdoc IVerifier
-    function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view override returns (bool) {
+    function verify(
+        uint256[] calldata _publicInputs,
+        uint256[] calldata _proof
+    ) public view override returns (bool) {
         // We allow skipping the zkp verification for the test(net) environment
         // If the proof is not empty, verify it, otherwise, skip the verification
         if (_proof.length == 0) {

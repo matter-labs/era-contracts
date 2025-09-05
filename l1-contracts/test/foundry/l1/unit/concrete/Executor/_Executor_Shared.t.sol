@@ -225,7 +225,11 @@ contract ExecutorTest is Test {
             timestamp: 0,
             commitment: bytes32("")
         });
-        TestnetVerifier testnetVerifier = new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
+        TestnetVerifier testnetVerifier = new TestnetVerifier(
+            IVerifierV2(address(0)),
+            IVerifier(address(0)),
+            address(0)
+        );
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW
