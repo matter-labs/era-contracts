@@ -370,7 +370,7 @@ error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
-// 0x8b15f239
+// 0x1bc36e67
 error ZeroGasPriceL1TxZKSyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
