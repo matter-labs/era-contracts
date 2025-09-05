@@ -253,10 +253,23 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade {
         instantiateCreate2Factory();
 
         deployVerifiers();
-        deployUpgradeStageValidator();
+        upgradeAddresses.upgradeStageValidator = 0xe28ad831d216fCD71BF3944867f3834dB55eD382;
+        // deployUpgradeStageValidator();
 
         upgradeConfig.ecosystemContractsDeployed = true;
     }
+
+    // function deployVerifiers() override internal {
+    //     if (compareStrings(ecosystem, "mainnet")) {
+    //         (addresses.stateTransition.verifierFflonk) = (0x1AC4F629Fdc77A7700B68d03bF8D1A53f2210911);
+    //         (addresses.stateTransition.verifierPlonk) = 0x2db2ffdecb7446aaab01FAc3f4D55863db3C5bd6;
+    //         (addresses.stateTransition.verifier) = 0xD71DDC9956781bf07DbFb9fCa891f971dbE9868A;
+    //     } else {
+    //         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("L1VerifierFflonk", false);
+    //         (addresses.stateTransition.verifierPlonk) = deploySimpleContract("L1VerifierPlonk", false);
+    //         (addresses.stateTransition.verifier) = deploySimpleContract("TestnetVerifier", false);
+    //     }
+    // }
 
     /// all GW contracts are manually deployed before.
     function deployNewEcosystemContractsGW() public virtual override {

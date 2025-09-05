@@ -211,7 +211,7 @@ contract DeployL1Script is Script, DeployUtils {
         return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
     }
 
-    function deployVerifiers() internal {
+    function deployVerifiers() internal virtual {
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
         (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
