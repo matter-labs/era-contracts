@@ -46,6 +46,7 @@ library TransactionValidator {
         // Ensuring that the transaction covers the minimal costs for its processing:
         // hashing its content, publishing the factory dependencies, etc.
         if (
+            // solhint-disable-next-line func-named-parameters
             getMinimalPriorityTransactionGasLimit(
                 _encoded.length,
                 _transaction.data.length,
@@ -126,7 +127,9 @@ library TransactionValidator {
             gasCost += L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS * _calldataLength;
 
             uint256 nativeComputationalCost = L1_TX_STATIC_NATIVE_ZKSYNC_OS; // static computational native part
-            nativeComputationalCost += Math.max(1, Math.ceilDiv(_encodingLength, 136)) * L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS; // dynamic computational native part for hashing
+            nativeComputationalCost +=
+                Math.max(1, Math.ceilDiv(_encodingLength, 136)) *
+                L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS; // dynamic computational native part for hashing
             nativeComputationalCost += _calldataLength * L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS; // dynamic computational part for calldata
             uint256 gasNeededToCoverComputationalNative;
             // 0 gas price is possible only for upgrade transactions currently, it's validated before calling this method.
@@ -134,7 +137,9 @@ library TransactionValidator {
             if (_maxFeePerGas == 0) {
                 gasNeededToCoverComputationalNative = nativeComputationalCost / UPGRADE_TX_NATIVE_PER_GAS;
             } else {
-                gasNeededToCoverComputationalNative = nativeComputationalCost * ZKSYNC_OS_L1_TX_NATIVE_PRICE / _maxFeePerGas;
+                gasNeededToCoverComputationalNative =
+                    (nativeComputationalCost * ZKSYNC_OS_L1_TX_NATIVE_PRICE) /
+                    _maxFeePerGas;
             }
 
             uint256 pubdataGasCost = L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS * _l2GasPricePerPubdata;
@@ -168,7 +173,10 @@ library TransactionValidator {
                 costForPubdata = L1_TX_INTRINSIC_PUBDATA * _l2GasPricePerPubdata;
 
                 // Taking into the account the additional costs of providing new factory dependencies
-                costForPubdata += _numberOfFactoryDependencies * L1_TX_DELTA_FACTORY_DEPS_PUBDATA * _l2GasPricePerPubdata;
+                costForPubdata +=
+                    _numberOfFactoryDependencies *
+                    L1_TX_DELTA_FACTORY_DEPS_PUBDATA *
+                    _l2GasPricePerPubdata;
             }
 
             return costForComputation + costForPubdata;

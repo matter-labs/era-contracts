@@ -169,10 +169,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
-// Currently ZKsync OS, always generates rollup da commitment and sets l2DaValidator to 0.
-//        if (_newBatch.l2DaValidator != s.l2DAValidator) {
-//             revert MismatchL2DAValidator();
-//        }
+        // Currently ZKsync OS, always generates rollup da commitment and sets l2DaValidator to 0.
+        //        if (_newBatch.l2DaValidator != s.l2DAValidator) {
+        //             revert MismatchL2DAValidator();
+        //        }
 
         // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
         // batch output hash commits to information about batch that needs to be opened on l1.
@@ -213,7 +213,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             // If we are settling on top of Gateway, we always relay the data needed to construct
             // a proof for a new batch (and finalize it) even if the data for Gateway transactions has been fully lost.
             // For ZKsync OS this data includes only `StoredBatchInfo`: that is needed to commit and prove a batch on top of the previous one.
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(abi.encode(RELAYED_EXECUTOR_VERSION_ZKSYNC_OS, storedBatchInfo));
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+                abi.encode(RELAYED_EXECUTOR_VERSION_ZKSYNC_OS, storedBatchInfo)
+            );
         }
     }
 
@@ -521,7 +523,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
-        bool processSystemUpgradeTx = systemContractsUpgradeTxHash != bytes32(0) && s.l2SystemContractsUpgradeBatchNumber == 0;
+        bool processSystemUpgradeTx = systemContractsUpgradeTxHash != bytes32(0) &&
+            s.l2SystemContractsUpgradeBatchNumber == 0;
         _commitBatchesZKsyncOS(lastCommittedBatchData, newBatchesData, processSystemUpgradeTx);
 
         s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
@@ -635,7 +638,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // We disable this check because calldata array length is cheap.
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
-            _lastCommittedBatchData = _commitOneBatchZKsyncOS(_lastCommittedBatchData, _newBatchesData[i], upgradeTxHash);
+            _lastCommittedBatchData = _commitOneBatchZKsyncOS(
+                _lastCommittedBatchData,
+                _newBatchesData[i],
+                upgradeTxHash
+            );
 
             s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
             emit BlockCommit(
@@ -643,7 +650,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
-
 
             // reset upgradeTxHash after the first batch
             if (i == 0) {
