@@ -94,10 +94,7 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        forceDeployOnAddress(
-            fixedForceDeploymentsData.messageRootBytecodeInfo,
-            address(L2_MESSAGE_ROOT_ADDR)
-        );
+        forceDeployOnAddress(fixedForceDeploymentsData.messageRootBytecodeInfo, address(L2_MESSAGE_ROOT_ADDR));
         // If this is a genesis upgrade, we need to initialize the MessageRoot contract.
         // We dont need to do anything for already deployed chains.
         if (_isGenesisUpgrade) {
@@ -124,10 +121,7 @@ library L2GenesisForceDeploymentsHelper {
             ? address(0)
             : L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE();
 
-        forceDeployOnAddress(
-            fixedForceDeploymentsData.l2AssetRouterBytecodeInfo,
-            address(L2_ASSET_ROUTER_ADDR)
-        );
+        forceDeployOnAddress(fixedForceDeploymentsData.l2AssetRouterBytecodeInfo, address(L2_ASSET_ROUTER_ADDR));
         if (_isGenesisUpgrade) {
             // solhint-disable-next-line
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
@@ -176,10 +170,7 @@ library L2GenesisForceDeploymentsHelper {
             if (fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
                 // We need to deploy tbe beacon, we will use a separate contract for that to save
                 // up on size of this contract.
-                forceDeployOnAddress(
-                    fixedForceDeploymentsData.beaconDeployerInfo,
-                    L2_NTV_BEACON_DEPLOYER_ADDR
-                );
+                forceDeployOnAddress(fixedForceDeploymentsData.beaconDeployerInfo, L2_NTV_BEACON_DEPLOYER_ADDR);
 
                 deployedTokenBeacon = UpgradeableBeaconDeployer(L2_NTV_BEACON_DEPLOYER_ADDR).deployUpgradeableBeacon(
                     fixedForceDeploymentsData.aliasedL1Governance

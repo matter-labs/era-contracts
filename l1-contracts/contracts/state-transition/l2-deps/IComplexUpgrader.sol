@@ -6,7 +6,6 @@ import {IL2ContractDeployer} from "../../common/interfaces/IL2ContractDeployer.s
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IComplexUpgrader {
-
     /// @notice Executes an upgrade process by delegating calls to another contract.
     /// @dev Compatible with Era only.
     /// @param _forceDeployments the list of initial deployments that should be performed before the upgrade.

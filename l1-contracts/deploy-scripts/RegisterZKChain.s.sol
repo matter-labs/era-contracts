@@ -498,7 +498,10 @@ contract RegisterZKChainScript is Script {
         factoryDeps[0] = Utils.readFoundryDeployedBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
         factoryDeps[1] = Utils.readFoundryDeployedBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
         factoryDeps[2] = Utils.readFoundryDeployedBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
-        factoryDeps[3] = Utils.readFoundryDeployedBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer");
+        factoryDeps[3] = Utils.readFoundryDeployedBytecodeL1(
+            "UpgradeableBeaconDeployer.sol",
+            "UpgradeableBeaconDeployer"
+        );
         return factoryDeps;
     }
 
