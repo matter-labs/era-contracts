@@ -81,6 +81,7 @@ contract L2ComplexUpgrader is IComplexUpgrader {
         if (_delegateTo.code.length == 0) {
             revert AddressHasNoCode(_delegateTo);
         }
+        // slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory returnData) = _delegateTo.delegatecall(_calldata);
         assembly {
             if iszero(success) {
