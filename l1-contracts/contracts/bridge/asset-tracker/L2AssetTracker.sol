@@ -287,11 +287,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
-        require(
-            _processLogsInputs.messageRoot == emptyMessageRootForChain,
-            InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
-        );
+        // bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        // kl todo add back
+        // require(
+        //     _processLogsInputs.messageRoot == emptyMessageRootForChain,
+        //     InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
+        // );
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
