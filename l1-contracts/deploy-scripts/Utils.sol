@@ -46,6 +46,18 @@ bytes32 constant EXECUTE_EMERGENCY_UPGRADE_ZK_FOUNDATION_TYPEHASH = keccak256(
 /// @dev EIP-712 TypeHash for protocol upgrades approval by the Security Council.
 bytes32 constant APPROVE_UPGRADE_SECURITY_COUNCIL_TYPEHASH = keccak256("ApproveUpgradeSecurityCouncil(bytes32 id)");
 
+/// @dev The offset from which the built-in, but user space contracts are located.
+uint160 constant USER_CONTRACTS_OFFSET = 0x10000; // 2^16
+
+// address constant
+address constant L2_BRIDGEHUB_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x02);
+address constant L2_ASSET_ROUTER_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x03);
+address constant L2_NATIVE_TOKEN_VAULT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x04);
+address constant L2_MESSAGE_ROOT_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x05);
+address constant L2_WETH_IMPL_ADDRESS = address(USER_CONTRACTS_OFFSET + 0x07);
+
+address constant L2_CREATE2_FACTORY_ADDRESS = address(USER_CONTRACTS_OFFSET);
+
 uint256 constant SECURITY_COUNCIL_SIZE = 12;
 
 // solhint-disable-next-line gas-struct-packing
@@ -1300,20 +1312,6 @@ library Utils {
         info.admin = IGetters(info.diamondProxy).getAdmin();
         info.ctm = L1Bridgehub(_bridgehub).chainTypeManager(_chainId);
         info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
-    }
-
-    function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {
-        bytes32 bytecodeBlakeHash = blakeHashBytecode(bytecode);
-        bytes32 observableBytecodeBlakeHash = keccak256(bytecode);
-        bytecodeInfo = abi.encode(bytecodeBlakeHash, bytecode.length, observableBytecodeBlakeHash);
-    }
-
-    function getZKOSBytecodeInfoForContract(
-        string memory fileName,
-        string memory contractName
-    ) internal returns (bytes memory bytecodeInfo) {
-        bytes memory bytecode = readFoundryDeployedBytecodeL1(fileName, contractName);
-        bytecodeInfo = getZKOSBytecodeInfo(bytecode);
     }
 
     function mergeCalls(Call[] memory a, Call[] memory b) public pure returns (Call[] memory result) {

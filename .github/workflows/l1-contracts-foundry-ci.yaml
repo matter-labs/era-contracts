@@ -109,6 +109,11 @@ jobs:
             exit 1
           fi
 
+      - name: Run DeployL1CoreContracts script
+        working-directory: ./l1-contracts
+        # First we need to deploy the ecosystem contracts
+        run: forge script ./deploy-scripts/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
+
       - name: Run DeployL1 script
         working-directory: ./l1-contracts
         # l1-contracts are skipped because we don't want to recompile Bridgehub with a high optimizer-runs value.

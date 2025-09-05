@@ -64,7 +64,7 @@ contract ChainTypeManagerTest is Test {
 
     function deploy() public {
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageRoot = new L1MessageRoot(bridgehub);
+        L1MessageRoot messageroot = new L1MessageRoot(bridgehub);
         vm.prank(governor);
         bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageRoot, address(0));
 
@@ -78,7 +78,7 @@ contract ChainTypeManagerTest is Test {
 
         vm.startPrank(address(bridgehub));
         chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
-        diamondInit = address(new DiamondInit(false));
+        diamondInit = address(new DiamondInit());
         genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(

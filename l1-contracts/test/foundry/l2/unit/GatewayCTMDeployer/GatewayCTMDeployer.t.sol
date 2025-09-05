@@ -63,7 +63,7 @@ contract GatewayCTMDeployerTest is Test {
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
 
-        new DiamondInit(false);
+        new DiamondInit();
         new L1GenesisUpgrade();
         new RollupDAManager();
         new ValidiumL1DAValidator();
@@ -119,8 +119,7 @@ contract GatewayCTMDeployerTest is Test {
             genesisRollupLeafIndex: 10,
             genesisBatchCommitment: bytes32(uint256(0x456)),
             forceDeploymentsData: hex"deadbeef",
-            protocolVersion: 1,
-            isZKsyncOS: false
+            protocolVersion: 1
         });
 
         // Initialize selectors with sample function selectors

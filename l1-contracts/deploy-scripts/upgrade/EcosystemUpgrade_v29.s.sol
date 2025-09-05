@@ -101,6 +101,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     address[] internal oldValidatorTimelocks;
     address[] internal oldGatewayValidatorTimelocks;
     address protocolUpgradeHandlerImplementationAddress;
+    uint256 v28ProtocolVersion;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
@@ -115,6 +116,8 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     function initializeConfig(string memory newConfigPath) internal override {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
+
+        v28ProtocolVersion = toml.readUint("$.v28_protocol_version");
 
         bytes memory encodedOldValidatorTimelocks = toml.readBytes("$.V29.encoded_old_validator_timelocks");
         oldValidatorTimelocks = abi.decode(encodedOldValidatorTimelocks, (address[]));
@@ -211,7 +214,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         (
             addresses.bridgehub.chainAssetHandlerImplementation,
             addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
+        ) = deployTuppWithContract("L1ChainAssetHandler", false);
 
         (
             addresses.stateTransition.validatorTimelockImplementation,
@@ -308,7 +311,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        uint256 oldProtocolVersion = newConfig.v28ProtocolVersion;
+        uint256 oldProtocolVersion = v28ProtocolVersion;
         Diamond.DiamondCutData memory upgradeCut = abi.decode(gatewayConfig.upgradeCutData, (Diamond.DiamondCutData));
 
         bytes memory l2Calldata = abi.encodeCall(
@@ -328,7 +331,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         calls = new Call[](1);
         calls[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
-            data: abi.encodeCall(Bridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
+            data: abi.encodeCall(IBridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
             value: 0
         });
     }
@@ -351,7 +354,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     function prepareSetUpgradeDiamondCutOnL1Call() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
 
-        uint256 oldProtocolVersion = newConfig.v28ProtocolVersion;
+        uint256 oldProtocolVersion = v28ProtocolVersion;
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             newlyGeneratedData.upgradeCutData,
             (Diamond.DiamondCutData)
@@ -417,39 +420,5 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
     function deployUsedUpgradeContractGW() internal override returns (address) {
         return deployGWContract("L1V29Upgrade");
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ValidatorTimelock")) {
-            if (!isZKBytecode) {
-                return
-                    abi.encodeCall(
-                        ValidatorTimelock.initialize,
-                        (config.ownerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
-                    );
-            } else {
-                // On Gateway, the delay is always 0.
-                return
-                    abi.encodeCall(
-                        ValidatorTimelock.initialize,
-                        (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), uint32(0))
-                    );
-            }
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
-            if (!isZKBytecode) {
-                return abi.encodeCall(ChainAssetHandler.initialize, (config.ownerAddress));
-            } else {
-                return
-                    abi.encodeCall(
-                        ChainAssetHandler.initialize,
-                        AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress)
-                    );
-            }
-        } else {
-            return super.getInitializeCalldata(contractName, isZKBytecode);
-        }
     }
 }

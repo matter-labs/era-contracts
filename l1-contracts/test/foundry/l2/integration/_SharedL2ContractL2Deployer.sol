@@ -69,7 +69,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         addresses.stateTransition.mailboxFacet = address(new MailboxFacet(config.eraChainId, config.l1ChainId));
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
-        addresses.stateTransition.diamondInit = address(new DiamondInit(false));
+        addresses.stateTransition.diamondInit = address(new DiamondInit());
         // Deploy ChainTypeManager implementation
         addresses.stateTransition.chainTypeManagerImplementation = address(
             new ChainTypeManager(addresses.bridgehub.bridgehubProxy)
@@ -107,8 +107,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     }
 
     function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
+        string memory contractName
     ) internal virtual override returns (bytes memory) {
         return ("Not implemented initialize calldata");
     }

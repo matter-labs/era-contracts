@@ -266,9 +266,7 @@ contract GatewayCTMFromL1 is Script {
             genesisRollupLeafIndex: uint64(config.genesisRollupLeafIndex),
             genesisBatchCommitment: config.genesisBatchCommitment,
             forceDeploymentsData: config.forceDeploymentsData,
-            protocolVersion: config.latestProtocolVersion,
-            // TODO: for now, zksync os on gateway is not supported
-            isZKsyncOS: false
+            protocolVersion: config.latestProtocolVersion
         });
     }
 

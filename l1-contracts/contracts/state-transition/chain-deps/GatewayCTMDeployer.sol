@@ -83,8 +83,6 @@ struct GatewayCTMDeployerConfig {
     bytes forceDeploymentsData;
     /// @notice The latest protocol version.
     uint256 protocolVersion;
-    /// @notice Whether the chain is ZKsyncOS.
-    bool isZKsyncOS;
 }
 
 /// @notice Addresses of state transition related contracts.
@@ -186,7 +184,6 @@ contract GatewayCTMDeployer {
             _l1ChainId: l1ChainId,
             _rollupL2DAValidatorAddress: _config.rollupL2DAValidatorAddress,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
-            _isZKsyncOS: _config.isZKsyncOS,
             _deployedContracts: contracts
         });
         _deployVerifier(salt, _config.testnetVerifier, contracts);
@@ -222,7 +219,6 @@ contract GatewayCTMDeployer {
         uint256 _l1ChainId,
         address _rollupL2DAValidatorAddress,
         address _aliasedGovernanceAddress,
-        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
@@ -241,7 +237,7 @@ contract GatewayCTMDeployer {
             new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
         );
 
-        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(_isZKsyncOS));
+        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}());
         _deployedContracts.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade{salt: _salt}());
     }
 

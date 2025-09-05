@@ -9,14 +9,11 @@ import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol"
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IZKOSContractDeployer} from "./IZKOSContractDeployer.sol";
 import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
 import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
-
-import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
 import {ICTMDeploymentTracker} from "../bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
@@ -71,12 +68,8 @@ library L2GenesisForceDeploymentsHelper {
     /// @param _isZKsyncOS Whether the deployment is for ZKSyncOS or Era.
     /// @param _bytecodeInfo The bytecode information for deployment.
     /// @param _newAddress The address where the contract should be deployed.
-    function forceDeployOnAddress(bool _isZKsyncOS, bytes memory _bytecodeInfo, address _newAddress) internal {
-        if (_isZKsyncOS) {
-            forceDeployZKsyncOS(_bytecodeInfo, _newAddress);
-        } else {
-            forceDeployEra(_bytecodeInfo, _newAddress);
-        }
+    function forceDeployOnAddress(bytes memory _bytecodeInfo, address _newAddress) internal {
+        forceDeployEra(_bytecodeInfo, _newAddress);
     }
 
     /// @notice Initializes force-deployed contracts.
@@ -86,7 +79,6 @@ library L2GenesisForceDeploymentsHelper {
     /// @param _additionalForceDeploymentsData Encoded data for force deployments that
     /// is specific for each ZK Chain.
     function performForceDeployedContractsInit(
-        bool _isZKsyncOS,
         address _ctmDeployer,
         bytes memory _fixedForceDeploymentsData,
         bytes memory _additionalForceDeploymentsData,
@@ -103,17 +95,16 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         forceDeployOnAddress(
-            _isZKsyncOS,
             fixedForceDeploymentsData.messageRootBytecodeInfo,
             address(L2_MESSAGE_ROOT_ADDR)
         );
         // If this is a genesis upgrade, we need to initialize the MessageRoot contract.
         // We dont need to do anything for already deployed chains.
         if (_isGenesisUpgrade) {
-            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2();
+            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
         }
 
-        forceDeployOnAddress(_isZKsyncOS, fixedForceDeploymentsData.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
+        forceDeployOnAddress(fixedForceDeploymentsData.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
         if (_isGenesisUpgrade) {
             L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
@@ -134,7 +125,6 @@ library L2GenesisForceDeploymentsHelper {
             : L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE();
 
         forceDeployOnAddress(
-            _isZKsyncOS,
             fixedForceDeploymentsData.l2AssetRouterBytecodeInfo,
             address(L2_ASSET_ROUTER_ADDR)
         );
@@ -177,7 +167,7 @@ library L2GenesisForceDeploymentsHelper {
         });
 
         // Now initialiazing the upgradeable token beacon
-        forceDeployOnAddress(_isZKsyncOS, fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
+        forceDeployOnAddress(fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
 
         if (_isGenesisUpgrade) {
             address deployedTokenBeacon;
@@ -187,7 +177,6 @@ library L2GenesisForceDeploymentsHelper {
                 // We need to deploy tbe beacon, we will use a separate contract for that to save
                 // up on size of this contract.
                 forceDeployOnAddress(
-                    _isZKsyncOS,
                     fixedForceDeploymentsData.beaconDeployerInfo,
                     L2_NTV_BEACON_DEPLOYER_ADDR
                 );
@@ -220,7 +209,6 @@ library L2GenesisForceDeploymentsHelper {
         }
 
         forceDeployOnAddress(
-            _isZKsyncOS,
             fixedForceDeploymentsData.chainAssetHandlerBytecodeInfo,
             address(L2_CHAIN_ASSET_HANDLER_ADDR)
         );

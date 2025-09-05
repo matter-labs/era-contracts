@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./Utils.sol";
+import {Utils as Utils_old} from "./Utils.sol";
+import {BytecodeUtils as Utils} from "./BytecodeUtils.s.sol";
 
 /// @title ContractsBytecodesLib
 /// @notice Library providing functions to read bytecodes of L2 contracts individually.
@@ -24,6 +25,7 @@ library ContractsBytecodesLib {
             return getCreationCodeEVM(contractIdentifier);
         }
     }
+
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
         string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
 
@@ -48,11 +50,11 @@ library ContractsBytecodesLib {
             "BeaconProxy",
             "BridgedStandardERC20",
             "BridgedTokenBeacon",
-            "L2Bridgehub",
+            "Bridgehub",
             "BytecodesSupplier", // ???
             "ChainAdmin",
             "ChainAdminOwnable",
-            "L2ChainAssetHandler",
+            "ChainAssetHandler",
             "ChainRegistrar",
             "ChainTypeManager",
             "CTMDeploymentTracker",
@@ -70,7 +72,7 @@ library ContractsBytecodesLib {
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
-            "L2MessageRoot",
+            "MessageRoot",
             "PermanentRestriction",
             "ProxyAdmin", // ??
             "UpgradeableBeacon",

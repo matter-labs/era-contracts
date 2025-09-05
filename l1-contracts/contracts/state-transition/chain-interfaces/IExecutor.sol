@@ -70,8 +70,8 @@ interface IExecutor is IZKChainBase {
     // solhint-disable-next-line gas-struct-packing
     struct StoredBatchInfo {
         uint64 batchNumber;
-        bytes32 batchHash; // For Boojum OS batches we'll store here full state commitment
-        uint64 indexRepeatedStorageChanges; // For Boojum OS not used, 0
+        bytes32 batchHash;
+        uint64 indexRepeatedStorageChanges;
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
         bytes32 dependencyRootsRollingHash;
@@ -90,8 +90,8 @@ interface IExecutor is IZKChainBase {
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
         bytes32 l2LogsTreeRoot;
-        uint256 timestamp; // For Boojum OS not used, 0
-        bytes32 commitment; // For Boojum OS batches we'll store batch output hash here
+        uint256 timestamp;
+        bytes32 commitment;
     }
 
     /// @notice Data needed to commit new batch
