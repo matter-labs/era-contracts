@@ -68,7 +68,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ input.commit }}
+          tag_name: ${{ inputs.commit }}
           fail_on_unmatched_files: true
           files: |
             l1-contracts.tar.gz
