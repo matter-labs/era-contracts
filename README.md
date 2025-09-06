@@ -1,5 +1,7 @@
 # ZKsync Era: Smart Contracts
 
+tmp
+
 [![Logo](eraLogo.svg)](https://zksync.io/)
 
 ZKsync Era is a layer 2 rollup that uses zero-knowledge proofs to scale Ethereum without compromising on security or
