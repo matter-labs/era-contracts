@@ -3,10 +3,9 @@ name: Build and release(manual)
 on:
   workflow_dispatch:
     inputs:
-      # TODO: rename from commit to tag.
-      commit:
+      tag:
         type: string
-        description: tag/branch/commit to build from
+        description: tag to build from
         required: true
 
 
@@ -21,7 +20,7 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.commit }}
+          ref: ${{ inputs.tag }}
           submodules: recursive
 
       - name: Install foundry-zksync
@@ -68,7 +67,7 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ inputs.commit }}
+          tag_name: ${{ inputs.tag }}
           fail_on_unmatched_files: true
           files: |
             l1-contracts.tar.gz
