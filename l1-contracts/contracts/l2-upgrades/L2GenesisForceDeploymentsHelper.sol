@@ -14,6 +14,7 @@ import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
+import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
 import {ICTMDeploymentTracker} from "../bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
@@ -45,31 +46,37 @@ library L2GenesisForceDeploymentsHelper {
         IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(forceDeployments);
     }
 
-    function forceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
-        (bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash) = abi.decode(
-            _bytecodeInfo,
-            (bytes32, uint32, bytes32)
-        );
+    // FIXME do we need this?
+    // function forceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
+    //     (bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash) = abi.decode(
+    //         _bytecodeInfo,
+    //         (bytes32, uint32, bytes32)
+    //     );
 
-        bytes memory data = abi.encodeCall(
-            IZKOSContractDeployer.setBytecodeDetailsEVM,
-            (_newAddress, bytecodeHash, bytecodeLength, observableBytecodeHash)
-        );
+    //     bytes memory data = abi.encodeCall(
+    //         IZKOSContractDeployer.setBytecodeDetailsEVM,
+    //         (_newAddress, bytecodeHash, bytecodeLength, observableBytecodeHash)
+    //     );
 
-        // Note, that we dont use interface, but raw call to avoid Solidity checking for empty bytecode
-        bool success = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
-        if (!success) {
-            // solhint-disable-next-line gas-custom-errors
-            revert("setBytecodeDetailsEVM failed");
-        }
-    }
+    //     // Note, that we dont use interface, but raw call to avoid Solidity checking for empty bytecode
+    //     bool success = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
+    //     if (!success) {
+    //         // solhint-disable-next-line gas-custom-errors
+    //         revert("setBytecodeDetailsEVM failed");
+    //     }
+    // }
 
     /// @notice Unified function to force deploy contracts based on whether it's ZKSyncOS or Era.
     /// @param _isZKsyncOS Whether the deployment is for ZKSyncOS or Era.
     /// @param _bytecodeInfo The bytecode information for deployment.
     /// @param _newAddress The address where the contract should be deployed.
-    function forceDeployOnAddress(bytes memory _bytecodeInfo, address _newAddress) internal {
-        forceDeployEra(_bytecodeInfo, _newAddress);
+    function forceDeployOnAddress(bool _isZKsyncOS, bytes memory _bytecodeInfo, address _newAddress) internal {
+        // FIXME do we need this?
+        // if(_isZKsyncOS) { 
+            // forceDeployZKsyncOS(_bytecodeInfo, _newAddress);
+        // } else { 
+            forceDeployEra(_bytecodeInfo, _newAddress);
+        // }
     }
 
     /// @notice Initializes force-deployed contracts.
@@ -94,14 +101,14 @@ library L2GenesisForceDeploymentsHelper {
             (ZKChainSpecificForceDeploymentsData)
         );
 
-        forceDeployOnAddress(fixedForceDeploymentsData.messageRootBytecodeInfo, address(L2_MESSAGE_ROOT_ADDR));
+        forceDeployOnAddress(false, fixedForceDeploymentsData.messageRootBytecodeInfo, address(L2_MESSAGE_ROOT_ADDR));
         // If this is a genesis upgrade, we need to initialize the MessageRoot contract.
         // We dont need to do anything for already deployed chains.
         if (_isGenesisUpgrade) {
             L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
         }
 
-        forceDeployOnAddress(fixedForceDeploymentsData.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
+        forceDeployOnAddress(false, fixedForceDeploymentsData.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
         if (_isGenesisUpgrade) {
             L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
@@ -121,7 +128,7 @@ library L2GenesisForceDeploymentsHelper {
             ? address(0)
             : L2AssetRouter(L2_ASSET_ROUTER_ADDR).L2_LEGACY_SHARED_BRIDGE();
 
-        forceDeployOnAddress(fixedForceDeploymentsData.l2AssetRouterBytecodeInfo, address(L2_ASSET_ROUTER_ADDR));
+        forceDeployOnAddress(false, fixedForceDeploymentsData.l2AssetRouterBytecodeInfo, address(L2_ASSET_ROUTER_ADDR));
         if (_isGenesisUpgrade) {
             // solhint-disable-next-line
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
@@ -161,7 +168,7 @@ library L2GenesisForceDeploymentsHelper {
         });
 
         // Now initialiazing the upgradeable token beacon
-        forceDeployOnAddress(fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
+        forceDeployOnAddress(false, fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
 
         if (_isGenesisUpgrade) {
             address deployedTokenBeacon;
@@ -170,7 +177,7 @@ library L2GenesisForceDeploymentsHelper {
             if (fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
                 // We need to deploy the beacon, we will use a separate contract for that to save
                 // up on size of this contract.
-                forceDeployOnAddress(fixedForceDeploymentsData.beaconDeployerInfo, L2_NTV_BEACON_DEPLOYER_ADDR);
+                forceDeployOnAddress(false, fixedForceDeploymentsData.beaconDeployerInfo, L2_NTV_BEACON_DEPLOYER_ADDR);
 
                 deployedTokenBeacon = UpgradeableBeaconDeployer(L2_NTV_BEACON_DEPLOYER_ADDR).deployUpgradeableBeacon(
                     fixedForceDeploymentsData.aliasedL1Governance
@@ -200,6 +207,7 @@ library L2GenesisForceDeploymentsHelper {
         }
 
         forceDeployOnAddress(
+            false,
             fixedForceDeploymentsData.chainAssetHandlerBytecodeInfo,
             address(L2_CHAIN_ASSET_HANDLER_ADDR)
         );

@@ -63,7 +63,7 @@ contract GatewayCTMDeployerTest is Test {
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
 
-        new DiamondInit();
+        new DiamondInit(false);
         new L1GenesisUpgrade();
         new RollupDAManager();
         new ValidiumL1DAValidator();
@@ -74,8 +74,7 @@ contract GatewayCTMDeployerTest is Test {
         new VerifierFflonk();
         new VerifierPlonk();
 
-        new TestnetVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
-        new DualVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
+        new TestnetVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)), address(0));
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();

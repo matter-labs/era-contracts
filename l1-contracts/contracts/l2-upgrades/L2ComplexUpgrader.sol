@@ -8,6 +8,8 @@ import {Unauthorized, AddressHasNoCode} from "../common/L1ContractErrors.sol";
 
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 
+import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev

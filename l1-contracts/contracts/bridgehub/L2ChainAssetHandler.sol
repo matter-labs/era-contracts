@@ -2,8 +2,13 @@
 
 pragma solidity 0.8.28;
 
+import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
+import {IBridgehub} from "./IBridgehub.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {InvalidCaller} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -37,6 +42,14 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// the old version where it was an immutable.
     address private ASSET_ROUTER;
 
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
     /// @notice One-time initializer (replaces constructor on L2).
     function initL2(
         uint256 _l1ChainId,
@@ -57,12 +70,12 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
         IBridgehub _bridgehub,
         address _assetRouter,
         IMessageRoot _messageRoot
-    ) external onlyUpgrader {
-        bridgehub = _bridgehub;
-        l1ChainId = _l1ChainId;
-        assetRouter = _assetRouter;
-        messageRoot = _messageRoot;
-        ethTokenAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+    ) public onlyUpgrader {
+        BRIDGEHUB = _bridgehub;
+        L1_CHAIN_ID = _l1ChainId;
+        ASSET_ROUTER = _assetRouter;
+        MESSAGE_ROOT = _messageRoot;
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -70,18 +83,18 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     //////////////////////////////////////////////////////////////*/
 
     function _ethTokenAssetId() internal view override returns (bytes32) {
-        return ethTokenAssetId;
+        return ETH_TOKEN_ASSET_ID;
     }
     function _l1ChainId() internal view override returns (uint256) {
-        return l1ChainId;
+        return L1_CHAIN_ID;
     }
     function _bridgehub() internal view override returns (IBridgehub) {
-        return bridgehub;
+        return BRIDGEHUB;
     }
     function _messageRoot() internal view override returns (IMessageRoot) {
-        return messageRoot;
+        return MESSAGE_ROOT;
     }
     function _assetRouter() internal view override returns (address) {
-        return assetRouter;
+        return ASSET_ROUTER;
     }
 }

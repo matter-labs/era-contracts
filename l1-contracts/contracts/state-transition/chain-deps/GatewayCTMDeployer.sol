@@ -237,7 +237,7 @@ contract GatewayCTMDeployer {
             new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
         );
 
-        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}());
+        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));
         _deployedContracts.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade{salt: _salt}());
     }
 

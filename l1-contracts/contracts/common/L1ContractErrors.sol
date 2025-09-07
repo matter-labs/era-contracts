@@ -130,8 +130,6 @@ error IncorrectBatchBounds(
     uint256 processFromProvided,
     uint256 processToProvided
 );
-// 0x55bde247
-error IncorrectBatchChainId();
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de

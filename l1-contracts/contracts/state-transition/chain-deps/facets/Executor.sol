@@ -20,7 +20,6 @@ import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1T
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {InteropRoot} from "../../../common/Messaging.sol";
-import {IL2ToL1Messenger} from "../../../common/l2-helpers/IL2ToL1Messenger.sol";
 import {IL2MessageRoot} from "../../../bridgehub/IL2MessageRoot.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
@@ -169,7 +168,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             revert L2TimestampTooBig();
         }
         if (_newBatch.chainId != s.chainId) {
-            revert IncorrectBatchChainId();
+            revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
 // Currently ZKsync OS, always generates rollup da commitment and sets l2DaValidator to 0.
 //        if (_newBatch.l2DaValidator != s.l2DAValidator) {
@@ -831,6 +830,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
+        bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
@@ -859,6 +859,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
 
             prevBatchCommitment = currentBatchCommitment;
+            prevBatchStateCommitment = currentBatchStateCommitment;
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
             revert VerifiedBatchesExceedsCommittedBatches();

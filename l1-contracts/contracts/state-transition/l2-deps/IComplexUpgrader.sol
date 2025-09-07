@@ -6,6 +6,22 @@ import {IL2ContractDeployer} from "../../common/interfaces/IL2ContractDeployer.s
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IComplexUpgrader {
+    /// @notice Information about the force deployment.
+    /// @dev This struct is used to store the information about the force deployment.
+    /// @dev For ZKsyncOS, the `deployedBytecodeInfo` is the abi-encoded tuple of `(bytes32, uint32, bytes32)`,
+    /// for Era, it is the abi-encoded `bytes32`.
+    /// @dev Note, that ZKsyncOS does not support constructors, so the `deployedBytecodeInfo` should only describe the
+    /// deployed bytecode.
+    /// @param isZKsyncOS whether the deployment is for ZKsyncOS or Era.
+    /// @param deployedBytecodeInfo the bytecode information for deployment.
+    /// @param newAddress the address where the contract should be deployed.
+    // solhint-disable-next-line gas-struct-packing
+    struct UniversalForceDeploymentInfo {
+        bool isZKsyncOS;
+        bytes deployedBytecodeInfo;
+        address newAddress;
+    }
+
     /// @notice Executes an upgrade process by delegating calls to another contract.
     /// @dev Compatible with Era only.
     /// @param _forceDeployments the list of initial deployments that should be performed before the upgrade.

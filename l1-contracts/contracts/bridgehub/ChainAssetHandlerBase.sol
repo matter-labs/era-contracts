@@ -125,7 +125,7 @@ abstract contract ChainAssetHandlerBase is
             );
 
             // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
-            if (_settlementChainId != L1_CHAIN_ID && BRIDGEHUB.chainTypeManager(_settlementChainId) != ctm) {
+            if (_settlementChainId != _l1ChainId() && _bridgehub().chainTypeManager(_settlementChainId) != ctm) {
                 revert SLHasDifferentCTM();
             }
         }

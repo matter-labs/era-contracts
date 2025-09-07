@@ -101,7 +101,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
     /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
     modifier onlyL2() {
-        if (block.chainid == L1_CHAIN_ID) {
+        if (block.chainid == _l1ChainId()) {
             revert NotL2();
         }
         _;

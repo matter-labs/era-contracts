@@ -841,9 +841,7 @@ contract DeployL1Script is Script, DeployUtils {
                     return getCreationCode("DualVerifier", true);
                 }
             } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
+                return Utils.readZKFoundryBytecodeL1("VerifierFflonk.sol", "VerifierFflonk");
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {

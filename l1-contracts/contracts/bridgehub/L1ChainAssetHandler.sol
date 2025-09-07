@@ -5,6 +5,8 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {IBridgehub} from "./IBridgehub.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
