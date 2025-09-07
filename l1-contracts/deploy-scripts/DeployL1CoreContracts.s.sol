@@ -12,6 +12,7 @@ import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -34,8 +35,8 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
+import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
+import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -65,6 +66,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 
 import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -73,7 +75,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
     using stdToml for string;
 
     function run() public virtual {
-        console.log("Deploying L1 contracts");
+        console.log("Deploying L1 core contracts");
 
         runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
     }
@@ -279,14 +281,19 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
 
     function setBridgehubParams() internal {
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        IMessageRoot messageRoot = IMessageRoot(addresses.bridgehub.messageRootProxy);
+        IL1AssetTracker assetTracker = L1AssetTracker(addresses.bridgehub.assetTrackerProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         bridgehub.setAddresses(
             addresses.bridges.l1AssetRouterProxy,
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy),
-            addresses.bridgehub.chainAssetHandlerProxy
+            addresses.bridgehub.chainAssetHandlerProxy,
+            addresses.bridgehub.chainRegistrationSenderProxy
         );
+        messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
+        assetTracker.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
     }
@@ -296,6 +303,14 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         vm.broadcast(msg.sender);
         sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(addresses.bridges.erc20BridgeProxy));
         console.log("SharedBridge updated with ERC20Bridge address");
+
+        L1NativeTokenVault ntv = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
+        vm.broadcast(msg.sender);
+        ntv.setAssetTracker(addresses.bridgehub.assetTrackerProxy);
+        console.log("L1NativeTokenVault updated with AssetTracker address");
+
+        vm.broadcast(msg.sender);
+        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
     function setL1NativeTokenVaultParams() internal {
@@ -308,9 +323,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
         l1Nullifier.setL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-
-        vm.broadcast(msg.sender);
-        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
     }
 
     function updateOwners() internal {
@@ -346,6 +358,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             addresses.bridgehub.chainAssetHandlerImplementation
         );
         vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
+        vm.serializeAddress("bridgehub", "chain_registration_sender_proxy_addr", addresses.bridgehub.chainRegistrationSenderProxy);
         vm.serializeAddress(
             "bridgehub",
             "ctm_deployment_tracker_proxy_addr",
@@ -362,6 +375,8 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             "chain_asset_handler_implementation_addr",
             addresses.bridgehub.chainAssetHandlerImplementation
         );
+        vm.serializeAddress("bridgehub", "l1_asset_tracker_implementation_addr", addresses.bridgehub.assetTrackerImplementation);
+        vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
@@ -545,6 +560,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
 
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
+            gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
@@ -555,10 +571,16 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
             messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
             chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
+            interopCenterBytecodeHash: getL2BytecodeHash("InteropCenter"),
+            interopHandlerBytecodeHash: getL2BytecodeHash("InteropHandler"),
+            assetTrackerBytecodeHash: getL2BytecodeHash("L2AssetTracker"),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
+            aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(
+                addresses.bridgehub.chainRegistrationSenderProxy
+            ),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
         });
 
@@ -676,12 +698,16 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "ChainRegistrar")) {
+            if (compareStrings(contractName, "L1AssetTracker")) {
+                return type(L1AssetTracker).creationCode;
+            } else if (compareStrings(contractName, "ChainRegistrar")) {
                 return type(ChainRegistrar).creationCode;
             } else if (compareStrings(contractName, "Bridgehub")) {
                 return type(Bridgehub).creationCode;
             } else if (compareStrings(contractName, "ChainAssetHandler")) {
                 return type(ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+                return type(ChainRegistrationSender).creationCode;
             } else if (compareStrings(contractName, "MessageRoot")) {
                 return type(MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -713,9 +739,9 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
                     return type(DualVerifier).creationCode;
                 }
             } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return type(L1VerifierFflonk).creationCode;
+                return type(VerifierFflonk).creationCode;
             } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return type(L1VerifierPlonk).creationCode;
+                return type(VerifierPlonk).creationCode;
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
@@ -771,6 +797,8 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "Bridgehub")) {
                 return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+                return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "MessageRoot")) {
                 return abi.encodeCall(MessageRoot.initialize, ());
             } else if (compareStrings(contractName, "ChainAssetHandler")) {
@@ -787,7 +815,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
                 return
                     abi.encodeCall(
                         L1NativeTokenVault.initialize,
-                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                        (config.deployerAddress, addresses.bridges.bridgedTokenBeacon)
                     );
             } else if (compareStrings(contractName, "ChainTypeManager")) {
                 return
@@ -803,6 +831,8 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
                     );
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
+            } else if (compareStrings(contractName, "L1AssetTracker")) {
+                return abi.encodeCall(L1AssetTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return
                     abi.encodeCall(

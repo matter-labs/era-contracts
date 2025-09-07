@@ -124,6 +124,13 @@ contract ChainAssetHandler is
         _transferOwnership(_owner);
     }
 
+    /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
+    /// @param _owner the owner of the contract
+    function initialize(address _owner) external reentrancyGuardInitializer {
+        _transferOwnership(_owner);
+    }
+
+
     /*//////////////////////////////////////////////////////////////
                             Getters
     //////////////////////////////////////////////////////////////*/
@@ -219,7 +226,7 @@ contract ChainAssetHandler is
             );
 
             // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
-            if (_settlementChainId != L1_CHAIN_ID && BRIDGEHUB.chainTypeManager(_settlementChainId) != ctm) {
+            if (_settlementChainId != L1_CHAIN_ID && BRIDGE_HUB.chainTypeManager(_settlementChainId) != ctm) {
                 revert SLHasDifferentCTM();
             }
         }

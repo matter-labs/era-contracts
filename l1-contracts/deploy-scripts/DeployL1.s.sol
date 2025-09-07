@@ -79,19 +79,14 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function runWithBridgehub(address bridgehub) public {
-        console.log("Deploying L1 contracts");
+        console.log("Deploying L1 contracts with bridgehub", bridgehub);
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", bridgehub);
+        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", bridgehub, false);
     }
 
     function runForTest(bool skipL1Deployments) public {
         runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), address(0), skipL1Deployments);
 
-                // In the production environment, there will be a separate script dedicated to accepting the adminship
-        // but for testing purposes we'll have to do it here.
-        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.broadcast(addresses.chainAdmin);
-        bridgehub.acceptAdmin();
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -335,9 +330,6 @@ contract DeployL1Script is Script, DeployUtils {
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
-        L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
-        l1NativeTokenVault.transferOwnership(config.ownerAddress);
-
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.stateTransition.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);
 
@@ -386,7 +378,7 @@ contract DeployL1Script is Script, DeployUtils {
             "interop_center_implementation_addr",
             addresses.bridgehub.interopCenterImplementation
         );
-        vm.serializeAddress("bridgehub", "asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
+        vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
         vm.serializeAddress(
             "bridgehub",
             "asset_tracker_implementation_addr",

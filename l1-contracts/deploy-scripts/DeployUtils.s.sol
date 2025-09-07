@@ -214,6 +214,12 @@ abstract contract DeployUtils is Create2FactoryUtils {
         addresses.bridgehub.chainAssetHandlerProxy = toml.readAddress(
             ".deployed_addresses.bridgehub.chain_asset_handler_proxy_addr"
         );
+        addresses.bridgehub.chainRegistrationSenderProxy = toml.readAddress(
+            ".deployed_addresses.bridgehub.chain_registration_sender_proxy_addr"
+        );
+        addresses.bridgehub.assetTrackerProxy = toml.readAddress(
+            ".deployed_addresses.bridgehub.l1_asset_tracker_proxy_addr"
+        );
         addresses.bridgehub.messageRootImplementation = toml.readAddress(
             ".deployed_addresses.bridgehub.message_root_implementation_addr"
         );
