@@ -56,7 +56,7 @@ contract MailboxTest is UtilsTest {
             selectors: Utils.getGettersSelectors()
         });
 
-        mockDiamondInitInteropCenterCalls();
+        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0));
         vm.mockCall(
             address(bridgehub),
             abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
@@ -67,10 +67,9 @@ contract MailboxTest is UtilsTest {
             abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
             abi.encode(1)
         );
-        proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);
-        utilsFacet.util_setInteropCenter(interopCenter);
     }
 
     function setupDiamondProxy() public {

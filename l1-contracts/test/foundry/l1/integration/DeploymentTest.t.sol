@@ -143,7 +143,7 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
                 owner,
                 addresses.chainTypeManager.protocolVersion(),
                 addresses.chainTypeManager.storedBatchZero(),
-                address(addresses.bridgehub.assetRouter()),
+                address(addresses.bridgehub),
                 address(addresses.interopCenter)
             );
 
@@ -151,9 +151,6 @@ contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, 
 
             vm.startBroadcast(owner);
             addresses.bridgehub.addTokenAssetId(baseTokenAssetId);
-            vm.expectRevert(
-                abi.encodeWithSelector(IncorrectBridgeHubAddress.selector, address(addresses.bridgehub.assetRouter()))
-            );
             addresses.bridgehub.registerAlreadyDeployedZKChain(chainId, chain);
             vm.stopBroadcast();
         }

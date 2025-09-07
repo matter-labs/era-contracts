@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -18,7 +18,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {AssetIdNotRegistered, InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotEnoughChainBalance, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, TokenBalanceNotMigratedToGateway, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotEnoughChainBalance, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, TokenBalanceNotMigratedToGateway, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidEmptyMessageRoot} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
@@ -200,7 +200,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             _forceSetAssetMigrationNumber(_tokenOriginChainId, _assetId);
         } else {
             /// Deposits are already paused when the chain migrates to GW, however L2->L2 interop is not.
-            _checkAssetMigrationNumberOnGateway(_assetId);
+            /// todo add back in after debuggin server.
+            // _checkAssetMigrationNumberOnGateway(_assetId);
         }
 
         if (_tokenOriginChainId == block.chainid) {
@@ -268,10 +269,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 if (log.value == bytes32(uint256(TxStatus.Failure))) {
                     _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key);
                 }
-                continue;
             } else if (log.sender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                 ++msgCount;
-                bytes memory message = _processLogsInputs.messages[msgCount - 1];
+                bytes calldata message = _processLogsInputs.messages[msgCount - 1];
 
                 if (log.value != keccak256(message)) {
                     revert InvalidMessage();
@@ -286,7 +286,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                     _handleAssetRouterMessage(_processLogsInputs.chainId, message);
                 } else if (log.key == bytes32(uint256(uint160(L2_ASSET_TRACKER_ADDR)))) {
                     _checkAssetTrackerMessageSelector(message);
+                } else if (log.key == bytes32(uint256(uint160(L2_COMPRESSOR_ADDR)))) {
+                    // No further action is required in this case.
                 } else if (uint256(log.key) <= MAX_BUILT_IN_CONTRACT_ADDR) {
+                    // This Log is not supported
                     revert InvalidBuiltInContractMessage(logCount, msgCount - 1, log.key);
                 } else {
                     address legacySharedBridge = legacySharedBridgeAddress[block.chainid];
@@ -299,10 +302,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        // bytes32 emptyMessageRootForChain =
-        _getEmptyMessageRoot(_processLogsInputs.chainId);
-        /// kl todo: fix this alongside FullMerkleMemory
-        // require(_processLogsInputs.messageRoot == emptyMessageRootForChain, InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot));
+        // bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        // kl todo add back
+        // require(
+        //     _processLogsInputs.messageRoot == emptyMessageRootForChain,
+        //     InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
+        // );
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
@@ -325,11 +330,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         chainTree.createTree(1);
         bytes32 initialChainTreeHash = chainTree.setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
         bytes32 leafHash = MessageHashing.chainIdLeafHash(initialChainTreeHash, _chainId);
-        return bytes32(leafHash); // kl todo fix
-        // bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
+        bytes32 emptyMessageRootCalculated = sharedTree.pushNewLeaf(leafHash);
 
-        // emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
-        // return emptyMessageRootCalculated;
+        emptyMessageRoot[_chainId] = emptyMessageRootCalculated;
+        return emptyMessageRootCalculated;
     }
 
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
@@ -348,13 +352,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
     }
 
-    function _handleInteropMessage(uint256 _chainId, bytes memory _message, bytes32 _baseTokenAssetId) internal {
+    function _handleInteropMessage(uint256 _chainId, bytes calldata _message, bytes32 _baseTokenAssetId) internal {
         if (_message[0] != BUNDLE_IDENTIFIER) {
             // This should not be possible in V30. In V31 this will be a trigger.
             return;
         }
 
-        InteropBundle memory interopBundle = this.parseInteropBundle(_message);
+        InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));
 
         InteropCall memory interopCall;
         uint256 callsLength = interopBundle.calls.length;
@@ -632,10 +636,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 revert AssetIdNotRegistered(_assetId);
             }
         }
-    }
-
-    function parseInteropBundle(bytes calldata _bundleData) external pure returns (InteropBundle memory interopBundle) {
-        interopBundle = abi.decode(_bundleData[1:], (InteropBundle));
     }
 
     function parseInteropCall(

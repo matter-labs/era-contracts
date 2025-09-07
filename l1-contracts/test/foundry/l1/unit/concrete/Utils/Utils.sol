@@ -356,14 +356,13 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](45);
+        bytes4[] memory selectors = new bytes4[](44);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
         selectors[i++] = UtilsFacet.util_getChainId.selector;
         selectors[i++] = UtilsFacet.util_setBridgehub.selector;
         selectors[i++] = UtilsFacet.util_getBridgehub.selector;
-        selectors[i++] = UtilsFacet.util_setInteropCenter.selector;
         selectors[i++] = UtilsFacet.util_setBaseToken.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenAssetId.selector;
         selectors[i++] = UtilsFacet.util_setVerifier.selector;
@@ -429,13 +428,11 @@ library Utils {
             });
     }
 
-    function makeInitializeData(address testnetVerifier) public returns (InitializeData memory) {
-        DummyBridgehub dummyBridgehub = new DummyBridgehub();
-
+    function makeInitializeData(address testnetVerifier, address bridgehub) public returns (InitializeData memory) {
         return
             InitializeData({
                 chainId: 1,
-                bridgehub: address(dummyBridgehub),
+                bridgehub: bridgehub,
                 chainTypeManager: address(0x1234567890876543567890),
                 interopCenter: address(0x1234567890876543567890),
                 protocolVersion: 0,
@@ -468,11 +465,15 @@ library Utils {
             });
     }
 
-    function makeDiamondProxy(Diamond.FacetCut[] memory facetCuts, address testnetVerifier) public returns (address) {
+    function makeDiamondProxy(
+        Diamond.FacetCut[] memory facetCuts,
+        address testnetVerifier,
+        address bridgehub
+    ) public returns (address) {
         DiamondInit diamondInit = new DiamondInit();
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
-            makeInitializeData(testnetVerifier)
+            makeInitializeData(testnetVerifier, bridgehub)
         );
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({

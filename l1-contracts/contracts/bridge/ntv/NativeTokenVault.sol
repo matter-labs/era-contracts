@@ -96,7 +96,7 @@ abstract contract NativeTokenVault is
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
 
-    function _assetTracker() internal view virtual returns (IAssetTrackerBase);
+    function assetTracker() public view virtual override returns (IAssetTrackerBase);
 
     /// @inheritdoc INativeTokenVault
     function registerToken(address _nativeToken) external virtual {
@@ -119,7 +119,7 @@ abstract contract NativeTokenVault is
         bytes32 currentAssetId = assetId[_nativeToken];
         if (currentAssetId == bytes32(0)) {
             tokenAssetId = _registerToken(_nativeToken);
-            _assetTracker().registerNewToken(tokenAssetId, block.chainid);
+            assetTracker().registerNewToken(tokenAssetId, block.chainid);
         } else {
             tokenAssetId = currentAssetId;
         }
@@ -496,7 +496,7 @@ abstract contract NativeTokenVault is
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
         _addTokenToTokensList(_assetId);
-        _assetTracker().registerNewToken(_assetId, _originChainId);
+        assetTracker().registerNewToken(_assetId, _originChainId);
     }
 
     /// @notice Calculates the bridged token address corresponding to native token counterpart.

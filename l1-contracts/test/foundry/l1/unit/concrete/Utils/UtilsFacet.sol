@@ -19,10 +19,6 @@ contract UtilsFacet is ZKChainBase {
         s.bridgehub = _bridgehub;
     }
 
-    function util_setInteropCenter(address _interopCenter) external {
-        s.interopCenter = _interopCenter;
-    }
-
     function util_getBridgehub() external view returns (address) {
         return s.bridgehub;
     }

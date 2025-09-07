@@ -14,6 +14,7 @@ import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncr
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {InsufficientChainBalance, InsufficientTotalSupply} from "./AssetTrackerErrors.sol";
 
 abstract contract AssetTrackerBase is
     IAssetTrackerBase,
@@ -111,6 +112,20 @@ abstract contract AssetTrackerBase is
 
     function _registerTokenOnL2(bytes32 _assetId) internal {
         assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+    }
+
+    function _decreaseChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        if (chainBalance[_chainId][_assetId] < _amount) {
+            revert InsufficientChainBalance(_chainId, _assetId, _amount);
+        }
+        chainBalance[_chainId][_assetId] -= _amount;
+    }
+
+    function _decreaseTotalSupplyAcrossAllChains(bytes32 _assetId, uint256 _amount) internal {
+        if (totalSupplyAcrossAllChains[_assetId] < _amount) {
+            revert InsufficientTotalSupply(_assetId, _amount);
+        }
+        totalSupplyAcrossAllChains[_assetId] -= _amount;
     }
 
     /*//////////////////////////////////////////////////////////////

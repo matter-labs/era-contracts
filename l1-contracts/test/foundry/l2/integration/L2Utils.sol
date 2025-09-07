@@ -69,7 +69,7 @@ library L2Utils {
 
     function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
-        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), L1_CHAIN_ID);
+        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), L1_CHAIN_ID, 1);
         forceDeployWithConstructor(
             "MessageRoot",
             L2_MESSAGE_ROOT_ADDR,
@@ -95,7 +95,6 @@ library L2Utils {
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            L2_INTEROP_CENTER_ADDR,
             address(0x000000000000000000000000000000000002000a)
         );
     }
@@ -150,16 +149,16 @@ library L2Utils {
 
     function forceDeployInteropCenter(SystemContractsArgs memory _args) internal {
         prankOrBroadcast(_args.broadcast, RANDOM_ADDRESS);
-        new InteropCenter(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId, _args.aliasedOwner);
+        new InteropCenter(_args.l1ChainId, _args.aliasedOwner);
         forceDeployWithConstructor(
             "InteropCenter",
             L2_INTEROP_CENTER_ADDR,
-            abi.encode(L2_BRIDGEHUB_ADDR, _args.l1ChainId, _args.aliasedOwner),
+            abi.encode(_args.l1ChainId, _args.aliasedOwner),
             _args.broadcast
         );
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         prankOrBroadcast(_args.broadcast, _args.aliasedOwner);
-        interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
+        // interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {

@@ -71,7 +71,7 @@ contract ChainTypeManagerTest is UtilsTest {
 
     function deploy() public {
         bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new MessageRoot(bridgehub, block.chainid);
+        messageroot = new MessageRoot(bridgehub, block.chainid, 1);
         chainAssetHandler = new ChainAssetHandler(
             block.chainid,
             governor,
@@ -84,16 +84,17 @@ contract ChainTypeManagerTest is UtilsTest {
         stdstore.target(address(messageroot)).sig(IMessageRoot.v30UpgradeGatewayBlockNumber.selector).checked_write(
             uint256(1)
         );
-        stdstore.target(address(messageroot)).sig(IMessageRoot.v30UpgradeChainBatchNumber.selector).with_key(chainId).checked_write(
-            uint256(1)
-        );
+        stdstore
+            .target(address(messageroot))
+            .sig(IMessageRoot.v30UpgradeChainBatchNumber.selector)
+            .with_key(chainId)
+            .checked_write(uint256(1));
         vm.prank(governor);
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
             messageroot,
             address(chainAssetHandler),
-            address(0),
             address(0x000000000000000000000000000000000002000a)
         );
 
@@ -239,7 +240,7 @@ contract ChainTypeManagerTest is UtilsTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
-        mockDiamondInitInteropCenterCallsWithAddress(interopCenterAddress);
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge);
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,

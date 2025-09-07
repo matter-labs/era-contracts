@@ -12,7 +12,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
@@ -33,6 +33,7 @@ import {IL2CrossChainSender} from "../bridge/interfaces/IL2CrossChainSender.sol"
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev This contract serves as the primary entry point for communication between chains connected to the interop, facilitating interactions between end user and bridges.
+/// @dev as of V30 only deployed on the L2s, not on L1.
 contract InteropCenter is
     IInteropCenter,
     IERC7786GatewaySource,
@@ -40,24 +41,12 @@ contract InteropCenter is
     Ownable2StepUpgradeable,
     PausableUpgradeable
 {
-    /// @notice The bridgehub, responsible for registering chains.
-    IBridgehub public immutable override BRIDGE_HUB;
-
     /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     uint256 public immutable L1_CHAIN_ID;
 
     /// @notice The asset ID of ETH on L1.
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
-
-    /// @notice All of the ETH and ERC20 tokens are held by NativeTokenVault managed by this AssetRouter.
-    address public assetRouter;
-
-    /// @notice AssetTracker component address on L1. On L2 the address is L2_ASSET_TRACKER_ADDR.
-    ///         It adds one more layer of security on top of cross chain communication.
-    ///         Refer to its documentation for more details.
-    /// @dev This is not used but is required for discoverability.
-    IL2AssetTracker public assetTracker;
 
     /// @notice This mapping stores a number of interop bundles sent by an individual sender.
     ///         It's being used to derive interopBundleSalt in InteropBundle struct, whose role
@@ -80,35 +69,12 @@ contract InteropCenter is
     }
 
     /// @notice To avoid parity hack
-    constructor(IBridgehub _bridgehub, uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
+    constructor(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer {
         _disableInitializers();
-        BRIDGE_HUB = _bridgehub;
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
         _transferOwnership(_owner);
-    }
-
-    /// @notice Used to initialize the contract
-    ///         InteropCenter is deployed on L2 as a system contract without a proxy thus initialization is needed only on L1.
-    /// @param _owner the owner of the contract
-    function initialize(address _owner) external reentrancyGuardInitializer onlyL1 {
-        _transferOwnership(_owner);
-    }
-
-    /// @notice To set the addresses of some of the ecosystem contracts, only accessible to owner.
-    ///         Not done in initialize, as the order of deployment is InteropCenter, other contracts, and then we call this.
-    /// @param _assetRouter  Address of the AssetRouter component.
-    /// @param _assetTracker  Address of the AssetTracker component on L1.
-    function setAddresses(address _assetRouter, address _assetTracker) external onlyOwner {
-        address oldAssetRouter = assetRouter;
-        address oldAssetTracker = address(assetTracker);
-
-        assetRouter = _assetRouter;
-        assetTracker = IL2AssetTracker(_assetTracker);
-
-        emit NewAssetRouter(oldAssetRouter, _assetRouter);
-        emit NewAssetTracker(oldAssetTracker, _assetTracker);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -237,16 +203,16 @@ contract InteropCenter is
     /// @param _destinationChainId Destination chain ID.
     /// @param _totalValue Sum of requested interop call values.
     function _ensureCorrectTotalValue(uint256 _destinationChainId, uint256 _totalValue) internal {
-        bytes32 destinationChainBaseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_destinationChainId);
+        bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         // We burn the value that is passed along the bundle here, on source chain.
-        bytes32 thisChainBaseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(block.chainid);
+        bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
         if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
             require(msg.value == _totalValue, MsgValueMismatch(_totalValue, msg.value));
             // slither-disable-next-line arbitrary-send-eth
             L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalValue}();
         } else {
             require(msg.value == 0, MsgValueMismatch(0, msg.value));
-            IL2AssetRouter(assetRouter).bridgehubDepositBaseToken(
+            L2_ASSET_ROUTER.bridgehubDepositBaseToken(
                 _destinationChainId,
                 destinationChainBaseTokenAssetId,
                 msg.sender,
@@ -389,14 +355,14 @@ contract InteropCenter is
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }
-        _balanceChange.baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
-        IL2AssetTracker(L2_ASSET_TRACKER_ADDR).handleChainBalanceIncreaseOnGateway({
+        _balanceChange.baseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_chainId);
+        L2_ASSET_TRACKER.handleChainBalanceIncreaseOnGateway({
             _chainId: _chainId,
             _canonicalTxHash: _canonicalTxHash,
             _balanceChange: _balanceChange
         });
 
-        address zkChain = BRIDGE_HUB.getZKChain(_chainId);
+        address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
     }
 

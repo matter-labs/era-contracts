@@ -14,11 +14,13 @@ import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerif
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 
 contract AdminTest is UtilsTest {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](13);
@@ -54,8 +56,9 @@ contract AdminTest is UtilsTest {
             selectors: Utils.getUtilsFacetSelectors()
         });
 
-        mockDiamondInitInteropCenterCalls();
-        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        dummyBridgehub = new DummyBridgehub();
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0));
+        address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
         adminFacet = IAdmin(diamondProxy);
         utilsFacet = UtilsFacet(diamondProxy);
     }
