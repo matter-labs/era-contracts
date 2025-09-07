@@ -8,7 +8,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "./IBridgehub.sol";
-import {IInteropCenter} from "../interop/IInteropCenter.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
@@ -105,9 +104,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
 
     /// @notice the chain asset handler used for chain migration.
     address public chainAssetHandler;
-
-    /// @notice interopCenter used for L2<>L2 communication
-    IInteropCenter public override interopCenter;
 
     /// @notice the chain registration sender used for chain registration.
     /// @notice the chainRegistrationSender is only deployed on L1.
@@ -243,14 +239,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
         address _chainAssetHandler,
-        address _interopCenter,
         address _chainRegistrationSender
     ) external onlyOwner {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
-        interopCenter = IInteropCenter(_interopCenter);
         chainRegistrationSender = _chainRegistrationSender;
     }
 

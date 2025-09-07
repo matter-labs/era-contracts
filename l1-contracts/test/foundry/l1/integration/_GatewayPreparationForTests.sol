@@ -130,16 +130,19 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
     function fullGatewayRegistration() public {
         Call[] memory calls = _prepareGatewayGovernanceCalls(
-            _getL1GasPrice(),
-            // Some non-zero address
-            address(uint160(1)),
-            // Some non-zero address
-            address(uint160(1)),
-            // Some non-zero address
-            address(uint160(1)),
-            // Some non-zero address
-            address(uint160(1)),
-            msg.sender
+            PrepareGatewayGovernanceCalls({
+                _l1GasPrice: _getL1GasPrice(),
+                // Some non-zero address
+                _gatewayCTMAddress: address(uint160(1)),
+                // Some non-zero address
+                _gatewayRollupDAManager: address(uint160(1)),
+                // Some non-zero address
+                _gatewayValidatorTimelock: address(uint160(1)),
+                // Some non-zero address
+                _gatewayServerNotifier: address(uint160(1)),
+                _refundRecipient: msg.sender,
+                _ctmChainId: 0
+            })
         );
         Utils.executeCalls(Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
     }

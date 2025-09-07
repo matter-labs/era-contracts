@@ -95,8 +95,6 @@ interface IBridgehub {
 
     function messageRoot() external view returns (IMessageRoot);
 
-    function interopCenter() external view returns (IInteropCenter);
-
     function getZKChain(uint256 _chainId) external view returns (address);
 
     function getAllZKChains() external view returns (address[] memory);
@@ -177,7 +175,6 @@ interface IBridgehub {
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
         address _chainAssetHandler,
-        address _interopCenter,
         address _chainRegistrationSender
     ) external;
 

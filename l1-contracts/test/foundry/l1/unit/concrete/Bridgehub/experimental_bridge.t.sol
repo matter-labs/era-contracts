@@ -271,7 +271,6 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(address(0)),
             messageRoot,
             address(0),
-            address(interopCenter),
             address(0x000000000000000000000000000000000002000a)
         );
         // interopCenter.setAddresses(sharedBridgeAddress, address(assetTracker));
@@ -481,7 +480,6 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(address(0)),
             IMessageRoot(address(0)),
             address(0),
-            address(interopCenter),
             address(0x000000000000000000000000000000000002000a)
         );
         vm.stopPrank();
@@ -522,7 +520,6 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(address(0)),
             IMessageRoot(address(0)),
             address(0),
-            address(interopCenter),
             address(0x000000000000000000000000000000000002000a)
         );
         vm.stopPrank();
@@ -564,7 +561,6 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(randomCTMDeployer),
             IMessageRoot(randomMessageRoot),
             address(0),
-            address(interopCenter),
             address(0x000000000000000000000000000000000002000a)
         );
 
@@ -591,7 +587,6 @@ contract ExperimentalBridgeTest is Test {
             ICTMDeploymentTracker(randomCTMDeployer),
             IMessageRoot(randomMessageRoot),
             address(0),
-            address(interopCenter),
             address(0x000000000000000000000000000000000002000a)
         );
 

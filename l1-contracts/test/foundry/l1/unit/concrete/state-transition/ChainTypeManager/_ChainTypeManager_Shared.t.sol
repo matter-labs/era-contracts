@@ -95,7 +95,6 @@ contract ChainTypeManagerTest is UtilsTest {
             ICTMDeploymentTracker(address(0)),
             messageroot,
             address(chainAssetHandler),
-            address(0),
             address(0x000000000000000000000000000000000002000a)
         );
 

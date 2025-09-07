@@ -10,6 +10,8 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
+import {Call} from "contracts/governance/Common.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 
@@ -73,17 +75,18 @@ contract DeployL1Script is Script, DeployUtils {
     function run() public virtual {
         console.log("Deploying L1 contracts");
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", false);
+        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", address(0), false);
+    }
+
+    function runWithBridgehub(address bridgehub) public {
+        console.log("Deploying L1 contracts with bridgehub", bridgehub);
+
+        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", bridgehub, false);
     }
 
     function runForTest(bool skipL1Deployments) public {
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), skipL1Deployments);
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), address(0), skipL1Deployments);
 
-        // In the production environment, there will be a separate script dedicated to accepting the adminship
-        // but for testing purposes we'll have to do it here.
-        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.broadcast(addresses.chainAdmin);
-        bridgehub.acceptAdmin();
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -94,7 +97,7 @@ contract DeployL1Script is Script, DeployUtils {
         return config;
     }
 
-    function runInner(string memory inputPath, string memory outputPath, bool skipL1Deployments) internal {
+    function runInner(string memory inputPath, string memory outputPath, address bridgehub, bool skipL1Deployments) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);
@@ -104,7 +107,46 @@ contract DeployL1Script is Script, DeployUtils {
         if (!skipL1Deployments) {
             instantiateCreate2Factory();
         }
-        deployIfNeededMulticall3();
+
+        if (bridgehub == address(0)) {
+            initializeConfigIfEcosystemDeployedLocally(outputPath);
+        } else {
+            console.log("Initializing dynamically main contracts");
+            IBridgehub bridgehubProxy = IBridgehub(bridgehub);
+            L1AssetRouter assetRouter = L1AssetRouter(bridgehubProxy.assetRouter());
+            address messageRoot = address(bridgehubProxy.messageRoot());
+            address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
+            address chainAssetHandler = address(bridgehubProxy.chainAssetHandler());
+            address nativeTokenVault = address(assetRouter.nativeTokenVault());
+            address erc20Bridge = address(assetRouter.legacyBridge());
+            address l1Nullifier = address(assetRouter.L1_NULLIFIER());
+
+            addresses.bridgehub.bridgehubProxy = bridgehub;
+            addresses.bridgehub.ctmDeploymentTrackerProxy = l1CtmDeployer;
+            addresses.bridgehub.messageRootProxy = messageRoot;
+            addresses.bridgehub.chainAssetHandlerProxy = chainAssetHandler;
+
+            // Bridges
+            addresses.bridges.erc20BridgeProxy = erc20Bridge;
+            addresses.bridges.l1NullifierProxy = l1Nullifier;
+            addresses.bridges.l1AssetRouterProxy = address(assetRouter);
+            addresses.vaults.l1NativeTokenVaultProxy = nativeTokenVault;
+
+            addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
+            updateRollupDAManager();
+            addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
+
+            vm.startBroadcast(msg.sender);
+            IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
+            rollupDAManager.updateDAPair(
+                addresses.daAddresses.l1RollupDAValidator,
+                getL2ValidatorAddress("RollupL2DAValidator"),
+                true
+            );
+            vm.stopBroadcast();
+
+            deployIfNeededMulticall3();
+        }
 
         addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
 
@@ -112,22 +154,16 @@ contract DeployL1Script is Script, DeployUtils {
 
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
-        deployDAValidators();
-        (addresses.governance) = deploySimpleContract("Governance", false);
-        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
-        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
+
+        if (bridgehub != address(0)) {
+            (addresses.governance) = deploySimpleContract("Governance", false);
+            (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+            addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
+        }
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
-        (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
-            "Bridgehub",
-            false
-        );
-        (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
-            "MessageRoot",
-            false
-        );
 
         (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
 
@@ -136,51 +172,6 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.stateTransition.serverNotifierProxy
         ) = deployServerNotifier();
 
-        (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
-            "L1Nullifier",
-            false
-        );
-        (addresses.bridges.l1AssetRouterImplementation, addresses.bridges.l1AssetRouterProxy) = deployTuppWithContract(
-            "L1AssetRouter",
-            false
-        );
-        (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20", false);
-        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
-            "BridgedTokenBeacon",
-            config.ownerAddress,
-            false
-        );
-        (
-            addresses.vaults.l1NativeTokenVaultImplementation,
-            addresses.vaults.l1NativeTokenVaultProxy
-        ) = deployTuppWithContract("L1NativeTokenVault", false);
-        setL1NativeTokenVaultParams();
-
-        (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
-            "L1ERC20Bridge",
-            false
-        );
-        (
-            addresses.bridgehub.assetTrackerImplementation,
-            addresses.bridgehub.assetTrackerProxy
-        ) = deployTuppWithContract("L1AssetTracker", false);
-        updateSharedBridge();
-        // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
-        (
-            addresses.bridgehub.ctmDeploymentTrackerImplementation,
-            addresses.bridgehub.ctmDeploymentTrackerProxy
-        ) = deployTuppWithContract("CTMDeploymentTracker", false);
-
-        (
-            addresses.bridgehub.chainAssetHandlerImplementation,
-            addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
-        (
-            addresses.bridgehub.chainRegistrationSenderImplementation,
-            addresses.bridgehub.chainRegistrationSenderProxy
-        ) = deployTuppWithContract("ChainRegistrationSender", false);
-        setBridgehubParams();
-
         initializeGeneratedData();
 
         deployStateTransitionDiamondFacets();
@@ -188,7 +179,6 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
         ) = deployTuppWithContract("ChainTypeManager", false);
-        registerChainTypeManager();
         setChainTypeManagerInServerNotifier();
 
         updateOwners();
@@ -269,31 +259,6 @@ contract DeployL1Script is Script, DeployUtils {
         }
     }
 
-    function registerChainTypeManager() internal {
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.startBroadcast(msg.sender);
-        bridgehub.addChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
-        console.log("ChainTypeManager registered");
-        ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy);
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        sharedBridge.setAssetDeploymentTracker(
-            bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
-            address(ctmDT)
-        );
-        console.log("CTM DT whitelisted");
-
-        ctmDT.registerCTMAssetOnL1(addresses.stateTransition.chainTypeManagerProxy);
-        vm.stopBroadcast();
-        console.log("CTM registered in CTMDeploymentTracker");
-
-        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
-        console.log(
-            "CTM in router 1",
-            sharedBridge.assetHandlerAddress(assetId),
-            bridgehub.ctmAssetIdToAddress(assetId)
-        );
-    }
-
     function deployDiamondProxy() internal {
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
         facetCuts[0] = Diamond.FacetCut({
@@ -326,7 +291,6 @@ contract DeployL1Script is Script, DeployUtils {
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy),
             addresses.bridgehub.chainAssetHandlerProxy,
-            addresses.bridgehub.interopCenterProxy,
             addresses.bridgehub.chainRegistrationSenderProxy
         );
         messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
@@ -365,32 +329,12 @@ contract DeployL1Script is Script, DeployUtils {
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
-        L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
-        l1NativeTokenVault.transferOwnership(config.ownerAddress);
-
         ValidatorTimelock validatorTimelock = ValidatorTimelock(addresses.stateTransition.validatorTimelock);
         validatorTimelock.transferOwnership(config.ownerAddress);
-
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
-        IOwnable(address(bridgehub)).transferOwnership(addresses.governance);
-        bridgehub.setPendingAdmin(addresses.chainAdmin);
-
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        IOwnable(address(sharedBridge)).transferOwnership(addresses.governance);
-
-        IL1AssetTracker assetTracker = IL1AssetTracker(addresses.bridgehub.assetTrackerProxy);
-        IOwnable(address(assetTracker)).transferOwnership(addresses.governance);
 
         IChainTypeManager ctm = IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy);
         IOwnable(address(ctm)).transferOwnership(addresses.governance);
         ctm.setPendingAdmin(addresses.chainAdmin);
-
-        ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
-            addresses.bridgehub.ctmDeploymentTrackerProxy
-        );
-        IOwnable(address(ctmDeploymentTracker)).transferOwnership(addresses.governance);
-
-        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
 
@@ -401,6 +345,12 @@ contract DeployL1Script is Script, DeployUtils {
     function saveOutput(string memory outputPath) internal virtual {
         vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
         vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_asset_handler_implementation_addr",
+            addresses.bridgehub.chainAssetHandlerImplementation
+        );
+        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
         vm.serializeAddress(
             "bridgehub",
             "ctm_deployment_tracker_proxy_addr",
@@ -427,7 +377,7 @@ contract DeployL1Script is Script, DeployUtils {
             "interop_center_implementation_addr",
             addresses.bridgehub.interopCenterImplementation
         );
-        vm.serializeAddress("bridgehub", "asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
+        vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
         vm.serializeAddress(
             "bridgehub",
             "asset_tracker_implementation_addr",

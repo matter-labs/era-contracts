@@ -95,7 +95,6 @@ library L2Utils {
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            L2_INTEROP_CENTER_ADDR,
             address(0x000000000000000000000000000000000002000a)
         );
     }
