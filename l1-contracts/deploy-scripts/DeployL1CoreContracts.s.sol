@@ -358,7 +358,11 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             addresses.bridgehub.chainAssetHandlerImplementation
         );
         vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
-        vm.serializeAddress("bridgehub", "chain_registration_sender_proxy_addr", addresses.bridgehub.chainRegistrationSenderProxy);
+        vm.serializeAddress(
+            "bridgehub",
+            "chain_registration_sender_proxy_addr",
+            addresses.bridgehub.chainRegistrationSenderProxy
+        );
         vm.serializeAddress(
             "bridgehub",
             "ctm_deployment_tracker_proxy_addr",
@@ -375,7 +379,11 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             "chain_asset_handler_implementation_addr",
             addresses.bridgehub.chainAssetHandlerImplementation
         );
-        vm.serializeAddress("bridgehub", "l1_asset_tracker_implementation_addr", addresses.bridgehub.assetTrackerImplementation);
+        vm.serializeAddress(
+            "bridgehub",
+            "l1_asset_tracker_implementation_addr",
+            addresses.bridgehub.assetTrackerImplementation
+        );
         vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
         vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
         string memory bridgehub = vm.serializeAddress(

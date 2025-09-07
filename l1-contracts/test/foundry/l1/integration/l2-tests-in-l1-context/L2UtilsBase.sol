@@ -63,9 +63,7 @@ library L2UtilsBase {
         address wethToken = address(0x1);
         // we deploy the code to get the contract code with immutables which we then vm.etch
         address bridgehub = address(new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100));
-        address interopCenter = address(
-            new InteropCenter(_args.l1ChainId, _args.aliasedOwner)
-        );
+        address interopCenter = address(new InteropCenter(_args.l1ChainId, _args.aliasedOwner));
         address assetRouter = address(
             new L2AssetRouter(
                 _args.l1ChainId,
@@ -158,7 +156,6 @@ library L2UtilsBase {
             address l2DummyBaseTokenSystemContract = address(new DummyL2BaseTokenSystemContract());
             vm.etch(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, l2DummyBaseTokenSystemContract.code);
         }
-
 
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);

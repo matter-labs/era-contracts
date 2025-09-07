@@ -5,21 +5,19 @@ pragma solidity ^0.8.24;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IInteropCenter} from "./IInteropCenter.sol";
 
-import {L2_ASSET_ROUTER, L2_ASSET_TRACKER, GW_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_BRIDGEHUB_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER, GW_ASSET_TRACKER, L2_BRIDGEHUB, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BUNDLE_IDENTIFIER, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERSION, INTEROP_CALL_VERSION, InteropBundle, InteropCall, InteropCallStarter, InteropCallStarterInternal} from "../common/Messaging.sol";
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
-import {BalanceChange, IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
+import {BalanceChange} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";

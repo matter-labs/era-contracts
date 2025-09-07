@@ -136,5 +136,5 @@ contract ExecutorProofTest is UtilsTest {
     }
 
     // add this to be excluded from coverage report
-    function test() internal override  {}
+    function test() internal override {}
 }

@@ -25,7 +25,6 @@ import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, Inva
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
-import {IL2AssetTracker} from "../../../bridge/asset-tracker/IL2AssetTracker.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.

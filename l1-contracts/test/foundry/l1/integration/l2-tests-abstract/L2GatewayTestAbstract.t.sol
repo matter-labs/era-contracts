@@ -18,7 +18,6 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_
 import {ETH_TOKEN_ADDRESS, MAX_GAS_PER_TRANSACTION, SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common/Config.sol";
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
 
-
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";

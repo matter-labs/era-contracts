@@ -133,7 +133,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // There are three possible cases:
         // 1. We are depositing it back to the origin chain. The balance outside of it decreases and so we decrease
         // totalSupplyAcrossAllChains.
-        // 2. The token's origin is L1 and so regardless of the destination chain, the total amount outside of L1, i.e. 
+        // 2. The token's origin is L1 and so regardless of the destination chain, the total amount outside of L1, i.e.
         // inside our ecosystem increases.
         // 3. (Skipped) Since the token moves between non-origin chains, the totalSupplyAcrossAllChains remains unchanged.
         if (_tokenOriginChainId == _chainId) {
@@ -152,7 +152,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         /// A malicious transactionFilterer can do multiple deposits, but this will make the chainBalance smaller on the Gateway.
         TransientPrimitivesLib.set(key, uint256(_assetId));
         TransientPrimitivesLib.set(key + 1, _amount);
-
     }
 
     /// @notice Called on the L1 by the gateway's mailbox when a deposit happens

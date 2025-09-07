@@ -2,8 +2,7 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.21;
 
-import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {BalanceChange, TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 interface IL2AssetTracker {
     function setAddresses(uint256 _l1ChainId) external;

@@ -86,7 +86,6 @@ contract DeployL1Script is Script, DeployUtils {
 
     function runForTest(bool skipL1Deployments) public {
         runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), address(0), skipL1Deployments);
-
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -97,7 +96,12 @@ contract DeployL1Script is Script, DeployUtils {
         return config;
     }
 
-    function runInner(string memory inputPath, string memory outputPath, address bridgehub, bool skipL1Deployments) internal {
+    function runInner(
+        string memory inputPath,
+        string memory outputPath,
+        address bridgehub,
+        bool skipL1Deployments
+    ) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
         outputPath = string.concat(root, outputPath);

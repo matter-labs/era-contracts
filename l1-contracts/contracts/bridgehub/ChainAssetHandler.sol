@@ -21,7 +21,6 @@ import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
-import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 import {IGWAssetTracker} from "../bridge/asset-tracker/IGWAssetTracker.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
@@ -130,7 +129,6 @@ contract ChainAssetHandler is
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }
-
 
     /*//////////////////////////////////////////////////////////////
                             Getters
