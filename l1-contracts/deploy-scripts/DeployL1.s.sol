@@ -291,7 +291,6 @@ contract DeployL1Script is Script, DeployUtils {
             ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
             IMessageRoot(addresses.bridgehub.messageRootProxy),
             addresses.bridgehub.chainAssetHandlerProxy,
-            addresses.bridgehub.interopCenterProxy,
             addresses.bridgehub.chainRegistrationSenderProxy
         );
         messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);

@@ -370,7 +370,6 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             ICTMDeploymentTracker(address(0)),
             messageRootNew,
             address(chainAssetHandler),
-            address(0),
             address(0x000000000000000000000000000000000002000a)
         ); // kl todo maybe address(1)
         vm.stopPrank();

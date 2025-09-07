@@ -10,7 +10,6 @@ interface IBridgehub {
         address _ctmDeployer,
         address _messageRoot,
         address _chainAssetHandler,
-        address _interopCenter,
         address _chainRegistrationSender
     ) external;
 

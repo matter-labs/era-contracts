@@ -565,7 +565,6 @@ library Utils {
         address refundRecipient
     ) internal returns (bytes32 txHash) {
         IBridgehub bridgehub = IBridgehub(bridgehubAddress);
-        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
         PrepareL1L2TransactionParams memory params = PrepareL1L2TransactionParams({
             l1GasPrice: bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
             l2Calldata: l2Calldata,

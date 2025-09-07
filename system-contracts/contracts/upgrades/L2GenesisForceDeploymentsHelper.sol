@@ -57,7 +57,6 @@ library L2GenesisForceDeploymentsHelper {
                 _ctmDeployer,
                 address(L2_MESSAGE_ROOT),
                 address(L2_CHAIN_ASSET_HANDLER),
-                address(L2_INTEROP_CENTER),
                 fixedForceDeploymentsData.aliasedChainRegistrationSender
             )
         );
