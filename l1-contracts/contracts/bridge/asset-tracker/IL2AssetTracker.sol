@@ -8,12 +8,6 @@ import {BalanceChange, TokenBalanceMigrationData} from "../../common/Messaging.s
 interface IL2AssetTracker {
     function setAddresses(uint256 _l1ChainId) external;
 
-    function handleChainBalanceIncreaseOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        BalanceChange calldata _balanceChange
-    ) external;
-
     function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) external;
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external;
@@ -27,15 +21,7 @@ interface IL2AssetTracker {
         address _tokenAddress
     ) external;
 
-    function processLogsAndMessages(ProcessLogsInput calldata) external;
-
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external;
 
-    function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external;
-
     function confirmMigrationOnL2(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
-
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
-
-    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 }

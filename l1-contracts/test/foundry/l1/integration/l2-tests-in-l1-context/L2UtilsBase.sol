@@ -9,6 +9,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
+import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -16,7 +17,7 @@ import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Config, DeployUtils, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../l2-tests-abstract/Utils.sol";
 
@@ -141,6 +142,11 @@ library L2UtilsBase {
             vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
+
+            address gwAssetTrackerAddress = address(new GWAssetTracker());
+            vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(_args.l1ChainId);
         }
         {
             address l2StandardTriggerAccount = address(new DummyL2StandardTriggerAccount());

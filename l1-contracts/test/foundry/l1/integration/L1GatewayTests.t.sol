@@ -399,7 +399,7 @@ contract L1GatewayTests is
     }
 
     /// to increase coverage, properly tested in L2GatewayTests
-    function test_forwardToL2OnGateway() public {
+    function test_forwardToL2OnGateway_L1() public {
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);

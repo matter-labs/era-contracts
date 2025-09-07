@@ -18,6 +18,7 @@ import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubError
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
+import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
@@ -297,7 +298,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         /// Note: the confirmMigrationOnL2 is a L1->GW->L2 txs.
         _sendToChain(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
-            abi.encodeCall(IL2AssetTracker.confirmMigrationOnGateway, (data))
+            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (data))
         );
         _sendToChain(data.chainId, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
     }

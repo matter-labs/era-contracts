@@ -13,7 +13,7 @@ import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, Ch
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
-import {L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
@@ -112,7 +112,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// except for PreV30 chains, which can add it directly.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (block.chainid != L1_CHAIN_ID) {
-            if (msg.sender == assetTracker) {
+            if (msg.sender == GW_ASSET_TRACKER_ADDR) {
                 // this case is valid.
             } else if (v30UpgradeChainBatchNumber[_chainId] != 0) {
                 address chain = BRIDGE_HUB.getZKChain(_chainId);

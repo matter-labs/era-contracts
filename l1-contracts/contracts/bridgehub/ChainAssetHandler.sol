@@ -22,6 +22,7 @@ import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
+import {IGWAssetTracker} from "../bridge/asset-tracker/IGWAssetTracker.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
 /// @author Matter Labs
@@ -190,7 +191,7 @@ contract ChainAssetHandler is
         /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
         if (block.chainid == L1_CHAIN_ID) {
             bytes memory data = abi.encodeCall(
-                IL2AssetTracker.setLegacySharedBridgeAddress,
+                IGWAssetTracker.setLegacySharedBridgeAddress,
                 (bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(bridgehubBurnData.chainId))
             );
             address settlementZkChain = BRIDGE_HUB.getZKChain(_settlementChainId);
