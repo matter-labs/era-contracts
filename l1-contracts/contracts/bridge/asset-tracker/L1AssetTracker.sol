@@ -148,6 +148,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// @notice Called on the L1 by the gateway's mailbox when a deposit happens
     /// @notice Used for deposits via Gateway.
+    /// @dev Note that this function assumes that all whitelisted settlement layers are trusted.
     function consumeBalanceChange(
         uint256 _callerChainId,
         uint256 _chainId

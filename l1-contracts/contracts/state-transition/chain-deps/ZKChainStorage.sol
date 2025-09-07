@@ -164,6 +164,8 @@ struct ZKChainStorage {
     bytes32 baseTokenAssetId;
     /// @dev If this ZKchain settles on this chain, then this is zero. Otherwise it is the address of the ZKchain that is a
     /// settlement layer for this ZKchain. (think about it as a 'forwarding' address for the chain that migrated away).
+    /// @dev Note, that while we can not trust the operator of the settlement layer, it is assumed that the settlement layer 
+    /// belongs to the same CTM and has a trusted implementation, i.e. the implementation of the it consists of the expected facets: Mailbox, Executor, etc.
     address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;

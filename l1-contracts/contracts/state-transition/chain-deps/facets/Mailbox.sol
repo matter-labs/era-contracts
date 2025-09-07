@@ -313,12 +313,12 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (IChainTypeManager(s.chainTypeManager).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
-        /// We pause L1->GW->L2 deposits.
+        // We pause L1->GW->L2 deposits.
         require(_checkV30UpgradeProcessed(_chainId), DepositsPaused());
 
         (bytes32 assetId, uint256 amount) = (bytes32(0), 0);
         BalanceChange memory balanceChange;
-        /// baseTokenAssetId is known on Gateway.
+        // baseTokenAssetId is known on Gateway, we do not read it here for gas-saving purposes.
         balanceChange.baseTokenAmount = _baseTokenAmount;
 
         if (_getBalanceChange) {
@@ -392,7 +392,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             });
     }
 
-    ///  @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailboxImpl
     function requestL2ServiceTransaction(
         address _contractL2,
         bytes calldata _l2Calldata
