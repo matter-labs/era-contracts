@@ -20,7 +20,7 @@ import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTr
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
-import {L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {BroadcastUtils} from "../provider/BroadcastUtils.s.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
@@ -60,7 +60,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
                 l2AssetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
             } else {
                 // console.log(l2AssetTracker.chainBalance(chainId, assetId));
-                l2AssetTracker.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
+                GW_ASSET_TRACKER.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
             }
         }
     }
