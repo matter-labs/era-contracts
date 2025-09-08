@@ -39,6 +39,7 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
 
         // solhint-disable-next-line func-named-parameters
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
+            _isZKsyncOS,
             _ctmDeployer,
             _fixedForceDeploymentsData,
             _additionalForceDeploymentsData,
