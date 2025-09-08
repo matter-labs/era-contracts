@@ -98,7 +98,6 @@ library L2UtilsBase {
                 L2_ASSET_ROUTER_ADDR,
                 L2MessageRoot(L2_MESSAGE_ROOT_ADDR)
             );
-
         }
 
         vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
