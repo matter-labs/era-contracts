@@ -15,7 +15,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
@@ -152,6 +152,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         L1_ASSET_ROUTER = _l1AssetRouter;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         eraChainId = _eraChainId;
+        BRIDGE_HUB = IBridgehub(L2_BRIDGEHUB_ADDR);
     }
 
     /// @inheritdoc IL2AssetRouter
