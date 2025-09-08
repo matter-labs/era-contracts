@@ -270,7 +270,7 @@ function collectErrorUsages(directories: string[], usedErrors: Set<string>) {
           const revertRegex = /revert\s+([A-Za-z0-9_]+)/g;
           let match;
           while ((match = revertRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
-          
+
           // Also check for error selector usage like ErrorName.selector
           const selectorRegex = /([A-Za-z0-9_]+)\.selector/g;
           while ((match = selectorRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
