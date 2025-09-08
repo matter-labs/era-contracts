@@ -29,7 +29,6 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    // slither-disable-next-line uninitialized-state-variables
     IBridgehub public override BRIDGE_HUB;
 
     /// @dev Chain ID of L1 for bridging reasons.
@@ -152,6 +151,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         L1_ASSET_ROUTER = _l1AssetRouter;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         eraChainId = _eraChainId;
+        BRIDGE_HUB = IBridgehub(L2_BRIDGEHUB_ADDR);
     }
 
     /// @inheritdoc IL2AssetRouter
