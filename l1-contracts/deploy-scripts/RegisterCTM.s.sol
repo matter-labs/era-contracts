@@ -370,7 +370,7 @@ contract RegisterCTM is Script, DeployUtils {
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual returns (bytes memory) {
+    ) internal virtual override returns (bytes memory) {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "Bridgehub")) {
                 return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));

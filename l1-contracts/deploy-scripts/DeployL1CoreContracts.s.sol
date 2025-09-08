@@ -538,11 +538,12 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
-            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
-            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
-            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
-            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
+            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
+            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -753,7 +754,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual returns (bytes memory) {
+    ) internal virtual override returns (bytes memory) {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "Bridgehub")) {
                 return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
