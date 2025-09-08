@@ -3,7 +3,6 @@
 pragma solidity 0.8.28;
 
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
-import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
 /// @title Base Native token vault contract interface
 /// @author Matter Labs
