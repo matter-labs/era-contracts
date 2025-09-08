@@ -251,11 +251,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         /// Here we do not need to decrement the chainBalance, since the chainBalance was added to the chain's chainBalance on L1,
         /// and never migrated to the GW's chainBalance, since it never increments the totalSupply since the L2 txs fails.
         if (savedBalanceChange.amount > 0 && savedBalanceChange.tokenOriginChainId != _chainId) {
-            chainBalance[_chainId][savedBalanceChange.assetId] -= savedBalanceChange.amount;
+            _decreaseChainBalance(_chainId, savedBalanceChange.assetId, savedBalanceChange.amount);
         }
         /// Note the base token is never native to the chain as of V30.
         if (savedBalanceChange.baseTokenAmount > 0) {
-            chainBalance[_chainId][savedBalanceChange.baseTokenAssetId] -= savedBalanceChange.baseTokenAmount;
+            _decreaseChainBalance(_chainId, savedBalanceChange.baseTokenAssetId, savedBalanceChange.baseTokenAmount);
         }
     }
 
@@ -274,8 +274,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             interopCall = interopBundle.calls[callCount];
 
             if (interopCall.value > 0) {
-                require(chainBalance[_chainId][_baseTokenAssetId] >= interopCall.value, InvalidAmount());
-                chainBalance[_chainId][_baseTokenAssetId] -= interopCall.value;
+                _decreaseChainBalance(_chainId, _baseTokenAssetId, interopCall.value);
             }
 
             // e.g. for direct calls we just skip
@@ -354,11 +353,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _amount
     ) internal {
         if (_tokenOriginalChainId != _sourceChainId && _amount > 0) {
-            require(
-                chainBalance[_sourceChainId][_assetId] >= _amount,
-                NotEnoughChainBalance(_sourceChainId, _assetId, _amount)
-            );
-            chainBalance[_sourceChainId][_assetId] -= _amount;
+            _decreaseChainBalance(_sourceChainId, _assetId, _amount);
         }
         if (_tokenOriginalChainId != _destinationChainId && _amount > 0) {
             chainBalance[_destinationChainId][_assetId] += _amount;
@@ -389,7 +384,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector,
             InvalidFunctionSignature(functionSignature)
         );
-        chainBalance[_chainId][_baseTokenAssetId] -= amount;
+        _decreaseChainBalance(_chainId, _baseTokenAssetId, amount);
         _updateTotalSupplyOnGateway({
             _sourceChainId: _chainId,
             _destinationChainId: L1_CHAIN_ID,
@@ -421,45 +416,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (_tokenOriginChainId == _sourceChainId) {
             totalSupplyAcrossAllChains[_assetId] += _amount;
         } else if (_tokenOriginChainId == _destinationChainId) {
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
         }
     }
 
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice Migrates the token balance from L2 to L1.
-    /// @dev This function can be called multiple times on the chain it does not have a direct effect.
-    /// @dev This function is permissionless, it does not affect the state.
-    function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
-        address tokenAddress = _tryGetTokenAddress(_assetId);
-
-        uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
-        address originalToken;
-        if (originChainId == block.chainid) {
-            originalToken = tokenAddress;
-        } else if (originChainId != 0) {
-            originalToken = IBridgedStandardToken(tokenAddress).originToken();
-        } else {
-            /// this is the base token case. We can set the L1 chain id here, we don't store the real origin chainId.
-            originChainId = L1_CHAIN_ID;
-        }
-        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
-        uint256 amount = IERC20(tokenAddress).totalSupply();
-
-        TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            chainId: block.chainid,
-            assetId: _assetId,
-            tokenOriginChainId: originChainId,
-            amount: amount,
-            migrationNumber: migrationNumber,
-            originToken: originalToken,
-            isL1ToGateway: true
-        });
-        _sendMigrationDataToL1(tokenBalanceMigrationData);
-    }
 
     /// @notice Migrates the token balance from Gateway to L1.
     /// @dev This function can be called multiple times on the Gateway as it does not have a direct effect.
@@ -498,13 +461,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         } else {
             require(data.amount == chainBalance[data.chainId][data.assetId], InvalidAmount());
             chainBalance[data.chainId][data.assetId] = 0;
-            totalSupplyAcrossAllChains[data.assetId] -= data.amount;
+            _decreaseTotalSupplyAcrossAllChains(data.assetId, data.amount);
         }
-    }
-
-    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external {
-        //onlyServiceTransactionSender {
-        assetMigrationNumber[block.chainid][data.assetId] = data.migrationNumber;
     }
 
     function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {
@@ -522,26 +480,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (originToken[_assetId] == address(0)) {
             originToken[_assetId] = _originalToken;
             tokenOriginChainId[_assetId] = _tokenOriginChainId;
-        }
-    }
-
-    function _tokenCanSkipMigrationOnL2(uint256 _chainId, bytes32 _assetId) internal view returns (bool) {
-        uint256 savedAssetMigrationNumber = assetMigrationNumber[_chainId][_assetId];
-        address tokenAddress = _tryGetTokenAddress(_assetId);
-        uint256 amount = IERC20(tokenAddress).totalSupply();
-
-        return savedAssetMigrationNumber == 0 && amount == 0;
-    }
-
-    function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
-        tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
-
-        if (tokenAddress == address(0)) {
-            if (_assetId == L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID()) {
-                tokenAddress = address(L2_BASE_TOKEN_SYSTEM_CONTRACT);
-            } else {
-                revert AssetIdNotRegistered(_assetId);
-            }
         }
     }
 

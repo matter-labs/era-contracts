@@ -121,7 +121,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             return;
         }
 
-        IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(nativeTokenVault.assetTracker()));
+        IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(nativeTokenVault.l1AssetTracker()));
         IAssetTrackerBase l1AssetTrackerBase = IAssetTrackerBase(address(l1AssetTracker));
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {

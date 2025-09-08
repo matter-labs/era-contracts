@@ -224,27 +224,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
     }
 
-    function parseInteropCall(
-        bytes calldata _callData
-    ) external pure returns (uint256 fromChainId, bytes32 assetId, bytes memory transferData) {
-        (fromChainId, assetId, transferData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
-    }
-
-    function parseTokenData(
-        bytes calldata _tokenData
-    ) external pure returns (uint256 originChainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
-        (originChainId, name, symbol, decimals) = DataEncoding.decodeTokenData(_tokenData);
-    }
-
-    /// @notice Appends the batch message root to the global message.
-    /// @param _batchNumber The number of the batch
-    /// @param _messageRootToAppend The root of the merkle tree of the messages to L1.
-    /// @dev The logic of this function depends on the settlement layer as we support
-    /// message root aggregation only on non-L1 settlement layers for ease for migration.
-    function _appendChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _messageRootToAppend) internal {
-        _messageRoot().addChainBatchRoot(_chainId, _batchNumber, _messageRootToAppend);
-    }
-
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.getMigrationNumber(_chainId);
     }

@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {InvalidProof} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
@@ -297,9 +297,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         /// Note: the confirmMigrationOnL2 is a L1->GW->L2 txs.
         _sendToChain(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
+            GW_ASSET_TRACKER_ADDR,
             abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (data))
         );
-        _sendToChain(data.chainId, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
+        _sendToChain(data.chainId, L2_ASSET_TRACKER_ADDR, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
     }
 
     function _migrateFunds(
@@ -327,10 +328,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         return _tokenOriginChainId == _chainId || _bridgehub().settlementLayer(_tokenOriginChainId) == _chainId;
     }
 
-    function _sendToChain(uint256 _chainId, bytes memory _data) internal {
+    function _sendToChain(uint256 _chainId, address _to, bytes memory _data) internal {
         address zkChain = _bridgehub().getZKChain(_chainId);
         // slither-disable-next-line unused-return
-        IMailbox(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, _data);
+        IMailbox(zkChain).requestL2ServiceTransaction(_to, _data);
     }
 
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {

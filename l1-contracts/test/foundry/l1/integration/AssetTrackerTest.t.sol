@@ -43,6 +43,7 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {
     using stdStorage for StdStorage;
@@ -100,7 +101,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         }
 
         assetTracker = IL1AssetTracker(
-            address(INativeTokenVault(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy).assetTracker())
+            address(IL1NativeTokenVault(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy).l1AssetTracker())
         );
         address l2AssetTrackerAddress = address(new L2AssetTracker());
         vm.etch(L2_ASSET_TRACKER_ADDR, l2AssetTrackerAddress.code);

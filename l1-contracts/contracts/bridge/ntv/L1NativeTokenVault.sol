@@ -56,7 +56,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     /// @dev Returns the AssetTracker component address on L1.
-    function assetTracker() public view override(INativeTokenVault, NativeTokenVault) returns (IAssetTrackerBase) {
+    function _assetTracker() internal view override returns (IAssetTrackerBase) {
         return IAssetTrackerBase(address(l1AssetTracker));
     }
 

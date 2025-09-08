@@ -10,7 +10,7 @@ import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
-import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
+import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();
@@ -30,7 +30,7 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
         super.upgrade(_proposedUpgrade);
 
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
-        s.assetTracker = address(INativeTokenVault(s.nativeTokenVault).assetTracker());
+        s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
 
         uint256 v30UpgradeGatewayBlockNumber = (IBridgehub(s.bridgehub).messageRoot()).v30UpgradeGatewayBlockNumber();
         if (!bridgehub.whitelistedSettlementLayers(s.chainId)) {
