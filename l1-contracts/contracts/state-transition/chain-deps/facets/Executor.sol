@@ -778,7 +778,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
-    ) external nonReentrant onlySettlementLayer {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         (
             StoredBatchInfo[] memory batchesData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
@@ -814,7 +814,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
-    ) external nonReentrant onlySettlementLayer {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         (
             StoredBatchInfo memory prevBatch,
             StoredBatchInfo[] memory committedBatches,
