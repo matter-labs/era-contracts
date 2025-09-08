@@ -131,7 +131,8 @@ jobs:
         run: yarn calculate-hashes:check
 
   test-foundry:
-    needs: [build, lint]
+    # FIXME require lint
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -181,7 +182,8 @@ jobs:
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
   test-foundry-zksync:
-    needs: [build, lint]
+    # FIXME require lint
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
@@ -260,7 +262,8 @@ jobs:
     defaults:
       run:
         working-directory: l1-contracts
-    needs: [build, lint]
+    # FIXME require lint
+    needs: [build]
     runs-on: ubuntu-latest
 
     steps:
