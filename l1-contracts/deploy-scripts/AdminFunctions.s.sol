@@ -50,16 +50,25 @@ contract AdminFunctions is Script {
     }
 
     // This function should be called by the owner to accept the admin role
-    function governanceAcceptOwner(address governor, address target) public {
+    function governanceAcceptOwner(address governor, address target, bool shouldSend) public {
         Ownable2Step adminContract = Ownable2Step(target);
-        Utils.executeUpgrade({
-            _governor: governor,
-            _salt: bytes32(0),
-            _target: target,
-            _data: abi.encodeCall(adminContract.acceptOwnership, ()),
-            _value: 0,
-            _delay: 0
-        });
+        bytes memory _data = abi.encodeCall(adminContract.acceptOwnership, ());
+        if (shouldSend) {
+            Utils.executeUpgrade({
+                _governor: governor,
+                _salt: bytes32(0),
+                _target: target,
+                _data: _data,
+                _value: 0,
+                _delay: 0
+            });
+        }
+
+        Call[] memory calls = new Call[](1);
+        calls[0] = Call({target: target, value: 0, data: _data});
+        bytes memory data = abi.encode(calls);
+
+        saveOutput(Output({admin: governor, encodedData: data}));
     }
 
     // This function should be called by the owner to accept the admin role
@@ -76,15 +85,13 @@ contract AdminFunctions is Script {
     }
 
     // This function should be called by the owner to accept the admin role
-    function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) public {
+    function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target, bool shouldSend) public {
         IZKChain adminContract = IZKChain(target);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
 
-        vm.startBroadcast();
-        chainAdmin.multicall(calls, true);
-        vm.stopBroadcast();
+        saveAndSendAdminTx(address(chainAdmin), calls, shouldSend);
     }
 
     // This function should be called by the owner to update token multiplier setter role
