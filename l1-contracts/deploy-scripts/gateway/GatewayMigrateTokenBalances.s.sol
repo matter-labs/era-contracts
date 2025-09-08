@@ -18,6 +18,7 @@ import {TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -88,7 +89,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         bool onlyWaitForFinalization
     ) public {
         IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
-        INativeTokenVault nativeTokenVault = INativeTokenVault(assetRouter.nativeTokenVault());
+        IL1NativeTokenVault l1NativeTokenVault = IL1NativeTokenVault(address(assetRouter.nativeTokenVault()));
 
         uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
         bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile(toGateway ? chainId : gatewayChainId);
@@ -121,7 +122,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             return;
         }
 
-        IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(nativeTokenVault.l1AssetTracker()));
+        IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(l1NativeTokenVault.l1AssetTracker()));
         IAssetTrackerBase l1AssetTrackerBase = IAssetTrackerBase(address(l1AssetTracker));
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
