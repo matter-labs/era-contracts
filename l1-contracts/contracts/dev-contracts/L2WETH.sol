@@ -5,6 +5,8 @@ pragma solidity ^0.8.0;
 import "@openzeppelin/contracts-upgradeable-v4/token/ERC20/extensions/draft-ERC20PermitUpgradeable.sol";
 import "./IL2WETH.sol";
 import "./IL2StandardToken.sol";
+import {InvalidCaller} from "../common/L1ContractErrors.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @notice The canonical implementation of the WETH token.
@@ -17,6 +19,14 @@ import "./IL2StandardToken.sol";
 /// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
 /// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
 contract L2WETH is ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
+    /// @notice Checks that the message sender is authorized to upgrade the contract.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
     /// @dev Stores the L1 address of the bridge and set `name`/`symbol`/`decimals` getters.
     /// @param name_ The name of the token.
