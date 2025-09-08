@@ -115,11 +115,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
             if (finalizeL1DepositParams[i].merkleProof.length == 0) {
                 continue;
             }
-            waitForBatchToBeExecuted(
-                address(bridgehub),
-                chainId,
-                finalizeL1DepositParams[i]
-            );
+            waitForBatchToBeExecuted(address(bridgehub), chainId, finalizeL1DepositParams[i]);
             break;
         }
 

@@ -130,7 +130,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     ) internal {
         if (_tokenCanSkipMigrationOnL2(_tokenOriginChainId, _assetId)) {
             _forceSetAssetMigrationNumber(_tokenOriginChainId, _assetId);
-        } 
+        }
 
         /// We save the total supply for the first deposit after a migration.
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
@@ -142,7 +142,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 amount: IERC20(_tokenAddress).totalSupply()
             });
         }
-
 
         if (_tokenOriginChainId == block.chainid) {
             // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
