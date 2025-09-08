@@ -33,6 +33,7 @@ import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
+import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
@@ -369,6 +370,7 @@ contract L1GatewayTests is
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
+        vm.expectRevert(NotInGatewayMode.selector);
         addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
         vm.stopBroadcast();
     }
