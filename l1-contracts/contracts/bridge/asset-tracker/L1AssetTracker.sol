@@ -110,7 +110,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) external onlyNativeTokenVault {
-        uint256 savedAssetMigrationNumber = assetMigrationNumber[_chainId][_assetId];
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _assetId);
