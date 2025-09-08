@@ -9,9 +9,8 @@ on:
         required: true
   create:
     tags:
-      - "v*"      # for main releases
-      - "zkos*"   # for zk releases
-
+      - "v*" # for main releases
+      - "zkos*" # for zk releases
 
 permissions:
   contents: write
@@ -21,7 +20,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Resolve tag
         id: vars
         run: |
