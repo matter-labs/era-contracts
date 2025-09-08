@@ -48,6 +48,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
+import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {VerifierParams, IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -319,6 +320,8 @@ contract RegisterCTM is Script, DeployUtils {
                 }
             } else if (compareStrings(contractName, "VerifierFflonk")) {
                 return type(VerifierFflonk).creationCode;
+            } else if (compareStrings(contractName, "VerifierPlonk")) {
+                return type(VerifierPlonk).creationCode;
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
@@ -372,11 +375,11 @@ contract RegisterCTM is Script, DeployUtils {
         bool isZKBytecode
     ) internal virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "Bridgehub")) {
+            if (compareStrings(contractName, "L1Bridgehub")) {
                 return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "MessageRoot")) {
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
                 return abi.encodeCall(L1MessageRoot.initialize, ());
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
                 return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));

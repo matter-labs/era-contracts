@@ -842,6 +842,8 @@ contract DeployL1Script is Script, DeployUtils {
                 }
             } else if (compareStrings(contractName, "VerifierFflonk")) {
                 return Utils.readZKFoundryBytecodeL1("VerifierFflonk.sol", "VerifierFflonk");
+            } else if (compareStrings(contractName, "VerifierPlonk")) {
+                return Utils.readZKFoundryBytecodeL1("VerifierPlonk.sol", "VerifierPlonk");
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
