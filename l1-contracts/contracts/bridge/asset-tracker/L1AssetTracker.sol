@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {InvalidProof} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
@@ -18,6 +18,7 @@ import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubError
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
+import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
@@ -113,13 +114,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _assetId);
-        } else {
-            /// We require that the asset is migrated, deposits are paused until then.
-            require(
-                currentSettlementLayer == block.chainid ||
-                    savedAssetMigrationNumber == _getChainMigrationNumber(_chainId),
-                InvalidAssetId(_assetId)
-            );
         }
 
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
@@ -132,7 +126,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // There are three possible cases:
         // 1. We are depositing it back to the origin chain. The balance outside of it decreases and so we decrease
         // totalSupplyAcrossAllChains.
-        // 2. The token's origin is L1 and so regardless of the destination chain, the total amount outside of L1, i.e. 
+        // 2. The token's origin is L1 and so regardless of the destination chain, the total amount outside of L1, i.e.
         // inside our ecosystem increases.
         // 3. (Skipped) Since the token moves between non-origin chains, the totalSupplyAcrossAllChains remains unchanged.
         if (_tokenOriginChainId == _chainId) {
@@ -151,7 +145,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         /// A malicious transactionFilterer can do multiple deposits, but this will make the chainBalance smaller on the Gateway.
         TransientPrimitivesLib.set(key, uint256(_assetId));
         TransientPrimitivesLib.set(key + 1, _amount);
-
     }
 
     /// @notice Called on the L1 by the gateway's mailbox when a deposit happens
@@ -297,9 +290,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         /// Note: the confirmMigrationOnL2 is a L1->GW->L2 txs.
         _sendToChain(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
-            abi.encodeCall(IL2AssetTracker.confirmMigrationOnGateway, (data))
+            GW_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (data))
         );
-        _sendToChain(data.chainId, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
+        _sendToChain(data.chainId, L2_ASSET_TRACKER_ADDR, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
     }
 
     function _migrateFunds(
@@ -327,10 +321,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         return _tokenOriginChainId == _chainId || _bridgehub().settlementLayer(_tokenOriginChainId) == _chainId;
     }
 
-    function _sendToChain(uint256 _chainId, bytes memory _data) internal {
+    function _sendToChain(uint256 _chainId, address _to, bytes memory _data) internal {
         address zkChain = _bridgehub().getZKChain(_chainId);
         // slither-disable-next-line unused-return
-        IMailbox(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, _data);
+        IMailbox(zkChain).requestL2ServiceTransaction(_to, _data);
     }
 
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {

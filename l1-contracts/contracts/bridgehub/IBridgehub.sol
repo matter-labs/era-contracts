@@ -5,7 +5,6 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {IInteropCenter} from "../interop/IInteropCenter.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;

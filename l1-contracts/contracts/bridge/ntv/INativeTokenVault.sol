@@ -54,6 +54,4 @@ interface INativeTokenVault {
 
     /// @notice Tries to register a token from the provided `_burnData` and reverts if it is not possible.
     function tryRegisterTokenFromBurnData(bytes calldata _burnData, bytes32 _expectedAssetId) external;
-
-    function assetTracker() external view returns (IAssetTrackerBase);
 }

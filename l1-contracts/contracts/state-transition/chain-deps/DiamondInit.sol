@@ -11,7 +11,7 @@ import {PriorityTree} from "../libraries/PriorityTree.sol";
 import {EmptyAssetId, EmptyBytes32, TooMuchGas, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
+import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
 /// @author Matter Labs
@@ -73,7 +73,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
                 IL1AssetRouter(IBridgehub(_initializeData.bridgehub).assetRouter()).nativeTokenVault()
             );
             s.nativeTokenVault = nativeTokenVault;
-            s.assetTracker = address(INativeTokenVault(nativeTokenVault).assetTracker());
+            s.assetTracker = address(IL1NativeTokenVault(nativeTokenVault).l1AssetTracker());
         }
         s.baseTokenAssetId = _initializeData.baseTokenAssetId;
         s.protocolVersion = _initializeData.protocolVersion;

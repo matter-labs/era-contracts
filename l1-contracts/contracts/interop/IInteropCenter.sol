@@ -3,8 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {BalanceChange, InteropBundle, InteropCallStarter} from "../common/Messaging.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

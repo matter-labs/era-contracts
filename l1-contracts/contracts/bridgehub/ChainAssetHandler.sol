@@ -17,11 +17,11 @@ import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, SLHasDifferentCTM, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
-import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
-import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
+import {IGWAssetTracker} from "../bridge/asset-tracker/IGWAssetTracker.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
 /// @author Matter Labs
@@ -130,7 +130,6 @@ contract ChainAssetHandler is
         _transferOwnership(_owner);
     }
 
-
     /*//////////////////////////////////////////////////////////////
                             Getters
     //////////////////////////////////////////////////////////////*/
@@ -193,15 +192,14 @@ contract ChainAssetHandler is
         );
         address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
 
-        /// We set the isL1ToL2DepositProcessed flag on the asset tracker to demarcate deposits happening before and after the migration.
         /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
         if (block.chainid == L1_CHAIN_ID) {
             bytes memory data = abi.encodeCall(
-                IL2AssetTracker.setLegacySharedBridgeAddress,
+                IGWAssetTracker.setLegacySharedBridgeAddress,
                 (bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(bridgehubBurnData.chainId))
             );
             address settlementZkChain = BRIDGE_HUB.getZKChain(_settlementChainId);
-            IZKChain(settlementZkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
+            IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);
         }
 
         bytes memory ctmMintData;

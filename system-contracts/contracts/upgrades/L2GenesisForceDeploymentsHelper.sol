@@ -247,10 +247,7 @@ library L2GenesisForceDeploymentsHelper {
             newAddress: address(L2_INTEROP_CENTER),
             callConstructor: true,
             value: 0,
-            input: abi.encode(
-                fixedForceDeploymentsData.l1ChainId,
-                fixedForceDeploymentsData.aliasedL1Governance
-            )
+            input: abi.encode(fixedForceDeploymentsData.l1ChainId, fixedForceDeploymentsData.aliasedL1Governance)
         });
 
         forceDeployments[6] = ForceDeployment({
