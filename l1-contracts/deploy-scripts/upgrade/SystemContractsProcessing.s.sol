@@ -355,7 +355,7 @@ library SystemContractsProcessing {
         result[3] = ContractsBytecodesLib.getCreationCode("MessageRoot");
         result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
         result[5] = ContractsBytecodesLib.getCreationCode("L2MessageVerification");
-        result[6] = ContractsBytecodesLib.getCreationCode("ChainAssetHandler");
+        result[6] = ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler");
     }
 
     /// Note, that while proper initialization may require multiple steps,

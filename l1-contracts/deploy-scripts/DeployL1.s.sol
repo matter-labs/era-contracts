@@ -177,14 +177,6 @@ contract DeployL1Script is Script, DeployUtils {
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
-        (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
-            "L1Bridgehub",
-            false
-        );
-        (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
-            "L1MessageRoot",
-            false
-        );
 
         (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
 
@@ -192,43 +184,6 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.stateTransition.serverNotifierImplementation,
             addresses.stateTransition.serverNotifierProxy
         ) = deployServerNotifier();
-
-        (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
-            "L1Nullifier",
-            false
-        );
-        (addresses.bridges.l1AssetRouterImplementation, addresses.bridges.l1AssetRouterProxy) = deployTuppWithContract(
-            "L1AssetRouter",
-            false
-        );
-        (addresses.bridges.bridgedStandardERC20Implementation) = deploySimpleContract("BridgedStandardERC20", false);
-        addresses.bridges.bridgedTokenBeacon = deployWithCreate2AndOwner(
-            "BridgedTokenBeacon",
-            config.ownerAddress,
-            false
-        );
-        (
-            addresses.vaults.l1NativeTokenVaultImplementation,
-            addresses.vaults.l1NativeTokenVaultProxy
-        ) = deployTuppWithContract("L1NativeTokenVault", false);
-        setL1NativeTokenVaultParams();
-
-        (addresses.bridges.erc20BridgeImplementation, addresses.bridges.erc20BridgeProxy) = deployTuppWithContract(
-            "L1ERC20Bridge",
-            false
-        );
-        updateSharedBridge();
-        // deployChainRegistrar(); // TODO: enable after ChainRegistrar is reviewed
-        (
-            addresses.bridgehub.ctmDeploymentTrackerImplementation,
-            addresses.bridgehub.ctmDeploymentTrackerProxy
-        ) = deployTuppWithContract("CTMDeploymentTracker", false);
-
-        (
-            addresses.bridgehub.chainAssetHandlerImplementation,
-            addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("L1ChainAssetHandler", false);
-        setBridgehubParams();
 
         initializeGeneratedData();
 
@@ -820,6 +775,10 @@ contract DeployL1Script is Script, DeployUtils {
                 return Utils.readZKFoundryBytecodeL1("ICTMDeploymentTracker.sol", "ICTMDeploymentTracker");
             } else if (compareStrings(contractName, "L2AssetRouter")) {
                 return Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
+            } else if (compareStrings(contractName, "L2ChainAssetHandler")) {
+                return Utils.readZKFoundryBytecodeL1("L2ChainAssetHandler.sol", "L2ChainAssetHandler");
+            } else if (compareStrings(contractName, "UpgradeableBeaconDeployer")) {
+                return Utils.readZKFoundryBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer");
             } else if (compareStrings(contractName, "L1ERC20Bridge")) {
                 return Utils.readZKFoundryBytecodeL1("L1ERC20Bridge.sol", "L1ERC20Bridge");
             } else if (compareStrings(contractName, "L2NativeTokenVault")) {
