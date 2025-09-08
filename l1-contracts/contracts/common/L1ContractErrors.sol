@@ -130,6 +130,8 @@ error IncorrectBatchBounds(
     uint256 processFromProvided,
     uint256 processToProvided
 );
+// 0xc1b4bc7b
+error IncorrectBatchChainId(uint256, uint256);
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
@@ -172,8 +174,6 @@ error InvalidSystemLogsLength();
 error InvalidUpgradeTxn(UpgradeTxVerifyParam);
 // 0xfb5c22e6
 error L2TimestampTooBig();
-// 0x55bde247
-error IncorrectBatchChainId(uint256, uint256);
 // 0x97e1359e
 error L2WithdrawalMessageWrongLength(uint256 messageLen);
 // 0x8efef97a
@@ -372,7 +372,7 @@ error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
-// 0x8b15f239
+// 0x1bc36e67
 error ZeroGasPriceL1TxZKSyncOS();
 // 0x601b6882
 error ZKChainLimitReached();

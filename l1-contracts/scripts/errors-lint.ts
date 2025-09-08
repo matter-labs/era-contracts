@@ -270,6 +270,10 @@ function collectErrorUsages(directories: string[], usedErrors: Set<string>) {
           const revertRegex = /revert\s+([A-Za-z0-9_]+)/g;
           let match;
           while ((match = revertRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
+          
+          // Also check for error selector usage like ErrorName.selector
+          const selectorRegex = /([A-Za-z0-9_]+)\.selector/g;
+          while ((match = selectorRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
         }
       }
     }
@@ -302,7 +306,12 @@ async function main() {
       process.exit(1);
     }
     if (options.check) {
-      collectErrorUsages([contractsPath], usedErrors);
+      // Check for error usage in contracts, test files, and deploy scripts
+      const searchPaths = [contractsPath];
+      if (contractsPath === "contracts") {
+        searchPaths.push("test"); // Also search test directory for contracts
+      }
+      collectErrorUsages(searchPaths, usedErrors);
       const unusedErrors = [...declaredErrors].filter(([, [errorName]]) => !usedErrors.has(errorName));
       if (unusedErrors.length > 0) {
         for (const [errorSig, errorFile] of unusedErrors)
