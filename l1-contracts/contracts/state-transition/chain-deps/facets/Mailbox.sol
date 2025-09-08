@@ -482,7 +482,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         WritePriorityOpParams memory params = WritePriorityOpParams({
             request: _request,
             txId: _nextPriorityTxId(),
-            l2GasPrice: 0,
+            l2GasPrice: _deriveL2GasPrice(tx.gasprice, _request.l2GasPerPubdataByteLimit),
             expirationTimestamp: uint64(block.timestamp + PRIORITY_EXPIRATION)
         });
 
