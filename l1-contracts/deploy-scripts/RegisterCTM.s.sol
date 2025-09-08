@@ -104,13 +104,23 @@ contract RegisterCTM is Script, DeployUtils {
     function run() public virtual {
         console.log("Registering CTM");
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", true);
+        runInner(
+            "/script-config/config-deploy-l1.toml",
+            "/script-out/output-deploy-l1.toml",
+            "/script-out/register-ctm-l1.toml",
+            true
+        );
     }
 
     function registerCTM(bool shouldSend) public virtual {
         console.log("Registering CTM");
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", shouldSend);
+        runInner(
+            "/script-config/config-deploy-l1.toml",
+            "/script-out/output-deploy-l1.toml",
+            "/script-out/register-ctm-l1.toml",
+            shouldSend
+        );
     }
 
     function runForTest() public {
@@ -125,24 +135,29 @@ contract RegisterCTM is Script, DeployUtils {
         return config;
     }
 
-    function runInner(string memory inputPath, string memory outputPath, bool shouldSend) internal {
+    function runInner(
+        string memory inputPath,
+        string memory inputPathIfEcosystemDeployedLocally,
+        string memory outputPath,
+        bool shouldSend
+    ) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
-        outputPath = string.concat(root, outputPath);
+        inputPathIfEcosystemDeployedLocally = string.concat(root, inputPathIfEcosystemDeployedLocally);
 
         initializeConfig(inputPath);
-        initializeConfigIfEcosystemDeployedLocally(outputPath);
+        initializeConfigIfEcosystemDeployedLocally(inputPathIfEcosystemDeployedLocally);
 
         registerChainTypeManager(outputPath, shouldSend);
     }
 
-    function runInnerForTest(string memory inputPath, string memory outputPath) internal {
+    function runInnerForTest(string memory inputPath, string memory inputPathIfEcosystemDeployedLocally) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
-        outputPath = string.concat(root, outputPath);
+        inputPathIfEcosystemDeployedLocally = string.concat(root, inputPathIfEcosystemDeployedLocally);
 
         initializeConfig(inputPath);
-        initializeConfigIfEcosystemDeployedLocally(outputPath);
+        initializeConfigIfEcosystemDeployedLocally(inputPathIfEcosystemDeployedLocally);
 
         registerChainTypeManagerForTest();
     }
@@ -195,7 +210,7 @@ contract RegisterCTM is Script, DeployUtils {
                 bridgehub.ctmAssetIdToAddress(assetId)
             );
         } else {
-            saveOutput(Output({admin: address(governance), encodedData: abi.encode(calls)}));
+            saveOutput(Output({admin: address(governance), encodedData: abi.encode(calls)}), outputPath);
         }
     }
     function registerChainTypeManagerForTest() internal {
@@ -223,10 +238,10 @@ contract RegisterCTM is Script, DeployUtils {
         );
     }
 
-    function saveOutput(Output memory output) internal {
+    function saveOutput(Output memory output, string memory outputPath) internal {
         vm.serializeAddress("root", "admin_address", output.admin);
         string memory toml = vm.serializeBytes("root", "encoded_data", output.encodedData);
-        string memory path = string.concat(vm.projectRoot(), "/script-out/output-deploy-l1.toml");
+        string memory path = string.concat(vm.projectRoot(), outputPath);
         vm.writeToml(toml, path);
     }
 
