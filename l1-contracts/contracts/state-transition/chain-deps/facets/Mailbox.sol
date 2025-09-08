@@ -521,12 +521,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) internal view returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
         transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
+        // solhint-disable-next-line
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
             transactionEncoding,
             s.priorityTxMaxGasLimit,
             s.feeParams.priorityTxMaxPubdata,
-    s.zksyncOS
+            s.zksyncOS
         );
         canonicalTxHash = keccak256(transactionEncoding);
     }

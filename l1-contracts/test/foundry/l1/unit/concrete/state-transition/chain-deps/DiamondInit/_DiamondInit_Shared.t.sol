@@ -13,7 +13,8 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 
 contract DiamondInitTest is Test {
     Diamond.FacetCut[] internal facetCuts;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
+    address internal testnetVerifier =
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
 
     function setUp() public virtual {
         facetCuts.push(

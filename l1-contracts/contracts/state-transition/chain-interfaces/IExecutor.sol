@@ -136,11 +136,13 @@ interface IExecutor is IZKChainBase {
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
     /// @param l2DaValidator Address of the L2 DA validator
     /// @param daCommitment Commitment to the DA input
+    // solhint-disable-next-line gas-struct-packing
     struct CommitBatchInfoZKsyncOS {
         uint64 batchNumber;
         bytes32 newStateCommitment;
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
         address l2DaValidator;
         bytes32 daCommitment;

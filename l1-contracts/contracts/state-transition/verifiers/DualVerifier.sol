@@ -48,6 +48,7 @@ contract DualVerifier is IVerifier {
     }
 
     function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external {
+        // solhint-disable-next-line gas-custom-errors
         require(msg.sender == ctmOwner, "Only ctmOwner can add verifiers");
         // Add logic to add verifiers
         fflonkVerifiers[version] = _fflonkVerifier;
@@ -55,6 +56,7 @@ contract DualVerifier is IVerifier {
     }
 
     function removeVerifier(uint32 version) external {
+        // solhint-disable-next-line reason-string, gas-custom-errors
         require(msg.sender == ctmOwner, "Only ctmOwner can remove verifiers");
         delete fflonkVerifiers[version];
         delete plonkVerifiers[version];
@@ -77,6 +79,7 @@ contract DualVerifier is IVerifier {
         // The first element of `_proof` determines the verifier type (either FFLONK or PLONK).
         uint256 verifierType = _proof[0] & 255;
         uint32 verifierVersion = uint32(_proof[0] >> 8);
+        // solhint-disable-next-line gas-custom-errors
         require(
             fflonkVerifiers[verifierVersion] != IVerifierV2(address(0)) ||
                 plonkVerifiers[verifierVersion] != IVerifier(address(0)),
@@ -134,6 +137,7 @@ contract DualVerifier is IVerifier {
         uint256 verifierType = _verifierType & 255;
         uint32 verifierVersion = uint32(verifierType >> 8);
 
+        // solhint-disable-next-line gas-custom-errors
         require(
             fflonkVerifiers[verifierVersion] != IVerifierV2(address(0)) ||
                 plonkVerifiers[verifierVersion] != IVerifier(address(0)),
@@ -183,13 +187,14 @@ contract DualVerifier is IVerifier {
         uint256 initialHash,
         uint256[] calldata _publicInputs
     ) public pure returns (uint256 result) {
+        uint256 publicInputsLength = _publicInputs.length;
         if (initialHash == 0) {
             initialHash = _publicInputs[0];
-            for (uint256 i = 1; i < _publicInputs.length; i++) {
+            for (uint256 i = 1; i < publicInputsLength; ++i) {
                 initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
             }
         } else {
-            for (uint256 i = 0; i < _publicInputs.length; i++) {
+            for (uint256 i = 0; i < publicInputsLength; ++i) {
                 initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
             }
         }

@@ -46,7 +46,7 @@ library L2GenesisForceDeploymentsHelper {
         IL2ContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(forceDeployments);
     }
 
-    // FIXME do we need this?
+    // FIXME
     // function forceDeployZKsyncOS(bytes memory _bytecodeInfo, address _newAddress) internal {
     //     (bytes32 bytecodeHash, uint32 bytecodeLength, bytes32 observableBytecodeHash) = abi.decode(
     //         _bytecodeInfo,
@@ -71,12 +71,12 @@ library L2GenesisForceDeploymentsHelper {
     /// @param _bytecodeInfo The bytecode information for deployment.
     /// @param _newAddress The address where the contract should be deployed.
     function forceDeployOnAddress(bool _isZKsyncOS, bytes memory _bytecodeInfo, address _newAddress) internal {
-        // FIXME do we need this?
-        // if(_isZKsyncOS) { 
+        if (_isZKsyncOS) {
+            // FIXME
             // forceDeployZKsyncOS(_bytecodeInfo, _newAddress);
-        // } else { 
+        } else {
             forceDeployEra(_bytecodeInfo, _newAddress);
-        // }
+        }
     }
 
     /// @notice Initializes force-deployed contracts.

@@ -890,7 +890,10 @@ contract DeployL1Script is Script, DeployUtils {
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
     }
 
-    function getInitializeCalldata(string memory contractName, bool isZKBytecode) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "L1Bridgehub")) {
                 return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
