@@ -189,6 +189,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             originChainId = L1_CHAIN_ID;
         }
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
+        if (migrationNumber == assetMigrationNumber[block.chainid][_assetId]) {
+            /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
+            return;
+        }
         uint256 amount;
         {
             SavedTotalSupply memory totalSupply = savedTotalSupply[migrationNumber][_assetId];

@@ -148,7 +148,7 @@ contract ZKSProvider is Script {
             }
         }
 
-        revert("Withdrawal log not found at specified index");
+        console.log("Withdrawal log not found at specified index", index);
     }
 
     function getWithdrawalL2ToL1Log(
@@ -178,7 +178,7 @@ contract ZKSProvider is Script {
             }
         }
 
-        revert("L2ToL1 log not found at specified index");
+        console.log("L2ToL1 log not found at specified index", index);
     }
 
     function getFinalizeWithdrawalParams(
@@ -192,6 +192,9 @@ contract ZKSProvider is Script {
         // Get withdrawal log and L2ToL1 log
         (Log memory log, uint64 l1BatchTxId) = getWithdrawalLog(l2RpcUrl, withdrawalHash, index);
         (uint64 l2ToL1LogIndex, L2ToL1Log memory l2ToL1Log) = getWithdrawalL2ToL1Log(l2RpcUrl, withdrawalHash, index);
+        if (l2ToL1Log.key == bytes32(0)) {
+            return params;
+        }
 
         // Get L2ToL1 log proof
         L2ToL1LogProof memory proof = getL2ToL1LogProof(l2RpcUrl, withdrawalHash, l2ToL1LogIndex);

@@ -110,14 +110,19 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
                 0
             );
         }
-        // console.log("msgHashes");
-        // console.log(msgHashes.length);
-        // console.log(vm.toString(msgHashes[0]));
-        waitForBatchToBeExecuted(
-            address(bridgehub),
-            chainId,
-            finalizeL1DepositParams[finalizeL1DepositParams.length - 1]
-        );
+
+        for (uint256 i = 0; i < bridgedTokenCount; i++) {
+            if (finalizeL1DepositParams[i].merkleProof.length == 0) {
+                continue;
+            }
+            waitForBatchToBeExecuted(
+                address(bridgehub),
+                chainId,
+                finalizeL1DepositParams[i]
+            );
+            break;
+        }
+
         if (onlyWaitForFinalization) {
             return;
         }
@@ -126,6 +131,9 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         IAssetTrackerBase l1AssetTrackerBase = IAssetTrackerBase(address(l1AssetTracker));
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
+            if (finalizeL1DepositParams[i].merkleProof.length == 0) {
+                continue;
+            }
             // console.logBytes(abi.encodeCall(l1AssetTracker.receiveMigrationOnL1, (finalizeL1DepositParams[i])));
             (bytes4 functionSignature, TokenBalanceMigrationData memory data) = DataEncoding
                 .decodeTokenBalanceMigrationData(finalizeL1DepositParams[i].message);
