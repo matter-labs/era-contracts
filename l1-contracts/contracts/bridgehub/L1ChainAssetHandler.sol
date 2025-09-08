@@ -2,7 +2,9 @@
 
 pragma solidity 0.8.28;
 
-import "./ChainAssetHandlerBase.sol";
+import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
+import {IBridgehub} from "./IBridgehub.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 

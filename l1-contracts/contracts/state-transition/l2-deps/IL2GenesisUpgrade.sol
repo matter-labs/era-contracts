@@ -63,5 +63,5 @@ interface IL2GenesisUpgrade {
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,
         bytes calldata _additionalForceDeploymentsData
-    ) external payable;
+    ) external;
 }
