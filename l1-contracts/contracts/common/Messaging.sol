@@ -170,11 +170,13 @@ struct FinalizeL1DepositParams {
 }
 
 /// @dev Struct used to define parameters for adding a single call in an interop bundle.
-/// @param to Address to call on the destination chain.
+/// @param to ERC-7930 address to call on the destination chain. Note, that it will have empty ChainReference.
+///           This is due to the fact that chain ID is always provided on a bundle level, as a destination chain ID.
+///           And in case of sendMessage the chain ID is also provided via the sendMessage interface, so it's redundant to store it here.
 /// @param data Calldata payload to send to `to` address on the destination chain.
 /// @param callAttributes EIP-7786 Attributes.
 struct InteropCallStarter {
-    address to;
+    bytes to;
     bytes data;
     bytes[] callAttributes;
 }

@@ -161,7 +161,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         callAttributes[0] = abi.encodeCall(IERC7786Attributes.indirectCall, (0));
 
         calls[0] = InteropCallStarter({
-            to: L2_ASSET_ROUTER_ADDR,
+            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
             data: secondBridgeCalldata,
             callAttributes: callAttributes
         });
@@ -189,7 +189,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             IERC7786Attributes.unbundlerAddress,
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
-        l2InteropCenter.sendBundle(271, calls, bundleAttributes);
+        l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
     }
 
     function test_requestSendCall() public {
@@ -219,7 +219,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
         calls[0] = InteropCallStarter({
-            to: L2_ASSET_ROUTER_ADDR,
+            to: InteroperableAddress.formatEvmV1(L2_ASSET_ROUTER_ADDR),
             data: secondBridgeCalldata,
             callAttributes: attributes
         });
@@ -242,7 +242,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             abi.encode(bytes(""))
         );
         IERC7786GatewaySource(address(l2InteropCenter)).sendMessage(
-            InteroperableAddress.formatEvmV1(271, calls[0].to),
+            calls[0].to,
             calls[0].data,
             calls[0].callAttributes
         );
