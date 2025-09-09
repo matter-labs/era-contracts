@@ -524,7 +524,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
 
         vm.writeToml(toml, outputPath);
     }
-    
+
     function deployTuppWithContract(
         string memory contractName,
         bool isZKBytecode
