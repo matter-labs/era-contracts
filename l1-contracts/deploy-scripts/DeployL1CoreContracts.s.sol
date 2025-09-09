@@ -186,8 +186,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         ) = deployTuppWithContract("L1ChainAssetHandler", false);
         setBridgehubParams();
 
-        deployStateTransitionDiamondFacets();
-
         updateOwners();
 
         saveOutput(outputPath);
