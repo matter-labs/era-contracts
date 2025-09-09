@@ -97,7 +97,7 @@ contract RegisterCTM is Script, DeployUtils {
     using stdToml for string;
 
     struct Output {
-        address admin;
+        address governance;
         bytes encodedData;
     }
 
@@ -210,7 +210,7 @@ contract RegisterCTM is Script, DeployUtils {
                 bridgehub.ctmAssetIdToAddress(assetId)
             );
         } else {
-            saveOutput(Output({admin: address(governance), encodedData: abi.encode(calls)}), outputPath);
+            saveOutput(Output({governance: address(governance), encodedData: abi.encode(calls)}), outputPath);
         }
     }
     function registerChainTypeManagerForTest() internal {
@@ -239,7 +239,7 @@ contract RegisterCTM is Script, DeployUtils {
     }
 
     function saveOutput(Output memory output, string memory outputPath) internal {
-        vm.serializeAddress("root", "admin_address", output.admin);
+        vm.serializeAddress("root", "admin_address", output.governance);
         string memory toml = vm.serializeBytes("root", "encoded_data", output.encodedData);
         string memory path = string.concat(vm.projectRoot(), outputPath);
         vm.writeToml(toml, path);
