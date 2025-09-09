@@ -15,6 +15,9 @@ import {InteropRoot} from "../../common/Messaging.sol";
 library BatchDecoder {
     /// @notice The currently supported encoding version.
     uint8 internal constant SUPPORTED_ENCODING_VERSION = 1;
+    /// @notice The currently supported encoding version for ZKSync OS commit data.
+    /// We use different encoding only for commit, while prove/execute are common for Era VM and ZKsync OS chains.
+    uint8 internal constant SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS = 2;
 
     /// @notice Decodes commit data from a calldata bytes into the last committed batch data and an array of new batch data.
     /// @param _commitData The calldata byte array containing the data for committing batches.
@@ -45,27 +48,31 @@ library BatchDecoder {
         }
     }
 
-    function _decodeBoojumOSCommitData(
+    // exactly the same as regular `_decodeCommitData`, except for 2 differences:
+    // - encoding version is different
+    // - uses different structure for the commit batch info
+    function _decodeCommitDataZKsyncOS(
         bytes calldata _commitData
     )
         private
         pure
         returns (
             IExecutor.StoredBatchInfo memory lastCommittedBatchData,
-            IExecutor.CommitBoojumOSBatchInfo[] memory newBatchesData
+            IExecutor.CommitBatchInfoZKsyncOS[] memory newBatchesData
         )
     {
         if (_commitData.length == 0) {
             revert EmptyData();
         }
 
-        // TODO: different version?
         uint8 encodingVersion = uint8(_commitData[0]);
-        if (encodingVersion == SUPPORTED_ENCODING_VERSION) {
+        if (encodingVersion == SUPPORTED_ENCODING_VERSION_COMMIT_ZKSYNC_OS) {
             (lastCommittedBatchData, newBatchesData) = abi.decode(
                 _commitData[1:],
-                (IExecutor.StoredBatchInfo, IExecutor.CommitBoojumOSBatchInfo[])
+                (IExecutor.StoredBatchInfo, IExecutor.CommitBatchInfoZKsyncOS[])
             );
+        } else {
+            revert UnsupportedCommitBatchEncoding(encodingVersion);
         }
     }
 
@@ -124,7 +131,9 @@ library BatchDecoder {
         }
     }
 
-    function decodeAndCheckBoojumOSCommitData(
+    // exactly the same as regular `decodeAndCheckCommitData`, except for one difference:
+    // uses different structure for the commit batch info
+    function decodeAndCheckCommitDataZKsyncOS(
         bytes calldata _commitData,
         uint256 _processBatchFrom,
         uint256 _processBatchTo
@@ -133,10 +142,10 @@ library BatchDecoder {
         pure
         returns (
             IExecutor.StoredBatchInfo memory lastCommittedBatchData,
-            IExecutor.CommitBoojumOSBatchInfo[] memory newBatchesData
+            IExecutor.CommitBatchInfoZKsyncOS[] memory newBatchesData
         )
     {
-        (lastCommittedBatchData, newBatchesData) = _decodeBoojumOSCommitData(_commitData);
+        (lastCommittedBatchData, newBatchesData) = _decodeCommitDataZKsyncOS(_commitData);
 
         if (newBatchesData.length == 0) {
             revert EmptyData();
