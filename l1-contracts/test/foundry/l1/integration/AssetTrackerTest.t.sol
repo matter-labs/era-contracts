@@ -139,7 +139,6 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         return keccak256(abi.encodePacked(_assetId, uint256(2 + 151)));
     }
 
-
     function computeNestedMappingSlot(
         uint256 outerKey,
         uint256 innerKey,
@@ -325,7 +324,6 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
         vm.store(address(gwAssetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
         vm.store(address(gwAssetTracker), getTotalSupplyAcrossAllChainsLocation(assetId), bytes32(amount));
-
 
         vm.store(
             address(assetTracker),
