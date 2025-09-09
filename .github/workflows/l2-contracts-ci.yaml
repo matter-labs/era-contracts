@@ -33,7 +33,7 @@ jobs:
       - name: Install dependencies
         run: yarn
 
-    # In the future, we should simply take the artifacts that are built by l1-contracts.
+      # In the future, we should simply take the artifacts that are built by l1-contracts.
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
