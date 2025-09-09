@@ -1,3 +1,6 @@
+// FIXME decide what to do with L2ComplexUpgrader + L2GenesisUpgrade tests, when they are out of system-contracts
+// For now they are ignored
+
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.20;
