@@ -394,6 +394,19 @@ error ZeroGasPriceL1TxZKsyncOS();
 error ZKChainLimitReached();
 // 0x646ac57e
 error ZKsyncOSNotForceDeployForExistingContract(address);
+// 0x0e0ff4d9
+error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
+// TODO
+error SignersNotSorted();
+// TODO
+error SignerNotAuthorized(address signer);
+// TODO
+error SignatureNotValid(address signer);
+
+// 0xd08a97e6
+error InvalidMockProofLength();
+// 0x616008dd
+error UnsupportedChainIdForMockVerifier();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

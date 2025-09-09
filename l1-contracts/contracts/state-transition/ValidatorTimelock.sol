@@ -77,7 +77,11 @@ contract ValidatorTimelock is
     }
 
     /// @inheritdoc IValidatorTimelock
-    function initialize(address _initialOwner, uint32 _initialExecutionDelay) external initializer {
+    function initialize(address _initialOwner, uint32 _initialExecutionDelay) external virtual initializer {
+        __ValidatorTimelock_init(_initialOwner, _initialExecutionDelay);
+    }
+
+    function __ValidatorTimelock_init(address _initialOwner, uint32 _initialExecutionDelay) internal onlyInitializing {
         _transferOwnership(_initialOwner);
         executionDelay = _initialExecutionDelay;
     }
@@ -199,7 +203,14 @@ contract ValidatorTimelock is
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata // _batchData (unused in this specific implementation)
-    ) external onlyRole(_chainAddress, COMMITTER_ROLE) {
+    ) public virtual onlyRole(_chainAddress, COMMITTER_ROLE) {
+        _recordBatchCommitment(_chainAddress, _processBatchFrom, _processBatchTo);
+        _propagateToZKChain(_chainAddress);
+    }
+
+    /// @dev Records the timestamp of batch commitment for the given chain address.
+    /// To be used from `commitBatchesSharedBridge`
+    function _recordBatchCommitment(address _chainAddress, uint256 _processBatchFrom, uint256 _processBatchTo) internal {
         unchecked {
             // This contract is only a temporary solution, that hopefully will be disabled until 2106 year, so...
             // It is safe to cast.
@@ -208,7 +219,6 @@ contract ValidatorTimelock is
                 committedBatchTimestamp[_chainAddress].set(i, timestamp);
             }
         }
-        _propagateToZKChain(_chainAddress);
     }
 
     /// @inheritdoc IValidatorTimelock
