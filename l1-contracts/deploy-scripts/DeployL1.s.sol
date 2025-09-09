@@ -123,6 +123,7 @@ contract DeployL1Script is Script, DeployUtils {
 
         instantiateCreate2Factory();
 
+        // If ecosystem has been deployed locally, we initialize the config from local files
         if (bridgehub == address(0)) {
             initializeConfigIfEcosystemDeployedLocally(outputPath);
         } else {
@@ -170,6 +171,7 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
+        // If ecosystem has been deployed separately, so we need to deploy new governance and admin contracts
         if (bridgehub != address(0)) {
             (addresses.governance) = deploySimpleContract("Governance", false);
             (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
