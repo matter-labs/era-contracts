@@ -62,6 +62,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     uint256 originalChainId;
     uint256 gwChainId;
     bytes32 assetMigrationNumberLocation;
+    bytes32 totalSupplyAcrossAllChainsLocation;
     uint256 migrationNumber = 20;
     bytes32 chainBalanceLocation;
     uint256 amount = 1000000000000000000;
@@ -133,6 +134,11 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     function getAssetMigrationNumberLocation(bytes32 _assetId, uint256 _chainId) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(_assetId, keccak256(abi.encodePacked(_chainId, uint256(1 + 151)))));
     }
+
+    function getTotalSupplyAcrossAllChainsLocation(bytes32 _assetId) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(_assetId, uint256(2 + 151)));
+    }
+
 
     function computeNestedMappingSlot(
         uint256 outerKey,
@@ -215,6 +221,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             bytes32(migrationNumber - 1)
         );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
+        vm.store(address(assetTracker), getTotalSupplyAcrossAllChainsLocation(assetId), bytes32(amount));
+
         vm.mockCall(
             address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
             abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
@@ -315,9 +323,17 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encode(0x0000000000000000000000000000000000000011)
         );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
+        vm.store(address(gwAssetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));
+        vm.store(address(gwAssetTracker), getTotalSupplyAcrossAllChainsLocation(assetId), bytes32(amount));
+
 
         vm.store(
             address(assetTracker),
+            getAssetMigrationNumberLocation(assetId, eraZKChainId),
+            bytes32(migrationNumber - 1)
+        );
+        vm.store(
+            address(gwAssetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
             bytes32(migrationNumber - 1)
         );
@@ -334,6 +350,8 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(address(assetTracker), chainBalanceLocation, bytes32(amount));
         vm.store(address(l2AssetTracker), chainBalanceLocation, bytes32(amount));
         vm.store(address(l2AssetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
+        vm.store(address(gwAssetTracker), chainBalanceLocation, bytes32(amount));
+        vm.store(address(gwAssetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
 
         gwAssetTracker.confirmMigrationOnGateway(data);
     }

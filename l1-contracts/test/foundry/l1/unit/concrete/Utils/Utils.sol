@@ -270,6 +270,25 @@ library Utils {
         );
     }
 
+    function encodeExecuteBatchesDataZeroLogs(
+        IExecutor.StoredBatchInfo[] memory _batchesData,
+        PriorityOpsBatchInfo[] memory _priorityOpsData
+    ) internal pure returns (uint256, uint256, bytes memory) {
+        InteropRoot[][] memory dependencyRoots = new InteropRoot[][](_batchesData.length);
+        L2Log[] memory l2Logs = new L2Log[](0);
+        bytes[] memory messages = new bytes[](0);
+        bytes32[] memory messageRoots = new bytes32[](0);
+
+        return (
+            _batchesData[0].batchNumber,
+            _batchesData[_batchesData.length - 1].batchNumber,
+            bytes.concat(
+                bytes1(BatchDecoder.SUPPORTED_ENCODING_VERSION),
+                abi.encode(_batchesData, _priorityOpsData, dependencyRoots, l2Logs, messages, messageRoots)
+            )
+        );
+    }
+
     function getAdminSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](13);
         uint256 i = 0;

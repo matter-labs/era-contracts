@@ -69,9 +69,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @dev We only update the chainTree on GW as of V30.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
-    /// @notice The address of the asset tracker.
-    address public assetTracker;
-
     /// @notice The mapping storing the batch number at the moment the chain was updated to V30.
     /// @notice We store this, as we did not store chainBatchRoots prior to V30 on L1, so we need to get them from the diamond proxies of the chains.
     /// @notice We fill the mapping with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE for deployed chains until the chain upgrades to V30.
@@ -124,7 +121,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
                 require(BRIDGE_HUB.chainTypeManager(_chainId) == eraVmChainTypeManager, OnlyChain(msg.sender, chain));
                 require(minor < 30, OnlyPreV30Chain(_chainId));
             } else {
-                revert OnlyAssetTracker(msg.sender, assetTracker);
+                revert OnlyAssetTracker(msg.sender, GW_ASSET_TRACKER_ADDR);
             }
         } else {
             if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
@@ -296,10 +293,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             );
         }
         v30UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
-    }
-
-    function setAddresses(address _assetTracker) external onlyBridgehubOwner {
-        assetTracker = _assetTracker;
     }
 
     /// @notice Adds a single chain to the message root.

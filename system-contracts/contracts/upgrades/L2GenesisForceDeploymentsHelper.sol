@@ -76,23 +76,6 @@ library L2GenesisForceDeploymentsHelper {
             }
         }
 
-        bytes memory messageRootConstructorData = abi.encodeCall(
-            L2_MESSAGE_ROOT.setAddresses,
-            (L2_ASSET_TRACKER_ADDRESS)
-        );
-
-        (bool success3, bytes memory returnData3) = SystemContractHelper.mimicCall(
-            address(L2_MESSAGE_ROOT),
-            bridgehubOwner,
-            messageRootConstructorData
-        );
-        if (!success3) {
-            // Progapatate revert reason
-            assembly {
-                revert(add(returnData3, 0x20), returndatasize())
-            }
-        }
-
         bytes memory assetTrackerConstructorData = abi.encodeCall(
             L2_ASSET_TRACKER.setAddresses,
             (fixedForceDeploymentsData.l1ChainId)

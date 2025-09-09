@@ -366,11 +366,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) external override returns (bytes32 canonicalTxHash) {
         return
             requestL2TransactionToGatewayMailboxWithBalanceChange(
-                _chainId,
-                _canonicalTxHash,
-                _expirationTimestamp,
-                0,
-                false
+                {
+                    _chainId: _chainId,
+                    _canonicalTxHash: _canonicalTxHash,
+                    _expirationTimestamp: _expirationTimestamp,
+                    _baseTokenAmount: 0,
+                    _getBalanceChange: false
+                }
             );
     }
 

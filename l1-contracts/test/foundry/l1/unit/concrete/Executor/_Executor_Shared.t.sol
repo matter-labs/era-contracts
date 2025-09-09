@@ -29,7 +29,9 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
@@ -59,6 +61,7 @@ contract ExecutorTest is UtilsTest {
     address internal rollupL1DAValidator;
     MessageRoot internal messageRoot;
     DummyBridgehub dummyBridgehub;
+    ChainAssetHandler internal chainAssetHandler;
 
     uint256 eraChainId;
 
@@ -98,7 +101,7 @@ contract ExecutorTest is UtilsTest {
     }
 
     function getGettersSelectors() public view returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](32);
+        bytes4[] memory selectors = new bytes4[](33);
         uint256 i = 0;
         selectors[i++] = getters.getVerifier.selector;
         selectors[i++] = getters.getAdmin.selector;
@@ -132,6 +135,7 @@ contract ExecutorTest is UtilsTest {
         selectors[i++] = getters.isPriorityQueueActive.selector;
         selectors[i++] = getters.getChainTypeManager.selector;
         selectors[i++] = getters.getChainId.selector;
+        selectors[i++] = getters.getSemverProtocolVersion.selector;
         return selectors;
     }
 
@@ -198,6 +202,9 @@ contract ExecutorTest is UtilsTest {
         messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID, 1);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
+        address assetTracker = makeAddr("assetTracker");
+        chainAssetHandler = new ChainAssetHandler(l1ChainID, owner, IBridgehub(address(dummyBridgehub)), address(sharedBridge), address(assetTracker), messageRoot, address(0));
+        dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 

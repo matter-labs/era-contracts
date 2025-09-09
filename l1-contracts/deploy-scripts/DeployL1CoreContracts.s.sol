@@ -292,7 +292,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             addresses.bridgehub.chainAssetHandlerProxy,
             addresses.bridgehub.chainRegistrationSenderProxy
         );
-        messageRoot.setAddresses(addresses.bridgehub.assetTrackerProxy);
         assetTracker.setAddresses();
         vm.stopBroadcast();
         console.log("SharedBridge registered");
@@ -337,6 +336,9 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
 
         IL1AssetTracker assetTracker = IL1AssetTracker(addresses.bridgehub.assetTrackerProxy);
         IOwnable(address(assetTracker)).transferOwnership(addresses.governance);
+
+        L1NativeTokenVault l1NativeTokenVault = L1NativeTokenVault(payable(addresses.vaults.l1NativeTokenVaultProxy));
+        l1NativeTokenVault.transferOwnership(config.ownerAddress);
 
         ICTMDeploymentTracker ctmDeploymentTracker = ICTMDeploymentTracker(
             addresses.bridgehub.ctmDeploymentTrackerProxy

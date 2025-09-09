@@ -96,8 +96,6 @@ library L2UtilsBase {
         uint256 prevChainId = block.chainid;
         vm.chainId(_args.l1ChainId);
         Bridgehub(L2_BRIDGEHUB_ADDR).initialize(_args.aliasedOwner);
-        vm.prank(_args.aliasedOwner);
-        MessageRoot(L2_MESSAGE_ROOT_ADDR).setAddresses(L2_ASSET_TRACKER_ADDR);
         vm.chainId(prevChainId);
         vm.prank(_args.aliasedOwner);
         address aliasedL1ChainRegistrationSender = address(0x000000000000000000000000000000000002000a);
