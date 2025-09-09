@@ -205,11 +205,11 @@ contract RegisterCTM is Script, DeployUtils {
 
             bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
             console.log(
-                "CTM in asset router and BH on L1",
+                "CTM in router 1",
                 sharedBridge.assetHandlerAddress(assetId),
                 bridgehub.ctmAssetIdToAddress(assetId)
             );
-        }
+        } 
         saveOutput(Output({governance: address(governance), encodedData: abi.encode(calls)}), outputPath);
     }
 
