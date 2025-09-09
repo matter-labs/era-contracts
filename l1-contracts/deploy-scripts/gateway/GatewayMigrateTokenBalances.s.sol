@@ -15,10 +15,13 @@ import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.so
 import {IL1AssetTracker} from "contracts/bridge/asset-tracker/IL1AssetTracker.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
-import {L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {BroadcastUtils} from "../provider/BroadcastUtils.s.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
 
@@ -58,7 +61,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
                 l2AssetTracker.initiateL1ToGatewayMigrationOnL2(assetId);
             } else {
                 // console.log(l2AssetTracker.chainBalance(chainId, assetId));
-                l2AssetTracker.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
+                GW_ASSET_TRACKER.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
             }
         }
     }
@@ -74,6 +77,8 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         assetIds[bridgedTokenCount] = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
     }
 
+    error InvalidFunctionSignature(bytes4 functionSignature);
+
     function finishMigrationOnL1(
         bool toGateway,
         IBridgehub bridgehub,
@@ -83,7 +88,8 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         string memory gwRpcUrl,
         bool onlyWaitForFinalization
     ) public {
-        IInteropCenter interopCenter = IInteropCenter(bridgehub.interopCenter());
+        IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
+        IL1NativeTokenVault l1NativeTokenVault = IL1NativeTokenVault(address(assetRouter.nativeTokenVault()));
 
         uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
         bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile(toGateway ? chainId : gatewayChainId);
@@ -104,26 +110,32 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
                 0
             );
         }
-        // console.log("msgHashes");
-        // console.log(msgHashes.length);
-        // console.log(vm.toString(msgHashes[0]));
-        waitForBatchToBeExecuted(
-            address(bridgehub),
-            chainId,
-            finalizeL1DepositParams[finalizeL1DepositParams.length - 1]
-        );
+
+        for (uint256 i = 0; i < bridgedTokenCount; i++) {
+            if (finalizeL1DepositParams[i].merkleProof.length == 0) {
+                continue;
+            }
+            waitForBatchToBeExecuted(address(bridgehub), chainId, finalizeL1DepositParams[i]);
+            break;
+        }
+
         if (onlyWaitForFinalization) {
             return;
         }
 
-        IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(interopCenter.assetTracker()));
+        IL1AssetTracker l1AssetTracker = IL1AssetTracker(address(l1NativeTokenVault.l1AssetTracker()));
         IAssetTrackerBase l1AssetTrackerBase = IAssetTrackerBase(address(l1AssetTracker));
 
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
+            if (finalizeL1DepositParams[i].merkleProof.length == 0) {
+                continue;
+            }
             // console.logBytes(abi.encodeCall(l1AssetTracker.receiveMigrationOnL1, (finalizeL1DepositParams[i])));
-            TokenBalanceMigrationData memory data = abi.decode(
-                finalizeL1DepositParams[i].message,
-                (TokenBalanceMigrationData)
+            (bytes4 functionSignature, TokenBalanceMigrationData memory data) = DataEncoding
+                .decodeTokenBalanceMigrationData(finalizeL1DepositParams[i].message);
+            require(
+                functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector,
+                InvalidFunctionSignature(functionSignature)
             );
             if (!l1AssetTrackerBase.tokenMigrated(data.chainId, data.assetId)) {
                 vm.broadcast();

@@ -8,7 +8,6 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "./IBridgehub.sol";
-import {IInteropCenter} from "../interop/IInteropCenter.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
@@ -23,7 +22,7 @@ import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../comm
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotRelayedSender, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotRelayedSender, OnlyL2, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdAlreadyExists, ChainIdCantBeCurrentChain, ChainIdMismatch, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, IncorrectBridgeHubAddress, MigrationPaused, MsgValueMismatch, NoCTMForAssetId, NotCurrentSettlementLayer, NotL1, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, WrongMagicValue, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 
@@ -106,9 +105,6 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice the chain asset handler used for chain migration.
     address public chainAssetHandler;
 
-    /// @notice interopCenter used for L1<>L2 communication
-    IInteropCenter public override interopCenter;
-
     /// @notice the chain registration sender used for chain registration.
     /// @notice the chainRegistrationSender is only deployed on L1.
     /// @dev If the Bridgehub is on L1 it is the address just the chainRegistrationSender address.
@@ -125,6 +121,13 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     modifier onlyL1() {
         if (L1_CHAIN_ID != block.chainid) {
             revert NotL1(L1_CHAIN_ID, block.chainid);
+        }
+        _;
+    }
+
+    modifier onlyL2() {
+        if (L1_CHAIN_ID == block.chainid) {
+            revert OnlyL2();
         }
         _;
     }
@@ -236,14 +239,12 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
         address _chainAssetHandler,
-        address _interopCenter,
         address _chainRegistrationSender
     ) external onlyOwner {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
-        interopCenter = IInteropCenter(_interopCenter);
         chainRegistrationSender = _chainRegistrationSender;
     }
 
@@ -378,7 +379,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
             _factoryDeps: _factoryDeps
         });
         _registerNewZKChain(_chainId, chainAddress, true);
-        messageRoot.addNewChain(_chainId);
+        messageRoot.addNewChain(_chainId, 0);
 
         emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;
@@ -387,7 +388,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice used to register chains on L2 for the purpose of interop.
     /// @param _chainId the chainId of the chain to be registered.
     /// @param _baseTokenAssetId the base token asset id of the chain.
-    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
+    function registerChainForInterop(
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId
+    ) external onlyChainRegistrationSender onlyL2 {
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
         // kl todo: should we add ctm asset id here?
     }
@@ -627,8 +631,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         L2Message calldata _message,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address zkChain = zkChainMap.get(_chainId);
-        return IZKChain(zkChain).proveL2MessageInclusion(_batchNumber, _index, _message, _proof);
+        return
+            messageRoot.proveL2MessageInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _batchNumber,
+                _index: _index,
+                _message: _message,
+                _proof: _proof
+            });
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
@@ -645,8 +655,14 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         L2Log calldata _log,
         bytes32[] calldata _proof
     ) external view override returns (bool) {
-        address zkChain = zkChainMap.get(_chainId);
-        return IZKChain(zkChain).proveL2LogInclusion(_batchNumber, _index, _log, _proof);
+        return
+            messageRoot.proveL2LogInclusionShared({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _batchNumber,
+                _index: _index,
+                _log: _log,
+                _proof: _proof
+            });
     }
 
     /// @notice forwards function call to Mailbox based on ChainId
@@ -668,9 +684,9 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         bytes32[] calldata _merkleProof,
         TxStatus _status
     ) external view override returns (bool) {
-        address zkChain = zkChainMap.get(_chainId);
         return
-            IZKChain(zkChain).proveL1ToL2TransactionStatus({
+            messageRoot.proveL1ToL2TransactionStatusShared({
+                _chainId: _chainId,
                 _l2TxHash: _l2TxHash,
                 _l2BatchNumber: _l2BatchNumber,
                 _l2MessageIndex: _l2MessageIndex,
@@ -800,6 +816,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         address chainAdmin = IZKChain(_zkChain).getAdmin();
         bytes32 chainBaseTokenAssetId = IZKChain(_zkChain).getBaseTokenAssetId();
         address bridgeHub = IZKChain(_zkChain).getBridgehub();
+        uint256 batchNumber = IZKChain(_zkChain).getTotalBatchesExecuted();
 
         if (bridgeHub != address(this)) {
             revert IncorrectBridgeHubAddress(bridgeHub);
@@ -813,7 +830,7 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
         settlementLayer[_chainId] = block.chainid;
 
         _registerNewZKChain(_chainId, _zkChain, true);
-        messageRoot.addNewChain(_chainId);
+        messageRoot.addNewChain(_chainId, batchNumber);
 
         emit NewChain(_chainId, ctm, chainAdmin);
     }

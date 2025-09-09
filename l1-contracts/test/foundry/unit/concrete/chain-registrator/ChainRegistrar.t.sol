@@ -42,8 +42,8 @@ contract ChainRegistrarTest is Test {
 
     constructor() {
         bridgeHub = new DummyBridgehub();
-        interopCenter = new InteropCenter(IBridgehub(address(bridgeHub)), block.chainid, makeAddr("admin"));
-        messageRoot = new MessageRoot(IBridgehub(address(bridgeHub)), block.chainid);
+        interopCenter = new InteropCenter(block.chainid, makeAddr("admin"));
+        messageRoot = new MessageRoot(IBridgehub(address(bridgeHub)), block.chainid, 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");
@@ -60,7 +60,6 @@ contract ChainRegistrarTest is Test {
         assetRouter = new L1AssetRouter({
             _l1WethAddress: makeAddr("weth"),
             _bridgehub: address(bridgeHub),
-            _interopCenter: address(interopCenter),
             _l1Nullifier: address(l1NullifierImpl),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")

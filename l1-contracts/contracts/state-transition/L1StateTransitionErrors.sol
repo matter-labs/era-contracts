@@ -14,6 +14,10 @@ error CommitBasedInteropNotSupported();
 error ContractNotDeployed();
 // 0xdf2c5fa5
 error DependencyRootsRollingHashMismatch(bytes32 _expected, bytes32 _actual);
+// 0xacf542ab
+error DepositsAlreadyPaused();
+// 0xdeeb6943
+error DepositsPaused();
 // 0xedae13f3
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
 // 0xc866ff2c
@@ -58,6 +62,8 @@ error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLengt
 error NotAllBatchesExecuted();
 // 0xf05c64c6
 error NotChainAdmin(address prevMsgSender, address admin);
+// 0x8fd63d21
+error NotEraChain();
 // 0xa7050bf6
 error NotHistoricalRoot(bytes32);
 // 0x32ddf9a2
@@ -74,6 +80,8 @@ error OnlyOneBlobWithCalldataAllowed();
 error OperatorDAInputTooSmall(uint256 operatorDAInputLength, uint256 minAllowedLength);
 // 0x681150be
 error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVersion);
+// 0xfe26193e
+error PriorityQueueNotFullyProcessed();
 // 0xc59d372c
 error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protocolVersion);
 // 0x2dc9747d

@@ -5,7 +5,6 @@ pragma solidity ^0.8.21;
 import {L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {IInteropCenter} from "../interop/IInteropCenter.sol";
 
 struct L2TransactionRequestDirect {
     uint256 chainId;
@@ -42,6 +41,7 @@ struct L2TransactionRequestTwoBridgesInner {
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
     bytes32 baseTokenAssetId;
+    uint256 batchNumber;
     bytes ctmData;
     bytes chainData;
     uint256 migrationNumber;
@@ -93,10 +93,6 @@ interface IBridgehub {
     function baseTokenAssetId(uint256 _chainId) external view returns (bytes32);
 
     function messageRoot() external view returns (IMessageRoot);
-
-    function interopCenter() external view returns (IInteropCenter);
-
-    // function assetTracker() external view returns (IAssetTracker);
 
     function getZKChain(uint256 _chainId) external view returns (address);
 
@@ -178,7 +174,6 @@ interface IBridgehub {
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
         address _chainAssetHandler,
-        address _interopCenter,
         address _chainRegistrationSender
     ) external;
 

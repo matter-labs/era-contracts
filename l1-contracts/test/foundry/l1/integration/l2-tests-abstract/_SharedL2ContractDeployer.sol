@@ -15,7 +15,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "../../../../../contracts/vendor/AddressAliasHelper.sol";
@@ -39,8 +39,9 @@ import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
+abstract contract SharedL2ContractDeployer is UtilsTest, DeployIntegrationUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
 
@@ -166,6 +167,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         );
 
         vm.prank(L2_BRIDGEHUB_ADDR);
+        mockDiamondInitInteropCenterCallsWithAddress(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR);
         address chainAddress = chainTypeManager.createNewChain(
             ERA_CHAIN_ID + 1,
             baseTokenAssetId,
@@ -279,6 +281,7 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
         BridgehubMintCTMAssetData memory data = BridgehubMintCTMAssetData({
             chainId: _chainId,
             baseTokenAssetId: baseTokenAssetId,
+            batchNumber: 0,
             ctmData: ctmData,
             chainData: chainData,
             migrationNumber: 0
@@ -290,5 +293,5 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;
     function deployL2Contracts(uint256 _l1ChainId) public virtual;
 
-    function test() internal virtual override {}
+    function test() internal virtual override(DeployIntegrationUtils, UtilsTest) {}
 }

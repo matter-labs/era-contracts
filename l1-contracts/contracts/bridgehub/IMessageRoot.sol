@@ -16,6 +16,19 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
     0x46700b4d40ac5c35af2c22dda2787a91eb567b06c924a8fb8ae9a05b20c08c21
 );
 
+// The value that is saved in the v30UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v30.
+uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY = uint256(
+    keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY"))
+);
+
+// The value that is saved in the v30UpgradeChainBatchNumber mapping for all deployed chains until the chain upgrades to v30.
+uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint256(
+    keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
+);
+
+// TODO fix the value
+bytes32 constant GENESIS_CHAIN_BATCH_ROOT = keccak256("GENESIS_CHAIN_BATCH_ROOT");
+
 /**
  * @author Matter Labs
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
@@ -50,17 +63,21 @@ interface IMessageRoot is IMessageVerification {
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
-    function setAddresses(address _assetTracker) external;
-
-    function addNewChain(uint256 _chainId) external;
+    function addNewChain(uint256 _chainId, uint256 _startingBatchNumber) external;
 
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
+
+    function chainBatchRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
 
     function v30UpgradeGatewayBlockNumber() external view returns (uint256);
 
     function saveV30UpgradeGatewayBlockNumberOnL2(uint256 _v30UpgradeGatewayBlockNumber) external;
+
+    function v30UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
+
+    function saveV30UpgradeChainBatchNumber(uint256 _chainId) external;
 
     /// @dev Used to parse the merkle proof data, this function calls a library function.
     function getProofData(
@@ -70,4 +87,6 @@ interface IMessageRoot is IMessageVerification {
         bytes32 _leaf,
         bytes32[] calldata _proof
     ) external pure returns (ProofData memory);
+
+    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber) external;
 }

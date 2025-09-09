@@ -177,6 +177,10 @@ struct ZKChainStorage {
     /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
     /// (the value of the constant can be found in Config.sol).
     bytes32 precommitmentForTheLatestBatch;
-    /// @dev Interop Center, responsible for starting L1->L2 messages
-    address interopCenter;
+    /// @dev The address of the asset tracker
+    address assetTracker;
+    /// @dev The address of the native token vault
+    address nativeTokenVault;
+    /// @dev Whether we have paused deposits, used for chain migration to and from Gateway.
+    mapping(uint256 migrationNumber => uint256 pausedDepositsTimestamp) pausedDepositsTimestamp;
 }

@@ -28,6 +28,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 contract L1AssetRouterTest is Test {
     using stdStorage for StdStorage;
@@ -74,6 +75,7 @@ contract L1AssetRouterTest is Test {
     L1Nullifier l1Nullifier;
     address bridgehubAddress;
     address interopCenterAddress;
+    address chainAssetHandler;
     address messageRootAddress;
     address l1ERC20BridgeAddress;
     address l1WethAddress;
@@ -160,7 +162,6 @@ contract L1AssetRouterTest is Test {
         sharedBridgeImpl = new L1AssetRouter({
             _l1WethAddress: l1WethAddress,
             _bridgehub: bridgehubAddress,
-            _interopCenter: interopCenterAddress,
             _l1Nullifier: address(l1Nullifier),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
@@ -183,6 +184,16 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
+        vm.mockCall(
+            bridgehubAddress,
+            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encode(address(chainAssetHandler))
+        );
+        vm.mockCall(
+            chainAssetHandler,
+            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encode(0)
+        );
         l1AssetTracker = new L1AssetTracker(
             block.chainid,
             bridgehubAddress,
@@ -315,6 +326,16 @@ contract L1AssetRouterTest is Test {
         vm.mockCall(
             l1NullifierAddress,
             abi.encodeWithSelector(IL1Nullifier.getTransientSettlementLayer.selector),
+            abi.encode(0)
+        );
+        vm.mockCall(
+            messageRootAddress,
+            abi.encodeWithSelector(IMessageRoot.v30UpgradeGatewayBlockNumber.selector),
+            abi.encode(0)
+        );
+        vm.mockCall(
+            messageRootAddress,
+            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
             abi.encode(0)
         );
         vm.mockCall(

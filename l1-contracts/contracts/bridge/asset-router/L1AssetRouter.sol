@@ -26,7 +26,6 @@ import {AddressAlreadySet, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedFor
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -87,14 +86,10 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     constructor(
         address _l1WethAddress,
         address _bridgehub,
-        address _interopCenter,
         address _l1Nullifier,
         uint256 _eraChainId,
         address _eraDiamondProxy
-    )
-        reentrancyGuardInitializer
-        AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub), IInteropCenter(_interopCenter))
-    {
+    ) reentrancyGuardInitializer AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub)) {
         _disableInitializers();
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;

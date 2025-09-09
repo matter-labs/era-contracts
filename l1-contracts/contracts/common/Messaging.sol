@@ -192,7 +192,7 @@ struct InteropCallStarterInternal {
 }
 
 /// @param interopCallValue Base token value on destination chain to send for interop call.
-/// @param indirectCall True if routed through bridge, false for direct interop.
+/// @param indirectCall An indirect call first calls a contract as specified by the call starter which returns an actual call starter that will be used to form an interop call. In particular, this is used for interop token transfers. In contrast, a direct call uses the call starter to form an interop call.
 /// @param indirectCallMessageValue Base token value on sending chain to send for indirect call.
 struct CallAttributes {
     uint256 interopCallValue;

@@ -14,6 +14,7 @@ import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncr
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {InsufficientChainBalance, InsufficientTotalSupply} from "./AssetTrackerErrors.sol";
 
 abstract contract AssetTrackerBase is
     IAssetTrackerBase,
@@ -34,6 +35,9 @@ abstract contract AssetTrackerBase is
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
 
+    /// @notice This is used to store the total supply of the token bridged out from the token's origin chain.
+    /// This is used to prevent malicious chains from overflowing the sum of chainBalances.
+    /// We track it both on the origin L2, Gateway and the L1.
     mapping(bytes32 assetId => uint256 totalSupplyAcrossAllChains) public totalSupplyAcrossAllChains;
 
     function _l1ChainId() internal view virtual returns (uint256);
@@ -80,6 +84,18 @@ abstract contract AssetTrackerBase is
         return assetMigrationNumber[_chainId][_assetId] == _getChainMigrationNumber(_chainId);
     }
 
+    /// If we are bridging the token for the first time, then we are allowed to bridge it, and set the assetMigrationNumber.
+    /// Note it might be the case that the token was deposited and all the supply was withdrawn, and the token balance was never migrated.
+    /// It is still ok to bridge in this case, since the chainBalance does not need to be migrated, and we set the assetMigrationNumber manually on the GW and the L2 manually.
+    function _tokenCanSkipMigrationOnSettlementLayer(uint256 _chainId, bytes32 _assetId) internal view returns (bool) {
+        uint256 savedAssetMigrationNumber = assetMigrationNumber[_chainId][_assetId];
+        return savedAssetMigrationNumber == 0 && chainBalance[_chainId][_assetId] == 0;
+    }
+
+    function _forceSetAssetMigrationNumber(uint256 _chainId, bytes32 _assetId) internal {
+        assetMigrationNumber[_chainId][_assetId] = _getChainMigrationNumber(_chainId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Register token
     //////////////////////////////////////////////////////////////*/
@@ -96,6 +112,20 @@ abstract contract AssetTrackerBase is
 
     function _registerTokenOnL2(bytes32 _assetId) internal {
         assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+    }
+
+    function _decreaseChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        if (chainBalance[_chainId][_assetId] < _amount) {
+            revert InsufficientChainBalance(_chainId, _assetId, _amount);
+        }
+        chainBalance[_chainId][_assetId] -= _amount;
+    }
+
+    function _decreaseTotalSupplyAcrossAllChains(bytes32 _assetId, uint256 _amount) internal {
+        if (totalSupplyAcrossAllChains[_assetId] < _amount) {
+            revert InsufficientTotalSupply(_assetId, _amount);
+        }
+        totalSupplyAcrossAllChains[_assetId] -= _amount;
     }
 
     /*//////////////////////////////////////////////////////////////

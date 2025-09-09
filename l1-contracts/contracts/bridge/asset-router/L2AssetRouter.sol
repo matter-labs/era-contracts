@@ -13,7 +13,6 @@ import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 
 import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
@@ -77,9 +76,9 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         _;
     }
 
-    /// @notice Checks that the message sender is the interopCenter.
-    modifier onlyInteropCenter() {
-        require(msg.sender == address(INTEROP_CENTER), Unauthorized(msg.sender));
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyL2InteropCenter() {
+        require(msg.sender == L2_INTEROP_CENTER_ADDR, Unauthorized(msg.sender));
         _;
     }
 
@@ -93,10 +92,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         address _legacySharedBridge,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
-    )
-        AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR), IInteropCenter(L2_INTEROP_CENTER_ADDR))
-        reentrancyGuardInitializer
-    {
+    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) reentrancyGuardInitializer {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         require(_l1AssetRouter != address(0), EmptyAddress());
         L1_ASSET_ROUTER = _l1AssetRouter;

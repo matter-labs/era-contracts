@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+
 import {Transaction} from "./BroadcastTypes.sol";
 
 contract BroadcastUtils is Script {

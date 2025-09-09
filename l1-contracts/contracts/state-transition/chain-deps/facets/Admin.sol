@@ -6,18 +6,22 @@ import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment} from "../../../common/Config.sol";
+import {MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
+import {IZKChain} from "../../../state-transition/chain-interfaces/IZKChain.sol";
+import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
-import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, V30UpgradeGatewayBlockNumberNotSet, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, V30UpgradeGatewayBlockNumberNotSet, VerifiedIsNotConsistentWithCommitted, DepositsAlreadyPaused, DepositsPaused} from "../../L1StateTransitionErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../../../common/Config.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -296,6 +300,18 @@ contract AdminFacet is ZKChainBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
+    function pauseDepositsAndInitiateMigration() external onlyAdmin onlyL1 {
+        address chainAssetHandler = IBridgehub(s.bridgehub).chainAssetHandler();
+        uint256 migrationNumber = IChainAssetHandler(chainAssetHandler).getMigrationNumber(s.chainId);
+        require(
+            s.pausedDepositsTimestamp[migrationNumber] + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp,
+            DepositsAlreadyPaused()
+        );
+        s.pausedDepositsTimestamp[migrationNumber] = block.timestamp;
+        emit DepositsPaused(migrationNumber, block.timestamp);
+    }
+
+    /// @inheritdoc IAdmin
     function forwardedBridgeBurn(
         address _settlementLayer,
         address _originalCaller,
@@ -307,6 +323,24 @@ contract AdminFacet is ZKChainBase, IAdmin {
         if (_originalCaller != s.admin) {
             revert NotChainAdmin(_originalCaller, s.admin);
         }
+
+        /// We require that all the priority transactions are processed.
+        // kl todo uncomment.
+        // require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
+
+        // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
+        // ie, controlled by the governance, which is currently Era Gateways and Ethereum.
+        // Otherwise a malicious settlement layer could forge an interop message from an Era chain.
+        if (_settlementLayer != L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS) {
+            uint256 chainId = IZKChain(_settlementLayer).getChainId();
+            if (_settlementLayer != IBridgehub(s.bridgehub).getZKChain(chainId)) {
+                revert NotAZKChain(_settlementLayer);
+            }
+            if (s.chainTypeManager != IBridgehub(s.bridgehub).chainTypeManager(chainId)) {
+                revert NotEraChain();
+            }
+        }
+
         // As of now all we need in this function is the chainId so we encode it and pass it down in the _chainData field
         uint256 protocolVersion = abi.decode(_data, (uint256));
 
@@ -316,12 +350,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert ProtocolVersionNotUpToDate(currentProtocolVersion, protocolVersion);
         }
 
-        if (block.chainid != L1_CHAIN_ID) {
-            // We assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
-            // That's why we need to bound the gas that can be consumed during such a migration.
-            if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
-                revert NotAllBatchesExecuted();
-            }
+        // We require all committed batches to be executed, since each batch has a predefined settlement layer.
+        // Also we assume that GW -> L1 transactions can never fail and provide no recovery mechanism from it.
+        // That's why we need to bound the gas that can be consumed during a GW->L1 migration.
+        if (s.totalBatchesCommitted != s.totalBatchesExecuted) {
+            revert NotAllBatchesExecuted();
         }
 
         s.settlementLayer = _settlementLayer;

@@ -5,6 +5,12 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_DA_VALIDATOR_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils} from "./Utils.sol";
 
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+
 // solhint-enable max-line-length
 
 contract UtilsTest is Test {
@@ -143,6 +149,30 @@ contract UtilsTest is Test {
                 bytes32("")
             ),
             "log[8] should be correct"
+        );
+    }
+
+    function mockDiamondInitInteropCenterCalls() public {
+        mockDiamondInitInteropCenterCallsWithAddress(address(0x1234567890876543567890), address(0));
+    }
+
+    function mockDiamondInitInteropCenterCallsWithAddress(address bridgehub, address assetRouter) public {
+        address assetTracker = address(0x1234567890876543567890);
+        if (assetRouter == address(0)) {
+            assetRouter = address(0x1234567890876543567890);
+        }
+        address nativeTokenVault = address(0x1234567890876543567890);
+
+        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehub.assetRouter.selector), abi.encode(assetRouter));
+        vm.mockCall(
+            assetRouter,
+            abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
+            abi.encode(nativeTokenVault)
+        );
+        vm.mockCall(
+            nativeTokenVault,
+            abi.encodeWithSelector(IL1NativeTokenVault.l1AssetTracker.selector),
+            abi.encode(assetTracker)
         );
     }
 

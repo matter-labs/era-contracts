@@ -15,13 +15,13 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTracker, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
+import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, SLHasDifferentCTM, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
-import {L2_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
-import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
+import {IGWAssetTracker} from "../bridge/asset-tracker/IGWAssetTracker.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
 /// @author Matter Labs
@@ -86,8 +86,10 @@ contract ChainAssetHandler is
         _;
     }
 
-    modifier onlyAssetTracker() {
-        require(msg.sender == ASSET_TRACKER, OnlyAssetTracker(msg.sender, ASSET_TRACKER));
+    modifier onlyAssetTrackerOrChain(uint256 _chainId) {
+        if (msg.sender != ASSET_TRACKER && msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
+            revert OnlyAssetTrackerOrChain(msg.sender, _chainId);
+        }
         _;
     }
 
@@ -122,12 +124,19 @@ contract ChainAssetHandler is
         _transferOwnership(_owner);
     }
 
+    /// @dev Initializes the reentrancy guard. Expected to be used in the proxy.
+    /// @param _owner the owner of the contract
+    function initialize(address _owner) external reentrancyGuardInitializer {
+        _transferOwnership(_owner);
+    }
+
     /*//////////////////////////////////////////////////////////////
                             Getters
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Returns the migration number for a chain.
-    function getMigrationNumber(uint256 _chainId) external view onlyAssetTracker returns (uint256) {
+    function getMigrationNumber(uint256 _chainId) external view returns (uint256) {
+        // onlyAssetTrackerOrChain(_chainId) returns (uint256) {
         return migrationNumber[_chainId];
     }
 
@@ -183,22 +192,14 @@ contract ChainAssetHandler is
         );
         address zkChain = BRIDGE_HUB.getZKChain(bridgehubBurnData.chainId);
 
-        /// We set the isL1ToL2DepositProcessed flag on the asset tracker to demarcate deposits happening before and after the migration.
-        if (block.chainid == L1_CHAIN_ID) {
-            bytes memory data = abi.encodeCall(
-                IL2AssetTracker.setIsL1ToL2DepositProcessed,
-                (migrationNumber[bridgehubBurnData.chainId])
-            );
-            IZKChain(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
-        }
         /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
         if (block.chainid == L1_CHAIN_ID) {
             bytes memory data = abi.encodeCall(
-                IL2AssetTracker.setLegacySharedBridgeAddress,
+                IGWAssetTracker.setLegacySharedBridgeAddress,
                 (bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(bridgehubBurnData.chainId))
             );
             address settlementZkChain = BRIDGE_HUB.getZKChain(_settlementChainId);
-            IZKChain(settlementZkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, data);
+            IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);
         }
 
         bytes memory ctmMintData;
@@ -211,7 +212,7 @@ contract ChainAssetHandler is
             );
 
             if (zkChain == address(0)) {
-                revert HyperchainNotRegistered();
+                revert ZKChainNotRegistered();
             }
             if (_originalCaller != IZKChain(zkChain).getAdmin()) {
                 revert IncorrectSender(_originalCaller, IZKChain(zkChain).getAdmin());
@@ -221,6 +222,11 @@ contract ChainAssetHandler is
                 bridgehubBurnData.chainId,
                 bridgehubBurnData.ctmData
             );
+
+            // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
+            if (_settlementChainId != L1_CHAIN_ID && BRIDGE_HUB.chainTypeManager(_settlementChainId) != ctm) {
+                revert SLHasDifferentCTM();
+            }
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == L1_CHAIN_ID
@@ -229,15 +235,26 @@ contract ChainAssetHandler is
             _originalCaller,
             bridgehubBurnData.chainData
         );
+        ++migrationNumber[bridgehubBurnData.chainId];
+
+        uint256 batchNumber = IZKChain(zkChain).getTotalBatchesExecuted();
+        require(
+            MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber) != bytes32(0),
+            ChainBatchRootNotSet(bridgehubBurnData.chainId, batchNumber)
+        );
+        require(
+            MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber + 1) == bytes32(0),
+            NextChainBatchRootAlreadySet(bridgehubBurnData.chainId, batchNumber + 1)
+        );
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
             baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(bridgehubBurnData.chainId),
+            batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
             migrationNumber: migrationNumber[bridgehubBurnData.chainId]
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
-        ++migrationNumber[bridgehubBurnData.chainId];
 
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
@@ -256,6 +273,16 @@ contract ChainAssetHandler is
             (BridgehubMintCTMAssetData)
         );
 
+        uint256 currentMigrationNumber = migrationNumber[bridgehubMintData.chainId];
+        /// If we are not migrating for the first time, we check that the migration number is correct.
+        if (currentMigrationNumber != 0) {
+            require(
+                currentMigrationNumber + 1 == bridgehubMintData.migrationNumber,
+                MigrationNumberMismatch(currentMigrationNumber + 1, bridgehubMintData.migrationNumber)
+            );
+        }
+        migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
+
         (address zkChain, address ctm) = BRIDGE_HUB.forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
@@ -270,17 +297,11 @@ contract ChainAssetHandler is
             }
             // We want to allow any chain to be migrated,
             BRIDGE_HUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId);
-        }
-        if (migrationNumber[bridgehubMintData.chainId] == 0) {
-            migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
+            MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
-            uint256 newMigrationNumber = ++migrationNumber[bridgehubMintData.chainId];
-            require(
-                newMigrationNumber == bridgehubMintData.migrationNumber,
-                MigrationNumberMismatch(newMigrationNumber, bridgehubMintData.migrationNumber)
-            );
+            MESSAGE_ROOT.setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.migrationNumber);
         }
+
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);
 
         emit MigrationFinalized(bridgehubMintData.chainId, _assetId, zkChain);

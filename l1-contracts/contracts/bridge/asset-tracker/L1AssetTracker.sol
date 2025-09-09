@@ -3,22 +3,26 @@
 pragma solidity 0.8.28;
 
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {InvalidProof} from "../../common/L1ContractErrors.sol";
-import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
+import {IMessageRoot, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidBaseTokenAssetId, InvalidChainMigrationNumber, InvalidMigrationNumber, InvalidOriginChainId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalanceAssetTracker, InvalidAssetId, InvalidBaseTokenAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidOriginChainId, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer} from "./AssetTrackerErrors.sol";
+import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
+import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
+import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
+import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     uint256 public immutable L1_CHAIN_ID;
@@ -29,7 +33,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     IMessageRoot public immutable MESSAGE_ROOT;
 
-    // mapping(uint256 chainId => mapping(address l1Token => bool)) internal l1TokenToAssetIdMessageSent;
+    IL1Nullifier public immutable L1_NULLIFIER;
+
+    IChainAssetHandler public chainAssetHandler;
 
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
@@ -73,9 +79,17 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         BRIDGE_HUB = IBridgehub(_bridgehub);
         NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
+        L1_NULLIFIER = IL1Nullifier(IL1NativeTokenVault(_nativeTokenVault).L1_NULLIFIER());
     }
 
-    function initialize() external reentrancyGuardInitializer {}
+    function initialize(address _owner) external reentrancyGuardInitializer initializer {
+        require(_owner != address(0), ZeroAddress());
+        _transferOwnership(_owner);
+    }
+
+    function setAddresses() external onlyOwner {
+        chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler());
+    }
 
     function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
@@ -89,33 +103,52 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice Called on the L1 when a deposit to the chain happens.
     /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
+    /// @param _chainId The destination chain id of the transfer.
     function handleChainBalanceIncreaseOnL1(
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) external onlyNativeTokenVault {
-        if (_tokenOriginChainId == _chainId) {
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
-        } else if (_tokenOriginChainId == block.chainid) {
-            totalSupplyAcrossAllChains[_assetId] += _amount;
-        }
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
+        if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
+            _forceSetAssetMigrationNumber(_chainId, _assetId);
+        }
+
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
-            uint256 key = uint256(keccak256(abi.encode(_chainId)));
-            /// A malicious transactionFilterer can do multiple deposits, but this will make the chainBalance smaller on the Gateway.
-            TransientPrimitivesLib.set(key, uint256(_assetId));
-            TransientPrimitivesLib.set(key + 1, _amount);
+            _setTransientBalanceChange(_chainId, _assetId, _amount);
+        }
+
+        /// We increase/decrease the totalSupply
+        // `totalSupplyAcrossAllChains` stores the total balance of tokens outside of the origin chain.
+        // There are three possible cases:
+        // 1. We are depositing it back to the origin chain. The balance outside of it decreases and so we decrease
+        // totalSupplyAcrossAllChains.
+        // 2. The token's origin is L1 and so regardless of the destination chain, the total amount outside of L1, i.e.
+        // inside our ecosystem increases.
+        // 3. (Skipped) Since the token moves between non-origin chains, the totalSupplyAcrossAllChains remains unchanged.
+        if (_tokenOriginChainId == _chainId) {
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
+        } else if (_tokenOriginChainId == block.chainid) {
+            totalSupplyAcrossAllChains[_assetId] += _amount;
         }
         if (_tokenOriginChainId != _chainId) {
             chainBalance[chainToUpdate][_assetId] += _amount;
         }
     }
 
+    /// @notice We set the transient balance change so the Mailbox can consume it so the Gateway can keep track of the balance change.
+    function _setTransientBalanceChange(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
+        uint256 key = uint256(keccak256(abi.encode(_chainId)));
+        /// A malicious transactionFilterer can do multiple deposits, but this will make the chainBalance smaller on the Gateway.
+        TransientPrimitivesLib.set(key, uint256(_assetId));
+        TransientPrimitivesLib.set(key + 1, _amount);
+    }
+
     /// @notice Called on the L1 by the gateway's mailbox when a deposit happens
     /// @notice Used for deposits via Gateway.
-    function getBalanceChange(
+    function consumeBalanceChange(
         uint256 _callerChainId,
         uint256 _chainId
     ) external onlyWhitelistedSettlementLayer(_callerChainId) returns (bytes32 assetId, uint256 amount) {
@@ -137,7 +170,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (_tokenOriginChainId == _chainId) {
             totalSupplyAcrossAllChains[_assetId] += _amount;
         } else if (_tokenOriginChainId == block.chainid) {
-            totalSupplyAcrossAllChains[_assetId] -= _amount;
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
         }
 
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
@@ -149,25 +182,26 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (chainBalance[chainToUpdate][_assetId] < _amount) {
             revert InsufficientChainBalanceAssetTracker(chainToUpdate, _assetId, _amount);
         }
-        chainBalance[chainToUpdate][_assetId] -= _amount;
+        _decreaseChainBalance(chainToUpdate, _assetId, _amount);
     }
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
-        uint256 settlementLayer = IL1Nullifier(IL1NativeTokenVault(address(_nativeTokenVault())).L1_NULLIFIER())
-            .getTransientSettlementLayer();
-        chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
+        (uint256 settlementLayer, uint256 l2BatchNumber) = L1_NULLIFIER.getTransientSettlementLayer();
+        uint256 v30UpgradeChainBatchNumber = MESSAGE_ROOT.v30UpgradeChainBatchNumber(_chainId);
+        /// We need to wait for the proper v30UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
+        require(
+            v30UpgradeChainBatchNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
+            V30UpgradeChainBatchNumberNotSet()
+        );
+        if (v30UpgradeChainBatchNumber != 0) {
+            /// For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
+            chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeChainBatchNumber
+                ? _chainId
+                : settlementLayer;
+        } else {
+            chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
+        }
     }
-
-    // error MessageAlreadySent();
-    // error InvalidSettlementChainId();
-
-    // function sendSetL1TokenToAssetId(uint256 _settlementChainId, address _l1Token) external {
-    //     require(!l1TokenToAssetIdMessageSent[_settlementChainId][_l1Token], MessageAlreadySent());
-    //     require(BRIDGE_HUB.whitelistedSettlementLayers(_settlementChainId), InvalidSettlementChainId());
-
-    //     bytes32 assetId = NATIVE_TOKEN_VAULT.assetId(_l1Token);
-    //     _sendToChain(_settlementChainId, abi.encodeCall(IL2AssetTracker.setL1TokenToAssetId, (_l1Token, assetId)));
-    // }
 
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration 
@@ -179,11 +213,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _proveMessageInclusion(_finalizeWithdrawalParams);
         require(_finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR, InvalidSender());
 
-        TokenBalanceMigrationData memory data = abi.decode(
-            _finalizeWithdrawalParams.message,
-            (TokenBalanceMigrationData)
+        (bytes4 functionSignature, TokenBalanceMigrationData memory data) = DataEncoding
+            .decodeTokenBalanceMigrationData(_finalizeWithdrawalParams.message);
+        require(
+            functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector,
+            InvalidFunctionSignature(functionSignature)
         );
-        require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId());
+
+        require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
 
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         require(
@@ -247,11 +284,15 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _tokenOriginChainId: data.tokenOriginChainId
         });
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
+
+        /// We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
+        /// Note: the confirmMigrationOnL2 is a L1->GW->L2 txs.
         _sendToChain(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
-            abi.encodeCall(IL2AssetTracker.confirmMigrationOnGateway, (data))
+            GW_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (data))
         );
-        _sendToChain(data.chainId, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
+        _sendToChain(data.chainId, L2_ASSET_TRACKER_ADDR, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
     }
 
     function _migrateFunds(
@@ -262,10 +303,16 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _tokenOriginChainId
     ) internal {
         if (!_isChainMinter(_fromChainId, _tokenOriginChainId)) {
-            chainBalance[_fromChainId][_assetId] -= _amount;
+            _decreaseChainBalance(_fromChainId, _assetId, _amount);
+        } else {
+            /// if the source chain is a minter, we are increasing the totalSupply.
+            totalSupplyAcrossAllChains[_assetId] += _amount;
         }
         if (!_isChainMinter(_toChainId, _tokenOriginChainId)) {
             chainBalance[_toChainId][_assetId] += _amount;
+        } else {
+            /// If the destination chain is a minter, we are decreasing the totalSupply.
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
         }
     }
 
@@ -273,10 +320,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         return _tokenOriginChainId == _chainId || _bridgehub().settlementLayer(_tokenOriginChainId) == _chainId;
     }
 
-    function _sendToChain(uint256 _chainId, bytes memory _data) internal {
+    function _sendToChain(uint256 _chainId, address _to, bytes memory _data) internal {
         address zkChain = _bridgehub().getZKChain(_chainId);
         // slither-disable-next-line unused-return
-        IMailbox(zkChain).requestL2ServiceTransaction(L2_ASSET_TRACKER_ADDR, _data);
+        IMailbox(zkChain).requestL2ServiceTransaction(_to, _data);
     }
 
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
@@ -287,6 +334,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return IChainAssetHandler(IBridgehub(_bridgehub()).chainAssetHandler()).getMigrationNumber(_chainId);
+        return chainAssetHandler.getMigrationNumber(_chainId);
     }
 }

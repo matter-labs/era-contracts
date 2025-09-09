@@ -3,21 +3,20 @@ pragma solidity ^0.8.0;
 
 // solhint-disable no-console, gas-custom-errors, reason-string
 
-import {Vm} from "forge-std/Vm.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {stdToml} from "forge-std/StdToml.sol";
+
 import {stdJson} from "forge-std/StdJson.sol";
 
 import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
 import {Utils} from "../Utils.sol";
-import {L2ToL1LogProof, Log, TransactionReceipt, AltTransactionReceipt, AltLog, AltL2ToL1Log, L2ToL1Log} from "./ReceipTypes.sol";
+import {AltL2ToL1Log, AltLog, AltTransactionReceipt, L2ToL1Log, L2ToL1LogProof, Log, TransactionReceipt} from "./ReceipTypes.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {MessageHashing, ProofData} from "contracts/common/libraries/MessageHashing.sol";
+import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 
 contract ZKSProvider is Script {
     function finalizeWithdrawal(
@@ -149,7 +148,7 @@ contract ZKSProvider is Script {
             }
         }
 
-        revert("Withdrawal log not found at specified index");
+        console.log("Withdrawal log not found at specified index", index);
     }
 
     function getWithdrawalL2ToL1Log(
@@ -179,7 +178,7 @@ contract ZKSProvider is Script {
             }
         }
 
-        revert("L2ToL1 log not found at specified index");
+        console.log("L2ToL1 log not found at specified index", index);
     }
 
     function getFinalizeWithdrawalParams(
@@ -193,6 +192,9 @@ contract ZKSProvider is Script {
         // Get withdrawal log and L2ToL1 log
         (Log memory log, uint64 l1BatchTxId) = getWithdrawalLog(l2RpcUrl, withdrawalHash, index);
         (uint64 l2ToL1LogIndex, L2ToL1Log memory l2ToL1Log) = getWithdrawalL2ToL1Log(l2RpcUrl, withdrawalHash, index);
+        if (l2ToL1Log.key == bytes32(0)) {
+            return params;
+        }
 
         // Get L2ToL1 log proof
         L2ToL1LogProof memory proof = getL2ToL1LogProof(l2RpcUrl, withdrawalHash, l2ToL1LogIndex);

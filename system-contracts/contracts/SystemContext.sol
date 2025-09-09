@@ -6,7 +6,7 @@ import {ISystemContext} from "./interfaces/ISystemContext.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
 import {ISystemContextDeprecated} from "./interfaces/ISystemContextDeprecated.sol";
 import {SystemContractHelper} from "./libraries/SystemContractHelper.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, SystemLogKey, L2_CHAIN_ASSET_HANDLER, L2_ASSET_TRACKER_ADDRESS} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, SystemLogKey, L2_CHAIN_ASSET_HANDLER, L2_ASSET_TRACKER_ADDRESS, L2_INTEROP_CENTER_ADDRESS} from "./Constants.sol";
 import {CannotInitializeFirstVirtualBlock, CannotReuseL2BlockNumberFromPreviousBatch, CurrentBatchNumberMustBeGreaterThanZero, DeprecatedFunction, InconsistentNewBatchTimestamp, IncorrectL2BlockHash, IncorrectSameL2BlockPrevBlockHash, IncorrectSameL2BlockTimestamp, IncorrectVirtualBlockInsideMiniblock, InvalidNewL2BlockNumber, L2BlockAndBatchTimestampMismatch, L2BlockNumberZero, NoVirtualBlocks, NonMonotonicL2BlockTimestamp, PreviousL2BlockHashIsIncorrect, ProvidedBatchNumberIsNotCorrect, TimestampsShouldBeIncremental, UpgradeTransactionMustBeFirst} from "contracts/SystemContractErrors.sol";
 
 /**
@@ -85,11 +85,11 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
 
     uint256 internal currentSettlementLayerChainId;
 
-    error OnlyL2AssetTracker();
+    error OnlyL2AssetTrackerOrInteropCenter();
 
-    modifier onlyL2AssetTracker() {
-        if (msg.sender != L2_ASSET_TRACKER_ADDRESS) {
-            revert OnlyL2AssetTracker();
+    modifier onlyL2AssetTrackerOrInteropCenter() {
+        if (msg.sender != L2_ASSET_TRACKER_ADDRESS && msg.sender != L2_INTEROP_CENTER_ADDRESS) {
+            revert OnlyL2AssetTrackerOrInteropCenter();
         }
         _;
     }
@@ -107,7 +107,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         }
     }
 
-    function getSettlementLayerChainId() external view onlyL2AssetTracker returns (uint256) {
+    function getSettlementLayerChainId() external view onlyL2AssetTrackerOrInteropCenter returns (uint256) {
         return currentSettlementLayerChainId;
     }
 

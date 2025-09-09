@@ -13,8 +13,11 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
-contract MailboxTest is Test {
+contract MailboxTest is UtilsTest {
     IMailbox internal mailboxFacet;
     UtilsFacet internal utilsFacet;
     IGetters internal gettersFacet;
@@ -23,11 +26,13 @@ contract MailboxTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     address diamondProxy;
     address bridgehub;
+    address chainAssetHandler;
     address interopCenter;
 
     function deployDiamondProxy() internal returns (address proxy) {
         sender = makeAddr("sender");
         bridgehub = makeAddr("bridgehub");
+        chainAssetHandler = makeAddr("chainAssetHandler");
         interopCenter = makeAddr("interopCenter");
         vm.deal(sender, 100 ether);
 
@@ -51,10 +56,20 @@ contract MailboxTest is Test {
             selectors: Utils.getGettersSelectors()
         });
 
-        proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier);
+        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0));
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
+        vm.mockCall(
+            address(chainAssetHandler),
+            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encode(1)
+        );
+        proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);
         utilsFacet = UtilsFacet(proxy);
         utilsFacet.util_setBridgehub(bridgehub);
-        utilsFacet.util_setInteropCenter(interopCenter);
     }
 
     function setupDiamondProxy() public {
@@ -69,5 +84,5 @@ contract MailboxTest is Test {
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }

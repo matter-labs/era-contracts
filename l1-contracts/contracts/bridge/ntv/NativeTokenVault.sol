@@ -76,7 +76,7 @@ abstract contract NativeTokenVault is
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[44] private __gap;
+    uint256[43] private __gap;
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
@@ -136,8 +136,12 @@ abstract contract NativeTokenVault is
         if (tokenIndex[tokenAssetId] != 0) {
             revert TokenAlreadyInBridgedTokensList();
         }
-        bridgedTokens[bridgedTokensCount] = tokenAssetId;
-        tokenIndex[tokenAssetId] = bridgedTokensCount;
+        _addTokenToTokensList(tokenAssetId);
+    }
+
+    function _addTokenToTokensList(bytes32 _tokenAssetId) internal {
+        bridgedTokens[bridgedTokensCount] = _tokenAssetId;
+        tokenIndex[_tokenAssetId] = bridgedTokensCount;
         ++bridgedTokensCount;
     }
 
@@ -484,9 +488,7 @@ abstract contract NativeTokenVault is
         tokenAddress[_assetId] = _tokenAddress;
         assetId[_tokenAddress] = _assetId;
         originChainId[_assetId] = _originChainId;
-        bridgedTokens[bridgedTokensCount] = _assetId;
-        tokenIndex[_assetId] = bridgedTokensCount;
-        ++bridgedTokensCount;
+        _addTokenToTokensList(_assetId);
         _assetTracker().registerNewToken(_assetId, _originChainId);
     }
 
