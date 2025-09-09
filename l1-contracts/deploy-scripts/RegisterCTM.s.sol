@@ -96,10 +96,31 @@ import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 contract RegisterCTM is Script, DeployUtils {
     using stdToml for string;
 
-    function run() public virtual {
-        console.log("Deploying L1 contracts");
+    struct Output {
+        address governance;
+        bytes encodedData;
+    }
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
+    function run() public virtual {
+        console.log("Registering CTM");
+
+        runInner(
+            "/script-config/config-deploy-l1.toml",
+            "/script-out/output-deploy-l1.toml",
+            "/script-out/register-ctm-l1.toml",
+            true
+        );
+    }
+
+    function registerCTM(bool shouldSend) public virtual {
+        console.log("Registering CTM");
+
+        runInner(
+            "/script-config/config-deploy-l1.toml",
+            "/script-out/output-deploy-l1.toml",
+            "/script-out/register-ctm-l1.toml",
+            shouldSend
+        );
     }
 
     function runForTest() public {
@@ -114,15 +135,20 @@ contract RegisterCTM is Script, DeployUtils {
         return config;
     }
 
-    function runInner(string memory inputPath, string memory outputPath) internal {
+    function runInner(
+        string memory inputPath,
+        string memory inputPathIfEcosystemDeployedLocally,
+        string memory outputPath,
+        bool shouldSend
+    ) internal {
         string memory root = vm.projectRoot();
         inputPath = string.concat(root, inputPath);
-        outputPath = string.concat(root, outputPath);
+        inputPathIfEcosystemDeployedLocally = string.concat(root, inputPathIfEcosystemDeployedLocally);
 
         initializeConfig(inputPath);
         initializeConfigIfEcosystemDeployedLocally(outputPath);
 
-        registerChainTypeManager();
+        registerChainTypeManager(outputPath, shouldSend);
     }
 
     function runInnerForTest(string memory inputPath, string memory outputPath) internal {
@@ -136,7 +162,7 @@ contract RegisterCTM is Script, DeployUtils {
         registerChainTypeManagerForTest();
     }
 
-    function registerChainTypeManager() internal {
+    function registerChainTypeManager(string memory outputPath, bool shouldSend) internal {
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
 
         vm.startBroadcast(msg.sender);
@@ -169,19 +195,23 @@ contract RegisterCTM is Script, DeployUtils {
             salt: bytes32(0)
         });
 
-        governance.scheduleTransparent(operation, 0);
-        // We assume that the total value is 0
-        governance.execute{value: 0}(operation);
+        if (shouldSend) {
+            governance.scheduleTransparent(operation, 0);
+            // We assume that the total value is 0
+            governance.execute{value: 0}(operation);
 
-        console.log("CTM DT whitelisted");
-        vm.stopBroadcast();
+            console.log("CTM DT whitelisted");
+            vm.stopBroadcast();
 
-        bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
-        console.log(
-            "CTM in router 1",
-            sharedBridge.assetHandlerAddress(assetId),
-            bridgehub.ctmAssetIdToAddress(assetId)
-        );
+            bytes32 assetId = bridgehub.ctmAssetIdFromAddress(addresses.stateTransition.chainTypeManagerProxy);
+            console.log(
+                "CTM in router 1",
+                sharedBridge.assetHandlerAddress(assetId),
+                bridgehub.ctmAssetIdToAddress(assetId)
+            );
+        } else {
+            saveOutput(Output({governance: address(governance), encodedData: abi.encode(calls)}), outputPath);
+        }
     }
     function registerChainTypeManagerForTest() internal {
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
@@ -206,6 +236,13 @@ contract RegisterCTM is Script, DeployUtils {
             sharedBridge.assetHandlerAddress(assetId),
             bridgehub.ctmAssetIdToAddress(assetId)
         );
+    }
+
+    function saveOutput(Output memory output, string memory outputPath) internal {
+        vm.serializeAddress("root", "admin_address", output.governance);
+        string memory toml = vm.serializeBytes("root", "encoded_data", output.encodedData);
+        string memory path = string.concat(vm.projectRoot(), outputPath);
+        vm.writeToml(toml, path);
     }
 
     function deployTuppWithContract(
