@@ -15,6 +15,8 @@ import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
+import {DeployFailed} from "../common/L1ContractErrors.sol";
+
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
 import {ICTMDeploymentTracker} from "../bridgehub/ICTMDeploymentTracker.sol";
@@ -61,8 +63,7 @@ library L2GenesisForceDeploymentsHelper {
         // Note, that we dont use interface, but raw call to avoid Solidity checking for empty bytecode
         (bool success, ) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
         if (!success) {
-            // solhint-disable-next-line reason-string, gas-custom-errors
-            revert("Failed to call setBytecodeDetailsEVM");
+            revert DeployFailed();
         }
     }
 
@@ -138,7 +139,7 @@ library L2GenesisForceDeploymentsHelper {
             address(L2_ASSET_ROUTER_ADDR)
         );
         if (_isGenesisUpgrade) {
-            // solhint-disable-next-line
+            // solhint-disable-next-line func-named-parameters
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
@@ -148,7 +149,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.aliasedL1Governance
             );
         } else {
-            // solhint-disable-next-line
+            // solhint-disable-next-line func-named-parameters
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
@@ -197,7 +198,8 @@ library L2GenesisForceDeploymentsHelper {
             } else {
                 deployedTokenBeacon = fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
             }
-            // solhint-disable-next-line
+
+            // solhint-disable-next-line func-named-parameters
             L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
@@ -208,7 +210,7 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.baseTokenAssetId
             );
         } else {
-            // solhint-disable-next-line
+            // solhint-disable-next-line func-named-parameters
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 previousL2TokenProxyBytecodeHash,
@@ -224,7 +226,7 @@ library L2GenesisForceDeploymentsHelper {
             address(L2_CHAIN_ASSET_HANDLER_ADDR)
         );
         if (_isGenesisUpgrade) {
-            // solhint-disable-next-line
+            // solhint-disable-next-line func-named-parameters
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,

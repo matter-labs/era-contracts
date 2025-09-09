@@ -153,8 +153,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // we can just ignore l1 da validator output with ZKsync OS:
         // - used state diffs hash correctness verifier within state transition program
         // - blobs not supported yet, and likely even once it's supported design will allow to ignore blobs related values anyway
-        // solhint-disable-next-line
-        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
+        // slither-disable-next-line unused-return
+        IL1DAValidator(s.l1DAValidator).checkDA({
             _chainId: s.chainId,
             _batchNumber: uint256(_newBatch.batchNumber),
             _l2DAValidatorOutputHash: _newBatch.daCommitment,
@@ -779,7 +779,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _executeData
-    ) external nonReentrant onlySettlementLayer {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         (
             StoredBatchInfo[] memory batchesData,
             PriorityOpsBatchInfo[] memory priorityOpsData,
@@ -815,7 +815,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         uint256 _processBatchFrom,
         uint256 _processBatchTo,
         bytes calldata _proofData
-    ) external nonReentrant onlySettlementLayer {
+    ) external nonReentrant onlyValidator onlySettlementLayer {
         (
             StoredBatchInfo memory prevBatch,
             StoredBatchInfo[] memory committedBatches,

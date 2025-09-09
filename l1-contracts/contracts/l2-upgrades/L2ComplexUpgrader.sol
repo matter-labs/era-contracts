@@ -59,7 +59,7 @@ contract L2ComplexUpgrader is IComplexUpgrader {
         address _delegateTo,
         bytes calldata _calldata
     ) external payable onlyForceDeployer {
-        // solhint-disable-next-line
+        // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _forceDeployments.length; ++i) {
             L2GenesisForceDeploymentsHelper.forceDeployOnAddress(
                 _forceDeployments[i].isZKsyncOS,

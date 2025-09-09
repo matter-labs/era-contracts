@@ -93,28 +93,14 @@ contract MessageRootTest is Test {
     //     messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     // }
 
-    // function test_RevertWhen_ChainNotL2() public {
-    //     address alphaChainSender = makeAddr("alphaChainSender");
-    //     vm.mockCall(
-    //         bridgeHub,
-    //         abi.encodeWithSelector(IBridgehub.getZKChain.selector, L1_CHAIN_ID),
-    //         abi.encode(alphaChainSender)
-    //     );
-
-    //     vm.chainId(L1_CHAIN_ID);
-    //     vm.prank(alphaChainSender);
-    //     vm.expectRevert(OnlyL2.selector);
-    //     messageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
-    // }
-
-    // function test_addChainBatchRoot() public {
-    //     address alphaChainSender = makeAddr("alphaChainSender");
-    //     uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-    //     vm.mockCall(
-    //         bridgeHub,
-    //         abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
-    //         abi.encode(alphaChainSender)
-    //     );
+    function test_addChainBatchRoot() public {
+        address alphaChainSender = makeAddr("alphaChainSender");
+        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+        vm.mockCall(
+            bridgeHub,
+            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            abi.encode(alphaChainSender)
+        );
 
     //     vm.prank(bridgeHub);
     //     messageRoot.addNewChain(alphaChainId);

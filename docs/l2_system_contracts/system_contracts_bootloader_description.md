@@ -704,7 +704,10 @@ A contract that is responsible for facilitating initialization of a newly create
 
 ### Bridging-related contracts
 
-`L2Bridgehub`, `L2AssetRouter`, `L2NativeTokenVault`, as well as `L2MessageRoot`.
+- [`L2Bridgehub`](../../l1-contracts/contracts/bridgehub/L2Bridgehub.sol)
+- [`L2AssetRouter`](../../l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol)
+- [`L2NativeTokenVault`](../../l1-contracts/contracts/bridge/ntv/L2NativeTokenVault.sol)
+- [`L2MessageRoot`](../../l1-contracts/contracts/bridgehub/L2MessageRoot.sol)
 
 These contracts are used to facilitate cross-chain communication as well value bridging. You can read more about then in [the asset router spec](../bridging/asset_router/overview.md).
 

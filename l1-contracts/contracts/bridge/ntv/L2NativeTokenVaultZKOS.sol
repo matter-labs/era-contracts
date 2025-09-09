@@ -25,7 +25,10 @@ contract L2NativeTokenVaultZKOS is L2NativeTokenVault {
     /// for the code of the proxy.
     /// @param _salt The salt used for beacon proxy deployment of L2 bridged token.
     /// @return proxy The beacon proxy, i.e. L2 bridged token.
-    function _deployBeaconProxy(bytes32 _salt, uint256) internal virtual override returns (BeaconProxy proxy) {
+    function _deployBeaconProxy(
+        bytes32 _salt,
+        uint256 /* _tokenOriginChainId */
+    ) internal virtual override returns (BeaconProxy proxy) {
         // For all zkOS-first chains, `L2_LEGACY_SHARED_BRIDGE` is zero and so L2NativeTokenVault
         // is the sole deployer of all bridged tokens.
 

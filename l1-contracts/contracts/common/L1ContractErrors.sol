@@ -115,8 +115,6 @@ error GasPerPubdataMismatch();
 error GenesisBatchCommitmentZero();
 // 0x7940c83f
 error GenesisBatchHashZero();
-// 0xb4fc6835
-error GenesisIndexStorageZero();
 // 0x3a1a8589
 error GenesisUpgradeZero();
 // 0xd356e6ba
