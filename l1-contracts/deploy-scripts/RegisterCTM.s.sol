@@ -209,10 +209,10 @@ contract RegisterCTM is Script, DeployUtils {
                 sharedBridge.assetHandlerAddress(assetId),
                 bridgehub.ctmAssetIdToAddress(assetId)
             );
-        } else {
-            saveOutput(Output({governance: address(governance), encodedData: abi.encode(calls)}), outputPath);
         }
+        saveOutput(Output({governance: address(governance), encodedData: abi.encode(calls)}), outputPath);
     }
+
     function registerChainTypeManagerForTest() internal {
         IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
