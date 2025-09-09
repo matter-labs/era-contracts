@@ -60,7 +60,7 @@ library L2UtilsBase {
 
         vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2();
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId);
 
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         uint256 prevChainId = block.chainid;

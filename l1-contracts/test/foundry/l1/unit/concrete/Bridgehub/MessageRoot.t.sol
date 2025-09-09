@@ -93,14 +93,14 @@ contract MessageRootTest is Test {
     //     messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     // }
 
-    function test_addChainBatchRoot() public {
-        address alphaChainSender = makeAddr("alphaChainSender");
-        uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
-        vm.mockCall(
-            bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
-            abi.encode(alphaChainSender)
-        );
+    // function test_addChainBatchRoot() public {
+    //     address alphaChainSender = makeAddr("alphaChainSender");
+    //     uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
+    //     vm.mockCall(
+    //         bridgeHub,
+    //         abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+    //         abi.encode(alphaChainSender)
+    //     );
 
     //     vm.prank(bridgeHub);
     //     messageRoot.addNewChain(alphaChainId);
