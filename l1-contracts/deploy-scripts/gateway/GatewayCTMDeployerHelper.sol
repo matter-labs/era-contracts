@@ -173,7 +173,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.diamondInit = _deployInternal(
             "DiamondInit",
             "DiamondInit.sol",
-            hex"",
+            abi.encode(false),
             innerConfig
         );
         _deployedContracts.stateTransition.genesisUpgrade = _deployInternal(
