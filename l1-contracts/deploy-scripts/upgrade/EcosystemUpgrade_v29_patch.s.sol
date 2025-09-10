@@ -88,6 +88,15 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
     }
 
+    function deployUpgradeSpecificContractsL1() internal override {
+        super.deployUpgradeSpecificContractsL1();
+
+        (
+            addresses.bridgehub.chainAssetHandlerImplementation,
+            addresses.bridgehub.chainAssetHandlerProxy
+        ) = deployTuppWithContract("ChainAssetHandler", false);
+    }
+
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal override returns (Diamond.FacetCut[] memory facetCuts) {
         // Remove the old MailboxFacet
