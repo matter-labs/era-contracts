@@ -15,7 +15,7 @@ import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
 import {InvalidSystemLogsLength, MissingSystemLogs, BatchNumberMismatch, TimeNotReached, ValueMismatch, HashMismatch, NonIncreasingTimestamp, TimestampError, InvalidLogSender, TxHashMismatch, UnexpectedSystemLog, LogAlreadyProcessed, InvalidProtocolVersion, CanOnlyProcessOneBatch, BatchHashMismatch, UpgradeBatchNumberIsNotZero, NonSequentialBatch, CantExecuteUnprovenBatches, SystemLogsSizeTooBig, InvalidNumberOfBlobs, VerifiedBatchesExceedsCommittedBatches, InvalidProof, RevertedBatchNotAfterNewLastBatch, CantRevertExecutedBatch, L2TimestampTooBig, PriorityOperationsRollingHashMismatch, IncorrectBatchChainId, InvalidMessageRoot, InvalidBatchNumber, EmptyPrecommitData, PrecommitmentMismatch, InvalidPackedPrecommitmentLength} from "../../../common/L1ContractErrors.sol";
-import {InvalidBatchesDataLength, MismatchL2DAValidator, MismatchNumberOfLayer1Txs, CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, MessageRootIsZero} from "../../L1StateTransitionErrors.sol";
+import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchNumberOfLayer1Txs, MismatchL2DACommitmentScheme} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -353,8 +353,8 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                     revert InvalidLogSender(logSender, logKey);
                 }
-                if (s.l2DAValidator != address(uint160(uint256(logValue)))) {
-                    revert MismatchL2DAValidator();
+                if (uint256(s.l2DACommitmentScheme) != uint256(logValue)) {
+                    revert MismatchL2DACommitmentScheme(uint256(logValue), uint256(s.l2DACommitmentScheme));
                 }
             } else if (logKey == uint256(SystemLogKey.L2_DA_VALIDATOR_OUTPUT_HASH_KEY)) {
                 if (logSender != L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {

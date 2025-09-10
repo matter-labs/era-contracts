@@ -65,6 +65,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -230,7 +231,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(
             addresses.daAddresses.l1RollupDAValidator,
-            getL2ValidatorAddress("RollupL2DAValidator"),
+            L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256,
             true
         );
         vm.stopBroadcast();
@@ -504,17 +505,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress(
-            "root",
-            "expected_rollup_l2_da_validator_addr",
-            getL2ValidatorAddress("RollupL2DAValidator")
-        );
-        vm.serializeAddress(
-            "root",
-            "expected_no_da_validium_l2_validator_addr",
-            getL2ValidatorAddress("ValidiumL2DAValidator")
-        );
-        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getL2ValidatorAddress("AvailL2DAValidator"));
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
