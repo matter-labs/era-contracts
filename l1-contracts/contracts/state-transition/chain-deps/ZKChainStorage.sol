@@ -179,6 +179,4 @@ struct ZKChainStorage {
     bytes32 precommitmentForTheLatestBatch;
     /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
     bool zksyncOS;
-    /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
-    L2DACommitmentScheme l2DACommitmentScheme;
 }
