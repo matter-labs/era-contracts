@@ -92,27 +92,6 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
     }
 
-    /// @notice Get new facet cuts
-    function getFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal override returns (FacetCut[] memory facetCuts) {
-        // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
-        // If we start to use different selectors for Gateway, we should change this.
-        facetCuts = new FacetCut[](2);
-        facetCuts[0] = FacetCut({
-            facet: stateTransition.adminFacet,
-            action: Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        });
-        facetCuts[1] = FacetCut({
-            facet: stateTransition.mailboxFacet,
-            action: Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
-        });
-    }
-
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal override returns (Diamond.FacetCut[] memory facetCuts) {
         // Remove the old MailboxFacet
