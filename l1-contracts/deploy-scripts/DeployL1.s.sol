@@ -148,6 +148,13 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.vaults.l1NativeTokenVaultProxy = nativeTokenVault;
         }
 
+        // If ecosystem has been deployed separately, so we need to deploy new governance and admin contracts
+        if (bridgehub != address(0)) {
+            (addresses.governance) = deploySimpleContract("Governance", false);
+            (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+            addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
+        }
+
         deployDAValidators();
         deployIfNeededMulticall3();
 
@@ -157,10 +164,6 @@ contract DeployL1Script is Script, DeployUtils {
 
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
-
-        (addresses.governance) = deploySimpleContract("Governance", false);
-        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
-        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.

@@ -117,6 +117,10 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
 
         instantiateCreate2Factory();
 
+        (addresses.governance) = deploySimpleContract("Governance", false);
+        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
+
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
