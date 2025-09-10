@@ -44,14 +44,16 @@ error InvalidUnprocessedIndex(uint256 treeUnprocessedIndex, uint256 commitmentUn
 error L1DAValidatorAddressIsZero();
 // 0x7fbff2dd
 error L1DAValidatorInvalidSender(address msgSender);
+// 0x944bc075
+error L2DAValidatorAddressIsZero();
 // 0xa969e486
 error LocalRootIsZero();
 // 0xbdaf7d42
 error LocalRootMustBeZero();
 // 0x9b5f85eb
 error MessageRootIsZero();
-// 0x32fff278
-error MismatchL2DACommitmentScheme(uint256 operatorProvidedScheme, uint256 expectedScheme);
+// 0x2237c426
+error MismatchL2DAValidator();
 // 0x2c01a4af
 error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLength);
 // 0xf9ba09d6

@@ -28,7 +28,6 @@ import {Diamond} from "../libraries/Diamond.sol";
 import {ChainTypeManager} from "../ChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -37,7 +36,6 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
-// solhint-disable-next-line gas-struct-packing
 struct GatewayCTMDeployerConfig {
     /// @notice Address of the aliased governance contract.
     address aliasedGovernanceAddress;
@@ -47,6 +45,8 @@ struct GatewayCTMDeployerConfig {
     uint256 eraChainId;
     /// @notice Chain ID of the L1 chain.
     uint256 l1ChainId;
+    /// @notice Address of the Rollup L2 Data Availability Validator.
+    address rollupL2DAValidatorAddress;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
     /// @notice Array of function selectors for the Admin facet.
@@ -181,6 +181,7 @@ contract GatewayCTMDeployer {
             _salt: salt,
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
+            _rollupL2DAValidatorAddress: _config.rollupL2DAValidatorAddress,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
             _deployedContracts: contracts
         });
@@ -206,6 +207,7 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _eraChainId Era Chain ID.
     /// @param _l1ChainId L1 Chain ID.
+    /// @param _rollupL2DAValidatorAddress The expected L2 DA Validator to be
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
@@ -214,6 +216,7 @@ contract GatewayCTMDeployer {
         bytes32 _salt,
         uint256 _eraChainId,
         uint256 _l1ChainId,
+        address _rollupL2DAValidatorAddress,
         address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal {
@@ -225,6 +228,7 @@ contract GatewayCTMDeployer {
 
         RollupDAManager rollupDAManager = _deployRollupDAContracts(
             _salt,
+            _rollupL2DAValidatorAddress,
             _aliasedGovernanceAddress,
             _deployedContracts
         );
@@ -314,12 +318,14 @@ contract GatewayCTMDeployer {
 
     /// @notice Deploys DA-related contracts.
     /// @param _salt Salt used for CREATE2 deployments.
+    /// @param _rollupL2DAValidatorAddress The expected L2 DA Validator to be
     /// used by permanent rollups.
     /// @param _aliasedGovernanceAddress The aliased address of the governnace.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// in the process of the execution of this function.
     function _deployRollupDAContracts(
         bytes32 _salt,
+        address _rollupL2DAValidatorAddress,
         address _aliasedGovernanceAddress,
         DeployedContracts memory _deployedContracts
     ) internal returns (RollupDAManager rollupDAManager) {
@@ -328,7 +334,7 @@ contract GatewayCTMDeployer {
         ValidiumL1DAValidator validiumDAValidator = new ValidiumL1DAValidator{salt: _salt}();
 
         RelayedSLDAValidator relayedSLDAValidator = new RelayedSLDAValidator{salt: _salt}();
-        rollupDAManager.updateDAPair(address(relayedSLDAValidator), ROLLUP_L2_DA_COMMITMENT_SCHEME, true);
+        rollupDAManager.updateDAPair(address(relayedSLDAValidator), _rollupL2DAValidatorAddress, true);
 
         // Note, that the governance still has to accept it.
         // It will happen in a separate voting after the deployment is done.

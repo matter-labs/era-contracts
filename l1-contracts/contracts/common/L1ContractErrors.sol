@@ -142,8 +142,6 @@ error InvalidBatchNumber(uint256 provided, uint256 expected);
 error InvalidCaller(address);
 // 0x92daded2
 error InvalidDAForPermanentRollup();
-// 0x3f98a77e
-error InvalidL2DACommitmentScheme(uint8);
 // 0x4fbe5dba
 error InvalidDelay();
 // 0xc1780bd6
