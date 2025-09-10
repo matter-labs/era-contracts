@@ -209,6 +209,7 @@ contract RegisterCTM is Script, DeployUtils {
                 sharedBridge.assetHandlerAddress(assetId),
                 bridgehub.ctmAssetIdToAddress(assetId)
             );
+            saveOutput(Output({governance: address(governance), encodedData: abi.encode(calls)}), outputPath);
         } else {
             saveOutput(Output({governance: address(governance), encodedData: abi.encode(calls)}), outputPath);
         }
