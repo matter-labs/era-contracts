@@ -242,6 +242,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             revert InvalidProof();
         }
 
+        require(_finalizeWithdrawalParams.chainId == GATEWAY_CHAIN_ID, OnlyGateway());
         require(
             BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
             NotWhitelistedSettlementLayer(_finalizeWithdrawalParams.chainId)

@@ -416,7 +416,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function requestL2ServiceTransaction(
         address _contractL2,
         bytes calldata _l2Calldata
-    ) external onlyServiceTransaction returns (bytes32 canonicalTxHash) {
+    ) external onlyServiceTransaction onlyL1 returns (bytes32 canonicalTxHash) {
         canonicalTxHash = _requestL2TransactionFree(
             BridgehubL2TransactionRequest({
                 sender: SERVICE_TRANSACTION_SENDER,

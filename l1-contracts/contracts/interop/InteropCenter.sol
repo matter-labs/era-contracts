@@ -17,7 +17,6 @@ import {BUNDLE_IDENTIFIER, BundleAttributes, CallAttributes, INTEROP_BUNDLE_VERS
 import {MsgValueMismatch, NotL1, NotL2ToL2, Unauthorized} from "../common/L1ContractErrors.sol";
 import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
-import {IL2AssetTracker} from "../bridge/asset-tracker/IL2AssetTracker.sol";
 import {AttributeAlreadySet, AttributeViolatesRestriction, IndirectCallValueMismatch, InteroperableAddressChainReferenceNotEmpty, InteroperableAddressNotEmpty} from "./InteropErrors.sol";
 
 import {IERC7786GatewaySource} from "./IERC7786GatewaySource.sol";

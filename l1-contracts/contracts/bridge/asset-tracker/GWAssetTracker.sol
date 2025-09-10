@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
-import {L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -73,6 +73,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _;
     }
 
+    modifier onlyL2InteropCenter() {
+        if (msg.sender != L2_INTEROP_CENTER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
     }
@@ -100,7 +107,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         BalanceChange calldata _balanceChange
-    ) external {
+    ) external onlyL2InteropCenter {
         _updateTotalSupplyOnGateway({
             _sourceChainId: L1_CHAIN_ID,
             _destinationChainId: _chainId,
@@ -204,7 +211,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        // bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
         // require(
         //     _processLogsInputs.messageRoot == emptyMessageRootForChain,
         //     InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
