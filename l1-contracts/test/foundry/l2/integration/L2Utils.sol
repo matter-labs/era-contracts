@@ -13,9 +13,9 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
@@ -26,6 +26,7 @@ import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
 import {Utils} from "deploy-scripts/Utils.sol";
+import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -53,18 +54,18 @@ library L2Utils {
     }
 
     function forceDeployMessageRoot() internal {
-        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), L1_CHAIN_ID);
-        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR, L1_CHAIN_ID));
+        new L2MessageRoot();
+        forceDeployWithConstructor("L2MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR));
     }
 
     function forceDeployBridgehub(SystemContractsArgs memory _args) internal {
-        new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100);
+        new L2Bridgehub();
         forceDeployWithConstructor(
-            "Bridgehub",
+            "L2Bridgehub",
             L2_BRIDGEHUB_ADDR,
             abi.encode(_args.l1ChainId, _args.aliasedOwner, 100)
         );
-        Bridgehub bridgehub = Bridgehub(L2_BRIDGEHUB_ADDR);
+        L2Bridgehub bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
         vm.prank(_args.aliasedOwner);
         bridgehub.setAddresses(
             L2_ASSET_ROUTER_ADDR,
@@ -75,15 +76,9 @@ library L2Utils {
     }
 
     function forceDeployChainAssetHandler(SystemContractsArgs memory _args) internal {
-        new ChainAssetHandler(
-            _args.l1ChainId,
-            _args.aliasedOwner,
-            IBridgehub(L2_BRIDGEHUB_ADDR),
-            L2_ASSET_ROUTER_ADDR,
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
-        );
+        new L2ChainAssetHandler();
         forceDeployWithConstructor(
-            "ChainAssetHandler",
+            "L2ChainAssetHandler",
             L2_CHAIN_ASSET_HANDLER_ADDR,
             abi.encode(
                 _args.l1ChainId,
@@ -100,14 +95,7 @@ library L2Utils {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         {
-            new L2AssetRouter(
-                _args.l1ChainId,
-                _args.eraChainId,
-                _args.l1AssetRouter,
-                _args.legacySharedBridge,
-                ethAssetId,
-                _args.aliasedOwner
-            );
+            new L2AssetRouter();
         }
         forceDeployWithConstructor(
             "L2AssetRouter",
@@ -128,16 +116,7 @@ library L2Utils {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         {
-            new L2NativeTokenVault({
-                _l1ChainId: _args.l1ChainId,
-                _aliasedOwner: _args.aliasedOwner,
-                _l2TokenProxyBytecodeHash: _args.l2TokenProxyBytecodeHash,
-                _legacySharedBridge: _args.legacySharedBridge,
-                _bridgedTokenBeacon: _args.l2TokenBeacon,
-                _contractsDeployedAlready: _args.contractsDeployedAlready,
-                _wethToken: address(0),
-                _baseTokenAssetId: ethAssetId
-            });
+            new L2NativeTokenVault();
         }
         forceDeployWithConstructor(
             "L2NativeTokenVault",

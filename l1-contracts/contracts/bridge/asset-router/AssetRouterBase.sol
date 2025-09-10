@@ -25,15 +25,6 @@ import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
-    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IBridgehub public immutable override BRIDGE_HUB;
-
-    /// @dev Chain ID of L1 for bridging reasons
-    uint256 public immutable L1_CHAIN_ID;
-
-    /// @dev Chain ID of Era for legacy reasons
-    uint256 public immutable ERA_CHAIN_ID;
-
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
     /// @dev P.S. this liquidity was locked directly in SharedBridge before.
@@ -55,18 +46,10 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB)) {
+        if (msg.sender != address(_bridgehub())) {
             revert Unauthorized(msg.sender);
         }
         _;
-    }
-
-    /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(uint256 _l1ChainId, uint256 _eraChainId, IBridgehub _bridgehub) {
-        L1_CHAIN_ID = _l1ChainId;
-        ERA_CHAIN_ID = _eraChainId;
-        BRIDGE_HUB = _bridgehub;
     }
 
     /// @inheritdoc IAssetRouterBase
@@ -190,4 +173,10 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     function unpause() external onlyOwner {
         _unpause();
     }
+
+    function _bridgehub() internal view virtual returns (IBridgehub);
+
+    function _l1ChainId() internal view virtual returns (uint256);
+
+    function _eraChainId() internal view virtual returns (uint256);
 }

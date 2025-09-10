@@ -352,6 +352,11 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
         require(stateTransition.verifier != address(0), "verifier is zero");
 
+        // TODO should be provided?
+        //        if (!stateTransition.isOnGateway) {
+        //            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
+        //        }
+
         return
             DiamondInitializeDataNewChain({
                 verifier: IVerifier(stateTransition.verifier),
@@ -409,13 +414,13 @@ abstract contract DeployUtils is Create2FactoryUtils {
     ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "Bridgehub")) {
-            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
-        } else if (compareStrings(contractName, "MessageRoot")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId);
+        } else if (compareStrings(contractName, "L1Bridgehub")) {
+            return abi.encode(config.ownerAddress, (config.contracts.maxNumberOfChains));
+        } else if (compareStrings(contractName, "L1MessageRoot")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return
                 abi.encode(
                     config.l1ChainId,
@@ -519,10 +524,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         }
     }
 
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual returns (bytes memory);
+    function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory);
 
     function test() internal virtual {}
 }

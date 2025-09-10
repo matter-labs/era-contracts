@@ -11,7 +11,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps} from "contracts/common/L1ContractErrors.sol";
-import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;

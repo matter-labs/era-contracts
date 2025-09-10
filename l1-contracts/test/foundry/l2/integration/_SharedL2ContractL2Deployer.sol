@@ -107,8 +107,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     }
 
     function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
+        string memory contractName
     ) internal virtual override returns (bytes memory) {
         return ("Not implemented initialize calldata");
     }

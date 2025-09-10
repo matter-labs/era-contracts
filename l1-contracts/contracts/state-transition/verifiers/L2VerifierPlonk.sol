@@ -9,7 +9,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of
 /// Knowledge (PLONK) verifier.
 /// Modifications have been made to optimize the proof system for ZK chain circuits.
-/// @dev Contract was generated from a verification key with a hash of 0x64b347c642ea60114c98b3976124ea8a7e0bb778bd7e479aedc02f994486c8a1
+/// @dev Contract was generated from a verification key with a hash of 0x5a091e307e516869a79fa79db2aa70865fe606adb6d9ac16e6426d2b7b8530ac
 /// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the
 /// constants below.
 /// @dev For a better understanding of the verifier algorithm please refer to the following papers:

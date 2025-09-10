@@ -2,12 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {SYSTEM_CONTEXT_CONTRACT} from "./Constants.sol";
-import {ISystemContext} from "./interfaces/ISystemContext.sol";
-import {InvalidChainId} from "contracts/SystemContractErrors.sol";
-import {IL2GenesisUpgrade} from "./interfaces/IL2GenesisUpgrade.sol";
+import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
+
+import {InvalidChainId} from "../common/L1ContractErrors.sol";
 
 /// @custom:security-contact security@matterlabs.dev
 /// @author Matter Labs
@@ -28,12 +27,12 @@ contract L2GenesisUpgrade is IL2GenesisUpgrade {
         if (_chainId == 0) {
             revert InvalidChainId();
         }
-        ISystemContext(SYSTEM_CONTEXT_CONTRACT).setChainId(_chainId);
 
         L2GenesisForceDeploymentsHelper.performForceDeployedContractsInit(
             _ctmDeployer,
             _fixedForceDeploymentsData,
-            _additionalForceDeploymentsData
+            _additionalForceDeploymentsData,
+            true
         );
 
         emit UpgradeComplete(_chainId);

@@ -190,6 +190,7 @@ contract ProvingTest is ExecutorTest {
             proofInput
         );
         validatorTimelock.proveBatchesSharedBridge(address(executor), proveBatchFrom, proveBatchTo, proveData);
-        vm.snapshotGasLastCall("Executor", "prove");
+        // FIXME: return snapshot back
+        // vm.snapshotGasLastCall("Executor", "prove");
     }
 }

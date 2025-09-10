@@ -18,7 +18,6 @@ import {SemVer} from "../common/libraries/SemVer.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
-import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol";
 
 /// @author Matter Labs
@@ -78,7 +77,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
                 reserved: [uint256(0), 0, 0, 0],
                 data: complexUpgraderCalldata,
                 signature: new bytes(0),
-                factoryDeps: L2ContractHelper.hashFactoryDeps(_factoryDeps),
+                factoryDeps: new uint256[](0),
                 paymasterInput: new bytes(0),
                 reservedDynamic: new bytes(0)
             });

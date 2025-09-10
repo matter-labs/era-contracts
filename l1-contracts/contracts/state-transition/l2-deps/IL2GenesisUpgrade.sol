@@ -38,11 +38,12 @@ struct FixedForceDeploymentsData {
     bytes32 l2TokenProxyBytecodeHash;
     address aliasedL1Governance;
     uint256 maxNumberOfZKChains;
-    bytes32 bridgehubBytecodeHash;
-    bytes32 l2AssetRouterBytecodeHash;
-    bytes32 l2NtvBytecodeHash;
-    bytes32 messageRootBytecodeHash;
-    bytes32 chainAssetHandlerBytecodeHash;
+    bytes bridgehubBytecodeInfo;
+    bytes l2AssetRouterBytecodeInfo;
+    bytes l2NtvBytecodeInfo;
+    bytes messageRootBytecodeInfo;
+    bytes chainAssetHandlerBytecodeInfo;
+    bytes beaconDeployerInfo;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.

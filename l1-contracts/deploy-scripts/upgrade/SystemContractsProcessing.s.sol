@@ -349,7 +349,7 @@ library SystemContractsProcessing {
     function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
 
-        result[0] = ContractsBytecodesLib.getCreationCode("Bridgehub");
+        result[0] = ContractsBytecodesLib.getCreationCode("L2Bridgehub");
         result[1] = ContractsBytecodesLib.getCreationCode("L2AssetRouter");
         result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
         result[3] = ContractsBytecodesLib.getCreationCode("MessageRoot");
