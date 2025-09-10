@@ -104,7 +104,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         origin = _newOrigin;
     }
 
-    /// @notice Set the the current gas price.
+    /// @notice Set the current gas price.
     /// @param _gasPrice The new tx gasPrice.
     function setGasPrice(uint256 _gasPrice) external onlyCallFromBootloader {
         gasPrice = _gasPrice;
