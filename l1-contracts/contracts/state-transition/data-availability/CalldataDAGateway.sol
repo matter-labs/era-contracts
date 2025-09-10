@@ -6,7 +6,7 @@ import {BLOB_COMMITMENT_SIZE, BLOB_SIZE_BYTES, CalldataDA} from "./CalldataDA.so
 import {InvalidPubdataHash, PubdataInputTooSmall, PubdataLengthTooBig} from "../L1StateTransitionErrors.sol";
 
 /// @notice Contract that contains the functionality for processing the calldata DA.
-/// @dev The expected L2DACommitmentScheme that should be used with it is `BLOBS_AND_PUBDATA_KECCAK256`.
+/// @dev The expected l2DAValidator that should be used with it `RollupL2DAValidator`.
 abstract contract CalldataDAGateway is CalldataDA {
     /// @inheritdoc CalldataDA
     function _processCalldataDA(

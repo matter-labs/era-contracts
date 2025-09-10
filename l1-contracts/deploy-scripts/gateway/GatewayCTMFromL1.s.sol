@@ -85,6 +85,7 @@ contract GatewayCTMFromL1 is Script {
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
         uint256 latestProtocolVersion;
+        address expectedRollupL2DAValidator;
         bytes forceDeploymentsData;
     }
 
@@ -228,6 +229,7 @@ contract GatewayCTMFromL1 is Script {
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
             latestProtocolVersion: toml.readUint("$.latest_protocol_version"),
+            expectedRollupL2DAValidator: toml.readAddress("$.expected_rollup_l2_da_validator"),
             forceDeploymentsData: toml.readBytes("$.force_deployments_data")
         });
 
@@ -237,6 +239,7 @@ contract GatewayCTMFromL1 is Script {
             salt: bytes32(0),
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
+            rollupL2DAValidatorAddress: config.expectedRollupL2DAValidator,
             testnetVerifier: config.testnetVerifier,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),

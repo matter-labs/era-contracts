@@ -80,8 +80,6 @@ error InvalidCall();
 error InvalidChainId();
 // 0x6a84bc39
 error InvalidCodeHash(CodeHashReason);
-// 0xc74537a1
-error InvalidDACommitmentScheme(uint256);
 // 0xb4fa3fb3
 error InvalidInput();
 // 0x8c13f15d
@@ -144,8 +142,7 @@ error PreviousBytecodeUnknown();
 error PreviousL2BlockHashIsIncorrect(bytes32 correctPrevBlockHash, bytes32 expectedPrevL2BlockHash);
 // 0x33cb1485
 error ProvidedBatchNumberIsNotCorrect(uint128 previousBatchNumber, uint128 _expectedNewNumber);
-// Note: enum should be encoded as uint8 to calculate selector!
-// skip-errors-lint 0x7f7b0cf7
+// 0x7f7b0cf7
 error ReconstructionMismatch(PubdataField, bytes32 expected, bytes32 actual);
 // 0x26772295
 error ReturnedBytecodeDoesNotMatchExpectedHash(bytes32 returnedBytecode, bytes32 expectedBytecodeHash);
@@ -206,9 +203,7 @@ enum PubdataField {
     InputMsgsHash,
     InputBytecodeHash,
     Offset,
-    Length,
-    StateDiffCompressionVersion,
-    ExtraData
+    Length
 }
 
 enum BytecodeError {

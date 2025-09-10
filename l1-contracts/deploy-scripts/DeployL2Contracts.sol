@@ -44,6 +44,7 @@ contract DeployL2Script is Script {
     }
 
     struct DeployedContrats {
+        address l2DaValidatorAddress;
         address forceDeployUpgraderAddress;
         address consensusRegistryImplementation;
         address consensusRegistryProxy;
@@ -82,6 +83,9 @@ contract DeployL2Script is Script {
     }
 
     function deploy(bool legacyBridge) public {
+        // Note, that it is important that the first transaction is for setting the L2 DA validator
+        deployL2DaValidator();
+
         deployForceDeployer();
         deployConsensusRegistry();
         deployConsensusRegistryProxy();
@@ -124,6 +128,14 @@ contract DeployL2Script is Script {
         saveOutput();
     }
 
+    function runDeployL2DAValidator() public {
+        initializeConfig();
+
+        deployL2DaValidator();
+
+        saveOutput();
+    }
+
     function initializeConfig() internal {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-config/config-deploy-l2-contracts.toml");
@@ -144,6 +156,7 @@ contract DeployL2Script is Script {
     }
 
     function saveOutput() internal {
+        vm.serializeAddress("root", "l2_da_validator_address", deployed.l2DaValidatorAddress);
         vm.serializeAddress("root", "multicall3", deployed.multicall3);
         vm.serializeAddress("root", "consensus_registry_implementation", deployed.consensusRegistryImplementation);
         vm.serializeAddress("root", "consensus_registry_proxy", deployed.consensusRegistryProxy);
@@ -153,6 +166,30 @@ contract DeployL2Script is Script {
         string memory root = vm.projectRoot();
         string memory path = string.concat(root, "/script-out/output-deploy-l2-contracts.toml");
         vm.writeToml(toml, path);
+    }
+
+    function deployL2DaValidator() internal {
+        bytes memory bytecode;
+        if (config.validatorType == DAValidatorType.Rollup) {
+            bytecode = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
+        } else if (config.validatorType == DAValidatorType.NoDA) {
+            bytecode = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
+        } else if (config.validatorType == DAValidatorType.Avail) {
+            bytecode = ContractsBytecodesLib.getCreationCode("AvailL2DAValidator");
+        } else {
+            revert("Invalid DA validator type");
+        }
+
+        deployed.l2DaValidatorAddress = Utils.deployThroughL1Deterministic({
+            bytecode: bytecode,
+            constructorargs: bytes(""),
+            create2salt: "",
+            l2GasLimit: Utils.MAX_PRIORITY_TX_GAS,
+            factoryDeps: new bytes[](0),
+            chainId: config.chainId,
+            bridgehubAddress: config.bridgehubAddress,
+            l1SharedBridgeProxy: config.l1SharedBridgeProxy
+        });
     }
 
     function deployForceDeployer() internal {
