@@ -76,8 +76,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
     uint256 internal eraChainId;
-    address internal rollupL2DAValidator;
-    address internal oldRollupL2DAValidator;
 
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
@@ -95,9 +93,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         refundRecipient = toml.readAddress("$.refund_recipient");
 
         eraChainId = toml.readUint("$.era_chain_id");
-        // The "new" and "old" rollup L2 DA validators are those that were set in v27 and v26 respectively
-        rollupL2DAValidator = toml.readAddress("$.rollup_l2_da_validator");
-        oldRollupL2DAValidator = toml.readAddress("$.old_rollup_l2_da_validator");
 
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
@@ -311,27 +306,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 _ctmChainId: ctmChainId
             })
         );
-
-        // We need to also whitelist the old L2 rollup address
-        if (oldRollupL2DAValidator != address(0)) {
-            governanceCalls = Utils.mergeCalls(
-                governanceCalls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    EXPECTED_MAX_L1_GAS_PRICE,
-                    abi.encodeCall(
-                        RollupDAManager.updateDAPair,
-                        (output.relayedSLDAValidator, oldRollupL2DAValidator, true)
-                    ),
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    output.rollupDAManager,
-                    gatewayChainId,
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    refundRecipient
-                )
-            );
-        }
 
         saveOutput(governanceCalls, ecosystemAdminCalls);
     }
