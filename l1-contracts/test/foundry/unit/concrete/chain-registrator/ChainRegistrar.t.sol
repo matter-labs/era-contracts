@@ -6,7 +6,8 @@ import {Vm} from "forge-std/Vm.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import "contracts/bridgehub/Bridgehub.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
@@ -26,6 +27,8 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 contract ChainRegistrarTest is Test {
     DummyBridgehub private bridgeHub;
+    InteropCenter private interopCenter;
+    MessageRoot private messageRoot;
     DummyChainTypeManagerWBH private ctm;
     address private admin;
     address private deployer;
@@ -39,6 +42,8 @@ contract ChainRegistrarTest is Test {
 
     constructor() {
         bridgeHub = new DummyBridgehub();
+        interopCenter = new InteropCenter(block.chainid, makeAddr("admin"));
+        messageRoot = new MessageRoot(IBridgehub(address(bridgeHub)), block.chainid, 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");
@@ -46,6 +51,8 @@ contract ChainRegistrarTest is Test {
 
         l1NullifierImpl = new L1NullifierDev({
             _bridgehub: IBridgehub(address(bridgeHub)),
+            _messageRoot: IMessageRoot(address(messageRoot)),
+            _interopCenter: (interopCenter),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")
         });

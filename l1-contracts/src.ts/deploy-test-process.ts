@@ -21,17 +21,9 @@ import {
 import { deployTokens, getTokens } from "./deploy-token";
 
 import { SYSTEM_CONFIG } from "../scripts/utils";
-import {
-  testConfigPath,
-  getNumberFromEnv,
-  getHashFromEnv,
-  PubdataPricingMode,
-  ADDRESS_ONE,
-  EMPTY_STRING_KECCAK,
-  isCurrentNetworkLocal,
-  ETH_ADDRESS_IN_CONTRACTS,
-  encodeNTVAssetId,
-} from "./utils";
+import { getNumberFromEnv, getHashFromEnv, PubdataPricingMode, isCurrentNetworkLocal, encodeNTVAssetId } from "./utils";
+import { testConfigPath, ADDRESS_ONE, EMPTY_STRING_KECCAK, ETH_ADDRESS_IN_CONTRACTS } from "../src.ts/constants";
+
 import { diamondCut, getCurrentFacetCutsForAdd, facetCut, Action } from "./diamondCut";
 import { CONTRACTS_GENESIS_PROTOCOL_VERSION } from "../test/unit_tests/utils";
 
@@ -333,6 +325,7 @@ export class EraDeployer extends Deployer {
       {
         chainId: this.chainId, // era chain Id
         bridgehub: this.addresses.Bridgehub.BridgehubProxy,
+        interopCenter: this.addresses.Bridgehub.InteropCenterProxy,
         chainTypeManager: this.addresses.StateTransition.StateTransitionProxy,
         protocolVersion: CONTRACTS_GENESIS_PROTOCOL_VERSION,
         admin: this.ownerAddress,

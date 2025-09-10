@@ -147,6 +147,11 @@ interface IAdmin is IZKChainBase {
 
     event BridgeMint(address indexed _account, uint256 _amount);
 
+    event DepositsPaused(uint256 migrationNumber, uint256 pausedDepositsTimestamp);
+
+    /// @notice Pauses deposits and initiates the migration to the Gateway.
+    function pauseDepositsAndInitiateMigration() external;
+
     /// @dev Similar to IL1AssetHandler interface, used to send chains.
     function forwardedBridgeBurn(
         address _settlementLayer,

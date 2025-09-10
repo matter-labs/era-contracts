@@ -10,6 +10,8 @@ const CONTRACTS_DIRECTORIES = {
     "common/L1ContractErrors.sol",
     "bridge/L1BridgeContractErrors.sol",
     "bridgehub/L1BridgehubErrors.sol",
+    "interop/InteropErrors.sol",
+    "bridge/asset-tracker/AssetTrackerErrors.sol",
     "state-transition/L1StateTransitionErrors.sol",
     "upgrades/ZkSyncUpgradeErrors.sol",
   ],
@@ -267,9 +269,14 @@ function collectErrorUsages(directories: string[], usedErrors: Set<string>) {
           collectErrorUsages([fullPath], usedErrors);
         } else if (file.endsWith(".sol")) {
           const fileContent = fs.readFileSync(fullPath, "utf8");
-          const revertRegex = /revert\s+([A-Za-z0-9_]+)/g;
-          let match;
-          while ((match = revertRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
+          // Remove comments and normalize whitespace for better parsing
+          const normalizedContent = fileContent.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, "").replace(/\s+/g, " ");
+          const revertRegex = /(?:revert\s+([A-Za-z0-9_]+)|(?:require\s*\(.*?,\s*|,\s*)([A-Za-z0-9_]+)\s*\()/g;
+          let match: RegExpExecArray | null;
+          while ((match = revertRegex.exec(normalizedContent)) !== null) {
+            const errorName = match[1] || match[2];
+            usedErrors.add(errorName);
+          }
         }
       }
     }

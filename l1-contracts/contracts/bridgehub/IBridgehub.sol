@@ -41,8 +41,10 @@ struct L2TransactionRequestTwoBridgesInner {
 struct BridgehubMintCTMAssetData {
     uint256 chainId;
     bytes32 baseTokenAssetId;
+    uint256 batchNumber;
     bytes ctmData;
     bytes chainData;
+    uint256 migrationNumber;
 }
 
 struct BridgehubBurnCTMAssetData {
@@ -103,6 +105,8 @@ interface IBridgehub {
     function admin() external view returns (address);
 
     function assetRouter() external view returns (address);
+
+    function chainRegistrationSender() external view returns (address);
 
     /// Mailbox forwarder
 
@@ -169,7 +173,8 @@ interface IBridgehub {
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler
+        address _chainAssetHandler,
+        address _chainRegistrationSender
     ) external;
 
     function setChainAssetHandler(address _chainAssetHandler) external;
@@ -198,12 +203,6 @@ interface IBridgehub {
     //     bytes calldata _diamondCut
     // ) external;
 
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
-
     function ctmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
 
     function ctmAssetIdFromAddress(address _ctmAddress) external view returns (bytes32);
@@ -219,8 +218,6 @@ interface IBridgehub {
     function chainAssetHandler() external view returns (address);
 
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
-
-    function registerLegacyChain(uint256 _chainId) external;
 
     function pauseMigration() external;
 
@@ -240,4 +237,12 @@ interface IBridgehub {
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
 
     function forwardedBridgeRecoverFailedTransfer(uint256 _chainId) external returns (address zkChain, address ctm);
+
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external;
+
+    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external;
 }

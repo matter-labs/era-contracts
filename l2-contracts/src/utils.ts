@@ -3,7 +3,8 @@ import { artifacts } from "hardhat";
 import { Interface } from "ethers/lib/utils";
 import { deployedAddressesFromEnv } from "../../l1-contracts/src.ts/deploy-utils";
 import type { Deployer } from "../../l1-contracts/src.ts/deploy";
-import { ADDRESS_ONE, getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
+import { ADDRESS_ONE } from "../../l1-contracts/src.ts/constants";
+import { getNumberFromEnv } from "../../l1-contracts/src.ts/utils";
 import { IBridgehubFactory } from "../../l1-contracts/typechain/IBridgehubFactory";
 import { web3Provider } from "../../l1-contracts/scripts/utils";
 
@@ -136,7 +137,7 @@ export async function requestL2TransactionDirect(
   const ntv = IL1NativeTokenVaultFactory.connect(deployedAddresses.Bridges.NativeTokenVaultProxy, wallet);
   gasPrice ??= await bridgehub.provider.getGasPrice();
 
-  const expectedCost = await bridgehub.l2TransactionBaseCost(
+  const expectedCost = await interopCenter.l2TransactionBaseCost(
     chainId,
     gasPrice,
     l2GasLimit,
@@ -153,7 +154,7 @@ export async function requestL2TransactionDirect(
     const tx = await baseToken.approve(baseTokenBridge, expectedCost);
     await tx.wait();
   }
-  return await bridgehub.requestL2TransactionDirect(
+  return await interopCenter.requestL2TransactionDirect(
     {
       chainId,
       l2Contract: l2Contract,

@@ -24,6 +24,7 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
@@ -269,7 +270,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             secondBridgeCalldata: hex""
         });
         if (!correctSecondBridge) {
-            call.data = abi.encodeCall(Bridgehub.requestL2TransactionTwoBridges, (outer));
+            call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
             // 0 is not correct second bridge
             return call;
         }
@@ -289,7 +290,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
 
-        call.data = abi.encodeCall(Bridgehub.requestL2TransactionTwoBridges, (outer));
+        call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
     }
 
     function assertInvalidMigrationCall(Call memory call) public {
@@ -363,12 +364,14 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
+        MessageRoot messageRootNew = new MessageRoot(bridgehub, block.chainid, 1);
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
-            new MessageRoot(bridgehub, block.chainid),
-            address(0)
-        );
+            messageRootNew,
+            address(chainAssetHandler),
+            address(0x000000000000000000000000000000000002000a)
+        ); // kl todo maybe address(1)
         vm.stopPrank();
 
         // ctm deployer address is 0 in this test
@@ -395,9 +398,25 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
+        vm.mockCall(
+            address(messageRootNew),
+            abi.encodeWithSelector(IMessageRoot.v30UpgradeGatewayBlockNumber.selector),
+            abi.encode(1)
+        );
+        vm.mockCall(
+            address(messageRootNew),
+            abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
+            abi.encode(0)
+        );
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encode(chainAssetHandler)
+        );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge);
         vm.startPrank(governor);
         bridgehub.createNewChain({
             _chainId: chainId,

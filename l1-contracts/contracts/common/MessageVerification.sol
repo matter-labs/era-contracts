@@ -2,9 +2,9 @@
 
 pragma solidity ^0.8.24;
 
-import {L2Log, L2Message} from "../../../common/Messaging.sol";
-import {IMessageVerification} from "../../chain-interfaces/IMessageVerification.sol";
-import {L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2Log, L2Message, TxStatus} from "./Messaging.sol";
+import {FinalizeL1DepositParams, IMessageVerification} from "./interfaces/IMessageVerification.sol";
+import {MessageHashing} from "./libraries/MessageHashing.sol";
 
 /// @title The interface of the ZKsync MessageVerification contract that can be used to prove L2 message inclusion.
 /// @dev This contract is abstract and is inherited by the Mailbox and L2MessageVerification contracts.
@@ -25,7 +25,7 @@ abstract contract MessageVerification is IMessageVerification {
                 _chainId: _chainId,
                 _blockOrBatchNumber: _blockOrBatchNumber,
                 _index: _index,
-                _log: _l2MessageToLog(_message),
+                _log: MessageHashing._l2MessageToLog(_message),
                 _proof: _proof
             });
     }
@@ -48,12 +48,50 @@ abstract contract MessageVerification is IMessageVerification {
             });
     }
 
+    function proveL2LeafInclusionSharedRecursive(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof,
+        uint256 _depth
+    ) public view virtual returns (bool) {
+        return
+            _proveL2LeafInclusionRecursive({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof,
+                _depth: _depth
+            });
+    }
+
     function _proveL2LeafInclusion(
         uint256 _chainId,
         uint256 _blockOrBatchNumber,
         uint256 _leafProofMask,
         bytes32 _leaf,
         bytes32[] calldata _proof
+    ) internal view virtual returns (bool) {
+        return
+            _proveL2LeafInclusionRecursive({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _blockOrBatchNumber,
+                _leafProofMask: _leafProofMask,
+                _leaf: _leaf,
+                _proof: _proof,
+                _depth: 0
+            });
+    }
+
+    function _proveL2LeafInclusionRecursive(
+        uint256 _chainId,
+        uint256 _blockOrBatchNumber,
+        uint256 _leafProofMask,
+        bytes32 _leaf,
+        bytes32[] calldata _proof,
+        uint256 _depth
     ) internal view virtual returns (bool);
 
     /// @dev Prove that a specific L2 log was sent in a specific L2 batch number
@@ -64,10 +102,7 @@ abstract contract MessageVerification is IMessageVerification {
         L2Log memory _log,
         bytes32[] calldata _proof
     ) internal view returns (bool) {
-        bytes32 hashedLog = keccak256(
-            // solhint-disable-next-line func-named-parameters
-            abi.encodePacked(_log.l2ShardId, _log.isService, _log.txNumberInBatch, _log.sender, _log.key, _log.value)
-        );
+        bytes32 hashedLog = MessageHashing.getLeafHashFromLog(_log);
 
         // It is ok to not check length of `_proof` array, as length
         // of leaf preimage (which is `L2_TO_L1_LOG_SERIALIZE_SIZE`) is not
@@ -82,19 +117,6 @@ abstract contract MessageVerification is IMessageVerification {
                 _leafProofMask: _index,
                 _leaf: hashedLog,
                 _proof: _proof
-            });
-    }
-
-    /// @dev Convert arbitrary-length message to the raw L2 log
-    function _l2MessageToLog(L2Message calldata _message) internal pure returns (L2Log memory) {
-        return
-            L2Log({
-                l2ShardId: 0,
-                isService: true,
-                txNumberInBatch: _message.txNumberInBatch,
-                sender: L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
-                key: bytes32(uint256(uint160(_message.sender))),
-                value: keccak256(_message.data)
             });
     }
 
@@ -114,5 +136,45 @@ abstract contract MessageVerification is IMessageVerification {
                 _log: _log,
                 _proof: _proof
             });
+    }
+
+    /// @inheritdoc IMessageVerification
+    function proveL1ToL2TransactionStatusShared(
+        uint256 _chainId,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof,
+        TxStatus _status
+    ) public view returns (bool) {
+        L2Log memory l2Log = MessageHashing.getL2LogFromL1ToL2Transaction(_l2TxNumberInBatch, _l2TxHash, _status);
+        return
+            _proveL2LogInclusion({
+                _chainId: _chainId,
+                _blockOrBatchNumber: _l2BatchNumber,
+                _index: _l2MessageIndex,
+                _log: l2Log,
+                _proof: _merkleProof
+            });
+    }
+
+    function proveL1DepositParamsInclusion(
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams,
+        address _sender
+    ) public view returns (bool success) {
+        L2Message memory l2ToL1Message = L2Message({
+            txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
+            sender: _sender,
+            data: _finalizeWithdrawalParams.message
+        });
+
+        success = this.proveL2MessageInclusionShared({
+            _chainId: _finalizeWithdrawalParams.chainId,
+            _blockOrBatchNumber: _finalizeWithdrawalParams.l2BatchNumber,
+            _index: _finalizeWithdrawalParams.l2MessageIndex,
+            _message: l2ToL1Message,
+            _proof: _finalizeWithdrawalParams.merkleProof
+        });
     }
 }

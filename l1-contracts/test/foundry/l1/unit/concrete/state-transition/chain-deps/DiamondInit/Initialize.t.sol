@@ -15,7 +15,6 @@ import {EmptyAssetId, TooMuchGas, ZeroAddress} from "contracts/common/L1Contract
 
 contract InitializeTest is DiamondInitTest {
     function test_revertWhen_verifierIsZeroAddress() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.verifier = IVerifier(address(0));
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -29,7 +28,6 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_governorIsZeroAddress() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.admin = address(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -43,7 +41,6 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_validatorTimelockIsZeroAddress() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.validatorTimelock = address(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -57,7 +54,6 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_priorityTxMaxGasLimitIsGreaterThanMaxGasPerTransaction() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.priorityTxMaxGasLimit = MAX_GAS_PER_TRANSACTION + 1;
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -71,7 +67,6 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_bridgehubAddressIsZero() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.bridgehub = address(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -85,7 +80,6 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_chainTypeManagerAddressIsZero() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.chainTypeManager = address(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -99,7 +93,6 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_revertWhen_baseTokenAssetIdIsZero() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
         initializeData.baseTokenAssetId = bytes32(0);
 
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
@@ -113,8 +106,6 @@ contract InitializeTest is DiamondInitTest {
     }
 
     function test_valuesCorrectWhenSuccessfulInit() public {
-        InitializeData memory initializeData = Utils.makeInitializeData(testnetVerifier);
-
         Diamond.DiamondCutData memory diamondCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
             initAddress: address(new DiamondInit()),

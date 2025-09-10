@@ -9,6 +9,7 @@ import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -50,6 +51,13 @@ contract ZKChainBase is ReentrancyGuard {
         _;
     }
 
+    modifier onlyBridgehubOrInteropCenter() {
+        if ((msg.sender != s.bridgehub) && (msg.sender != L2_INTEROP_CENTER_ADDR)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     modifier onlyChainAssetHandler() {
         if (msg.sender != IBridgehub(s.bridgehub).chainAssetHandler()) {
             revert Unauthorized(msg.sender);
@@ -80,6 +88,26 @@ contract ZKChainBase is ReentrancyGuard {
 
     modifier onlySelf() {
         if (msg.sender != address(this)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyServiceTransaction() {
+        IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        if (
+            /// Multiple purposes.
+            /// 1. Allow EVM emulation.
+            /// 2. saveV30UpgradeGatewayBlockNumberOnL2, so disable interop for pre V30 batches.
+            msg.sender != address(this) &&
+            /// For registering chains in the L2Bridgehub. This is used for interop initiation.
+            msg.sender != bridgehub.chainRegistrationSender() &&
+            /// For sending the token balance migration confirmation txs to L2s and the Gateway.
+            msg.sender != address(s.assetTracker) &&
+            /// 1. For setting the legacy shared bridge in the L2Asset Tracker.
+            /// 2. Also for sending the demarcation txs for token balance migration. It might be deleted.
+            msg.sender != address(bridgehub.chainAssetHandler())
+        ) {
             revert Unauthorized(msg.sender);
         }
         _;

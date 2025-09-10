@@ -36,3 +36,5 @@ error ProtocolVersionDeltaTooLarge(uint256 _proposedDelta, uint256 _maxDelta);
 error ProtocolVersionMinorDeltaTooBig(uint256 limit, uint256 proposed);
 // 0x88d7b498
 error ProtocolVersionTooSmall();
+// 0x364b6f8b
+error SettlementLayerUpgradeMustPrecedeChainUpgrade();

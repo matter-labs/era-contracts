@@ -102,7 +102,7 @@ contract RegisterCTM is Script, DeployUtils {
     }
 
     function run() public virtual {
-        console.log("Registering CTM");
+        console.log("RegisterCTM for L1 contracts");
 
         runInner(
             "/script-config/config-deploy-l1.toml",

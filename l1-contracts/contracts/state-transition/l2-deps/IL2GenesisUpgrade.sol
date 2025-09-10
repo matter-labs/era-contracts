@@ -33,6 +33,7 @@ struct ZKChainSpecificForceDeploymentsData {
 // solhint-disable-next-line gas-struct-packing
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
+    uint256 gatewayChainId;
     uint256 eraChainId;
     address l1AssetRouter;
     bytes32 l2TokenProxyBytecodeHash;
@@ -43,8 +44,12 @@ struct FixedForceDeploymentsData {
     bytes32 l2NtvBytecodeHash;
     bytes32 messageRootBytecodeHash;
     bytes32 chainAssetHandlerBytecodeHash;
+    bytes32 interopCenterBytecodeHash;
+    bytes32 interopHandlerBytecodeHash;
+    bytes32 assetTrackerBytecodeHash;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
+    address aliasedChainRegistrationSender;
     // The forced beacon address. It is needed only for internal testing.
     // MUST be equal to 0 in production.
     // It will be the job of the governance to ensure that this value is set correctly.

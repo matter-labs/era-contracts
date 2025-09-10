@@ -24,6 +24,7 @@ contract UpgradeLogicTest is DiamondCutTest {
     AdminFacet private adminFacet;
     AdminFacet private proxyAsAdmin;
     GettersFacet private proxyAsGetters;
+    address interopCenter = makeAddr("interopCenter");
     address private admin;
     address private chainTypeManager;
     address private randomSigner;
@@ -81,6 +82,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             chainId: 1,
             bridgehub: address(dummyBridgehub),
             chainTypeManager: chainTypeManager,
+            interopCenter: interopCenter,
             protocolVersion: 0,
             admin: admin,
             validatorTimelock: makeAddr("validatorTimelock"),
@@ -115,6 +117,7 @@ contract UpgradeLogicTest is DiamondCutTest {
             initCalldata: diamondInitCalldata
         });
 
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0));
         diamondProxy = new DiamondProxy(block.chainid, diamondCutData);
         proxyAsAdmin = AdminFacet(address(diamondProxy));
         proxyAsGetters = GettersFacet(address(diamondProxy));
