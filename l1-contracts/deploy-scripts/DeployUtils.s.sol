@@ -11,6 +11,7 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
@@ -531,6 +532,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }
+    }
+
+    function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
+        return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
+    }
+
+    function calculateExpectedL2Address(string memory contractName) internal returns (address) {
+        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
     }
 
     function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory);

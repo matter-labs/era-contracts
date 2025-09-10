@@ -16,7 +16,6 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -147,22 +146,10 @@ contract DeployL1Script is Script, DeployUtils {
             addresses.bridges.l1NullifierProxy = l1Nullifier;
             addresses.bridges.l1AssetRouterProxy = address(assetRouter);
             addresses.vaults.l1NativeTokenVaultProxy = nativeTokenVault;
-
-            addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
-            updateRollupDAManager();
-            addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
-
-            vm.startBroadcast(msg.sender);
-            IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
-            rollupDAManager.updateDAPair(
-                addresses.daAddresses.l1RollupDAValidator,
-                getL2ValidatorAddress("RollupL2DAValidator"),
-                true
-            );
-            vm.stopBroadcast();
-
-            deployIfNeededMulticall3();
         }
+
+        deployDAValidators();
+        deployIfNeededMulticall3();
 
         addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
 
@@ -171,12 +158,9 @@ contract DeployL1Script is Script, DeployUtils {
         (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
-        // If ecosystem has been deployed separately, so we need to deploy new governance and admin contracts
-        if (bridgehub != address(0)) {
-            (addresses.governance) = deploySimpleContract("Governance", false);
-            (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
-            addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
-        }
+        (addresses.governance) = deploySimpleContract("Governance", false);
+        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
+        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
@@ -218,14 +202,6 @@ contract DeployL1Script is Script, DeployUtils {
         }
     }
 
-    function getL2ValidatorAddress(string memory contractName) internal returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
-    }
-
-    function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
-        return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
-    }
-
     function deployVerifiers() internal {
         (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
         (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
@@ -258,7 +234,7 @@ contract DeployL1Script is Script, DeployUtils {
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(
             addresses.daAddresses.l1RollupDAValidator,
-            getL2ValidatorAddress("RollupL2DAValidator"),
+            calculateExpectedL2Address("RollupL2DAValidator"),
             true
         );
         vm.stopBroadcast();
@@ -297,42 +273,6 @@ contract DeployL1Script is Script, DeployUtils {
         addresses.stateTransition.diamondProxy = contractAddress;
     }
 
-    function setBridgehubParams() internal {
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
-        vm.startBroadcast(msg.sender);
-        bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
-        bridgehub.setAddresses(
-            addresses.bridges.l1AssetRouterProxy,
-            ICTMDeploymentTracker(addresses.bridgehub.ctmDeploymentTrackerProxy),
-            IMessageRoot(addresses.bridgehub.messageRootProxy),
-            addresses.bridgehub.chainAssetHandlerProxy
-        );
-        vm.stopBroadcast();
-        console.log("SharedBridge registered");
-    }
-
-    function updateSharedBridge() internal {
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        vm.broadcast(msg.sender);
-        sharedBridge.setL1Erc20Bridge(IL1ERC20Bridge(addresses.bridges.erc20BridgeProxy));
-        console.log("SharedBridge updated with ERC20Bridge address");
-    }
-
-    function setL1NativeTokenVaultParams() internal {
-        IL1AssetRouter sharedBridge = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-        IL1Nullifier l1Nullifier = IL1Nullifier(addresses.bridges.l1NullifierProxy);
-        // Ownable ownable = Ownable(addresses.bridges.l1AssetRouterProxy);
-        vm.broadcast(msg.sender);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
-        vm.broadcast(msg.sender);
-        l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
-        vm.broadcast(msg.sender);
-        l1Nullifier.setL1AssetRouter(addresses.bridges.l1AssetRouterProxy);
-
-        vm.broadcast(msg.sender);
-        IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerEthToken();
-    }
-
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
@@ -344,6 +284,7 @@ contract DeployL1Script is Script, DeployUtils {
         ctm.setPendingAdmin(addresses.chainAdmin);
 
         IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
+        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -533,14 +474,18 @@ contract DeployL1Script is Script, DeployUtils {
         vm.serializeAddress(
             "root",
             "expected_rollup_l2_da_validator_addr",
-            getL2ValidatorAddress("RollupL2DAValidator")
+            calculateExpectedL2Address("RollupL2DAValidator")
         );
         vm.serializeAddress(
             "root",
             "expected_no_da_validium_l2_validator_addr",
-            getL2ValidatorAddress("ValidiumL2DAValidator")
+            calculateExpectedL2Address("ValidiumL2DAValidator")
         );
-        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getL2ValidatorAddress("AvailL2DAValidator"));
+        vm.serializeAddress(
+            "root",
+            "expected_avail_l2_da_validator_addr",
+            calculateExpectedL2Address("AvailL2DAValidator")
+        );
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);

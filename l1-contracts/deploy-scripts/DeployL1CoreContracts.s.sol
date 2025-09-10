@@ -14,7 +14,6 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -117,18 +116,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         initializeConfig(inputPath);
 
         instantiateCreate2Factory();
-        deployIfNeededMulticall3();
-
-        addresses.stateTransition.bytecodesSupplier = deploySimpleContract("BytecodesSupplier", false);
-
-        deployVerifiers();
-
-        (addresses.stateTransition.defaultUpgrade) = deploySimpleContract("DefaultUpgrade", false);
-        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
-        deployDAValidators();
-        (addresses.governance) = deploySimpleContract("Governance", false);
-        (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
-        addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
 
         // The single owner chainAdmin does not have a separate control restriction contract.
         // We set to it to zero explicitly so that it is clear to the reader.
@@ -141,13 +128,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             "L1MessageRoot",
             false
         );
-
-        (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
-
-        (
-            addresses.stateTransition.serverNotifierImplementation,
-            addresses.stateTransition.serverNotifierProxy
-        ) = deployServerNotifier();
 
         (addresses.bridges.l1NullifierImplementation, addresses.bridges.l1NullifierProxy) = deployTuppWithContract(
             "L1Nullifier",
@@ -189,89 +169,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         updateOwners();
 
         saveOutput(outputPath);
-    }
-
-    function deployIfNeededMulticall3() internal {
-        // Multicall3 is already deployed on public networks
-        if (MULTICALL3_ADDRESS.code.length == 0) {
-            address contractAddress = deployViaCreate2(type(Multicall3).creationCode, "");
-            console.log("Multicall3 deployed at:", contractAddress);
-            config.contracts.multicall3Addr = contractAddress;
-        } else {
-            config.contracts.multicall3Addr = MULTICALL3_ADDRESS;
-        }
-    }
-
-    function getL2ValidatorAddress(string memory contractName) internal returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
-    }
-
-    function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
-        return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
-    }
-
-    function deployVerifiers() internal {
-        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
-        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
-        (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
-    }
-
-    function deployDAValidators() internal {
-        addresses.daAddresses.rollupDAManager = deployWithCreate2AndOwner("RollupDAManager", msg.sender, false);
-        updateRollupDAManager();
-
-        // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
-        addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
-
-        addresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
-
-        if (config.contracts.availL1DAValidator == address(0)) {
-            addresses.daAddresses.availBridge = deploySimpleContract("DummyAvailBridge", false);
-            addresses.daAddresses.availL1DAValidator = deploySimpleContract("AvailL1DAValidator", false);
-        } else {
-            addresses.daAddresses.availL1DAValidator = config.contracts.availL1DAValidator;
-        }
-        vm.startBroadcast(msg.sender);
-        IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
-        rollupDAManager.updateDAPair(
-            addresses.daAddresses.l1RollupDAValidator,
-            getL2ValidatorAddress("RollupL2DAValidator"),
-            true
-        );
-        vm.stopBroadcast();
-    }
-
-    function updateRollupDAManager() internal virtual {
-        IOwnable rollupDAManager = IOwnable(addresses.daAddresses.rollupDAManager);
-        if (rollupDAManager.owner() != address(msg.sender)) {
-            if (rollupDAManager.pendingOwner() == address(msg.sender)) {
-                vm.broadcast(msg.sender);
-                rollupDAManager.acceptOwnership();
-            } else {
-                require(rollupDAManager.owner() == config.ownerAddress, "Ownership was not set correctly");
-            }
-        }
-    }
-
-    function deployDiamondProxy() internal {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: addresses.stateTransition.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        });
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: ""
-        });
-        address contractAddress = deployViaCreate2(
-            type(DiamondProxy).creationCode,
-            abi.encode(config.l1ChainId, diamondCut)
-        );
-        console.log("DiamondProxy deployed at:", contractAddress);
-        addresses.stateTransition.diamondProxy = contractAddress;
     }
 
     function setBridgehubParams() internal {
@@ -324,8 +221,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
             addresses.bridgehub.ctmDeploymentTrackerProxy
         );
         IOwnable(address(ctmDeploymentTracker)).transferOwnership(addresses.governance);
-
-        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         vm.stopBroadcast();
         console.log("Owners updated");
@@ -510,14 +405,18 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         vm.serializeAddress(
             "root",
             "expected_rollup_l2_da_validator_addr",
-            getL2ValidatorAddress("RollupL2DAValidator")
+            calculateExpectedL2Address("RollupL2DAValidator")
         );
         vm.serializeAddress(
             "root",
             "expected_no_da_validium_l2_validator_addr",
-            getL2ValidatorAddress("ValidiumL2DAValidator")
+            calculateExpectedL2Address("ValidiumL2DAValidator")
         );
-        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getL2ValidatorAddress("AvailL2DAValidator"));
+        vm.serializeAddress(
+            "root",
+            "expected_avail_l2_da_validator_addr",
+            calculateExpectedL2Address("AvailL2DAValidator")
+        );
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
@@ -557,74 +456,11 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         return (implementation, proxy);
     }
 
-    function deployServerNotifier() internal returns (address implementation, address proxy) {
-        // We will not store the address of the ProxyAdmin as it is trivial to query if needed.
-        address ecosystemProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.chainAdmin, false);
-
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin("ServerNotifier", ecosystemProxyAdmin, false);
-    }
-
-    function saveDiamondSelectors() public {
-        AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
-        GettersFacet gettersFacet = new GettersFacet();
-        MailboxFacet mailboxFacet = new MailboxFacet(1, 1);
-        ExecutorFacet executorFacet = new ExecutorFacet(1);
-        bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
-        bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);
-        bytes4[] memory mailboxFacetSelectors = Utils.getAllSelectors(address(mailboxFacet).code);
-        bytes4[] memory executorFacetSelectors = Utils.getAllSelectors(address(executorFacet).code);
-
-        string memory root = vm.projectRoot();
-        string memory outputPath = string.concat(root, "/script-out/diamond-selectors.toml");
-
-        bytes memory adminFacetSelectorsBytes = abi.encode(adminFacetSelectors);
-        bytes memory gettersFacetSelectorsBytes = abi.encode(gettersFacetSelectors);
-        bytes memory mailboxFacetSelectorsBytes = abi.encode(mailboxFacetSelectors);
-        bytes memory executorFacetSelectorsBytes = abi.encode(executorFacetSelectors);
-
-        vm.serializeBytes("diamond_selectors", "admin_facet_selectors", adminFacetSelectorsBytes);
-        vm.serializeBytes("diamond_selectors", "getters_facet_selectors", gettersFacetSelectorsBytes);
-        vm.serializeBytes("diamond_selectors", "mailbox_facet_selectors", mailboxFacetSelectorsBytes);
-        string memory toml = vm.serializeBytes(
-            "diamond_selectors",
-            "executor_facet_selectors",
-            executorFacetSelectorsBytes
-        );
-
-        vm.writeToml(toml, outputPath);
-    }
-
     /// @notice Get new facet cuts
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
-        // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
-        // If we start to use different selectors for Gateway, we should change this.
-        facetCuts = new FacetCut[](4);
-        facetCuts[0] = FacetCut({
-            facet: stateTransition.adminFacet,
-            action: Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        });
-        facetCuts[1] = FacetCut({
-            facet: stateTransition.gettersFacet,
-            action: Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
-        });
-        facetCuts[2] = FacetCut({
-            facet: stateTransition.mailboxFacet,
-            action: Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
-        });
-        facetCuts[3] = FacetCut({
-            facet: stateTransition.executorFacet,
-            action: Action.Add,
-            isFreezable: true,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
-        });
+        revert("not implemented");
     }
 
     ////////////////////////////// GetContract data  /////////////////////////////////
