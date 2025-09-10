@@ -649,7 +649,7 @@ One of the most expensive resource for a rollup is data availability, so in orde
 The contract provides two methods:
 
 - `publishCompressedBytecode` that verifies the correctness of the bytecode compression and publishes it in form of a message to the DA layer.
-- `verifyCompressedStateDiffs` that can verify the correctness of our standard state diff compression. This method can be used by common L2DAValidators and it is for instance utilized by the [RollupL2DAValidator](../../l2-contracts/contracts/data-availability/RollupL2DAValidator.sol).
+- `verifyCompressedStateDiffs` that can verify the correctness of our standard state diff compression. This method can be used by common L2DAValidators and it is for instance utilized by the [L2DAValidator](../../system-contracts/contracts/libraries/L2DAValidator.sol).
 
 You can read more about how custom DA is handled [here](../settlement_contracts/data_availability/custom_da.md).
 
