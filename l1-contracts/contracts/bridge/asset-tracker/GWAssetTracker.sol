@@ -135,7 +135,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
-    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external onlyServiceTransactionSender() {
+    function setLegacySharedBridgeAddress(
+        uint256 _chainId,
+        address _legacySharedBridgeAddress
+    ) external onlyServiceTransactionSender {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
     /*//////////////////////////////////////////////////////////////
@@ -255,8 +258,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             if (savedBalanceChange.tokenOriginChainId != _chainId) {
                 _decreaseChainBalance(_chainId, savedBalanceChange.assetId, savedBalanceChange.amount);
             } else {
-                _increaseTotalSupplyAcrossAllChains(savedBalanceChange.assetId, savedBalanceChange.tokenOriginChainId, savedBalanceChange.amount);
-            } 
+                _increaseTotalSupplyAcrossAllChains(
+                    savedBalanceChange.assetId,
+                    savedBalanceChange.tokenOriginChainId,
+                    savedBalanceChange.amount
+                );
+            }
         }
         /// Note the base token is never native to the chain as of V30.
         if (savedBalanceChange.baseTokenAmount > 0) {

@@ -2,8 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-import {L2DACommitmentScheme} from "../Constants.sol";
-
 /// @dev The log passed from L2
 /// @param l2ShardId The shard identifier, 0 - rollup, 1 - porter. All other values are not used but are reserved for the future
 /// @param isService A boolean flag that is part of the log along with `key`, `value`, and `sender` address.

@@ -90,11 +90,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _handleInitiateBridgingOnL2Inner(_assetId, _amount, _tokenOriginChainId);
     }
 
-    function _handleInitiateBridgingOnL2Inner(
-        bytes32 _assetId,
-        uint256 _amount,
-        uint256 _tokenOriginChainId
-    ) internal {
+    function _handleInitiateBridgingOnL2Inner(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) internal {
         if (_tokenOriginChainId == block.chainid) {
             // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
             totalSupplyAcrossAllChains[_assetId] += _amount;

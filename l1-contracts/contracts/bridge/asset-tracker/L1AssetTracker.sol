@@ -315,7 +315,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         }
         if (!_isChainMinter(_toChainId, _tokenOriginChainId)) {
             chainBalance[_toChainId][_assetId] += _amount;
-        } 
+        }
     }
 
     function _migrateTotalSupply(
