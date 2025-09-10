@@ -185,20 +185,20 @@ contract RegisterZKChainScript is Script {
 
         // These were added to zkstack tool recently (9th Sept 2025).
         // So doing this for backwards compatibility.
-        string memory raw = toml.readString("$.chain.validator_sender_operator_prove");
-        if (bytes(raw).length == 0) {
+        string memory raw_operator_prove = toml.readString("$.chain.validator_sender_operator_prove");
+        if (bytes(raw_operator_prove).length == 0) {
             // None → leave default value
             config.validatorSenderOperatorProve = address(0);
         } else {
-            config.validatorSenderOperatorProve = vm.parseAddress(raw);
+            config.validatorSenderOperatorProve = vm.parseAddress(raw_operator_prove);
         }
 
-        string memory raw = toml.readString("$.chain.validator_sender_operator_execute");
-        if (bytes(raw).length == 0) {
+        string memory raw_operator_execute = toml.readString("$.chain.validator_sender_operator_execute");
+        if (bytes(raw_operator_execute).length == 0) {
             // None → leave default value
             config.validatorSenderOperatorExecute = address(0);
         } else {
-            config.validatorSenderOperatorExecute = vm.parseAddress(raw);
+            config.validatorSenderOperatorExecute = vm.parseAddress(raw_operator_execute);
         }
 
         config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
