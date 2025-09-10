@@ -38,7 +38,7 @@ bridgehub_proxy_address = "0x236D1c3Ff32Bd0Ca26b72Af287E895627c0478cE"
 rollup_da_manager = "0xeb7c0daaddfb52afa05400b489e7497b271d6122"
 
 governance_security_council_address = "0xed04b1ac422251851a3EC953Ff4395e5c2443647"
-latest_protocol_version = 0x1d00000000
+latest_protocol_version = 0x1d00000001
 l1_bytecodes_supplier_addr = "0x662B8fE285BB3aab483e75Ec46136e01aaa154f9"
 protocol_upgrade_handler_proxy_address = "0x8f08627524aeD610192132A425D6b9C32a1727EF"
 
