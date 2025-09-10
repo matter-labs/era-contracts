@@ -65,6 +65,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
 import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
@@ -197,8 +198,8 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         }
     }
 
-    function getL2ValidatorAddress(string memory contractName) internal returns (address) {
-        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
+    function getRollupL2DACommitmentScheme() internal returns (L2DACommitmentScheme) {
+        return ROLLUP_L2_DA_COMMITMENT_SCHEME;
     }
 
     function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
@@ -228,11 +229,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         }
         vm.startBroadcast(msg.sender);
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
-        rollupDAManager.updateDAPair(
-            addresses.daAddresses.l1RollupDAValidator,
-            getL2ValidatorAddress("RollupL2DAValidator"),
-            true
-        );
+        rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true);
         vm.stopBroadcast();
     }
 
@@ -504,17 +501,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress(
-            "root",
-            "expected_rollup_l2_da_validator_addr",
-            getL2ValidatorAddress("RollupL2DAValidator")
-        );
-        vm.serializeAddress(
-            "root",
-            "expected_no_da_validium_l2_validator_addr",
-            getL2ValidatorAddress("ValidiumL2DAValidator")
-        );
-        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getL2ValidatorAddress("AvailL2DAValidator"));
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
