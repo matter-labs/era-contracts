@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {L2Log, L2Message} from "../libraries/Messaging.sol";
 import {IMessageVerification} from "../interfaces/IMessageVerification.sol";
-import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "../interfaces/IL1Messenger.sol";
+import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH} from "../Constants.sol";
 import {L1_MESSENGER_CONTRACT} from "../Constants.sol";
 error HashedLogIsDefault();
 
