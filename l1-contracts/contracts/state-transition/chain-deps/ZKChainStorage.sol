@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {PriorityQueue} from "../../state-transition/libraries/PriorityQueue.sol";
 import {PriorityTree} from "../../state-transition/libraries/PriorityTree.sol";
-import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @notice Indicates whether an upgrade is initiated and if yes what type
 /// @param None Upgrade is NOT initiated
@@ -160,7 +159,7 @@ struct ZKChainStorage {
     address l1DAValidator;
     /// @dev The address of the contract on L2 that is responsible for the data availability verification.
     /// This contract sends `l2DAValidatorOutputHash` to L1 via L2->L1 system log and it will routed to the `l1DAValidator` contract.
-    address __DEPRECATED_l2DAValidator;
+    address l2DAValidator;
     /// @dev the Asset Id of the baseToken
     bytes32 baseTokenAssetId;
     /// @dev If this ZKchain settles on this chain, then this is zero. Otherwise it is the address of the ZKchain that is a

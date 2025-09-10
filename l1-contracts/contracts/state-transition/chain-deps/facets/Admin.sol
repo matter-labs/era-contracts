@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment, L2DACommitmentScheme} from "../../../common/Config.sol";
+import {MAX_GAS_PER_TRANSACTION, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -14,8 +14,8 @@ import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, InvalidL2DACommitmentScheme, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
-import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidPubdataPricingMode, PriorityTxPubdataExceedsMaxPubDataPerBatch, NotAZKChain,  ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
+import {AlreadyMigrated, ContractNotDeployed, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, L2DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
@@ -154,34 +154,31 @@ contract AdminFacet is ZKChainBase, IAdmin {
         return address(ROLLUP_DA_MANAGER);
     }
 
-    /// @notice Sets the DA validator pair with the given values.
-    /// @param _l1DAValidator The address of the L1 DA validator.
-    /// @param _l2DACommitmentScheme The scheme of the L2 DA commitment.
-    /// @dev It does not check for these values to be non-zero, since when migrating to a new settlement
+    /// @notice Sets the DA validator pair with the given addresses.
+    /// @dev It does not check for these addresses to be non-zero, since when migrating to a new settlement
     /// layer, we set them to zero.
-    function _setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) internal {
+    function _setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) internal {
         emit NewL1DAValidator(s.l1DAValidator, _l1DAValidator);
-        emit NewL2DACommitmentScheme(s.l2DACommitmentScheme, _l2DACommitmentScheme);
+        emit NewL2DAValidator(s.l2DAValidator, _l2DAValidator);
 
         s.l1DAValidator = _l1DAValidator;
-        s.l2DACommitmentScheme = _l2DACommitmentScheme;
+        s.l2DAValidator = _l2DAValidator;
     }
 
     /// @inheritdoc IAdmin
-    function setDAValidatorPair(address _l1DAValidator, L2DACommitmentScheme _l2DACommitmentScheme) external onlyAdmin {
+    function setDAValidatorPair(address _l1DAValidator, address _l2DAValidator) external onlyAdmin {
         if (_l1DAValidator == address(0)) {
             revert L1DAValidatorAddressIsZero();
         }
-
-        if (_l2DACommitmentScheme == L2DACommitmentScheme.NONE) {
-            revert InvalidL2DACommitmentScheme(uint8(_l2DACommitmentScheme));
+        if (_l2DAValidator == address(0)) {
+            revert L2DAValidatorAddressIsZero();
         }
 
-        if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DACommitmentScheme)) {
+        if (s.isPermanentRollup && !ROLLUP_DA_MANAGER.isPairAllowed(_l1DAValidator, _l2DAValidator)) {
             revert InvalidDAForPermanentRollup();
         }
 
-        _setDAValidatorPair(_l1DAValidator, _l2DACommitmentScheme);
+        _setDAValidatorPair(_l1DAValidator, _l2DAValidator);
     }
 
     /// @inheritdoc IAdmin
@@ -190,7 +187,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
             revert AlreadyPermanentRollup();
         }
 
-        if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DACommitmentScheme)) {
+        if (!ROLLUP_DA_MANAGER.isPairAllowed(s.l1DAValidator, s.l2DAValidator)) {
             // The correct data availability pair should be set beforehand.
             revert InvalidDAForPermanentRollup();
         }
@@ -419,7 +416,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // Set the settlement to 0 - as this is the current settlement chain.
         s.settlementLayer = address(0);
 
-        _setDAValidatorPair(address(0), L2DACommitmentScheme.NONE);
+        _setDAValidatorPair(address(0), address(0));
 
         emit MigrationComplete();
     }

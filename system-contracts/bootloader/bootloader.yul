@@ -2857,7 +2857,7 @@ object "Bootloader" {
 
                 // First slot (only last 4 bytes) -- selector
                 mstore(ptr, {{PUBLISH_PUBDATA_SELECTOR}})
-                // Second slot is occupied by the option of L2 DA commitment scheme.
+                // Second slot is occupied by the address of the L2 DA validator.
                 // The operator can provide any one it wants. It will be the responsibility of the 
                 // L1Messenger system contract to send the corresponding log to L1.
                 // 
@@ -2866,7 +2866,7 @@ object "Bootloader" {
 
                 // Third slot -- length of pubdata
                 let len := mload(add(ptr, 96))
-                // 4 bytes for selector, 32 bytes for ABI-encoded L2 DA validation scheme option,
+                // 4 bytes for selector, 32 bytes for ABI-encoded L2 DA validator address,
                 // 32 bytes for array offset and 32 bytes for array length
                 let fullLen := add(len, 100)
 
