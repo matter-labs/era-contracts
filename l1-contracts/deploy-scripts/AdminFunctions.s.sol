@@ -360,16 +360,30 @@ contract AdminFunctions is Script {
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
-        address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
-        require(transactionFilterer != address(0), "Chain does not have a transaction filterer");
+        GatewayTransactionFilterer transactionFilterer = GatewayTransactionFilterer(
+            IGetters(chainInfo.diamondProxy).getTransactionFilterer()
+        );
+        require(address(transactionFilterer) != address(0), "Chain does not have a transaction filterer");
 
-        Call[] memory calls = new Call[](_grantees.length);
+        uint256 countWhitelistedSenders = 0;
         for (uint256 i = 0; i < _grantees.length; i++) {
-            calls[i] = Call({
-                target: transactionFilterer,
-                value: 0,
-                data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantees[i]))
-            });
+            if (!transactionFilterer.whitelistedSenders(_grantees[i])) {
+                countWhitelistedSenders++;
+            }
+        }
+
+        Call[] memory calls = new Call[](countWhitelistedSenders);
+
+        uint256 j = 0;
+        for (uint256 i = 0; i < _grantees.length; i++) {
+            if (!transactionFilterer.whitelistedSenders(_grantees[i])) {
+                calls[j] = Call({
+                    target: address(transactionFilterer),
+                    value: 0,
+                    data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantees[i]))
+                });
+                j++;
+            }
         }
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
@@ -801,7 +815,7 @@ contract AdminFunctions is Script {
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
         bytes memory data = abi.encode(_calls);
 
-        if (_shouldSend) {
+        if (_shouldSend && _calls.length > 0) {
             Utils.adminExecuteCalls(_admin, address(0), _calls);
         }
 

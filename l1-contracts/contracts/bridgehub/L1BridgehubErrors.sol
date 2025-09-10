@@ -32,6 +32,8 @@ error NotCurrentSL(uint256 settlementLayerChainId, uint256 blockChainId);
 error NotInGatewayMode();
 // 0xecb34449
 error NotL1(uint256 l1ChainId, uint256 blockChainId);
+// 0x8eb4fc01
+error NotL2();
 // 0x23295f0e
 error NotOwner(address sender, address owner);
 // 0x693cd3dc
@@ -44,11 +46,11 @@ error OnlyBridgehub(address msgSender, address bridgehub);
 error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
-// 0xa7a05e40
-error OnlyL2();
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x90c7cbf1
 error SLNotWhitelisted();
+// 0x36917565
+error SLHasDifferentCTM();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
