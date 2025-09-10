@@ -66,6 +66,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 
 import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
@@ -240,7 +241,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(
             addresses.daAddresses.l1RollupDAValidator,
-            getL2ValidatorAddress("RollupL2DAValidator"),
+            L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256,
             true
         );
         vm.stopBroadcast();

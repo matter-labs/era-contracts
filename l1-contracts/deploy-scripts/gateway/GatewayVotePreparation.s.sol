@@ -75,7 +75,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
 
     uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
-
     uint256 internal eraChainId;
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
@@ -91,7 +90,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
 
         addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
         refundRecipient = toml.readAddress("$.refund_recipient");
-
 
         eraChainId = toml.readUint("$.era_chain_id");
         gatewayChainId = toml.readUint("$.gateway_chain_id");
