@@ -139,7 +139,7 @@ contract DeployL1Script is Script, DeployUtils {
             IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
             rollupDAManager.updateDAPair(
                 addresses.daAddresses.l1RollupDAValidator,
-                L2DACommitmentScheme.BLOBS_AND_PUBDATA_KECCAK256,
+                getL2ValidatorAddress("RollupL2DAValidator"),
                 true
             );
             vm.stopBroadcast();
