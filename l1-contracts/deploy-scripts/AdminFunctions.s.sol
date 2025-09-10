@@ -50,19 +50,17 @@ contract AdminFunctions is Script {
     }
 
     // This function should be called by the owner to accept the admin role
-    function governanceAcceptOwner(address governor, address target, bool shouldSend) public {
+    function governanceAcceptOwner(address governor, address target) public {
         Ownable2Step adminContract = Ownable2Step(target);
         bytes memory _data = abi.encodeCall(adminContract.acceptOwnership, ());
-        if (shouldSend) {
-            Utils.executeUpgrade({
-                _governor: governor,
-                _salt: bytes32(0),
-                _target: target,
-                _data: _data,
-                _value: 0,
-                _delay: 0
-            });
-        }
+        Utils.executeUpgrade({
+            _governor: governor,
+            _salt: bytes32(0),
+            _target: target,
+            _data: _data,
+            _value: 0,
+            _delay: 0
+        });
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: target, value: 0, data: _data});
@@ -85,13 +83,13 @@ contract AdminFunctions is Script {
     }
 
     // This function should be called by the owner to accept the admin role
-    function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target, bool shouldSend) public {
+    function chainAdminAcceptAdmin(ChainAdmin chainAdmin, address target) public {
         IZKChain adminContract = IZKChain(target);
 
         Call[] memory calls = new Call[](1);
         calls[0] = Call({target: target, value: 0, data: abi.encodeCall(adminContract.acceptAdmin, ())});
 
-        saveAndSendAdminTx(address(chainAdmin), calls, shouldSend);
+        saveAndSendAdminTx(address(chainAdmin), calls, true);
     }
 
     // This function should be called by the owner to update token multiplier setter role
