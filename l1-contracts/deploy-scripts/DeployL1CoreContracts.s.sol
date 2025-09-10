@@ -505,17 +505,6 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress(
-            "root",
-            "expected_rollup_l2_da_validator_addr",
-            getL2ValidatorAddress("RollupL2DAValidator")
-        );
-        vm.serializeAddress(
-            "root",
-            "expected_no_da_validium_l2_validator_addr",
-            getL2ValidatorAddress("ValidiumL2DAValidator")
-        );
-        vm.serializeAddress("root", "expected_avail_l2_da_validator_addr", getL2ValidatorAddress("AvailL2DAValidator"));
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
