@@ -135,7 +135,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
-    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external {
+    function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external onlyServiceTransactionSender() {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
     /*//////////////////////////////////////////////////////////////
@@ -251,8 +251,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         /// because they were initiated when the chain settles on L1, however the failedDeposit L2->L1 message goes through GW.
         /// Here we do not need to decrement the chainBalance, since the chainBalance was added to the chain's chainBalance on L1,
         /// and never migrated to the GW's chainBalance, since it never increments the totalSupply since the L2 txs fails.
-        if (savedBalanceChange.amount > 0 && savedBalanceChange.tokenOriginChainId != _chainId) {
-            _decreaseChainBalance(_chainId, savedBalanceChange.assetId, savedBalanceChange.amount);
+        if (savedBalanceChange.amount > 0) {
+            if (savedBalanceChange.tokenOriginChainId != _chainId) {
+                _decreaseChainBalance(_chainId, savedBalanceChange.assetId, savedBalanceChange.amount);
+            } else {
+                _increaseTotalSupplyAcrossAllChains(savedBalanceChange.assetId, savedBalanceChange.tokenOriginChainId, savedBalanceChange.amount);
+            } 
         }
         /// Note the base token is never native to the chain as of V30.
         if (savedBalanceChange.baseTokenAmount > 0) {
@@ -415,9 +419,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _amount
     ) internal {
         if (_tokenOriginChainId == _sourceChainId) {
-            totalSupplyAcrossAllChains[_assetId] += _amount;
+            _increaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
         } else if (_tokenOriginChainId == _destinationChainId) {
-            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
         }
     }
 
@@ -446,31 +450,29 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             amount: chainBalance[_chainId][_assetId],
             migrationNumber: migrationNumber,
             originToken: originToken[_assetId],
-            isL1ToGateway: false
+            isL1ToGateway: false,
+            totalSupplyAcrossAllChains: totalSupplyAcrossAllChains[_assetId]
         });
 
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata data) external {
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external {
         //onlyServiceTransactionSender {
-        assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
-        if (data.isL1ToGateway) {
+        assetMigrationNumber[_data.chainId][_data.assetId] = _data.migrationNumber;
+        if (_data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
-            chainBalance[data.chainId][data.assetId] += data.amount;
-            totalSupplyAcrossAllChains[data.assetId] += data.amount;
+            chainBalance[_data.chainId][_data.assetId] += _data.amount;
+            if (_data.chainId == _data.tokenOriginChainId) {
+                totalSupplyAcrossAllChains[_data.assetId] = _data.totalSupplyAcrossAllChains;
+            }
         } else {
-            require(data.amount == chainBalance[data.chainId][data.assetId], InvalidAmount());
-            chainBalance[data.chainId][data.assetId] = 0;
-            _decreaseTotalSupplyAcrossAllChains(data.assetId, data.amount);
+            require(_data.amount == chainBalance[_data.chainId][_data.assetId], InvalidAmount());
+            chainBalance[_data.chainId][_data.assetId] = 0;
+            if (_data.chainId == _data.tokenOriginChainId) {
+                totalSupplyAcrossAllChains[_data.assetId] = 0;
+            }
         }
-    }
-
-    function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {
-        // slither-disable-next-line unused-return
-        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data)
-        );
     }
 
     /*//////////////////////////////////////////////////////////////

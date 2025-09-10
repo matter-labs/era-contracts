@@ -87,6 +87,14 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) public onlyL2NativeTokenVault {
+        _handleInitiateBridgingOnL2Inner(_assetId, _amount, _tokenOriginChainId);
+    }
+
+    function _handleInitiateBridgingOnL2Inner(
+        bytes32 _assetId,
+        uint256 _amount,
+        uint256 _tokenOriginChainId
+    ) internal {
         if (_tokenOriginChainId == block.chainid) {
             // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
             totalSupplyAcrossAllChains[_assetId] += _amount;
@@ -112,7 +120,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         bytes32 baseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
         /// Note the tokenOriginChainId, might not be the L1 chain Id, but the base token is bridged from L1,
         /// and we only use the token origin chain id to increase the totalSupplyAcrossAllChains.
-        handleInitiateBridgingOnL2(baseTokenAssetId, _amount, L1_CHAIN_ID);
+        _handleInitiateBridgingOnL2Inner(baseTokenAssetId, _amount, L1_CHAIN_ID);
     }
 
     function handleFinalizeBridgingOnL2(
@@ -212,7 +220,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             amount: amount,
             migrationNumber: migrationNumber,
             originToken: originalToken,
-            isL1ToGateway: true
+            isL1ToGateway: true,
+            totalSupplyAcrossAllChains: 0
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }

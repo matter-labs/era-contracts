@@ -124,11 +124,45 @@ abstract contract AssetTrackerBase is
         chainBalance[_chainId][_assetId] -= _amount;
     }
 
-    function _decreaseTotalSupplyAcrossAllChains(bytes32 _assetId, uint256 _amount) internal {
+    function _increaseTotalSupplyAcrossAllChains(
+        bytes32 _assetId,
+        uint256 _tokenOriginChainId,
+        uint256 _amount
+    ) internal {
+        if (!_tokenOriginChainIdOnSettlementLayer(_tokenOriginChainId)) {
+            /// We only track the total supply on the origin chain's settlement layer.
+            return;
+        }
+        totalSupplyAcrossAllChains[_assetId] += _amount;
+    }
+
+    function _decreaseTotalSupplyAcrossAllChains(
+        bytes32 _assetId,
+        uint256 _tokenOriginChainId,
+        uint256 _amount
+    ) internal {
+        if (!_tokenOriginChainIdOnSettlementLayer(_tokenOriginChainId)) {
+            /// We only track the total supply on the origin chain's settlement layer.
+            return;
+        }
         if (totalSupplyAcrossAllChains[_assetId] < _amount) {
             revert InsufficientTotalSupply(_assetId, _amount);
         }
         totalSupplyAcrossAllChains[_assetId] -= _amount;
+    }
+
+    function _tokenOriginChainIdOnSettlementLayer(uint256 _tokenOriginChainId) internal view returns (bool) {
+        if (_bridgehub().settlementLayer(_tokenOriginChainId) != block.chainid) {
+            return false;
+        }
+        return true;
+    }
+
+    function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {
+        // slither-disable-next-line unused-return
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data)
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -129,9 +129,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // inside our ecosystem increases.
         // 3. (Skipped) Since the token moves between non-origin chains, the totalSupplyAcrossAllChains remains unchanged.
         if (_tokenOriginChainId == _chainId) {
-            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
         } else if (_tokenOriginChainId == block.chainid) {
-            totalSupplyAcrossAllChains[_assetId] += _amount;
+            _increaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
         }
         if (_tokenOriginChainId != _chainId) {
             chainBalance[chainToUpdate][_assetId] += _amount;
@@ -168,9 +168,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _tokenOriginChainId
     ) external onlyNativeTokenVault {
         if (_tokenOriginChainId == _chainId) {
-            totalSupplyAcrossAllChains[_assetId] += _amount;
+            _increaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
         } else if (_tokenOriginChainId == block.chainid) {
-            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
+            _decreaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
         }
 
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
@@ -257,6 +257,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 require(data.tokenOriginChainId == L1_CHAIN_ID, InvalidOriginChainId());
                 require(BRIDGE_HUB.baseTokenAssetId(data.chainId) == data.assetId, InvalidBaseTokenAssetId());
             }
+            data.totalSupplyAcrossAllChains = totalSupplyAcrossAllChains[data.assetId];
 
             fromChainId = data.chainId;
             toChainId = currentSettlementLayer;
@@ -283,6 +284,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _amount: data.amount,
             _tokenOriginChainId: data.tokenOriginChainId
         });
+        _migrateTotalSupply({
+            _migratingChainId: data.chainId,
+            _assetId: data.assetId,
+            _tokenOriginChainId: data.tokenOriginChainId,
+            _migrationTotalSupply: data.totalSupplyAcrossAllChains,
+            _isL1ToGateway: data.isL1ToGateway
+        });
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
 
         /// We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
@@ -304,15 +312,25 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     ) internal {
         if (!_isChainMinter(_fromChainId, _tokenOriginChainId)) {
             _decreaseChainBalance(_fromChainId, _assetId, _amount);
-        } else {
-            /// if the source chain is a minter, we are increasing the totalSupply.
-            totalSupplyAcrossAllChains[_assetId] += _amount;
         }
         if (!_isChainMinter(_toChainId, _tokenOriginChainId)) {
             chainBalance[_toChainId][_assetId] += _amount;
-        } else {
-            /// If the destination chain is a minter, we are decreasing the totalSupply.
-            _decreaseTotalSupplyAcrossAllChains(_assetId, _amount);
+        } 
+    }
+
+    function _migrateTotalSupply(
+        uint256 _migratingChainId,
+        bytes32 _assetId,
+        uint256 _tokenOriginChainId,
+        uint256 _migrationTotalSupply,
+        bool _isL1ToGateway
+    ) internal {
+        if (_migratingChainId == _tokenOriginChainId) {
+            if (_isL1ToGateway) {
+                totalSupplyAcrossAllChains[_assetId] = 0;
+            } else {
+                totalSupplyAcrossAllChains[_assetId] = _migrationTotalSupply;
+            }
         }
     }
 
