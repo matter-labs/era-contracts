@@ -192,7 +192,7 @@ contract RegisterCTM is Script, DeployUtils {
         IGovernance.Operation memory operation = IGovernance.Operation({
             calls: calls,
             predecessor: bytes32(0),
-            salt: bytes32(13)
+            salt: bytes32(uint256(13))
         });
 
         if (shouldSend) {
