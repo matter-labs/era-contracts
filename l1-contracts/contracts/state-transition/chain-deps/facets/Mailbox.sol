@@ -6,7 +6,6 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
-import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
@@ -317,7 +316,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
         }
-        if (IChainTypeManager(s.chainTypeManager).getZKChain(_chainId) != msg.sender) {
+        if (IBridgehub(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
 
