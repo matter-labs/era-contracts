@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT
 
-import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/data-availability/StateDiffL2DAValidator.sol";
+pragma solidity ^0.8.28;
 
-import {L2ContractHelper} from "contracts/L2ContractHelper.sol";
+import {L2_TO_L1_LOG_SERIALIZE_SIZE} from "contracts/Constants.sol";
+import {Utils} from "contracts/libraries/Utils.sol";
 
 /// @notice The contract that is used in testing to compose the pubdata needed for the
 /// state diff DA validator.
@@ -46,17 +47,17 @@ contract TestStateDiffComposer {
         }
     }
 
-    function appendBytecode(bytes memory bytecode, bool includeToArray, bool includeToCorrectHash) public {
+    function appendBytecode(bytes calldata bytecode, bool includeToArray, bool includeToCorrectHash) public {
         if (includeToArray) {
             ++bytecodesNumber;
             bytecodes = bytes.concat(bytecodes, bytes4(uint32(bytecode.length)), bytecode);
             currentRollingBytecodesHash = keccak256(
-                abi.encode(currentRollingBytecodesHash, L2ContractHelper.hashL2Bytecode(bytecode))
+                abi.encode(currentRollingBytecodesHash, Utils.hashL2Bytecode(bytecode))
             );
         }
         if (includeToCorrectHash) {
             correctRollingBytecodesHash = keccak256(
-                abi.encode(correctRollingBytecodesHash, L2ContractHelper.hashL2Bytecode(bytecode))
+                abi.encode(correctRollingBytecodesHash, Utils.hashL2Bytecode(bytecode))
             );
         }
     }
@@ -79,7 +80,8 @@ contract TestStateDiffComposer {
         uncomressedStateDiffsPart = abi.encodePacked(_numberOfStateDiffs, _stateDiffs);
     }
 
-    function getTotalPubdata() public returns (bytes memory _totalPubdata) {
+    function getTotalPubdata() public view returns (bytes memory _totalPubdata) {
+        // solhint-disable-next-line func-named-parameters
         _totalPubdata = abi.encodePacked(
             uint32(logsNumber),
             logs,
@@ -91,7 +93,7 @@ contract TestStateDiffComposer {
         );
     }
 
-    function generateTotalStateDiffsAndPubdata() public returns (bytes memory _totalL2ToL1PubdataAndStateDiffs) {
+    function generateTotalStateDiffsAndPubdata() public view returns (bytes memory _totalL2ToL1PubdataAndStateDiffs) {
         _totalL2ToL1PubdataAndStateDiffs = abi.encodePacked(getTotalPubdata(), uncomressedStateDiffsPart);
     }
 }
