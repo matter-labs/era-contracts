@@ -36,7 +36,6 @@ import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployCTM} from "deploy-scripts/DeployCTM.s.sol";
 
 library L2UtilsBase {
     using stdToml for string;

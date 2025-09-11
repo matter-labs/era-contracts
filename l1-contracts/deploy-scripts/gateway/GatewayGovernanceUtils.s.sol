@@ -47,7 +47,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
-import {DeployCTM} from "../DeployCTM.s.sol";
+import {DeployCTMScript} from "../DeployCTM.s.sol";
 
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
