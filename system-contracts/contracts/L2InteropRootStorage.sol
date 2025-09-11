@@ -9,6 +9,16 @@ error SidesLengthNotOne();
 error InteropRootAlreadyExists();
 error MessageRootIsZero();
 
+/// @param chainId The chain ID of the chain that the message root is for.
+/// @param @param blockOrBatchNumber The block or batch number of the message root. Either of block number or batch number will be used,
+/// depends on finality form of interop.
+/// @param sides The message root sides. Note, that `sides` here are coming from `DynamicIncrementalMerkle` nomenclature.
+struct InteropRoot {
+    uint256 chainId;
+    uint256 blockOrBatchNumber;
+    bytes32[] sides;
+}
+
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
@@ -33,6 +43,25 @@ contract L2InteropRootStorage is SystemContractBase {
         uint256 blockOrBatchNumber,
         bytes32[] calldata sides
     ) external onlyCallFromBootloader {
+        _addInteropRoot(chainId, blockOrBatchNumber, sides);
+    }
+
+    /// @dev Adds a group of interop roots to the L2InteropRootStorage contract.
+    /// @param interopRootsInput The array of interop roots. See the description above.
+    function addInteropRootsInBatch(InteropRoot[] calldata interopRootsInput) external onlyCallFromBootloader {
+        unchecked {
+            uint256 amountOfRoots = interopRootsInput.length;
+            for (uint256 i; i < amountOfRoots; ++i) {
+                _addInteropRoot(
+                    interopRootsInput[i].chainId,
+                    interopRootsInput[i].blockOrBatchNumber,
+                    interopRootsInput[i].sides
+                );
+            }
+        }
+    }
+
+    function _addInteropRoot(uint256 chainId, uint256 blockOrBatchNumber, bytes32[] calldata sides) private {
         // In the current code sides should only contain the Interop Root itself, as mentioned above.
         if (sides.length != 1) {
             revert SidesLengthNotOne();
