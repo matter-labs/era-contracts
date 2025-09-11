@@ -11,12 +11,15 @@ import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
@@ -77,6 +80,11 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
         addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
 
+        (
+            addresses.bridgehub.chainAssetHandlerImplementation,
+            addresses.bridgehub.chainAssetHandlerProxy
+        ) = deployTuppWithContract("ChainAssetHandler", false);
+
         upgradeConfig.ecosystemContractsDeployed = true;
     }
 
@@ -86,15 +94,6 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract("AdminFacet");
         gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
-    }
-
-    function deployUpgradeSpecificContractsL1() internal override {
-        super.deployUpgradeSpecificContractsL1();
-
-        (
-            addresses.bridgehub.chainAssetHandlerImplementation,
-            addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
     }
 
     /// @notice Get facet cuts that should be removed
@@ -117,14 +116,15 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
 
     /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
     function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](6);
+        Call[][] memory allCalls = new Call[][](7);
 
         allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
         allCalls[1] = prepareCheckMigrationsPausedCalls();
         allCalls[2] = prepareUpgradeProxiesCalls();
         allCalls[3] = prepareNewChainCreationParamsCall();
         allCalls[4] = provideSetNewVersionUpgradeCall();
-        allCalls[5] = prepareGatewaySpecificStage1GovernanceCalls();
+        allCalls[5] = prepareSetChainAssetHandlerOnBridgehubCall();
+        allCalls[6] = prepareGatewaySpecificStage1GovernanceCalls();
 
         calls = mergeCallsArray(allCalls);
     }
@@ -137,6 +137,15 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
             addresses.bridgehub.messageRootProxy,
             addresses.bridgehub.messageRootImplementation
         );
+    }
+
+    function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: addresses.bridgehub.bridgehubProxy,
+            data: abi.encodeCall(Bridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
+            value: 0
+        });
     }
 
     function prepareGatewaySpecificStage1GovernanceCalls() public override returns (Call[] memory calls) {
@@ -203,6 +212,25 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
             upgradeTimestamp: 0,
             newProtocolVersion: getNewProtocolVersion()
         });
+    }
+
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
+        if (compareStrings(contractName, "ChainAssetHandler")) {
+            if (!isZKBytecode) {
+                return abi.encodeCall(ChainAssetHandler.initialize, (config.ownerAddress));
+            } else {
+                return
+                    abi.encodeCall(
+                        ChainAssetHandler.initialize,
+                        AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress)
+                    );
+            }
+        } else {
+            return super.getInitializeCalldata(contractName, isZKBytecode);
+        }
     }
 
     /// @notice Build empty L1 -> L2 upgrade tx
