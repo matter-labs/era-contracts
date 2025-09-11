@@ -1317,6 +1317,25 @@ library Utils {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 
+    function getProxyAdmin(address _proxyAddr) internal view returns (address proxyAdmin) {
+        // the constant is the proxy admin storage slot
+        proxyAdmin = address(
+            uint160(
+                uint256(
+                    vm.load(_proxyAddr, bytes32(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103))
+                )
+            )
+        );
+    }
+
+    // EIP-1967 implementation slot
+    bytes32 internal constant IMPLEMENTATION_SLOT = bytes32(uint256(keccak256("eip1967.proxy.implementation")) - 1);
+
+    function getImplementation(address proxy) internal view returns (address) {
+        bytes32 value = vm.load(proxy, IMPLEMENTATION_SLOT); // Foundry cheatcode
+        return address(uint160(uint256(value)));
+    }
+
     // add this to be excluded from coverage report
     function test() internal {}
 }

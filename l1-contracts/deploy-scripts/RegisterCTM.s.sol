@@ -146,7 +146,6 @@ contract RegisterCTM is Script, DeployUtils {
         inputPathIfEcosystemDeployedLocally = string.concat(root, inputPathIfEcosystemDeployedLocally);
 
         initializeConfig(inputPath);
-        initializeConfigIfEcosystemDeployedLocally(inputPathIfEcosystemDeployedLocally);
 
         registerChainTypeManager(outputPath, shouldSend);
     }
@@ -157,7 +156,6 @@ contract RegisterCTM is Script, DeployUtils {
         outputPath = string.concat(root, outputPath);
 
         initializeConfig(inputPath);
-        initializeConfigIfEcosystemDeployedLocally(outputPath);
 
         registerChainTypeManagerForTest();
     }
