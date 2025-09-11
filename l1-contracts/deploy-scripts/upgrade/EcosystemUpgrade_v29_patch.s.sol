@@ -29,6 +29,8 @@ import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol"
 contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
+    bool prepareNewChainCreationParams = false;
+
     function run() public virtual override {
         initialize(
             vm.envString("V29_PATCH_UPGRADE_ECOSYSTEM_INPUT"),
@@ -96,6 +98,32 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
     }
 
+    /// @notice Get new facet cuts
+    function getFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal override returns (FacetCut[] memory facetCuts) {
+        // If we are preparing new chain creation params, we need to use all facets. For upgrading a chain, we only specify the new ones
+        if (prepareNewChainCreationParams) {
+            return super.getFacetCuts(stateTransition);
+        } else {
+            // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
+            // If we start to use different selectors for Gateway, we should change this.
+            facetCuts = new FacetCut[](2);
+            facetCuts[0] = FacetCut({
+                facet: stateTransition.adminFacet,
+                action: Action.Add,
+                isFreezable: false,
+                selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+            });
+            facetCuts[1] = FacetCut({
+                facet: stateTransition.mailboxFacet,
+                action: Action.Add,
+                isFreezable: true,
+                selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+            });
+        }
+    }
+
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal override returns (Diamond.FacetCut[] memory facetCuts) {
         // Remove the old MailboxFacet
@@ -139,6 +167,12 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         );
     }
 
+    function prepareNewChainCreationParamsCall() public override returns (Call[] memory calls) {
+        prepareNewChainCreationParams = true;
+        calls = super.prepareNewChainCreationParamsCall();
+        prepareNewChainCreationParams = false;
+    }
+
     function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
@@ -161,6 +195,15 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         allCalls[1] = prepareNewChainCreationParamsCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = mergeCallsArray(allCalls);
+    }
+
+    function prepareNewChainCreationParamsCallForGateway(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public override returns (Call[] memory calls) {
+        prepareNewChainCreationParams = true;
+        calls = super.prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
+        prepareNewChainCreationParams = false;
     }
 
     // Tests patch upgrade by upgrading a chain and deploying a new one
