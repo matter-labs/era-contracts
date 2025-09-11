@@ -34,7 +34,7 @@ contract L2InteropRootStorage is SystemContractBase {
     mapping(uint256 chainId => mapping(uint256 blockOrBatchNumber => bytes32 interopRoot)) public interopRoots;
 
     /// @dev Adds a message root to the L2InteropRootStorage contract.
-    /// @param interopRoot The interop roots. See the description of the corresponding struct.
+    /// @param interopRoot The interop root to be added. See the description of the corresponding struct.
     function addInteropRoot(InteropRoot calldata interopRoot) external onlyCallFromBootloader {
         _addInteropRoot(interopRoot.chainId, interopRoot.blockOrBatchNumber, interopRoot.sides);
     }
