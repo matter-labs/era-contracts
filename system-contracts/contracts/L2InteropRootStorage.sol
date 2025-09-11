@@ -10,7 +10,7 @@ error InteropRootAlreadyExists();
 error MessageRootIsZero();
 
 /// @param chainId The chain ID of the chain that the message root is for.
-/// @param @param blockOrBatchNumber The block or batch number of the message root. Either of block number or batch number will be used,
+/// @param blockOrBatchNumber The block or batch number of the message root. Either of block number or batch number will be used,
 /// depends on finality form of interop.
 /// @param sides The message root sides. Note, that `sides` here are coming from `DynamicIncrementalMerkle` nomenclature.
 struct InteropRoot {
