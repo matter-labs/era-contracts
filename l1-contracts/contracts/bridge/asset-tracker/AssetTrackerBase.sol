@@ -6,7 +6,9 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
 import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
-import {L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+
+import {L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
@@ -15,6 +17,7 @@ import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {InsufficientChainBalance, InsufficientTotalSupply} from "./AssetTrackerErrors.sol";
+import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
 abstract contract AssetTrackerBase is
     IAssetTrackerBase,
@@ -121,11 +124,45 @@ abstract contract AssetTrackerBase is
         chainBalance[_chainId][_assetId] -= _amount;
     }
 
-    function _decreaseTotalSupplyAcrossAllChains(bytes32 _assetId, uint256 _amount) internal {
+    function _increaseTotalSupplyAcrossAllChains(
+        bytes32 _assetId,
+        uint256 _tokenOriginChainId,
+        uint256 _amount
+    ) internal {
+        if (!_tokenOriginChainIdOnSettlementLayer(_tokenOriginChainId)) {
+            /// We only track the total supply on the origin chain's settlement layer.
+            return;
+        }
+        totalSupplyAcrossAllChains[_assetId] += _amount;
+    }
+
+    function _decreaseTotalSupplyAcrossAllChains(
+        bytes32 _assetId,
+        uint256 _tokenOriginChainId,
+        uint256 _amount
+    ) internal {
+        if (!_tokenOriginChainIdOnSettlementLayer(_tokenOriginChainId)) {
+            /// We only track the total supply on the origin chain's settlement layer.
+            return;
+        }
         if (totalSupplyAcrossAllChains[_assetId] < _amount) {
             revert InsufficientTotalSupply(_assetId, _amount);
         }
         totalSupplyAcrossAllChains[_assetId] -= _amount;
+    }
+
+    function _tokenOriginChainIdOnSettlementLayer(uint256 _tokenOriginChainId) internal view returns (bool) {
+        if (_bridgehub().settlementLayer(_tokenOriginChainId) != block.chainid) {
+            return false;
+        }
+        return true;
+    }
+
+    function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {
+        // slither-disable-next-line unused-return
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data)
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

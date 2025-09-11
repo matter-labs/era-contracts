@@ -203,7 +203,15 @@ contract ExecutorTest is UtilsTest {
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
         address assetTracker = makeAddr("assetTracker");
-        chainAssetHandler = new ChainAssetHandler(l1ChainID, owner, IBridgehub(address(dummyBridgehub)), address(sharedBridge), address(assetTracker), messageRoot, address(0));
+        chainAssetHandler = new ChainAssetHandler(
+            l1ChainID,
+            owner,
+            IBridgehub(address(dummyBridgehub)),
+            address(sharedBridge),
+            address(assetTracker),
+            messageRoot,
+            address(0)
+        );
         dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));

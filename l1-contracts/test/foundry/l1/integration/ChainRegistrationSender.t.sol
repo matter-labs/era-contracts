@@ -30,7 +30,13 @@ import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {CHAIN_REGISTRATION_SENDER_ENCODING_VERSION} from "contracts/bridgehub/ChainRegistrationSender.sol";
 
-contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
+contract ChainRegistrationSenderTests is
+    L1ContractDeployer,
+    ZKChainDeployer,
+    TokenDeployer,
+    L2TxMocker,
+    ConfigSemaphore
+{
     using stdStorage for StdStorage;
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;

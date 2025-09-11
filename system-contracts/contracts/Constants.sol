@@ -217,5 +217,17 @@ uint8 constant EVM_BYTECODE_FLAG = 2;
 
 address constant SERVICE_CALL_PSEUDO_CALLER = 0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF;
 
+/// @dev Pubdata commitment scheme used for DA.
+/// @param NONE Invalid option.
+/// @param EMPTY_NO_DA No DA commitment, used by Validiums.
+/// @param PUBDATA_KECCAK256 Keccak of stateDiffHash and keccak(pubdata). Can be used by custom DA solutions.
+/// @param BLOBS_AND_PUBDATA_KECCAK256 This commitment includes EIP-4844 blobs data. Used by default RollupL1DAValidator.
+enum L2DACommitmentScheme {
+    NONE,
+    EMPTY_NO_DA,
+    PUBDATA_KECCAK256,
+    BLOBS_AND_PUBDATA_KECCAK256
+}
+
 /// @dev The metadata version that is supported by the ZK Chains to prove that an L2->L1 log was included in a batch.
 uint256 constant SUPPORTED_PROOF_METADATA_VERSION = 1;
