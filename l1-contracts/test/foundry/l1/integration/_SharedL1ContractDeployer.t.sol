@@ -44,7 +44,7 @@ contract L1ContractDeployer is Test {
 
     function registerCTM() public {
         registerCTMScript = new RegisterCTM();
-        registerCTMScript.runForTest();
+        registerCTMScript.runForTest(addresses.bridgehubProxyAddress, address(addresses.chainTypeManager));
     }
 
     function _deployL1Contracts() internal {
@@ -65,7 +65,7 @@ contract L1ContractDeployer is Test {
 
         deployEcosystem();
         l1Script = new DeployL1IntegrationScript();
-        l1Script.runForTest();
+        l1Script.runForTest(addresses.bridgehubProxyAddress);
         registerCTM();
 
         addresses.ecosystemAddresses = l1Script.getAddresses();

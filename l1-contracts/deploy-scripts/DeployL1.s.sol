@@ -55,9 +55,8 @@ contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
 
     function run() public virtual {
-        console.log("Deploying L1 contracts");
-
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml", address(0), false);
+        // Had to leave the function due to scripts that inherit this one
+        revert("run(): must call runWithBridgehub(bridgehub, reuseGovAndAdmin)");
     }
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
@@ -71,8 +70,8 @@ contract DeployL1Script is Script, DeployUtils {
         );
     }
 
-    function runForTest() public {
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), address(0), false);
+    function runForTest(address bridgehub) public {
+        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), bridgehub, false);
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
