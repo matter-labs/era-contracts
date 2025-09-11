@@ -131,7 +131,7 @@ jobs:
             exit 1
           fi
 
-          echo "bridgehub=$BRIDGEHUB" >> "$GITHUB_OUTPUT"
+          echo "BRIDGEHUB=$BRIDGEHUB" >> $GITHUB_ENV
 
       - name: Run DeployL1 script with bridgehub
         working-directory: ./l1-contracts
