@@ -37,14 +37,15 @@ contract L1ContractDeployer is Test {
 
     AllAddresses public addresses;
 
-    function deployEcosystem() public {
+    function deployEcosystem() public returns (DeployedAddresses memory addresses) {
         l1CoreContractsScript = new DeployL1CoreContractsIntegrationScript();
         l1CoreContractsScript.runForTest();
+        addresses = l1CoreContractsScript.getAddresses();
     }
 
-    function registerCTM() public {
+    function registerCTM(address bridgehub, address ctm) public {
         registerCTMScript = new RegisterCTM();
-        registerCTMScript.runForTest(addresses.bridgehubProxyAddress, address(addresses.chainTypeManager));
+        registerCTMScript.runForTest(bridgehub, ctm);
     }
 
     function _deployL1Contracts() internal {
@@ -63,12 +64,15 @@ contract L1ContractDeployer is Test {
             "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml"
         );
 
-        deployEcosystem();
+        DeployedAddresses memory coreContractsAddresses = deployEcosystem();
         l1Script = new DeployL1IntegrationScript();
-        l1Script.runForTest(addresses.bridgehubProxyAddress);
-        registerCTM();
-
+        l1Script.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy);
         addresses.ecosystemAddresses = l1Script.getAddresses();
+        registerCTM(
+            addresses.ecosystemAddresses.bridgehub.bridgehubProxy,
+            addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy
+        );
+
         ecosystemConfig = l1Script.getConfig();
 
         addresses.bridgehub = Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);

@@ -55,8 +55,8 @@ contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
 
     function run() public virtual {
-        // Had to leave the function due to scripts that inherit this one
-        revert("run(): must call runWithBridgehub(bridgehub, reuseGovAndAdmin)");
+        // Had to leave the function due to scripts that inherit this one, as well as for tests
+        return ();
     }
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
@@ -71,6 +71,7 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function runForTest(address bridgehub) public {
+        saveDiamondSelectors();
         runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), bridgehub, false);
     }
 
