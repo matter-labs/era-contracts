@@ -51,7 +51,7 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-contract DeployL1Script is Script, DeployUtils {
+contract DeployCTM is Script, DeployUtils {
     using stdToml for string;
 
     function run() public virtual {
@@ -60,7 +60,7 @@ contract DeployL1Script is Script, DeployUtils {
     }
 
     function runWithBridgehub(address bridgehub, bool reuseGovAndAdmin) public {
-        console.log("Deploying L1 contracts");
+        console.log("Deploying CTM related contracts");
 
         runInner(
             "/script-config/config-deploy-l1.toml",

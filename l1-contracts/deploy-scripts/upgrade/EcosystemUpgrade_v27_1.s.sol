@@ -67,9 +67,9 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
-import {DeployL1Script} from "../DeployL1.s.sol";
+import {DeployCTM} from "../DeployCTM.s.sol";
 
-contract EcosystemUpgrade_v27_1 is Script, DeployL1Script {
+contract EcosystemUpgrade_v27_1 is Script, DeployCTM {
     using stdToml for string;
 
     bytes internal oldEncodedChainCreationParams;

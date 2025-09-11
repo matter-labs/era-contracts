@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
 
 import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1CoreContractsIntegration.s.sol";
-import {DeployL1IntegrationScript} from "./deploy-scripts/DeployL1Integration.s.sol";
+import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.s.sol";
 import {RegisterCTM} from "deploy-scripts/RegisterCTM.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -19,7 +19,7 @@ contract L1ContractDeployer is Test {
     using stdStorage for StdStorage;
 
     DeployL1CoreContractsIntegrationScript l1CoreContractsScript;
-    DeployL1IntegrationScript l1Script;
+    DeployCTMIntegrationScript ctmScript;
     RegisterCTM registerCTMScript;
     struct AllAddresses {
         DeployedAddresses ecosystemAddresses;
@@ -65,15 +65,15 @@ contract L1ContractDeployer is Test {
         );
 
         DeployedAddresses memory coreContractsAddresses = deployEcosystem();
-        l1Script = new DeployL1IntegrationScript();
-        l1Script.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy);
-        addresses.ecosystemAddresses = l1Script.getAddresses();
+        ctmScript = new DeployCTMIntegrationScript();
+        ctmScript.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy);
+        addresses.ecosystemAddresses = ctmScript.getAddresses();
         registerCTM(
             addresses.ecosystemAddresses.bridgehub.bridgehubProxy,
             addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy
         );
 
-        ecosystemConfig = l1Script.getConfig();
+        ecosystemConfig = ctmScript.getConfig();
 
         addresses.bridgehub = Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
         addresses.chainTypeManager = IChainTypeManager(

@@ -121,7 +121,7 @@ jobs:
           # Extract bridgehub_proxy_addr allowing leading whitespace
           BRIDGEHUB=$(
             sed -nE 's/^[[:space:]]*bridgehub_proxy_addr[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' \
-              ./script-out/output-deploy-l1-core-contracts.toml | head -n1
+              ./script-out/output-deploy-l1.toml | head -n1
           )
 
           echo "Parsed bridgehub_proxy_addr: $BRIDGEHUB"
@@ -133,10 +133,10 @@ jobs:
 
           echo "BRIDGEHUB=$BRIDGEHUB" >> $GITHUB_ENV
 
-      - name: Run DeployL1 script with bridgehub
+      - name: Run DeployCTM script with bridgehub
         working-directory: ./l1-contracts
         run: |
-          forge script ./deploy-scripts/DeployL1.s.sol \
+          forge script ./deploy-scripts/DeployCTM.s.sol \
             --ffi \
             --rpc-url $ANVIL_RPC_URL \
             --broadcast \

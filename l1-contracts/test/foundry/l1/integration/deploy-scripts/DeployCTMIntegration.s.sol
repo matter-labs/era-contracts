@@ -6,10 +6,10 @@ pragma solidity 0.8.28;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {DeployCTM} from "deploy-scripts/DeployCTM.s.sol";
 import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
-contract DeployL1IntegrationScript is Script, DeployL1Script {
+contract DeployCTMIntegrationScript is Script, DeployCTM {
     using stdToml for string;
 
     function test() internal virtual override {}

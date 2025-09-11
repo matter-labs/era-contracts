@@ -79,11 +79,11 @@ import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-import {DeployL1Script} from "../DeployL1.s.sol";
+import {DeployCTM} from "../DeployCTM.s.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract EcosystemUpgrade_v28 is Script, DeployL1Script {
+contract EcosystemUpgrade_v28 is Script, DeployCTM {
     using stdToml for string;
 
     /**
@@ -532,9 +532,9 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
         return
             Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), // the same as it is currently in the DeployL1.s.sol. Todo unify.
+                bytes32(0), // the same as it is currently in the DeployCTM.s.sol. Todo unify.
                 getL2BytecodeHash(contractName),
-                hex"" // the same as it is currently in DeployL1.s.sol
+                hex"" // the same as it is currently in DeployCTM.s.sol
             );
     }
 

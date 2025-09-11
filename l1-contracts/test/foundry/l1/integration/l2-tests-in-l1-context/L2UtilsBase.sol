@@ -31,12 +31,12 @@ import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/
 
 import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
-import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
+import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {DeployCTM} from "deploy-scripts/DeployCTM.s.sol";
 
 library L2UtilsBase {
     using stdToml for string;
