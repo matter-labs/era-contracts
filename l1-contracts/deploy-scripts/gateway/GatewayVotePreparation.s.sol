@@ -47,7 +47,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
-import {DeployCTM} from "../DeployCTM.s.sol";
+import {DeployCTMScript} from "../DeployCTM.s.sol";
 
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
@@ -59,7 +59,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-contract GatewayVotePreparation is DeployCTM, GatewayGovernanceUtils {
+contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
     using stdToml for string;
 
     struct GatewayCTMOutput {
