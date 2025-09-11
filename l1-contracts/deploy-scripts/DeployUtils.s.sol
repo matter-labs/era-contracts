@@ -257,6 +257,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
+    function getFullFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual returns (FacetCut[] memory facetCuts);
+
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (FacetCut[] memory facetCuts);
