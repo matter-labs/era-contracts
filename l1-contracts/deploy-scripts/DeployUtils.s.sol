@@ -12,8 +12,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
-
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -186,67 +186,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
         }
 
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
-    }
-
-    function initializeConfigIfEcosystemDeployedLocally(string memory configPath) internal virtual {
-        string memory toml = vm.readFile(configPath);
-
-        // Bridgehub Related
-        addresses.bridgehub.bridgehubImplementation = toml.readAddress(
-            ".deployed_addresses.bridgehub.bridgehub_implementation_addr"
-        );
-        addresses.bridgehub.bridgehubProxy = toml.readAddress(".deployed_addresses.bridgehub.bridgehub_proxy_addr");
-        addresses.bridgehub.ctmDeploymentTrackerImplementation = toml.readAddress(
-            ".deployed_addresses.bridgehub.ctm_deployment_tracker_implementation_addr"
-        );
-        addresses.bridgehub.ctmDeploymentTrackerProxy = toml.readAddress(
-            ".deployed_addresses.bridgehub.ctm_deployment_tracker_proxy_addr"
-        );
-        addresses.bridgehub.chainAssetHandlerImplementation = toml.readAddress(
-            ".deployed_addresses.bridgehub.chain_asset_handler_implementation_addr"
-        );
-        addresses.bridgehub.chainAssetHandlerProxy = toml.readAddress(
-            ".deployed_addresses.bridgehub.chain_asset_handler_proxy_addr"
-        );
-        addresses.bridgehub.messageRootImplementation = toml.readAddress(
-            ".deployed_addresses.bridgehub.message_root_implementation_addr"
-        );
-        addresses.bridgehub.messageRootProxy = toml.readAddress(
-            ".deployed_addresses.bridgehub.message_root_proxy_addr"
-        );
-
-        // Bridges
-        addresses.bridges.erc20BridgeImplementation = toml.readAddress(
-            ".deployed_addresses.bridges.erc20_bridge_implementation_addr"
-        );
-        addresses.bridges.erc20BridgeProxy = toml.readAddress(".deployed_addresses.bridges.erc20_bridge_proxy_addr");
-        addresses.bridges.l1NullifierImplementation = toml.readAddress(
-            ".deployed_addresses.bridges.l1_nullifier_implementation_addr"
-        );
-        addresses.bridges.l1NullifierProxy = toml.readAddress(".deployed_addresses.bridges.l1_nullifier_proxy_addr");
-        addresses.bridges.l1AssetRouterImplementation = toml.readAddress(
-            ".deployed_addresses.bridges.shared_bridge_implementation_addr"
-        );
-        addresses.bridges.l1AssetRouterProxy = toml.readAddress(".deployed_addresses.bridges.shared_bridge_proxy_addr");
-
-        // Other Important Deployed Addresses
-        addresses.governance = toml.readAddress(".deployed_addresses.governance_addr");
-        addresses.transparentProxyAdmin = toml.readAddress(".deployed_addresses.transparent_proxy_admin_addr");
-        addresses.chainAdmin = toml.readAddress(".deployed_addresses.chain_admin");
-        addresses.daAddresses.rollupDAManager = toml.readAddress(".deployed_addresses.l1_rollup_da_manager");
-        addresses.daAddresses.l1RollupDAValidator = toml.readAddress(".deployed_addresses.rollup_l1_da_validator_addr");
-        addresses.daAddresses.noDAValidiumL1DAValidator = toml.readAddress(
-            ".deployed_addresses.no_da_validium_l1_validator_addr"
-        );
-        addresses.daAddresses.availL1DAValidator = toml.readAddress(".deployed_addresses.avail_l1_da_validator_addr");
-        addresses.vaults.l1NativeTokenVaultProxy = toml.readAddress(".deployed_addresses.native_token_vault_addr");
-        config.contracts.multicall3Addr = toml.readAddress(".multicall3_addr");
-
-        if (vm.keyExistsToml(toml, "$.deployed_addresses.state_transition.state_transition_proxy_addr")) {
-            addresses.stateTransition.chainTypeManagerProxy = toml.readAddress(
-                ".deployed_addresses.state_transition.state_transition_proxy_addr"
-            );
-        }
     }
 
     function deployStateTransitionDiamondFacets() internal {
@@ -539,6 +478,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }
+    }
+
+    function calculateExpectedL2Address(string memory contractName) internal returns (address) {
+        return Utils.getL2AddressViaCreate2Factory(bytes32(0), getL2BytecodeHash(contractName), hex"");
+    }
+
+    function getL2BytecodeHash(string memory contractName) public view virtual returns (bytes32) {
+        return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
     }
 
     function getInitializeCalldata(
