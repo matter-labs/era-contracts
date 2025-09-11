@@ -29,8 +29,6 @@ import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol"
 contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
-    bool prepareNewChainCreationParams = false;
-
     function run() public virtual override {
         initialize(
             vm.envString("V29_1_UPGRADE_ECOSYSTEM_INPUT"),
@@ -102,26 +100,21 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override returns (FacetCut[] memory facetCuts) {
-        // If we are preparing new chain creation params, we need to use all facets. For upgrading a chain, we only specify the new ones
-        if (prepareNewChainCreationParams) {
-            return super.getFacetCuts(stateTransition);
-        } else {
-            // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
-            // If we start to use different selectors for Gateway, we should change this.
-            facetCuts = new FacetCut[](2);
-            facetCuts[0] = FacetCut({
-                facet: stateTransition.adminFacet,
-                action: Action.Add,
-                isFreezable: false,
-                selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-            });
-            facetCuts[1] = FacetCut({
-                facet: stateTransition.mailboxFacet,
-                action: Action.Add,
-                isFreezable: true,
-                selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
-            });
-        }
+        // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
+        // If we start to use different selectors for Gateway, we should change this.
+        facetCuts = new FacetCut[](2);
+        facetCuts[0] = FacetCut({
+            facet: stateTransition.adminFacet,
+            action: Action.Add,
+            isFreezable: false,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
+        });
+        facetCuts[1] = FacetCut({
+            facet: stateTransition.mailboxFacet,
+            action: Action.Add,
+            isFreezable: true,
+            selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
+        });
     }
 
     /// @notice Get facet cuts that should be removed
@@ -167,12 +160,6 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         );
     }
 
-    function prepareNewChainCreationParamsCall() public override returns (Call[] memory calls) {
-        prepareNewChainCreationParams = true;
-        calls = super.prepareNewChainCreationParamsCall();
-        prepareNewChainCreationParams = false;
-    }
-
     function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
@@ -197,15 +184,6 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         calls = mergeCallsArray(allCalls);
     }
 
-    function prepareNewChainCreationParamsCallForGateway(
-        uint256 l2GasLimit,
-        uint256 l1GasPrice
-    ) public override returns (Call[] memory calls) {
-        prepareNewChainCreationParams = true;
-        calls = super.prepareNewChainCreationParamsCallForGateway(l2GasLimit, l1GasPrice);
-        prepareNewChainCreationParams = false;
-    }
-
     // Tests patch upgrade by upgrading a chain and deploying a new one
     function prepareTestCalls() public virtual returns (Call[] memory calls) {
         Call[][] memory testCalls = new Call[][](1);
@@ -215,25 +193,6 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
 
         string memory testCallsSerialized = vm.serializeBytes("governance_calls", "test_calls", abi.encode(calls));
         vm.writeToml(testCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
-    }
-
-    function prepareTestUpgradeChainCall() public returns (Call[] memory calls) {
-        calls = new Call[](1);
-
-        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
-            config.gatewayChainId
-        );
-        uint256 oldProtocolVersion = getOldProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
-
-        address admin = IZKChain(chainDiamondProxyAddress).getAdmin();
-        console.log("Chain admin:", admin);
-
-        calls[0] = Call({
-            target: chainDiamondProxyAddress,
-            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
-            value: 0
-        });
     }
 
     function getProposedUpgrade(
@@ -276,56 +235,24 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         }
     }
 
-    /// @notice Build empty L1 -> L2 upgrade tx
-    function _composeEmptyUpgradeTx() internal virtual returns (L2CanonicalTransaction memory transaction) {
-        transaction = L2CanonicalTransaction({
-            txType: 0,
-            from: uint256(0),
-            to: uint256(0),
-            gasLimit: 0,
-            gasPerPubdataByteLimit: 0,
-            maxFeePerGas: 0,
-            maxPriorityFeePerGas: 0,
-            paymaster: uint256(uint160(address(0))),
-            nonce: 0,
-            value: 0,
-            reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
-            data: new bytes(0),
-            signature: new bytes(0),
-            factoryDeps: new uint256[](0),
-            paymasterInput: new bytes(0),
-            // Reserved dynamic type for the future use-case. Using it should be avoided,
-            // But it is still here, just in case we want to enable some additional functionality
-            reservedDynamic: new bytes(0)
-        });
-    }
+    ////////////////////////////// Test utils /////////////////////////////////
 
-    /////////////////////////// Blockchain interactions ////////////////////////////
+    function prepareTestUpgradeChainCall() public returns (Call[] memory calls) {
+        calls = new Call[](1);
 
-    function publishBytecodes() public override {
-        bytes[] memory allDeps = getFullListOfFactoryDependencies();
-        uint256[] memory factoryDeps = new uint256[](allDeps.length);
-        require(factoryDeps.length <= 64, "Too many deps");
-
-        BytecodePublisher.publishBytecodesInBatches(
-            BytecodesSupplier(addresses.stateTransition.bytecodesSupplier),
-            allDeps
+        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+            config.gatewayChainId
         );
+        uint256 oldProtocolVersion = getOldProtocolVersion();
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
 
-        for (uint256 i = 0; i < allDeps.length; i++) {
-            bytes32 bytecodeHash = L2ContractHelper.hashL2Bytecode(allDeps[i]);
-            factoryDeps[i] = uint256(bytecodeHash);
-            isHashInFactoryDeps[bytecodeHash] = true;
-        }
+        address admin = IZKChain(chainDiamondProxyAddress).getAdmin();
+        console.log("Chain admin:", admin);
 
-        // This check is removed as we set these hashes to bytes32(0), given that this is a patch upgrade
-        // Double check for consistency:
-        // require(bytes32(factoryDeps[0]) == config.contracts.bootloaderHash, "bootloader hash factory dep mismatch");
-        // require(bytes32(factoryDeps[1]) == config.contracts.defaultAAHash, "default aa hash factory dep mismatch");
-        // require(bytes32(factoryDeps[2]) == config.contracts.evmEmulatorHash, "EVM emulator hash factory dep mismatch");
-
-        factoryDepsHashes = factoryDeps;
-
-        upgradeConfig.factoryDepsPublished = true;
+        calls[0] = Call({
+            target: chainDiamondProxyAddress,
+            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+            value: 0
+        });
     }
 }
