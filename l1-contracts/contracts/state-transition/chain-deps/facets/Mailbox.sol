@@ -34,7 +34,6 @@ import {IMessageVerification, MessageVerification} from "../../../common/Message
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVault} from "../../../bridge/ntv/INativeTokenVault.sol";
-import {IBridgedStandardToken} from "../../../bridge/BridgedStandardERC20.sol";
 import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
 import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../../bridgehub/IMessageRoot.sol";
 
@@ -331,13 +330,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
             (assetId, amount) = (assetTracker.consumeBalanceChange(s.chainId, _chainId));
             uint256 tokenOriginChainId = nativeTokenVault.originChainId(assetId);
-            address originToken;
-            address tokenAddress = nativeTokenVault.tokenAddress(assetId);
-            if (tokenOriginChainId == block.chainid) {
-                originToken = tokenAddress;
-            } else {
-                originToken = IBridgedStandardToken(tokenAddress).originToken();
-            }
+            address originToken = nativeTokenVault.originToken(assetId);
             balanceChange = BalanceChange({
                 version: BALANCE_CHANGE_VERSION,
                 baseTokenAssetId: bytes32(0),

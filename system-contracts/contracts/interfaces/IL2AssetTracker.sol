@@ -8,7 +8,7 @@ pragma solidity ^0.8.20;
  * @notice The interface for the L2AssetTracker contract
  */
 interface IL2AssetTracker {
-    function setAddresses(uint256 _l1ChainId) external;
+    function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external;
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external;
 

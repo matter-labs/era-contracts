@@ -112,7 +112,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.etch(GW_ASSET_TRACKER_ADDR, gwAssetTrackerAddress.code);
         gwAssetTracker = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2AssetTracker.setAddresses(block.chainid);
+        l2AssetTracker.setAddresses(block.chainid, bytes32(0));
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         gwAssetTracker.setAddresses(block.chainid);
 

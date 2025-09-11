@@ -98,6 +98,15 @@ abstract contract NativeTokenVault is
 
     function _assetTracker() internal view virtual returns (IAssetTrackerBase);
 
+    function originToken(bytes32 _assetId) public view virtual returns (address) {
+        address token = tokenAddress[_assetId];
+        if (originChainId[_assetId] == block.chainid) {
+            return token;
+        } else {
+            return IBridgedStandardToken(token).originToken();
+        }
+    }
+
     /// @inheritdoc INativeTokenVault
     function registerToken(address _nativeToken) external virtual {
         _registerToken(_nativeToken);

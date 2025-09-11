@@ -12,6 +12,9 @@ struct ZKChainSpecificForceDeploymentsData {
     /// needed to deploy weth token in case it is not present
     string baseTokenName;
     string baseTokenSymbol;
+    uint256 baseTokenOriginChainId;
+    /// The address of the base token on the origin chain.
+    address baseTokenOriginAddress;
 }
 
 /// @notice The structure that describes force deployments that are the same for each chain.

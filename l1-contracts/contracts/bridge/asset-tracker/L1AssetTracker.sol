@@ -254,8 +254,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             if (data.originToken != address(0)) {
                 DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
             } else {
-                require(data.tokenOriginChainId == L1_CHAIN_ID, InvalidOriginChainId());
+                /// This is only the case for the base token, as we don't store the base tokens origin chain id on the L2.
+                require(data.tokenOriginChainId == 0, InvalidOriginChainId());
                 require(BRIDGE_HUB.baseTokenAssetId(data.chainId) == data.assetId, InvalidBaseTokenAssetId());
+                data.tokenOriginChainId = NATIVE_TOKEN_VAULT.originChainId(data.assetId);
             }
             data.totalSupplyAcrossAllChains = totalSupplyAcrossAllChains[data.assetId];
 
@@ -345,7 +347,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
-        bool success = MESSAGE_ROOT.proveL1DepositParamsInclusion(_finalizeWithdrawalParams, L2_ASSET_TRACKER_ADDR);
+        require(_finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR, InvalidSender());
+        bool success = MESSAGE_ROOT.proveL1DepositParamsInclusion(_finalizeWithdrawalParams);
         if (!success) {
             revert InvalidProof();
         }

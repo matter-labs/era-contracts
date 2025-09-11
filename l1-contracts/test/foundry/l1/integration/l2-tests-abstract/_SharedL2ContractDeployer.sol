@@ -165,7 +165,6 @@ abstract contract SharedL2ContractDeployer is UtilsTest, DeployIntegrationUtils 
             abi.encodeWithSelector(IBridgehub.baseToken.selector, ERA_CHAIN_ID + 1),
             abi.encode(address(uint160(1)))
         );
-
         vm.prank(L2_BRIDGEHUB_ADDR);
         mockDiamondInitInteropCenterCallsWithAddress(L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR);
         uint256 currentChainId = block.chainid;

@@ -13,6 +13,8 @@ import {L2WrappedBaseTokenStore} from "../bridge/L2WrappedBaseTokenStore.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
+import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
+import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 
 /// @title L1FixedForceDeploymentsHelper
 /// @author Matter Labs
@@ -69,6 +71,9 @@ abstract contract L1FixedForceDeploymentsHelper {
             }
         }
 
+        INativeTokenVault nativeTokenVault = IL1AssetRouter(sharedBridge).nativeTokenVault();
+        bytes32 baseTokenAssetId = s.baseTokenAssetId;
+
         ZKChainSpecificForceDeploymentsData
             memory additionalForceDeploymentsData = ZKChainSpecificForceDeploymentsData({
                 baseTokenAssetId: s.baseTokenAssetId,
@@ -76,7 +81,9 @@ abstract contract L1FixedForceDeploymentsHelper {
                 predeployedL2WethAddress: l2WBaseToken,
                 baseTokenL1Address: _baseTokenAddress,
                 baseTokenName: baseTokenName,
-                baseTokenSymbol: baseTokenSymbol
+                baseTokenSymbol: baseTokenSymbol,
+                baseTokenOriginChainId: nativeTokenVault.originChainId(baseTokenAssetId),
+                baseTokenOriginAddress: nativeTokenVault.originToken(baseTokenAssetId)
             });
         return abi.encode(additionalForceDeploymentsData);
     }

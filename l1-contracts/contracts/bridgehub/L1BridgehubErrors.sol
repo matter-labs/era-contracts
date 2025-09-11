@@ -74,14 +74,20 @@ error OnlyGateway();
 error OnlyL1();
 // 0xa7a05e40
 error OnlyL2();
+// 0x605d6b86
+error OnlyL2MessageRoot();
 // 0x52013f4d
 error OnlyOnGateway();
+// 0x6b75db8c
+error OnlyOnSettlementLayer();
 // 0x26d10385
 error OnlyPreV30Chain(uint256 chainId);
 // 0x94072c53
 error PreviousChainBatchRootNotSet(uint256 chainId, uint256 batchNumber);
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
+// 0x36917565
+error SLHasDifferentCTM();
 // 0x90c7cbf1
 error SLNotWhitelisted();
 // 0x8732442d
@@ -94,8 +100,6 @@ error V30UpgradeChainBatchNumberAlreadySet();
 error V30UpgradeChainBatchNumberNotSet();
 // 0x29bc3a3c
 error V30UpgradeGatewayBlockNumberAlreadySet();
-// 0x36917565
-error SLHasDifferentCTM();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06

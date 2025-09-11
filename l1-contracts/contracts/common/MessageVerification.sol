@@ -160,12 +160,11 @@ abstract contract MessageVerification is IMessageVerification {
     }
 
     function proveL1DepositParamsInclusion(
-        FinalizeL1DepositParams calldata _finalizeWithdrawalParams,
-        address _sender
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) public view returns (bool success) {
         L2Message memory l2ToL1Message = L2Message({
             txNumberInBatch: _finalizeWithdrawalParams.l2TxNumberInBatch,
-            sender: _sender,
+            sender: _finalizeWithdrawalParams.l2Sender,
             data: _finalizeWithdrawalParams.message
         });
 
