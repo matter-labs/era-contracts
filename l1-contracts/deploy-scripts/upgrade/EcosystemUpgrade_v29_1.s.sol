@@ -25,16 +25,16 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
-/// @notice Script used for v29 stage patch
-contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
+/// @notice Script used for v29.1 stage patch
+contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     bool prepareNewChainCreationParams = false;
 
     function run() public virtual override {
         initialize(
-            vm.envString("V29_PATCH_UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("V29_PATCH_UPGRADE_ECOSYSTEM_OUTPUT")
+            vm.envString("V29_1_UPGRADE_ECOSYSTEM_INPUT"),
+            vm.envString("V29_1_UPGRADE_ECOSYSTEM_OUTPUT")
         );
 
         prepareEcosystemUpgrade();
@@ -51,7 +51,7 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         addresses.stateTransition.executorFacet = toml.readAddress("$.state_transition.executor_facet_addr");
         addresses.stateTransition.genesisUpgrade = toml.readAddress("$.state_transition.genesis_upgrade_addr");
         addresses.stateTransition.gettersFacet = toml.readAddress("$.state_transition.getters_facet_addr");
-        addresses.stateTransition.verifier = toml.readAddress("$.state_transition.verifier_addr");
+        //addresses.stateTransition.verifier = toml.readAddress("$.state_transition.verifier_addr");
 
         gatewayConfig.gatewayStateTransition.diamondInit = toml.readAddress(
             "$.gateway.gateway_state_transition.diamond_init_addr"
@@ -65,9 +65,9 @@ contract EcosystemUpgrade_v29_patch is Script, DefaultEcosystemUpgrade {
         gatewayConfig.gatewayStateTransition.gettersFacet = toml.readAddress(
             "$.gateway.gateway_state_transition.getters_facet_addr"
         );
-        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
+        /* gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
             "$.gateway.gateway_state_transition.verifier_addr"
-        );
+        ) */
     }
 
     function deployNewEcosystemContractsL1() public override {
