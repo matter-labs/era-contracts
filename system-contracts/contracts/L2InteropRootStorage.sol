@@ -39,6 +39,7 @@ contract L2InteropRootStorage is SystemContractBase {
     /// @dev This interface is preserved now so that enabling pre-commit interop later requires no changes in interface.
     /// @dev In proof-based and pre-commit interop, `blockOrBatchNumber` represents the block number, in commit-based interop,
     /// it represents the batch number. This distinction reflects the implementation requirements  of each interop finality form.
+    /// @dev Note: should be removed in the next protocol version.
     /// @param chainId The chain ID of the chain that the message root is for.
     /// @param blockOrBatchNumber The block or batch number of the message root. Either of block number or batch number will be used,
     /// depends on finality form of interop, mentioned above.
