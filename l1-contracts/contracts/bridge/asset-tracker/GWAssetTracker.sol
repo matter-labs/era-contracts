@@ -464,8 +464,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external {
-        //onlyServiceTransactionSender {
+    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
         assetMigrationNumber[_data.chainId][_data.assetId] = _data.migrationNumber;
         if (_data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.

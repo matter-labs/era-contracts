@@ -10,10 +10,9 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "./IBridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
-import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, SLHasDifferentCTM, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
@@ -37,9 +36,6 @@ contract ChainAssetHandler is
     AssetHandlerModifiers
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
-
-    /// @notice the asset id of Eth. This is only used on L1.
-    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
     /// @notice The chain id of the L1.
     uint256 internal immutable L1_CHAIN_ID;
@@ -117,10 +113,6 @@ contract ChainAssetHandler is
         MESSAGE_ROOT = _messageRoot;
         ASSET_TRACKER = _assetTracker;
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
-        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
-        // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
-        // We will change this with interop.
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
     }
 

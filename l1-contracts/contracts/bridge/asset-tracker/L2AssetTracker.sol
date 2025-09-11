@@ -12,7 +12,7 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {AssetIdNotRegistered, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, TokenBalanceNotMigratedToGateway, MissingBaseTokenAssetId} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IBridgedStandardToken} from "../BridgedStandardERC20.sol";
@@ -157,14 +157,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
         bytes32 baseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
-        if (baseTokenAssetId == bytes32(0)) {
-            /// this means we are before the genesis upgrade, where we don't transfer value, so we can skip.
-            /// if we don't skip we use incorrect asset id.
-            return;
-        }
         if (_amount == 0) {
             return;
         }
+        if (baseTokenAssetId == bytes32(0)) {
+            /// this means we are before the genesis upgrade, where we don't transfer value, so we can skip.
+            /// if we don't skip we use incorrect asset id.
+            revert MissingBaseTokenAssetId();
+        }
+
         _handleFinalizeBridgingOnL2Inner(
             baseTokenAssetId,
             _amount,
@@ -205,6 +206,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 amount = IERC20(tokenAddress).totalSupply();
             } else {
                 amount = totalSupply.amount;
+                /// We save the total supply for later use just in case.
+                savedTotalSupply[migrationNumber][_assetId] = SavedTotalSupply({isSaved: true, amount: amount});
             }
         }
 
@@ -222,8 +225,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
-    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external {
-        //onlyServiceTransactionSender {
+    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external onlyServiceTransactionSender {
         assetMigrationNumber[block.chainid][data.assetId] = data.migrationNumber;
     }
 

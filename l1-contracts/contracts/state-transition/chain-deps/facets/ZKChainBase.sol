@@ -103,6 +103,7 @@ contract ZKChainBase is ReentrancyGuard {
             /// For registering chains in the L2Bridgehub. This is used for interop initiation.
             msg.sender != bridgehub.chainRegistrationSender() &&
             /// For sending the token balance migration confirmation txs to L2s and the Gateway.
+            /// confirmMigrationOnL2, confirmMigrationOnGateway.
             msg.sender != address(s.assetTracker) &&
             /// 1. For setting the legacy shared bridge in the L2Asset Tracker.
             /// 2. Also for sending the demarcation txs for token balance migration. It might be deleted.
