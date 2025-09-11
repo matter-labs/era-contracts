@@ -40,7 +40,7 @@ contract L2InteropRootStorage is SystemContractBase {
     }
 
     /// @dev Adds a group of interop roots to the L2InteropRootStorage contract.
-    /// @param interopRootsInput The array of interop roots to be added. See the description above.
+    /// @param interopRootsInput The array of interop roots to be added. See the description of the corresponding struct above.
     function addInteropRootsInBatch(InteropRoot[] calldata interopRootsInput) external onlyCallFromBootloader {
         unchecked {
             uint256 amountOfRoots = interopRootsInput.length;
