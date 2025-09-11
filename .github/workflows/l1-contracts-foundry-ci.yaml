@@ -118,8 +118,8 @@ jobs:
         id: read-bridgehub
         working-directory: ./l1-contracts
         run: |
-          BRIDGEHUB=$(dasel -f ./script-out/output-deploy-l1-core-contracts.toml -r toml 'deployed_addresses.bridgehub.bridgehub_proxy_addr')
-          echo "bridgehub=$BRIDGEHUB" >> $GITHUB_OUTPUT
+          BRIDGEHUB=$(grep -E '^bridgehub_proxy_addr' ./script-out/output-deploy-l1-core-contracts.toml | sed -E 's/.*= *"([^"]+)".*/\1/')
+          echo "bridgehub=$BRIDGEHUB" >> "$GITHUB_OUTPUT"
 
       - name: Run DeployL1 script with bridgehub
         working-directory: ./l1-contracts
@@ -129,7 +129,7 @@ jobs:
             --rpc-url $ANVIL_RPC_URL \
             --broadcast \
             --private-key $ANVIL_PRIVATE_KEY \
-            --sig "runWithBridgehub(address,bool)" "${{ steps.read-bridgehub.outputs.bridgehub }}" false \
+            --sig "runWithBridgehub(address,bool)" $BRIDGEHUB false \
             --skip '*/l1-contracts/contracts/*'
 
       - name: Run DeployErc20 script
