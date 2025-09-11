@@ -351,6 +351,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
         FeeParams memory feeParams = getFeeParams();
 
         require(stateTransition.verifier != address(0), "verifier is zero");
+        require(config.contracts.bootloaderHash != bytes32(0), "bootloader hash is zero");
+        require(config.contracts.defaultAAHash != bytes32(0), "default aa hash is zero");
+        require(config.contracts.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
 
         return
             DiamondInitializeDataNewChain({
