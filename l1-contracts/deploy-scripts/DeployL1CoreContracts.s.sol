@@ -43,7 +43,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
     function run() public virtual {
         console.log("Deploying L1 contracts");
 
-        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1-core-contracts.toml");
+        runInner("/script-config/config-deploy-l1.toml", "/script-out/output-deploy-l1.toml");
     }
 
     function runForTest() public {
