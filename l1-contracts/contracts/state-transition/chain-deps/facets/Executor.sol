@@ -10,7 +10,7 @@ import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET
 import {BatchDecoder} from "../../libraries/BatchDecoder.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {UnsafeBytes} from "../../../common/libraries/UnsafeBytes.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BOOTLOADER_ADDRESS, GW_ASSET_TRACKER, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, PACKED_L2_BLOCK_TIMESTAMP_MASK} from "../../../common/Config.sol";
@@ -25,7 +25,6 @@ import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, Inva
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {InteropRoot, L2Log} from "../../../common/Messaging.sol";
-import {IL2AssetTracker} from "../../../bridge/asset-tracker/IL2AssetTracker.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -651,8 +650,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                     chainBatchRoot: batchesData[i].l2LogsTreeRoot,
                     messageRoot: messageRoots[i]
                 });
-                IL2AssetTracker assetTracker = IL2AssetTracker(s.assetTracker);
-                assetTracker.processLogsAndMessages(processLogsInput);
+                GW_ASSET_TRACKER.processLogsAndMessages(processLogsInput);
             }
         } else {
             uint256 batchesDataLength = batchesData.length;

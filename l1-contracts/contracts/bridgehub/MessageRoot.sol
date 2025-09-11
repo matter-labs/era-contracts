@@ -9,11 +9,11 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, GENESIS_CHAIN_BATCH_ROOT, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, NotL2, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, PreviousChainBatchRootNotSet, LocallyNoChainsAtGenesis, OnlyGateway} from "./L1BridgehubErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, NotL2, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, PreviousChainBatchRootNotSet, LocallyNoChainsAtGenesis, OnlyGateway} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
-import {L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
@@ -68,9 +68,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @dev We store these values for message verification on L1 and Gateway.
     /// @dev We only update the chainTree on GW as of V30.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
-
-    /// @notice The address of the asset tracker.
-    address public assetTracker;
 
     /// @notice The mapping storing the batch number at the moment the chain was updated to V30. 
     /// Starting from this batch, if a settlement layer has agreed to a proof, it will be held accountable for the content of the message, e.g.
@@ -127,7 +124,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// except for PreV30 chains, which can add it directly.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
         if (block.chainid != L1_CHAIN_ID) {
-            if (msg.sender == assetTracker) {
+            if (msg.sender == GW_ASSET_TRACKER_ADDR) {
                 // this case is valid.
             } else if (v30UpgradeChainBatchNumber[_chainId] != 0) {
                 address chain = BRIDGE_HUB.getZKChain(_chainId);
@@ -139,7 +136,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
                 require(BRIDGE_HUB.chainTypeManager(_chainId) == eraVmChainTypeManager, OnlyChain(msg.sender, chain));
                 require(minor < 30, OnlyPreV30Chain(_chainId));
             } else {
-                revert OnlyAssetTracker(msg.sender, assetTracker);
+                revert OnlyAssetTracker(msg.sender, GW_ASSET_TRACKER_ADDR);
             }
         } else {
             if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
@@ -324,10 +321,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             );
         }
         v30UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
-    }
-
-    function setAddresses(address _assetTracker) external onlyBridgehubOwner {
-        assetTracker = _assetTracker;
     }
 
     /// @notice Adds a single chain to the message root.

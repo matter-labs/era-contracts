@@ -388,7 +388,10 @@ contract Bridgehub is IBridgehub, ReentrancyGuard, Ownable2StepUpgradeable, Paus
     /// @notice used to register chains on L2 for the purpose of interop.
     /// @param _chainId the chainId of the chain to be registered.
     /// @param _baseTokenAssetId the base token asset id of the chain.
-    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender onlyL2 {
+    function registerChainForInterop(
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId
+    ) external onlyChainRegistrationSender onlyL2 {
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
         // kl todo: should we add ctm asset id here?
     }

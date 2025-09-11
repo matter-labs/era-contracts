@@ -9,7 +9,7 @@ import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 
 // solhint-enable max-line-length
 
@@ -171,7 +171,7 @@ contract UtilsTest is Test {
         );
         vm.mockCall(
             nativeTokenVault,
-            abi.encodeWithSelector(INativeTokenVault.assetTracker.selector),
+            abi.encodeWithSelector(IL1NativeTokenVault.l1AssetTracker.selector),
             abi.encode(assetTracker)
         );
     }

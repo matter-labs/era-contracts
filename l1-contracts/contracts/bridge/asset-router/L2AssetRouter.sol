@@ -92,10 +92,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         address _legacySharedBridge,
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
-    )
-        AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR))
-        reentrancyGuardInitializer
-    {
+    ) AssetRouterBase(_l1ChainId, _eraChainId, IBridgehub(L2_BRIDGEHUB_ADDR)) reentrancyGuardInitializer {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
         require(_l1AssetRouter != address(0), EmptyAddress());
         L1_ASSET_ROUTER = _l1AssetRouter;

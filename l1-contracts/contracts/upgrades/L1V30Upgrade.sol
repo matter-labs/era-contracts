@@ -10,13 +10,15 @@ import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
-import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
+import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
+/// @notice Note, that this upgrade is run wherever the settlement layer of the chain is, i.e. 
+/// on L1 if the chain settles there or on the ZK Gateway.
 contract L1V30Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
@@ -30,9 +32,16 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
         super.upgrade(_proposedUpgrade);
 
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
-        s.assetTracker = address(INativeTokenVault(s.nativeTokenVault).assetTracker());
+        // Note, that this call will revert if the native token vault has not been upgraded, i.e. 
+        // if a chain settling on Gateway tries to upgrade before ZK Gateway has done the upgrade.
+        s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
 
+        // Note, that the line below ensures that chains can only upgrade once the ZK Gateway itself is upgraded,
+        // i.e. its `v30UpgradeGatewayBlockNumber` is non zero.
         uint256 v30UpgradeGatewayBlockNumber = (IBridgehub(s.bridgehub).messageRoot()).v30UpgradeGatewayBlockNumber();
+        // At the time of the upgrade, it is assumed that only one whitelisted settlement layer exists, i.e. 
+        // the EraVM-based ZK Gateway.
+        // For ZK Gateway itself, this value (i.e. v30UpgradeGatewayBlockNumber) is set inside the constructor o the MessageRoot.
         if (!bridgehub.whitelistedSettlementLayers(s.chainId)) {
             require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
             IMailbox(address(this)).requestL2ServiceTransaction(

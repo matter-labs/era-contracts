@@ -17,6 +17,8 @@ contract DummyBridgehub {
 
     address public sharedBridge;
 
+    address public chainAssetHandler;
+
     // add this to be excluded from coverage report
     function test() internal virtual {}
 
@@ -34,6 +36,10 @@ contract DummyBridgehub {
 
     function setMessageRoot(address _messageRoot) public {
         messageRoot = IMessageRoot(_messageRoot);
+    }
+
+    function setChainAssetHandler(address _chainAssetHandler) public {
+        chainAssetHandler = _chainAssetHandler;
     }
 
     function setZKChain(uint256, address _zkChain) external {

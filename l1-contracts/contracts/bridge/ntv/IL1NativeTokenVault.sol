@@ -5,6 +5,7 @@ pragma solidity 0.8.28;
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
 import {INativeTokenVault} from "./INativeTokenVault.sol";
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
+import {IL1AssetTracker} from "../asset-tracker/IL1AssetTracker.sol";
 
 /// @title L1 Native token vault contract interface
 /// @author Matter Labs
@@ -23,6 +24,8 @@ interface IL1NativeTokenVault is INativeTokenVault, IL1AssetDeploymentTracker {
 
     /// Used for V30 migrating token balances to AssetTracker
     function migrateTokenBalanceToAssetTracker(uint256 _chainId, bytes32 _assetId) external returns (uint256);
+
+    function l1AssetTracker() external view returns (IL1AssetTracker);
 
     event TokenBeaconUpdated(address indexed l2TokenBeacon);
 }

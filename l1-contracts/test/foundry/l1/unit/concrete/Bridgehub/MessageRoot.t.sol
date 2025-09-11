@@ -9,6 +9,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, NotL2} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
 bytes32 constant CHAIN_TREE_EMPTY_ENTRY_HASH = bytes32(
@@ -48,8 +49,6 @@ contract MessageRootTest is Test {
         L1_CHAIN_ID = 5;
         messageRoot = new MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID, 1);
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
-        vm.prank(assetTracker);
-        messageRoot.setAddresses(assetTracker);
     }
 
     function test_init() public {
@@ -108,7 +107,7 @@ contract MessageRootTest is Test {
             abi.encode(alphaChainSender)
         );
 
-        vm.prank(assetTracker);
+        vm.prank(GW_ASSET_TRACKER_ADDR);
         vm.expectRevert(MessageRootNotRegistered.selector);
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
@@ -142,7 +141,7 @@ contract MessageRootTest is Test {
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
 
-        vm.prank(assetTracker);
+        vm.prank(GW_ASSET_TRACKER_ADDR);
         vm.expectEmit(true, false, false, false);
         emit IMessageRoot.AppendedChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
         vm.expectEmit(true, false, false, false);
@@ -162,7 +161,7 @@ contract MessageRootTest is Test {
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
 
-        vm.prank(assetTracker);
+        vm.prank(GW_ASSET_TRACKER_ADDR);
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
 
         messageRoot.updateFullTree();
@@ -182,7 +181,7 @@ contract MessageRootTest is Test {
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
 
-        vm.prank(assetTracker);
+        vm.prank(GW_ASSET_TRACKER_ADDR);
         // vm.expectEmit(true, false, false, false);
         // emit MessageRoot.Preimage(bytes32(0), bytes32(0));
         // vm.expectEmit(true, false, false, false);
@@ -192,13 +191,13 @@ contract MessageRootTest is Test {
             1,
             bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd")
         );
-        vm.prank(assetTracker);
+        vm.prank(GW_ASSET_TRACKER_ADDR);
         messageRoot.addChainBatchRoot(
             alphaChainId,
             2,
             bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12")
         );
-        vm.prank(assetTracker);
+        vm.prank(GW_ASSET_TRACKER_ADDR);
         messageRoot.addChainBatchRoot(
             alphaChainId,
             3,

@@ -13,6 +13,7 @@ import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {IInteropCenter} from "../../interop/IInteropCenter.sol";
 import {IL2AssetRouter} from "../../bridge/asset-router/IL2AssetRouter.sol";
 import {IL2AssetTracker} from "../../bridge/asset-tracker/IL2AssetTracker.sol";
+import {IGWAssetTracker} from "../../bridge/asset-tracker/IGWAssetTracker.sol";
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 
@@ -128,3 +129,7 @@ address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0
 /// @dev the address of the L2 asset tracker
 address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0d);
 IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
+
+/// @dev the address of the GW asset tracker
+address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0e);
+IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);
