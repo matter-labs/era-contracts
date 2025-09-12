@@ -570,20 +570,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         });
     }
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        return super.getCreationCode(contractName, isZKBytecode);
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
-    }
-
     // add this to be excluded from coverage report
     function test() internal virtual override {}
 }
