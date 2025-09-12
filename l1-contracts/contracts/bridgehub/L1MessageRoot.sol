@@ -20,8 +20,9 @@ contract L1MessageRoot is MessageRootBase {
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub) {
+    constructor(IBridgehub _bridgehub, uint256 _l1ChainId) {
         BRIDGE_HUB = _bridgehub;
+        L1_CHAIN_ID = _l1ChainId;
         _initialize();
         _disableInitializers();
     }

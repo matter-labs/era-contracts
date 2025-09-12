@@ -68,6 +68,7 @@ contract ExperimentalBridgeTest is Test {
 
     address mockL2Contract;
 
+    uint256 l1ChainId;
     uint256 eraChainId;
 
     address deployerAddress;
@@ -95,8 +96,9 @@ contract ExperimentalBridgeTest is Test {
     }
 
     function setUp() public {
-        deployerAddress = makeAddr("DEPLOYER_ADDRESS");
+        l1ChainId = 1;
         eraChainId = 320;
+        deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
         bridgeHub = L1Bridgehub(address(dummyBridgehub));
@@ -124,7 +126,7 @@ contract ExperimentalBridgeTest is Test {
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
-        messageRoot = new L1MessageRoot(bridgeHub);
+        messageRoot = new L1MessageRoot(bridgeHub, l1ChainId);
 
         sharedBridge = new L1AssetRouter(
             mockL1WethAddress,
