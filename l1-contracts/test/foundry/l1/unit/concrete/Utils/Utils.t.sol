@@ -16,7 +16,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 // solhint-enable max-line-length
 
 contract UtilsTest is Test {
-    function test_PackBatchTimestampAndBlockTimestamp() public {
+    function test_PackBatchTimestampAndBlockTimestamp() public virtual {
         uint64 batchTimestamp = 0x12345678;
         uint64 blockTimestamp = 0x87654321;
         bytes32 packedBytes = Utils.packBatchTimestampAndBlockTimestamp(batchTimestamp, blockTimestamp);
@@ -28,7 +28,7 @@ contract UtilsTest is Test {
         );
     }
 
-    function test_ConstructL2Log() public {
+    function test_ConstructL2Log() public virtual {
         bytes memory l2Log = Utils.constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
@@ -49,7 +49,7 @@ contract UtilsTest is Test {
         );
     }
 
-    function test_CreateSystemLogs() public {
+    function test_CreateSystemLogs() public virtual {
         bytes[] memory logs = Utils.createSystemLogs(bytes32(0));
 
         assertEq(logs.length, 10, "logs length should be correct");
