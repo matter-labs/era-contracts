@@ -7,7 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -589,31 +589,31 @@ contract DeployCTMScript is Script, DeployUtils {
     /// @notice Get all four facet cuts
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
         // If we start to use different selectors for Gateway, we should change this.
-        facetCuts = new FacetCut[](4);
-        facetCuts[0] = FacetCut({
+        facetCuts = new Diamond.FacetCut[](4);
+        facetCuts[0] = Diamond.FacetCut({
             facet: stateTransition.adminFacet,
-            action: Action.Add,
+            action: Diamond.Action.Add,
             isFreezable: false,
             selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
         });
-        facetCuts[1] = FacetCut({
+        facetCuts[1] = Diamond.FacetCut({
             facet: stateTransition.gettersFacet,
-            action: Action.Add,
+            action: Diamond.Action.Add,
             isFreezable: false,
             selectors: Utils.getAllSelectors(addresses.stateTransition.gettersFacet.code)
         });
-        facetCuts[2] = FacetCut({
+        facetCuts[2] = Diamond.FacetCut({
             facet: stateTransition.mailboxFacet,
-            action: Action.Add,
+            action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
         });
-        facetCuts[3] = FacetCut({
+        facetCuts[3] = Diamond.FacetCut({
             facet: stateTransition.executorFacet,
-            action: Action.Add,
+            action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getAllSelectors(addresses.stateTransition.executorFacet.code)
         });
@@ -623,7 +623,7 @@ contract DeployCTMScript is Script, DeployUtils {
     /// @dev By default, we return all four facet cuts. For patches, it may be overridden to return only a subset of facets.
     function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         return getChainCreationFacetCuts(stateTransition);
     }
 

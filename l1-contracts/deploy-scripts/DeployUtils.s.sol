@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -198,48 +198,32 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (FacetCut[] memory facetCuts);
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
     function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (FacetCut[] memory facetCuts);
-
-    function formatFacetCuts(
-        FacetCut[] memory facetCutsUnformatted
-    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
-        facetCuts = new Diamond.FacetCut[](facetCutsUnformatted.length);
-        for (uint256 i = 0; i < facetCutsUnformatted.length; i++) {
-            facetCuts[i] = Diamond.FacetCut({
-                facet: facetCutsUnformatted[i].facet,
-                action: Diamond.Action(uint8(facetCutsUnformatted[i].action)),
-                isFreezable: facetCutsUnformatted[i].isFreezable,
-                selectors: facetCutsUnformatted[i].selectors
-            });
-        }
-    }
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
     /// @dev For chain upgrades, we only include the facets that are being changed,
     /// see `getUpgradeFacetCuts` and `getChainCreationFacetCuts`.
     function getUpgradeDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        FacetCut[] memory facetCutsUnformatted = getUpgradeFacetCuts(stateTransition);
-        return _getDiamondCutData(stateTransition, facetCutsUnformatted);
+        Diamond.FacetCut[] memory facetCuts = getUpgradeFacetCuts(stateTransition);
+        return _getDiamondCutData(stateTransition, facetCuts);
     }
 
     function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        FacetCut[] memory facetCutsUnformatted = getChainCreationFacetCuts(stateTransition);
-        return _getDiamondCutData(stateTransition, facetCutsUnformatted);
+        Diamond.FacetCut[] memory facetCuts = getChainCreationFacetCuts(stateTransition);
+        return _getDiamondCutData(stateTransition, facetCuts);
     }
 
     function _getDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition,
-        FacetCut[] memory facetCutsUnformatted
+        Diamond.FacetCut[] memory facetCuts
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        Diamond.FacetCut[] memory facetCuts = formatFacetCuts(facetCutsUnformatted);
-
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
 
         diamondCut = Diamond.DiamondCutData({

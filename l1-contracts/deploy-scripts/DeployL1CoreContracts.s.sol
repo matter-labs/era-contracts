@@ -7,7 +7,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {FacetCut, StateTransitionDeployedAddresses} from "./Utils.sol";
+import {StateTransitionDeployedAddresses} from "./Utils.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -291,7 +292,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
     /// @notice Get all four facet cuts
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         // We still want to reuse DeployUtils, but this function is not used in this script
         revert("not implemented");
     }
@@ -299,7 +300,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
     /// @notice Get new facet cuts
     function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         // We still want to reuse DeployUtils, but this function is not used in this script
         revert("not implemented");
     }

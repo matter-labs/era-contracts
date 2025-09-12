@@ -27,7 +27,8 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
-import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
@@ -90,13 +91,23 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
 
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override(DeployCTMIntegrationScript, DeployIntegrationUtils) returns (FacetCut[] memory) {
+    )
+        internal
+        virtual
+        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+        returns (Diamond.FacetCut[] memory)
+    {
         return super.getChainCreationFacetCuts(stateTransition);
     }
 
     function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override(DeployCTMIntegrationScript, DeployIntegrationUtils) returns (FacetCut[] memory) {
+    )
+        internal
+        virtual
+        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+        returns (Diamond.FacetCut[] memory)
+    {
         return super.getUpgradeFacetCuts(stateTransition);
     }
 }

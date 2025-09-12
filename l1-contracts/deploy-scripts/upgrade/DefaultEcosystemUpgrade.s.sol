@@ -447,7 +447,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = formatFacetCuts(getUpgradeFacetCuts(stateTransition));
+        facetCuts = getUpgradeFacetCuts(stateTransition);
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);

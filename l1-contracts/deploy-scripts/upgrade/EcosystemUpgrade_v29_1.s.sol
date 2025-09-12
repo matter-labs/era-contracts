@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {BytecodePublisher} from "./BytecodePublisher.s.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
@@ -92,19 +92,19 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
     /// @notice Get new facet cuts
     function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal override returns (FacetCut[] memory facetCuts) {
+    ) internal override returns (Diamond.FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
         // If we start to use different selectors for Gateway, we should change this.
-        facetCuts = new FacetCut[](2);
-        facetCuts[0] = FacetCut({
+        facetCuts = new Diamond.FacetCut[](2);
+        facetCuts[0] = Diamond.FacetCut({
             facet: stateTransition.adminFacet,
-            action: Action.Add,
+            action: Diamond.Action.Add,
             isFreezable: false,
             selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
         });
-        facetCuts[1] = FacetCut({
+        facetCuts[1] = Diamond.FacetCut({
             facet: stateTransition.mailboxFacet,
-            action: Action.Add,
+            action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getAllSelectors(addresses.stateTransition.mailboxFacet.code)
         });
