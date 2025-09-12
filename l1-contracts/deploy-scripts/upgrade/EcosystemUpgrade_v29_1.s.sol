@@ -94,7 +94,7 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
     }
 
     /// @notice Get new facet cuts
-    function getFacetCuts(
+    function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override returns (FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.

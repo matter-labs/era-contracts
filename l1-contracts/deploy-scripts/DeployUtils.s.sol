@@ -196,11 +196,11 @@ abstract contract DeployUtils is Create2FactoryUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function getFullFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (FacetCut[] memory facetCuts);
 
-    function getFacetCuts(
+    function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (FacetCut[] memory facetCuts);
 
@@ -218,11 +218,12 @@ abstract contract DeployUtils is Create2FactoryUtils {
         }
     }
 
-    /// @dev For chain upgrades, we only include the facets that are being changed, see `getFacetCuts` and `getFullFacetCuts`.
+    /// @dev For chain upgrades, we only include the facets that are being changed,
+    /// see `getUpgradeFacetCuts` and `getChainCreationFacetCuts`.
     function getUpgradeDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        FacetCut[] memory facetCutsUnformatted = getFacetCuts(stateTransition);
+        FacetCut[] memory facetCutsUnformatted = getUpgradeFacetCuts(stateTransition);
         return _getDiamondCutDataInner(stateTransition, facetCutsUnformatted);
     }
 

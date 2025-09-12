@@ -587,7 +587,7 @@ contract DeployCTMScript is Script, DeployUtils {
     }
 
     /// @notice Get all four facet cuts
-    function getFullFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
@@ -621,10 +621,10 @@ contract DeployCTMScript is Script, DeployUtils {
 
     /// @notice Get new facet cuts
     /// @dev By default, we return all four facet cuts. For patches, it may be overridden to return only a subset of facets.
-    function getFacetCuts(
+    function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
-        return getFullFacetCuts(stateTransition);
+        return getChainCreationFacetCuts(stateTransition);
     }
 
     ////////////////////////////// GetContract data  /////////////////////////////////

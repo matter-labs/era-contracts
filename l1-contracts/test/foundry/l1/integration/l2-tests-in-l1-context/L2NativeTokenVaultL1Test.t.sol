@@ -50,16 +50,16 @@ contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeT
         super.deployL2Contracts(_l1ChainId);
     }
 
-    function getFullFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (FacetCut[] memory) {
-        return super.getFullFacetCuts(stateTransition);
+        return super.getChainCreationFacetCuts(stateTransition);
     }
 
-    function getFacetCuts(
+    function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (FacetCut[] memory) {
-        return super.getFacetCuts(stateTransition);
+        return super.getUpgradeFacetCuts(stateTransition);
     }
 
     function getCreationCode(

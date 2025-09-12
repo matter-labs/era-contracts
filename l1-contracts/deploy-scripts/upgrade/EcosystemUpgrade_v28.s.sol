@@ -339,7 +339,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
+        facetCuts = formatFacetCuts(getUpgradeFacetCuts(stateTransition));
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
         VerifierParams memory verifierParams = getVerifierParams();

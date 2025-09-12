@@ -289,7 +289,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
     }
 
     /// @notice Get all four facet cuts
-    function getFullFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
         // We still want to reuse DeployUtils, but this function is not used in this script
@@ -297,7 +297,7 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
     }
 
     /// @notice Get new facet cuts
-    function getFacetCuts(
+    function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
         // We still want to reuse DeployUtils, but this function is not used in this script
