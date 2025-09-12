@@ -13,9 +13,12 @@ import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
+import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
@@ -34,6 +37,8 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -41,6 +46,8 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
@@ -627,7 +634,33 @@ contract DeployCTMScript is Script, DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "RollupDAManager")) {
+            if (compareStrings(contractName, "ChainRegistrar")) {
+                return type(ChainRegistrar).creationCode;
+            } else if (compareStrings(contractName, "Bridgehub")) {
+                return type(Bridgehub).creationCode;
+            } else if (compareStrings(contractName, "ChainAssetHandler")) {
+                return type(ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "MessageRoot")) {
+                return type(MessageRoot).creationCode;
+            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+                return type(CTMDeploymentTracker).creationCode;
+            } else if (compareStrings(contractName, "L1Nullifier")) {
+                if (config.supportL2LegacySharedBridgeTest) {
+                    return type(L1NullifierDev).creationCode;
+                } else {
+                    return type(L1Nullifier).creationCode;
+                }
+            } else if (compareStrings(contractName, "L1AssetRouter")) {
+                return type(L1AssetRouter).creationCode;
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return type(L1ERC20Bridge).creationCode;
+            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+                return type(L1NativeTokenVault).creationCode;
+            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+                return type(BridgedStandardERC20).creationCode;
+            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+                return type(UpgradeableBeacon).creationCode;
+            } else if (compareStrings(contractName, "RollupDAManager")) {
                 return type(RollupDAManager).creationCode;
             } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
                 return type(ValidiumL1DAValidator).creationCode;
