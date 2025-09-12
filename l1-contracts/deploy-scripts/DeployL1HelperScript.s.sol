@@ -143,8 +143,7 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(ChainAdmin).creationCode;
             } else if (compareStrings(contractName, "ProxyAdmin")) {
                 return type(ProxyAdmin).creationCode;
-            }
-            if (compareStrings(contractName, "RollupDAManager")) {
+            } else if (compareStrings(contractName, "RollupDAManager")) {
                 return type(RollupDAManager).creationCode;
             } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
                 return type(ValidiumL1DAValidator).creationCode;
