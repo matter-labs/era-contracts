@@ -143,7 +143,8 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(ChainAdmin).creationCode;
             } else if (compareStrings(contractName, "ProxyAdmin")) {
                 return type(ProxyAdmin).creationCode;
-            } if (compareStrings(contractName, "RollupDAManager")) {
+            }
+            if (compareStrings(contractName, "RollupDAManager")) {
                 return type(RollupDAManager).creationCode;
             } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
                 return type(ValidiumL1DAValidator).creationCode;
@@ -263,9 +264,7 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
     }
 
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "L1Bridgehub")) {
             return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "L1MessageRoot")) {
@@ -286,7 +285,7 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                     L1NativeTokenVault.initialize,
                     (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
                 );
-        } else  if (compareStrings(contractName, "ChainTypeManager")) {
+        } else if (compareStrings(contractName, "ChainTypeManager")) {
             return
                 abi.encodeCall(
                     ChainTypeManager.initialize,

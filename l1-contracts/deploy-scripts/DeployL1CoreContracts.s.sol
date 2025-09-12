@@ -263,12 +263,10 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
         return super.getInitializeCalldata(contractName);
     }
 
