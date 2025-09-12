@@ -135,21 +135,6 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         });
     }
 
-    /// @notice The first step of upgrade. It upgrades the proxies and sets the new version upgrade
-    function prepareStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](7);
-
-        allCalls[0] = prepareGovernanceUpgradeTimerCheckCall();
-        allCalls[1] = prepareCheckMigrationsPausedCalls();
-        allCalls[2] = prepareUpgradeProxiesCalls();
-        allCalls[3] = prepareNewChainCreationParamsCall();
-        allCalls[4] = provideSetNewVersionUpgradeCall();
-        allCalls[5] = prepareSetChainAssetHandlerOnBridgehubCall();
-        allCalls[6] = prepareGatewaySpecificStage1GovernanceCalls();
-
-        calls = mergeCallsArray(allCalls);
-    }
-
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public override returns (Call[] memory calls) {
         calls = new Call[](1);
@@ -160,7 +145,12 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         );
     }
 
-    function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
+    function prepareDAValidatorCall() public override returns (Call[] memory calls) {
+        // Overriding it to be empty as this is not needed for the patch
+        return calls;
+    }
+
+    function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
@@ -169,19 +159,20 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         });
     }
 
-    function prepareGatewaySpecificStage1GovernanceCalls() public override returns (Call[] memory calls) {
-        if (gatewayConfig.chainId == 0) return calls; // Gateway is unknown
+    function prepareCTMImplementationUpgrade(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public override returns (Call[] memory calls) {
+        // Overriding it to be empty as this is not needed for the patch
+        return calls;
+    }
 
-        Call[][] memory allCalls = new Call[][](2);
-
-        // Note: gas price can fluctuate, so we need to be sure that upgrade won't be broken because of that
-        uint256 priorityTxsL2GasLimit = newConfig.priorityTxsL2GasLimit;
-        uint256 maxExpectedL1GasPrice = newConfig.maxExpectedL1GasPrice;
-
-        allCalls[0] = provideSetNewVersionUpgradeCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-        allCalls[1] = prepareNewChainCreationParamsCallForGateway(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
-
-        calls = mergeCallsArray(allCalls);
+    function prepareDAValidatorCallGW(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public override returns (Call[] memory calls) {
+        // Overriding it to be empty as this is not needed for the patch
+        return calls;
     }
 
     // Tests patch upgrade by upgrading an existing chain
