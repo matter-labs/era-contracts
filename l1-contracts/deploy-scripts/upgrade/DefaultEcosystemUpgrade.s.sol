@@ -387,6 +387,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     /// @notice Build empty L1 -> L2 upgrade tx
+    /// @dev Only useful for patch upgrades, the above `_composeUpgradeTx` must be used otherwise.
     function _composeEmptyUpgradeTx() internal virtual returns (L2CanonicalTransaction memory transaction) {
         transaction = L2CanonicalTransaction({
             txType: 0,
