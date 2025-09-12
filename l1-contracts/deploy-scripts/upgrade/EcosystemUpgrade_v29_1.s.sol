@@ -74,13 +74,9 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         addresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
         upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
         addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
+        addresses.bridgehub.chainAssetHandlerImplementation = deploySimpleContract("ChainAssetHandler", false);
         addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
         addresses.stateTransition.mailboxFacet = deploySimpleContract("MailboxFacet", false);
-
-        (
-            addresses.bridgehub.chainAssetHandlerImplementation,
-            addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
 
         upgradeConfig.ecosystemContractsDeployed = true;
     }
@@ -134,26 +130,21 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
 
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public override returns (Call[] memory calls) {
-        calls = new Call[](1);
+        calls = new Call[](2);
 
         calls[0] = _buildCallProxyUpgrade(
             addresses.bridgehub.messageRootProxy,
             addresses.bridgehub.messageRootImplementation
+        );
+        calls[1] = _buildCallProxyUpgrade(
+            addresses.bridgehub.chainAssetHandlerProxy,
+            addresses.bridgehub.chainAssetHandlerImplementation
         );
     }
 
     function prepareDAValidatorCall() public override returns (Call[] memory calls) {
         // Overriding it to be empty as this is not needed for the patch
         return calls;
-    }
-
-    function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: addresses.bridgehub.bridgehubProxy,
-            data: abi.encodeCall(Bridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
-            value: 0
-        });
     }
 
     function prepareCTMImplementationUpgrade(
