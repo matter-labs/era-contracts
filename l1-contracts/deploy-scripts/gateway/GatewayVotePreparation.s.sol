@@ -47,7 +47,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
-import {DeployCTMScript} from "../DeployCTM.s.sol";
+import {DeployL1Script} from "../DeployL1.s.sol";
 
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
@@ -59,7 +59,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
+contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     using stdToml for string;
 
     struct GatewayCTMOutput {
@@ -78,7 +78,6 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
     address internal rollupL2DAValidator;
     address internal oldRollupL2DAValidator;
 
-    uint256 internal eraChainId;
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
@@ -87,7 +86,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
-    function initializeConfig(string memory configPath, uint256 ctmChainId) internal virtual {
+    function initializeConfig(string memory configPath) internal virtual override {
         super.initializeConfig(configPath);
         string memory toml = vm.readFile(configPath);
 
@@ -98,11 +97,10 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         rollupL2DAValidator = toml.readAddress("$.rollup_l2_da_validator");
         oldRollupL2DAValidator = toml.readAddress("$.old_rollup_l2_da_validator");
 
-        eraChainId = toml.readUint("$.era_chain_id");
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
-        setAddressesBasedOnBridgehub(ctmChainId);
+        setAddressesBasedOnBridgehub();
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
@@ -143,9 +141,9 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         });
     }
 
-    function setAddressesBasedOnBridgehub(uint256 ctmChainId) internal {
-        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmChainId);
+    function setAddressesBasedOnBridgehub() internal {
+        config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
+        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
@@ -250,16 +248,12 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
     }
 
     function run() public override {
-        prepareForGWVoting(0);
-    }
-
-    function prepareForGWVoting(uint256 ctmChainId) public {
         console.log("Setting up the Gateway script");
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
 
-        initializeConfig(configPath, ctmChainId);
+        initializeConfig(configPath);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: addresses.bridgehub.bridgehubProxy,
@@ -299,15 +293,12 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         deployGatewayCTM();
 
         Call[] memory governanceCalls = _prepareGatewayGovernanceCalls(
-            PrepareGatewayGovernanceCalls({
-                _l1GasPrice: EXPECTED_MAX_L1_GAS_PRICE,
-                _gatewayCTMAddress: output.gatewayStateTransition.chainTypeManagerProxy,
-                _gatewayRollupDAManager: output.rollupDAManager,
-                _gatewayValidatorTimelock: output.gatewayStateTransition.validatorTimelock,
-                _gatewayServerNotifier: output.gatewayStateTransition.serverNotifierProxy,
-                _refundRecipient: refundRecipient,
-                _ctmChainId: ctmChainId
-            })
+            EXPECTED_MAX_L1_GAS_PRICE,
+            output.gatewayStateTransition.chainTypeManagerProxy,
+            output.rollupDAManager,
+            output.gatewayStateTransition.validatorTimelock,
+            output.gatewayStateTransition.serverNotifierProxy,
+            refundRecipient
         );
 
         // We need to also whitelist the old L2 rollup address

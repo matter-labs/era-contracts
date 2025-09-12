@@ -41,7 +41,6 @@ contract TestPermanentRestriction is PermanentRestriction {
 }
 
 contract PermanentRestrictionTest is ChainTypeManagerTest {
-    uint256 internal L1_CHAIN_ID;
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     TestPermanentRestriction internal permRestriction;
@@ -63,7 +62,6 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
         chainAdmin = new ChainAdmin(restrictions);
-        L1_CHAIN_ID = 5;
     }
 
     function _deployPermRestriction(
@@ -368,7 +366,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
-            new L1MessageRoot(bridgehub, L1_CHAIN_ID),
+            new L1MessageRoot(bridgehub),
             address(0)
         );
         vm.stopPrank();

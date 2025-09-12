@@ -359,30 +359,16 @@ contract AdminFunctions is Script {
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
 
-        GatewayTransactionFilterer transactionFilterer = GatewayTransactionFilterer(
-            IGetters(chainInfo.diamondProxy).getTransactionFilterer()
-        );
-        require(address(transactionFilterer) != address(0), "Chain does not have a transaction filterer");
+        address transactionFilterer = IGetters(chainInfo.diamondProxy).getTransactionFilterer();
+        require(transactionFilterer != address(0), "Chain does not have a transaction filterer");
 
-        uint256 countWhitelistedSenders = 0;
+        Call[] memory calls = new Call[](_grantees.length);
         for (uint256 i = 0; i < _grantees.length; i++) {
-            if (!transactionFilterer.whitelistedSenders(_grantees[i])) {
-                countWhitelistedSenders++;
-            }
-        }
-
-        Call[] memory calls = new Call[](countWhitelistedSenders);
-
-        uint256 j = 0;
-        for (uint256 i = 0; i < _grantees.length; i++) {
-            if (!transactionFilterer.whitelistedSenders(_grantees[i])) {
-                calls[j] = Call({
-                    target: address(transactionFilterer),
-                    value: 0,
-                    data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantees[i]))
-                });
-                j++;
-            }
+            calls[i] = Call({
+                target: transactionFilterer,
+                value: 0,
+                data: abi.encodeCall(GatewayTransactionFilterer.grantWhitelist, (_grantees[i]))
+            });
         }
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
@@ -811,7 +797,7 @@ contract AdminFunctions is Script {
     function saveAndSendAdminTx(address _admin, Call[] memory _calls, bool _shouldSend) internal {
         bytes memory data = abi.encode(_calls);
 
-        if (_shouldSend && _calls.length > 0) {
+        if (_shouldSend) {
             Utils.adminExecuteCalls(_admin, address(0), _calls);
         }
 

@@ -83,12 +83,12 @@ import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-import {DeployCTMScript} from "../DeployCTM.s.sol";
-import {DeployCTMAdditional} from "../DeployCTMAdditional.s.sol";
+import {DeployL1Script} from "../DeployL1.s.sol";
+import {DeployL1Additional} from "../DeployL1Additional.s.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
+contract DefaultEcosystemUpgrade is Script, DeployL1Additional {
     using stdToml for string;
 
     /**
