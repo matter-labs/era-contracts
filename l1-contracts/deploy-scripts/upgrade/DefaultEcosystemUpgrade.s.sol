@@ -641,6 +641,10 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         addresses.bridgehub.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
 
+        addresses.bridgehub.chainAssetHandlerProxy = address(
+            Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
+        );
+
         addresses.bridges.erc20BridgeProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
         );
