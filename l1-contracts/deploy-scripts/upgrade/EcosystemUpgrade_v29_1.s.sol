@@ -185,7 +185,7 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
     }
 
     // Tests patch upgrade by upgrading an existing chain
-    function prepareTestCalls() public virtual returns (Call[] memory calls) {
+    function prepareTestCalls() public returns (Call[] memory calls) {
         Call[][] memory testCalls = new Call[][](1);
 
         testCalls[0] = prepareTestUpgradeChainCall();
