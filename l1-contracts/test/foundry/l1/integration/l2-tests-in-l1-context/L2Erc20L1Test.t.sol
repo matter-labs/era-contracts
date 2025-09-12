@@ -50,6 +50,12 @@ contract L2Erc20L1Test is Test, SharedL2ContractL1Deployer, L2Erc20TestAbstract 
         super.deployL2Contracts(_l1ChainId);
     }
 
+    function getFullFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (FacetCut[] memory) {
+        return super.getFullFacetCuts(stateTransition);
+    }
+
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (FacetCut[] memory) {

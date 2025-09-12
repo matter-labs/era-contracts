@@ -14,7 +14,7 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
 
     function test() internal virtual override {}
 
-    function getFacetCuts(
+    function getFullFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
         string memory root = vm.projectRoot();
@@ -58,5 +58,11 @@ contract DeployCTMIntegrationScript is Script, DeployCTMScript {
                 selectors: executorFacetSelectorsArray
             });
         }
+    }
+
+    function getFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+        return getFullFacetCuts(stateTransition);
     }
 }

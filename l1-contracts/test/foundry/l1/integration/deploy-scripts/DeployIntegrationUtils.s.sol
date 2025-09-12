@@ -19,7 +19,7 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
         bool isZKBytecode
     ) internal virtual override returns (bytes memory);
 
-    function getFacetCuts(
+    function getFullFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
         string memory root = vm.projectRoot();
@@ -63,5 +63,11 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
                 selectors: executorFacetSelectorsArray
             });
         }
+    }
+
+    function getFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+        return getFullFacetCuts(stateTransition);
     }
 }

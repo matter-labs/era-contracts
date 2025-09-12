@@ -88,6 +88,12 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
+    function getFullFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual override(DeployCTMIntegrationScript, DeployIntegrationUtils) returns (FacetCut[] memory) {
+        return super.getFullFacetCuts(stateTransition);
+    }
+
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override(DeployCTMIntegrationScript, DeployIntegrationUtils) returns (FacetCut[] memory) {
