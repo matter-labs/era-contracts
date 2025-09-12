@@ -1089,11 +1089,11 @@
   },
   {
     "contractName": "l1-contracts/L1MessageRoot",
-    "zkBytecodeHash": "0x010003d3f4620f07acff704217a3c400d94d3fd4643cbde291b1d44aba86e253",
+    "zkBytecodeHash": "0x010003d3b3105b7ca86b3eaa2f5cb897ff837c131fe11c11012605b58a58f456",
     "zkBytecodePath": "/l1-contracts/zkout/L1MessageRoot.sol/L1MessageRoot.json",
-    "evmBytecodeHash": "0xf3f3e712ebf703dd6b6b7b820ebb7cea543a1c283e762ebe9907aa9158b87104",
+    "evmBytecodeHash": "0xe81089e87d05ab0a2d4c982c215a8759de27b12f023277a836536d6927f0ad83",
     "evmBytecodePath": "/l1-contracts/out/L1MessageRoot.sol/L1MessageRoot.json",
-    "evmDeployedBytecodeHash": "0xbc6d39c824c30dc05387ad3e6878a01b519377324d31cd3ee569642279c6583b"
+    "evmDeployedBytecodeHash": "0xfb241b8b6f452a1e8bd94711c8b0c4057ef6d409006efcb70531ec4d5aa9989d"
   },
   {
     "contractName": "l1-contracts/L1NativeTokenVault",
