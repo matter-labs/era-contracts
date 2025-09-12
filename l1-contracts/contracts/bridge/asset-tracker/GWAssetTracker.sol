@@ -129,7 +129,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
 
         /// A malicious chain can cause a collision for the canonical tx hash.
-        require(balanceChange[_chainId][_canonicalTxHash].amount == 0, InvalidCanonicalTxHash(_canonicalTxHash));
+        require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
         // we save the balance change to be able to handle failed deposits.
 
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
@@ -148,6 +148,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
+        // TODO in V31, remove onlyWithdrawals option.
         (, uint32 minor, ) = IZKChain(msg.sender).getSemverProtocolVersion();
         /// If a chain is pre v30, we only allow withdrawals, and don't keep track of chainBalance.
         bool onlyWithdrawals = minor < 30;

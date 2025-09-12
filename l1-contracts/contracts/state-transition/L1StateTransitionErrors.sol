@@ -98,3 +98,5 @@ error V30UpgradeGatewayBlockNumberNotSet();
 error ValL1DAWrongInputLength(uint256 inputLength, uint256 expectedLength);
 // 0x712d02d2
 error VerifiedIsNotConsistentWithCommitted(uint256 batchesVerified, uint256 batchesCommitted);
+error NotAssetRouter(address _sender, address _assetRouter);
+

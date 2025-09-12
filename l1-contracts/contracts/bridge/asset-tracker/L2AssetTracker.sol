@@ -153,7 +153,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         if (_tokenOriginChainId == block.chainid) {
             // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
             // Otherwise a malicious token can freeze its host chain.
-            totalSupplyAcrossAllChains[_assetId] += _amount;
+            totalSupplyAcrossAllChains[_assetId] -= _amount;
         }
     }
 
@@ -182,7 +182,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Migrates the token balance from L2 to L1.
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
-    /// @dev This function is permissionless, it does not affect the state.
+    /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
         address tokenAddress = _tryGetTokenAddress(_assetId);
 

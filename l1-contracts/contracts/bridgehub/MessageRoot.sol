@@ -40,7 +40,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     uint256 public immutable L1_CHAIN_ID;
 
     /// @notice The chain id of the Gateway chain.
-    uint256 public immutable GATEWAY_CHAIN_ID;
+    uint256 public immutable override GATEWAY_CHAIN_ID;
 
     /// @notice The number of chains that are registered.
     uint256 public chainCount;

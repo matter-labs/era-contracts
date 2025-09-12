@@ -47,23 +47,22 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
 
-        /// This is called only at the settlement of the chain.
-        if (s.settlementLayer == address(0)) {
-            chainAssetHandler.setMigrationNumberForV30(s.chainId);
-        }
+        chainAssetHandler.setMigrationNumberForV30(s.chainId);
 
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
 
         uint256 v30UpgradeGatewayBlockNumber = (IBridgehub(s.bridgehub).messageRoot()).v30UpgradeGatewayBlockNumber();
-        if (!bridgehub.whitelistedSettlementLayers(s.chainId)) {
+        if (s.chainId !=  messageRoot.GATEWAY_CHAIN_ID()) {
             require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
             IMailbox(address(this)).requestL2ServiceTransaction(
                 L2_MESSAGE_ROOT_ADDR,
                 abi.encodeCall(L2_MESSAGE_ROOT.saveV30UpgradeGatewayBlockNumberOnL2, v30UpgradeGatewayBlockNumber)
             );
         }
-        messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
+        if (s.settlementLayer == address(0)) {
+            messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
+        }
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

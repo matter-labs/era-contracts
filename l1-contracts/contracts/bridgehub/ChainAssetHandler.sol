@@ -148,8 +148,12 @@ contract ChainAssetHandler is
     /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
         require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
-        require(block.chainid != L1_CHAIN_ID, OnlyOnGateway());
-        migrationNumber[_chainId] = 1;
+        bool isOnThisSettlementLayer = block.chainid == BRIDGE_HUB.settlementLayer(_chainId);
+        bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != L1_CHAIN_ID) || (!isOnThisSettlementLayer && block.chainid == L1_CHAIN_ID);
+        /// Note we don't increment the migration number if the chain migrated to GW and back to L1 previously.
+        if (shouldIncrementMigrationNumber) {
+            migrationNumber[_chainId] = 1;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

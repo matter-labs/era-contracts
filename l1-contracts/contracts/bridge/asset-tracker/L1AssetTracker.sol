@@ -93,7 +93,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
-        chainBalance[_chainId][_assetId] = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
+        uint256 migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
+        chainBalance[_chainId][_assetId] += migratedBalance;
+        totalSupplyAcrossAllChains[_assetId] += migratedBalance;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -223,9 +225,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
 
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
+        uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
         require(
             _getChainMigrationNumber(data.chainId) == data.migrationNumber,
-            InvalidChainMigrationNumber(_getChainMigrationNumber(data.chainId), data.migrationNumber)
+            InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
         );
         uint256 fromChainId;
         uint256 toChainId;
@@ -240,7 +243,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
-            uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
 
             // we check parity here to make sure that we migrated the token balance back to L1 from Gateway.
             // this is needed to ensure that the chainBalance on the Gateway AssetTracker is currently 0.
@@ -251,14 +253,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             );
 
             /// We check the assetId to make sure the chain is not lying about it.
-            if (data.originToken != address(0)) {
-                DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
-            } else {
-                /// This is only the case for the base token, as we don't store the base tokens origin chain id on the L2.
-                require(data.tokenOriginChainId == 0, InvalidOriginChainId());
-                require(BRIDGE_HUB.baseTokenAssetId(data.chainId) == data.assetId, InvalidBaseTokenAssetId());
-                data.tokenOriginChainId = NATIVE_TOKEN_VAULT.originChainId(data.assetId);
-            }
+            DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+
             data.totalSupplyAcrossAllChains = totalSupplyAcrossAllChains[data.assetId];
 
             fromChainId = data.chainId;
