@@ -31,11 +31,12 @@ import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/
 
 import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
-import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
+import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
+import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 library L2UtilsBase {
@@ -59,7 +60,7 @@ library L2UtilsBase {
 
         vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2();
 
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         uint256 prevChainId = block.chainid;

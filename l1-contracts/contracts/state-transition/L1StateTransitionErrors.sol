@@ -58,8 +58,6 @@ error MismatchNumberOfLayer1Txs(uint256 numberOfLayer1Txs, uint256 expectedLengt
 error NotAllBatchesExecuted();
 // 0xf05c64c6
 error NotChainAdmin(address prevMsgSender, address admin);
-// 0x8fd63d21
-error NotEraChain();
 // 0xa7050bf6
 error NotHistoricalRoot(bytes32);
 // 0x32ddf9a2

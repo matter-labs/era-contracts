@@ -80,6 +80,8 @@ import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
+import {DeployL1Script} from "../DeployL1.s.sol";
+
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
@@ -131,11 +133,6 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     function saveOutputVersionSpecific() internal override {
-        vm.serializeAddress(
-            "deployed_addresses",
-            "protocol_upgrade_handler_address_implementation",
-            protocolUpgradeHandlerImplementationAddress
-        );
         vm.serializeBytes("v29", "encoded_old_gateway_validator_timelocks", abi.encode(oldGatewayValidatorTimelocks));
         string memory oldValidatorTimelocksSerialized = vm.serializeBytes(
             "v29",

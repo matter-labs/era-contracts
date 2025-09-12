@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializabl
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainExists, MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyChain, NotL2} from "./L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {InvalidCaller} from "../common/L1ContractErrors.sol";
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
@@ -30,13 +30,6 @@ bytes32 constant SHARED_ROOT_TREE_EMPTY_HASH = bytes32(
 abstract contract MessageRootBase is IMessageRoot, Initializable {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
-
-    /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    ///@notice virtual getters standing in for the original immutables
-    function _l1ChainId() internal view virtual returns (uint256);
 
     /// @notice Emitted when a new chain is added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
@@ -114,14 +107,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
         _;
     }
 
-    /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
-    modifier onlyL2() {
-        if (block.chainid == _l1ChainId()) {
-            revert NotL2();
-        }
-        _;
-    }
-
     /// @notice Adds a single chain to the message root.
     /// @param _chainId The ID of the chain that is being added to the message root.
     function addNewChain(uint256 _chainId) external onlyBridgehubOrChainAssetHandler {
@@ -143,7 +128,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) onlyL2 {
+    ) external onlyChain(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();

@@ -47,7 +47,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
-import {DeployCTMScript} from "../DeployCTM.s.sol";
+import {DeployL1Script} from "../DeployL1.s.sol";
 
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
@@ -62,16 +62,6 @@ abstract contract GatewayGovernanceUtils is Script {
         address chainTypeManagerProxy;
         address ctmDeploymentTrackerProxy;
         uint256 gatewayChainId;
-    }
-
-    struct PrepareGatewayGovernanceCalls {
-        uint256 _l1GasPrice;
-        address _gatewayCTMAddress;
-        address _gatewayRollupDAManager;
-        address _gatewayValidatorTimelock;
-        address _gatewayServerNotifier;
-        address _refundRecipient;
-        uint256 _ctmChainId;
     }
 
     GatewayGovernanceConfig internal _gatewayGovernanceConfig;
@@ -90,25 +80,23 @@ abstract contract GatewayGovernanceUtils is Script {
     }
 
     function _prepareGatewayGovernanceCalls(
-        PrepareGatewayGovernanceCalls memory prepareGWGovCallsStruct
+        uint256 _l1GasPrice,
+        address _gatewayCTMAddress,
+        address _gatewayRollupDAManager,
+        address _gatewayValidatorTimelock,
+        address _gatewayServerNotifier,
+        address _refundRecipient
     ) internal returns (Call[] memory calls) {
-        {
-            if (prepareGWGovCallsStruct._ctmChainId == _gatewayGovernanceConfig.gatewayChainId) {
-                calls = _getRegisterSettlementLayerCalls();
-            }
-        }
+        calls = _getRegisterSettlementLayerCalls();
 
         // Registration of the new chain type manager inside the ZK Gateway chain
         {
-            bytes memory data = abi.encodeCall(
-                IBridgehub.addChainTypeManager,
-                (prepareGWGovCallsStruct._gatewayCTMAddress)
-            );
+            bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (_gatewayCTMAddress));
 
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
+                    _l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
                     new bytes[](0),
@@ -116,7 +104,7 @@ abstract contract GatewayGovernanceUtils is Script {
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
+                    _refundRecipient
                 )
             );
         }
@@ -169,7 +157,7 @@ abstract contract GatewayGovernanceUtils is Script {
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2TwoBridgesTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
+                    _l1GasPrice,
                     Utils.MAX_PRIORITY_TX_GAS,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
@@ -177,7 +165,7 @@ abstract contract GatewayGovernanceUtils is Script {
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
                     0,
                     secondBridgeData,
-                    prepareGWGovCallsStruct._refundRecipient
+                    _refundRecipient
                 )
             );
         }
@@ -187,13 +175,13 @@ abstract contract GatewayGovernanceUtils is Script {
         {
             bytes memory secondBridgeData = abi.encodePacked(
                 bytes1(0x01),
-                abi.encode(_gatewayGovernanceConfig.chainTypeManagerProxy, prepareGWGovCallsStruct._gatewayCTMAddress)
+                abi.encode(_gatewayGovernanceConfig.chainTypeManagerProxy, _gatewayCTMAddress)
             );
 
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2TwoBridgesTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
+                    _l1GasPrice,
                     Utils.MAX_PRIORITY_TX_GAS,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
@@ -201,7 +189,7 @@ abstract contract GatewayGovernanceUtils is Script {
                     _gatewayGovernanceConfig.ctmDeploymentTrackerProxy,
                     0,
                     secondBridgeData,
-                    prepareGWGovCallsStruct._refundRecipient
+                    _refundRecipient
                 )
             );
         }
@@ -213,43 +201,43 @@ abstract contract GatewayGovernanceUtils is Script {
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
+                    _l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
                     new bytes[](0),
-                    prepareGWGovCallsStruct._gatewayRollupDAManager,
+                    _gatewayRollupDAManager,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
+                    _refundRecipient
                 )
             );
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
+                    _l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
                     new bytes[](0),
-                    prepareGWGovCallsStruct._gatewayValidatorTimelock,
+                    _gatewayValidatorTimelock,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
+                    _refundRecipient
                 )
             );
             calls = Utils.mergeCalls(
                 calls,
                 Utils.prepareGovernanceL1L2DirectTransaction(
-                    prepareGWGovCallsStruct._l1GasPrice,
+                    _l1GasPrice,
                     data,
                     Utils.MAX_PRIORITY_TX_GAS,
                     new bytes[](0),
-                    prepareGWGovCallsStruct._gatewayServerNotifier,
+                    _gatewayServerNotifier,
                     _gatewayGovernanceConfig.gatewayChainId,
                     _gatewayGovernanceConfig.bridgehubProxy,
                     _gatewayGovernanceConfig.l1AssetRouterProxy,
-                    prepareGWGovCallsStruct._refundRecipient
+                    _refundRecipient
                 )
             );
         }
