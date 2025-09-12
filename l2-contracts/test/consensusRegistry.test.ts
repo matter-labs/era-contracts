@@ -21,8 +21,8 @@ describe("ConsensusRegistry", function () {
   const provider = new Provider(hre.config.networks.localhost.url);
   const owner = new Wallet(richAccount.privateKey, provider);
   const nonOwner = new Wallet(Wallet.createRandom().privateKey, provider);
-  const nodes = [];
-  const nodeEntries = [];
+  const validators = [];
+  const validatorEntries = [];
   let registry: ConsensusRegistry;
 
   before("Initialize", async function () {
@@ -46,19 +46,19 @@ describe("ConsensusRegistry", function () {
       })
     ).wait();
 
-    // Prepare the node list.
-    const numNodes = 10;
-    for (let i = 0; i < numNodes; i++) {
-      const node = makeRandomNode();
-      const nodeEntry = makeRandomNodeEntry(node, i + 1);
-      nodes.push(node);
-      nodeEntries.push(nodeEntry);
+    // Prepare the validator list.
+    const numValidators = 10;
+    for (let i = 0; i < numValidators; i++) {
+      const validator = makeRandomValidator(provider);
+      const validatorEntry = makeRandomValidatorEntry(validator, i);
+      validators.push(validator);
+      validatorEntries.push(validatorEntry);
     }
 
-    // Fund the first node owner.
+    // Fund the first validator owner.
     await (
       await owner.sendTransaction({
-        to: nodes[0].ownerKey.address,
+        to: validators[0].ownerKey.address,
         value: ethers.utils.parseEther("100"),
       })
     ).wait();
@@ -68,232 +68,202 @@ describe("ConsensusRegistry", function () {
     expect(await registry.owner()).to.equal(owner.address);
   });
 
-  it("Should add nodes to both registries", async function () {
-    for (let i = 0; i < nodes.length; i++) {
+  it("Should add validators to registry", async function () {
+    for (let i = 0; i < validators.length; i++) {
       await (
         await registry.add(
-          nodeEntries[i].ownerAddr,
-          true,
-          nodeEntries[i].validatorWeight,
-          nodeEntries[i].validatorPubKey,
-          nodeEntries[i].validatorPoP,
-          true,
-          nodeEntries[i].attesterWeight,
-          nodeEntries[i].attesterPubKey,
-          { gasLimit }
+          validatorEntries[i].ownerAddr,
+          validatorEntries[i].validatorIsLeader,
+          validatorEntries[i].validatorWeight,
+          validatorEntries[i].validatorPubKey,
+          validatorEntries[i].validatorPoP
         )
       ).wait();
     }
 
-    expect(await registry.numNodes()).to.equal(nodes.length);
+    expect(await registry.numValidators()).to.equal(validators.length);
 
-    for (let i = 0; i < nodes.length; i++) {
-      const nodeOwner = await registry.nodeOwners(i);
-      expect(nodeOwner).to.equal(nodeEntries[i].ownerAddr);
-      const node = await registry.nodes(nodeOwner);
-      expect(node.attesterLastUpdateCommit).to.equal(0);
-      expect(node.validatorLastUpdateCommit).to.equal(0);
+    for (let i = 0; i < validators.length; i++) {
+      const validatorOwner = await registry.validatorOwners(i);
+      expect(validatorOwner).to.equal(validatorEntries[i].ownerAddr);
+      const validator = await registry.validators(validatorOwner);
+      expect(validator.lastSnapshotCommit).to.equal(0);
+      expect(validator.previousSnapshotCommit).to.equal(0);
 
-      // 'Latest' is expected to match the added node's attributes.
-      expect(node.attesterLatest.active).to.equal(true);
-      expect(node.attesterLatest.removed).to.equal(false);
-      expect(node.attesterLatest.weight).to.equal(nodeEntries[i].attesterWeight);
-      expect(node.attesterLatest.pubKey.tag).to.equal(nodeEntries[i].attesterPubKey.tag);
-      expect(node.attesterLatest.pubKey.x).to.equal(nodeEntries[i].attesterPubKey.x);
-      expect(node.validatorLastUpdateCommit).to.equal(0);
-      expect(node.validatorLatest.active).to.equal(true);
-      expect(node.validatorLatest.removed).to.equal(false);
-      expect(node.validatorLatest.weight).to.equal(nodeEntries[i].attesterWeight);
-      expect(node.validatorLatest.pubKey.a).to.equal(nodeEntries[i].validatorPubKey.a);
-      expect(node.validatorLatest.pubKey.b).to.equal(nodeEntries[i].validatorPubKey.b);
-      expect(node.validatorLatest.pubKey.c).to.equal(nodeEntries[i].validatorPubKey.c);
-      expect(node.validatorLatest.proofOfPossession.a).to.equal(nodeEntries[i].validatorPoP.a);
-      expect(node.validatorLatest.proofOfPossession.b).to.equal(nodeEntries[i].validatorPoP.b);
+      // 'Latest' is expected to match the added validator's attributes.
+      expect(validator.latest.active).to.equal(true);
+      expect(validator.latest.removed).to.equal(false);
+      expect(validator.latest.weight).to.equal(validatorEntries[i].validatorWeight);
+      expect(validator.latest.pubKey.a).to.equal(validatorEntries[i].validatorPubKey.a);
+      expect(validator.latest.pubKey.b).to.equal(validatorEntries[i].validatorPubKey.b);
+      expect(validator.latest.pubKey.c).to.equal(validatorEntries[i].validatorPubKey.c);
+      expect(validator.latest.proofOfPossession.a).to.equal(validatorEntries[i].validatorPoP.a);
+      expect(validator.latest.proofOfPossession.b).to.equal(validatorEntries[i].validatorPoP.b);
 
       // 'Snapshot' is expected to have zero values.
-      expect(node.attesterSnapshot.active).to.equal(false);
-      expect(node.attesterSnapshot.removed).to.equal(false);
-      expect(node.attesterSnapshot.weight).to.equal(0);
-      expect(ethers.utils.arrayify(node.attesterSnapshot.pubKey.tag)).to.deep.equal(new Uint8Array(1));
-      expect(ethers.utils.arrayify(node.attesterSnapshot.pubKey.x)).to.deep.equal(new Uint8Array(32));
-      expect(node.validatorSnapshot.active).to.equal(false);
-      expect(node.validatorSnapshot.removed).to.equal(false);
-      expect(node.validatorSnapshot.weight).to.equal(0);
-      expect(ethers.utils.arrayify(node.validatorSnapshot.pubKey.a)).to.deep.equal(new Uint8Array(32));
-      expect(ethers.utils.arrayify(node.validatorSnapshot.pubKey.b)).to.deep.equal(new Uint8Array(32));
-      expect(ethers.utils.arrayify(node.validatorSnapshot.pubKey.c)).to.deep.equal(new Uint8Array(32));
-      expect(ethers.utils.arrayify(node.validatorSnapshot.proofOfPossession.a)).to.deep.equal(new Uint8Array(32));
-      expect(ethers.utils.arrayify(node.validatorSnapshot.proofOfPossession.b)).to.deep.equal(new Uint8Array(16));
+      expect(validator.snapshot.active).to.equal(false);
+      expect(validator.snapshot.removed).to.equal(false);
+      expect(validator.snapshot.weight).to.equal(0);
+      expect(ethers.utils.arrayify(validator.snapshot.pubKey.a)).to.deep.equal(new Uint8Array(32));
+      expect(ethers.utils.arrayify(validator.snapshot.pubKey.b)).to.deep.equal(new Uint8Array(32));
+      expect(ethers.utils.arrayify(validator.snapshot.pubKey.c)).to.deep.equal(new Uint8Array(32));
+      expect(ethers.utils.arrayify(validator.snapshot.proofOfPossession.a)).to.deep.equal(new Uint8Array(32));
+      expect(ethers.utils.arrayify(validator.snapshot.proofOfPossession.b)).to.deep.equal(new Uint8Array(16));
+
+      // 'Previous snapshot' is expected to have zero values.
+      expect(validator.previousSnapshot.active).to.equal(false);
+      expect(validator.previousSnapshot.removed).to.equal(false);
+      expect(validator.previousSnapshot.weight).to.equal(0);
+      expect(ethers.utils.arrayify(validator.previousSnapshot.pubKey.a)).to.deep.equal(new Uint8Array(32));
+      expect(ethers.utils.arrayify(validator.previousSnapshot.pubKey.b)).to.deep.equal(new Uint8Array(32));
+      expect(ethers.utils.arrayify(validator.previousSnapshot.pubKey.c)).to.deep.equal(new Uint8Array(32));
     }
   });
 
-  it("Should not allow nonOwner to add", async function () {
+  it("Should not allow validatorOwner to add", async function () {
     await expect(
       registry
-        .connect(nonOwner)
+        .connect(validators[0].ownerKey)
         .add(
           ethers.Wallet.createRandom().address,
-          true,
           0,
           { a: new Uint8Array(32), b: new Uint8Array(32), c: new Uint8Array(32) },
           { a: new Uint8Array(32), b: new Uint8Array(16) },
-          true,
-          0,
-          { tag: new Uint8Array(1), x: new Uint8Array(32) },
           { gasLimit }
         )
     ).to.be.reverted;
   });
 
-  it("Should allow owner to deactivate attester", async function () {
-    const nodeOwner = nodeEntries[0].ownerAddr;
-    expect((await registry.nodes(nodeOwner)).attesterLatest.active).to.equal(true);
-
-    await (await registry.connect(owner).deactivateAttester(nodeOwner, { gasLimit })).wait();
-    expect((await registry.nodes(nodeOwner)).attesterLatest.active).to.equal(false);
-
-    // Restore state.
-    await (await registry.connect(owner).activateAttester(nodeOwner, { gasLimit })).wait();
+  it("Should not allow to add a validator with a public key which already exists", async function () {
+    const newEntry = makeRandomValidatorEntry(makeRandomValidator(), 0);
+    await expect(
+      registry.add(
+        newEntry.ownerAddr,
+        newEntry.validatorIsLeader,
+        newEntry.validatorWeight,
+        validatorEntries[0].validatorPubKey,
+        newEntry.validatorPoP,
+        { gasLimit }
+      )
+    ).to.be.reverted;
   });
 
-  it("Should allow owner to deactivate validator", async function () {
-    const nodeOwner = nodeEntries[0].ownerAddr;
-    expect((await registry.nodes(nodeOwner)).validatorLatest.active).to.equal(true);
-
-    await (await registry.connect(owner).deactivateValidator(nodeOwner, { gasLimit })).wait();
-    expect((await registry.nodes(nodeOwner)).validatorLatest.active).to.equal(false);
-
-    // Restore state.
-    await (await registry.connect(owner).activateValidator(nodeOwner, { gasLimit })).wait();
+  it("Should not allow to add a validator with an owner address which already exists", async function () {
+    const newEntry = makeRandomValidatorEntry(makeRandomValidator(), 0);
+    await expect(
+      registry.add(
+        validatorEntries[0].ownerAddr, // Using an existing owner address
+        newEntry.validatorIsLeader,
+        newEntry.validatorWeight,
+        newEntry.validatorPubKey,
+        newEntry.validatorPoP,
+        { gasLimit }
+      )
+    ).to.be.reverted;
   });
 
-  it("Should not allow nonOwner, nonNodeOwner to deactivate attester", async function () {
-    const nodeOwner = nodeEntries[0].ownerAddr;
-    await expect(registry.connect(nonOwner).deactivateAttester(nodeOwner, { gasLimit })).to.be.reverted;
+  it("Should change validator active status", async function () {
+    const validatorOwner = validatorEntries[0].ownerAddr;
+    expect((await registry.validators(validatorOwner)).latest.active).to.equal(true);
+
+    // Deactivate
+    await (await registry.connect(validatorOwner).changeValidatorActive(validatorOwner, false, { gasLimit })).wait();
+    expect((await registry.validators(validatorOwner)).latest.active).to.equal(false);
+
+    // Activate
+    await (await registry.connect(validatorOwner).changeValidatorActive(validatorOwner, true, { gasLimit })).wait();
+    expect((await registry.validators(validatorOwner)).latest.active).to.equal(true);
   });
 
-  it("Should not allow nonOwner, nonNodeOwner to deactivate validator", async function () {
-    const nodeOwner = nodeEntries[0].ownerAddr;
-    await expect(registry.connect(nonOwner).deactivateValidator(nodeOwner, { gasLimit })).to.be.reverted;
+  it("Should not allow nonOwner to change validator active status", async function () {
+    const validatorOwner = validatorEntries[0].ownerAddr;
+    await expect(registry.connect(nonOwner).changeValidatorActive(validatorOwner, false, { gasLimit })).to.be.reverted;
   });
 
   it("Should change validator weight", async function () {
-    const entry = nodeEntries[0];
-    expect((await registry.nodes(entry.ownerAddr)).validatorLatest.weight).to.equal(entry.validatorWeight);
+    const entry = validatorEntries[0];
+    expect((await registry.validators(entry.ownerAddr)).latest.weight).to.equal(entry.validatorWeight);
 
     const baseWeight = entry.validatorWeight;
     const newWeight = getRandomNumber(100, 1000);
     await (await registry.changeValidatorWeight(entry.ownerAddr, newWeight, { gasLimit })).wait();
-    expect((await registry.nodes(entry.ownerAddr)).validatorLatest.weight).to.equal(newWeight);
-    expect((await registry.nodes(entry.ownerAddr)).attesterLatest.weight).to.equal(entry.attesterWeight);
+    expect((await registry.validators(entry.ownerAddr)).latest.weight).to.equal(newWeight);
 
     // Restore state.
     await (await registry.changeValidatorWeight(entry.ownerAddr, baseWeight, { gasLimit })).wait();
   });
 
-  it("Should not allow nodeOwner to change validator weight", async function () {
-    const node = nodes[0];
-    await expect(registry.connect(node.ownerKey).changeValidatorWeight(node.ownerKey.address, 0, { gasLimit })).to.be
-      .reverted;
+  it("Should not allow validatorOwner to change validator weight", async function () {
+    const validator = validators[0];
+    await expect(
+      registry.connect(validator.ownerKey).changeValidatorWeight(validator.ownerKey.address, 0, { gasLimit })
+    ).to.be.reverted;
   });
 
-  it("Should not allow nonOwner to change validator weight", async function () {
-    const node = nodes[0];
-    await expect(registry.connect(nonOwner).changeValidatorWeight(node.ownerKey.address, 0, { gasLimit })).to.be
-      .reverted;
+  it("Should change validator leader status", async function () {
+    const entry = validatorEntries[0];
+    // By default leader should be true.
+    const initialLeaderStatus = (await registry.validators(entry.ownerAddr)).latest["leader"];
+
+    // Change to the opposite status
+    await (await registry.changeValidatorLeader(entry.ownerAddr, !initialLeaderStatus, { gasLimit })).wait();
+    expect((await registry.validators(entry.ownerAddr)).latest["leader"]).to.equal(!initialLeaderStatus);
+
+    // Change back to original status
+    await (await registry.changeValidatorLeader(entry.ownerAddr, initialLeaderStatus, { gasLimit })).wait();
+    expect((await registry.validators(entry.ownerAddr)).latest["leader"]).to.equal(initialLeaderStatus);
   });
 
-  it("Should change attester weight", async function () {
-    const entry = nodeEntries[0];
-    expect((await registry.nodes(entry.ownerAddr)).attesterLatest.weight).to.equal(entry.attesterWeight);
+  it("Should not allow validatorOwner to change validator leader status", async function () {
+    const validator = validators[0];
+    await expect(
+      registry.connect(validator.ownerKey).changeValidatorLeader(validator.ownerKey.address, true, { gasLimit })
+    ).to.be.reverted;
+  });
 
-    const baseWeight = entry.attesterWeight;
-    const newWeight = getRandomNumber(100, 1000);
-    await (await registry.changeAttesterWeight(entry.ownerAddr, newWeight, { gasLimit })).wait();
-    expect((await registry.nodes(entry.ownerAddr)).attesterLatest.weight).to.equal(newWeight);
-    expect((await registry.nodes(entry.ownerAddr)).validatorLatest.weight).to.equal(entry.validatorWeight);
+  it("Should change validator public key", async function () {
+    const entry = validatorEntries[0];
+    const newEntry = makeRandomValidatorEntry(makeRandomValidator(), 0);
+
+    // Change public key.
+    await (
+      await registry.changeValidatorKey(entry.ownerAddr, newEntry.validatorPubKey, newEntry.validatorPoP, { gasLimit })
+    ).wait();
+    expect((await registry.validators(entry.ownerAddr)).latest.pubKey.a).to.equal(newEntry.validatorPubKey.a);
 
     // Restore state.
-    await (await registry.changeAttesterWeight(entry.ownerAddr, baseWeight, { gasLimit })).wait();
+    await (
+      await registry.changeValidatorKey(entry.ownerAddr, entry.validatorPubKey, entry.validatorPoP, { gasLimit })
+    ).wait();
+    expect((await registry.validators(entry.ownerAddr)).latest.pubKey.a).to.equal(entry.validatorPubKey.a);
   });
 
-  it("Should not allow nodeOwner to change attester weight", async function () {
-    const node = nodes[0];
-    await expect(registry.connect(node.ownerKey).changeAttesterWeight(node.ownerKey.address, 0, { gasLimit })).to.be
-      .reverted;
-  });
-
-  it("Should not allow nonOwner to change attester weight", async function () {
-    const node = nodes[0];
-    await expect(registry.connect(nonOwner).changeAttesterWeight(node.ownerKey.address, 0, { gasLimit })).to.be
-      .reverted;
-  });
-
-  it("Should not allow to add a node with a validator public key which already exist", async function () {
-    const newEntry = makeRandomNodeEntry(makeRandomNode(), 1);
+  it("Should not allow nonOwner to change validator public key", async function () {
+    const validator = makeRandomValidatorEntry(makeRandomValidator(), 0);
     await expect(
-      registry.add(
-        newEntry.ownerAddr,
-        true,
-        newEntry.validatorWeight,
-        nodeEntries[0].validatorPubKey,
-        newEntry.validatorPoP,
-        true,
-        newEntry.attesterWeight,
-        newEntry.attesterPubKey,
-        { gasLimit }
-      )
+      registry
+        .connect(nonOwner)
+        .changeValidatorKey(validator.ownerAddr, validator.validatorPubKey, validator.validatorPoP, { gasLimit })
     ).to.be.reverted;
-  });
-
-  it("Should not allow to add a node with an attester public key which already exist", async function () {
-    const newEntry = makeRandomNodeEntry(makeRandomNode(), 1);
-    await expect(
-      registry.add(
-        newEntry.ownerAddr,
-        true,
-        newEntry.validatorWeight,
-        newEntry.validatorPubKey,
-        newEntry.validatorPoP,
-        true,
-        newEntry.attesterWeight,
-        nodeEntries[0].attesterPubKey,
-        { gasLimit }
-      )
-    ).to.be.reverted;
-  });
-
-  it("Should return attester committee once committed to", async function () {
-    // Verify that committee was not committed to.
-    expect((await registry.getAttesterCommittee()).length).to.equal(0);
-
-    // Commit.
-    await (await registry.commitAttesterCommittee({ gasLimit })).wait();
-
-    // Read committee.
-    const attesterCommittee = await registry.getAttesterCommittee();
-    expect(attesterCommittee.length).to.equal(nodes.length);
-    for (let i = 0; i < attesterCommittee.length; i++) {
-      const entry = nodeEntries[i];
-      const attester = attesterCommittee[i];
-      expect(attester.weight).to.equal(entry.attesterWeight);
-      expect(attester.pubKey.tag).to.equal(entry.attesterPubKey.tag);
-      expect(attester.pubKey.x).to.equal(entry.attesterPubKey.x);
-    }
   });
 
   it("Should return validator committee once committed to", async function () {
     // Verify that committee was not committed to.
-    expect((await registry.getValidatorCommittee()).length).to.equal(0);
+    const [initialCommittee, initialLeaderSelection] = await registry.getValidatorCommittee();
+    expect(initialCommittee.length).to.equal(0);
+    expect(initialLeaderSelection.frequency).to.equal(1);
+    expect(initialLeaderSelection.weighted).to.equal(false);
 
     // Commit.
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
 
     // Read committee.
-    const validatorCommittee = await registry.getValidatorCommittee();
-    expect(validatorCommittee.length).to.equal(nodes.length);
+    const [validatorCommittee, leaderSelection] = await registry.getValidatorCommittee();
+    expect(validatorCommittee.length).to.equal(validators.length);
+    expect(leaderSelection.frequency).to.equal(1);
+    expect(leaderSelection.weighted).to.equal(false);
     for (let i = 0; i < validatorCommittee.length; i++) {
-      const entry = nodeEntries[i];
+      const entry = validatorEntries[i];
       const validator = validatorCommittee[i];
       expect(validator.weight).to.equal(entry.validatorWeight);
       expect(validator.pubKey.a).to.equal(entry.validatorPubKey.a);
@@ -304,113 +274,189 @@ describe("ConsensusRegistry", function () {
     }
   });
 
-  it("Should not include inactive nodes in attester and validator committees when committed to", async function () {
-    const idx = nodeEntries.length - 1;
-    const entry = nodeEntries[idx];
+  it("Should not include inactive validators in committee when committed to", async function () {
+    const idx = validatorEntries.length - 1;
+    const entry = validatorEntries[idx];
 
-    // Deactivate attribute.
-    await (await registry.deactivateAttester(entry.ownerAddr, { gasLimit })).wait();
-    await (await registry.deactivateValidator(entry.ownerAddr, { gasLimit })).wait();
+    // Deactivate validator.
+    await (await registry.changeValidatorActive(entry.ownerAddr, false, { gasLimit })).wait();
 
     // Verify no change.
-    expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length);
-    expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length);
-
-    // Commit attester committee and verify.
-    await (await registry.commitAttesterCommittee({ gasLimit })).wait();
-    expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length - 1);
-    expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length);
+    const [currentCommittee] = await registry.getValidatorCommittee();
+    expect(currentCommittee.length).to.equal(validators.length);
 
     // Commit validator committee and verify.
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
-    expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length - 1);
-    expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length - 1);
+    const [newCommittee] = await registry.getValidatorCommittee();
+    expect(newCommittee.length).to.equal(validators.length - 1);
 
     // Restore state.
-    await (await registry.activateAttester(entry.ownerAddr, { gasLimit })).wait();
-    await (await registry.activateValidator(entry.ownerAddr, { gasLimit })).wait();
-    await (await registry.commitAttesterCommittee({ gasLimit })).wait();
+    await (await registry.changeValidatorActive(entry.ownerAddr, true, { gasLimit })).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
 
-  it("Should not include removed nodes in attester and validator committees when committed to", async function () {
-    const idx = nodeEntries.length - 1;
-    const entry = nodeEntries[idx];
+  it("Should not include removed validators in committee when committed to", async function () {
+    const idx = validatorEntries.length - 1;
+    const entry = validatorEntries[idx];
 
-    // Remove node.
+    // Remove validator.
     await (await registry.remove(entry.ownerAddr, { gasLimit })).wait();
 
     // Verify no change.
-    expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length);
-    expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length);
-
-    // Commit attester committee and verify.
-    await (await registry.commitAttesterCommittee({ gasLimit })).wait();
-    expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length - 1);
-    expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length);
+    const [currentCommittee] = await registry.getValidatorCommittee();
+    expect(currentCommittee.length).to.equal(validators.length);
 
     // Commit validator committee and verify.
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
-    expect((await registry.getAttesterCommittee()).length).to.equal(nodes.length - 1);
-    expect((await registry.getValidatorCommittee()).length).to.equal(nodes.length - 1);
+    const [newCommittee] = await registry.getValidatorCommittee();
+    expect(newCommittee.length).to.equal(validators.length - 1);
 
     // Restore state.
     await (await registry.remove(entry.ownerAddr, { gasLimit })).wait();
     await (
       await registry.add(
         entry.ownerAddr,
-        true,
+        entry.validatorIsLeader,
         entry.validatorWeight,
         entry.validatorPubKey,
-        entry.validatorPoP,
-        true,
-        entry.attesterWeight,
-        entry.attesterPubKey
+        entry.validatorPoP
       )
     ).wait();
-    await (await registry.commitAttesterCommittee({ gasLimit })).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
 
-  it("Should not include node attribute change in attester committee before committed to", async function () {
-    const idx = nodeEntries.length - 1;
-    const entry = nodeEntries[idx];
+  it("Should not allow committing validator committee with no active leader", async function () {
+    // First, make sure all validators have leader=false
+    for (let i = 0; i < validatorEntries.length; i++) {
+      await (await registry.changeValidatorLeader(validatorEntries[i].ownerAddr, false, { gasLimit })).wait();
+    }
 
-    // Change attribute.
-    await (await registry.changeAttesterWeight(entry.ownerAddr, entry.attesterWeight + 1, { gasLimit })).wait();
+    // Trying to commit should now fail with NoActiveLeader error
+    await expect(registry.commitValidatorCommittee({ gasLimit })).to.be.revertedWithCustomError(
+      registry,
+      "NoActiveLeader"
+    );
 
-    // Verify no change.
-    const attester = (await registry.getAttesterCommittee())[idx];
-    expect(attester.weight).to.equal(entry.attesterWeight);
+    // Set at least one validator as leader to restore state
+    await (await registry.changeValidatorLeader(validatorEntries[0].ownerAddr, true, { gasLimit })).wait();
 
-    // Commit.
-    await (await registry.commitAttesterCommittee({ gasLimit })).wait();
-
-    // Verify change.
-    const committedAttester = (await registry.getAttesterCommittee())[idx];
-    expect(committedAttester.weight).to.equal(entry.attesterWeight + 1);
-
-    // Restore state.
-    await (await registry.changeAttesterWeight(entry.ownerAddr, entry.attesterWeight, { gasLimit })).wait();
-    await (await registry.commitAttesterCommittee({ gasLimit })).wait();
+    // Now the commit should succeed
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
 
-  it("Should not include node attribute change in validator committee before committed to", async function () {
-    const idx = nodeEntries.length - 1;
-    const entry = nodeEntries[idx];
+  it("Should set and respect committee activation delay", async function () {
+    // Set delay
+    const delay = 5;
+    await (await registry.setCommitteeActivationDelay(delay, { gasLimit })).wait();
+
+    // Make changes
+    const idx = validatorEntries.length - 1;
+    const entry = validatorEntries[idx];
+    await (await registry.changeValidatorWeight(entry.ownerAddr, entry.validatorWeight + 10, { gasLimit })).wait();
+
+    // Commit
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+
+    // Attempting to commit again before delay passes should revert
+    await expect(registry.commitValidatorCommittee({ gasLimit })).to.be.revertedWithCustomError(
+      registry,
+      "PreviousCommitStillPending"
+    );
+
+    // Should have a pending committee
+    const [pendingCommittee] = await registry.getNextValidatorCommittee();
+    expect(pendingCommittee[idx].weight).to.equal(entry.validatorWeight + 10);
+
+    // Current committee should be unchanged until delay passes
+    const [currentCommittee] = await registry.getValidatorCommittee();
+    expect(currentCommittee[idx].weight).to.equal(entry.validatorWeight);
+
+    // Restore state
+    await (await registry.changeValidatorWeight(entry.ownerAddr, entry.validatorWeight, { gasLimit })).wait();
+    await (await registry.setCommitteeActivationDelay(0, { gasLimit })).wait();
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+  });
+
+  it("Should activate pending committee after delay passes", async function () {
+    // Set delay
+    const delay = 5;
+    await (await registry.setCommitteeActivationDelay(delay, { gasLimit })).wait();
+
+    // Get initial leader selection configuration
+    const leaderInfo = await registry.leaderSelection();
+    const initialFrequency = leaderInfo.latest.frequency;
+    const initialWeighted = leaderInfo.latest.weighted;
+
+    // Make changes to validator weight
+    const idx = validatorEntries.length - 1;
+    const entry = validatorEntries[idx];
+    const newWeight = entry.validatorWeight + 20;
+    await (await registry.changeValidatorWeight(entry.ownerAddr, newWeight, { gasLimit })).wait();
+
+    // Also update leader selection
+    const newFrequency = initialFrequency + 5;
+    const newWeighted = !initialWeighted;
+    await (await registry.updateLeaderSelection(newFrequency, newWeighted, { gasLimit })).wait();
+
+    // Commit to create pending committee
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+
+    // Verify pending committee has new weight and leader selection
+    const [pendingCommittee, pendingLeaderSelection] = await registry.getNextValidatorCommittee();
+    expect(pendingCommittee[idx].weight).to.equal(newWeight);
+    expect(pendingLeaderSelection.frequency).to.equal(newFrequency);
+    expect(pendingLeaderSelection.weighted).to.equal(newWeighted);
+
+    // Verify current committee still has old weight and leader selection
+    let [currentCommittee, currentLeaderSelection] = await registry.getValidatorCommittee();
+    expect(currentCommittee[idx].weight).to.equal(entry.validatorWeight);
+    expect(currentLeaderSelection.frequency).to.equal(initialFrequency);
+    expect(currentLeaderSelection.weighted).to.equal(initialWeighted);
+
+    // Mine blocks to pass the delay
+    for (let i = 0; i < delay; i++) {
+      await hre.network.provider.send("hardhat_mine", ["0x1"]);
+    }
+
+    // Trigger state update with a transaction
+    await (
+      await owner.sendTransaction({
+        to: owner.address,
+        value: 0,
+      })
+    ).wait();
+
+    // Now pending committee should have become the active committee with new leader selection
+    [currentCommittee, currentLeaderSelection] = await registry.getValidatorCommittee();
+    expect(currentCommittee[idx].weight).to.equal(newWeight);
+    expect(currentLeaderSelection.frequency).to.equal(newFrequency);
+    expect(currentLeaderSelection.weighted).to.equal(newWeighted);
+
+    // Restore state
+    await (await registry.changeValidatorWeight(entry.ownerAddr, entry.validatorWeight, { gasLimit })).wait();
+    await (await registry.updateLeaderSelection(initialFrequency, initialWeighted, { gasLimit })).wait();
+    await (await registry.setCommitteeActivationDelay(0, { gasLimit })).wait();
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+  });
+
+  it("Should not include validator attribute change in committee before committed to", async function () {
+    const idx = validatorEntries.length - 1;
+    const entry = validatorEntries[idx];
 
     // Change attribute.
-    await (await registry.changeValidatorWeight(entry.ownerAddr, entry.attesterWeight + 1, { gasLimit })).wait();
+    await (await registry.changeValidatorWeight(entry.ownerAddr, entry.validatorWeight + 1, { gasLimit })).wait();
 
     // Verify no change.
-    const validator = (await registry.getValidatorCommittee())[idx];
+    const [validatorCommittee] = await registry.getValidatorCommittee();
+    const validator = validatorCommittee[idx];
     expect(validator.weight).to.equal(entry.validatorWeight);
 
     // Commit.
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
 
     // Verify change.
-    const committedValidator = (await registry.getValidatorCommittee())[idx];
+    const [newValidatorCommittee] = await registry.getValidatorCommittee();
+    const committedValidator = newValidatorCommittee[idx];
     expect(committedValidator.weight).to.equal(entry.validatorWeight + 1);
 
     // Restore state.
@@ -418,78 +464,142 @@ describe("ConsensusRegistry", function () {
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
 
-  it("Should finalize node removal by fully deleting it from storage", async function () {
-    const idx = nodeEntries.length - 1;
-    const entry = nodeEntries[idx];
+  it("Should finalize validator removal by fully deleting it from storage", async function () {
+    const idx = validatorEntries.length - 1;
+    const entry = validatorEntries[idx];
 
     // Remove.
-    expect((await registry.nodes(entry.ownerAddr)).attesterLatest.removed).to.equal(false);
-    expect((await registry.nodes(entry.ownerAddr)).validatorLatest.removed).to.equal(false);
+    expect((await registry.validators(entry.ownerAddr)).latest.removed).to.equal(false);
     await (await registry.remove(entry.ownerAddr, { gasLimit })).wait();
-    expect((await registry.nodes(entry.ownerAddr)).attesterLatest.removed).to.equal(true);
-    expect((await registry.nodes(entry.ownerAddr)).validatorLatest.removed).to.equal(true);
+    expect((await registry.validators(entry.ownerAddr)).latest.removed).to.equal(true);
 
-    // Commit committees.
-    await (await registry.commitAttesterCommittee({ gasLimit })).wait();
+    // Commit committee.
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
 
-    // Verify node was not yet deleted.
-    expect(await registry.numNodes()).to.equal(nodes.length);
-    const attesterPubKeyHash = hashAttesterPubKey(entry.attesterPubKey);
-    expect(await registry.attesterPubKeyHashes(attesterPubKeyHash)).to.be.equal(true);
+    // Verify validator was not yet deleted.
+    expect(await registry.numValidators()).to.equal(validators.length);
     const validatorPubKeyHash = hashValidatorPubKey(entry.validatorPubKey);
     expect(await registry.validatorPubKeyHashes(validatorPubKeyHash)).to.be.equal(true);
 
-    // Trigger node deletion.
+    // Trigger validator deletion.
     await (await registry.remove(entry.ownerAddr, { gasLimit })).wait();
 
     // Verify the deletion.
-    expect(await registry.numNodes()).to.equal(nodes.length - 1);
-    expect(await registry.attesterPubKeyHashes(attesterPubKeyHash)).to.be.equal(false);
-    expect(await registry.validatorPubKeyHashes(attesterPubKeyHash)).to.be.equal(false);
-    const node = await registry.nodes(entry.ownerAddr, { gasLimit });
-    expect(ethers.utils.arrayify(node.attesterLatest.pubKey.tag)).to.deep.equal(new Uint8Array(1));
-    expect(ethers.utils.arrayify(node.attesterLatest.pubKey.x)).to.deep.equal(new Uint8Array(32));
+    expect(await registry.numValidators()).to.equal(validators.length - 1);
+    expect(await registry.validatorPubKeyHashes(validatorPubKeyHash)).to.be.equal(false);
+    const validator = await registry.validators(entry.ownerAddr, { gasLimit });
+    expect(ethers.utils.arrayify(validator.latest.pubKey.a)).to.deep.equal(new Uint8Array(32));
+    expect(ethers.utils.arrayify(validator.latest.pubKey.b)).to.deep.equal(new Uint8Array(32));
+    expect(ethers.utils.arrayify(validator.latest.pubKey.c)).to.deep.equal(new Uint8Array(32));
 
     // Restore state.
     await (
       await registry.add(
         entry.ownerAddr,
-        true,
+        entry.validatorIsLeader,
         entry.validatorWeight,
         entry.validatorPubKey,
-        entry.validatorPoP,
-        true,
-        entry.attesterWeight,
-        entry.attesterPubKey
+        entry.validatorPoP
       )
     ).wait();
-    await (await registry.commitAttesterCommittee({ gasLimit })).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
 
-  function makeRandomNode() {
+  it("Should have default leader selection configuration after initialization", async function () {
+    const leaderSelection = await registry.leaderSelection();
+    expect(leaderSelection.latest.frequency).to.equal(1);
+    expect(leaderSelection.latest.weighted).to.equal(false);
+  });
+
+  it("Should update leader selection configuration", async function () {
+    // Get initial configuration
+    const initialConfig = await registry.leaderSelection();
+
+    // Change to new values
+    const newFrequency = 10;
+    const newWeighted = true;
+    await (await registry.updateLeaderSelection(newFrequency, newWeighted, { gasLimit })).wait();
+
+    // Verify changes
+    const updatedConfig = await registry.leaderSelection();
+    expect(updatedConfig.latest.frequency).to.equal(newFrequency);
+    expect(updatedConfig.latest.weighted).to.equal(newWeighted);
+
+    // Reset to original values
+    await (
+      await registry.updateLeaderSelection(initialConfig.latest.frequency, initialConfig.latest.weighted, { gasLimit })
+    ).wait();
+  });
+
+  it("Should not allow validatorOwner to update leader selection", async function () {
+    await expect(registry.connect(validators[0].ownerKey).updateLeaderSelection(5, true, { gasLimit })).to.be.reverted;
+  });
+
+  it("Should snapshot leader selection configuration on commit", async function () {
+    // Initial state
+    let leaderSelection = await registry.leaderSelection();
+    const initialFrequency = leaderSelection.latest.frequency;
+    const initialWeighted = leaderSelection.latest.weighted;
+
+    // Update leader selection
+    const newFrequency = 20;
+    const newWeighted = !initialWeighted;
+    await (await registry.updateLeaderSelection(newFrequency, newWeighted, { gasLimit })).wait();
+
+    // Commit
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+
+    // Check snapshot was created
+    leaderSelection = await registry.leaderSelection();
+    expect(leaderSelection.lastSnapshotCommit).to.be.greaterThan(0);
+    expect(leaderSelection.snapshot.frequency).to.equal(newFrequency);
+    expect(leaderSelection.snapshot.weighted).to.equal(newWeighted);
+
+    // Update again to test multiple snapshots
+    const newerFrequency = 30;
+    const newerWeighted = !newWeighted;
+    await (await registry.updateLeaderSelection(newerFrequency, newerWeighted, { gasLimit })).wait();
+
+    // Commit again
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+
+    // Verify previous snapshot is preserved
+    leaderSelection = await registry.leaderSelection();
+    expect(leaderSelection.previousSnapshotCommit).to.be.greaterThan(0);
+    expect(leaderSelection.previousSnapshot.frequency).to.equal(newFrequency);
+    expect(leaderSelection.previousSnapshot.weighted).to.equal(newWeighted);
+    expect(leaderSelection.snapshot.frequency).to.equal(newerFrequency);
+    expect(leaderSelection.snapshot.weighted).to.equal(newerWeighted);
+
+    // Reset to original values
+    await (await registry.updateLeaderSelection(initialFrequency, initialWeighted, { gasLimit })).wait();
+    await (await registry.commitValidatorCommittee({ gasLimit })).wait();
+  });
+
+  function makeRandomValidator(provider?) {
     return {
       ownerKey: new Wallet(Wallet.createRandom().privateKey, provider),
       validatorKey: Wallet.createRandom(),
-      attesterKey: Wallet.createRandom(),
     };
   }
 
-  function makeRandomNodeEntry(node, weight: number) {
+  function makeRandomValidatorEntry(validator, weight: number) {
     return {
-      ownerAddr: node.ownerKey.address,
+      ownerAddr: validator.ownerKey.address,
       validatorWeight: weight,
+      validatorIsLeader: getRandomBoolean(),
       validatorPubKey: getRandomValidatorPubKey(),
       validatorPoP: getRandomValidatorPoP(),
-      attesterWeight: weight,
-      attesterPubKey: getRandomAttesterPubKey(),
     };
   }
 });
 
 function getRandomNumber(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getRandomBoolean() {
+  return Math.random() >= 0.5;
 }
 
 function getRandomValidatorPubKey() {
@@ -505,19 +615,6 @@ function getRandomValidatorPoP() {
     a: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
     b: ethers.utils.hexlify(ethers.utils.randomBytes(16)),
   };
-}
-
-function getRandomAttesterPubKey() {
-  return {
-    tag: ethers.utils.hexlify(ethers.utils.randomBytes(1)),
-    x: ethers.utils.hexlify(ethers.utils.randomBytes(32)),
-  };
-}
-
-function hashAttesterPubKey(attesterPubKey) {
-  return ethers.utils.keccak256(
-    ethers.utils.defaultAbiCoder.encode(["bytes1", "bytes32"], [attesterPubKey.tag, attesterPubKey.x])
-  );
 }
 
 function hashValidatorPubKey(validatorPubKey) {
