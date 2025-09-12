@@ -494,11 +494,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
-        bytes[] memory factoryDeps = new bytes[](4);
-        factoryDeps[0] = ContractsBytecodesLib.getCreationCode("BeaconProxy");
-        factoryDeps[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-        factoryDeps[2] = ContractsBytecodesLib.getCreationCode("UpgradeableBeacon");
-        factoryDeps[3] = ContractsBytecodesLib.getCreationCode("SystemTransparentUpgradeableProxy");
+        bytes[] memory factoryDeps = new bytes[](0);
         return factoryDeps;
     }
 

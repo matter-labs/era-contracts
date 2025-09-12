@@ -45,10 +45,11 @@ import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
@@ -70,6 +71,19 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 
 import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+
+import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+
+import {Utils} from "./Utils.sol";
 
 contract DeployL1Script is Script, DeployUtils {
     using stdToml for string;
@@ -528,7 +542,7 @@ contract DeployL1Script is Script, DeployUtils {
         vm.writeToml(toml, outputPath);
     }
 
-    function prepareForceDeploymentsData() internal view returns (bytes memory) {
+    function prepareForceDeploymentsData() internal returns (bytes memory) {
         require(addresses.governance != address(0), "Governance address is not set");
 
         address dangerousTestOnlyForcedBeacon;
@@ -547,11 +561,12 @@ contract DeployL1Script is Script, DeployUtils {
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
-            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
-            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
-            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
-            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
+            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
@@ -675,12 +690,12 @@ contract DeployL1Script is Script, DeployUtils {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "ChainRegistrar")) {
                 return type(ChainRegistrar).creationCode;
-            } else if (compareStrings(contractName, "Bridgehub")) {
-                return type(Bridgehub).creationCode;
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return type(ChainAssetHandler).creationCode;
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return type(MessageRoot).creationCode;
+            } else if (compareStrings(contractName, "L1Bridgehub")) {
+                return type(L1Bridgehub).creationCode;
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return type(L1ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return type(L1MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return type(CTMDeploymentTracker).creationCode;
             } else if (compareStrings(contractName, "L1Nullifier")) {
@@ -750,12 +765,87 @@ contract DeployL1Script is Script, DeployUtils {
                 return type(UpgradeStageValidator).creationCode;
             }
         } else {
-            if (compareStrings(contractName, "Verifier")) {
+            if (compareStrings(contractName, "ChainRegistrar")) {
+                return Utils.readZKFoundryBytecodeL1("ChainRegistrar.sol", "ChainRegistrar");
+            } else if (compareStrings(contractName, "L2Bridgehub")) {
+                return Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
+            } else if (compareStrings(contractName, "L2MessageRoot")) {
+                return Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
+            } else if (compareStrings(contractName, "ICTMDeploymentTracker")) {
+                return Utils.readZKFoundryBytecodeL1("ICTMDeploymentTracker.sol", "ICTMDeploymentTracker");
+            } else if (compareStrings(contractName, "L2AssetRouter")) {
+                return Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
+            } else if (compareStrings(contractName, "L2ChainAssetHandler")) {
+                return Utils.readZKFoundryBytecodeL1("L2ChainAssetHandler.sol", "L2ChainAssetHandler");
+            } else if (compareStrings(contractName, "UpgradeableBeaconDeployer")) {
+                return Utils.readZKFoundryBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer");
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return Utils.readZKFoundryBytecodeL1("L1ERC20Bridge.sol", "L1ERC20Bridge");
+            } else if (compareStrings(contractName, "L2NativeTokenVault")) {
+                return Utils.readZKFoundryBytecodeL1("L2NativeTokenVault.sol", "L2NativeTokenVault");
+            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+                return Utils.readZKFoundryBytecodeL1("BridgedStandardERC20.sol", "BridgedStandardERC20");
+            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+                return Utils.readZKFoundryBytecodeL1("UpgradeableBeacon.sol", "UpgradeableBeacon");
+            } else if (compareStrings(contractName, "BlobVersionedHashRetriever")) {
+                return hex"600b600b5f39600b5ff3fe5f358049805f5260205ff3";
+            } else if (compareStrings(contractName, "RollupDAManager")) {
+                return Utils.readZKFoundryBytecodeL1("RollupDAManager.sol", "RollupDAManager");
+            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
+                return Utils.readZKFoundryBytecodeL1("ValidiumL1DAValidator.sol", "ValidiumL1DAValidator");
+            } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
                     return getCreationCode("TestnetVerifier", true);
                 } else {
                     return getCreationCode("DualVerifier", true);
                 }
+            } else if (compareStrings(contractName, "VerifierFflonk")) {
+                return Utils.readZKFoundryBytecodeL1("VerifierFflonk.sol", "VerifierFflonk");
+            } else if (compareStrings(contractName, "VerifierPlonk")) {
+                return Utils.readZKFoundryBytecodeL1("VerifierPlonk.sol", "VerifierPlonk");
+            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+                return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
+            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
+                return Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+            } else if (compareStrings(contractName, "ValidatorTimelock")) {
+                return Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
+            } else if (compareStrings(contractName, "Governance")) {
+                return Utils.readZKFoundryBytecodeL1("Governance.sol", "Governance");
+            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+                return Utils.readZKFoundryBytecodeL1("ChainAdminOwnable.sol", "ChainAdminOwnable");
+            } else if (compareStrings(contractName, "AccessControlRestriction")) {
+                // TODO(EVM-924): this function is unused
+                return Utils.readZKFoundryBytecodeL1("AccessControlRestriction.sol", "AccessControlRestriction");
+            } else if (compareStrings(contractName, "ChainAdmin")) {
+                return Utils.readZKFoundryBytecodeL1("ChainAdmin.sol", "ChainAdmin");
+            } else if (compareStrings(contractName, "ChainTypeManager")) {
+                return Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
+            } else if (compareStrings(contractName, "BytecodesSupplier")) {
+                return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
+            } else if (compareStrings(contractName, "ProxyAdmin")) {
+                return Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
+            } else if (compareStrings(contractName, "ExecutorFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Executor.sol", "ExecutorFacet");
+            } else if (compareStrings(contractName, "AdminFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
+            } else if (compareStrings(contractName, "MailboxFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Mailbox.sol", "MailboxFacet");
+            } else if (compareStrings(contractName, "GettersFacet")) {
+                return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
+            } else if (compareStrings(contractName, "DiamondInit")) {
+                return Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
+            } else if (compareStrings(contractName, "ServerNotifier")) {
+                return Utils.readZKFoundryBytecodeL1("ServerNotifier.sol", "ServerNotifier");
+            } else if (compareStrings(contractName, "BeaconProxy")) {
+                return Utils.readZKFoundryBytecodeL1("BeaconProxy.sol", "BeaconProxy");
+            } else if (compareStrings(contractName, "RollupL2DAValidator")) {
+                return Utils.readZKFoundryBytecodeL2("RollupL2DAValidator.sol", "RollupL2DAValidator");
+            } else if (compareStrings(contractName, "ValidiumL2DAValidator")) {
+                return Utils.readZKFoundryBytecodeL2("ValidiumL2DAValidator.sol", "ValidiumL2DAValidator");
+            } else if (compareStrings(contractName, "AvailL2DAValidator")) {
+                return Utils.readZKFoundryBytecodeL2("AvailL2DAValidator.sol", "AvailL2DAValidator");
+            } else {
+                revert(string.concat("Contract ", contractName, " creation code not set"));
             }
         }
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
@@ -766,12 +856,12 @@ contract DeployL1Script is Script, DeployUtils {
         bool isZKBytecode
     ) internal virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "Bridgehub")) {
-                return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return abi.encodeCall(MessageRoot.initialize, ());
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return abi.encodeCall(ChainAssetHandler.initialize, (config.deployerAddress));
+            if (compareStrings(contractName, "L1Bridgehub")) {
+                return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return abi.encodeCall(L1MessageRoot.initialize, ());
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return abi.encode();
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1Nullifier")) {
@@ -807,7 +897,7 @@ contract DeployL1Script is Script, DeployUtils {
                         (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
                     );
             } else {
-                revert(string.concat("Contract ", contractName, " initialize calldata not set"));
+                revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));
             }
         } else {
             revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));

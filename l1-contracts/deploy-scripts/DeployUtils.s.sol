@@ -77,6 +77,7 @@ struct Config {
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
+    bool isZKsyncOS;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -138,6 +139,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
+        config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -352,6 +354,11 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
         require(stateTransition.verifier != address(0), "verifier is zero");
 
+        // TODO should be provided?
+        //        if (!stateTransition.isOnGateway) {
+        //            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
+        //        }
+
         return
             DiamondInitializeDataNewChain({
                 verifier: IVerifier(stateTransition.verifier),
@@ -409,13 +416,13 @@ abstract contract DeployUtils is Create2FactoryUtils {
     ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "Bridgehub")) {
-            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
-        } else if (compareStrings(contractName, "MessageRoot")) {
+        } else if (compareStrings(contractName, "L1Bridgehub")) {
+            return abi.encode(config.l1ChainId, config.ownerAddress, config.contracts.maxNumberOfChains);
+        } else if (compareStrings(contractName, "L1MessageRoot")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return
                 abi.encode(
                     config.l1ChainId,
@@ -470,7 +477,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+            /// TODO: Currently setting it to owner address (which means whole bridgehub owner).
+            /// In practice we might want to set it to CTM owner (which in production will be less restritive).
+            return
+                abi.encode(
+                    addresses.stateTransition.verifierFflonk,
+                    addresses.stateTransition.verifierPlonk,
+                    config.ownerAddress
+                );
         } else if (compareStrings(contractName, "VerifierFflonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "VerifierPlonk")) {
@@ -513,7 +527,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DiamondInit")) {
-            return abi.encode();
+            return abi.encode(config.isZKsyncOS);
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }

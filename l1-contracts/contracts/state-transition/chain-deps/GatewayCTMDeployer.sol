@@ -185,7 +185,7 @@ contract GatewayCTMDeployer {
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
             _deployedContracts: contracts
         });
-        _deployVerifier(salt, _config.testnetVerifier, contracts);
+        _deployVerifier(salt, _config.testnetVerifier, contracts, _config.aliasedGovernanceAddress);
 
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
 
@@ -236,7 +236,7 @@ contract GatewayCTMDeployer {
             new AdminFacet{salt: _salt}(_l1ChainId, rollupDAManager)
         );
 
-        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}());
+        _deployedContracts.stateTransition.diamondInit = address(new DiamondInit{salt: _salt}(false));
         _deployedContracts.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade{salt: _salt}());
     }
 
@@ -295,11 +295,13 @@ contract GatewayCTMDeployer {
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _testnetVerifier Whether testnet verifier should be used.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
+    /// @param _verifierOwner The owner that can add additional verification keys.
     /// in the process of the execution of this function.
     function _deployVerifier(
         bytes32 _salt,
         bool _testnetVerifier,
-        DeployedContracts memory _deployedContracts
+        DeployedContracts memory _deployedContracts,
+        address _verifierOwner
     ) internal {
         VerifierFflonk fflonkVerifier = new VerifierFflonk{salt: _salt}();
         _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);
@@ -307,11 +309,11 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, _verifierOwner)
             );
         } else {
             _deployedContracts.stateTransition.verifier = address(
-                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk)
+                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, _verifierOwner)
             );
         }
     }
