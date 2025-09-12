@@ -236,9 +236,9 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         // Important, this must come after the initializeExpectedL2Addresses
         generateFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
-        getDiamondCutData(addresses.stateTransition);
+        getUpgradeDiamondCutData(addresses.stateTransition);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
+        gatewayConfig.facetCutsData = abi.encode(getUpgradeDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition);
         generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
