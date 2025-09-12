@@ -35,6 +35,7 @@ import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstrac
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";
+import {DeployL1HelperScript} from "deploy-scripts/DeployL1HelperScript.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegrationScript {
@@ -77,14 +78,14 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual override(DeployUtils, DeployCTMScript) returns (bytes memory) {
+    ) internal view virtual override(DeployUtils, DeployL1HelperScript) returns (bytes memory) {
         return super.getCreationCode(contractName, false);
     }
 
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual override(DeployIntegrationUtils, DeployCTMScript) returns (bytes memory) {
+    ) internal virtual override(DeployIntegrationUtils, DeployL1HelperScript) returns (bytes memory) {
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 

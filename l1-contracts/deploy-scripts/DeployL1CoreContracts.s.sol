@@ -5,14 +5,11 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {FacetCut, StateTransitionDeployedAddresses} from "./Utils.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
@@ -32,12 +29,11 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 
-import {Config, DeployUtils, DeployedAddresses} from "./DeployUtils.s.sol";
+import {Config, DeployedAddresses} from "./DeployUtils.s.sol";
+import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
 
-contract DeployL1CoreContractsScript is Script, DeployUtils {
+contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
     using stdToml for string;
 
     function run() public virtual {
@@ -254,123 +250,12 @@ contract DeployL1CoreContractsScript is Script, DeployUtils {
         vm.writeToml(toml, outputPath);
     }
 
-    function deployTuppWithContract(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (address implementation, address proxy) {
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
-            contractName,
-            addresses.transparentProxyAdmin,
-            isZKBytecode
-        );
-    }
-
-    function deployTuppWithContractAndProxyAdmin(
-        string memory contractName,
-        address proxyAdmin,
-        bool isZKBytecode
-    ) internal returns (address implementation, address proxy) {
-        implementation = deployViaCreate2AndNotify(
-            getCreationCode(contractName, false),
-            getCreationCalldata(contractName, false),
-            contractName,
-            string.concat(contractName, " Implementation"),
-            isZKBytecode
-        );
-
-        proxy = deployViaCreate2AndNotify(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName, false)),
-            contractName,
-            string.concat(contractName, " Proxy"),
-            isZKBytecode
-        );
-        return (implementation, proxy);
-    }
-
     /// @notice Get new facet cuts
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
         // We still want to reuse DeployUtils, but this function is not used in this script
         revert("not implemented");
-    }
-
-    ////////////////////////////// GetContract data  /////////////////////////////////
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "Bridgehub")) {
-                return type(Bridgehub).creationCode;
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return type(ChainAssetHandler).creationCode;
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return type(MessageRoot).creationCode;
-            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-                return type(CTMDeploymentTracker).creationCode;
-            } else if (compareStrings(contractName, "L1Nullifier")) {
-                if (config.supportL2LegacySharedBridgeTest) {
-                    return type(L1NullifierDev).creationCode;
-                } else {
-                    return type(L1Nullifier).creationCode;
-                }
-            } else if (compareStrings(contractName, "L1AssetRouter")) {
-                return type(L1AssetRouter).creationCode;
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return type(L1ERC20Bridge).creationCode;
-            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-                return type(L1NativeTokenVault).creationCode;
-            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
-                return type(BridgedStandardERC20).creationCode;
-            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
-                return type(UpgradeableBeacon).creationCode;
-            } else if (compareStrings(contractName, "Governance")) {
-                return type(Governance).creationCode;
-            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
-                return type(ChainAdminOwnable).creationCode;
-            } else if (compareStrings(contractName, "ChainAdmin")) {
-                return type(ChainAdmin).creationCode;
-            } else if (compareStrings(contractName, "ProxyAdmin")) {
-                return type(ProxyAdmin).creationCode;
-            }
-        }
-        return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        if (!isZKBytecode) {
-            if (compareStrings(contractName, "Bridgehub")) {
-                return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return abi.encodeCall(MessageRoot.initialize, ());
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return abi.encodeCall(ChainAssetHandler.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-                return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1Nullifier")) {
-                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
-            } else if (compareStrings(contractName, "L1AssetRouter")) {
-                return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-                return abi.encodeCall(L1ERC20Bridge.initialize, ());
-            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-                return
-                    abi.encodeCall(
-                        L1NativeTokenVault.initialize,
-                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
-                    );
-            } else {
-                revert(string.concat("Contract ", contractName, " initialize calldata not set"));
-            }
-        } else {
-            revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));
-        }
     }
 
     // add this to be excluded from coverage report
