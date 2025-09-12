@@ -224,17 +224,17 @@ abstract contract DeployUtils is Create2FactoryUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
         FacetCut[] memory facetCutsUnformatted = getUpgradeFacetCuts(stateTransition);
-        return _getDiamondCutDataInner(stateTransition, facetCutsUnformatted);
+        return _getDiamondCutData(stateTransition, facetCutsUnformatted);
     }
 
-    function getDiamondCutData(
+    function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
         FacetCut[] memory facetCutsUnformatted = getChainCreationFacetCuts(stateTransition);
-        return _getDiamondCutDataInner(stateTransition, facetCutsUnformatted);
+        return _getDiamondCutData(stateTransition, facetCutsUnformatted);
     }
 
-    function _getDiamondCutDataInner(
+    function _getDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition,
         FacetCut[] memory facetCutsUnformatted
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
@@ -255,7 +255,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getChainCreationParams(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainCreationParams memory) {
-        Diamond.DiamondCutData memory diamondCut = getDiamondCutData(stateTransition);
+        Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
         return
             ChainCreationParams({
                 genesisUpgrade: stateTransition.genesisUpgrade,
