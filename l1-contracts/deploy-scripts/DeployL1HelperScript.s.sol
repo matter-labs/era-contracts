@@ -235,5 +235,4 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
             revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));
         }
     }
-
 }
