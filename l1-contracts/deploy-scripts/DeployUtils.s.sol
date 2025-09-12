@@ -15,7 +15,6 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
-
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
     uint256 eraChainId;
@@ -23,10 +22,11 @@ struct FixedForceDeploymentsData {
     bytes32 l2TokenProxyBytecodeHash;
     address aliasedL1Governance;
     uint256 maxNumberOfZKChains;
-    bytes32 bridgehubBytecodeHash;
-    bytes32 l2AssetRouterBytecodeHash;
-    bytes32 l2NtvBytecodeHash;
-    bytes32 messageRootBytecodeHash;
+    bytes bridgehubBytecodeOrInfo;
+    bytes l2AssetRouterBytecodeOrInfo;
+    bytes l2NtvBytecodeOrInfo;
+    bytes messageRootBytecodeOrInfo;
+    bytes beaconDeployerInfo;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     // The forced beacon address. It is needed only for internal testing.
@@ -96,6 +96,7 @@ struct Config {
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
+    bool isZKsyncOS;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -157,6 +158,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
+        config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -378,9 +380,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
     ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "Bridgehub")) {
-            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
-        } else if (compareStrings(contractName, "MessageRoot")) {
+        } else if (compareStrings(contractName, "L1Bridgehub")) {
+            return abi.encode(config.ownerAddress, (config.contracts.maxNumberOfChains));
+        } else if (compareStrings(contractName, "L1MessageRoot")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
@@ -476,7 +478,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DiamondInit")) {
-            return abi.encode();
+            return abi.encode(config.isZKsyncOS);
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }
