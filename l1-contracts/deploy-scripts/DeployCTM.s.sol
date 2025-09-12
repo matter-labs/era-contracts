@@ -574,7 +574,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getInitializeCalldata(
