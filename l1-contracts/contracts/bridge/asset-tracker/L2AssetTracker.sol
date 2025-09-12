@@ -228,8 +228,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    function _registerToken(bytes32 _assetId, address _originalToken, uint256 _tokenOriginChainId) internal {}
-
     function _tokenCanSkipMigrationOnL2(bytes32 _assetId) internal view returns (bool) {
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         address tokenAddress = _tryGetTokenAddress(_assetId);
