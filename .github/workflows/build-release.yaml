@@ -12,9 +12,6 @@ on:
       - "v*" # for main releases
       - "zkos*" # for zk releases
 
-permissions:
-  contents: write
-
 jobs:
   build-contracts:
     runs-on: ubuntu-latest

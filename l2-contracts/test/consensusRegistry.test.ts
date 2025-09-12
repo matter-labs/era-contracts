@@ -73,6 +73,7 @@ describe("ConsensusRegistry", function () {
       await (
         await registry.add(
           validatorEntries[i].ownerAddr,
+          validatorEntries[i].validatorIsLeader,
           validatorEntries[i].validatorWeight,
           validatorEntries[i].validatorPubKey,
           validatorEntries[i].validatorPoP
@@ -138,6 +139,7 @@ describe("ConsensusRegistry", function () {
     await expect(
       registry.add(
         newEntry.ownerAddr,
+        newEntry.validatorIsLeader,
         newEntry.validatorWeight,
         validatorEntries[0].validatorPubKey,
         newEntry.validatorPoP,
@@ -151,6 +153,7 @@ describe("ConsensusRegistry", function () {
     await expect(
       registry.add(
         validatorEntries[0].ownerAddr, // Using an existing owner address
+        newEntry.validatorIsLeader,
         newEntry.validatorWeight,
         newEntry.validatorPubKey,
         newEntry.validatorPoP,
@@ -311,7 +314,13 @@ describe("ConsensusRegistry", function () {
     // Restore state.
     await (await registry.remove(entry.ownerAddr, { gasLimit })).wait();
     await (
-      await registry.add(entry.ownerAddr, entry.validatorWeight, entry.validatorPubKey, entry.validatorPoP)
+      await registry.add(
+        entry.ownerAddr,
+        entry.validatorIsLeader,
+        entry.validatorWeight,
+        entry.validatorPubKey,
+        entry.validatorPoP
+      )
     ).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
@@ -485,7 +494,13 @@ describe("ConsensusRegistry", function () {
 
     // Restore state.
     await (
-      await registry.add(entry.ownerAddr, entry.validatorWeight, entry.validatorPubKey, entry.validatorPoP)
+      await registry.add(
+        entry.ownerAddr,
+        entry.validatorIsLeader,
+        entry.validatorWeight,
+        entry.validatorPubKey,
+        entry.validatorPoP
+      )
     ).wait();
     await (await registry.commitValidatorCommittee({ gasLimit })).wait();
   });
@@ -572,6 +587,7 @@ describe("ConsensusRegistry", function () {
     return {
       ownerAddr: validator.ownerKey.address,
       validatorWeight: weight,
+      validatorIsLeader: getRandomBoolean(),
       validatorPubKey: getRandomValidatorPubKey(),
       validatorPoP: getRandomValidatorPoP(),
     };
@@ -580,6 +596,10 @@ describe("ConsensusRegistry", function () {
 
 function getRandomNumber(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function getRandomBoolean() {
+  return Math.random() >= 0.5;
 }
 
 function getRandomValidatorPubKey() {
