@@ -230,7 +230,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        FacetCut[] memory facetCutsUnformatted = getFullFacetCuts(stateTransition);
+        FacetCut[] memory facetCutsUnformatted = getChainCreationFacetCuts(stateTransition);
         return _getDiamondCutDataInner(stateTransition, facetCutsUnformatted);
     }
 
