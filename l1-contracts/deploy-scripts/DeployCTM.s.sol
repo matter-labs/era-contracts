@@ -582,7 +582,7 @@ contract DeployCTMScript is Script, DeployUtils {
     /// @notice Get all four facet cuts
     function getFullFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal override returns (FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.
         // If we start to use different selectors for Gateway, we should change this.
         facetCuts = new FacetCut[](4);
