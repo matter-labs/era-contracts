@@ -10,7 +10,7 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
-import {ADDRESS_ONE, Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {ADDRESS_ONE} from "deploy-scripts/Utils.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
