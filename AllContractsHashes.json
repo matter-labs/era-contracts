@@ -424,6 +424,14 @@
     "evmDeployedBytecodeHash": null
   },
   {
+    "contractName": "l2-contracts/CelestiaL2DAValidator",
+    "zkBytecodeHash": "0x0100010793f7931de162ffbcd269d34d9a7fd7e3eba6bba108aee4f7b94d686b",
+    "zkBytecodePath": "/l2-contracts/zkout/CelestiaL2DAValidator.sol/CelestiaL2DAValidator.json",
+    "evmBytecodeHash": null,
+    "evmBytecodePath": null,
+    "evmDeployedBytecodeHash": null
+  },
+  {
     "contractName": "l2-contracts/ConsensusRegistry",
     "zkBytecodeHash": "0x0100046f04cc82e8938a5358c38e46dd6c4fad8d6771ba99ac1e19cceb370f86",
     "zkBytecodePath": "/l2-contracts/zkout/ConsensusRegistry.sol/ConsensusRegistry.json",
@@ -1620,6 +1628,14 @@
     "evmBytecodeHash": "0x55172a8886a8522d0e297f10a644a5aa4eb2054437487efc5a4301e0f9a53efc",
     "evmBytecodePath": "/da-contracts/out/AvailL1DAValidator.sol/AvailL1DAValidator.json",
     "evmDeployedBytecodeHash": "0x23efca3701cc0d3f9df7defff2f4c307c24ed9086f539662660bfa98101c9684",
+    "zkBytecodeHash": null,
+    "zkBytecodePath": null
+  },
+  {
+    "contractName": "da-contracts/CelestiaL1DAValidator",
+    "evmBytecodeHash": "0x64b16e19f3ed97a1705d0e6eae7b6a055631e8b72c863911de495fab8673093a",
+    "evmBytecodePath": "/da-contracts/out/CelestiaL1DAValidator.sol/CelestiaL1DAValidator.json",
+    "evmDeployedBytecodeHash": "0x7f011e5b00c58f22728fc11aa287e8915becafc3564983b5c495bfca68934f1c",
     "zkBytecodeHash": null,
     "zkBytecodePath": null
   },
