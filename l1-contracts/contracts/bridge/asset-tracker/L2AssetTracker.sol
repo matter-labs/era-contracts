@@ -96,6 +96,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         if (_tokenOriginChainId == block.chainid) {
             // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
             totalSupplyAcrossAllChains[_assetId] += _amount;
+            // We don't require migration for native tokens
             return;
         }
         _checkAssetMigrationNumber(_assetId);
@@ -135,7 +136,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _tokenOriginChainId,
         address _tokenAddress
     ) internal {
-        if (_tokenCanSkipMigrationOnL2(_assetId)) {
+        if (_needToForceSetAssetMigrationOnL2(_assetId)) {
             _forceSetAssetMigrationNumber(block.chainid, _assetId);
         }
 
@@ -228,7 +229,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    function _tokenCanSkipMigrationOnL2(bytes32 _assetId) internal view returns (bool) {
+    function _needToForceSetAssetMigrationOnL2(bytes32 _assetId) internal view returns (bool) {
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         address tokenAddress = _tryGetTokenAddress(_assetId);
         uint256 amount = IERC20(tokenAddress).totalSupply();
