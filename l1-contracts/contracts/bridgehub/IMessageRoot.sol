@@ -26,9 +26,6 @@ uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint2
     keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
 );
 
-// TODO fix the value
-bytes32 constant GENESIS_CHAIN_BATCH_ROOT = keccak256("GENESIS_CHAIN_BATCH_ROOT");
-
 /**
  * @author Matter Labs
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
@@ -72,10 +69,6 @@ interface IMessageRoot is IMessageVerification {
     function chainBatchRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
-
-    function v30UpgradeGatewayBlockNumber() external view returns (uint256);
-
-    function saveV30UpgradeGatewayBlockNumberOnL2(uint256 _v30UpgradeGatewayBlockNumber) external;
 
     function v30UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
 

@@ -4,16 +4,14 @@ pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT, L2_MESSAGE_VERIFICATION} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
-import {BUNDLE_IDENTIFIER, BundleStatus, CallStatus, InteropBundle, InteropCall, L2Message, MessageInclusionProof} from "../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BundleStatus, CallStatus, InteropBundle, InteropCall, MessageInclusionProof} from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
-import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, SettlementLayerBatchNumberTooLow, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId} from "./InteropErrors.sol";
-import {V30UpgradeGatewayBlockNumberNotSet} from "../state-transition/L1StateTransitionErrors.sol";
+import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId} from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
-import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
@@ -314,30 +312,6 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         });
 
         require(isIncluded, MessageNotIncluded());
-
-        L2Message memory l2ToL1Message = L2Message({
-            txNumberInBatch: _proof.message.txNumberInBatch,
-            sender: _proof.message.sender,
-            data: _proof.message.data
-        });
-
-        bytes32 leaf = MessageHashing.getLeafHashFromMessage(l2ToL1Message);
-
-        ProofData memory proofData = L2_MESSAGE_ROOT.getProofData({
-            _chainId: _proof.chainId,
-            _batchNumber: _proof.l1BatchNumber,
-            _leafProofMask: _proof.l2MessageIndex,
-            _leaf: leaf,
-            _proof: _proof.proof
-        });
-
-        /// We need to make sure that the proof belongs to a batch that settled on GW after the v30 upgrade.
-        uint256 v30UpgradeGatewayBlockNumber = L2_MESSAGE_ROOT.v30UpgradeGatewayBlockNumber();
-        require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
-        require(
-            proofData.settlementLayerBatchNumber > v30UpgradeGatewayBlockNumber,
-            SettlementLayerBatchNumberTooLow()
-        );
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
 

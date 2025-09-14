@@ -16,6 +16,8 @@ error ChainBatchRootNotSet(uint256 chainId, uint256 batchNumber);
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
+// 0x5d03f19d
+error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
 error DepthMoreThanOneForRecursiveMerkleProof();
 // 0x48857c1d
@@ -36,8 +38,8 @@ error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
 error NextChainBatchRootAlreadySet(uint256 chainId, uint256 batchNumber);
 // 0x7f4316f3
 error NoEthAllowed();
-// 0xf306a770
-error NotAssetRouter(address msgSender, address sharedBridge);
+// 0x366c42f8
+error NonConsecutiveBatchNumber(uint256 chainId, uint256 batchNumber);
 // 0x8beee3a3
 error NotChainAssetHandler(address sender, address chainAssetHandler);
 // 0x88d9dae3
@@ -104,3 +106,4 @@ error V30UpgradeGatewayBlockNumberAlreadySet();
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
 error ZKChainNotRegistered();
+

@@ -100,6 +100,9 @@ abstract contract NativeTokenVault is
 
     function originToken(bytes32 _assetId) public view virtual returns (address) {
         address token = tokenAddress[_assetId];
+        if (token == address(0)) {
+            return address(0);
+        }
         if (originChainId[_assetId] == block.chainid) {
             return token;
         } else {

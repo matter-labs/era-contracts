@@ -5,8 +5,7 @@ pragma solidity 0.8.28;
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-import {L2_GENESIS_UPGRADE_ADDR, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
+import {L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
@@ -52,14 +51,6 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
 
-        uint256 v30UpgradeGatewayBlockNumber = (IBridgehub(s.bridgehub).messageRoot()).v30UpgradeGatewayBlockNumber();
-        if (s.chainId !=  messageRoot.GATEWAY_CHAIN_ID()) {
-            require(v30UpgradeGatewayBlockNumber != 0, V30UpgradeGatewayBlockNumberNotSet());
-            IMailbox(address(this)).requestL2ServiceTransaction(
-                L2_MESSAGE_ROOT_ADDR,
-                abi.encodeCall(L2_MESSAGE_ROOT.saveV30UpgradeGatewayBlockNumberOnL2, v30UpgradeGatewayBlockNumber)
-            );
-        }
         if (s.settlementLayer == address(0)) {
             messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
         }

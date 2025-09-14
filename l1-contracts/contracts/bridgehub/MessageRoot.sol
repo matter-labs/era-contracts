@@ -8,8 +8,8 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IBridgehub} from "./IBridgehub.sol";
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, GENESIS_CHAIN_BATCH_ROOT, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, NotL2, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2MessageRoot, OnlyPreV30Chain, V30UpgradeGatewayBlockNumberAlreadySet, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, PreviousChainBatchRootNotSet, LocallyNoChainsAtGenesis, OnlyGateway, OnlyOnSettlementLayer} from "./L1BridgehubErrors.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
+import {NonConsecutiveBatchNumber, CurrentBatchNumberAlreadySet, BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, NotL2, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, MessageRootNotRegistered, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyL1, OnlyL2MessageRoot, OnlyPreV30Chain, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, LocallyNoChainsAtGenesis, OnlyGateway, OnlyOnSettlementLayer} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
@@ -63,6 +63,9 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
+    /// We store the current batch number for each chain.
+    mapping(uint256 chainId => uint256 currentChainBatchNumber) public currentChainBatchNumber;
+
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
     /// @dev These are the same values as the leaves of the chainTree.
     /// @dev We store these values for message verification on L1 and Gateway.
@@ -73,10 +76,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @notice We store this, as we did not store chainBatchRoots prior to V30 on L1, so we need to get them from the diamond proxies of the chains.
     /// @notice We fill the mapping with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE for deployed chains until the chain upgrades to V30.
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
-
-    /// @notice The block number at the moment the MessageRoot was updated to V30.
-    /// @notice We store this, as it is used on the L2s to filter out old interop roots.
-    uint256 public v30UpgradeGatewayBlockNumber;
 
     /// @dev The chain type manager for EraVM chains. EraVM chains are upgraded directly by governance,
     /// @dev so they can be trusted more than ZKsync OS chains, or chains from other CTMs.
@@ -172,10 +171,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         GATEWAY_CHAIN_ID = _gatewayChainId;
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
-        if (L1_CHAIN_ID != block.chainid) {
-            /// On Gateway we save the upgrade block number
-            v30UpgradeGatewayBlockNumber = block.number;
-        }
         _initialize();
         _disableInitializers();
     }
@@ -187,20 +182,18 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         uint256 allZKChainsLength = allZKChains.length;
         /// locally there are no chains deployed before.
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
+    }
 
-        v30UpgradeGatewayBlockNumber = 1;
+    function _initialize() internal {
+        // slither-disable-next-line unused-return
+        sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
+        _addNewChain(block.chainid, 0);
     }
 
     /// @dev The initialized used for the V30 upgrade.
     function initializeV30Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
-        uint256 allZKChainsLength = allZKChains.length;
         _v30InitializeInner(allZKChains);
-
-        /// If there are no chains, that means we are using the contracts locally.
-        if (allZKChainsLength == 0) {
-            v30UpgradeGatewayBlockNumber = 1;
-        }
     }
 
     function _v30InitializeInner(uint256[] memory _allZKChains) internal {
@@ -219,24 +212,21 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         }
     }
 
+    /// @notice This function is used to send the V30 upgrade block number from the Gateway to the L1 chain.
     function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external onlyGateway {
-        uint256 sentBlockNumber;
-        if (_chainId != block.chainid) {
-            sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];
-            require(
-                sentBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
-                V30UpgradeChainBatchNumberNotSet()
-            );
-        } else {
-            sentBlockNumber = v30UpgradeGatewayBlockNumber;
-        }
+        uint256 sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];
+        require(
+            sentBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY && sentBlockNumber != 0,
+            V30UpgradeChainBatchNumberNotSet()
+        );
+        
         // slither-disable-next-line unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             abi.encodeCall(this.sendV30UpgradeBlockNumberFromGateway, (_chainId, sentBlockNumber))
         );
     }
 
-    function saveV30UpgradeGatewayBlockNumberOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
+    function saveV30UpgradeChainBatchNumberOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         require(_finalizeWithdrawalParams.l2Sender == L2_MESSAGE_ROOT_ADDR, OnlyL2MessageRoot());
         bool success = proveL1DepositParamsInclusion(_finalizeWithdrawalParams);
         if (!success) {
@@ -256,23 +246,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             IncorrectFunctionSignature()
         );
 
-        require(v30UpgradeGatewayBlockNumber == 0, V30UpgradeGatewayBlockNumberAlreadySet());
         (uint256 chainId, ) = UnsafeBytes.readUint256(_finalizeWithdrawalParams.message, offset);
-        (uint256 receivedV30UpgradeGatewayBlockNumber, ) = UnsafeBytes.readUint256(
+        (uint256 receivedV30UpgradeChainBatchNumber, ) = UnsafeBytes.readUint256(
             _finalizeWithdrawalParams.message,
             offset
         );
-        if (chainId == _finalizeWithdrawalParams.chainId) {
-            v30UpgradeGatewayBlockNumber = receivedV30UpgradeGatewayBlockNumber;
-        } else {
-            v30UpgradeChainBatchNumber[chainId] = receivedV30UpgradeGatewayBlockNumber;
-        }
-    }
-
-    function saveV30UpgradeGatewayBlockNumberOnL2(
-        uint256 _v30UpgradeGatewayBlockNumber
-    ) external onlyServiceTransactionSender {
-        v30UpgradeGatewayBlockNumber = _v30UpgradeGatewayBlockNumber;
+        require(v30UpgradeChainBatchNumber[chainId] == 0, V30UpgradeChainBatchNumberAlreadySet());
+        v30UpgradeChainBatchNumber[chainId] = receivedV30UpgradeChainBatchNumber;
     }
 
     function saveV30UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
@@ -289,12 +269,9 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
                 v30UpgradeChainBatchNumber[_chainId] == V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1,
             V30UpgradeChainBatchNumberAlreadySet()
         );
-        if (totalBatchesExecuted != 0) {
-            require(
-                chainBatchRoots[_chainId][totalBatchesExecuted - 1] == bytes32(0),
-                ChainBatchRootAlreadyExists(_chainId, totalBatchesExecuted)
-            );
-        }
+        require(currentChainBatchNumber[_chainId] == 0, CurrentBatchNumberAlreadySet());
+
+        currentChainBatchNumber[_chainId] = totalBatchesExecuted;
         v30UpgradeChainBatchNumber[_chainId] = totalBatchesExecuted + 1;
     }
 
@@ -316,7 +293,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
         );
-        chainBatchRoots[_chainId][_batchNumber] = GENESIS_CHAIN_BATCH_ROOT;
+        currentChainBatchNumber[_chainId] = _batchNumber;
     }
 
     function chainRegistered(uint256 _chainId) public view returns (bool) {
@@ -341,12 +318,11 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
         );
-        if (_batchNumber > 0) {
-            bytes32 previousBatchNumber = chainBatchRoots[_chainId][_batchNumber - 1];
-            require(previousBatchNumber != bytes32(0), PreviousChainBatchRootNotSet(_chainId, _batchNumber - 1));
-        }
+        require(_batchNumber == currentChainBatchNumber[_chainId] + 1, NonConsecutiveBatchNumber(_chainId, _batchNumber));
+
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
+        ++currentChainBatchNumber[_chainId];
         if (block.chainid == L1_CHAIN_ID) {
             /// On L1 we only store the chainBatchRoot, but don't update the chainTree or sharedTree.
             return;
@@ -407,12 +383,6 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         historicalRoot[block.number] = newRoot;
     }
 
-    function _initialize() internal {
-        // slither-disable-next-line unused-return
-        sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
-        _addNewChain(block.chainid, 0);
-    }
-
     /// @dev Adds a single chain to the message root.
     /// @param _chainId The ID of the chain that is being added to the message root.
     function _addNewChain(uint256 _chainId, uint256 _startingBatchNumber) internal {
@@ -423,7 +393,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         ++chainCount;
         chainIndex[_chainId] = cachedChainCount;
         chainIndexToId[cachedChainCount] = _chainId;
-        chainBatchRoots[_chainId][_startingBatchNumber] = GENESIS_CHAIN_BATCH_ROOT;
+        currentChainBatchNumber[_chainId] = _startingBatchNumber;
 
         // slither-disable-next-line unused-return
         bytes32 initialHash = chainTree[_chainId].setup(CHAIN_TREE_EMPTY_ENTRY_HASH);
