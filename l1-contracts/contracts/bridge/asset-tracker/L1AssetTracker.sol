@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
@@ -93,9 +95,24 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
-        uint256 migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
+        uint256 migratedBalance;
+        if (_chainId != block.chainid) {
+            migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
+        } else {
+            address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
+            migratedBalance = IERC20(tokenAddress).totalSupply();
+            require(chainBalance[block.chainid][_assetId] == 0, "chainBalance is not 0");
+        }
+        /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1, 
+        /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
+        uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
+        /// kl todo can it be the case that we set chainBalance to uint256.max twice.
+        if (chainBalance[originChainId][_assetId] == 0) {
+            chainBalance[originChainId][_assetId] = type(uint256).max - migratedBalance;
+        } else {
+            chainBalance[originChainId][_assetId] -= migratedBalance;
+        }
         chainBalance[_chainId][_assetId] += migratedBalance;
-        totalSupplyAcrossAllChains[_assetId] += migratedBalance;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -122,22 +139,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _setTransientBalanceChange(_chainId, _assetId, _amount);
         }
 
-        /// We increase/decrease the totalSupply
-        // `totalSupplyAcrossAllChains` stores the total balance of tokens outside of the origin chain.
-        // There are three possible cases:
-        // 1. We are depositing it back to the origin chain. The balance outside of it decreases and so we decrease
-        // totalSupplyAcrossAllChains.
-        // 2. The token's origin is L1 and so regardless of the destination chain, the total amount outside of L1, i.e.
-        // inside our ecosystem increases.
-        // 3. (Skipped) Since the token moves between non-origin chains, the totalSupplyAcrossAllChains remains unchanged.
-        if (_tokenOriginChainId == _chainId) {
-            _decreaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
-        } else if (_tokenOriginChainId == block.chainid) {
-            _increaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
-        }
-        if (_tokenOriginChainId != _chainId) {
-            chainBalance[chainToUpdate][_assetId] += _amount;
-        }
+        chainBalance[chainToUpdate][_assetId] += _amount;
+        _decreaseChainBalance(block.chainid, _assetId, _amount);
     }
 
     /// @notice We set the transient balance change so the Mailbox can consume it so the Gateway can keep track of the balance change.
@@ -169,22 +172,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) external onlyNativeTokenVault {
-        if (_tokenOriginChainId == _chainId) {
-            _increaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
-        } else if (_tokenOriginChainId == block.chainid) {
-            _decreaseTotalSupplyAcrossAllChains(_assetId, _tokenOriginChainId, _amount);
-        }
-
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
-        if (_isChainMinter(chainToUpdate, _tokenOriginChainId)) {
-            return;
-        }
         // Check that the chain has sufficient balance
         if (chainBalance[chainToUpdate][_assetId] < _amount) {
             revert InsufficientChainBalanceAssetTracker(chainToUpdate, _assetId, _amount);
         }
         _decreaseChainBalance(chainToUpdate, _assetId, _amount);
+        chainBalance[block.chainid][_assetId] += _amount;
     }
 
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
@@ -255,8 +250,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             /// We check the assetId to make sure the chain is not lying about it.
             DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
 
-            data.totalSupplyAcrossAllChains = totalSupplyAcrossAllChains[data.assetId];
-
             fromChainId = data.chainId;
             toChainId = currentSettlementLayer;
         } else {
@@ -282,13 +275,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _amount: data.amount,
             _tokenOriginChainId: data.tokenOriginChainId
         });
-        _migrateTotalSupply({
-            _migratingChainId: data.chainId,
-            _assetId: data.assetId,
-            _tokenOriginChainId: data.tokenOriginChainId,
-            _migrationTotalSupply: data.totalSupplyAcrossAllChains,
-            _isL1ToGateway: data.isL1ToGateway
-        });
+
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
 
         /// We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
@@ -308,32 +295,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId
     ) internal {
-        if (!_isChainMinter(_fromChainId, _tokenOriginChainId)) {
-            _decreaseChainBalance(_fromChainId, _assetId, _amount);
-        }
-        if (!_isChainMinter(_toChainId, _tokenOriginChainId)) {
-            chainBalance[_toChainId][_assetId] += _amount;
-        }
-    }
-
-    function _migrateTotalSupply(
-        uint256 _migratingChainId,
-        bytes32 _assetId,
-        uint256 _tokenOriginChainId,
-        uint256 _migrationTotalSupply,
-        bool _isL1ToGateway
-    ) internal {
-        if (_migratingChainId == _tokenOriginChainId) {
-            if (_isL1ToGateway) {
-                totalSupplyAcrossAllChains[_assetId] = 0;
-            } else {
-                totalSupplyAcrossAllChains[_assetId] = _migrationTotalSupply;
-            }
-        }
-    }
-
-    function _isChainMinter(uint256 _chainId, uint256 _tokenOriginChainId) internal view returns (bool) {
-        return _tokenOriginChainId == _chainId || _bridgehub().settlementLayer(_tokenOriginChainId) == _chainId;
+        _decreaseChainBalance(_fromChainId, _assetId, _amount);
+        chainBalance[_toChainId][_assetId] += _amount;
     }
 
     function _sendToChain(uint256 _chainId, address _to, bytes memory _data) internal {

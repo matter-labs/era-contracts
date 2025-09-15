@@ -177,8 +177,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             amount: amount,
             migrationNumber: migrationNumber,
             originToken: tokenAddress,
-            isL1ToGateway: true,
-            totalSupplyAcrossAllChains: 0
+            isL1ToGateway: true
         });
         bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
 
@@ -285,8 +284,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             amount: amount,
             migrationNumber: migrationNumber,
             originToken: tokenAddress,
-            isL1ToGateway: false,
-            totalSupplyAcrossAllChains: 0
+            isL1ToGateway: false
         });
         bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
 
