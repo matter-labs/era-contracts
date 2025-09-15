@@ -104,7 +104,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         /// Note we always allow bridging when settling on L1.
         /// On Gateway we require that the tokenBalance be migrated to Gateway from L1,
-        /// otherwise withdrawals might fail in the Gateway L2AssetTracker when the chain settles.
+        /// otherwise withdrawals might fail in the GWAssetTracker when the chain settles.
         require(
             savedAssetMigrationNumber == migrationNumber ||
                 L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId(),
