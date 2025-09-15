@@ -77,7 +77,6 @@ interface IMessageVerification {
 
     /// @notice Prove that the L2 -> L1 transaction was processed with the specified status.
     function proveL1DepositParamsInclusion(
-        FinalizeL1DepositParams calldata _finalizeWithdrawalParams,
-        address _sender
+        FinalizeL1DepositParams calldata _finalizeWithdrawalParams
     ) external view returns (bool success);
 }

@@ -246,6 +246,8 @@ error NonSequentialVersion();
 error NotAllowed(address addr);
 // 0x64846fe4
 error NotARestriction(address addr);
+// 0xf306a770
+error NotAssetRouter(address _sender, address _assetRouter);
 // 0xb49df1f2
 error NotAZKChain(address addr);
 // 0x5e67e793
@@ -386,6 +388,7 @@ error ZeroAddress();
 error ZeroChainId();
 // 0x601b6882
 error ZKChainLimitReached();
+
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

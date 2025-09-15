@@ -257,11 +257,6 @@ contract L1AssetRouterTest is Test {
             .checked_write(100);
         stdstore
             .target(address(l1AssetTracker))
-            .sig(IAssetTrackerBase.totalSupplyAcrossAllChains.selector)
-            .with_key(ETH_TOKEN_ASSET_ID)
-            .checked_write(100);
-        stdstore
-            .target(address(l1AssetTracker))
             .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(chainId)
             .with_key(ETH_TOKEN_ASSET_ID)
@@ -270,11 +265,6 @@ contract L1AssetRouterTest is Test {
             .target(address(l1AssetTracker))
             .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(chainId)
-            .with_key(tokenAssetId)
-            .checked_write(100);
-        stdstore
-            .target(address(l1AssetTracker))
-            .sig(IAssetTrackerBase.totalSupplyAcrossAllChains.selector)
             .with_key(tokenAssetId)
             .checked_write(100);
 
@@ -326,11 +316,6 @@ contract L1AssetRouterTest is Test {
         vm.mockCall(
             l1NullifierAddress,
             abi.encodeWithSelector(IL1Nullifier.getTransientSettlementLayer.selector),
-            abi.encode(0)
-        );
-        vm.mockCall(
-            messageRootAddress,
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeGatewayBlockNumber.selector),
             abi.encode(0)
         );
         vm.mockCall(

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IBaseToken} from "./interfaces/IBaseToken.sol";
 import {SystemContractBase} from "./abstract/SystemContractBase.sol";
-import {BOOTLOADER_FORMAL_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
+import {BOOTLOADER_FORMAL_ADDRESS, COMPLEX_UPGRADER_CONTRACT, DEPLOYER_SYSTEM_CONTRACT, L1_MESSENGER_CONTRACT, L2_ASSET_TRACKER, MSG_VALUE_SYSTEM_CONTRACT} from "./Constants.sol";
 import {IMailboxImpl} from "./interfaces/IMailboxImpl.sol";
 import {InsufficientFunds, Unauthorized} from "./SystemContractErrors.sol";
 
@@ -22,6 +22,17 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
 
     /// @notice The total amount of tokens that have been minted.
     uint256 public override totalSupply;
+
+    /// @dev Address of the token on its origin chain that can be deposited to mint this bridged token
+    address public originToken;
+
+    /// @dev The assetId of the token.
+    bytes32 public assetId;
+
+    function setAddresses(bytes32 _assetId, address _originTokenOriginAddress) external onlyCallFrom(address(COMPLEX_UPGRADER_CONTRACT))  {
+        originToken = _originTokenOriginAddress;
+        assetId = _assetId;
+    }
 
     /// @notice Transfer tokens from one address to another.
     /// @param _from The address to transfer the ETH from.

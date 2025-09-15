@@ -15,6 +15,4 @@ interface IAssetTrackerBase {
     function registerLegacyTokenOnChain(bytes32 _assetId) external;
 
     function chainBalance(uint256 _chainId, bytes32 _assetId) external view returns (uint256);
-
-    function totalSupplyAcrossAllChains(bytes32 _assetId) external view returns (uint256);
 }

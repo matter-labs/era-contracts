@@ -5,7 +5,7 @@ pragma solidity ^0.8.21;
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 interface IL2AssetTracker {
-    function setAddresses(uint256 _l1ChainId) external;
+    function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external;
 
     function handleInitiateBridgingOnL2(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) external;
 

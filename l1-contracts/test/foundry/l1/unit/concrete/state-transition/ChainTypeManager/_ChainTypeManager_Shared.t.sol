@@ -81,9 +81,6 @@ contract ChainTypeManagerTest is UtilsTest {
             messageroot,
             address(0)
         );
-        stdstore.target(address(messageroot)).sig(IMessageRoot.v30UpgradeGatewayBlockNumber.selector).checked_write(
-            uint256(1)
-        );
         stdstore
             .target(address(messageroot))
             .sig(IMessageRoot.v30UpgradeChainBatchNumber.selector)

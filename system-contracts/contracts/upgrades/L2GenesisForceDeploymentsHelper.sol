@@ -2,12 +2,13 @@
 
 pragma solidity 0.8.28;
 
-import {DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS, L2_ASSET_TRACKER, L2_BRIDGE_HUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, WRAPPED_BASE_TOKEN_IMPL_ADDRESS, L2_INTEROP_HANDLER, COMPLEX_UPGRADER_CONTRACT} from "../Constants.sol";
+import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDRESS, DEPLOYER_SYSTEM_CONTRACT, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDRESS, L2_ASSET_TRACKER, L2_BRIDGE_HUB, L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NATIVE_TOKEN_VAULT, WRAPPED_BASE_TOKEN_IMPL_ADDRESS, L2_INTEROP_HANDLER, COMPLEX_UPGRADER_CONTRACT} from "../Constants.sol";
 import {ForceDeployment, IContractDeployer} from "../interfaces/IContractDeployer.sol";
 import {SystemContractHelper} from "../libraries/SystemContractHelper.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../interfaces/IL2GenesisUpgrade.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IL2WrappedBaseToken} from "../interfaces/IL2WrappedBaseToken.sol";
+import {BASE_TOKEN_SYSTEM_CONTRACT} from "../Constants.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -76,20 +77,79 @@ library L2GenesisForceDeploymentsHelper {
             }
         }
 
-        bytes memory assetTrackerConstructorData = abi.encodeCall(
+        ZKChainSpecificForceDeploymentsData memory additionalForceDeploymentsData = abi.decode(
+            _additionalForceDeploymentsData,
+            (ZKChainSpecificForceDeploymentsData)
+        );
+
+        bytes memory l2AssetTrackerConstructorData = abi.encodeCall(
             L2_ASSET_TRACKER.setAddresses,
-            (fixedForceDeploymentsData.l1ChainId)
+            (fixedForceDeploymentsData.l1ChainId, additionalForceDeploymentsData.baseTokenAssetId)
         );
 
         (bool success4, bytes memory returnData4) = SystemContractHelper.mimicCall(
             L2_ASSET_TRACKER_ADDRESS,
             address(COMPLEX_UPGRADER_CONTRACT),
-            assetTrackerConstructorData
+            l2AssetTrackerConstructorData
         );
         if (!success4) {
             // Progapatate revert reason
             assembly {
                 revert(add(returnData4, 0x20), returndatasize())
+            }
+        }
+
+        // GW: Set addresses for GWAssetTracker instead of L2AssetTracker
+        bytes memory gwAssetTrackerConstructorData = abi.encodeCall(
+            GW_ASSET_TRACKER.setAddresses,
+            (fixedForceDeploymentsData.l1ChainId)
+        );
+
+        (bool successGW, bytes memory returnDataGW) = SystemContractHelper.mimicCall(
+            GW_ASSET_TRACKER_ADDRESS,
+            address(COMPLEX_UPGRADER_CONTRACT),
+            gwAssetTrackerConstructorData
+        );
+        if (!successGW) {
+            // Propagate revert reason
+            assembly {
+                revert(add(returnDataGW, 0x20), returndatasize())
+            }
+        }
+
+        bytes memory l2BaseTokenConstructorData = abi.encodeCall(
+            BASE_TOKEN_SYSTEM_CONTRACT.setAddresses,
+            (additionalForceDeploymentsData.baseTokenAssetId, additionalForceDeploymentsData.baseTokenOriginAddress)
+        );
+
+        (bool successBaseToken, bytes memory returnDataBaseToken) = SystemContractHelper.mimicCall(
+            address(BASE_TOKEN_SYSTEM_CONTRACT),
+            address(COMPLEX_UPGRADER_CONTRACT),
+            l2BaseTokenConstructorData
+        );
+
+        if (!successBaseToken) {
+            // Propagate revert reason
+            assembly {
+                revert(add(returnDataBaseToken, 0x20), returndatasize())
+            }
+        }
+
+        bytes memory l2NativeTokenVaultConstructorData = abi.encodeCall(
+            L2_NATIVE_TOKEN_VAULT.setAddresses,
+            (additionalForceDeploymentsData.baseTokenOriginChainId)
+        );
+
+        (bool successNativeTokenVault, bytes memory returnDataNativeTokenVault) = SystemContractHelper.mimicCall(
+            L2_NATIVE_TOKEN_VAULT_ADDR,
+            address(COMPLEX_UPGRADER_CONTRACT),
+            l2NativeTokenVaultConstructorData
+        );
+
+        if (!successNativeTokenVault) {
+            // Propagate revert reason
+            assembly {
+                revert(add(returnDataNativeTokenVault, 0x20), returndatasize())
             }
         }
     }

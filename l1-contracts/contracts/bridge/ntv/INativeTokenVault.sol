@@ -23,6 +23,9 @@ interface INativeTokenVault {
     /// @notice Returns the chain ID of the origin chain for a given asset ID
     function originChainId(bytes32 assetId) external view returns (uint256);
 
+    /// @notice Returns the origin token for a given asset ID
+    function originToken(bytes32 assetId) external view returns (address);
+
     /// @notice Returns the number of bridged tokens.
     function bridgedTokensCount() external view returns (uint256);
 

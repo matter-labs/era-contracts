@@ -16,6 +16,8 @@ error ChainBatchRootNotSet(uint256 chainId, uint256 batchNumber);
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
+// 0x5d03f19d
+error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
 error DepthMoreThanOneForRecursiveMerkleProof();
 // 0x48857c1d
@@ -36,16 +38,14 @@ error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
 error NextChainBatchRootAlreadySet(uint256 chainId, uint256 batchNumber);
 // 0x7f4316f3
 error NoEthAllowed();
-// 0xf306a770
-error NotAssetRouter(address msgSender, address sharedBridge);
+// 0x366c42f8
+error NonConsecutiveBatchNumber(uint256 chainId, uint256 batchNumber);
 // 0x8beee3a3
 error NotChainAssetHandler(address sender, address chainAssetHandler);
 // 0x88d9dae3
 error NotCurrentSettlementLayer(uint256 currentSettlementLayer, uint256 newSettlementLayer);
 // 0x472477e2
 error NotInGatewayMode();
-// 0xecb34449
-error NotL1(uint256 l1ChainId, uint256 blockChainId);
 // 0x8eb4fc01
 error NotL2();
 // 0x23295f0e
@@ -76,14 +76,20 @@ error OnlyGateway();
 error OnlyL1();
 // 0xa7a05e40
 error OnlyL2();
+// 0x605d6b86
+error OnlyL2MessageRoot();
 // 0x52013f4d
 error OnlyOnGateway();
+// 0x6b75db8c
+error OnlyOnSettlementLayer();
 // 0x26d10385
 error OnlyPreV30Chain(uint256 chainId);
 // 0x94072c53
 error PreviousChainBatchRootNotSet(uint256 chainId, uint256 batchNumber);
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
+// 0x36917565
+error SLHasDifferentCTM();
 // 0x90c7cbf1
 error SLNotWhitelisted();
 // 0x8732442d
@@ -96,9 +102,8 @@ error V30UpgradeChainBatchNumberAlreadySet();
 error V30UpgradeChainBatchNumberNotSet();
 // 0x29bc3a3c
 error V30UpgradeGatewayBlockNumberAlreadySet();
-// 0x36917565
-error SLHasDifferentCTM();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
 error ZKChainNotRegistered();
+

@@ -5,10 +5,8 @@ pragma solidity ^0.8.20;
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev
- * @notice The interface for the L2NativeTokenVault contract
+ * @notice The interface for the GWAssetTracker contract
  */
-interface IL2NativeTokenVault {
-    function tokenAddress(bytes32 _assetId) external view returns (address);
-
-    function setAddresses(uint256 _baseTokenOriginChainId) external;
+interface IGWAssetTracker {
+    function setAddresses(uint256 _l1ChainId) external;
 }

@@ -10,13 +10,12 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "./IBridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
-import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
-import {ETH_TOKEN_ADDRESS, L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, SLHasDifferentCTM, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotAssetRouter, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, OnlyOnGateway} from "./L1BridgehubErrors.sol";
-import {ChainIdNotRegistered, MigrationPaused, NotL1} from "../common/L1ContractErrors.sol";
+import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, SLHasDifferentCTM, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain} from "./L1BridgehubErrors.sol";
+import {ChainIdNotRegistered, MigrationPaused, NotL1, NotAssetRouter} from "../common/L1ContractErrors.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -37,9 +36,6 @@ contract ChainAssetHandler is
     AssetHandlerModifiers
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
-
-    /// @notice the asset id of Eth. This is only used on L1.
-    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
     /// @notice The chain id of the L1.
     uint256 internal immutable L1_CHAIN_ID;
@@ -117,10 +113,6 @@ contract ChainAssetHandler is
         MESSAGE_ROOT = _messageRoot;
         ASSET_TRACKER = _assetTracker;
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
-        // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
-        // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
-        // We will change this with interop.
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
     }
 
@@ -156,8 +148,12 @@ contract ChainAssetHandler is
     /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
         require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
-        require(block.chainid != L1_CHAIN_ID, OnlyOnGateway());
-        migrationNumber[_chainId] = 1;
+        bool isOnThisSettlementLayer = block.chainid == BRIDGE_HUB.settlementLayer(_chainId);
+        bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != L1_CHAIN_ID) || (!isOnThisSettlementLayer && block.chainid == L1_CHAIN_ID);
+        /// Note we don't increment the migration number if the chain migrated to GW and back to L1 previously.
+        if (shouldIncrementMigrationNumber) {
+            migrationNumber[_chainId] = 1;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
