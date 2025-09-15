@@ -174,10 +174,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     ) external onlyNativeTokenVault {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
-        // Check that the chain has sufficient balance
-        if (chainBalance[chainToUpdate][_assetId] < _amount) {
-            revert InsufficientChainBalanceAssetTracker(chainToUpdate, _assetId, _amount);
-        }
         _decreaseChainBalance(chainToUpdate, _assetId, _amount);
         chainBalance[block.chainid][_assetId] += _amount;
     }

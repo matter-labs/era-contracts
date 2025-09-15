@@ -105,9 +105,7 @@ abstract contract AssetTrackerBase is
     }
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) external onlyNativeTokenVault {
-        if (_originChainId == block.chainid) {
-            chainBalance[block.chainid][_assetId] = type(uint256).max;
-        }
+        chainBalance[_originChainId][_assetId] = type(uint256).max;
         if (block.chainid != _l1ChainId()) {
             _registerTokenOnL2(_assetId);
         }
