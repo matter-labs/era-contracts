@@ -142,7 +142,7 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     }
 
     function setAddressesBasedOnBridgehub(uint256 ctmChainId) internal {
-        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
+        config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
         address ctm;
         if (ctmChainId != 0) {
             ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmChainId);
