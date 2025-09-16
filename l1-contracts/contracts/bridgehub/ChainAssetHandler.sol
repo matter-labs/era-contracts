@@ -252,7 +252,8 @@ contract ChainAssetHandler is
             batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
-            migrationNumber: migrationNumber[bridgehubBurnData.chainId]
+            migrationNumber: migrationNumber[bridgehubBurnData.chainId],
+            v30UpgradeChainBatchNumber: MESSAGE_ROOT.v30UpgradeChainBatchNumber(bridgehubBurnData.chainId)
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
@@ -299,7 +300,7 @@ contract ChainAssetHandler is
             BRIDGE_HUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
-            MESSAGE_ROOT.setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
+            MESSAGE_ROOT.setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.batchNumber, bridgehubMintData.v30UpgradeChainBatchNumber);
         }
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);

@@ -83,5 +83,5 @@ interface IMessageRoot is IMessageVerification {
         bytes32[] calldata _proof
     ) external pure returns (ProofData memory);
 
-    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber) external;
+    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber, uint256 _v30UpgradeChainBatchNumber) external;
 }

@@ -287,13 +287,15 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @notice we set the chainBatchRoot to be nonempty for when a chain migrates.
     function setMigratingChainBatchRoot(
         uint256 _chainId,
-        uint256 _batchNumber
+        uint256 _batchNumber,
+        uint256 _v30UpgradeChainBatchNumber
     ) external onlyBridgehubOrChainAssetHandler {
         require(
             chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
         );
         currentChainBatchNumber[_chainId] = _batchNumber;
+        v30UpgradeChainBatchNumber[_chainId] = _v30UpgradeChainBatchNumber;
     }
 
     function chainRegistered(uint256 _chainId) public view returns (bool) {
