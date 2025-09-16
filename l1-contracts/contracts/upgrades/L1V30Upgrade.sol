@@ -17,6 +17,7 @@ import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();
+error GWNotV30(uint256 chainId);
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -46,6 +47,11 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
 
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
+
+        uint256 gwChainId = messageRoot.GATEWAY_CHAIN_ID();
+        address gwChain = bridgehub.getZKChain(gwChainId);
+        (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
+        require(gwMinor >= 30, GWNotV30(gwChainId));
 
         chainAssetHandler.setMigrationNumberForV30(s.chainId);
 
