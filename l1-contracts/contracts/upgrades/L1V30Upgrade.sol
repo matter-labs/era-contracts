@@ -42,7 +42,7 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
         );
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
-        this.upgradeInner(proposedUpgrade);
+        _delegatecallUpgrade(_proposedUpgrade);
 
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
@@ -60,12 +60,6 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
 
-        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
-    }
-
-    /// @notice the upgrade function.
-    function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) public returns (bytes32) {
-        super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }
