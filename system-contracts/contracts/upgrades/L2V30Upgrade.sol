@@ -14,5 +14,7 @@ contract L2V30Upgrade {
     /// @dev Intended to be delegate‑called by the `ComplexUpgrader` contract.
     /// @param _baseTokenOriginChainId The chainId of the origin chain of the base token.
     /// @param _baseTokenOriginAddress The address of the base token on the origin chain.
-    function upgrade(uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress) external {}
+    function upgrade(uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress) external {
+        // kl todo set baseTokenOriginChainId and baseTokenOriginAddress in some location.
+    }
 }
