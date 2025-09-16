@@ -121,7 +121,7 @@ contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
 
     function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "MessageRoot")) {
-            return abi.encodeCall(MessageRoot.initializeV30Upgrade, ());
+            return abi.encodeCall(MessageRoot.initializeL1V30Upgrade, ());
         }
         return super.getInitializeCalldata(contractName);
     }

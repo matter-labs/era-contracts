@@ -13,7 +13,7 @@ import {NonConsecutiveBatchNumber, CurrentBatchNumberAlreadySet, BatchZeroNotAll
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
@@ -159,6 +159,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _;
     }
 
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// Used for V30 upgrade deployment and local deployments.
@@ -190,8 +197,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _addNewChain(block.chainid, 0);
     }
 
+    function initializeL2V30Upgrade() external onlyL2 onlyUpgrader {
+        uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+        _v30InitializeInner(allZKChains);
+    }
+
     /// @dev The initialized used for the V30 upgrade.
-    function initializeV30Upgrade() external reinitializer(2) {
+    function initializeL1V30Upgrade() external reinitializer(2) {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
     }
