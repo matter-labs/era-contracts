@@ -276,7 +276,7 @@ contract ChainAssetHandler is
 
         uint256 currentMigrationNumber = migrationNumber[bridgehubMintData.chainId];
         /// If we are not migrating for the first time, we check that the migration number is correct.
-        if (currentMigrationNumber != 0) {
+        if (currentMigrationNumber != 0 && block.chainid == L1_CHAIN_ID) {
             require(
                 currentMigrationNumber + 1 == bridgehubMintData.migrationNumber,
                 MigrationNumberMismatch(currentMigrationNumber + 1, bridgehubMintData.migrationNumber)
