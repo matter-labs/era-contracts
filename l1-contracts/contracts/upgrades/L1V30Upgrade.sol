@@ -13,6 +13,7 @@ import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V30Upgrade} from "./IL2V30Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();
@@ -53,6 +54,10 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
 
         if (s.settlementLayer == address(0)) {
             messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
+        }
+
+        if (bridgehub.whitelistedSettlementLayers(s.chainId)) {
+            require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
