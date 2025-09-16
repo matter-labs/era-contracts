@@ -7,10 +7,12 @@ You can use the latest `EcosystemUpgrade_v**` script as a starting point. As a r
 ## Patch Upgrades
 
 Patch upgrades tend to introduce minor fixes and so they only modify some contracts. More personal judgement should be used when defining a new patch upgrade scripts. You should have the following pointers in mind:
+
 - You may not need to redefine all four facet cuts, you can override `getUpgradeFacetCuts` to specify only the ones that are needed for the upgrade. The old facets should equally be deleted via `getFacetCutsForDeletion`. Note that when creating a new chain all four facet cuts are needed, as done by `getChainCreationFacetCuts`.
 - You may need to override both `deployNewEcosystemContractsL1` and `deployNewEcosystemContractsGW` to only deploy the relevant contracts.
 - The addresses for contracts that are not deployed but needed (facets, verifier...) should be read from the input file via `initializeConfig`, and they should equal the latest values.
 - Some of the `prepareStage1GovernanceCalls` and `prepareGatewaySpecificStage1GovernanceCalls` may be overridden and left empty if they are not part of the upgrade.
+
 You can check out [EcosystemUpgrade_v29_1.s.sol](./EcosystemUpgrade_v29_1.s.sol) as an example.
 
 ## Setup
