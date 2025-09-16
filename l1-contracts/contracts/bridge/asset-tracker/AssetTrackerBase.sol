@@ -115,6 +115,8 @@ abstract contract AssetTrackerBase is
         assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
     }
 
+    /// @dev This function is used to decrease the chain balance of a token on a chain.
+    /// @dev It makes debugging issues easier. Overflows don't usually happen, so there is no similar function to increase the chain balance.
     function _decreaseChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
         if (chainBalance[_chainId][_assetId] < _amount) {
             revert InsufficientChainBalance(_chainId, _assetId, _amount);
