@@ -46,6 +46,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// empty messageRoot calculated for specific chain.
     mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
 
+    /// We record the number of received deposits on GW, and require that all of the deposits are processed before the chain migrates back to L1.
+    mapping(uint256 chainId => uint256 unprocessedDeposits) public unprocessedDeposits;
+
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
@@ -127,6 +130,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
         // we save the balance change to be able to handle failed deposits.
 
+        ++unprocessedDeposits[_chainId];
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
@@ -261,6 +265,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (savedBalanceChange.baseTokenAmount > 0) {
             _decreaseChainBalance(_chainId, savedBalanceChange.baseTokenAssetId, savedBalanceChange.baseTokenAmount);
         }
+        --unprocessedDeposits[_chainId];
     }
 
     function _handleInteropMessage(uint256 _chainId, bytes calldata _message, bytes32 _baseTokenAssetId) internal {
