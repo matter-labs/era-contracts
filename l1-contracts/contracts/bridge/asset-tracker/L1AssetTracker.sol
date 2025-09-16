@@ -218,7 +218,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
         require(
-            _getChainMigrationNumber(data.chainId) == data.migrationNumber,
+            chainMigrationNumber == data.migrationNumber,
             InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
         );
         uint256 fromChainId;

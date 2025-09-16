@@ -100,20 +100,12 @@ abstract contract AssetTrackerBase is
                     Register token
     //////////////////////////////////////////////////////////////*/
 
-    function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
-        _registerTokenOnL2(_assetId);
-    }
 
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) external onlyNativeTokenVault {
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public onlyNativeTokenVault virtual {
         chainBalance[_originChainId][_assetId] = type(uint256).max;
-        if (block.chainid != _l1ChainId()) {
-            _registerTokenOnL2(_assetId);
-        }
     }
 
-    function _registerTokenOnL2(bytes32 _assetId) internal {
-        assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
-    }
+
 
     /// @dev This function is used to decrease the chain balance of a token on a chain.
     /// @dev It makes debugging issues easier. Overflows don't usually happen, so there is no similar function to increase the chain balance.

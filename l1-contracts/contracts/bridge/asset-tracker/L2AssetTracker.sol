@@ -79,6 +79,20 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return L2_MESSAGE_ROOT;
     }
 
+
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override {
+        _registerTokenOnL2(_assetId);
+        super.registerNewToken(_assetId, _originChainId);
+    }
+
+    function _registerTokenOnL2(bytes32 _assetId) internal {
+        assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+    }
+
+    function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
+        _registerTokenOnL2(_assetId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
