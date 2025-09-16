@@ -51,3 +51,6 @@ error OnlyWhitelistedSettlementLayer(address, address);
 error OnlyWithdrawalsAllowedForPreV30Chains();
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
+
+error InvalidL2ShardId();
+error InvalidServiceLog();
