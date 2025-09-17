@@ -29,7 +29,7 @@ contract ChainUpgrade_v30 is DefaultChainUpgrade {
         uint256 bridgedTokensCount = ntv.bridgedTokensCount();
         for (uint256 i = 0; i < bridgedTokensCount; ++i) {
             bytes32 assetId = ntv.bridgedTokens(i);
-            l1AssetTracker.migrateTokenBalanceFromNTV(_chainId, assetId);
+            l1AssetTracker.migrateTokenBalanceFromNTVV30(_chainId, assetId);
         }
     }
 

@@ -93,7 +93,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainAssetHandler = IChainAssetHandler(BRIDGE_HUB.chainAssetHandler());
     }
 
-    function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external {
+    /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V30 upgrade.
+    /// @param _chainId The chain id of the chain to migrate the token balance for.
+    /// @param _assetId The asset id of the token to migrate the token balance for.
+    function migrateTokenBalanceFromNTVV30(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
         uint256 migratedBalance;
         if (_chainId != block.chainid) {
@@ -120,7 +123,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Called on the L1 when a deposit to the chain happens.
-    /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
     /// @param _chainId The destination chain id of the transfer.
     function handleChainBalanceIncreaseOnL1(
