@@ -123,7 +123,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Called on the L1 when a deposit to the chain happens.
-    /// @notice Also called from the InteropCenter on Gateway during deposits.
     /// @dev As the chain does not update its balance when settling on L1.
     /// @param _chainId The destination chain id of the transfer.
     function handleChainBalanceIncreaseOnL1(
