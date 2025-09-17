@@ -25,6 +25,7 @@ import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
+import {SavedTotalSupply} from "./IAssetTrackerBase.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
@@ -48,6 +49,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// We record the number of received deposits on GW, and require that all of the deposits are processed before the chain migrates back to L1.
     mapping(uint256 chainId => uint256 unprocessedDeposits) public unprocessedDeposits;
+
+    // @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
+    mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply)))
+        internal savedTotalSupply;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -187,7 +192,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     revert InvalidMessage();
                 }
                 require(log.l2ShardId == 0, InvalidL2ShardId());
-                require(!log.isService, InvalidServiceLog());
+                require(log.isService, InvalidServiceLog());
 
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
@@ -418,19 +423,33 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         uint256 migrationNumber = _getChainMigrationNumber(_chainId);
         require(assetMigrationNumber[_chainId][_assetId] < migrationNumber, InvalidAssetId(_assetId));
+        uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, migrationNumber);
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: _chainId,
             assetId: _assetId,
             tokenOriginChainId: tokenOriginChainId[_assetId],
-            amount: chainBalance[_chainId][_assetId],
+            amount: amount,
             migrationNumber: migrationNumber,
             originToken: originToken[_assetId],
             isL1ToGateway: false
         });
 
         _sendMigrationDataToL1(tokenBalanceMigrationData);
+    }
+
+    function _getOrSaveChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _migrationNumber) internal returns (uint256) {
+        SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_chainId][_migrationNumber][_assetId];
+        if (!tokenSavedTotalSupply.isSaved) {
+            tokenSavedTotalSupply.amount = chainBalance[_chainId][_assetId];
+            chainBalance[_chainId][_assetId] = 0;
+            savedTotalSupply[_chainId][_migrationNumber][_assetId] = SavedTotalSupply({
+                isSaved: true,
+                amount: tokenSavedTotalSupply.amount
+            });
+        }
+        return tokenSavedTotalSupply.amount;
     }
 
     function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {

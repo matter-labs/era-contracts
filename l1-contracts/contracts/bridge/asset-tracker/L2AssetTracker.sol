@@ -15,11 +15,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AssetIdNotRegistered, TokenBalanceNotMigratedToGateway, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
-
-struct SavedTotalSupply {
-    bool isSaved;
-    uint256 amount;
-}
+import {SavedTotalSupply} from "./IAssetTrackerBase.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     uint256 public L1_CHAIN_ID;
