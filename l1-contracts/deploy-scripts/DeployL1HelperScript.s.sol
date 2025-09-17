@@ -42,8 +42,8 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
+import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
+import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -149,9 +149,9 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                     return type(DualVerifier).creationCode;
                 }
             } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return type(L1VerifierFflonk).creationCode;
+                return type(VerifierFflonk).creationCode;
             } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return type(L1VerifierPlonk).creationCode;
+                return type(VerifierPlonk).creationCode;
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
