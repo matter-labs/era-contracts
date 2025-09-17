@@ -14,6 +14,7 @@ import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMa
 import {TimeNotReached, TooManyFactoryDeps} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IDefaultUpgrade} from "./IDefaultUpgrade.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
@@ -42,10 +43,21 @@ struct ProposedUpgrade {
     uint256 newProtocolVersion;
 }
 
+error UpgradeInnerFailed();
+
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
 abstract contract BaseZkSyncUpgrade is ZKChainBase {
+
+    /// @notice The address of this contract.
+    /// @dev needed if address is delegateCalled, and we delegateCall it again.
+    address public immutable THIS_ADDRESS;
+
+    constructor() {
+        THIS_ADDRESS = address(this);
+    }
+
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -116,6 +128,20 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
         emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
+    }
+
+    /// @notice With multiple chain upgrades we need to call the upgrade function externally to convert memory to calldata..
+
+    function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32 txHash) {
+        return upgrade(_proposedUpgrade);
+    }
+
+    function _delegatecallUpgrade(ProposedUpgrade calldata _proposedUpgrade) internal virtual returns (bytes32 txHash) {
+        // slither-disable-next-line controlled-delegatecall
+        (bool success, ) = THIS_ADDRESS.delegatecall(abi.encodeCall(IDefaultUpgrade.upgradeInner, _proposedUpgrade));
+        if (!success) {
+            revert UpgradeInnerFailed();
+        }
     }
 
     /// @notice Change default account bytecode hash, that is used on L2

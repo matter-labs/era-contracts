@@ -23,4 +23,6 @@ interface IL2AssetTracker {
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external;
 
     function confirmMigrationOnL2(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
+
+    function registerLegacyTokenOnChain(bytes32 _assetId) external;
 }

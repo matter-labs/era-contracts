@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature} from "./AssetTrackerErrors.sol";
+import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidL2ShardId, InvalidServiceLog} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -24,6 +24,7 @@ import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
+import {BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
@@ -53,6 +54,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// empty messageRoot calculated for specific chain.
     mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
+
+    /// We record the number of received deposits on GW, and require that all of the deposits are processed before the chain migrates back to L1.
+    mapping(uint256 chainId => uint256 unprocessedDeposits) public unprocessedDeposits;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -124,6 +128,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         BalanceChange calldata _balanceChange
     ) external onlyL2InteropCenter {
         // we increase the chain balance of the token.
+        // we don't decrease chainBalance of the source, since the source is L1, and keep track of chainBalance[L1_CHAIN_ID] on L1.
         if (_balanceChange.amount > 0) {
             chainBalance[_chainId][_balanceChange.assetId] += _balanceChange.amount;
         }
@@ -140,6 +145,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
         // we save the balance change to be able to handle failed deposits.
 
+        ++unprocessedDeposits[_chainId];
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
@@ -195,6 +201,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 if (log.value != keccak256(message)) {
                     revert InvalidMessage();
                 }
+                require(log.l2ShardId == 0, InvalidL2ShardId());
+                require(!log.isService, InvalidServiceLog());
+
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                     require(!onlyWithdrawals, OnlyWithdrawalsAllowedForPreV30Chains());
@@ -234,7 +243,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             revert ReconstructionMismatch(chainBatchRootHash, _processLogsInputs.chainBatchRoot);
         }
 
-        _appendChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
+        ///  Appends the batch message root to the global message.
+        /// _batchNumber The number of the batch
+        /// _messageRootToAppend The root of the merkle tree of the messages to L1.
+        /// The logic of this function depends on the settlement layer as we support
+        /// message root aggregation only on non-L1 settlement layers for ease for migration.
+        _messageRoot().addChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
     }
 
     function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
@@ -259,6 +273,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
     function _handlePotentialFailedDeposit(uint256 _chainId, bytes32 _canonicalTxHash) internal {
         BalanceChange memory savedBalanceChange = balanceChange[_chainId][_canonicalTxHash];
+        require(savedBalanceChange.version == BALANCE_CHANGE_VERSION, InvalidCanonicalTxHash(_canonicalTxHash));
         /// Note we handle failedDeposits here for deposits that do not go through GW during chainMigration,
         /// because they were initiated when the chain settles on L1, however the failedDeposit L2->L1 message goes through GW.
         /// Here we do not need to decrement the chainBalance, since the chainBalance was added to the chain's chainBalance on L1,
@@ -270,6 +285,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (savedBalanceChange.baseTokenAmount > 0) {
             _decreaseChainBalance(_chainId, savedBalanceChange.baseTokenAssetId, savedBalanceChange.baseTokenAmount);
         }
+        --unprocessedDeposits[_chainId];
     }
 
     function _handleInteropMessage(uint256 _chainId, bytes calldata _message, bytes32 _baseTokenAssetId) internal {
@@ -464,15 +480,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes calldata _tokenData
     ) external pure returns (uint256 originChainId, bytes memory name, bytes memory symbol, bytes memory decimals) {
         (originChainId, name, symbol, decimals) = DataEncoding.decodeTokenData(_tokenData);
-    }
-
-    /// @notice Appends the batch message root to the global message.
-    /// @param _batchNumber The number of the batch
-    /// @param _messageRootToAppend The root of the merkle tree of the messages to L1.
-    /// @dev The logic of this function depends on the settlement layer as we support
-    /// message root aggregation only on non-L1 settlement layers for ease for migration.
-    function _appendChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _messageRootToAppend) internal {
-        _messageRoot().addChainBatchRoot(_chainId, _batchNumber, _messageRootToAppend);
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {

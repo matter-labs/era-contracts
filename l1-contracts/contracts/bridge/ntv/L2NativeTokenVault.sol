@@ -189,7 +189,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         originChainId[_assetId] = L1_CHAIN_ID;
         bridgedTokens[bridgedTokensCount] = _assetId;
         ++bridgedTokensCount;
-        _assetTracker().registerLegacyTokenOnChain(_assetId);
+        L2_ASSET_TRACKER.registerLegacyTokenOnChain(_assetId);
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.

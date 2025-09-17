@@ -12,7 +12,7 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {AssetIdNotRegistered, TokenBalanceNotMigratedToGateway, MissingBaseTokenAssetId} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, TokenBalanceNotMigratedToGateway, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
@@ -79,6 +79,20 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return L2_MESSAGE_ROOT;
     }
 
+
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override {
+        _registerTokenOnL2(_assetId);
+        super.registerNewToken(_assetId, _originChainId);
+    }
+
+    function _registerTokenOnL2(bytes32 _assetId) internal {
+        assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+    }
+
+    function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
+        _registerTokenOnL2(_assetId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
@@ -114,7 +128,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
-        bytes32 baseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
+        bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
         _handleInitiateBridgingOnL2Inner(baseTokenAssetId, _amount, baseTokenOriginChainId);
     }
@@ -196,6 +210,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
     /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
+        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID, OnlyGatewaySettlementLayer());
         address tokenAddress = _tryGetTokenAddress(_assetId);
 
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);

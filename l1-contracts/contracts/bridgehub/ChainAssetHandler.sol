@@ -14,9 +14,9 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, SLHasDifferentCTM, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain} from "./L1BridgehubErrors.sol";
+import {ChainBatchRootNotSet, NextChainBatchRootAlreadySet, ZKChainNotRegistered, SLHasDifferentCTM, IncorrectChainAssetId, IncorrectSender, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, MigrationNotToL1} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotL1, NotAssetRouter} from "../common/L1ContractErrors.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, GW_ASSET_TRACKER, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
@@ -160,6 +160,8 @@ contract ChainAssetHandler is
                         Chain migration
     //////////////////////////////////////////////////////////////*/
 
+    error UnprocessedDepositsNotProcessed();
+
     /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     /// @param _settlementChainId the chainId of the settlement chain, i.e. where the message and the migrating chain is sent.
     /// @param _assetId the assetId of the migrating chain's CTM
@@ -223,6 +225,11 @@ contract ChainAssetHandler is
             if (_settlementChainId != L1_CHAIN_ID && BRIDGE_HUB.chainTypeManager(_settlementChainId) != ctm) {
                 revert SLHasDifferentCTM();
             }
+
+            if (block.chainid != L1_CHAIN_ID) {
+                require(_settlementChainId == L1_CHAIN_ID, MigrationNotToL1());
+                require(GW_ASSET_TRACKER.unprocessedDeposits(bridgehubBurnData.chainId) == 0, UnprocessedDepositsNotProcessed());
+            }
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == L1_CHAIN_ID
@@ -233,22 +240,16 @@ contract ChainAssetHandler is
         );
         ++migrationNumber[bridgehubBurnData.chainId];
 
-        uint256 batchNumber = IZKChain(zkChain).getTotalBatchesExecuted();
-        require(
-            MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber) != bytes32(0),
-            ChainBatchRootNotSet(bridgehubBurnData.chainId, batchNumber)
-        );
-        require(
-            MESSAGE_ROOT.chainBatchRoots(bridgehubBurnData.chainId, batchNumber + 1) == bytes32(0),
-            NextChainBatchRootAlreadySet(bridgehubBurnData.chainId, batchNumber + 1)
-        );
+        uint256 batchNumber = MESSAGE_ROOT.currentChainBatchNumber(bridgehubBurnData.chainId);
+
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
             baseTokenAssetId: BRIDGE_HUB.baseTokenAssetId(bridgehubBurnData.chainId),
             batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
-            migrationNumber: migrationNumber[bridgehubBurnData.chainId]
+            migrationNumber: migrationNumber[bridgehubBurnData.chainId],
+            v30UpgradeChainBatchNumber: MESSAGE_ROOT.v30UpgradeChainBatchNumber(bridgehubBurnData.chainId)
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
@@ -271,7 +272,7 @@ contract ChainAssetHandler is
 
         uint256 currentMigrationNumber = migrationNumber[bridgehubMintData.chainId];
         /// If we are not migrating for the first time, we check that the migration number is correct.
-        if (currentMigrationNumber != 0) {
+        if (currentMigrationNumber != 0 && block.chainid == L1_CHAIN_ID) {
             require(
                 currentMigrationNumber + 1 == bridgehubMintData.migrationNumber,
                 MigrationNumberMismatch(currentMigrationNumber + 1, bridgehubMintData.migrationNumber)
@@ -295,7 +296,7 @@ contract ChainAssetHandler is
             BRIDGE_HUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
-            MESSAGE_ROOT.setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.migrationNumber);
+            MESSAGE_ROOT.setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.batchNumber, bridgehubMintData.v30UpgradeChainBatchNumber);
         }
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);

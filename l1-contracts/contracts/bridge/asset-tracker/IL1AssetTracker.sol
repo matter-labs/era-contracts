@@ -24,7 +24,7 @@ interface IL1AssetTracker {
 
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external;
 
-    function migrateTokenBalanceFromNTV(uint256 _chainId, bytes32 _assetId) external;
+    function migrateTokenBalanceFromNTVV30(uint256 _chainId, bytes32 _assetId) external;
 
     function consumeBalanceChange(
         uint256 _callerChainId,

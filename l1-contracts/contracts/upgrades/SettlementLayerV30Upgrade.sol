@@ -13,15 +13,15 @@ import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V30Upgrade} from "./IL2V30Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
+import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();
+error GWNotV30(uint256 chainId);
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice Note, that this upgrade is run wherever the settlement layer of the chain is, i.e. 
-/// on L1 if the chain settles there or on the ZK Gateway.
-contract L1V30Upgrade is BaseZkSyncUpgrade {
+contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
@@ -43,10 +43,15 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
         );
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
-        this.upgradeInner(proposedUpgrade);
+        _delegatecallUpgrade(_proposedUpgrade);
 
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
+
+        uint256 gwChainId = messageRoot.GATEWAY_CHAIN_ID();
+        address gwChain = bridgehub.getZKChain(gwChainId);
+        (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
+        require(gwMinor >= 30, GWNotV30(gwChainId));
 
         chainAssetHandler.setMigrationNumberForV30(s.chainId);
 
@@ -61,12 +66,10 @@ contract L1V30Upgrade is BaseZkSyncUpgrade {
             messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
         }
 
-        return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
-    }
+        if (bridgehub.whitelistedSettlementLayers(s.chainId)) {
+            require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
+        }
 
-    /// @notice the upgrade function.
-    function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) public returns (bytes32) {
-        super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }
