@@ -40,7 +40,7 @@ The proposed solution is to introduce an abstract 3rd party DA layer, that the s
 
 On the protocol level, the complexity is in introducing two new components: L1 and L2 DA verifiers. They are required to ensure the verifiable delivery of the DA inclusion proofs to L1 and consequent verification of these proofs.
 
-The L2 verifier would validate the pubdata correctness and compute a final commitment for DA called `outputHash`. It consists of hashes of `L2→L1 logs and messages`, `bytecodes`, and `compressed state diffs`(blob hashes in case of blobs). This contract has to be deployed by the chain operator and it has to be tied to the DA layer logic, e.g. DA layer accepts 256kb blobs → on the final hash computation stage, the pubdata has to be packed into the chunks of <256kb, and a either the hashes of all blobs, or a rolling hash has to be be part of the `outputHash` preimage.
+The L2 verifier would validate the pubdata correctness and compute a final commitment for DA called `outputHash`. It consists of hashes of `L2→L1 logs and messages`, `bytecodes`, and `compressed state diffs`(blob hashes in case of blobs). This contract has to be deployed by the chain operator and it has to be tied to the DA layer logic, e.g. DA layer accepts 256kb blobs → on the final hash computation stage, the pubdata has to be packed into the chunks of <256kb, and a either the hashes of all blobs, or a rolling hash has to be part of the `outputHash` preimage.
 
 The `outputHash` will be sent to L1 as a L2→L1 log, so this process is a part of a bootloader execution and can be trusted.
 
