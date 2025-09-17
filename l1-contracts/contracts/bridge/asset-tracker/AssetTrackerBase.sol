@@ -29,7 +29,7 @@ abstract contract AssetTrackerBase is
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// NOTE: this function may be removed in the future, don't rely on it!
-    /// @dev For token origin chains, the balance starts at type(uint256).max, and decreases as withdrawals are made from the chain.
+    /// @dev For token origin chains, the balance starts at type(uint256).max on L1AssetTracker, and decreases as withdrawals are made from the chain.
     /// @dev On L1 the chainBalance for non origin chains equals the total supply of the token on the chain and unfinalized withdrawals to L1.
     /// @dev On Gateway the chainBalance for non origin chains equals the total supply of the token on the chain.
     /// @dev On non-Gateway L2s this mapping is only used to track the balance of native tokens.

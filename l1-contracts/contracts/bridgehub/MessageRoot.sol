@@ -75,12 +75,18 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// @notice The mapping storing the batch number at the moment the chain was updated to V30. 
     /// Starting from this batch, if a settlement layer has agreed to a proof, it will be held accountable for the content of the message, e.g.
     /// if a withdrawal happens, the balance of the settlement layer will be reduced and not the chain.
+    /// @notice This is also the first batch starting from which we store batch roots on L1.
     /// @notice Due to the definition above, this mapping will have the default value (0) for newly added chains, so all their batches are under v30 rules.
     /// For the chains that existed at the moment of the upgrade, it value will be populated either with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE until
     /// they call this contract to establish the batch when the upgrade has happened.
     /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
     /// to ensure balance consistency. 
-    /// @notice We store this, as we did not store chainBatchRoots prior to V30 on L1, so we need to get them from the diamond proxies of the chains. --- ???
+    /// @notice This value should contain the same value for both MessageRoot on L1 and on any settlement layer where the chain settles. This is ensured by the fact
+    /// that on the settlement layer the chain will provide its totalBatchesExecuted at the moment of upgrade, and on then the value will be moved to L1 and other settlement layers
+    /// via bridgeMint/bridgeBurn during migration.
+    /// @dev The attack that could be possible by a completely compromised chain is that it will provide an overly small `v30UpgradeChainBatchNumber` value and then migrate
+    /// to a settlement layer and then finalize messages that were not actually approved by the settlement layer. However, since before v30 release chains can only migrate within the same CTM,
+    /// this attack is not considered viable as the chains belong to the same CTM as the settlement layer and so the SL can trust their `getTotalBatchesExecuted` value.
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
 
     /// @dev The chain type manager for EraVM chains. EraVM chains are upgraded directly by governance,
