@@ -20,7 +20,6 @@ import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
@@ -28,15 +27,6 @@ import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol"
 /// @notice Script used for v29.1 stage patch
 contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
-
-    function run() public virtual override {
-        initialize(vm.envString("V29_1_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V29_1_UPGRADE_ECOSYSTEM_OUTPUT"));
-
-        prepareEcosystemUpgrade();
-        prepareDefaultGovernanceCalls();
-
-        prepareTestCalls();
-    }
 
     function initializeConfig(string memory newConfigPath) internal override {
         super.initializeConfig(newConfigPath);
@@ -163,15 +153,9 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         return calls;
     }
 
-    // Tests patch upgrade by upgrading an existing chain
-    function prepareTestCalls() public returns (Call[] memory calls) {
-        Call[][] memory testCalls = new Call[][](1);
-
-        testCalls[0] = prepareTestUpgradeChainCall();
-        calls = mergeCallsArray(testCalls);
-
-        string memory testCallsSerialized = vm.serializeBytes("governance_calls", "test_calls", abi.encode(calls));
-        vm.writeToml(testCallsSerialized, upgradeConfig.outputPath, ".governance_calls");
+    function prepareDefaultEcosystemAdminCalls() public override returns (Call[] memory calls) {
+        // Overriding it to be empty as this is not needed for the patch
+        return calls;
     }
 
     function getProposedUpgrade(
@@ -212,26 +196,5 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         } else {
             return super.getInitializeCalldata(contractName, isZKBytecode);
         }
-    }
-
-    ////////////////////////////// Test utils /////////////////////////////////
-
-    function prepareTestUpgradeChainCall() public returns (Call[] memory calls) {
-        calls = new Call[](1);
-
-        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
-            config.gatewayChainId
-        );
-        uint256 oldProtocolVersion = getOldProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
-
-        address admin = IZKChain(chainDiamondProxyAddress).getAdmin();
-        console.log("Chain admin:", admin);
-
-        calls[0] = Call({
-            target: chainDiamondProxyAddress,
-            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
-            value: 0
-        });
     }
 }
