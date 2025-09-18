@@ -28,6 +28,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -326,6 +327,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         prepareDefaultGovernanceCalls();
         prepareDefaultEcosystemAdminCalls();
+
+        prepareDefaultTestUpgradeCalls();
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -1048,6 +1051,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
         vm.serializeBytes("root", "ecosystem_admin_calls", new bytes(0)); // Will be populated later
+        vm.serializeBytes("root", "test_upgrade_calls", new bytes(0)); // Will be populated later
         vm.serializeBytes("root", "v29", new bytes(0)); // Will be populated later
 
         vm.serializeUint(
@@ -1129,6 +1133,22 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         );
 
         vm.writeToml(ecosystemAdminCallsSerialized, upgradeConfig.outputPath, ".ecosystem_admin_calls");
+    }
+
+    function prepareDefaultTestUpgradeCalls() public {
+        (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
+        vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
+        vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
+        (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareCreateChainCall();
+        vm.serializeAddress("test_upgrade_calls", "test_create_chain_caller", bridgehubAdmin);
+
+        string memory testUpgradeCallsSerialized = vm.serializeBytes(
+            "test_upgrade_calls",
+            "test_create_chain",
+            abi.encode(testCreateChainCall)
+        );
+
+        vm.writeToml(testUpgradeCallsSerialized, upgradeConfig.outputPath, ".test_upgrade_calls");
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
@@ -1670,6 +1690,31 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             l1GasPrice,
             gatewayConfig.gatewayStateTransition.rollupDAManager
         );
+    }
+
+    /// @notice Tests that it is possible to upgrade a chain to the new version
+    function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
+        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+            config.gatewayChainId
+        );
+        uint256 oldProtocolVersion = getOldProtocolVersion();
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
+
+        admin = IZKChain(chainDiamondProxyAddress).getAdmin();
+
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: chainDiamondProxyAddress,
+            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+            value: 0
+        });
+    }
+
+    /// @notice Tests that it is possible to create a new chain with the new version
+    function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
+        admin = getBridgehubAdmin();
+        calls = new Call[](1);
+        calls[0] = prepareCreateNewChainCall(555)[0];
     }
 
     function getCreationCode(
