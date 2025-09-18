@@ -57,11 +57,30 @@ library AddressAliasHelper {
                 ? _originalCaller
                 : AddressAliasHelper.applyL1ToL2Alias(_originalCaller);
             // solhint-enable avoid-tx-origin
-        } else if (_refundRecipient.code.length > 0) {
+        } else if (_refundRecipient.code.length > 0 && !isEIP7702EOA(_refundRecipient)) {
             // If the `_refundRecipient` is a smart contract, we apply the L1 to L2 alias to prevent foot guns.
+            // Also we check that refund recipient is not EIP7702 account, as this would result in incorrect aliasing
             _recipient = AddressAliasHelper.applyL1ToL2Alias(_refundRecipient);
         } else {
             _recipient = _refundRecipient;
         }
+    }
+
+    function isEIP7702EOA(address account) internal view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(account)
+        }
+        if (size != 23) return false; // must be exactly 23 bytes
+
+        bytes memory code = new bytes(3);
+        assembly {
+            extcodecopy(account, add(code, 0x20), 0, 3)
+        }
+
+        // Mask to get only the first 3 bytes
+        bytes3 prefix = bytes3(code);
+
+        return prefix == 0xef0100;
     }
 }

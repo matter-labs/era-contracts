@@ -450,7 +450,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
         // solhint-disable avoid-tx-origin
         // slither-disable-next-line tx-origin
-        if (request.sender != tx.origin) {
+        if (request.sender != tx.origin && !AddressAliasHelper.isEIP7702EOA(request.sender)) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
         }
 

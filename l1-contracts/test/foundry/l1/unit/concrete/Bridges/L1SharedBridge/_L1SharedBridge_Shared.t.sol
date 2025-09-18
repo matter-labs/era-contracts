@@ -14,6 +14,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
@@ -66,6 +67,7 @@ contract L1AssetRouterTest is Test {
     L1NativeTokenVault nativeTokenVault;
     L1Nullifier l1NullifierImpl;
     L1Nullifier l1Nullifier;
+    SimpleExecutor simpleExecutor;
     address bridgehubAddress;
     address l1ERC20BridgeAddress;
     address l1WethAddress;
@@ -81,6 +83,7 @@ contract L1AssetRouterTest is Test {
     address zkSync;
     address alice;
     address bob;
+    uint256 alicePk;
     uint256 chainId;
     uint256 amount = 100;
     uint256 mintValue = 1;
@@ -108,7 +111,8 @@ contract L1AssetRouterTest is Test {
         proxyAdmin = makeAddr("proxyAdmin");
         // zkSync = makeAddr("zkSync");
         bridgehubAddress = makeAddr("bridgehub");
-        alice = makeAddr("alice");
+        alicePk = uint256(keccak256("alice"));
+        alice = vm.addr(alicePk);
         // bob = makeAddr("bob");
         l1WethAddress = address(new ERC20("Wrapped ETH", "WETH"));
         l1ERC20BridgeAddress = makeAddr("l1ERC20Bridge");
@@ -168,6 +172,7 @@ contract L1AssetRouterTest is Test {
             abi.encodeWithSelector(L1NativeTokenVault.initialize.selector, owner, tokenBeacon)
         );
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
+        simpleExecutor = new SimpleExecutor();
 
         vm.prank(owner);
         l1Nullifier.setL1AssetRouter(address(sharedBridge));

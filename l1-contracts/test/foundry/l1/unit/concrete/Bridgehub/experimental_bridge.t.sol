@@ -2,6 +2,7 @@
 
 pragma solidity 0.8.28;
 
+import {Vm} from "forge-std/Vm.sol";
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
@@ -14,6 +15,7 @@ import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainT
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubSetter.sol";
+import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
@@ -54,6 +56,7 @@ contract ExperimentalBridgeTest is Test {
     L1NativeTokenVault ntv;
     IMessageRoot messageRoot;
     L1Nullifier l1Nullifier;
+    SimpleExecutor simpleExecutor;
 
     bytes32 tokenAssetId;
 
@@ -185,6 +188,8 @@ contract ExperimentalBridgeTest is Test {
 
         // Ownership should have changed
         assertEq(bridgeHub.owner(), bridgeOwner);
+
+        simpleExecutor = new SimpleExecutor();
     }
 
     function _deployNTV(address _sharedBridgeAddr) internal returns (L1NativeTokenVault addr) {
@@ -1196,6 +1201,104 @@ contract ExperimentalBridgeTest is Test {
         resultantHash = bridgeHub.requestL2TransactionDirect(l2TxnReqDirect);
 
         assertEq(canonicalHash, resultantHash);
+    }
+
+    function test_requestL2TransactionDirect_NonETHCase7702(
+        uint256 mockChainId,
+        uint256 mockMintValue,
+        address mockL2Contract,
+        uint256 mockL2Value,
+        bytes memory mockL2Calldata,
+        uint256 mockL2GasLimit,
+        uint256 mockL2GasPerPubdataByteLimit,
+        bytes[] memory mockFactoryDeps,
+        uint256 gasPrice,
+        uint256 randomValue
+    ) public useRandomToken(randomValue) {
+        _useFullSharedBridge();
+        _initializeBridgehub();
+
+        uint256 randomCallerPk = uint256(keccak256("RANDOM_CALLER"));
+        address payable randomCaller = payable(vm.addr(randomCallerPk));
+        mockChainId = bound(mockChainId, 1, type(uint48).max);
+
+        vm.assume(mockFactoryDeps.length <= MAX_NEW_FACTORY_DEPS);
+        vm.assume(mockMintValue > 0);
+
+        L2TransactionRequestDirect memory l2TxnReqDirect = _createMockL2TransactionRequestDirect({
+            mockChainId: mockChainId,
+            mockMintValue: mockMintValue,
+            mockL2Contract: mockL2Contract,
+            mockL2Value: mockL2Value,
+            mockL2Calldata: mockL2Calldata,
+            mockL2GasLimit: mockL2GasLimit,
+            mockL2GasPerPubdataByteLimit: mockL2GasPerPubdataByteLimit,
+            mockFactoryDeps: mockFactoryDeps,
+            mockRefundRecipient: randomCaller
+        });
+
+        l2TxnReqDirect.chainId = _setUpZKChainForChainId(l2TxnReqDirect.chainId);
+
+        _setUpBaseTokenForChainId(l2TxnReqDirect.chainId, false, address(testToken));
+
+        assertTrue(bridgeHub.getZKChain(l2TxnReqDirect.chainId) == address(mockChainContract));
+        bytes32 canonicalHash = keccak256(abi.encode("CANONICAL_TX_HASH"));
+
+        vm.mockCall(
+            address(mockChainContract),
+            abi.encodeWithSelector(mockChainContract.bridgehubRequestL2Transaction.selector),
+            abi.encode(canonicalHash)
+        );
+
+        mockChainContract.setFeeParams();
+        mockChainContract.setBaseTokenGasMultiplierPrice(uint128(1), uint128(1));
+        mockChainContract.setBridgeHubAddress(address(bridgeHub));
+        assertTrue(mockChainContract.getBridgeHubAddress() == address(bridgeHub));
+
+        gasPrice = bound(gasPrice, 1_000, 50_000_000);
+        vm.txGasPrice(gasPrice * 1 gwei);
+
+        vm.deal(randomCaller, 1 ether);
+        vm.prank(randomCaller);
+        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, 0, randomCaller.balance));
+        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
+
+        // Now, let's call the same function with zero msg.value
+        testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
+        assertEq(testToken.balanceOf(randomCaller), l2TxnReqDirect.mintValue);
+
+        bytes memory calldataForExecutor = abi.encodeWithSelector(
+            bridgeHub.requestL2TransactionDirect.selector,
+            l2TxnReqDirect
+        );
+
+        vm.recordLogs(); // start recording all logs
+
+        vm.prank(randomCaller);
+        testToken.approve(sharedBridgeAddress, l2TxnReqDirect.mintValue);
+        assertEq(testToken.allowance(randomCaller, sharedBridgeAddress), l2TxnReqDirect.mintValue);
+        vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
+        SimpleExecutor(randomCaller).execute(address(bridgeHub), 0, calldataForExecutor);
+
+        // Fetch all logs
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        console.log("Total events emitted:", logs.length);
+
+        for (uint256 i = 0; i < logs.length; i++) {
+            Vm.Log memory logEntry = logs[i];
+
+            console.log("---- Event", i, "----");
+            console.log("Emitter:", logEntry.emitter);
+            console.log("Topics count:", logEntry.topics.length);
+
+            for (uint256 t = 0; t < logEntry.topics.length; t++) {
+                console.logBytes32(logEntry.topics[t]);
+            }
+
+            console.log("Data:");
+            console.logBytes(logEntry.data);
+        }
     }
 
     function test_requestTransactionTwoBridgesChecksMagicValue(
