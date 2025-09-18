@@ -29,6 +29,10 @@ import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageV
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
+import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+
+import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
+
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {L2UtilsBase} from "./L2UtilsBase.sol";
@@ -37,10 +41,11 @@ import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.s
 import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
+import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";
+import {DeployL1HelperScript} from "deploy-scripts/DeployL1HelperScript.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 
-contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1IntegrationScript {
+contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegrationScript {
     using stdToml for string;
     using stdStorage for StdStorage;
 
@@ -87,25 +92,25 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployL1Integra
     }
 
     // add this to be excluded from coverage report
-    function test() internal virtual override(DeployL1IntegrationScript, SharedL2ContractDeployer) {}
+    function test() internal virtual override(DeployCTMIntegrationScript, SharedL2ContractDeployer) {}
 
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual override(DeployUtils, DeployL1Script) returns (bytes memory) {
+    ) internal view virtual override(DeployUtils, DeployL1HelperScript) returns (bytes memory) {
         return super.getCreationCode(contractName, false);
     }
 
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual override(DeployIntegrationUtils, DeployL1Script) returns (bytes memory) {
+    ) internal virtual override(DeployIntegrationUtils, DeployL1HelperScript) returns (bytes memory) {
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override(DeployL1IntegrationScript, DeployIntegrationUtils) returns (FacetCut[] memory) {
+    ) internal virtual override(DeployCTMIntegrationScript, DeployIntegrationUtils) returns (FacetCut[] memory) {
         return super.getFacetCuts(stateTransition);
     }
 }
