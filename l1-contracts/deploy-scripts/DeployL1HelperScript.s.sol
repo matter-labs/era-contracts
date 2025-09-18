@@ -106,10 +106,18 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "Bridgehub")) {
+            if (compareStrings(contractName, "L1AssetTracker")) {
+                return type(L1AssetTracker).creationCode;
+            } else if (compareStrings(contractName, "L2AssetTracker")) {
+                return type(L2AssetTracker).creationCode;
+            } else if (compareStrings(contractName, "ChainRegistrar")) {
+                return type(ChainRegistrar).creationCode;
+            } else if (compareStrings(contractName, "Bridgehub")) {
                 return type(Bridgehub).creationCode;
             } else if (compareStrings(contractName, "ChainAssetHandler")) {
                 return type(ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+                return type(ChainRegistrationSender).creationCode;
             } else if (compareStrings(contractName, "MessageRoot")) {
                 return type(MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
@@ -120,6 +128,8 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 } else {
                     return type(L1Nullifier).creationCode;
                 }
+            } else if (compareStrings(contractName, "InteropCenter")) {
+                return type(InteropCenter).creationCode;
             } else if (compareStrings(contractName, "L1AssetRouter")) {
                 return type(L1AssetRouter).creationCode;
             } else if (compareStrings(contractName, "L1ERC20Bridge")) {
@@ -196,6 +206,8 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "Bridgehub")) {
                 return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "ChainRegistrationSender")) {
+                return abi.encodeCall(ChainRegistrationSender.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "MessageRoot")) {
                 return abi.encodeCall(MessageRoot.initialize, ());
             } else if (compareStrings(contractName, "ChainAssetHandler")) {
@@ -212,7 +224,7 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return
                     abi.encodeCall(
                         L1NativeTokenVault.initialize,
-                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                        (config.deployerAddress, addresses.bridges.bridgedTokenBeacon)
                     );
             } else if (compareStrings(contractName, "ChainTypeManager")) {
                 return
@@ -220,8 +232,16 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                         ChainTypeManager.initialize,
                         getChainTypeManagerInitializeData(addresses.stateTransition)
                     );
+            } else if (compareStrings(contractName, "ChainRegistrar")) {
+                return
+                    abi.encodeCall(
+                        ChainRegistrar.initialize,
+                        (addresses.bridgehub.bridgehubProxy, config.deployerAddress, config.ownerAddress)
+                    );
             } else if (compareStrings(contractName, "ServerNotifier")) {
                 return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
+            } else if (compareStrings(contractName, "L1AssetTracker")) {
+                return abi.encodeCall(L1AssetTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return
                     abi.encodeCall(
