@@ -234,8 +234,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
 
         ///  Appends the batch message root to the global message.
-        /// _batchNumber The number of the batch
-        /// _messageRootToAppend The root of the merkle tree of the messages to L1.
         /// The logic of this function depends on the settlement layer as we support
         /// message root aggregation only on non-L1 settlement layers for ease for migration.
         _messageRoot().addChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
