@@ -204,26 +204,11 @@ abstract contract DeployUtils is Create2FactoryUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    /// @dev For chain upgrades, we only include the facets that are being changed,
-    /// see `getUpgradeFacetCuts` and `getChainCreationFacetCuts`.
-    function getUpgradeDiamondCutData(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        Diamond.FacetCut[] memory facetCuts = getUpgradeFacetCuts(stateTransition);
-        return _getDiamondCutData(stateTransition, facetCuts);
-    }
-
     function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
         Diamond.FacetCut[] memory facetCuts = getChainCreationFacetCuts(stateTransition);
-        return _getDiamondCutData(stateTransition, facetCuts);
-    }
 
-    function _getDiamondCutData(
-        StateTransitionDeployedAddresses memory stateTransition,
-        Diamond.FacetCut[] memory facetCuts
-    ) internal returns (Diamond.DiamondCutData memory diamondCut) {
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
 
         diamondCut = Diamond.DiamondCutData({
