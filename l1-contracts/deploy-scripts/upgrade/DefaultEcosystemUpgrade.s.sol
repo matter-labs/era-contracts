@@ -668,7 +668,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         // TODO(refactor): do we need this?
         additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
         additionalDependencies[5] = ContractsBytecodesLib.getCreationCode("L2V29Upgrade");
-        additionalDependencies[6] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
+        additionalDependencies[6] = Utils.readSystemContractsBytecode("ProxyAdmin");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
             additionalDependencies[6 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
