@@ -1138,14 +1138,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     function prepareDefaultTestUpgradeCalls() public {
         (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
         vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
-        vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
-        (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareCreateChainCall();
-        vm.serializeAddress("test_upgrade_calls", "test_create_chain_caller", bridgehubAdmin);
 
         string memory testUpgradeCallsSerialized = vm.serializeBytes(
             "test_upgrade_calls",
-            "test_create_chain",
-            abi.encode(testCreateChainCall)
+            "test_upgrade_chain",
+            abi.encode(testUpgradeChainCall)
         );
 
         vm.writeToml(testUpgradeCallsSerialized, upgradeConfig.outputPath, ".test_upgrade_calls");
@@ -1708,13 +1705,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
             value: 0
         });
-    }
-
-    /// @notice Tests that it is possible to create a new chain with the new version
-    function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
-        admin = getBridgehubAdmin();
-        calls = new Call[](1);
-        calls[0] = prepareCreateNewChainCall(555)[0];
     }
 
     function getCreationCode(
