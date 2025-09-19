@@ -114,11 +114,35 @@ jobs:
         # First we need to deploy the ecosystem contracts
         run: forge script ./deploy-scripts/DeployL1CoreContracts.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
 
-      - name: Run DeployL1 script
+      - name: Read bridgehub proxy address
+        id: read-bridgehub
         working-directory: ./l1-contracts
-        # l1-contracts are skipped because we don't want to recompile Bridgehub with a high optimizer-runs value.
-        # Otherwise, the Bridgehub contract size would be too large.
-        run: forge script ./deploy-scripts/DeployL1.s.sol --ffi --rpc-url $ANVIL_RPC_URL --broadcast --private-key $ANVIL_PRIVATE_KEY --skip '*/l1-contracts/contracts/*'
+        run: |
+          # Extract bridgehub_proxy_addr allowing leading whitespace
+          BRIDGEHUB=$(
+            sed -nE 's/^[[:space:]]*bridgehub_proxy_addr[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' \
+              ./script-out/output-deploy-l1.toml | head -n1
+          )
+
+          echo "Parsed bridgehub_proxy_addr: $BRIDGEHUB"
+
+          if [[ -z "$BRIDGEHUB" || ! "$BRIDGEHUB" =~ ^0x[0-9a-fA-F]{40}$ ]]; then
+            echo "❌ Failed to parse a valid bridgehub address"
+            exit 1
+          fi
+
+          echo "BRIDGEHUB=$BRIDGEHUB" >> $GITHUB_ENV
+
+      - name: Run DeployCTM script with bridgehub
+        working-directory: ./l1-contracts
+        run: |
+          forge script ./deploy-scripts/DeployCTM.s.sol \
+            --ffi \
+            --rpc-url $ANVIL_RPC_URL \
+            --broadcast \
+            --private-key $ANVIL_PRIVATE_KEY \
+            --sig "runWithBridgehub(address,bool)" $BRIDGEHUB "false" \
+            --skip '*/l1-contracts/contracts/*'
 
       - name: Run DeployErc20 script
         working-directory: ./l1-contracts
