@@ -102,7 +102,7 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
 
     /// @notice Get facet cuts that should be removed
     function getFacetCutsForDeletion() internal override returns (Diamond.FacetCut[] memory facetCuts) {
-        // Remove the old MailboxFacet
+        // Remove the old AdminFacet and MailboxFacet
         facetCuts = new Diamond.FacetCut[](2);
         facetCuts[0] = Diamond.FacetCut({
             facet: address(0),
