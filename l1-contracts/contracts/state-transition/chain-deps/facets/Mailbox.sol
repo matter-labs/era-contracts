@@ -505,26 +505,17 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.settlementLayer != address(0)) {
             address assetRouter = IBridgehub(s.bridgehub).assetRouter();
-            if (_params.request.sender != AddressAliasHelper.applyL1ToL2Alias(assetRouter)) {
-                // slither-disable-next-line unused-return
-                IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
-                    _chainId: s.chainId,
-                    _canonicalTxHash: canonicalTxHash,
-                    _expirationTimestamp: _params.expirationTimestamp,
-                    _baseTokenAmount: _params.request.mintValue,
-                    _getBalanceChange: false
-                });
-            } else {
-                // slither-disable-next-line unused-return
-                IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
-                    _chainId: s.chainId,
-                    _canonicalTxHash: canonicalTxHash,
-                    _expirationTimestamp: _params.expirationTimestamp,
-                    _baseTokenAmount: _params.request.mintValue,
-                    _getBalanceChange: true
-                });
+            bool getBalanceChange = _params.request.sender == AddressAliasHelper.applyL1ToL2Alias(assetRouter);
+
+            // slither-disable-next-line unused-return
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
+                _chainId: s.chainId,
+                _canonicalTxHash: canonicalTxHash,
+                _expirationTimestamp: _params.expirationTimestamp,
+                _baseTokenAmount: _params.request.mintValue,
+                _getBalanceChange: getBalanceChange
+            });
             }
-        }
     }
 
     function _nextPriorityTxId() internal view returns (uint256) {
