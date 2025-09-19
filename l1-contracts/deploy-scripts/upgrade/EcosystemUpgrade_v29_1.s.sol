@@ -178,23 +178,4 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
             newProtocolVersion: getNewProtocolVersion()
         });
     }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ChainAssetHandler")) {
-            if (!isZKBytecode) {
-                return abi.encodeCall(ChainAssetHandler.initialize, (config.ownerAddress));
-            } else {
-                return
-                    abi.encodeCall(
-                        ChainAssetHandler.initialize,
-                        AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress)
-                    );
-            }
-        } else {
-            return super.getInitializeCalldata(contractName, isZKBytecode);
-        }
-    }
 }
