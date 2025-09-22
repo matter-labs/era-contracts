@@ -123,12 +123,11 @@ jobs:
           cache: yarn
 
       - name: Run anvil-zksync
-        uses: dutterbutter/anvil-zksync-action@v1.1.0
+        uses: dutterbutter/anvil-zksync-action@v1.3.0
         with:
           mode: run
-          releaseTag: v0.6.1
-          protocolVersion: 28
-          emulateEvm: true
+          protocolVersion: 29
+          evmInterpreter: true
 
       - name: Install dependencies
         run: yarn
@@ -149,10 +148,6 @@ jobs:
 
       - name: Run tests
         run: yarn sc test
-
-      - name: Print output logs of anvil-zksync
-        if: always()
-        run: cat anvil_zksync.log
 
   test-contracts-foundry:
     needs: [lint]
