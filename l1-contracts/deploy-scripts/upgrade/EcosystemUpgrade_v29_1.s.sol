@@ -36,7 +36,6 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         addresses.stateTransition.executorFacet = toml.readAddress("$.state_transition.executor_facet_addr");
         addresses.stateTransition.genesisUpgrade = toml.readAddress("$.state_transition.genesis_upgrade_addr");
         addresses.stateTransition.gettersFacet = toml.readAddress("$.state_transition.getters_facet_addr");
-        addresses.stateTransition.verifier = toml.readAddress("$.state_transition.verifier_addr");
 
         gatewayConfig.gatewayStateTransition.diamondInit = toml.readAddress(
             "$.gateway.gateway_state_transition.diamond_init_addr"
@@ -50,15 +49,14 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
         gatewayConfig.gatewayStateTransition.gettersFacet = toml.readAddress(
             "$.gateway.gateway_state_transition.getters_facet_addr"
         );
-        gatewayConfig.gatewayStateTransition.verifier = toml.readAddress(
-            "$.gateway.gateway_state_transition.verifier_addr"
-        );
     }
 
     function deployNewEcosystemContractsL1() public override {
         require(upgradeConfig.initialized, "Not initialized");
 
         instantiateCreate2Factory();
+
+        deployVerifiers();
         deployUpgradeStageValidator();
 
         addresses.stateTransition.defaultUpgrade = deployUsedUpgradeContract();
@@ -73,6 +71,10 @@ contract EcosystemUpgrade_v29_1 is Script, DefaultEcosystemUpgrade {
 
     function deployNewEcosystemContractsGW() public override {
         require(upgradeConfig.initialized, "Not initialized");
+
+        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
+        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
+        gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
 
         gatewayConfig.gatewayStateTransition.adminFacet = deployGWContract("AdminFacet");
         gatewayConfig.gatewayStateTransition.mailboxFacet = deployGWContract("MailboxFacet");
