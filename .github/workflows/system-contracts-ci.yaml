@@ -128,7 +128,7 @@ jobs:
           mode: run
           protocolVersion: 29
           evmInterpreter: true
-          logFilePath: 'anvil_zksync.log'
+          logFilePath: "anvil_zksync.log"
           offline: true
 
       - name: Install dependencies
