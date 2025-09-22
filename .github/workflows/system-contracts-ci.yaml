@@ -127,7 +127,7 @@ jobs:
         with:
           mode: run
           protocolVersion: 30
-          emulateEvm: true
+          evmInterpreter: true
 
       - name: Install dependencies
         run: yarn
