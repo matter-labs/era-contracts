@@ -1,0 +1,67 @@
+  ecosystem: testnet
+  gatewayConfig.gatewayStateTransition.verifier: 0x50D67071Ef3a465225bCbB28339AcD8835aaE557
+  Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  VerifierFflonk has been deployed at 0x1AC4F629Fdc77A7700B68d03bF8D1A53f2210911
+  forge verify-contract 0x1AC4F629Fdc77A7700B68d03bF8D1A53f2210911 VerifierFflonk
+  VerifierPlonk has been deployed at 0x2db2ffdecb7446aaab01FAc3f4D55863db3C5bd6
+  forge verify-contract 0x2db2ffdecb7446aaab01FAc3f4D55863db3C5bd6 VerifierPlonk
+  Verifier has been deployed at 0x04F9897C4E45019c7D353784d39A30F6be9d7983
+  forge verify-contract 0x04F9897C4E45019c7D353784d39A30F6be9d7983 Verifier --constructor-args 0x0000000000000000000000001ac4f629fdc77a7700b68d03bf8d1a53f22109110000000000000000000000002db2ffdecb7446aaab01fac3f4d55863db3c5bd6
+  UpgradeStageValidator has been deployed at 0x5547CEEA03569872A0bbca271F7fAE3e70876c97
+  forge verify-contract 0x5547CEEA03569872A0bbca271F7fAE3e70876c97 UpgradeStageValidator --constructor-args 0x0000000000000000000000004e39e90746a9ee410a8ce173c7b96d3afed444a50000000000000000000000000000000000000000000000000000001c00000001
+  Ecosystem contracts are deployed!
+  Ecosystem contracts for GW are deployed!
+  Bytecodes published!
+  Generated fixed force deployments data
+  Prepared diamond cut data
+  Diamond proxy address: 0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9
+  Current protocol version: 0.28.0
+  Diamond proxy address: 0x9A6DE0f62Aa270A8bCB1e2610078650D539B1Ef9
+  Current protocol version: 0.28.0
+  UpgradeCutGenerated
+  Upgrade data generated!
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 11155111
+
+Estimated gas price: 0.003171905 gwei
+
+Estimated total gas used for script: 10738687
+
+Estimated amount required: 0.000034062094988735 ETH
+
+==========================
+
+##### sepolia
+✅  [Success] Hash: 0xf0e5974159c993ba5ca935b739f647af9e777ddbce0ee9122578c873b196f6ef
+Block: 8884769
+Paid: 0.000007587606768272 ETH (3212164 gas * 0.002362148 gwei)
+
+
+##### sepolia
+✅  [Success] Hash: 0x3c4a3db6702fc6b206bbb00aa2596f520e3579accab46a12f61b193f34300bc6
+Block: 8884770
+Paid: 0.000009275860005272 ETH (3780632 gas * 0.002453521 gwei)
+
+
+##### sepolia
+✅  [Success] Hash: 0xd09174bff9b0f850de3e3413dcf8d2950a0999082f2856b5ba97c174f36dd087
+Block: 8884771
+Paid: 0.00000117125770176 ETH (457920 gas * 0.002557778 gwei)
+
+
+##### sepolia
+✅  [Success] Hash: 0x0260b475832c90de1634e2d426276715e77b655b8627754fc922ab1548a347cf
+Block: 8884772
+Paid: 0.000000818320881138 ETH (305906 gas * 0.002675073 gwei)
+
+✅ Sequence #1 on sepolia | Total Paid: 0.000018853045356442 ETH (7756622 gas * avg 0.00251213 gwei)
+                                                                                                       

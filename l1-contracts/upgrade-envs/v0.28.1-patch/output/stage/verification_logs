@@ -1,0 +1,62 @@
+== Logs ==
+  Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  VerifierFflonk has been deployed at 0x64650711CC06cf7a0C5A268f4b8360cBA7dc232F
+  forge verify-contract 0x64650711CC06cf7a0C5A268f4b8360cBA7dc232F VerifierFflonk
+  VerifierPlonk has been deployed at 0xD298AFB880Fe94fa45cA855a9963820DAca36F87
+  forge verify-contract 0xD298AFB880Fe94fa45cA855a9963820DAca36F87 VerifierPlonk
+  Verifier has been deployed at 0xeaBDe7E3bA4dC37F273d7cA031B62e47ac7582Fa
+  forge verify-contract 0xeaBDe7E3bA4dC37F273d7cA031B62e47ac7582Fa Verifier --constructor-args 0x00000000000000000000000064650711cc06cf7a0c5a268f4b8360cba7dc232f000000000000000000000000d298afb880fe94fa45ca855a9963820daca36f87
+  UpgradeStageValidator has been deployed at 0x610f19427d1F9f07eC691Db62E940732A5e2EBB2
+  forge verify-contract 0x610f19427d1F9f07eC691Db62E940732A5e2EBB2 UpgradeStageValidator --constructor-args 0x0000000000000000000000008b448ac7cd0f18f3d8464e2645575772a26a3b6b0000000000000000000000000000000000000000000000000000001c00000001
+  DefaultUpgrade has been deployed at 0x35D62bed440f0bD64729c304396f224f91Bf13D7
+  forge verify-contract 0x35D62bed440f0bD64729c304396f224f91Bf13D7 DefaultUpgrade
+  GovernanceUpgradeTimer has been deployed at 0x2d3151c6B2D98E15F51130006e389654Bc2CE02D
+  forge verify-contract 0x2d3151c6B2D98E15F51130006e389654Bc2CE02D GovernanceUpgradeTimer --constructor-args 0x00000000000000000000000000000000000000000000000000000000000004b000000000000000000000000000000000000000000000000000000000001275000000000000000000000000008f08627524aed610192132a425d6b9c32a1727ef000000000000000000000000a6ed12b87d2e6ea039d27e1ffbdc24915ffd3042
+  Ecosystem contracts are deployed!
+  Ecosystem contracts for GW are deployed!
+  Bytecodes published!
+  Generated fixed force deployments data
+  Prepared diamond cut data
+  Diamond proxy address: 0x6d6e010A2680E2E5a3b097ce411528b36d880EF6
+  Current protocol version: 0.28.0
+  Diamond proxy address: 0x6d6e010A2680E2E5a3b097ce411528b36d880EF6
+  Current protocol version: 0.28.0
+  UpgradeCutGenerated
+  Upgrade data generated!
+  Base token not ETH, approving
+  Diamond proxy address: 0x6d6e010A2680E2E5a3b097ce411528b36d880EF6
+  Current protocol version: 0.28.0
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+  Base token not ETH, approving
+
+## Setting up 1 EVM.
+
+==========================
+
+Chain 11155111
+
+Estimated gas price: 2.594980404 gwei
+
+Estimated total gas used for script: 5069318
+
+Estimated amount required: 0.013154780871644472 ETH
+
+==========================
+
+##### sepolia
+✅  [Success] Hash: 0xbf6c7617e0461ef11d02d2a2a2e3b5f528881535b48e446faa6febc970c58c74
+Block: 8882305
+Paid: 0.00430997663349802 ETH (3212164 gas * 1.341767305 gwei)
+
+
+##### sepolia
+✅  [Success] Hash: 0xe7c54fa5ee82634043bcb0bef81d90458227c1d51f1b5534abb99f3093249ee7
+Block: 8882306
+Paid: 0.000626768035752636 ETH (457932 gas * 1.368692373 gwei)
+
+0x85d04a449086ecdef8757b3190ca2f8edb2a65c66682a4817fc0a3fbbfb9e312
+
+✅ Sequence #1 on sepolia | Total Paid: 0.004936744669250656 ETH (3670096 gas * avg 1.355229839 gwei)
