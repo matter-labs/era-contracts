@@ -127,7 +127,7 @@ jobs:
         with:
           mode: run
           releaseTag: v0.6.10
-          protocolVersion: 29
+          protocolVersion: 30
           emulateEvm: true
 
       - name: Install dependencies
