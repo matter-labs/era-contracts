@@ -55,26 +55,11 @@ contract RegisterCTM is Script {
 
         vm.startBroadcast(msg.sender);
         IGovernance governance = IGovernance(IOwnable(bridgehubProxy).owner());
-        Call[] memory calls = new Call[](3);
+        Call[] memory calls = new Call[](1);
         calls[0] = Call({
             target: bridgehubProxy,
             value: 0,
             data: abi.encodeCall(bridgehub.addChainTypeManager, (chainTypeManagerProxy))
-        });
-        ICTMDeploymentTracker ctmDT = ICTMDeploymentTracker(ctmDeploymentTrackerProxy);
-        IL1AssetRouter sharedBridge = IL1AssetRouter(l1AssetRouterProxy);
-        calls[1] = Call({
-            target: address(sharedBridge),
-            value: 0,
-            data: abi.encodeCall(
-                sharedBridge.setAssetDeploymentTracker,
-                (bytes32(uint256(uint160(chainTypeManagerProxy))), address(ctmDT))
-            )
-        });
-        calls[2] = Call({
-            target: address(ctmDT),
-            value: 0,
-            data: abi.encodeCall(ctmDT.registerCTMAssetOnL1, (chainTypeManagerProxy))
         });
 
         IGovernance.Operation memory operation = IGovernance.Operation({
@@ -90,13 +75,6 @@ contract RegisterCTM is Script {
 
             console.log("CTM DT whitelisted");
             vm.stopBroadcast();
-
-            bytes32 assetId = bridgehub.ctmAssetIdFromAddress(chainTypeManagerProxy);
-            console.log(
-                "CTM in router 1",
-                sharedBridge.assetHandlerAddress(assetId),
-                bridgehub.ctmAssetIdToAddress(assetId)
-            );
         }
         saveOutput(Output({governance: address(governance), encodedData: abi.encode(calls)}), outputPath);
     }
