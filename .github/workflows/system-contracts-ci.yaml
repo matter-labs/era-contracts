@@ -126,8 +126,8 @@ jobs:
         uses: dutterbutter/anvil-zksync-action@v1.1.0
         with:
           mode: run
-          releaseTag: v0.6.1
-          protocolVersion: 28
+          releaseTag: v0.6.10
+          protocolVersion: 29
           emulateEvm: true
 
       - name: Install dependencies
