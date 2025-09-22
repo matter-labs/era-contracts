@@ -121,6 +121,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // we don't decrease chainBalance of the source, since the source is L1, and keep track of chainBalance[L1_CHAIN_ID] on L1.
         if (_balanceChange.amount > 0) {
             chainBalance[_chainId][_balanceChange.assetId] += _balanceChange.amount;
+            /// Note we don't decrease L1ChainBalance here, since we don't track L1 chainBalance on Gateway.
         }
         // we increase the chain balance of the base token.
         if (_balanceChange.baseTokenAmount > 0) {
@@ -361,8 +362,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _amount
     ) internal {
         if ( _amount > 0) {
-            _decreaseChainBalance(_sourceChainId, _assetId, _amount);
-            chainBalance[_destinationChainId][_assetId] += _amount;
+            /// Note, we don't track L1 chainBalance on Gateway.
+            if (_sourceChainId != L1_CHAIN_ID) {
+                _decreaseChainBalance(_sourceChainId, _assetId, _amount);
+            } 
+            if (_destinationChainId != L1_CHAIN_ID) {
+                chainBalance[_destinationChainId][_assetId] += _amount;
+            }
         }
     }
 
