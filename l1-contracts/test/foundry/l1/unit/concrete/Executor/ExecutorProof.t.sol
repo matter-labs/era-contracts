@@ -88,7 +88,7 @@ contract ExecutorProofTest is Test {
         utilsFacet.util_setL2BootloaderBytecodeHash(0x010008ddde4acc465cde1c420883701caadb41954567c0b4e3a0d1093a7afde7);
         utilsFacet.util_setZkPorterAvailability(false);
 
-        bytes[] memory mockSystemLogs = Utils.createSystemLogsWithEmptyDAValidator();
+        bytes[] memory mockSystemLogs = Utils.createSystemLogsWithNoneDAValidator();
 
         IExecutor.CommitBatchInfo memory nextBatch = IExecutor.CommitBatchInfo({
             // ignored
