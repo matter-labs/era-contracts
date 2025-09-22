@@ -1682,7 +1682,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
             target: addresses.daAddresses.rollupDAManager,
             data: abi.encodeCall(
                 RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, getExpectedL2Address("RollupL2DAValidator"), true)
+                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true) //
             ),
             value: 0
         });
@@ -1694,11 +1694,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (
-                gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
-                getExpectedL2Address("RollupL2DAValidator"),
-                true
-            )
+            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
         calls = _prepareL1ToGatewayCall(
