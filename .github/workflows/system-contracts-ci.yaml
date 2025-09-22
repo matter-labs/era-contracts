@@ -148,3 +148,7 @@ jobs:
 
       - name: Run tests
         run: yarn sc test
+
+      - name: Print output logs of anvil-zksync
+        if: always()
+        run: cat anvil_zksync.log
