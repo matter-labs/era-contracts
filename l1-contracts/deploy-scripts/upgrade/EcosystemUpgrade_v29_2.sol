@@ -25,7 +25,7 @@ import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 /// @notice Script used for v29 -> v29.2 stage patch
-contract EcosystemUpgrade_v29_2_patch is Script, DefaultEcosystemUpgrade {
+contract EcosystemUpgrade_v29_2 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     function initializeConfig(string memory newConfigPath) internal override {

@@ -13,7 +13,7 @@ Patch upgrades tend to introduce minor fixes and so they only modify some contra
 - The addresses for contracts that are not deployed but needed (facets, verifier...) should be read from the input file via `initializeConfig`, and they should equal the latest values.
 - Some of the `prepareStage1GovernanceCalls` and `prepareGatewaySpecificStage1GovernanceCalls` may be overridden and left empty if they are not part of the upgrade.
 
-You can check out [EcosystemUpgrade_v29_2_patch.s.sol](./EcosystemUpgrade_v29_2_patch.s.sol) as an example.
+You can check out [EcosystemUpgrade_v29_2.s.sol](./EcosystemUpgrade_v29_2.s.sol) as an example.
 
 ## Setup
 
