@@ -229,28 +229,35 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
         assertEq(IERC20(tokenL1Address).allowance(randomCaller, address(addresses.l1NativeTokenVault)), 100);
 
-        L2TransactionRequestTwoBridgesOuter memory l2TxnReqTwoBridges = L2TransactionRequestTwoBridgesOuter({
-            chainId: eraZKChainId,
-            mintValue: 250000000000100,
-            l2Value: 0,
-            l2GasLimit: 1000000,
-            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-            refundRecipient: address(0),
-            secondBridgeAddress: address(addresses.sharedBridge),
-            secondBridgeValue: 0,
-            secondBridgeCalldata: secondBridgeCalldata
-        });
+        {
+            L2TransactionRequestTwoBridgesOuter memory l2TxnReqTwoBridges = L2TransactionRequestTwoBridgesOuter({
+                chainId: eraZKChainId,
+                mintValue: 250000000000100,
+                l2Value: 0,
+                l2GasLimit: 1000000,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                refundRecipient: address(0),
+                secondBridgeAddress: address(addresses.sharedBridge),
+                secondBridgeValue: 0,
+                secondBridgeCalldata: secondBridgeCalldata
+            });
 
-        bytes memory calldataForExecutor = abi.encodeWithSelector(
-            IBridgehub.requestL2TransactionTwoBridges.selector,
-            l2TxnReqTwoBridges
-        );
+            bytes memory calldataForExecutor = abi.encodeWithSelector(
+                IBridgehub.requestL2TransactionTwoBridges.selector,
+                l2TxnReqTwoBridges
+            );
 
-        vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
+            vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
 
-        vm.recordLogs();
-        vm.prank(randomCaller);
-        SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), 250000000000100, calldataForExecutor);
+            vm.recordLogs();
+            vm.prank(randomCaller);
+            SimpleExecutor(randomCaller).execute(
+                address(addresses.bridgehub),
+                250000000000100,
+                calldataForExecutor
+            );
+        }
+
         Vm.Log[] memory logs = vm.getRecordedLogs();
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
@@ -271,19 +278,26 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         }
 
         // Now decode the first layer
-        (uint256 chainId, bytes32 assetId, bytes memory assetData) = abi.decode(args, (uint256, bytes32, bytes));
+        bytes memory assetData;
+        {
+            uint256 chainId;
+            bytes32 assetId;
+            (chainId, assetId, assetData) = abi.decode(args, (uint256, bytes32, bytes));
+        }
 
         // Step 2: Decode assetData into the bridge mint fields
-        (
-            address originalCaller,
-            address remoteReceiver,
-            address parsedOriginToken,
-            uint256 amount,
-            bytes memory erc20Metadata
-        ) = abi.decode(assetData, (address, address, address, uint256, bytes));
+        {
+            (
+                address originalCaller,
+                address remoteReceiver,
+                address parsedOriginToken,
+                uint256 amount,
+                bytes memory erc20Metadata
+            ) = abi.decode(assetData, (address, address, address, uint256, bytes));
 
-        // Checking that caller hasn't been aliased
-        assert(remoteReceiver == randomCaller);
+            // Checking that caller hasn't been aliased
+            assert(remoteReceiver == randomCaller);
+        }
     }
 
     // add this to be excluded from coverage report

@@ -71,13 +71,7 @@ library AddressAliasHelper {
         assembly {
             size := extcodesize(account)
         }
-        if (size != 23) return false; // must be exactly 23 bytes
-
-        bytes3 prefix = bytes3(new bytes(3));
-        assembly {
-            extcodecopy(account, add(prefix, 0x20), 0, 3)
-        }
-
-        return prefix == bytes3(0xef0100);
+        // 23-byte code size is enough to uniquely identify EIP-7702 EOAs
+        return size == 23;
     }
 }
