@@ -53,7 +53,6 @@ diamond_init_addr = "0x721035F2420fEc7EF12229ceF4A55DC0C7CB19EA"
 executor_facet_addr = "0xDdFB1d1403fA94c7bA810e4Abf790fC73b5A3B9D"
 genesis_upgrade_addr = "0x65dAd0914338b7b99bB70CD2c62A3BC7BcC26a81"
 getters_facet_addr = "0xb4bBbbA20Ebc8d4E0aCcD7EBBA04AD887ACCf783"
-verifier_addr = "0x2877aDa176A0ef998D3E7b7E1Bf6F61aF23cF911"
 
 [gateway.gateway_state_transition]
 chain_type_manager_proxy_addr = "0x7f5401a0a0340f6a68fe3162e7bb3a57e262d18e"
@@ -64,4 +63,3 @@ diamond_init_addr = "0x793cbd3E57A5B0Bf5dc1CaEDc2390C738A45c9a1"
 executor_facet_addr = "0x1099487f403574BF163A60A1bE5e9a2D025964Bb"
 genesis_upgrade_addr = "0xE7b5f9f47A0Bb9Dd3C11bfD30fE251D50D04A2D6"
 getters_facet_addr = "0x00e4C7066107B6E5E81320793BCee38D2f85CC03"
-verifier_addr = "0x2AE9dD0DC9b5F0535CAA0ED81Fe711f22f2F6Ba2"
