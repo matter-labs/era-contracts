@@ -10,7 +10,7 @@
  * retries and fallbacks.
  */
 
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import * as path from "path";
 
@@ -72,10 +72,16 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
   const repoRoot = path.resolve(__dirname, "../..");
 
   try {
-    solPath = execSync(
-      `find ${repoRoot}/l1-contracts ${repoRoot}/da-contracts -type f -iname "${name}.sol" | head -n1`,
+    solPath = execFileSync(
+      "find",
+      [
+        `${repoRoot}/l1-contracts`,
+        `${repoRoot}/da-contracts`,
+        "-type", "f",
+        "-iname", `${name}.sol`
+      ],
       { encoding: "utf8" }
-    ).trim();
+    ).split("\n")[0].trim();
   } catch {
     solPath = "";
   }
@@ -86,10 +92,16 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
       console.log(`🛠 Using fallbacks for ${name}: ${fallbacks.join(", ")}`);
       for (const alt of fallbacks) {
         try {
-          solPath = execSync(
-            `find ${repoRoot}/l1-contracts ${repoRoot}/da-contracts -type f -iname "${alt}.sol" | head -n1`,
+          solPath = execFileSync(
+            "find",
+            [
+              `${repoRoot}/l1-contracts`,
+              `${repoRoot}/da-contracts`,
+              "-type", "f",
+              "-iname", `${alt}.sol`
+            ],
             { encoding: "utf8" }
-          ).trim();
+          ).split("\n")[0].trim();
         } catch {
           solPath = "";
         }
