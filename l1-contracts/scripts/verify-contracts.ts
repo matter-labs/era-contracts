@@ -10,7 +10,7 @@
  * retries and fallbacks.
  */
 
-import { execFileSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import * as path from "path";
 
@@ -152,16 +152,10 @@ function tryVerify(addr: string, name: string, rest: string, root: string, isZks
     cmd = `forge verify-contract ${addr} ${name} ${rest} --etherscan-api-key "${process.env.ETHERSCAN_API_KEY}" ${chainFlag} --watch`;
   }
 
-  // Mask ETHERSCAN_API_KEY when logging the command
-  let maskedCmd = cmd;
-  if (CHAIN !== "mainnet" || (CHAIN === "mainnet" && process.env.ETHERSCAN_API_KEY)) {
-    // Replace the API key parameter value by [REDACTED]
-    maskedCmd = cmd.replace(
-      /--etherscan-api-key\s+"[^"]*"/,
-      '--etherscan-api-key "[REDACTED]"'
-    );
-  }
+  // Redact API key from log
+  const maskedCmd = cmd.replace(/--etherscan-api-key\s+"[^"]*"/, '--etherscan-api-key "[REDACTED]"');
   console.log(`▶️  (cd ${root} && ${maskedCmd})`);
+
   try {
     execSync(cmd, { cwd: root, stdio: "inherit", shell: "/bin/bash" });
     return true;
