@@ -38,6 +38,7 @@ cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.by
 cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/DualVerifier.sol/DualVerifier.json | tr -d '"') -r ${GATEWAY_RPC?} --private-key ${PRIVATE_KEY?}
 ```
 
+
 deploy GW contracts: 
 
 ```shell
