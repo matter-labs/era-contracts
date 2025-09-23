@@ -69,7 +69,7 @@ VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification y
 
 ### Verifying Contracts from Deployment Logs
 
-We provide a script [`verify-contracts.ts`](./l1-contracts/scripts/verify-contracts.ts) that automates contract verification from deployment logs.
+We provide a script [`verify-contracts.ts`](./scripts/verify-contracts.ts) that automates contract verification from deployment logs.
 
 #### Usage
 
