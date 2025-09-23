@@ -123,12 +123,13 @@ jobs:
           cache: yarn
 
       - name: Run anvil-zksync
-        uses: dutterbutter/anvil-zksync-action@v1.1.0
+        uses: dutterbutter/anvil-zksync-action@v1.3.0
         with:
           mode: run
-          releaseTag: v0.6.1
-          protocolVersion: 28
-          emulateEvm: true
+          protocolVersion: 29
+          evmInterpreter: true
+          logFilePath: "anvil_zksync.log"
+          offline: true
 
       - name: Install dependencies
         run: yarn
@@ -153,3 +154,33 @@ jobs:
       - name: Print output logs of anvil-zksync
         if: always()
         run: cat anvil_zksync.log
+
+  test-contracts-foundry:
+    needs: [lint]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Use Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.18.0
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-5353a10345187933527fbad213d8c4f6500a775c/foundry_nightly_linux_amd64.tar.gz
+          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
+      - name: Run tests using foundry
+        run: yarn sc test:foundry
