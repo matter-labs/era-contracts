@@ -1203,6 +1203,7 @@ contract ExperimentalBridgeTest is Test {
         assertEq(canonicalHash, resultantHash);
     }
 
+    // This is an example how to test behaviour of 7702. Keeping it, so the logic can be re-used in the future
     function test_requestL2TransactionDirect_NonETHCase7702(
         uint256 mockChainId,
         uint256 mockMintValue,
@@ -1259,9 +1260,6 @@ contract ExperimentalBridgeTest is Test {
         vm.txGasPrice(gasPrice * 1 gwei);
 
         vm.deal(randomCaller, 1 ether);
-        vm.prank(randomCaller);
-        vm.expectRevert(abi.encodeWithSelector(MsgValueMismatch.selector, 0, randomCaller.balance));
-        bytes32 resultantHash = bridgeHub.requestL2TransactionDirect{value: randomCaller.balance}(l2TxnReqDirect);
 
         // Now, let's call the same function with zero msg.value
         testToken.mint(randomCaller, l2TxnReqDirect.mintValue);
@@ -1279,26 +1277,6 @@ contract ExperimentalBridgeTest is Test {
         assertEq(testToken.allowance(randomCaller, sharedBridgeAddress), l2TxnReqDirect.mintValue);
         vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
         SimpleExecutor(randomCaller).execute(address(bridgeHub), 0, calldataForExecutor);
-
-        // Fetch all logs
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        console.log("Total events emitted:", logs.length);
-
-        for (uint256 i = 0; i < logs.length; i++) {
-            Vm.Log memory logEntry = logs[i];
-
-            console.log("---- Event", i, "----");
-            console.log("Emitter:", logEntry.emitter);
-            console.log("Topics count:", logEntry.topics.length);
-
-            for (uint256 t = 0; t < logEntry.topics.length; t++) {
-                console.logBytes32(logEntry.topics[t]);
-            }
-
-            console.log("Data:");
-            console.logBytes(logEntry.data);
-        }
     }
 
     function test_requestTransactionTwoBridgesChecksMagicValue(

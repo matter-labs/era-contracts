@@ -7,6 +7,7 @@ import {console2 as console} from "forge-std/console2.sol";
 
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
+import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
@@ -33,11 +34,26 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
 contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
+    bytes32 constant NEW_PRIORITY_REQUEST_HASH =
+        keccak256(
+            "NewPriorityRequest(uint256,bytes32,uint64,(uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256,uint256[4],bytes,bytes,uint256[],bytes,bytes),bytes[])"
+        );
+
+    struct NewPriorityRequest {
+        uint256 txId;
+        bytes32 txHash;
+        uint64 expirationTimestamp;
+        L2CanonicalTransaction transaction;
+        bytes[] factoryDeps;
+    }
+
     uint256 constant TEST_USERS_COUNT = 10;
     address[] public users;
     address[] public l2ContractAddresses;
     bytes32 public l2TokenAssetId;
     address public tokenL1Address;
+    SimpleExecutor simpleExecutor;
+
     // generate MAX_USERS addresses and append it to users array
     function _generateUserAddresses() internal {
         require(users.length == 0, "Addresses already generated");
@@ -58,6 +74,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         _registerNewTokens(tokens);
 
         _deployEra();
+
+        simpleExecutor = new SimpleExecutor();
         // _deployHyperchain(ETH_TOKEN_ADDRESS);
         // _deployHyperchain(ETH_TOKEN_ADDRESS);
         // _deployHyperchain(tokens[0]);
@@ -195,6 +213,96 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         );
     }
 
+    function test_DepositToL1AndWithdraw7702() public {
+        uint256 randomCallerPk = uint256(keccak256("RANDOM_CALLER"));
+        address payable randomCaller = payable(vm.addr(randomCallerPk));
+        vm.deal(randomCaller, 1 ether);
+        depositToL1(ETH_TOKEN_ADDRESS);
+        vm.prank(address(this));
+        IERC20(tokenL1Address).transfer(randomCaller, 100);
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), randomCaller, tokenL1Address))
+        );
+
+        vm.prank(randomCaller);
+        IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
+        assertEq(IERC20(tokenL1Address).allowance(randomCaller, address(addresses.l1NativeTokenVault)), 100);
+
+        L2TransactionRequestTwoBridgesOuter memory l2TxnReqTwoBridges = L2TransactionRequestTwoBridgesOuter({
+            chainId: eraZKChainId,
+            mintValue: 250000000000100,
+            l2Value: 0,
+            l2GasLimit: 1000000,
+            l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+            refundRecipient: address(0),
+            secondBridgeAddress: address(addresses.sharedBridge),
+            secondBridgeValue: 0,
+            secondBridgeCalldata: secondBridgeCalldata
+        });
+
+        bytes memory calldataForExecutor = abi.encodeWithSelector(
+            IBridgehub.requestL2TransactionTwoBridges.selector,
+            l2TxnReqTwoBridges
+        );
+
+        vm.signAndAttachDelegation(address(simpleExecutor), randomCallerPk);
+
+        vm.recordLogs();
+        vm.prank(randomCaller);
+        SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), 250000000000100, calldataForExecutor);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
+
+        // Step 1: Strip selector and decode into (uint256, bytes32, bytes)
+        bytes memory callData = request.transaction.data;
+        bytes32 selector;
+        assembly {
+            selector := mload(add(callData, 32)) // load first 32 bytes, selector is first 4
+        }
+
+        // Verify selector matches finalizeDeposit
+        assertEq(selector, IAssetRouterBase.finalizeDeposit.selector, "Selector mismatch");
+
+        // Allocate new bytes without the 4-byte selector
+        bytes memory args = new bytes(callData.length - 4);
+        for (uint256 i = 0; i < args.length; i++) {
+            args[i] = callData[i + 4];
+        }
+
+        // Now decode the first layer
+        (uint256 chainId, bytes32 assetId, bytes memory assetData) = abi.decode(args, (uint256, bytes32, bytes));
+
+        // Step 2: Decode assetData into the bridge mint fields
+        (
+            address originalCaller,
+            address remoteReceiver,
+            address parsedOriginToken,
+            uint256 amount,
+            bytes memory erc20Metadata
+        ) = abi.decode(assetData, (address, address, address, uint256, bytes));
+
+        // Checking that caller hasn't been aliased
+        assert(remoteReceiver == randomCaller);
+    }
+
     // add this to be excluded from coverage report
     function test() internal override {}
+
+    // gets event from logs
+    function _getNewPriorityQueueFromLogs(Vm.Log[] memory logs) internal returns (NewPriorityRequest memory request) {
+        for (uint256 i = 0; i < logs.length; i++) {
+            Vm.Log memory log = logs[i];
+
+            if (log.topics[0] == NEW_PRIORITY_REQUEST_HASH) {
+                (
+                    request.txId,
+                    request.txHash,
+                    request.expirationTimestamp,
+                    request.transaction,
+                    request.factoryDeps
+                ) = abi.decode(log.data, (uint256, bytes32, uint64, L2CanonicalTransaction, bytes[]));
+            }
+        }
+    }
 }
