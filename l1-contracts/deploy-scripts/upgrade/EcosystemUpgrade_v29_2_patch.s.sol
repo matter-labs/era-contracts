@@ -81,7 +81,7 @@ contract EcosystemUpgrade_v29_2_patch is Script, DefaultEcosystemUpgrade {
         gatewayConfig.gatewayStateTransition.defaultUpgrade = deployUsedUpgradeContractGW();
     }
 
-    /// @notice Get new facet cuts
+    /// @notice Get new facet cuts that were added in the upgrade
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override returns (Diamond.FacetCut[] memory facetCuts) {
