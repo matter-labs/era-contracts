@@ -57,10 +57,10 @@ contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer, L2GatewayTestAbstr
         return super.getChainCreationFacetCuts(stateTransition);
     }
 
-    function getUpgradeFacetCuts(
+    function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
-        return super.getUpgradeFacetCuts(stateTransition);
+        return super.getUpgradeAddedFacetCuts(stateTransition);
     }
 
     function getCreationCode(

@@ -200,7 +200,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    function getUpgradeFacetCuts(
+    function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 

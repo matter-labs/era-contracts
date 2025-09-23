@@ -82,7 +82,7 @@ contract EcosystemUpgrade_v29_2_patch is Script, DefaultEcosystemUpgrade {
     }
 
     /// @notice Get new facet cuts
-    function getUpgradeFacetCuts(
+    function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal override returns (Diamond.FacetCut[] memory facetCuts) {
         // Note: we use the provided stateTransition for the facet address, but not to get the selectors, as we use this feature for Gateway, which we cannot query.

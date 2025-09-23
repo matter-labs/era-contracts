@@ -577,7 +577,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         });
     }
 
-    function getUpgradeFacetCuts(
+    function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         return getChainCreationFacetCuts(stateTransition);
