@@ -101,13 +101,7 @@ chain — one of stage, testnet, or mainnet (default: stage)
 
 #### ZKsync Support
 
-If a log line includes --verifier zksync, the script automatically appends the correct ZKsync verifier URL (no ETHERSCAN_API_KEY required):
-
-- stage: https://rpc-explorer-verify.era-gateway-stage.zksync.dev/contract_verification
-
-- testnet: https://rpc-explorer-verify.era-gateway-testnet.zksync.dev/contract_verification
-
-- mainnet: https://rpc-explorer-verify.era-gateway-mainnet.zksync.dev/contract_verification
+If a log line includes --verifier zksync, the script automatically appends the correct ZKsync verifier URL (no ETHERSCAN_API_KEY required).
 
 For non-ZKsync logs, the script uses Etherscan-style verification and requires ETHERSCAN_API_KEY.
 
