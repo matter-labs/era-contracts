@@ -74,7 +74,7 @@ We provide a script [`verify-contracts.ts`](./scripts/verify-contracts.ts) that 
 #### Usage
 
 ```bash
-npx ts-node l1-contracts/scripts/verify-contracts.ts <log_file> [stage|testnet|mainnet]
+yarn verify-contracts <log_file> [stage|testnet|mainnet]
 ```
 
 log_file — path to a deployment log containing forge verify-contract commands

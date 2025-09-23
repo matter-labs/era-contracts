@@ -129,8 +129,17 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
   // If we climbed all the way up and still didn’t find foundry.toml,
   // assume the project root is just the contracts folder (l1-contracts or da-contracts).
   if (!existsSync(path.join(dir, "foundry.toml"))) {
-    if (solPath.includes("/l1-contracts/")) dir = path.join(repoRoot, "l1-contracts");
-    else if (solPath.includes("/da-contracts/")) dir = path.join(repoRoot, "da-contracts");
+    if (solPath.includes("/l1-contracts/")) {
+      dir = path.join(repoRoot, "l1-contracts");
+    } else if (solPath.includes("/da-contracts/")) {
+      dir = path.join(repoRoot, "da-contracts");
+    } else {
+      throw new Error(
+        "❌ Could not determine project root for " +
+          solPath +
+          ". Expected it to be inside l1-contracts or da-contracts, but no foundry.toml found."
+      );
+    }
   }
 
   return { solPath, root: dir, resolvedName };
