@@ -110,16 +110,24 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
 
   if (!solPath) return null;
 
+  // Start from the directory where the Solidity file was found
   let dir = path.dirname(solPath);
+
+  // Walk up the directory tree until we either:
+  //  - reach the root of the repository (l1-contracts or da-contracts),
+  //  - or find a folder that contains foundry.toml (project root).
   while (
     dir !== "." &&
     dir !== `${repoRoot}/l1-contracts` &&
     dir !== `${repoRoot}/da-contracts` &&
     !existsSync(path.join(dir, "foundry.toml"))
   ) {
+    // Move one level up
     dir = path.dirname(dir);
   }
 
+  // If we climbed all the way up and still didn’t find foundry.toml,
+  // assume the project root is just the contracts folder (l1-contracts or da-contracts).
   if (!existsSync(path.join(dir, "foundry.toml"))) {
     if (solPath.includes("/l1-contracts/")) dir = path.join(repoRoot, "l1-contracts");
     else if (solPath.includes("/da-contracts/")) dir = path.join(repoRoot, "da-contracts");
