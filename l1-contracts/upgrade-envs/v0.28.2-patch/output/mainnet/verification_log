@@ -1,0 +1,115 @@
+  VerifierFflonk has been deployed at 0x6359aDcf9B18f2b26F7d27AB81D630247d961b51
+  forge verify-contract 0x6359aDcf9B18f2b26F7d27AB81D630247d961b51 VerifierFflonk --verifier zksync
+  VerifierPlonk has been deployed at 0xfA7c56B328bEb5deB9218f3a4b60ADc59Bb6Ad8d
+  forge verify-contract 0xfA7c56B328bEb5deB9218f3a4b60ADc59Bb6Ad8d VerifierPlonk --verifier zksync
+  Verifier has been deployed at 0x257A8ac018eB3d987d7204983D344025622cae4b
+  forge verify-contract 0x257A8ac018eB3d987d7204983D344025622cae4b Verifier --constructor-args 0x0000000000000000000000006359adcf9b18f2b26f7d27ab81d630247d961b51000000000000000000000000fa7c56b328beb5deb9218f3a4b60adc59bb6ad8d --verifier zksync
+
+gatewayConfig.gatewayStateTransition.verifier: 0x257A8ac018eB3d987d7204983D344025622cae4b
+  Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  VerifierFflonk has been deployed at 0xb3428a7a9F9a85A4D9b429d6a9fBA20469c6367C
+  forge verify-contract 0xb3428a7a9F9a85A4D9b429d6a9fBA20469c6367C VerifierFflonk
+  VerifierPlonk has been deployed at 0xe201837d151E5aC33Af3305f287Ad6F6a7Dfccd7
+  forge verify-contract 0xe201837d151E5aC33Af3305f287Ad6F6a7Dfccd7 VerifierPlonk
+  Verifier has been deployed at 0x2418DD3304815B62e9d90bF1c590f33Ae3abC524
+  forge verify-contract 0x2418DD3304815B62e9d90bF1c590f33Ae3abC524 Verifier --constructor-args 0x000000000000000000000000b3428a7a9f9a85a4d9b429d6a9fba20469c6367c000000000000000000000000e201837d151e5ac33af3305f287ad6f6a7dfccd7
+  UpgradeStageValidator has been deployed at 0x127b47290CfDb7Ec81561Aac538bd1142e928946
+  forge verify-contract 0x127b47290CfDb7Ec81561Aac538bd1142e928946 UpgradeStageValidator --constructor-args 0x000000000000000000000000c2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c0000000000000000000000000000000000000000000000000000001c00000002
+  ecosystem: mainnet
+  Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+  VerifierFflonk has been deployed at 0xb3428a7a9F9a85A4D9b429d6a9fBA20469c6367C
+  forge verify-contract 0xb3428a7a9F9a85A4D9b429d6a9fBA20469c6367C VerifierFflonk
+  VerifierPlonk has been deployed at 0xe201837d151E5aC33Af3305f287Ad6F6a7Dfccd7
+  forge verify-contract 0xe201837d151E5aC33Af3305f287Ad6F6a7Dfccd7 VerifierPlonk
+  Verifier has been deployed at 0x2418DD3304815B62e9d90bF1c590f33Ae3abC524
+  forge verify-contract 0x2418DD3304815B62e9d90bF1c590f33Ae3abC524 Verifier --constructor-args 0x000000000000000000000000b3428a7a9f9a85a4d9b429d6a9fba20469c6367c000000000000000000000000e201837d151e5ac33af3305f287ad6f6a7dfccd7
+  UpgradeStageValidator has been deployed at 0x127b47290CfDb7Ec81561Aac538bd1142e928946
+  forge verify-contract 0x127b47290CfDb7Ec81561Aac538bd1142e928946 UpgradeStageValidator --constructor-args 0x000000000000000000000000c2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c0000000000000000000000000000000000000000000000000000001c00000002
+  Ecosystem contracts are deployed!
+  Ecosystem contracts for GW are deployed!
+  Bytecodes published!
+  Generated fixed force deployments data
+  Prepared diamond cut data
+  Diamond proxy address: 0x32400084C286CF3E17e7B677ea9583e60a000324
+  Current protocol version: 0.28.1
+  Diamond proxy address: 0x32400084C286CF3E17e7B677ea9583e60a000324
+  Current protocol version: 0.28.1
+  UpgradeCutGenerated
+  gatewayConfig.gatewayStateTransition.verifierFflonk 2: 0x6359aDcf9B18f2b26F7d27AB81D630247d961b51
+  Upgrade data generated!
+  Base token not ETH, approving
+  Diamond proxy address: 0x32400084C286CF3E17e7B677ea9583e60a000324
+  Current protocol version: 0.28.1
+  Base token not ETH, approving
+
+;  gatewayConfig.gatewayStateTransition.verifier: 0xE841B98E524D827bBA664d19CB736C817707E730
+;   Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+;   VerifierFflonk has been deployed at 0xb3428a7a9F9a85A4D9b429d6a9fBA20469c6367C
+;   forge verify-contract 0xb3428a7a9F9a85A4D9b429d6a9fBA20469c6367C VerifierFflonk
+;   VerifierPlonk has been deployed at 0xe201837d151E5aC33Af3305f287Ad6F6a7Dfccd7
+;   forge verify-contract 0xe201837d151E5aC33Af3305f287Ad6F6a7Dfccd7 VerifierPlonk
+;   Verifier has been deployed at 0x2418DD3304815B62e9d90bF1c590f33Ae3abC524
+;   forge verify-contract 0x2418DD3304815B62e9d90bF1c590f33Ae3abC524 Verifier --constructor-args 0x000000000000000000000000b3428a7a9f9a85a4d9b429d6a9fba20469c6367c000000000000000000000000e201837d151e5ac33af3305f287ad6f6a7dfccd7
+;   UpgradeStageValidator has been deployed at 0x127b47290CfDb7Ec81561Aac538bd1142e928946
+;   forge verify-contract 0x127b47290CfDb7Ec81561Aac538bd1142e928946 UpgradeStageValidator --constructor-args 0x000000000000000000000000c2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c0000000000000000000000000000000000000000000000000000001c00000002
+;   ecosystem: mainnet
+;   Using configured Create2Factory address: 0x4e59b44847b379578588920cA78FbF26c0B4956C
+;   VerifierFflonk has been deployed at 0xb3428a7a9F9a85A4D9b429d6a9fBA20469c6367C
+;   forge verify-contract 0xb3428a7a9F9a85A4D9b429d6a9fBA20469c6367C VerifierFflonk
+;   VerifierPlonk has been deployed at 0xe201837d151E5aC33Af3305f287Ad6F6a7Dfccd7
+;   forge verify-contract 0xe201837d151E5aC33Af3305f287Ad6F6a7Dfccd7 VerifierPlonk
+;   Verifier has been deployed at 0x2418DD3304815B62e9d90bF1c590f33Ae3abC524
+;   forge verify-contract 0x2418DD3304815B62e9d90bF1c590f33Ae3abC524 Verifier --constructor-args 0x000000000000000000000000b3428a7a9f9a85a4d9b429d6a9fba20469c6367c000000000000000000000000e201837d151e5ac33af3305f287ad6f6a7dfccd7
+;   UpgradeStageValidator has been deployed at 0x127b47290CfDb7Ec81561Aac538bd1142e928946
+;   forge verify-contract 0x127b47290CfDb7Ec81561Aac538bd1142e928946 UpgradeStageValidator --constructor-args 0x000000000000000000000000c2ee6b6af7d616f6e27ce7f4a451aedc2b0f5f5c0000000000000000000000000000000000000000000000000000001c00000002
+;   Ecosystem contracts are deployed!
+;   Ecosystem contracts for GW are deployed!
+;   Bytecodes published!
+;   Generated fixed force deployments data
+;   Prepared diamond cut data
+;   Diamond proxy address: 0x32400084C286CF3E17e7B677ea9583e60a000324
+;   Current protocol version: 0.28.1
+;   Diamond proxy address: 0x32400084C286CF3E17e7B677ea9583e60a000324
+;   Current protocol version: 0.28.1
+;   UpgradeCutGenerated
+;   Upgrade data generated!
+;   Base token not ETH, approving
+;   Diamond proxy address: 0x32400084C286CF3E17e7B677ea9583e60a000324
+;   Current protocol version: 0.28.1
+;   Base token not ETH, approving
+;   Base token not ETH, approving
+;   Base token not ETH, approving
+;   Base token not ETH, approving
+
+
+;   0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001a54686520636f64652068617368206973206e6f74206b6e6f776e000000000000
+; VerifierFflonk has been deployed at 0x6359aDcf9B18f2b26F7d27AB81D630247d961b51
+; forge verify-contract 0x6359aDcf9B18f2b26F7d27AB81D630247d961b51 VerifierFflonk --verifier zksync
+; 0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001a54686520636f64652068617368206973206e6f74206b6e6f776e000000000000
+; VerifierPlonk has been deployed at 0xfA7c56B328bEb5deB9218f3a4b60ADc59Bb6Ad8d
+; forge verify-contract 0xfA7c56B328bEb5deB9218f3a4b60ADc59Bb6Ad8d VerifierPlonk --verifier zksync
+; Verifier has been deployed at 0x257A8ac018eB3d987d7204983D344025622cae4b
+; forge verify-contract 0x257A8ac018eB3d987d7204983D344025622cae4b Verifier --constructor-args 0x0000000000000000000000006359adcf9b18f2b26f7d27ab81d630247d961b51000000000000000000000000fa7c56b328beb5deb9218f3a4b60adc59bb6ad8d --verifier zksync
+
+; VerifierFflonk has been deployed at 0x6359aDcf9B18f2b26F7d27AB81D630247d961b51
+; forge verify-contract 0x6359aDcf9B18f2b26F7d27AB81D630247d961b51 VerifierFflonk --verifier zksync
+; VerifierPlonk has been deployed at 0xfA7c56B328bEb5deB9218f3a4b60ADc59Bb6Ad8d
+; forge verify-contract 0xfA7c56B328bEb5deB9218f3a4b60ADc59Bb6Ad8d VerifierPlonk --verifier zksync
+; Verifier has been deployed at 0x257A8ac018eB3d987d7204983D344025622cae4b
+; forge verify-contract 0x257A8ac018eB3d987d7204983D344025622cae4b Verifier --constructor-args 0x0000000000000000000000006359adcf9b18f2b26f7d27ab81d630247d961b51000000000000000000000000fa7c56b328beb5deb9218f3a4b60adc59bb6ad8d --verifier zksync
+
+; SKIPPING ON CHAIN SIMULATION.
+
+; ##### 9075
+; ✅  [Success]Hash: 0xe09695fa376c9a875ea6c0c9f5cb9f4fdbb9330619b2fbbeeb5460e938ca9826
+; Block: 54331
+; Paid: 0.43958222036724402 ETH (116380 gas * 3777.128547579 gwei)
+
+
+; ##### 9075
+; ✅  [Success]Hash: 0x3631cd4fb3a7b6d0e6370c0c4064b5fbacab12cfe6bbad89c95494ede2c10a0d
+; Block: 54332
+; Paid: 0.445244136060064941 ETH (117879 gas * 3777.128547579 gwei)
+
+; ✅ Sequence #1 on 9075 | Total Paid: 0.884826356427308961 ETH (234259 gas * avg 3777.128547579 gwei)
+

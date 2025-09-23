@@ -573,6 +573,8 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         });
     }
 
+    error NewProtocolVersionNotOnCTM(uint256, uint256);
+
     function setAddressesBasedOnBridgehub() internal virtual {
         config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
         address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
@@ -584,7 +586,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
         require(
             ctmProtocolVersion != getNewProtocolVersion(),
-            "The new protocol version is already present on the ChainTypeManager"
+            NewProtocolVersionNotOnCTM(ctmProtocolVersion, getNewProtocolVersion())
         );
         addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
 
@@ -801,6 +803,7 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
             "verifier_fflonk_addr",
             gatewayConfig.gatewayStateTransition.verifierFflonk
         );
+        console.log("gatewayConfig.gatewayStateTransition.verifierFflonk 2: %s", gatewayConfig.gatewayStateTransition.verifierFflonk);
         vm.serializeAddress(
             "gateway_state_transition",
             "validator_timelock_addr",

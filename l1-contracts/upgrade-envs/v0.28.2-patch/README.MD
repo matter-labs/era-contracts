@@ -26,7 +26,7 @@ export PRIVATE_KEY=XXX
 
 Then deploy the bytecodes (you might have to be whitelisted in sequencer in order for this step to succeed):
 
-You also need zksync-foundry version of cast.
+You also need a new zksync-foundry version of cast. For this the new foundry-zksync has to be installed (maybe run one in another foundry-zksync repot to not mess up compilation time, as the old version is required later).
 
 **WARNING** - currently we are pushign L1 Verifier not L2 verifier.
 
@@ -37,6 +37,7 @@ cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.by
 cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/TestnetVerifier.sol/TestnetVerifier.json | tr -d '"') -r ${GATEWAY_RPC?} --private-key ${PRIVATE_KEY?}
 cast send 0x0000000000000000000000000000000000020002 --zk-factory-deps $(yq '.bytecode.object' ./zkout/DualVerifier.sol/DualVerifier.json | tr -d '"') -r ${GATEWAY_RPC?} --private-key ${PRIVATE_KEY?}
 ```
+
 
 deploy GW contracts: 
 
@@ -70,6 +71,8 @@ Please run (and adjust the address & rpc):
 
 ```shell
 export CONTRACT_VERIFIER_URL=https://rpc-explorer-verify.era-gateway-testnet.zksync.dev/contract_verification
+export CONTRACT_VERIFIER_URL=https://rpc-explorer-verify.era-gateway-mainnet.zksync.dev/contract_verification
+
 
 forge verify-contract 0x3CFB3a80Af42cBE4d82C14301690A62D53e870a5 L1VerifierFflonk --verifier zksync --zksync --verifier-url ${CONTRACT_VERIFIER_URL?}
 forge verify-contract 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717 L1VerifierPlonk --verifier zksync --zksync --verifier-url ${CONTRACT_VERIFIER_URL?}
@@ -94,27 +97,26 @@ export MAINNET="https://eth.drpc.org"
 
 To run in stage:
 ```shell
-V28_2_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.1-patch/stage.toml V28_2_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.1-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_2.s.sol:EcosystemUpgrade_v28_2 --ffi --rpc-url ${SEPOLIA?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
+V28_2_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.2-patch/stage.toml V28_2_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.2-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_2.s.sol:EcosystemUpgrade_v28_2 --ffi --rpc-url ${SEPOLIA?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
 ```
 
 To run in testnet:
 ```shell
-V28_2_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.1-patch/testnet.toml V28_2_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.1-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_2.s.sol:EcosystemUpgrade_v28_2 --ffi --rpc-url ${SEPOLIA?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
+V28_2_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.2-patch/testnet.toml V28_2_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.2-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_2.s.sol:EcosystemUpgrade_v28_2 --ffi --rpc-url ${SEPOLIA?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
 ```
 
 To run in mainnet:
 ```shell
-V28_2_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.1-patch/mainnet.toml V28_2_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.1-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_2.s.sol:EcosystemUpgrade_v28_2 --ffi --rpc-url ${MAINNET?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
+V28_2_UPGRADE_ECOSYSTEM=mainnet V28_2_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.2-patch/mainnet.toml V28_2_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.2-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_2.s.sol:EcosystemUpgrade_v28_2 --ffi --rpc-url ${MAINNET?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
 ```
 
-
-To run main calldata: 
-
- V28_2_UPGRADE_ECOSYSTEM_INPUT=/upgrade-envs/v0.28.1-patch/stage.toml V28_2_UPGRADE_ECOSYSTEM_OUTPUT=/script-out/v28.1-ecosystem.toml forge script --sig "run()" ./deploy-scripts/upgrade/EcosystemUpgrade_v28_2.s.sol:EcosystemUpgrade_v28_2 --ffi --rpc-url ${SEPOLIA?}  --gas-limit 20000000000 --private-key ${PRIVATE_KEY?}  --broadcast --slow --skip-simulation
+## Verify contracts
 
  forge verify-contract 0x73De647A5C0F9716C9D9bA31eFb3Ec93ab52EC7f L1VerifierFflonk --chain {SEPOLIA?} --etherscan-api-key 7PSZZ1PB7WGUHQ5JI51QXI1JIK3REFTVTT
 
- UPGRADE_ECOSYSTEM_OUTPUT=script-out/v28.1-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade_v28_2.s.sol/11155111/run-latest.json YAML_OUTPUT_FILE=script-out/v28.1-stage-output.yaml yarn upgrade-yaml-output-generator
+## Generate yaml
+
+ UPGRADE_ECOSYSTEM_OUTPUT=script-out/v28.2-ecosystem.toml UPGRADE_ECOSYSTEM_OUTPUT_TRANSACTIONS=broadcast/EcosystemUpgrade_v28_2.s.sol/11155111/run-latest.json YAML_OUTPUT_FILE=script-out/v28.2-stage-output.yaml yarn upgrade-yaml-output-generator
 
 Still needs fixing: 
 
