@@ -8,7 +8,7 @@ owner_address = "0xE30Dca3047B37dc7d88849dE4A4Dc07937ad5Ab3"
 support_l2_legacy_shared_bridge_test = false
 
 # UPDATED
-old_protocol_version = 0x1c00000000
+old_protocol_version = 0x1c00000001
 
 priority_txs_l2_gas_limit = 2000000
 max_expected_l1_gas_price = 50000000000
@@ -46,7 +46,7 @@ default_upgrade = "0xDA65afc634528bC2ef5149d811Acda864dD78Ab6"
 
 governance_security_council_address = "0xBDFfCC71FE84020238F2990a6D2954e87355De0D"
 # UPDATED
-latest_protocol_version = 0x1c00000001
+latest_protocol_version = 0x1c00000002
 l1_bytecodes_supplier_addr = "0xC9F20FC268Fc3e0e597660550033Bf2C24218fd8"
 
 # fixme - previous protocol not released yet
@@ -69,5 +69,7 @@ rollup_sl_da_validator = "0x595b8C88B9e5f3a4c596C3e81BE6e11D53Bb9200"
 
 # UPDATED
 # verifier on gateway (has to be manually deployed)
-verifier = "0xE841B98E524D827bBA664d19CB736C817707E730"
+verifier = "0x257A8ac018eB3d987d7204983D344025622cae4b"
+verifier_fflonk = "0x6359aDcf9B18f2b26F7d27AB81D630247d961b51"
+verifier_plonk = "0xfA7c56B328bEb5deB9218f3a4b60ADc59Bb6Ad8d"
 default_upgrade = "0x69653a812038424290EFd0e7Ae8DcFB2Bbf9c9b2"

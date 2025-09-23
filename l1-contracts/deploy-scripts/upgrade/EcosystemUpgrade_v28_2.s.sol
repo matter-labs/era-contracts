@@ -117,7 +117,7 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
             vm.envString("V28_2_UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("V28_2_UPGRADE_ECOSYSTEM_OUTPUT")
         );
-        ecosystem = vm.envString("V28_2_PATCH_UPGRADE_ECOSYSTEM");
+        ecosystem = vm.envString("V28_2_UPGRADE_ECOSYSTEM");
         initializeOther( 
             vm.envString("V28_2_UPGRADE_ECOSYSTEM_INPUT"),
             vm.envString("V28_2_UPGRADE_ECOSYSTEM_OUTPUT")
@@ -242,6 +242,9 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
 
         string memory toml = vm.readFile(newConfigPath);
         gatewayConfig.gatewayStateTransition.verifier = toml.readAddress("$.gateway.gateway_state_transition.verifier");
+        gatewayConfig.gatewayStateTransition.verifierFflonk = toml.readAddress("$.gateway.gateway_state_transition.verifier_fflonk");
+        gatewayConfig.gatewayStateTransition.verifierPlonk = toml.readAddress("$.gateway.gateway_state_transition.verifier_plonk");
+
         gatewayConfig.gatewayStateTransition.defaultUpgrade = toml.readAddress("$.gateway.gateway_state_transition.default_upgrade");
         addresses.stateTransition.defaultUpgrade = toml.readAddress("$.contracts.default_upgrade");
         console.log("gatewayConfig.gatewayStateTransition.verifier: %s", gatewayConfig.gatewayStateTransition.verifier);
