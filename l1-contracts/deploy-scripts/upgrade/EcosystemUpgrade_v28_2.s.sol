@@ -146,11 +146,11 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
     }
 
 
-    /// only needed for v27 to v28.1 jump upgrade
+    /// only needed for v27 to v28.2 jump upgrade
     function initializePreviousUpgradeFile() public virtual {
         string memory root = vm.projectRoot();
         console.log("ecosystem: %s", ecosystem);
-        string memory path = string.concat(root, string.concat("/upgrade-envs/v0.28.1-patch/output_v28_patched/",ecosystem, "/v28-ecosystem.toml"));
+        string memory path = string.concat(root, string.concat("/upgrade-envs/v0.28.2-patch/output_v28_patched/",ecosystem, "/v28-ecosystem.toml"));
         string memory toml = vm.readFile(path);
         bytes memory unpatchedDiamondCutL1 =  toml.readBytes("$.diamond_cut_data_l1");
         bytes memory unpatchedDiamondCutGW =  toml.readBytes("$.diamond_cut_data_gw");
@@ -235,7 +235,7 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
             return abi.decode(previousUpgradeData.chainCreationParamsL1, (ChainCreationParams));
         }
     }
-    /// just for v28.1 special params, GW verifier and other contracts.
+    /// just for v28.2 special params, GW verifier and other contracts.
     function initializeOther(string memory newConfigPath, string memory _outputPath) public virtual {
         string memory root = vm.projectRoot();
         newConfigPath = string.concat(root, newConfigPath);
@@ -278,7 +278,7 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
     }
 
 
-    ///// V27 -> v28.1 upgrade ignore for now
+    ///// V27 -> v28.2 upgrade ignore for now
     
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
