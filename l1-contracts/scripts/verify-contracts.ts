@@ -74,14 +74,11 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
   try {
     solPath = execFileSync(
       "find",
-      [
-        `${repoRoot}/l1-contracts`,
-        `${repoRoot}/da-contracts`,
-        "-type", "f",
-        "-iname", `${name}.sol`
-      ],
+      [`${repoRoot}/l1-contracts`, `${repoRoot}/da-contracts`, "-type", "f", "-iname", `${name}.sol`],
       { encoding: "utf8" }
-    ).split("\n")[0].trim();
+    )
+      .split("\n")[0]
+      .trim();
   } catch {
     solPath = "";
   }
@@ -94,14 +91,11 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
         try {
           solPath = execFileSync(
             "find",
-            [
-              `${repoRoot}/l1-contracts`,
-              `${repoRoot}/da-contracts`,
-              "-type", "f",
-              "-iname", `${alt}.sol`
-            ],
+            [`${repoRoot}/l1-contracts`, `${repoRoot}/da-contracts`, "-type", "f", "-iname", `${alt}.sol`],
             { encoding: "utf8" }
-          ).split("\n")[0].trim();
+          )
+            .split("\n")[0]
+            .trim();
         } catch {
           solPath = "";
         }
@@ -152,8 +146,9 @@ function tryVerify(addr: string, name: string, rest: string, root: string, isZks
     cmd = `forge verify-contract ${addr} ${name} ${rest} --etherscan-api-key "${process.env.ETHERSCAN_API_KEY}" ${chainFlag} --watch`;
   }
 
-  // Redact API key from log
-  const maskedCmd = cmd.replace(/--etherscan-api-key\s+"[^"]*"/, '--etherscan-api-key "[REDACTED]"');
+  // Build masked command for logging
+  const redacted = "--etherscan-api-key [REDACTED]";
+  const maskedCmd = cmd.replace(/--etherscan-api-key\s+"[^"]*"/, redacted);
   console.log(`▶️  (cd ${root} && ${maskedCmd})`);
 
   try {
@@ -212,7 +207,7 @@ for (const raw of lines) {
   }
 
   if (!success) {
-    console.log(`🔁 Final attempt with TransparentUpgradeableProxy`);
+    console.log("🔁 Final attempt with TransparentUpgradeableProxy");
     success = tryVerify(addr, "TransparentUpgradeableProxy", rest, root, isZksync);
   }
 
