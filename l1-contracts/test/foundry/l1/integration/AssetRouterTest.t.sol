@@ -251,11 +251,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
             vm.recordLogs();
             vm.prank(randomCaller);
-            SimpleExecutor(randomCaller).execute(
-                address(addresses.bridgehub),
-                250000000000100,
-                calldataForExecutor
-            );
+            SimpleExecutor(randomCaller).execute(address(addresses.bridgehub), 250000000000100, calldataForExecutor);
         }
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
