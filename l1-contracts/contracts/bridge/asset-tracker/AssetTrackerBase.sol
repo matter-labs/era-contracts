@@ -8,7 +8,7 @@ import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
-import {L2_CHAIN_ASSET_HANDLER, L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
@@ -16,7 +16,7 @@ import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncr
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-import {InsufficientChainBalance, InsufficientTotalSupply} from "./AssetTrackerErrors.sol";
+import {InsufficientChainBalance} from "./AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
 abstract contract AssetTrackerBase is
@@ -29,19 +29,16 @@ abstract contract AssetTrackerBase is
 
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// NOTE: this function may be removed in the future, don't rely on it!
-    /// @dev For minter chains, the balance is 0.
-    /// @dev Only used on settlement layers
+    /// @dev For token origin chains, the balance starts at type(uint256).max, and decreases as withdrawals are made from the chain.
+    /// @dev On L1 the chainBalance for non origin chains equals the total supply of the token on the chain and unfinalized withdrawals to L1.
+    /// @dev On Gateway the chainBalance for non origin chains equals the total supply of the token on the chain.
+    /// @dev On non-Gateway L2s this mapping is only used to track the balance of native tokens.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
     /// @notice Used on the L2 instead of the settlement layer
     /// @dev Maps the migration number for each asset on the L2.
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
-
-    /// @notice This is used to store the total supply of the token bridged out from the token's origin chain.
-    /// This is used to prevent malicious chains from overflowing the sum of chainBalances.
-    /// We track it both on the origin L2, Gateway and the L1.
-    mapping(bytes32 assetId => uint256 totalSupplyAcrossAllChains) public totalSupplyAcrossAllChains;
 
     function _l1ChainId() internal view virtual returns (uint256);
 
@@ -103,59 +100,17 @@ abstract contract AssetTrackerBase is
                     Register token
     //////////////////////////////////////////////////////////////*/
 
-    function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
-        _registerTokenOnL2(_assetId);
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public virtual onlyNativeTokenVault {
+        chainBalance[_originChainId][_assetId] = type(uint256).max;
     }
 
-    function registerNewToken(bytes32 _assetId, uint256) external onlyNativeTokenVault {
-        if (block.chainid != _l1ChainId()) {
-            _registerTokenOnL2(_assetId);
-        }
-    }
-
-    function _registerTokenOnL2(bytes32 _assetId) internal {
-        assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
-    }
-
+    /// @dev This function is used to decrease the chain balance of a token on a chain.
+    /// @dev It makes debugging issues easier. Overflows don't usually happen, so there is no similar function to increase the chain balance.
     function _decreaseChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
         if (chainBalance[_chainId][_assetId] < _amount) {
             revert InsufficientChainBalance(_chainId, _assetId, _amount);
         }
         chainBalance[_chainId][_assetId] -= _amount;
-    }
-
-    function _increaseTotalSupplyAcrossAllChains(
-        bytes32 _assetId,
-        uint256 _tokenOriginChainId,
-        uint256 _amount
-    ) internal {
-        if (!_tokenOriginChainIdOnSettlementLayer(_tokenOriginChainId)) {
-            /// We only track the total supply on the origin chain's settlement layer.
-            return;
-        }
-        totalSupplyAcrossAllChains[_assetId] += _amount;
-    }
-
-    function _decreaseTotalSupplyAcrossAllChains(
-        bytes32 _assetId,
-        uint256 _tokenOriginChainId,
-        uint256 _amount
-    ) internal {
-        if (!_tokenOriginChainIdOnSettlementLayer(_tokenOriginChainId)) {
-            /// We only track the total supply on the origin chain's settlement layer.
-            return;
-        }
-        if (totalSupplyAcrossAllChains[_assetId] < _amount) {
-            revert InsufficientTotalSupply(_assetId, _amount);
-        }
-        totalSupplyAcrossAllChains[_assetId] -= _amount;
-    }
-
-    function _tokenOriginChainIdOnSettlementLayer(uint256 _tokenOriginChainId) internal view returns (bool) {
-        if (_bridgehub().settlementLayer(_tokenOriginChainId) != block.chainid) {
-            return false;
-        }
-        return true;
     }
 
     function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {

@@ -257,11 +257,6 @@ contract L1AssetRouterTest is Test {
             .checked_write(100);
         stdstore
             .target(address(l1AssetTracker))
-            .sig(IAssetTrackerBase.totalSupplyAcrossAllChains.selector)
-            .with_key(ETH_TOKEN_ASSET_ID)
-            .checked_write(100);
-        stdstore
-            .target(address(l1AssetTracker))
             .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(chainId)
             .with_key(ETH_TOKEN_ASSET_ID)
@@ -270,11 +265,6 @@ contract L1AssetRouterTest is Test {
             .target(address(l1AssetTracker))
             .sig(IAssetTrackerBase.chainBalance.selector)
             .with_key(chainId)
-            .with_key(tokenAssetId)
-            .checked_write(100);
-        stdstore
-            .target(address(l1AssetTracker))
-            .sig(IAssetTrackerBase.totalSupplyAcrossAllChains.selector)
             .with_key(tokenAssetId)
             .checked_write(100);
 
@@ -283,6 +273,9 @@ contract L1AssetRouterTest is Test {
         /// storing chainBalance
         _setAssetTrackerChainBalance(chainId, address(token), 1000 * amount);
         _setAssetTrackerChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
+        // Also set balance for block.chainid to handle _getWithdrawalChain scenarios
+        _setAssetTrackerChainBalance(block.chainid, address(token), 1000 * amount);
+        _setAssetTrackerChainBalance(block.chainid, ETH_TOKEN_ADDRESS, amount);
         // console.log("chainBalance %s, %s", address(token), nativeTokenVault.chainBalance(chainId, address(token)));
         _setSharedBridgeChainBalance(chainId, address(token), amount);
         _setSharedBridgeChainBalance(chainId, ETH_TOKEN_ADDRESS, amount);
@@ -330,13 +323,8 @@ contract L1AssetRouterTest is Test {
         );
         vm.mockCall(
             messageRootAddress,
-            abi.encodeWithSelector(IMessageRoot.v30UpgradeGatewayBlockNumber.selector),
-            abi.encode(0)
-        );
-        vm.mockCall(
-            messageRootAddress,
             abi.encodeWithSelector(IMessageRoot.v30UpgradeChainBatchNumber.selector),
-            abi.encode(0)
+            abi.encode(10)
         );
         vm.mockCall(
             address(messageRootAddress),

@@ -6,20 +6,16 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 
-import {AssetIdNotRegistered, TokenBalanceNotMigratedToGateway, MissingBaseTokenAssetId} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, TokenBalanceNotMigratedToGateway, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
-
-struct SavedTotalSupply {
-    bool isSaved;
-    uint256 amount;
-}
+import {SavedTotalSupply} from "./IAssetTrackerBase.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     uint256 public L1_CHAIN_ID;
@@ -79,6 +75,19 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return L2_MESSAGE_ROOT;
     }
 
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override {
+        _registerTokenOnL2(_assetId);
+        super.registerNewToken(_assetId, _originChainId);
+    }
+
+    function _registerTokenOnL2(bytes32 _assetId) internal {
+        assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+    }
+
+    function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
+        _registerTokenOnL2(_assetId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
@@ -94,9 +103,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function _handleInitiateBridgingOnL2Inner(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) internal {
         if (_tokenOriginChainId == block.chainid) {
-            // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
-            totalSupplyAcrossAllChains[_assetId] += _amount;
-            return;
+            /// On the L2 we only save chainBalance for native tokens.
+            _decreaseChainBalance(block.chainid, _assetId, _amount);
         }
         _checkAssetMigrationNumber(_assetId);
     }
@@ -115,7 +123,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
-        bytes32 baseTokenAssetId = L2_ASSET_ROUTER.BASE_TOKEN_ASSET_ID();
+        bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
         _handleInitiateBridgingOnL2Inner(baseTokenAssetId, _amount, baseTokenOriginChainId);
     }
@@ -135,25 +143,40 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _tokenOriginChainId,
         address _tokenAddress
     ) internal {
-        if (_tokenCanSkipMigrationOnL2(_assetId)) {
+        if (_needToForceSetAssetMigrationOnL2(_assetId)) {
             _forceSetAssetMigrationNumber(block.chainid, _assetId);
         }
 
         /// We save the total supply for the first deposit after a migration.
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
-        if (!savedTotalSupply[migrationNumber][_assetId].isSaved) {
-            /// This function saves the token supply before the first deposit after the chain migration is processed (in the same transaction).
-            /// This totalSupply is the chain's total supply at the moment of chain migration.
-            savedTotalSupply[migrationNumber][_assetId] = SavedTotalSupply({
-                isSaved: true,
-                amount: IERC20(_tokenAddress).totalSupply()
-            });
-        }
-
+        /// Here we don't care about the total supply, we only want to save it if it is not already saved.
+        // solhint-disable-next-line no-unused-vars
+        _getOrSaveTotalSupply(_assetId, migrationNumber, _tokenOriginChainId, _tokenAddress);
+        /// On the L2 we only save chainBalance for native tokens.
         if (_tokenOriginChainId == block.chainid) {
-            // We track the total supply on the origin L2 to make sure the token is not maliciously overflowing the sum of chainBalances.
-            // Otherwise a malicious token can freeze its host chain.
-            totalSupplyAcrossAllChains[_assetId] += _amount;
+            chainBalance[block.chainid][_assetId] += _amount;
+        }
+    }
+
+    /// @notice This saves the total supply if it is not saved yet. It returns the saved total supply.
+    function _getOrSaveTotalSupply(
+        bytes32 _assetId,
+        uint256 _migrationNumber,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) internal returns (uint256 _totalSupply) {
+        SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_migrationNumber][_assetId];
+        if (!tokenSavedTotalSupply.isSaved) {
+            if (_tokenOriginChainId == block.chainid) {
+                _totalSupply = chainBalance[block.chainid][_assetId];
+            } else {
+                _totalSupply = IERC20(_tokenAddress).totalSupply();
+                /// This function saves the token supply before the first deposit after the chain migration is processed (in the same transaction).
+                /// This totalSupply is the chain's total supply at the moment of chain migration.
+            }
+            savedTotalSupply[_migrationNumber][_assetId] = SavedTotalSupply({isSaved: true, amount: _totalSupply});
+        } else {
+            _totalSupply = tokenSavedTotalSupply.amount;
         }
     }
 
@@ -182,8 +205,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     /// @notice Migrates the token balance from L2 to L1.
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
-    /// @dev This function is permissionless, it does not affect the state.
+    /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
+        require(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID,
+            OnlyGatewaySettlementLayer()
+        );
         address tokenAddress = _tryGetTokenAddress(_assetId);
 
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
@@ -194,17 +221,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
             return;
         }
-        uint256 amount;
-        {
-            SavedTotalSupply memory totalSupply = savedTotalSupply[migrationNumber][_assetId];
-            if (!totalSupply.isSaved) {
-                amount = IERC20(tokenAddress).totalSupply();
-            } else {
-                amount = totalSupply.amount;
-                /// We save the total supply for later use just in case.
-                savedTotalSupply[migrationNumber][_assetId] = SavedTotalSupply({isSaved: true, amount: amount});
-            }
-        }
+        uint256 amount = _getOrSaveTotalSupply(_assetId, migrationNumber, originChainId, tokenAddress);
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
@@ -214,8 +231,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             amount: amount,
             migrationNumber: migrationNumber,
             originToken: originalToken,
-            isL1ToGateway: true,
-            totalSupplyAcrossAllChains: 0
+            isL1ToGateway: true
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
@@ -228,9 +244,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    function _registerToken(bytes32 _assetId, address _originalToken, uint256 _tokenOriginChainId) internal {}
-
-    function _tokenCanSkipMigrationOnL2(bytes32 _assetId) internal view returns (bool) {
+    function _needToForceSetAssetMigrationOnL2(bytes32 _assetId) internal view returns (bool) {
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         address tokenAddress = _tryGetTokenAddress(_assetId);
         uint256 amount = IERC20(tokenAddress).totalSupply();
@@ -240,14 +254,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
         tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
-
-        if (tokenAddress == address(0)) {
-            if (_assetId == BASE_TOKEN_ASSET_ID) {
-                tokenAddress = address(L2_BASE_TOKEN_SYSTEM_CONTRACT);
-            } else {
-                revert AssetIdNotRegistered(_assetId);
-            }
-        }
+        require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {

@@ -325,7 +325,6 @@ struct TokenBalanceMigrationData {
     uint256 tokenOriginChainId;
     uint256 amount;
     uint256 migrationNumber;
-    uint256 totalSupplyAcrossAllChains;
 }
 
 struct BalanceChange {

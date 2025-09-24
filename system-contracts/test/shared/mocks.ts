@@ -18,6 +18,7 @@ import {
   REAL_L2_MESSAGE_ROOT_ADDRESS,
   REAL_L2_INTEROP_CENTER_ADDRESS,
   REAL_L2_INTEROP_HANDLER_ADDRESS,
+  REAL_L2_NATIVE_TOKEN_VAULT_ADDRESS,
 } from "./constants";
 import { deployContractOnAddress, getWallets, loadArtifact } from "./utils";
 
@@ -50,6 +51,7 @@ const TEST_SYSTEM_CONTRACTS_MOCKS = {
   IMessageRoot: REAL_L2_MESSAGE_ROOT_ADDRESS,
   IInteropCenter: REAL_L2_INTEROP_CENTER_ADDRESS,
   IInteropHandler: REAL_L2_INTEROP_HANDLER_ADDRESS,
+  IL2NativeTokenVault: REAL_L2_NATIVE_TOKEN_VAULT_ADDRESS,
 };
 
 // Deploys mocks, and cleans previous call results during deployments.

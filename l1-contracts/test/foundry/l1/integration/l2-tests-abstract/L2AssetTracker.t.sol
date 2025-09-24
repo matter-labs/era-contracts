@@ -45,6 +45,13 @@ abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
                 .checked_write(bytes32(uint256(dummyBatchRoot) + i));
         }
 
+        // Set the current batch number to 4 so that batch 5 can be added next
+        stdstore
+            .target(address(L2_MESSAGE_ROOT_ADDR))
+            .sig("currentChainBatchNumber(uint256)")
+            .with_key(271)
+            .checked_write(4);
+
         vm.prank(L2_BRIDGEHUB.getZKChain(271));
         (bool success, ) = GW_ASSET_TRACKER_ADDR.call(bytes.concat(hex"e7ca8589", data));
 
