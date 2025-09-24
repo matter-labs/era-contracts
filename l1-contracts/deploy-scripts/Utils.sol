@@ -111,19 +111,6 @@ struct FacetToSelectors {
     uint16 facetPosition;
 }
 
-struct FacetCut {
-    address facet;
-    Action action;
-    bool isFreezable;
-    bytes4[] selectors;
-}
-
-enum Action {
-    Add,
-    Replace,
-    Remove
-}
-
 struct ChainInfoFromBridgehub {
     address diamondProxy;
     address admin;

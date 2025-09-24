@@ -5,7 +5,8 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {FacetCut, StateTransitionDeployedAddresses} from "./Utils.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
+import {StateTransitionDeployedAddresses} from "./Utils.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -250,10 +251,18 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         vm.writeToml(toml, outputPath);
     }
 
-    /// @notice Get new facet cuts
-    function getFacetCuts(
+    /// @notice Get all four facet cuts
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (FacetCut[] memory facetCuts) {
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
+        // We still want to reuse DeployUtils, but this function is not used in this script
+        revert("not implemented");
+    }
+
+    /// @notice Get new facet cuts that were added in the upgrade
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
         // We still want to reuse DeployUtils, but this function is not used in this script
         revert("not implemented");
     }
