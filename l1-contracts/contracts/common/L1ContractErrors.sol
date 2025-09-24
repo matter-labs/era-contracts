@@ -389,7 +389,6 @@ error ZeroChainId();
 // 0x601b6882
 error ZKChainLimitReached();
 
-
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,

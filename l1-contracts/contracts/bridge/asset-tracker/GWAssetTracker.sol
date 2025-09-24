@@ -195,7 +195,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 require(log.l2ShardId == 0, InvalidL2ShardId());
                 require(log.isService, InvalidServiceLog());
 
-
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                     require(!onlyWithdrawals, OnlyWithdrawalsAllowedForPreV30Chains());
                     _handleInteropMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
@@ -237,7 +236,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         ///  Appends the batch message root to the global message.
         /// The logic of this function depends on the settlement layer as we support
         /// message root aggregation only on non-L1 settlement layers for ease for migration.
-        _messageRoot().addChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
+        _messageRoot().addChainBatchRoot(
+            _processLogsInputs.chainId,
+            _processLogsInputs.batchNumber,
+            chainBatchRootHash
+        );
     }
 
     function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
@@ -352,7 +355,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _assetId: _assetId,
             _amount: amount
         });
-
     }
 
     function _handleChainBalanceChangeOnGateway(
@@ -361,11 +363,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _assetId,
         uint256 _amount
     ) internal {
-        if ( _amount > 0) {
+        if (_amount > 0) {
             /// Note, we don't track L1 chainBalance on Gateway.
             if (_sourceChainId != L1_CHAIN_ID) {
                 _decreaseChainBalance(_sourceChainId, _assetId, _amount);
-            } 
+            }
             if (_destinationChainId != L1_CHAIN_ID) {
                 chainBalance[_destinationChainId][_assetId] += _amount;
             }
@@ -410,7 +412,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         );
     }
 
-
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
@@ -443,7 +444,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
-    function _getOrSaveChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _migrationNumber) internal returns (uint256) {
+    function _getOrSaveChainBalance(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _migrationNumber
+    ) internal returns (uint256) {
         SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_chainId][_migrationNumber][_assetId];
         if (!tokenSavedTotalSupply.isSaved) {
             tokenSavedTotalSupply.amount = chainBalance[_chainId][_assetId];

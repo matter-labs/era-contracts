@@ -515,7 +515,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 _baseTokenAmount: _params.request.mintValue,
                 _getBalanceChange: getBalanceChange
             });
-            }
+        }
     }
 
     function _nextPriorityTxId() internal view returns (uint256) {

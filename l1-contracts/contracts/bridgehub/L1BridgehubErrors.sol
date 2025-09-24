@@ -30,6 +30,8 @@ error IncorrectSender(address prevMsgSender, address chainAdmin);
 error LocallyNoChainsAtGenesis();
 // 0x913183d8
 error MessageRootNotRegistered();
+// 0x4010a88d
+error MigrationNotToL1();
 // 0x12b08c62
 error MigrationNumberAlreadySet();
 // 0xde1362a2
@@ -106,5 +108,3 @@ error V30UpgradeGatewayBlockNumberAlreadySet();
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
 error ZKChainNotRegistered();
-error MigrationNotToL1();
-

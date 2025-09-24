@@ -240,7 +240,7 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             sentBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY && sentBlockNumber != 0,
             V30UpgradeChainBatchNumberNotSet()
         );
-        
+
         // slither-disable-next-line unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
             abi.encodeCall(this.sendV30UpgradeBlockNumberFromGateway, (_chainId, sentBlockNumber))
@@ -341,8 +341,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
             chainBatchRoots[_chainId][_batchNumber] == bytes32(0),
             ChainBatchRootAlreadyExists(_chainId, _batchNumber)
         );
-        require(_batchNumber == currentChainBatchNumber[_chainId] + 1, NonConsecutiveBatchNumber(_chainId, _batchNumber));
-
+        require(
+            _batchNumber == currentChainBatchNumber[_chainId] + 1,
+            NonConsecutiveBatchNumber(_chainId, _batchNumber)
+        );
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         ++currentChainBatchNumber[_chainId];
