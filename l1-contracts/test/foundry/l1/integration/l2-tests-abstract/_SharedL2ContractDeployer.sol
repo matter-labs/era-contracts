@@ -39,9 +39,9 @@ import {SystemContractsArgs} from "./Utils.sol";
 
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-abstract contract SharedL2ContractDeployer is UtilsTest, DeployIntegrationUtils {
+abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegrationUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
 
@@ -293,21 +293,5 @@ abstract contract SharedL2ContractDeployer is UtilsTest, DeployIntegrationUtils 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;
     function deployL2Contracts(uint256 _l1ChainId) public virtual;
 
-    function test() internal virtual override(DeployIntegrationUtils, UtilsTest) {}
-
-    // Override L1 unit tests that shouldn't run in L2 environment
-    function test_ConstructL2Log() public virtual override {
-        // Skip this L1 unit test in L2 integration tests
-        vm.skip(true);
-    }
-
-    function test_CreateSystemLogs() public virtual override {
-        // Skip this L1 unit test in L2 integration tests
-        vm.skip(true);
-    }
-
-    function test_PackBatchTimestampAndBlockTimestamp() public virtual override {
-        // Skip this L1 unit test in L2 integration tests
-        vm.skip(true);
-    }
+    function test() internal virtual override(DeployIntegrationUtils, UtilsCallMockerTest) {}
 }

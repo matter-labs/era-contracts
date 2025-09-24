@@ -12,10 +12,11 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 
 // solhint-enable max-line-length
 
-contract UtilsTest is Test {
+contract UtilsTest is UtilsCallMockerTest {
     function test_PackBatchTimestampAndBlockTimestamp() public virtual {
         uint64 batchTimestamp = 0x12345678;
         uint64 blockTimestamp = 0x87654321;
@@ -154,41 +155,6 @@ contract UtilsTest is Test {
         );
     }
 
-    function mockDiamondInitInteropCenterCalls() public {
-        mockDiamondInitInteropCenterCallsWithAddress(address(0x1234567890876543567890), address(0));
-    }
-
-    function mockDiamondInitInteropCenterCallsWithAddress(address bridgehub, address assetRouter) public {
-        address assetTracker = address(0x1234567890876543567890);
-        if (assetRouter == address(0)) {
-            assetRouter = address(0x1234567890876543567890);
-        }
-        address nativeTokenVault = address(0x1234567890876543567890);
-
-        vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehub.assetRouter.selector), abi.encode(assetRouter));
-        vm.mockCall(
-            assetRouter,
-            abi.encodeWithSelector(IL1AssetRouter.nativeTokenVault.selector),
-            abi.encode(nativeTokenVault)
-        );
-        vm.mockCall(
-            nativeTokenVault,
-            abi.encodeWithSelector(IL1NativeTokenVault.l1AssetTracker.selector),
-            abi.encode(assetTracker)
-        );
-        bytes32 baseTokenAssetId = bytes32(uint256(uint160(makeAddr("baseTokenAssetId"))));
-        vm.mockCall(
-            nativeTokenVault,
-            abi.encodeWithSelector(INativeTokenVault.originChainId.selector),
-            abi.encode(block.chainid)
-        );
-        vm.mockCall(
-            nativeTokenVault,
-            abi.encodeWithSelector(INativeTokenVault.originToken.selector),
-            abi.encode(ETH_TOKEN_ADDRESS)
-        );
-    }
-
     // add this to be excluded from coverage report
-    function test() internal virtual {}
+    function test() internal virtual override {}
 }
