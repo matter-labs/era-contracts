@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -199,29 +199,18 @@ abstract contract DeployUtils is Create2FactoryUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function getFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (FacetCut[] memory facetCuts);
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    function formatFacetCuts(
-        FacetCut[] memory facetCutsUnformatted
-    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
-        facetCuts = new Diamond.FacetCut[](facetCutsUnformatted.length);
-        for (uint256 i = 0; i < facetCutsUnformatted.length; i++) {
-            facetCuts[i] = Diamond.FacetCut({
-                facet: facetCutsUnformatted[i].facet,
-                action: Diamond.Action(uint8(facetCutsUnformatted[i].action)),
-                isFreezable: facetCutsUnformatted[i].isFreezable,
-                selectors: facetCutsUnformatted[i].selectors
-            });
-        }
-    }
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    function getDiamondCutData(
+    function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        FacetCut[] memory facetCutsUnformatted = getFacetCuts(stateTransition);
-        Diamond.FacetCut[] memory facetCuts = formatFacetCuts(facetCutsUnformatted);
+        Diamond.FacetCut[] memory facetCuts = getChainCreationFacetCuts(stateTransition);
 
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
 
@@ -238,7 +227,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getChainCreationParams(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainCreationParams memory) {
-        Diamond.DiamondCutData memory diamondCut = getDiamondCutData(stateTransition);
+        Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
         return
             ChainCreationParams({
                 genesisUpgrade: stateTransition.genesisUpgrade,
@@ -293,6 +282,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
         FeeParams memory feeParams = getFeeParams();
 
         require(stateTransition.verifier != address(0), "verifier is zero");
+        require(config.contracts.bootloaderHash != bytes32(0), "bootloader hash is zero");
+        require(config.contracts.defaultAAHash != bytes32(0), "default aa hash is zero");
+        require(config.contracts.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
 
         // TODO should be provided?
         //        if (!stateTransition.isOnGateway) {

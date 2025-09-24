@@ -32,7 +32,8 @@ import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2Contra
 import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2NativeTokenVaultTestAbstract} from "../l2-tests-abstract/L2NativeTokenVaultTestAbstract.t.sol";
 
-import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
 contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeTokenVaultTestAbstract {
@@ -50,10 +51,16 @@ contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeT
         super.deployL2Contracts(_l1ChainId);
     }
 
-    function getFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (FacetCut[] memory) {
-        return super.getFacetCuts(stateTransition);
+    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
+        return super.getChainCreationFacetCuts(stateTransition);
+    }
+
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
+        return super.getUpgradeAddedFacetCuts(stateTransition);
     }
 
     function getCreationCode(

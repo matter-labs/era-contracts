@@ -1049,7 +1049,7 @@
   },
   {
     "contractName": "l1-contracts/L1VerifierFflonk",
-    "zkBytecodeHash": "0x010009bf68f8b5fb7ddf225ab004155517aed2822e27fe6039e574f62a4a96e2",
+    "zkBytecodeHash": "0x010009bfe7dc4c879153fb09adcc4b70d62326b1a08400808d70f85b71aa5a3f",
     "zkBytecodePath": "/l1-contracts/zkout/L1VerifierFflonk.sol/L1VerifierFflonk.json",
     "evmBytecodeHash": "0x88eff30f7791c77e9551fa4b718631000e7fd871650931ae62315a7c269edaf5",
     "evmBytecodePath": "/l1-contracts/out/L1VerifierFflonk.sol/L1VerifierFflonk.json",
@@ -1177,7 +1177,7 @@
   },
   {
     "contractName": "l1-contracts/L2VerifierFflonk",
-    "zkBytecodeHash": "0x010009ed49b08976342fdf5d09e4bd7a7c66c76b6f6312666732669ad8a2cdc2",
+    "zkBytecodeHash": "0x010009ed5daafeb4aae604049ce9ab7eb61e4d05659227abdde776e919210d76",
     "zkBytecodePath": "/l1-contracts/zkout/L2VerifierFflonk.sol/L2VerifierFflonk.json",
     "evmBytecodeHash": "0x687994571392188f0e497c472cdd34bddc6131ffc844d844576ddaa24aed4b5d",
     "evmBytecodePath": "/l1-contracts/out/L2VerifierFflonk.sol/L2VerifierFflonk.json",

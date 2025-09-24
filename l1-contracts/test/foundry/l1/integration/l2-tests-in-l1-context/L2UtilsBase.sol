@@ -29,8 +29,6 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
-import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
-
 import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
