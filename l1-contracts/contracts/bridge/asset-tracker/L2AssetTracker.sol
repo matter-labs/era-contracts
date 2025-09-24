@@ -110,6 +110,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _checkAssetMigrationNumber(_assetId);
     }
 
+    /// @notice This function is used to check the asset migration number.
+    /// @dev This is used to pause outgoing withdrawals and interop transactions after the chain migrates to Gateway.
     function _checkAssetMigrationNumber(bytes32 _assetId) internal view {
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];

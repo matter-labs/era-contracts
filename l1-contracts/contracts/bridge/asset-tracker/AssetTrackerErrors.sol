@@ -55,3 +55,5 @@ error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 error InvalidL2ShardId();
 error InvalidServiceLog();
 error OnlyGatewaySettlementLayer();
+error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
+
