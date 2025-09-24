@@ -5,8 +5,8 @@
 First, copy the keys into data directory:
 
 ```shell
-cp ../../prover/data/keys/fflonk_verification_snark_key.json data/fflonk_scheduler_key.json
-cp ../../prover/data/keys/verification_snark_key.json data/plonk_scheduler_key.json
+cp ../../zksync-era/prover/data/keys/fflonk_verification_snark_key.json data/fflonk_scheduler_key.json
+cp ../../zksync-era/prover/data/keys/verification_snark_key.json data/plonk_scheduler_key.json
 ```
 
 To generate the verifier from the scheduler key in 'data' directory, just run:
