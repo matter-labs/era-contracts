@@ -24,8 +24,6 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {L2Utils, SystemContractsArgs} from "./L2Utils.sol";
 
-import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
-
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
