@@ -8,7 +8,6 @@ import {
   TEST_FORCE_DEPLOYER_ADDRESS,
   REAL_L2_ASSET_ROUTER_ADDRESS,
   REAL_L2_MESSAGE_ROOT_ADDRESS,
-  REAL_L2_INTEROP_CENTER_ADDRESS,
   REAL_L2_ASSET_TRACKER_ADDRESS,
   REAL_L2_CHAIN_ASSET_HANDLER_ADDRESS,
   TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS,
@@ -39,7 +38,7 @@ describe("L2GenesisUpgrade tests", function () {
 
   const additionalForceDeploymentsData = ethers.utils.defaultAbiCoder.encode(
     [
-      "tuple(bytes32 baseTokenAssetId, address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, string baseTokenName, string baseTokenSymbol)",
+      "tuple(bytes32 baseTokenAssetId, address l2LegacySharedBridge, address predeployedL2WethAddress, address baseTokenL1Address, string baseTokenName, string baseTokenSymbol, uint256 baseTokenOriginChainId, address baseTokenOriginAddress)",
     ],
     [
       {
@@ -49,6 +48,8 @@ describe("L2GenesisUpgrade tests", function () {
         baseTokenL1Address: ADDRESS_ONE,
         baseTokenName: "Ether",
         baseTokenSymbol: "ETH",
+        baseTokenOriginChainId: 1,
+        baseTokenOriginAddress: ADDRESS_ONE,
       },
     ]
   );
@@ -70,7 +71,6 @@ describe("L2GenesisUpgrade tests", function () {
         ctmDeployerAddress,
         REAL_L2_MESSAGE_ROOT_ADDRESS,
         REAL_L2_CHAIN_ASSET_HANDLER_ADDRESS,
-        REAL_L2_INTEROP_CENTER_ADDRESS,
         ADDRESS_ONE,
       ],
       {
@@ -86,6 +86,19 @@ describe("L2GenesisUpgrade tests", function () {
       failure: false,
       returnData: "0x",
     });
+    await setResult("IL2NativeTokenVault", "setAddresses", [1], {
+      failure: false,
+      returnData: "0x",
+    });
+    await setResult(
+      "L2BaseToken",
+      "setAddresses",
+      ["0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70", ADDRESS_ONE],
+      {
+        failure: false,
+        returnData: "0x",
+      }
+    );
 
     await setResult("SystemContext", "setChainId", [chainId], {
       failure: false,

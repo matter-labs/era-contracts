@@ -129,12 +129,6 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, address(l2NativeToken));
 
-        stdstore
-            .target(address(L2_ASSET_TRACKER_ADDR))
-            .sig(IAssetTrackerBase.totalSupplyAcrossAllChains.selector)
-            .with_key(assetId)
-            .checked_write(100);
-
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).withdraw(
             assetId,
             DataEncoding.encodeBridgeBurnData(100, address(1), address(l2NativeToken))

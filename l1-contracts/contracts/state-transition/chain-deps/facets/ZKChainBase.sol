@@ -96,9 +96,8 @@ contract ZKChainBase is ReentrancyGuard {
     modifier onlyServiceTransaction() {
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
         if (
-            /// Multiple purposes.
+            /// Purposes.
             /// 1. Allow EVM emulation.
-            /// 2. saveV30UpgradeGatewayBlockNumberOnL2, so disable interop for pre V30 batches.
             msg.sender != address(this) &&
             /// For registering chains in the L2Bridgehub. This is used for interop initiation.
             msg.sender != bridgehub.chainRegistrationSender() &&

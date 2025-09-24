@@ -26,9 +26,6 @@ uint256 constant V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1 = uint2
     keccak256(abi.encodePacked("V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1"))
 );
 
-// TODO fix the value
-bytes32 constant GENESIS_CHAIN_BATCH_ROOT = keccak256("GENESIS_CHAIN_BATCH_ROOT");
-
 /**
  * @author Matter Labs
  * @notice MessageRoot contract is responsible for storing and aggregating the roots of the batches from different chains into the MessageRoot.
@@ -63,6 +60,8 @@ interface IMessageRoot is IMessageVerification {
 
     function BRIDGE_HUB() external view returns (IBridgehub);
 
+    function GATEWAY_CHAIN_ID() external view returns (uint256);
+
     function addNewChain(uint256 _chainId, uint256 _startingBatchNumber) external;
 
     function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) external;
@@ -70,10 +69,6 @@ interface IMessageRoot is IMessageVerification {
     function chainBatchRoots(uint256 _chainId, uint256 _batchNumber) external view returns (bytes32);
 
     function historicalRoot(uint256 _blockNumber) external view returns (bytes32);
-
-    function v30UpgradeGatewayBlockNumber() external view returns (uint256);
-
-    function saveV30UpgradeGatewayBlockNumberOnL2(uint256 _v30UpgradeGatewayBlockNumber) external;
 
     function v30UpgradeChainBatchNumber(uint256 _chainId) external view returns (uint256);
 
@@ -88,5 +83,11 @@ interface IMessageRoot is IMessageVerification {
         bytes32[] calldata _proof
     ) external pure returns (ProofData memory);
 
-    function setMigratingChainBatchRoot(uint256 _chainId, uint256 _batchNumber) external;
+    function setMigratingChainBatchRoot(
+        uint256 _chainId,
+        uint256 _batchNumber,
+        uint256 _v30UpgradeChainBatchNumber
+    ) external;
+
+    function currentChainBatchNumber(uint256 _chainId) external view returns (uint256);
 }

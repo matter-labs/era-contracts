@@ -26,6 +26,7 @@ import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
 import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
 import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {NotAssetRouter} from "../../../common/L1ContractErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../bridgehub/L1BridgehubErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -319,7 +320,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         /// We pause L1->GW->L2 deposits.
         require(_checkV30UpgradeProcessed(_chainId), DepositsPaused());
 
-        (bytes32 assetId, uint256 amount) = (bytes32(0), 0);
         BalanceChange memory balanceChange;
         /// baseTokenAssetId is known on Gateway.
         balanceChange.baseTokenAmount = _baseTokenAmount;
@@ -328,7 +328,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             IL1AssetTracker assetTracker = IL1AssetTracker(s.assetTracker);
             INativeTokenVault nativeTokenVault = INativeTokenVault(s.nativeTokenVault);
 
-            (assetId, amount) = (assetTracker.consumeBalanceChange(s.chainId, _chainId));
+            (bytes32 assetId, uint256 amount) = (assetTracker.consumeBalanceChange(s.chainId, _chainId));
             uint256 tokenOriginChainId = nativeTokenVault.originChainId(assetId);
             address originToken = nativeTokenVault.originToken(assetId);
             balanceChange = BalanceChange({
@@ -505,25 +505,16 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.settlementLayer != address(0)) {
             address assetRouter = IBridgehub(s.bridgehub).assetRouter();
-            if (_params.request.sender != AddressAliasHelper.applyL1ToL2Alias(assetRouter)) {
-                // slither-disable-next-line unused-return
-                IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
-                    _chainId: s.chainId,
-                    _canonicalTxHash: canonicalTxHash,
-                    _expirationTimestamp: _params.expirationTimestamp,
-                    _baseTokenAmount: _params.request.mintValue,
-                    _getBalanceChange: false
-                });
-            } else {
-                // slither-disable-next-line unused-return
-                IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
-                    _chainId: s.chainId,
-                    _canonicalTxHash: canonicalTxHash,
-                    _expirationTimestamp: _params.expirationTimestamp,
-                    _baseTokenAmount: _params.request.mintValue,
-                    _getBalanceChange: true
-                });
-            }
+            bool getBalanceChange = _params.request.sender == AddressAliasHelper.applyL1ToL2Alias(assetRouter);
+
+            // slither-disable-next-line unused-return
+            IMailbox(s.settlementLayer).requestL2TransactionToGatewayMailboxWithBalanceChange({
+                _chainId: s.chainId,
+                _canonicalTxHash: canonicalTxHash,
+                _expirationTimestamp: _params.expirationTimestamp,
+                _baseTokenAmount: _params.request.mintValue,
+                _getBalanceChange: getBalanceChange
+            });
         }
     }
 
@@ -671,6 +662,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
+        address assetRouter = IBridgehub(s.bridgehub).assetRouter();
+        require(msg.sender != assetRouter, NotAssetRouter(msg.sender, assetRouter));
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({
                 sender: msg.sender,

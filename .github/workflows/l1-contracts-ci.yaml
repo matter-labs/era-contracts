@@ -250,7 +250,7 @@ jobs:
         working-directory: tools
         run: cargo run
 
-      - name: Compare L1VerifierPlonk.sol
+      - name: Compare VerifierPlonk.sol
         run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/VerifierPlonk.sol
 
       - name: Compare VerifierFflonk.sol
