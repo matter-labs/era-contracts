@@ -15,6 +15,7 @@ import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
+import {DeployFailed} from "../common/L1ContractErrors.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -60,9 +61,9 @@ library L2GenesisForceDeploymentsHelper {
         );
 
         // Note, that we dont use interface, but raw call to avoid Solidity checking for empty bytecode
-        (bool success, bytes memory returnData) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
+        (bool success, ) = L2_DEPLOYER_SYSTEM_CONTRACT_ADDR.call(data);
         if (!success) {
-            revert("Failed to call setBytecodeDetailsEVM");
+            revert DeployFailed();
         }
     }
 
@@ -109,7 +110,7 @@ library L2GenesisForceDeploymentsHelper {
         // If this is a genesis upgrade, we need to initialize the MessageRoot contract.
         // We dont need to do anything for already deployed chains.
         if (_isGenesisUpgrade) {
-            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2();
+            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
         }
 
         forceDeployOnAddress(_isZKsyncOS, fixedForceDeploymentsData.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
@@ -138,6 +139,7 @@ library L2GenesisForceDeploymentsHelper {
             address(L2_ASSET_ROUTER_ADDR)
         );
         if (_isGenesisUpgrade) {
+            // solhint-disable-next-line func-named-parameters
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
@@ -147,6 +149,7 @@ library L2GenesisForceDeploymentsHelper {
                 fixedForceDeploymentsData.aliasedL1Governance
             );
         } else {
+            // solhint-disable-next-line func-named-parameters
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.eraChainId,
@@ -181,7 +184,7 @@ library L2GenesisForceDeploymentsHelper {
             // In production, the `fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon` must always
             // be equal to 0. It is only for simplifying testing.
             if (fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon == address(0)) {
-                // We need to deploy tbe beacon, we will use a separate contract for that to save
+                // We need to deploy the beacon, we will use a separate contract for that to save
                 // up on size of this contract.
                 forceDeployOnAddress(
                     _isZKsyncOS,
@@ -196,6 +199,7 @@ library L2GenesisForceDeploymentsHelper {
                 deployedTokenBeacon = fixedForceDeploymentsData.dangerousTestOnlyForcedBeacon;
             }
 
+            // solhint-disable-next-line func-named-parameters
             L2NativeTokenVaultZKOS(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
@@ -206,6 +210,7 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.baseTokenAssetId
             );
         } else {
+            // solhint-disable-next-line func-named-parameters
             L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
                 previousL2TokenProxyBytecodeHash,
@@ -221,6 +226,7 @@ library L2GenesisForceDeploymentsHelper {
             address(L2_CHAIN_ASSET_HANDLER_ADDR)
         );
         if (_isGenesisUpgrade) {
+            // solhint-disable-next-line func-named-parameters
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,

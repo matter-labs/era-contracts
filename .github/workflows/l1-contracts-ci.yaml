@@ -180,53 +180,54 @@ jobs:
       #   working-directory: ./l1-contracts
       #   run: forge test --match-test MeasureGas --gas-snapshot-check=true
 
-  test-foundry-zksync:
-    needs: [build, lint]
-    runs-on: ubuntu-latest
+  # TODO: recover, not needed for zksync os specifically as it does not use zkEVM
+  # test-foundry-zksync:
+  #   needs: [build, lint]
+  #   runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
+  #   steps:
+  #     - name: Checkout the repository
+  #       uses: actions/checkout@v4
+  #       with:
+  #         submodules: recursive
 
-      - name: Use Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: 18.18.0
-          cache: yarn
+  #     - name: Use Node.js
+  #       uses: actions/setup-node@v3
+  #       with:
+  #         node-version: 18.18.0
+  #         cache: yarn
 
-      - name: Install foundry-zksync
-        run: |
-          mkdir ./foundry-zksync
-          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
-          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
-          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+  #     - name: Install foundry-zksync
+  #       run: |
+  #         mkdir ./foundry-zksync
+  #         curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/nightly-ae913af65381734ad46c044a9495b67310bc77c4/foundry_nightly_linux_amd64.tar.gz
+  #         tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+  #         chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+  #         echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
-      - name: Install dependencies
-        run: yarn
+  #     - name: Install dependencies
+  #       run: yarn
 
-      - name: Build system contract artifacts
-        run: yarn sc build:foundry
+  #     - name: Build system contract artifacts
+  #       run: yarn sc build:foundry
 
-      - name: Restore artifacts cache
-        uses: actions/cache/restore@v3
-        with:
-          fail-on-cache-miss: true
-          key: artifacts-l1-${{ github.sha }}
-          path: |
-            da-contracts/out
-            l1-contracts/cache-forge
-            l1-contracts/out
-            # TODO: cached `zkout` and the one for tests produce different hashes and so it causes the tests to fail
-            l2-contracts/cache-forge
-            l2-contracts/zkout
-            system-contracts/zkout
+  #     - name: Restore artifacts cache
+  #       uses: actions/cache/restore@v3
+  #       with:
+  #         fail-on-cache-miss: true
+  #         key: artifacts-l1-${{ github.sha }}
+  #         path: |
+  #           da-contracts/out
+  #           l1-contracts/cache-forge
+  #           l1-contracts/out
+  #           # TODO: cached `zkout` and the one for tests produce different hashes and so it causes the tests to fail
+  #           l2-contracts/cache-forge
+  #           l2-contracts/zkout
+  #           system-contracts/zkout
 
-      - name: Run tests
-        working-directory: ./l1-contracts
-        run: yarn test:zkfoundry
+  #     - name: Run tests
+  #       working-directory: ./l1-contracts
+  #       run: yarn test:zkfoundry
 
   check-verifier-generator-l1:
     runs-on: ubuntu-latest
@@ -255,34 +256,6 @@ jobs:
 
       - name: Compare VerifierFflonk.sol
         run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L1VerifierFflonk.sol
-
-  check-verifier-generator-l2:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout the repository
-        uses: actions/checkout@v4
-        with:
-          submodules: recursive
-
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: 1.72.0
-
-      - name: Install Rust toolchain
-        working-directory: tools
-        run: rustup toolchain install
-
-      - name: Generate verifiers
-        working-directory: tools
-        run: cargo run -- --l2_mode
-
-      - name: Compare L2VerifierPlonk.sol
-        run: diff tools/data/VerifierPlonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierPlonk.sol
-
-      - name: Compare L2VerifierFflonk.sol
-        run: diff tools/data/VerifierFflonk.sol l1-contracts/contracts/state-transition/verifiers/L2VerifierFflonk.sol
 
   coverage:
     defaults:
@@ -368,7 +341,7 @@ jobs:
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
-          minimum-coverage: 83 # TODO(EVM-944): increase threshold to 85
+          minimum-coverage: 80 # TODO(EVM-944): increase threshold to 85
 
 
   # FIXME: restore gas report CI

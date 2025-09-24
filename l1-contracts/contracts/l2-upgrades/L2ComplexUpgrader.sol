@@ -59,7 +59,8 @@ contract L2ComplexUpgrader is IComplexUpgrader {
         address _delegateTo,
         bytes calldata _calldata
     ) external payable onlyForceDeployer {
-        for (uint256 i = 0; i < _forceDeployments.length; i++) {
+        // solhint-disable-next-line gas-length-in-loops
+        for (uint256 i = 0; i < _forceDeployments.length; ++i) {
             L2GenesisForceDeploymentsHelper.forceDeployOnAddress(
                 _forceDeployments[i].isZKsyncOS,
                 _forceDeployments[i].deployedBytecodeInfo,
@@ -80,6 +81,7 @@ contract L2ComplexUpgrader is IComplexUpgrader {
         if (_delegateTo.code.length == 0) {
             revert AddressHasNoCode(_delegateTo);
         }
+        // slither-disable-next-line controlled-delegatecall
         (bool success, bytes memory returnData) = _delegateTo.delegatecall(_calldata);
         assembly {
             if iszero(success) {

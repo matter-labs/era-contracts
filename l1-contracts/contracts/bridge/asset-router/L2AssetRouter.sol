@@ -15,7 +15,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "../../common/l2-helpers/L2ContractHelper.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {AmountMustBeGreaterThanZero, AssetIdNotSupported, EmptyAddress, InvalidCaller, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
@@ -122,6 +122,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         address _aliasedOwner
     ) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
+        // solhint-disable-next-line func-named-parameters
         updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, _baseTokenAssetId);
         _setAssetHandler(_baseTokenAssetId, L2_NATIVE_TOKEN_VAULT_ADDR);
         _transferOwnership(_aliasedOwner);
@@ -150,6 +151,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         L1_ASSET_ROUTER = _l1AssetRouter;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         eraChainId = _eraChainId;
+        BRIDGE_HUB = IBridgehub(L2_BRIDGEHUB_ADDR);
     }
 
     /// @inheritdoc IL2AssetRouter
@@ -418,8 +420,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         return L1_ASSET_ROUTER;
     }
 
-    function _bridgehub() internal view override returns (IBridgehub) {
-        return BRIDGE_HUB;
+    function _bridgehub() internal pure override returns (IBridgehub) {
+        return IBridgehub(L2_BRIDGEHUB_ADDR);
     }
 
     function _l1ChainId() internal view override returns (uint256) {

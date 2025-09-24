@@ -262,11 +262,13 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
         bytes memory encodedTransaction = abi.encode(_l2ProtocolUpgradeTx);
 
+        // solhint-disable-next-line func-named-parameters
         TransactionValidator.validateL1ToL2Transaction(
             _l2ProtocolUpgradeTx,
             encodedTransaction,
             s.priorityTxMaxGasLimit,
-            s.feeParams.priorityTxMaxPubdata
+            s.feeParams.priorityTxMaxPubdata,
+            s.zksyncOS
         );
 
         TransactionValidator.validateUpgradeTransaction(_l2ProtocolUpgradeTx);

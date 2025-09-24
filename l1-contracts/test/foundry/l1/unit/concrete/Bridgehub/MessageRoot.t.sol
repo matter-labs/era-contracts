@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, OnlyL2} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, NotL2} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
@@ -27,8 +27,8 @@ contract MessageRootTest is Test {
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
-        messageRoot = new L1MessageRoot(IBridgehub(bridgeHub));
         L1_CHAIN_ID = 5;
+        messageRoot = new L1MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID);
     }
 
     function test_init() public {
@@ -102,7 +102,7 @@ contract MessageRootTest is Test {
 
         vm.chainId(L1_CHAIN_ID);
         vm.prank(alphaChainSender);
-        vm.expectRevert(OnlyL2.selector);
+        vm.expectRevert(NotL2.selector);
         messageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
     }
 

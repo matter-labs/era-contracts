@@ -178,6 +178,6 @@ struct ZKChainStorage {
     /// (the value of the constant can be found in Config.sol).
     /// @dev Note, that precommitments are only supported for Era VM.
     bytes32 precommitmentForTheLatestBatch;
-    /// @dev Boojum OS flag, if `true` settlement done using Boojum OS state transition, otherwise Era VM
-    bool boojumOS;
+    /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
+    bool zksyncOS;
 }

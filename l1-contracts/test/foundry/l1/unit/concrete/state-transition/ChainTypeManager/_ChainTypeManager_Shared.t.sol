@@ -52,8 +52,10 @@ contract ChainTypeManagerTest is Test {
     address internal constant l1Nullifier = address(0x6060606);
     address internal constant serverNotifier = address(0x7070707);
     address internal newChainAdmin;
+    uint256 l1ChainId = 5;
     uint256 chainId = 112;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
+    address internal testnetVerifier =
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
     bytes internal forceDeploymentsData = hex"";
 
     uint256 eraChainId = 9;
@@ -63,7 +65,7 @@ contract ChainTypeManagerTest is Test {
 
     function deploy() public {
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        L1MessageRoot messageroot = new L1MessageRoot(bridgehub);
+        L1MessageRoot messageroot = new L1MessageRoot(bridgehub, l1ChainId);
         vm.prank(governor);
         bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageroot, address(0));
 

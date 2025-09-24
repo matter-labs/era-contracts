@@ -89,6 +89,34 @@ uint256 constant MAX_NEW_FACTORY_DEPS = 64;
 /// @dev The L2 gasPricePerPubdata required to be used in bridges.
 uint256 constant REQUIRED_L2_GAS_PRICE_PER_PUBDATA = 800;
 
+/// @dev The native price for L1->L2 transactions in ZKsync OS.
+uint256 constant ZKSYNC_OS_L1_TX_NATIVE_PRICE = 10;
+
+/// @dev The intrinsic cost of the L1->L2 transaction in computational L2 gas for ZKsync OS.
+uint256 constant L1_TX_INTRINSIC_L2_GAS_ZKSYNC_OS = 21000;
+
+/// @dev The cost of calldata byte for the L1->L2 transaction in computational L2 gas for ZKsync OS.
+uint256 constant L1_TX_CALLDATA_PRICE_L2_GAS_ZKSYNC_OS = 16;
+
+/// @dev The static part of the L1->l2 transaction native cost for ZKsync OS.
+/// It includes intrinsic cost(130_000) and static part of hashing cost(2500).
+uint256 constant L1_TX_STATIC_NATIVE_ZKSYNC_OS = 132_500;
+
+/// @dev The encoding cost per keccak256 round(136 bytes) of the L1->l2 transaction in native resource for ZKsync OS.
+uint256 constant L1_TX_ENCODING_136_BYTES_COST_NATIVE_ZKSYNC_OS = 17500;
+
+/// @dev The cost of calldata byte for the L1->L2 transaction in native resource for ZKsync OS.
+uint256 constant L1_TX_CALLDATA_COST_NATIVE_ZKSYNC_OS = 1;
+
+/// @dev The intrinsic cost of the L1->l2 transaction in pubdata for ZKsync OS
+uint256 constant L1_TX_INTRINSIC_PUBDATA_ZSKYNC_OS = 88;
+
+/// @dev The minimal L1->L2 transaction gas limit in ZKsync OS to be extra safe
+uint256 constant L1_TX_MINIMAL_GAS_LIMIT_ZSKYNC_OS = 200_000;
+
+/// @dev The native per gas ratio for upgrade transactions in ZKsync OS.
+uint256 constant UPGRADE_TX_NATIVE_PER_GAS = 10_000;
+
 /// @dev The mask which should be applied to the packed batch and L2 block timestamp in order
 /// to obtain the L2 block timestamp. Applying this mask is equivalent to calculating modulo 2**128
 uint256 constant PACKED_L2_BLOCK_TIMESTAMP_MASK = 0xffffffffffffffffffffffffffffffff;

@@ -23,8 +23,8 @@ import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpe
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
-import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
-import {InvalidChainId, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
+import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -433,6 +433,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
+        // For ZKsync OS factory deps will be ignored
         if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
             revert TooManyFactoryDeps();
         }
@@ -520,11 +521,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) internal view returns (L2CanonicalTransaction memory transaction, bytes32 canonicalTxHash) {
         transaction = _serializeL2Transaction(_priorityOpParams);
         bytes memory transactionEncoding = abi.encode(transaction);
+        // solhint-disable-next-line func-named-parameters
         TransactionValidator.validateL1ToL2Transaction(
             transaction,
             transactionEncoding,
             s.priorityTxMaxGasLimit,
-            s.feeParams.priorityTxMaxPubdata
+            s.feeParams.priorityTxMaxPubdata,
+            s.zksyncOS
         );
         canonicalTxHash = keccak256(transactionEncoding);
     }
