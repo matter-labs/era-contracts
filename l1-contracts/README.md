@@ -74,7 +74,7 @@ We provide a script [`verify-contracts.ts`](./scripts/verify-contracts.ts) that 
 #### Usage
 
 ```bash
-yarn verify-contracts <log_file> [stage|testnet|mainnet]
+yarn verify-contracts <log_file> --chain [stage|testnet|mainnet]
 ```
 
 log_file — path to a deployment log containing forge verify-contract commands
@@ -111,13 +111,14 @@ _Etherscan-style (Ethereum):_
 
 ```bash
 export ETHERSCAN_API_KEY=$API_KEY
-npx ts-node l1-contracts/scripts/verify-contracts.ts ./deployment-logs.txt mainnet
+yarn verify-contracts ./deployment-logs.txt --chain mainnet
 ```
 
 _ZKsync logs (no API key needed):_
 
 ```bash
-npx ts-node l1-contracts/scripts/verify-contracts.ts ./deployment-logs.txt stage
+yarn verify-contracts ./deployment-logs.txt --chain stage
 ```
 
+If the file contains both Ethereum and ZKsync logs, it will process both successfully.
 At the end of execution, the script prints a summary of verified and skipped contracts.

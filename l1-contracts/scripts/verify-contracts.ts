@@ -3,29 +3,42 @@
  * 📄 verify-contracts.ts
  *
  * Usage:
- *   ts-node verify-contracts.ts <log_file> [stage|testnet|mainnet]
+ *   npx ts-node l1-contracts/scripts/verify-contracts.ts <log_file> [options]
+ *
+ * Options:
+ *   -c, --chain <chain>    Target chain: stage | testnet | mainnet (default: stage)
  *
  * Reads a deployment log file, extracts forge verify-contract commands,
  * finds the correct .sol sources, and runs `forge verify-contract` with
  * retries and fallbacks.
  */
 
+import { Command } from "commander";
 import { execFileSync, execSync } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import * as path from "path";
 
-const args = process.argv.slice(2);
-if (args.length < 1) {
+const program = new Command();
+
+program
+  .name("verify-contracts")
+  .description("Automates contract verification from deployment logs")
+  .argument("<log_file>", "Path to deployment log containing forge verify-contract commands")
+  .option("-c, --chain <chain>", "Target chain (stage|testnet|mainnet)", "stage");
+
+program.parse(process.argv);
+
+const logFile = program.args[0];
+const options = program.opts();
+const chain = (options.chain || "stage").toLowerCase();
+
+if (!logFile) {
   console.error("❌ Error: Missing log file argument");
-  console.error("Usage: verify-contracts.ts <log_file> [stage|testnet|mainnet]");
-  process.exit(1);
+  program.help();
 }
 
-const LOG_FILE = args[0];
-const CHAIN = (args[1] || "stage").toLowerCase(); // default to stage
-
-if (!existsSync(LOG_FILE)) {
-  console.error(`❌ Error: File '${LOG_FILE}' not found.`);
+if (!existsSync(logFile)) {
+  console.error(`❌ Error: File '${logFile}' not found.`);
   process.exit(1);
 }
 
@@ -110,24 +123,16 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
 
   if (!solPath) return null;
 
-  // Start from the directory where the Solidity file was found
   let dir = path.dirname(solPath);
-
-  // Walk up the directory tree until we either:
-  //  - reach the root of the repository (l1-contracts or da-contracts),
-  //  - or find a folder that contains foundry.toml (project root).
   while (
     dir !== "." &&
     dir !== `${repoRoot}/l1-contracts` &&
     dir !== `${repoRoot}/da-contracts` &&
     !existsSync(path.join(dir, "foundry.toml"))
   ) {
-    // Move one level up
     dir = path.dirname(dir);
   }
 
-  // If we climbed all the way up and still didn’t find foundry.toml,
-  // assume the project root is just the contracts folder (l1-contracts or da-contracts).
   if (!existsSync(path.join(dir, "foundry.toml"))) {
     if (solPath.includes("/l1-contracts/")) {
       dir = path.join(repoRoot, "l1-contracts");
@@ -150,20 +155,22 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
 // -----------------------------
 function tryVerify(addr: string, name: string, rest: string, root: string, isZksync: boolean): boolean {
   let cmd: string;
-
   if (isZksync) {
-    const url = ZKSYNC_VERIFIER_URLS[CHAIN];
+    const url = ZKSYNC_VERIFIER_URLS[chain];
     if (!url) {
-      console.error(`❌ Unsupported chain "${CHAIN}" for zksync verifier`);
+      console.error(`❌ Unsupported chain "${chain}" for zksync verifier`);
       return false;
     }
     cmd = `forge verify-contract ${addr} ${name} ${rest} --verifier-url ${url} --zksync --watch`;
   } else {
-    const chainFlag = CHAIN === "mainnet" ? "--chain mainnet" : "--chain sepolia";
+    if (!process.env.ETHERSCAN_API_KEY) {
+      console.error("❌ ETHERSCAN_API_KEY must be set for non-zksync verifier logs");
+      process.exit(1);
+    }
+    const chainFlag = chain === "mainnet" ? "--chain mainnet" : "--chain sepolia";
     cmd = `forge verify-contract ${addr} ${name} ${rest} --etherscan-api-key "${process.env.ETHERSCAN_API_KEY}" ${chainFlag} --watch`;
   }
 
-  // Build masked command for logging
   const redacted = "--etherscan-api-key [REDACTED]";
   const maskedCmd = cmd.replace(/--etherscan-api-key\s+"[^"]*"/, redacted);
   console.log(`▶️  (cd ${root} && ${maskedCmd})`);
@@ -179,7 +186,7 @@ function tryVerify(addr: string, name: string, rest: string, root: string, isZks
 // -----------------------------
 // Main Loop
 // -----------------------------
-const logContent = readFileSync(LOG_FILE, "utf8");
+const logContent = readFileSync(logFile, "utf8");
 const lines = logContent.split("\n").filter((l) => l.includes("forge verify-contract"));
 
 for (const raw of lines) {
@@ -201,11 +208,6 @@ for (const raw of lines) {
     continue;
   }
 
-  if (!isZksync && !process.env.ETHERSCAN_API_KEY) {
-    console.error("❌ ETHERSCAN_API_KEY must be set for non-zksync verifier logs");
-    process.exit(1);
-  }
-
   const found = findContractAndRoot(name);
   if (!found) {
     console.log(`⚠️  Could not find ${name}.sol (or fallback) — skipping`);
@@ -217,12 +219,10 @@ for (const raw of lines) {
   console.log(`📂 ${resolvedName} found: ${solPath} (project root: ${root})`);
 
   let success = tryVerify(addr, resolvedName, rest, root, isZksync);
-
   if (!success && resolvedName !== name) {
     console.log(`🔁 Retry with original contract name: ${name}`);
     success = tryVerify(addr, name, rest, root, isZksync);
   }
-
   if (!success) {
     console.log("🔁 Final attempt with TransparentUpgradeableProxy");
     success = tryVerify(addr, "TransparentUpgradeableProxy", rest, root, isZksync);
