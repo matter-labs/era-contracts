@@ -19,8 +19,7 @@ contract SystemContractsCallerTest is Test {
     uint128 public constant TEST_VALUE_128 = 1 ether;
     bytes public constant TEST_DATA = "test data";
 
-    function setUp() public {
-    }
+    function setUp() public {}
 
     function test_Utils_SafeCastToU32_Success() public {
         uint256 value = 1000;
