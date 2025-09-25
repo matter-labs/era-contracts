@@ -28,6 +28,7 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../../../../../contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
@@ -48,7 +49,6 @@ library L2UtilsBase {
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         address wethToken = address(0x1);
         // we deploy the code to get the contract code with immutables which we then vm.etch
-        // FIXME: init
         address messageRoot = address(new L2MessageRoot());
         address bridgehub = address(new L2Bridgehub());
         address assetRouter = address(new L2AssetRouter());
@@ -97,7 +97,6 @@ library L2UtilsBase {
         }
 
         vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
-        // Initializing reentrancy guard
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
             _args.l1ChainId,
@@ -106,6 +105,12 @@ library L2UtilsBase {
             _args.legacySharedBridge,
             baseTokenAssetId,
             _args.aliasedOwner
+        );
+        // Initializing reentrancy guard
+        vm.store(
+            L2_ASSET_ROUTER_ADDR,
+            bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
+            bytes32(uint256(1))
         );
 
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
@@ -120,6 +125,8 @@ library L2UtilsBase {
             wethToken,
             baseTokenAssetId
         );
+
+        vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));
         L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
     }
 }

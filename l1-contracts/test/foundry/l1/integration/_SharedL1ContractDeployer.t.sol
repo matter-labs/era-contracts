@@ -6,6 +6,7 @@ import {StdStorage, Test, stdStorage, console} from "forge-std/Test.sol";
 import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1CoreContractsIntegration.s.sol";
 import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.s.sol";
 import {RegisterCTM} from "deploy-scripts/RegisterCTM.s.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";

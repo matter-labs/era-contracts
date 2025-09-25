@@ -7,7 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {BytecodePublisher} from "./BytecodePublisher.s.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";

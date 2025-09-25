@@ -283,7 +283,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         bytes memory proxyCreationCalldata = abi.encode(
             implementationAddress,
             gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin,
-            getInitializeCalldata(contractName)
+            getInitializeCalldata(contractName, true)
         );
         proxyAddress = Utils.deployThroughL1Deterministic(
             ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
@@ -479,19 +479,13 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
 
+        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
+
         Diamond.FacetCut[] memory facetCuts;
         facetCuts = getUpgradeAddedFacetCuts(stateTransition);
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
-        ProposedUpgrade memory proposedUpgrade;
-        if (isPatchUpgrade()) {
-            proposedUpgrade = getProposedPatchUpgrade(stateTransition);
-        } else {
-            proposedUpgrade = getProposedUpgrade(stateTransition);
-            Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
-            facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
-            facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
-        }
+        ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
 
         upgradeCutData = Diamond.DiamondCutData({
             facetCuts: facetCuts,
@@ -501,7 +495,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         if (!stateTransition.isOnGateway) {
             newlyGeneratedData.upgradeCutData = abi.encode(upgradeCutData);
-            upgradeConfig.upgradeCutPrepared = true;
         } else {
             gatewayConfig.upgradeCutData = abi.encode(upgradeCutData);
         }
@@ -706,7 +699,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         addresses.bridgehub.messageRootProxy = address(L1Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
 
         addresses.bridgehub.chainAssetHandlerProxy = address(
-            Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
+            L1Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
         );
 
         addresses.bridges.erc20BridgeProxy = address(
@@ -1757,7 +1750,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
-        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+        address chainDiamondProxyAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
             config.gatewayChainId
         );
         uint256 oldProtocolVersion = getOldProtocolVersion();

@@ -26,9 +26,9 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -105,12 +105,12 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "Bridgehub")) {
-                return type(Bridgehub).creationCode;
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return type(ChainAssetHandler).creationCode;
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return type(MessageRoot).creationCode;
+            if (compareStrings(contractName, "L1Bridgehub")) {
+                return type(L1Bridgehub).creationCode;
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return type(L1ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return type(L1MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return type(CTMDeploymentTracker).creationCode;
             } else if (compareStrings(contractName, "L1Nullifier")) {
@@ -193,12 +193,12 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
         bool isZKBytecode
     ) internal virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "Bridgehub")) {
-                return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return abi.encodeCall(MessageRoot.initialize, ());
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return abi.encodeCall(ChainAssetHandler.initialize, (config.deployerAddress));
+            if (compareStrings(contractName, "L1Bridgehub")) {
+                return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return abi.encodeCall(L1MessageRoot.initialize, ());
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1Nullifier")) {
