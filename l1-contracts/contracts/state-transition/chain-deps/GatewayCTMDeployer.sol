@@ -306,7 +306,7 @@ contract GatewayCTMDeployer {
     /// in the process of the execution of this function.
     function _deployVerifier(
         bytes32 _salt,
-        uint32 _vesion,
+        uint32 _version,
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts,
         address _verifierOwner
@@ -317,11 +317,11 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(_vesion, fflonkVerifier, verifierPlonk, _verifierOwner)
+                new TestnetVerifier{salt: _salt}(_version, fflonkVerifier, verifierPlonk, _verifierOwner)
             );
         } else {
             _deployedContracts.stateTransition.verifier = address(
-                new DualVerifier{salt: _salt}(_vesion, fflonkVerifier, verifierPlonk, _verifierOwner)
+                new DualVerifier{salt: _salt}(_version, fflonkVerifier, verifierPlonk, _verifierOwner)
             );
         }
     }
