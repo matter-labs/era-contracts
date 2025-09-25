@@ -142,7 +142,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
-        config.executionVersion = toml.readBool("$.execution_version");
+        config.executionVersion = uint32(toml.readUint("$.execution_version"));
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
