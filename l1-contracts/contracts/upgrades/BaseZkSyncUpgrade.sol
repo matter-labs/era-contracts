@@ -14,7 +14,6 @@ import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMa
 import {TimeNotReached, TooManyFactoryDeps} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {IDefaultUpgrade} from "./IDefaultUpgrade.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
@@ -50,14 +49,6 @@ error UpgradeInnerFailed();
 /// @notice Interface to which all the upgrade implementations should adhere
 abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
-    /// @notice The address of this contract.
-    /// @dev needed if address is delegateCalled, and we delegateCall it again.
-    address public immutable THIS_ADDRESS;
-
-    constructor() {
-        THIS_ADDRESS = address(this);
-    }
-
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -88,7 +79,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// do not validate any variants about the upgrade transaction or generally don't do anything related to the upgrade transaction.
     /// Updates on diamond proxy located not on settlement layer are needed to ensure that the logic of the contracts remains compatible with
     /// the diamond proxy on the settlement layer and so are still needed to update facets, verifiers and so on.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32 txHash) {
+    function upgrade(ProposedUpgrade memory _proposedUpgrade) public virtual returns (bytes32 txHash) {
         // Note that due to commitment delay, the timestamp of the L2 upgrade batch may be earlier than the timestamp
         // of the L1 block at which the upgrade occurred. This means that using timestamp as a signifier of "upgraded"
         // on the L2 side would be inaccurate. The effects of this "back-dating" of L2 upgrade batches will be reduced
@@ -128,20 +119,6 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
         _postUpgrade(_proposedUpgrade.postUpgradeCalldata);
 
         emit UpgradeComplete(_proposedUpgrade.newProtocolVersion, txHash, _proposedUpgrade);
-    }
-
-    /// @notice With multiple chain upgrades we need to call the upgrade function externally to convert memory to calldata..
-
-    function upgradeInner(ProposedUpgrade calldata _proposedUpgrade) public virtual returns (bytes32 txHash) {
-        return upgrade(_proposedUpgrade);
-    }
-
-    function _delegatecallUpgrade(ProposedUpgrade calldata _proposedUpgrade) internal virtual returns (bytes32 txHash) {
-        // slither-disable-next-line controlled-delegatecall
-        (bool success, ) = THIS_ADDRESS.delegatecall(abi.encodeCall(IDefaultUpgrade.upgradeInner, _proposedUpgrade));
-        if (!success) {
-            revert UpgradeInnerFailed();
-        }
     }
 
     /// @notice Change default account bytecode hash, that is used on L2
@@ -228,7 +205,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
     /// @notice Change the verifier parameters
     /// @param _newVerifierParams New parameters for the verifier
-    function _setVerifierParams(VerifierParams calldata _newVerifierParams) private {
+    function _setVerifierParams(VerifierParams memory _newVerifierParams) private {
         // An upgrade to the verifier params must be done carefully to ensure there aren't batches in the committed state
         // during the transition. If verifier is upgraded, it will immediately be used to prove all committed batches.
         // Batches committed expecting the old verifier params will fail. Ensure all committed batches are finalized before the
@@ -249,7 +226,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @notice Updates the verifier and the verifier params
     /// @param _newVerifier The address of the new verifier. If 0, the verifier will not be updated.
     /// @param _verifierParams The new verifier params. If all of the fields are 0, the params will not be updated.
-    function _upgradeVerifier(address _newVerifier, VerifierParams calldata _verifierParams) internal {
+    function _upgradeVerifier(address _newVerifier, VerifierParams memory _verifierParams) internal {
         _setVerifier(IVerifier(_newVerifier));
         _setVerifierParams(_verifierParams);
     }
@@ -278,7 +255,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @param _patchOnly Whether only the patch part of the protocol version semver has changed.
     /// @return System contracts upgrade transaction hash. Zero if no upgrade transaction is set.
     function _setL2SystemContractUpgrade(
-        L2CanonicalTransaction calldata _l2ProtocolUpgradeTx,
+        L2CanonicalTransaction memory _l2ProtocolUpgradeTx,
         uint32 _newMinorProtocolVersion,
         bool _patchOnly
     ) internal returns (bytes32) {
@@ -325,7 +302,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// @dev Note, that unlike normal L1->L2 transactions, factory dependencies for
     /// an upgrade transaction should be made available prior to the upgrade via publishing those
     /// to the `BytecodesSupplier` contract.
-    function _verifyFactoryDeps(uint256[] calldata _hashes) private pure {
+    function _verifyFactoryDeps(uint256[] memory _hashes) private pure {
         if (_hashes.length > MAX_NEW_FACTORY_DEPS) {
             revert TooManyFactoryDeps();
         }
@@ -394,11 +371,11 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
     /// upgrade.
-    function _upgradeL1Contract(bytes calldata _customCallDataForUpgrade) internal virtual {}
+    function _upgradeL1Contract(bytes memory _customCallDataForUpgrade) internal virtual {}
 
     /// @notice placeholder function for custom logic for post-upgrade logic.
     /// Typically this function will never be used.
     /// @param _customCallDataForUpgrade Custom data for an upgrade, which may be interpreted differently for each
     /// upgrade.
-    function _postUpgrade(bytes calldata _customCallDataForUpgrade) internal virtual {}
+    function _postUpgrade(bytes memory _customCallDataForUpgrade) internal virtual {}
 }
