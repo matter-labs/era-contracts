@@ -18,39 +18,12 @@ import { execFileSync, execSync } from "child_process";
 import { readFileSync, existsSync } from "fs";
 import * as path from "path";
 
-const program = new Command();
-
-program
-  .name("verify-contracts")
-  .description("Automates contract verification from deployment logs")
-  .argument("<log_file>", "Path to deployment log containing forge verify-contract commands")
-  .option("-c, --chain <chain>", "Target chain (stage|testnet|mainnet)", "stage");
-
-program.parse(process.argv);
-
-const logFile = program.args[0];
-const options = program.opts();
-const chain = (options.chain || "stage").toLowerCase();
-
-if (!logFile) {
-  console.error("❌ Error: Missing log file argument");
-  program.help();
-}
-
-if (!existsSync(logFile)) {
-  console.error(`❌ Error: File '${logFile}' not found.`);
-  process.exit(1);
-}
-
 // ZKsync verifier URLs
 const ZKSYNC_VERIFIER_URLS: Record<string, string> = {
   mainnet: "https://rpc-explorer-verify.era-gateway-mainnet.zksync.dev/contract_verification",
   stage: "https://rpc-explorer-verify.era-gateway-stage.zksync.dev/contract_verification",
   testnet: "https://rpc-explorer-verify.era-gateway-testnet.zksync.dev/contract_verification",
 };
-
-const VERIFIED: string[] = [];
-const SKIPPED: string[] = [];
 
 // -----------------------------
 // Fallback name mappings
@@ -161,7 +134,7 @@ function findContractAndRoot(name: string): { solPath: string; root: string; res
 // -----------------------------
 // Run a single forge verify attempt
 // -----------------------------
-function tryVerify(addr: string, name: string, rest: string, root: string, isZksync: boolean): boolean {
+function tryVerify(chain: string, addr: string, name: string, rest: string, root: string, isZksync: boolean): boolean {
   let cmd: string;
   if (isZksync) {
     const url = ZKSYNC_VERIFIER_URLS[chain];
@@ -191,70 +164,99 @@ function tryVerify(addr: string, name: string, rest: string, root: string, isZks
   }
 }
 
-// -----------------------------
-// Main Loop
-// -----------------------------
-const logContent = readFileSync(logFile, "utf8");
-const lines = logContent.split("\n").filter((l) => l.includes("forge verify-contract"));
+async function main() {
+  const program = new Command();
 
-for (const raw of lines) {
-  const match = raw.match(/forge\s+verify-contract\s+([^\s]+)\s+([^\s]+)(.*)/);
-  if (!match) {
-    console.log(`⚠️  Could not parse: ${raw}`);
-    SKIPPED.push(raw);
-    continue;
-  }
+  program
+    .name("verify-contracts")
+    .description("Automates contract verification from deployment logs")
+    .argument("<log_file>", "Path to deployment log containing forge verify-contract commands")
+    .option("-c, --chain <chain>", "Target chain (stage|testnet|mainnet)", "stage")
+    .action(async (logFile, options) => {
+      const chain = (options.chain || "stage").toLowerCase();
+      if (!existsSync(logFile)) {
+        console.error(`❌ Error: File '${logFile}' not found.`);
+        process.exit(1);
+      }
 
-  const addr = match[1];
-  const name = match[2];
-  const rest = match[3] || "";
-  const isZksync = rest.includes("--verifier zksync");
+      const VERIFIED: string[] = [];
+      const SKIPPED: string[] = [];
 
-  if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) {
-    console.log(`⚠️  Parsed non-address '${addr}' — skipping`);
-    SKIPPED.push(raw);
-    continue;
-  }
+      // -----------------------------
+      // Main Loop
+      // -----------------------------
+      const logContent = readFileSync(logFile, "utf8");
+      const lines = logContent.split("\n").filter((l) => l.includes("forge verify-contract"));
+      for (const raw of lines) {
+        const match = raw.match(/forge\s+verify-contract\s+([^\s]+)\s+([^\s]+)(.*)/);
+        if (!match) {
+          console.log(`⚠️  Could not parse: ${raw}`);
+          SKIPPED.push(raw);
+          continue;
+        }
 
-  const found = findContractAndRoot(name);
-  if (!found) {
-    console.log(`⚠️  Could not find ${name}.sol (or fallback) — skipping`);
-    SKIPPED.push(name);
-    continue;
-  }
+        const addr = match[1];
+        const name = match[2];
+        const rest = match[3] || "";
+        const isZksync = rest.includes("--verifier zksync");
 
-  const { solPath, root, resolvedName } = found;
-  console.log(`📂 ${resolvedName} found: ${solPath} (project root: ${root})`);
+        if (!/^0x[0-9a-fA-F]{40}$/.test(addr)) {
+          console.log(`⚠️  Parsed non-address '${addr}' — skipping`);
+          SKIPPED.push(raw);
+          continue;
+        }
 
-  let success = tryVerify(addr, resolvedName, rest, root, isZksync);
-  if (!success && resolvedName !== name) {
-    console.log(`🔁 Retry with original contract name: ${name}`);
-    success = tryVerify(addr, name, rest, root, isZksync);
-  }
-  if (!success) {
-    console.log("🔁 Final attempt with TransparentUpgradeableProxy");
-    success = tryVerify(addr, "TransparentUpgradeableProxy", rest, root, isZksync);
-  }
+        const found = findContractAndRoot(name);
+        if (!found) {
+          console.log(`⚠️  Could not find ${name}.sol (or fallback) — skipping`);
+          SKIPPED.push(name);
+          continue;
+        }
 
-  if (success) {
-    VERIFIED.push(success ? resolvedName : name);
-  } else {
-    console.log(`❌ Verification failed for ${name}`);
-    SKIPPED.push(name);
-  }
+        const { solPath, root, resolvedName } = found;
+        console.log(`📂 ${resolvedName} found: ${solPath} (project root: ${root})`);
+
+        let success = tryVerify(chain, addr, resolvedName, rest, root, isZksync);
+        if (!success && resolvedName !== name) {
+          console.log(`🔁 Retry with original contract name: ${name}`);
+          success = tryVerify(chain, addr, name, rest, root, isZksync);
+        }
+        if (!success) {
+          console.log("🔁 Final attempt with TransparentUpgradeableProxy");
+          success = tryVerify(chain, addr, "TransparentUpgradeableProxy", rest, root, isZksync);
+        }
+
+        if (success) {
+          VERIFIED.push(success ? resolvedName : name);
+        } else {
+          console.log(`❌ Verification failed for ${name}`);
+          SKIPPED.push(name);
+        }
+      }
+
+      // -----------------------------
+      // Summary
+      // -----------------------------
+      console.log("\n📊 Verification Summary:");
+      console.log(`✅ Verified contracts: ${VERIFIED.length}`);
+      VERIFIED.forEach((c) => console.log(`  - ${c}`));
+
+      if (SKIPPED.length > 0) {
+        console.log(`⚠️  Skipped/Failed: ${SKIPPED.length}`);
+        SKIPPED.forEach((c) => console.log(`  - ${c}`));
+        process.exit(1);
+      } else {
+        console.log("🎉 All contracts verified successfully!");
+      }
+    });
+
+  // Currently parse would also work, but keeping async for future compatiblity
+  await program.parseAsync(process.argv);
 }
 
-// -----------------------------
-// Summary
-// -----------------------------
-console.log("\n📊 Verification Summary:");
-console.log(`✅ Verified contracts: ${VERIFIED.length}`);
-VERIFIED.forEach((c) => console.log(`  - ${c}`));
-
-if (SKIPPED.length > 0) {
-  console.log(`⚠️  Skipped/Failed: ${SKIPPED.length}`);
-  SKIPPED.forEach((c) => console.log(`  - ${c}`));
-  process.exit(1);
-} else {
-  console.log("🎉 All contracts verified successfully!");
-}
+main()
+  .then(() => process.exit(0))
+  .catch((err) => {
+    console.error("Error:", err.message || err);
+    process.exit(1);
+  });
