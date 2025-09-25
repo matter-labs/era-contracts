@@ -47,7 +47,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 
-import {DeployL1Script} from "../DeployL1.s.sol";
+import {DeployCTMScript} from "../DeployCTM.s.sol";
 
 import {GatewayCTMDeployerHelper} from "./GatewayCTMDeployerHelper.sol";
 import {DeployedContracts, GatewayCTMDeployerConfig} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
@@ -59,7 +59,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {GatewayGovernanceUtils} from "./GatewayGovernanceUtils.s.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
-contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
+contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
     using stdToml for string;
 
     struct GatewayCTMOutput {
@@ -76,8 +76,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
     uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
     uint256 internal eraChainId;
-    address internal rollupL2DAValidator;
-    address internal oldRollupL2DAValidator;
 
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
@@ -95,9 +93,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
         refundRecipient = toml.readAddress("$.refund_recipient");
 
         eraChainId = toml.readUint("$.era_chain_id");
-        // The "new" and "old" rollup L2 DA validators are those that were set in v27 and v26 respectively
-        rollupL2DAValidator = toml.readAddress("$.rollup_l2_da_validator");
-        oldRollupL2DAValidator = toml.readAddress("$.old_rollup_l2_da_validator");
 
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
@@ -110,7 +105,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
             salt: bytes32(0),
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
-            rollupL2DAValidatorAddress: rollupL2DAValidator,
             testnetVerifier: config.testnetVerifier,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
@@ -312,27 +306,6 @@ contract GatewayVotePreparation is DeployL1Script, GatewayGovernanceUtils {
                 _ctmChainId: ctmChainId
             })
         );
-
-        // We need to also whitelist the old L2 rollup address
-        if (oldRollupL2DAValidator != address(0)) {
-            governanceCalls = Utils.mergeCalls(
-                governanceCalls,
-                Utils.prepareGovernanceL1L2DirectTransaction(
-                    EXPECTED_MAX_L1_GAS_PRICE,
-                    abi.encodeCall(
-                        RollupDAManager.updateDAPair,
-                        (output.relayedSLDAValidator, oldRollupL2DAValidator, true)
-                    ),
-                    Utils.MAX_PRIORITY_TX_GAS,
-                    new bytes[](0),
-                    output.rollupDAManager,
-                    gatewayChainId,
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    refundRecipient
-                )
-            );
-        }
 
         saveOutput(governanceCalls, ecosystemAdminCalls);
     }

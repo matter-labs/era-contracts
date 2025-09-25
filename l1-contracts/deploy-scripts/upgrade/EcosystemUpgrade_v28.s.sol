@@ -16,6 +16,7 @@ import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
+import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -24,6 +25,7 @@ import {GatewayUpgrade, GatewayUpgradeEncodedInput} from "contracts/upgrades/Gat
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -46,6 +48,7 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "contracts/common/Config.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -76,11 +79,11 @@ import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-import {DeployL1Script} from "../DeployL1.s.sol";
+import {DeployCTMScript} from "../DeployCTM.s.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
-contract EcosystemUpgrade_v28 is Script, DeployL1Script {
+contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
     using stdToml for string;
 
     /**
@@ -233,9 +236,9 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
         // Important, this must come after the initializeExpectedL2Addresses
         generateFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
-        getDiamondCutData(addresses.stateTransition);
+        getChainCreationDiamondCutData(addresses.stateTransition);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
+        gatewayConfig.facetCutsData = abi.encode(getChainCreationDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition);
         generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
@@ -337,7 +340,7 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
+        facetCuts = getUpgradeAddedFacetCuts(stateTransition);
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
         VerifierParams memory verifierParams = getVerifierParams();
@@ -539,9 +542,9 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
     function getExpectedL2Address(string memory contractName) public virtual returns (address) {
         return
             Utils.getL2AddressViaCreate2Factory(
-                bytes32(0), // the same as it is currently in the DeployL1.s.sol. Todo unify.
+                bytes32(0), // the same as it is currently in the DeployCTM.s.sol. Todo unify.
                 getL2BytecodeHash(contractName),
-                hex"" // the same as it is currently in DeployL1.s.sol
+                hex"" // the same as it is currently in DeployCTM.s.sol
             );
     }
 
@@ -573,12 +576,11 @@ contract EcosystemUpgrade_v28 is Script, DeployL1Script {
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
-            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
-            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
-            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
-            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
-            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
+            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
+            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
+            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
+            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
             l2SharedBridgeLegacyImpl: address(0),
             // upgradeAddresses.expectedL2Addresses.l2SharedBridgeLegacyImpl,
             l2BridgedStandardERC20Impl: address(0),

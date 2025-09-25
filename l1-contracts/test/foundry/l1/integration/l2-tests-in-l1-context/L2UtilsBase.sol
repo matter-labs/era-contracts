@@ -29,15 +29,11 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {L2MessageVerification} from "../../../../../contracts/bridgehub/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 
-import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
-
-import {DeployL1IntegrationScript} from "../deploy-scripts/DeployL1Integration.s.sol";
+import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployL1Script} from "deploy-scripts/DeployL1.s.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 library L2UtilsBase {
     using stdToml for string;

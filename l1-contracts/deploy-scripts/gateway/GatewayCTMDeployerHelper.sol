@@ -57,7 +57,6 @@ library GatewayCTMDeployerHelper {
             salt,
             eraChainId,
             l1ChainId,
-            config.rollupL2DAValidatorAddress,
             config.aliasedGovernanceAddress,
             contracts,
             innerConfig
@@ -129,7 +128,6 @@ library GatewayCTMDeployerHelper {
         bytes32 _salt,
         uint256 _eraChainId,
         uint256 _l1ChainId,
-        address _rollupL2DAValidatorAddress,
         address _governanceAddress,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
@@ -158,7 +156,6 @@ library GatewayCTMDeployerHelper {
         address rollupDAManager;
         (_deployedContracts, rollupDAManager) = _deployRollupDAManager(
             _salt,
-            _rollupL2DAValidatorAddress,
             _governanceAddress,
             _deployedContracts,
             innerConfig
@@ -220,7 +217,6 @@ library GatewayCTMDeployerHelper {
 
     function _deployRollupDAManager(
         bytes32 _salt,
-        address _rollupL2DAValidatorAddress,
         address _governanceAddress,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig

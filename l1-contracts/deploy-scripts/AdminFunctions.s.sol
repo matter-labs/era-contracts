@@ -28,6 +28,7 @@ import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridge
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 bytes32 constant SET_TOKEN_MULTIPLIER_SETTER_ROLE = keccak256("SET_TOKEN_MULTIPLIER_SETTER_ROLE");
 
@@ -428,7 +429,7 @@ contract AdminFunctions is Script {
         address _bridgehub,
         uint256 _chainId,
         address _l1DaValidator,
-        address _l2DaValidator,
+        L2DACommitmentScheme _l2DaCommitmentScheme,
         bool _shouldSend
     ) public {
         ChainInfoFromBridgehub memory chainInfo = Utils.chainInfoFromBridgehubAndChainId(_bridgehub, _chainId);
@@ -437,7 +438,7 @@ contract AdminFunctions is Script {
         calls[0] = Call({
             target: chainInfo.diamondProxy,
             value: 0,
-            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaValidator))
+            data: abi.encodeCall(IAdmin.setDAValidatorPair, (_l1DaValidator, _l2DaCommitmentScheme))
         });
 
         saveAndSendAdminTx(chainInfo.admin, calls, _shouldSend);
@@ -538,7 +539,7 @@ contract AdminFunctions is Script {
         uint256 l2ChainId;
         uint256 gatewayChainId;
         address l1DAValidator;
-        address l2DAValidator;
+        L2DACommitmentScheme l2DACommitmentScheme;
         address chainDiamondProxyOnGateway;
         address refundRecipient;
         bool _shouldSend;
@@ -551,7 +552,10 @@ contract AdminFunctions is Script {
             data.bridgehub,
             data.l2ChainId
         );
-        bytes memory callData = abi.encodeCall(IAdmin.setDAValidatorPair, (data.l1DAValidator, data.l2DAValidator));
+        bytes memory callData = abi.encodeCall(
+            IAdmin.setDAValidatorPair,
+            (data.l1DAValidator, data.l2DACommitmentScheme)
+        );
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(
             data.l1GasPrice,
             callData,
@@ -574,7 +578,7 @@ contract AdminFunctions is Script {
         uint256 l2ChainId,
         uint256 gatewayChainId,
         address l1DAValidator,
-        address l2DAValidator,
+        L2DACommitmentScheme l2DACommitmentScheme,
         address chainDiamondProxyOnGateway,
         address refundRecipient,
         bool _shouldSend
@@ -586,7 +590,7 @@ contract AdminFunctions is Script {
                 l2ChainId: l2ChainId,
                 gatewayChainId: gatewayChainId,
                 l1DAValidator: l1DAValidator,
-                l2DAValidator: l2DAValidator,
+                l2DACommitmentScheme: l2DACommitmentScheme,
                 chainDiamondProxyOnGateway: chainDiamondProxyOnGateway,
                 refundRecipient: refundRecipient,
                 _shouldSend: _shouldSend
