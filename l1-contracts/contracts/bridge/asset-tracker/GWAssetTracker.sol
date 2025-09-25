@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidL2ShardId, InvalidServiceLog} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidL2ShardId, InvalidServiceLog} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";

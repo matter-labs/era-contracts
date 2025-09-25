@@ -14,7 +14,6 @@ import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMa
 import {TimeNotReached, TooManyFactoryDeps} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {IDefaultUpgrade} from "./IDefaultUpgrade.sol";
 
 /// @notice The struct that represents the upgrade proposal.
 /// @param l2ProtocolUpgradeTx The system upgrade transaction.
