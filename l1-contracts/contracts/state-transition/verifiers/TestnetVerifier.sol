@@ -18,7 +18,7 @@ contract TestnetVerifier is DualVerifier {
         IVerifierV2 _fflonkVerifier,
         IVerifier _plonkVerifier,
         address _ctmOwner
-    ) DualVerifier(_fflonkVerifier, _plonkVerifier, _ctmOwner) {
+    ) DualVerifier(_version, _fflonkVerifier, _plonkVerifier, _ctmOwner) {
         assert(block.chainid != 1);
     }
 
