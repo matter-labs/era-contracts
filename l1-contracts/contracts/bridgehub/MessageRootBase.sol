@@ -78,6 +78,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _bridgehub() internal view virtual returns (IBridgehub);
+
+    function _l1ChainId() internal view virtual returns (uint256);
+
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
         if (msg.sender != address(_bridgehub()) && msg.sender != address(_bridgehub().chainAssetHandler())) {
@@ -107,7 +115,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
         _;
     }
 
-    /// @notice only the upgrader can call
+    /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert InvalidCaller(msg.sender);
@@ -185,8 +193,4 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
         emit AddedChain(_chainId, cachedChainCount);
     }
-
-    function _bridgehub() internal view virtual returns (IBridgehub);
-
-    function _l1ChainId() internal view virtual returns (uint256);
 }

@@ -19,7 +19,7 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
-/// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
+/// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2MessageRoot is MessageRootBase, IL2MessageRoot {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
@@ -29,14 +29,30 @@ contract L2MessageRoot is MessageRootBase, IL2MessageRoot {
     /// the old version where it was an immutable.
     uint256 public L1_CHAIN_ID;
 
-    /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
-    /// This means we call the _initialize in both the constructor and the initialize functions.
-    /// @dev Initialize the implementation to prevent Parity hack.
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _bridgehub() internal view override returns (IBridgehub) {
+        return IBridgehub(L2_BRIDGEHUB_ADDR);
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
+    }
+
+    // A method for backwards compatibility with the old implementation
+    function BRIDGE_HUB() public view returns (IBridgehub) {
+        return IBridgehub(L2_BRIDGEHUB_ADDR);
+    }
+
+    /// @notice Initializes the contract.
+    /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
     function initL2(uint256 _l1ChainId) public onlyUpgrader {
+        _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         _initialize();
-        _disableInitializers();
     }
 
     /// @notice Adds a new chainBatchRoot to the chainTree.
@@ -72,18 +88,5 @@ contract L2MessageRoot is MessageRootBase, IL2MessageRoot {
         _sides[0] = sharedTreeRoot;
         emit NewInteropRoot(block.chainid, block.number, 0, _sides);
         historicalRoot[block.number] = sharedTreeRoot;
-    }
-
-    function _bridgehub() internal view override returns (IBridgehub) {
-        return IBridgehub(L2_BRIDGEHUB_ADDR);
-    }
-
-    function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
-    }
-
-    // A method for backwards compatibility with the old implementation
-    function BRIDGE_HUB() public view returns (IBridgehub) {
-        return IBridgehub(L2_BRIDGEHUB_ADDR);
     }
 }

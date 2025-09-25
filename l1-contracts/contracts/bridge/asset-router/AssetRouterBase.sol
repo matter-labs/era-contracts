@@ -25,6 +25,16 @@ import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _bridgehub() internal view virtual returns (IBridgehub);
+
+    function _l1ChainId() internal view virtual returns (uint256);
+
+    function _eraChainId() internal view virtual returns (uint256);
+
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
     /// @dev P.S. this liquidity was locked directly in SharedBridge before.
@@ -173,10 +183,4 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
     function unpause() external onlyOwner {
         _unpause();
     }
-
-    function _bridgehub() internal view virtual returns (IBridgehub);
-
-    function _l1ChainId() internal view virtual returns (uint256);
-
-    function _eraChainId() internal view virtual returns (uint256);
 }

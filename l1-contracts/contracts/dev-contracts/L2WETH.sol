@@ -19,7 +19,7 @@ import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses
 /// Note: This is an upgradeable contract. In the future, we will remove upgradeability to make it trustless.
 /// But for now, when the Rollup has instant upgradability, we leave the possibility of upgrading to improve the contract if needed.
 contract L2WETH is ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
-    /// @notice Checks that the message sender is authorized to upgrade the contract.
+    /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert InvalidCaller(msg.sender);
@@ -27,8 +27,8 @@ contract L2WETH is ERC20PermitUpgradeable, IL2WETH, IL2StandardToken {
         _;
     }
 
-    /// @notice Initializes a contract token for later use. Expected to be used in the proxy.
-    /// @dev Stores the L1 address of the bridge and set `name`/`symbol`/`decimals` getters.
+    /// @notice Initializes the contract.
+    /// @dev This function is used to initialize the contract with the initial values.
     /// @param name_ The name of the token.
     /// @param symbol_ The symbol of the token.
     /// Note: The decimals are hardcoded to 18, the same as on Ether.

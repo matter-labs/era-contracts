@@ -22,6 +22,26 @@ contract L1Bridgehub is BridgehubBase {
     /// This is the temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function L1_CHAIN_ID() public view override returns (uint256) {
+        return block.chainid;
+    }
+
+    function _ethTokenAssetId() internal view override returns (bytes32) {
+        return ETH_TOKEN_ASSET_ID;
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return block.chainid;
+    }
+
+    function _maxNumberOfZKChains() internal view override returns (uint256) {
+        return MAX_NUMBER_OF_ZK_CHAINS;
+    }
+
     /// @notice to avoid parity hack
     constructor(address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
         _disableInitializers();
@@ -46,21 +66,5 @@ contract L1Bridgehub is BridgehubBase {
     /// @notice Used to initialize the contract on L1
     function initializeV2() external initializer {
         _initializeInner();
-    }
-
-    function L1_CHAIN_ID() public view override returns (uint256) {
-        return block.chainid;
-    }
-
-    function _ethTokenAssetId() internal view override returns (bytes32) {
-        return ETH_TOKEN_ASSET_ID;
-    }
-
-    function _l1ChainId() internal view override returns (uint256) {
-        return block.chainid;
-    }
-
-    function _maxNumberOfZKChains() internal view override returns (uint256) {
-        return MAX_NUMBER_OF_ZK_CHAINS;
     }
 }

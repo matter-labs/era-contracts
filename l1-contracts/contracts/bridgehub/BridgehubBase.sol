@@ -42,6 +42,16 @@ abstract contract BridgehubBase is
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _ethTokenAssetId() internal view virtual returns (bytes32);
+
+    function _l1ChainId() internal view virtual returns (uint256);
+
+    function _maxNumberOfZKChains() internal view virtual returns (uint256);
+
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
     address public assetRouter;
 
@@ -123,7 +133,7 @@ abstract contract BridgehubBase is
         _;
     }
 
-    /// @notice Checks that the message sender is authorized to upgrade the contract.
+    /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert Unauthorized(msg.sender);
@@ -888,10 +898,4 @@ abstract contract BridgehubBase is
     function sharedBridge() public view returns (address) {
         return assetRouter;
     }
-
-    function _ethTokenAssetId() internal view virtual returns (bytes32);
-
-    function _l1ChainId() internal view virtual returns (uint256);
-
-    function _maxNumberOfZKChains() internal view virtual returns (uint256);
 }

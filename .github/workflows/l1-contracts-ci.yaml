@@ -340,7 +340,7 @@ jobs:
         with:
           coverage-files: ./l1-contracts/lcov.info
           working-directory: l1-contracts
-          minimum-coverage: 80 # TODO(EVM-944): increase threshold to 85
+          minimum-coverage: 83 # TODO(EVM-944): increase threshold to 85
 
 
   # FIXME: restore gas report CI

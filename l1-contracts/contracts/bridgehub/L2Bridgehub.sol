@@ -14,7 +14,7 @@ import {BridgehubBase} from "./BridgehubBase.sol";
 /// It also manages state transition managers, base tokens, and chain registrations.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
-/// @dev Important: L2 contracts are not allowed to have any constructor. This is needed for compatibility with ZKsyncOS.
+/// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2Bridgehub is BridgehubBase {
     /// @notice the asset id of Eth. This is only used on L1.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -33,9 +33,24 @@ contract L2Bridgehub is BridgehubBase {
     /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
 
-    /// @notice Initializes the contract
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function _ethTokenAssetId() internal view override returns (bytes32) {
+        return ETH_TOKEN_ASSET_ID;
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
+    }
+
+    function _maxNumberOfZKChains() internal view override returns (uint256) {
+        return MAX_NUMBER_OF_ZK_CHAINS;
+    }
+
+    /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
-    /// @dev This function is called both for new chains.
     /// @param _l1ChainId The chain id of L1.
     /// @param _owner The owner of the contract.
     /// @param _maxNumberOfZKChains The maximum number of ZK chains that can be created.
@@ -63,17 +78,5 @@ contract L2Bridgehub is BridgehubBase {
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
-    }
-
-    function _ethTokenAssetId() internal view override returns (bytes32) {
-        return ETH_TOKEN_ASSET_ID;
-    }
-
-    function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
-    }
-
-    function _maxNumberOfZKChains() internal view override returns (uint256) {
-        return MAX_NUMBER_OF_ZK_CHAINS;
     }
 }

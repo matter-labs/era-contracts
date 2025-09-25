@@ -29,7 +29,7 @@ import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
-/// @dev Important: L2 contracts are not allowed to have any immutable variables. This is needed for compatibility with ZKsyncOS.
+/// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     using SafeERC20 for IERC20;
 
@@ -58,9 +58,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// the old version where it was an immutable.
     bytes32 public L2_TOKEN_PROXY_BYTECODE_HASH;
 
-    /// @notice Initializes the bridge contract for later use.
+    /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
-    /// @dev This function is called both for new chains.
     /// @param _l1ChainId The chain id of L1.
     /// @param _aliasedOwner The address of the owner of the contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
@@ -86,7 +85,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
     }
 
-    /// @notice Checks that the message sender is authorized to upgrade the contract.
+    /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
             revert InvalidCaller(msg.sender);

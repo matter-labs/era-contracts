@@ -38,11 +38,14 @@ abstract contract ChainAssetHandlerBase is
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    ///@notice virtual getters standing in for the original immutables
     function _ethTokenAssetId() internal view virtual returns (bytes32);
+
     function _l1ChainId() internal view virtual returns (uint256);
+
     function _bridgehub() internal view virtual returns (IBridgehub);
+
     function _messageRoot() internal view virtual returns (IMessageRoot);
+
     function _assetRouter() internal view virtual returns (address);
 
     /// @notice Used to pause the migrations of chains. Used for upgrades.

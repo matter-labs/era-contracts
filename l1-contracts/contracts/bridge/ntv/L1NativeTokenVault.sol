@@ -36,7 +36,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @dev The address of the WETH token.
     address public immutable override WETH_TOKEN;
 
-    /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
+    /// @dev The L1 asset router contract.
     IAssetRouterBase public immutable override ASSET_ROUTER;
 
     /// @dev The assetId of the base token.
