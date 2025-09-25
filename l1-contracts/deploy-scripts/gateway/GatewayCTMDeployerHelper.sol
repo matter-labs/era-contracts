@@ -62,7 +62,13 @@ library GatewayCTMDeployerHelper {
             contracts,
             innerConfig
         );
-        contracts = _deployVerifier( config.testnetVerifier, contracts, innerConfig, config.executionVersion, config.aliasedGovernanceAddress);
+        contracts = _deployVerifier(
+            config.testnetVerifier,
+            contracts,
+            innerConfig,
+            config.executionVersion,
+            config.aliasedGovernanceAddress
+        );
 
         contracts.stateTransition.validatorTimelockImplementation = _deployInternal(
             "ValidatorTimelock",
