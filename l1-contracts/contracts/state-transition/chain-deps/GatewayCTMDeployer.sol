@@ -191,7 +191,13 @@ contract GatewayCTMDeployer {
             _isZKsyncOS: _config.isZKsyncOS,
             _deployedContracts: contracts
         });
-        _deployVerifier(salt, _config.executionVersion, _config.testnetVerifier, contracts, _config.aliasedGovernanceAddress);
+        _deployVerifier({
+            _salt: salt,
+            _version: _config.executionVersion,
+            _testnetVerifier: _config.testnetVerifier,
+            _deployedContracts: contracts,
+            _verifierOwner: _config.aliasedGovernanceAddress
+        });
 
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
 
