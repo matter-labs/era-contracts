@@ -117,18 +117,18 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
             verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
-                recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
-                recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
-            }),
+            recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
+            recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
+            recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
+        }),
             feeParams: FeeParams({
-                pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
-                batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
-                maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
-                maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
-                priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
-                minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
-            }),
+            pubdataPricingMode: config.contracts.diamondInitPubdataPricingMode,
+            batchOverheadL1Gas: uint32(config.contracts.diamondInitBatchOverheadL1Gas),
+            maxPubdataPerBatch: uint32(config.contracts.diamondInitMaxPubdataPerBatch),
+            maxL2GasPerBatch: uint32(config.contracts.diamondInitMaxL2GasPerBatch),
+            priorityTxMaxPubdata: uint32(config.contracts.diamondInitPriorityTxMaxPubdata),
+            minimalL2GasPrice: uint64(config.contracts.diamondInitMinimalL2GasPrice)
+        }),
             bootloaderHash: config.contracts.bootloaderHash,
             defaultAccountHash: config.contracts.defaultAAHash,
             evmEmulatorHash: config.contracts.evmEmulatorHash,
@@ -138,8 +138,9 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             genesisBatchCommitment: config.contracts.genesisBatchCommitment,
             forceDeploymentsData: forceDeploymentsData,
             protocolVersion: config.contracts.latestProtocolVersion,
-            // TODO: for now, zksync os on gateway is not supported
-            isZKsyncOS: false
+        // TODO: for now, zksync os on gateway is not supported
+            isZKsyncOS: false,
+            executionVersion: 0
         });
     }
 

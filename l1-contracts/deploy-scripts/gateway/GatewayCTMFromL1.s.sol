@@ -246,18 +246,18 @@ contract GatewayCTMFromL1 is Script {
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
             gettersSelectors: Utils.getAllSelectorsForFacet("Getters"),
             verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
-                recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
-                recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
-            }),
+            recursionNodeLevelVkHash: config.recursionNodeLevelVkHash,
+            recursionLeafLevelVkHash: config.recursionLeafLevelVkHash,
+            recursionCircuitsSetVksHash: config.recursionCircuitsSetVksHash
+        }),
             feeParams: FeeParams({
-                pubdataPricingMode: config.diamondInitPubdataPricingMode,
-                batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
-                maxPubdataPerBatch: uint32(config.diamondInitMaxPubdataPerBatch),
-                maxL2GasPerBatch: uint32(config.diamondInitMaxL2GasPerBatch),
-                priorityTxMaxPubdata: uint32(config.diamondInitPriorityTxMaxPubdata),
-                minimalL2GasPrice: uint64(config.diamondInitMinimalL2GasPrice)
-            }),
+            pubdataPricingMode: config.diamondInitPubdataPricingMode,
+            batchOverheadL1Gas: uint32(config.diamondInitBatchOverheadL1Gas),
+            maxPubdataPerBatch: uint32(config.diamondInitMaxPubdataPerBatch),
+            maxL2GasPerBatch: uint32(config.diamondInitMaxL2GasPerBatch),
+            priorityTxMaxPubdata: uint32(config.diamondInitPriorityTxMaxPubdata),
+            minimalL2GasPrice: uint64(config.diamondInitMinimalL2GasPrice)
+        }),
             bootloaderHash: config.bootloaderHash,
             defaultAccountHash: config.defaultAAHash,
             evmEmulatorHash: config.evmEmulatorHash,
@@ -268,7 +268,8 @@ contract GatewayCTMFromL1 is Script {
             forceDeploymentsData: config.forceDeploymentsData,
             protocolVersion: config.latestProtocolVersion,
             // TODO: for now, zksync os on gateway is not supported
-            isZKsyncOS: false
+            isZKsyncOS: false,
+            executionVersion: 0
         });
     }
 

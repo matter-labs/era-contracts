@@ -85,6 +85,8 @@ struct GatewayCTMDeployerConfig {
     uint256 protocolVersion;
     /// @notice Whether the chain is ZKsyncOS.
     bool isZKsyncOS;
+    /// @notice Default execution version(derived from circuits and zksync os version).
+    uint32 executionVersion;
 }
 
 /// @notice Addresses of state transition related contracts.
@@ -189,7 +191,7 @@ contract GatewayCTMDeployer {
             _isZKsyncOS: _config.isZKsyncOS,
             _deployedContracts: contracts
         });
-        _deployVerifier(salt, _config.testnetVerifier, contracts, _config.aliasedGovernanceAddress);
+        _deployVerifier(salt, _config.executionVersion, _config.testnetVerifier, contracts, _config.aliasedGovernanceAddress);
 
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
 
@@ -304,6 +306,7 @@ contract GatewayCTMDeployer {
     /// in the process of the execution of this function.
     function _deployVerifier(
         bytes32 _salt,
+        uint32 _vesion,
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts,
         address _verifierOwner
@@ -314,11 +317,11 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, _verifierOwner)
+                new TestnetVerifier{salt: _salt}(_vesion, fflonkVerifier, verifierPlonk, _verifierOwner)
             );
         } else {
             _deployedContracts.stateTransition.verifier = address(
-                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, _verifierOwner)
+                new DualVerifier{salt: _salt}(_vesion, fflonkVerifier, verifierPlonk, _verifierOwner)
             );
         }
     }

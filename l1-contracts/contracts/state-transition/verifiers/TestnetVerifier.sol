@@ -14,6 +14,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// otherwise, it will skip the verification.
 contract TestnetVerifier is DualVerifier {
     constructor(
+        uint32 _version,
         IVerifierV2 _fflonkVerifier,
         IVerifier _plonkVerifier,
         address _ctmOwner
