@@ -250,7 +250,7 @@ async function main() {
       }
     });
 
-  // Currently parse would also work, but keeping async for future compatiblity
+  // Currently parse would also work, but keeping async for future compatibility
   await program.parseAsync(process.argv);
 }
 
