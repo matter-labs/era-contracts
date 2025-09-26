@@ -7,8 +7,6 @@ error AssetIdNotRegistered(bytes32 _assetId);
 error ChainBalanceNotZero();
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
-// 0x2c5211c6
-error InvalidAmount();
 // 0x2e19b556
 error InvalidAssetId(bytes32);
 // 0xd24c490f
@@ -45,4 +43,5 @@ error OnlyWhitelistedSettlementLayer(address, address);
 error OnlyWithdrawalsAllowedForPreV30Chains();
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
+// 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);

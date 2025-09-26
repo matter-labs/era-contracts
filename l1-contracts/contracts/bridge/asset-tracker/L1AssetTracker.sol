@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
+import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
@@ -144,7 +144,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainBalance[chainToUpdate][_assetId] += _amount;
         _decreaseChainBalance(block.chainid, _assetId, _amount);
     }
-
 
     /// @notice We set the transient balance change so the Mailbox can consume it so the Gateway can keep track of the balance change.
     function _setTransientBalanceChange(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
