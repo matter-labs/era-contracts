@@ -3,7 +3,7 @@
  * 📄 verify-contracts.ts
  *
  * Usage:
- *   npx ts-node l1-contracts/scripts/verify-contracts.ts <log_file> [options]
+ *   yarn ts-node l1-contracts/scripts/verify-contracts.ts <log_file> [options]
  *
  * Options:
  *   -c, --chain <chain>    Target chain: stage | testnet | mainnet (default: stage)
