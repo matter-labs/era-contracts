@@ -100,7 +100,18 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             callAttributes: new bytes[](0)
         });
 
-        bytes[] memory bundleAttributes = new bytes[](0);
+        address executionAddress = makeAddr("executionAddress");
+        address unbundlerAddress = makeAddr("unbundlerAddress");
+
+        bytes[] memory bundleAttributes = new bytes[](2);
+        bundleAttributes[0] = abi.encodePacked(
+            IERC7786Attributes.executionAddress.selector,
+            InteroperableAddress.formatEvmV1(260, executionAddress)
+        );
+        bundleAttributes[1] = abi.encodePacked(
+            IERC7786Attributes.unbundlerAddress.selector,
+            InteroperableAddress.formatEvmV1(260, unbundlerAddress)
+        );
 
         (bool success, bytes memory returnData) = L2_INTEROP_CENTER_ADDR.call(
             abi.encodeWithSelector(
