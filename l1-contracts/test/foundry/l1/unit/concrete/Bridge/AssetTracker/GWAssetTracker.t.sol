@@ -150,9 +150,6 @@ contract GWAssetTrackerTest is Test {
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
         gwAssetTracker.setLegacySharedBridgeAddress(CHAIN_ID, legacyBridge);
-
-        // The legacySharedBridgeAddress is an internal mapping, so we can't test it directly
-        // The function call should succeed without reverting
     }
 
     function test_SetLegacySharedBridgeAddress_Unauthorized() public {
@@ -160,26 +157,6 @@ contract GWAssetTrackerTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         gwAssetTracker.setLegacySharedBridgeAddress(CHAIN_ID, legacyBridge);
-    }
-
-    function test_ConfirmMigrationOnGateway_InvalidAmount() public {
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            chainId: CHAIN_ID,
-            assetId: ASSET_ID,
-            tokenOriginChainId: ORIGIN_CHAIN_ID,
-            amount: AMOUNT,
-            migrationNumber: MIGRATION_NUMBER,
-            originToken: ORIGIN_TOKEN,
-            isL1ToGateway: false
-        });
-
-        // Set up different chain balance
-        // This is an internal mapping, so we can't set it directly
-
-        // vm.expectRevert(InvalidAmount.selector);
-        // vm.prank(SERVICE_TRANSACTION_SENDER);
-        // gwAssetTracker.confirmMigrationOnGateway(data);
     }
 
     function test_ConfirmMigrationOnGateway_Unauthorized() public {
@@ -209,14 +186,5 @@ contract GWAssetTrackerTest is Test {
         assertEq(fromChainId, CHAIN_ID);
         assertEq(assetId, ASSET_ID);
         assertEq(transferData, abi.encode("transferData"));
-    }
-
-    function test_HandlePotentialFailedDeposit() public {
-        // This function tests the internal _handlePotentialFailedDeposit function
-        // Since it's internal, we can't test it directly
-        // The function is called through processLogsAndMessages when a failed deposit is detected
-
-        // We can test the unprocessedDeposits function which is public
-        assertEq(gwAssetTracker.unprocessedDeposits(CHAIN_ID), 0);
     }
 }
