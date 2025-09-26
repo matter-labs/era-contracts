@@ -63,7 +63,10 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
-    /// We store the current batch number for each chain.
+    /// @notice The mapping from chainId to its current executed batch number.
+    /// @dev We store the current batch number for each chain once it upgrades to v30. This value is moved between settlement layers
+    /// during migration to ensure consistency. For now, only using a settlement layer from the same CTM is allowed,
+    /// so the value can be trusted on top of settlement layer. 
     mapping(uint256 chainId => uint256 currentChainBatchNumber) public currentChainBatchNumber;
 
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
