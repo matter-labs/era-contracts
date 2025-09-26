@@ -70,12 +70,12 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         _registerNewTokens(tokens);
 
         _deployEra();
-        // _deployHyperchain(ETH_TOKEN_ADDRESS);
-        // _deployHyperchain(ETH_TOKEN_ADDRESS);
-        // _deployHyperchain(tokens[0]);
-        // _deployHyperchain(tokens[0]);
-        // _deployHyperchain(tokens[1]);
-        // _deployHyperchain(tokens[1]);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(ETH_TOKEN_ADDRESS);
+        _deployZKChain(tokens[0]);
+        _deployZKChain(tokens[0]);
+        _deployZKChain(tokens[1]);
+        _deployZKChain(tokens[1]);
 
         releaseConfigLock();
 
