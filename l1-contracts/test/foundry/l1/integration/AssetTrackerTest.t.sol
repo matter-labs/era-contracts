@@ -30,7 +30,7 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
-import {TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {TokenBalanceMigrationData, ConfirmBalanceMigrationData} from "contracts/common/Messaging.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {L2_BRIDGEHUB, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IAssetTrackerBase, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
@@ -179,6 +179,14 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             originToken: tokenAddress,
             isL1ToGateway: true
         });
+        ConfirmBalanceMigrationData memory confirmData = ConfirmBalanceMigrationData({
+            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+            isL1ToGateway: true,
+            chainId: eraZKChainId,
+            assetId: assetId,
+            migrationNumber: migrationNumber,
+            amount: amount
+        });
         bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
 
         FinalizeL1DepositParams memory finalizeWithdrawalParamsL1ToGateway = FinalizeL1DepositParams({
@@ -239,9 +247,9 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         IL1AssetTracker(assetTracker).receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        l2AssetTracker.confirmMigrationOnL2(data);
+        l2AssetTracker.confirmMigrationOnL2(confirmData);
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        gwAssetTracker.confirmMigrationOnGateway(data);
+        gwAssetTracker.confirmMigrationOnGateway(confirmData);
     }
 
     function test_migrationGatewayToL1() public {
@@ -285,6 +293,14 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             migrationNumber: migrationNumber,
             originToken: tokenAddress,
             isL1ToGateway: false
+        });
+        ConfirmBalanceMigrationData memory confirmData = ConfirmBalanceMigrationData({
+            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+            isL1ToGateway: false,
+            chainId: eraZKChainId,
+            assetId: assetId,
+            migrationNumber: migrationNumber,
+            amount: amount
         });
         bytes memory encodedData = abi.encodeCall(IAssetTrackerDataEncoding.receiveMigrationOnL1, data);
 
@@ -359,7 +375,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(address(gwAssetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
-        gwAssetTracker.confirmMigrationOnGateway(data);
+        gwAssetTracker.confirmMigrationOnGateway(confirmData);
     }
 
     // add this to be excluded from coverage report

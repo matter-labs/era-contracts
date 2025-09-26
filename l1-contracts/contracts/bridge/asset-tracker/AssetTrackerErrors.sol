@@ -56,4 +56,6 @@ error InvalidL2ShardId();
 error InvalidServiceLog();
 error OnlyGatewaySettlementLayer();
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
+error InvalidSettlementLayer();
+error InvalidTokenAddress();
 

@@ -3,7 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
-import {BalanceChange, TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {BalanceChange, TokenBalanceMigrationData, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
 
 interface IGWAssetTracker {
     function setAddresses(uint256 _l1ChainId) external;
@@ -18,9 +18,11 @@ interface IGWAssetTracker {
 
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external;
 
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _tokenBalanceMigrationData) external;
+    function confirmMigrationOnGateway(ConfirmBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
     function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 
     function unprocessedDeposits(uint256 _chainId) external view returns (uint256);
+
+    function registerL2NativeTokenFromL1(uint256 _l2ChainId, address _l2NativeToken) external;
 }

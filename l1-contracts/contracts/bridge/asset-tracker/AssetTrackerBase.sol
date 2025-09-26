@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
-import {IAssetTrackerBase} from "./IAssetTrackerBase.sol";
+import {IAssetTrackerBase, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 import {L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
@@ -102,7 +102,7 @@ abstract contract AssetTrackerBase is
 
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public onlyNativeTokenVault virtual {
-        chainBalance[_originChainId][_assetId] = type(uint256).max;
+        chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
     }
 
 
