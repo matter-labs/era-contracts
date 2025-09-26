@@ -330,7 +330,6 @@ abstract contract NativeTokenVault is
         address _receiver,
         address _tokenAddress
     ) internal requireZeroValue(msg.value) returns (bytes memory _bridgeMintData) {
-        // "Amount cannot be zero");
         require(_amount != 0, AmountMustBeGreaterThanZero());
 
         IBridgedStandardToken(_tokenAddress).bridgeBurn(_originalCaller, _amount);

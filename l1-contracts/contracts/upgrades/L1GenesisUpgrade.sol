@@ -113,7 +113,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
     }
 
     /// @notice the upgrade function.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
+    function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         super.upgrade(_proposedUpgrade);
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

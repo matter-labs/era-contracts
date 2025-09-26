@@ -6,7 +6,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
@@ -15,11 +15,7 @@ import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AssetIdNotRegistered, TokenBalanceNotMigratedToGateway, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
-
-struct SavedTotalSupply {
-    bool isSaved;
-    uint256 amount;
-}
+import {SavedTotalSupply} from "./IAssetTrackerBase.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     uint256 public L1_CHAIN_ID;
@@ -102,18 +98,20 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         bytes32 _assetId,
         uint256 _amount,
         uint256 _tokenOriginChainId
-    ) public onlyL2NativeTokenVault {
+    ) external onlyL2NativeTokenVault {
         _handleInitiateBridgingOnL2Inner(_assetId, _amount, _tokenOriginChainId);
     }
 
     function _handleInitiateBridgingOnL2Inner(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) internal {
+        _checkAssetMigrationNumber(_assetId);
         if (_tokenOriginChainId == block.chainid) {
             /// On the L2 we only save chainBalance for native tokens.
             _decreaseChainBalance(block.chainid, _assetId, _amount);
         }
-        _checkAssetMigrationNumber(_assetId);
     }
 
+    /// @notice This function is used to check the asset migration number.
+    /// @dev This is used to pause outgoing withdrawals and interop transactions after the chain migrates to Gateway.
     function _checkAssetMigrationNumber(bytes32 _assetId) internal view {
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
@@ -138,7 +136,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId,
         address _tokenAddress
-    ) public onlyL2NativeTokenVault {
+    ) external onlyL2NativeTokenVault {
         _handleFinalizeBridgingOnL2Inner(_assetId, _amount, _tokenOriginChainId, _tokenAddress);
     }
 

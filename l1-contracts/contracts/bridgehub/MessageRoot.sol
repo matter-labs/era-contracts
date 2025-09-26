@@ -145,6 +145,13 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _;
     }
 
+    modifier onlyL1() {
+        if (block.chainid != L1_CHAIN_ID) {
+            revert OnlyL1();
+        }
+        _;
+    }
+
     /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
     modifier onlyL2() {
         if (block.chainid == L1_CHAIN_ID) {
@@ -212,13 +219,15 @@ contract MessageRoot is IMessageRoot, Initializable, MessageVerification {
         _addNewChain(block.chainid, 0);
     }
 
+    /// On L2s the initializer/reinitializer is not called.
     function initializeL2V30Upgrade() external onlyL2 onlyUpgrader {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
     }
 
     /// @dev The initialized used for the V30 upgrade.
-    function initializeL1V30Upgrade() external reinitializer(2) {
+    /// On L2s the initializers are disabled.
+    function initializeL1V30Upgrade() external reinitializer(2) onlyL1 {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
     }
