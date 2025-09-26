@@ -97,18 +97,20 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         bytes32 _assetId,
         uint256 _amount,
         uint256 _tokenOriginChainId
-    ) public onlyL2NativeTokenVault {
+    ) external onlyL2NativeTokenVault {
         _handleInitiateBridgingOnL2Inner(_assetId, _amount, _tokenOriginChainId);
     }
 
     function _handleInitiateBridgingOnL2Inner(bytes32 _assetId, uint256 _amount, uint256 _tokenOriginChainId) internal {
+        _checkAssetMigrationNumber(_assetId);
         if (_tokenOriginChainId == block.chainid) {
             /// On the L2 we only save chainBalance for native tokens.
             _decreaseChainBalance(block.chainid, _assetId, _amount);
         }
-        _checkAssetMigrationNumber(_assetId);
     }
 
+    /// @notice This function is used to check the asset migration number.
+    /// @dev This is used to pause outgoing withdrawals and interop transactions after the chain migrates to Gateway.
     function _checkAssetMigrationNumber(bytes32 _assetId) internal view {
         uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
@@ -133,7 +135,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _amount,
         uint256 _tokenOriginChainId,
         address _tokenAddress
-    ) public onlyL2NativeTokenVault {
+    ) external onlyL2NativeTokenVault {
         _handleFinalizeBridgingOnL2Inner(_assetId, _amount, _tokenOriginChainId, _tokenAddress);
     }
 

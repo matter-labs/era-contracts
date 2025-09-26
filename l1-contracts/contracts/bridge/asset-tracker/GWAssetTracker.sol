@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAmount, InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidL2ShardId, InvalidServiceLog} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidL2ShardId, InvalidServiceLog} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -182,9 +182,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 reconstructedLogsTree.push(hashedLog);
             }
             if (log.sender == L2_BOOTLOADER_ADDRESS) {
-                if (log.value == bytes32(uint256(TxStatus.Failure))) {
-                    _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key);
-                }
+                _handlePotentialFailedDeposit(_processLogsInputs.chainId, log.key, log.value);
             } else if (log.sender == L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR) {
                 ++msgCount;
                 bytes calldata message = _processLogsInputs.messages[msgCount - 1];
@@ -263,9 +261,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
-    function _handlePotentialFailedDeposit(uint256 _chainId, bytes32 _canonicalTxHash) internal {
+    function _handlePotentialFailedDeposit(uint256 _chainId, bytes32 _canonicalTxHash, bytes32 _value) internal {
         BalanceChange memory savedBalanceChange = balanceChange[_chainId][_canonicalTxHash];
         require(savedBalanceChange.version == BALANCE_CHANGE_VERSION, InvalidCanonicalTxHash(_canonicalTxHash));
+        --unprocessedDeposits[_chainId];
+        if (_value == bytes32(uint256(TxStatus.Success))) {
+            return;
+        }
         /// Note we handle failedDeposits here for deposits that do not go through GW during chainMigration,
         /// because they were initiated when the chain settles on L1, however the failedDeposit L2->L1 message goes through GW.
         /// Here we do not need to decrement the chainBalance, since the chainBalance was added to the chain's chainBalance on L1,
@@ -277,7 +279,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (savedBalanceChange.baseTokenAmount > 0) {
             _decreaseChainBalance(_chainId, savedBalanceChange.baseTokenAssetId, savedBalanceChange.baseTokenAmount);
         }
-        --unprocessedDeposits[_chainId];
     }
 
     function _handleInteropMessage(uint256 _chainId, bytes calldata _message, bytes32 _baseTokenAssetId) internal {
@@ -417,8 +418,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Migrates the token balance from Gateway to L1.
-    /// @dev This function can be called multiple times on the Gateway as it does not have a direct effect.
-    /// @dev This function is permissionless, it does not affect the state.
+    /// @dev This function can be called multiple times on the Gateway as it saves the chainBalance on the first call.
+    /// @dev This function is permissionless.
     function initiateGatewayToL1MigrationOnGateway(uint256 _chainId, bytes32 _assetId) external {
         address zkChain = L2_BRIDGEHUB.getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
@@ -466,9 +467,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         if (_data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[_data.chainId][_data.assetId] += _data.amount;
-        } else {
-            require(_data.amount == chainBalance[_data.chainId][_data.assetId], InvalidAmount());
-            chainBalance[_data.chainId][_data.assetId] = 0;
         }
     }
 

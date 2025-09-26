@@ -24,7 +24,7 @@ error GWNotV30(uint256 chainId);
 contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
-    function upgrade(ProposedUpgrade calldata _proposedUpgrade) public override returns (bytes32) {
+    function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
         INativeTokenVault nativeTokenVault = INativeTokenVault(
@@ -43,8 +43,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         );
         ProposedUpgrade memory proposedUpgrade = _proposedUpgrade;
         proposedUpgrade.l2ProtocolUpgradeTx.data = complexUpgraderCalldata;
-        _delegatecallUpgrade(_proposedUpgrade);
-
+        super.upgrade(proposedUpgrade);
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
 
