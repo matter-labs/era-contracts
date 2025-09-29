@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidSettlementLayer, InvalidTokenAddress} from "./AssetTrackerErrors.sol";
+import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidSettlementLayer, InvalidTokenAddress} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
@@ -105,9 +105,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         } else {
             address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
             migratedBalance = IERC20(tokenAddress).totalSupply();
-            require(chainBalance[block.chainid][_assetId] == 0, "chainBalance is not 0");
+            require(chainBalance[block.chainid][_assetId] == 0, ChainBalanceNotZero());
         }
-        /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1, 
+        /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
         /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
         /// kl todo can it be the case that we set chainBalance to uint256.max twice.
@@ -152,7 +152,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
-        uint256 _tokenOriginChainId
+        uint256 // _tokenOriginChainId
     ) external onlyNativeTokenVault {
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
@@ -167,7 +167,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainBalance[chainToUpdate][_assetId] += _amount;
         _decreaseChainBalance(block.chainid, _assetId, _amount);
     }
-
 
     /// @notice We set the transient balance change so the Mailbox can consume it so the Gateway can keep track of the balance change.
     function _setTransientBalanceChange(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
@@ -199,7 +198,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
-        uint256 _tokenOriginChainId
+        uint256 // _tokenOriginChainId
     ) external onlyNativeTokenVault {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
@@ -331,6 +330,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _toChainId,
         bytes32 _assetId,
         uint256 _amount,
+        // solhint-disable-next-line no-unused-vars
         uint256 _tokenOriginChainId
     ) internal {
         _decreaseChainBalance(_fromChainId, _assetId, _amount);

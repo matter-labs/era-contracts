@@ -75,7 +75,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return L2_MESSAGE_ROOT;
     }
 
-
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override {
         _registerTokenOnL2(_assetId);
         super.registerNewToken(_assetId, _originChainId);
@@ -165,7 +164,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     /// @notice This saves the total supply if it is not saved yet. It returns the saved total supply.
-    function _getOrSaveTotalSupply(bytes32 _assetId, uint256 _migrationNumber, uint256 _tokenOriginChainId, address _tokenAddress) internal returns (uint256 _totalSupply)  {
+    function _getOrSaveTotalSupply(
+        bytes32 _assetId,
+        uint256 _migrationNumber,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) internal returns (uint256 _totalSupply) {
         SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_migrationNumber][_assetId];
         if (!tokenSavedTotalSupply.isSaved) {
             if (_tokenOriginChainId == block.chainid) {
@@ -175,10 +179,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                 /// This function saves the token supply before the first deposit after the chain migration is processed (in the same transaction).
                 /// This totalSupply is the chain's total supply at the moment of chain migration.
             }
-            savedTotalSupply[_migrationNumber][_assetId] = SavedTotalSupply({
-                isSaved: true,
-                amount: _totalSupply
-            });
+            savedTotalSupply[_migrationNumber][_assetId] = SavedTotalSupply({isSaved: true, amount: _totalSupply});
         } else {
             _totalSupply = tokenSavedTotalSupply.amount;
         }
@@ -211,7 +212,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
     /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
-        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID, OnlyGatewaySettlementLayer());
+        require(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID,
+            OnlyGatewaySettlementLayer()
+        );
         address tokenAddress = _tryGetTokenAddress(_assetId);
 
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);

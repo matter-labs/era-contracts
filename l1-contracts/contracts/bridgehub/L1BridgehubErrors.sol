@@ -10,8 +10,6 @@ error BatchZeroNotAllowed();
 error ChainAlreadyRegistered();
 // 0xbe263463
 error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
-// 0x5dc2df31
-error ChainBatchRootNotSet(uint256 chainId, uint256 batchNumber);
 // 0x655c373c
 error ChainBatchRootZero();
 // 0x65e8a019
@@ -30,12 +28,12 @@ error IncorrectSender(address prevMsgSender, address chainAdmin);
 error LocallyNoChainsAtGenesis();
 // 0x913183d8
 error MessageRootNotRegistered();
+// 0x4010a88d
+error MigrationNotToL1();
 // 0x12b08c62
 error MigrationNumberAlreadySet();
 // 0xde1362a2
 error MigrationNumberMismatch(uint256 _expected, uint256 _actual);
-// 0xc02b8c3a
-error NextChainBatchRootAlreadySet(uint256 chainId, uint256 batchNumber);
 // 0x7f4316f3
 error NoEthAllowed();
 // 0x366c42f8
@@ -78,14 +76,10 @@ error OnlyL1();
 error OnlyL2();
 // 0x605d6b86
 error OnlyL2MessageRoot();
-// 0x52013f4d
-error OnlyOnGateway();
 // 0x6b75db8c
 error OnlyOnSettlementLayer();
 // 0x26d10385
 error OnlyPreV30Chain(uint256 chainId);
-// 0x94072c53
-error PreviousChainBatchRootNotSet(uint256 chainId, uint256 batchNumber);
 // 0xb78dbaa7
 error SecondBridgeAddressTooLow(address secondBridgeAddress, address minSecondBridgeAddress);
 // 0x36917565
@@ -100,11 +94,7 @@ error TotalBatchesExecutedZero();
 error V30UpgradeChainBatchNumberAlreadySet();
 // 0x862f0039
 error V30UpgradeChainBatchNumberNotSet();
-// 0x29bc3a3c
-error V30UpgradeGatewayBlockNumberAlreadySet();
 // 0x92626457
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
 error ZKChainNotRegistered();
-error MigrationNotToL1();
-

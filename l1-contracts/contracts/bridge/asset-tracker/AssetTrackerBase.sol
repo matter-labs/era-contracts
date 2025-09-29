@@ -100,12 +100,9 @@ abstract contract AssetTrackerBase is
                     Register token
     //////////////////////////////////////////////////////////////*/
 
-
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public onlyNativeTokenVault virtual {
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public virtual onlyNativeTokenVault {
         chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
     }
-
-
 
     /// @dev This function is used to decrease the chain balance of a token on a chain.
     /// @dev It makes debugging issues easier. Overflows don't usually happen, so there is no similar function to increase the chain balance.
@@ -115,7 +112,6 @@ abstract contract AssetTrackerBase is
         }
         chainBalance[_chainId][_assetId] -= _amount;
     }
-
 
     function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {
         // slither-disable-next-line unused-return

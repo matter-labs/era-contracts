@@ -337,6 +337,81 @@ contract IncrementalMerkleTestTest is Test {
         assertEq(merkleRegular.height(), merkleLazy.height());
     }
 
+    /// @dev Test reset() function - should clear and reinitialize the tree
+    function testReset() public {
+        merkleTest.push(bytes32(uint256(1)));
+        merkleTest.push(bytes32(uint256(2)));
+        merkleTest.push(bytes32(uint256(3)));
+
+        // Verify tree has data
+        assertTrue(merkleTest.root() != bytes32(0));
+        assertEq(merkleTest.index(), 3);
+        assertTrue(merkleTest.height() > 0);
+
+        // Reset with different zero value
+        bytes32 newZero = keccak256("NEW_ZERO");
+        merkleTest.reset(newZero);
+
+        // Verify tree is reset
+        assertEq(merkleTest.root(), bytes32(0));
+        assertEq(merkleTest.index(), 0);
+        assertEq(merkleTest.height(), 0);
+
+        // Verify it works with new zero value
+        merkleTest.push(bytes32(uint256(42)));
+        assertEq(merkleTest.root(), bytes32(uint256(42)));
+    }
+
+    /// @dev Test clear() function by testing reset() behavior
+    function testClear() public {
+        merkleTest.push(bytes32(uint256(100)));
+        merkleTest.push(bytes32(uint256(200)));
+
+        // Verify tree has data before reset
+        assertTrue(merkleTest.root() != bytes32(0));
+        assertEq(merkleTest.index(), 2);
+
+        // Reset should call clear internally
+        merkleTest.reset(zero);
+
+        // Verify tree is cleared
+        assertEq(merkleTest.root(), bytes32(0));
+        assertEq(merkleTest.index(), 0);
+        assertEq(merkleTest.height(), 0);
+    }
+
+    /// @dev Test extendUntilEnd() edge cases
+    function testExtendUntilEndEdgeCases() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory = setUpMemory();
+
+        // Test extending from empty tree (nextLeafIndex == 0)
+        merkleMemory._nextLeafIndex = 0;
+        merkleMemory._sides = new bytes32[](1);
+        merkleMemory._zeros = new bytes32[](1);
+        merkleMemory._sides[0] = zero;
+        merkleMemory._zeros[0] = zero;
+        merkleMemory._sidesLengthMemory = 1;
+        merkleMemory._zerosLengthMemory = 1;
+
+        // Extend the tree to a larger depth
+        bytes32[] memory newSides = new bytes32[](5);
+        bytes32[] memory newZeros = new bytes32[](5);
+        for (uint i = 0; i < 1; i++) {
+            newSides[i] = merkleMemory._sides[i];
+            newZeros[i] = merkleMemory._zeros[i];
+        }
+        merkleMemory._sides = newSides;
+        merkleMemory._zeros = newZeros;
+
+        // This should extend the tree properly
+        DynamicIncrementalMerkleMemory.extendUntilEnd(merkleMemory);
+
+        // Verify extension worked
+        assertEq(merkleMemory._sidesLengthMemory, 5);
+        assertEq(merkleMemory._zerosLengthMemory, 5);
+        assertTrue(merkleMemory._sides[0] == zero); // Should set _sides[0] = currentZero when _nextLeafIndex == 0
+    }
+
     /// @dev Gas comparison test - performance validation
     function testGasComparison() public {
         uint256 numElements = 50;
@@ -373,6 +448,73 @@ contract IncrementalMerkleTestTest is Test {
         // Verify significant savings (should be >40%)
         uint256 savingsPercent = ((gasUsedRegular - gasUsedLazy) * 100) / gasUsedRegular;
         assertGt(savingsPercent, 40, "Should achieve significant gas savings");
+    }
+
+    /// @dev Test createTree() function initialization
+    function testCreateTreeInitialization() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory;
+
+        // Initialize with createTree
+        DynamicIncrementalMerkleMemory.createTree(merkleMemory, 10);
+
+        // Verify proper initialization
+        assertEq(merkleMemory._sides.length, 10);
+        assertEq(merkleMemory._zeros.length, 10);
+        assertEq(merkleMemory._sidesLengthMemory, 0);
+        assertEq(merkleMemory._zerosLengthMemory, 0);
+        assertEq(merkleMemory._nextLeafIndex, 0);
+        assertFalse(merkleMemory._needsRootRecalculation);
+        assertEq(merkleMemory._lastLeafValue, bytes32(0));
+    }
+
+    /// @dev Test _recalculateRoot() with empty tree (leafCount == 0)
+    function testRecalculateRootEmptyTree() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory = setUpMemory();
+
+        // Ensure tree is empty
+        merkleMemory._nextLeafIndex = 0;
+
+        // Call root() which internally calls _recalculateRoot()
+        bytes32 rootResult = merkleMemory.root();
+
+        // Should return bytes32(0) for empty tree
+        assertEq(rootResult, bytes32(0));
+    }
+
+    /// @dev Test various extendUntilEnd() scenarios for memory tree
+    function testExtendUntilEndScenarios() public {
+        DynamicIncrementalMerkleMemory.Bytes32PushTree memory merkleMemory = setUpMemory();
+
+        // Setup initial state with some elements
+        merkleMemory.push(bytes32(uint256(1)));
+        merkleMemory.push(bytes32(uint256(2)));
+
+        // Manually extend the arrays to test extending behavior
+        bytes32[] memory newSides = new bytes32[](8);
+        bytes32[] memory newZeros = new bytes32[](8);
+
+        // Copy existing data
+        for (uint i = 0; i < merkleMemory._sidesLengthMemory && i < newSides.length; i++) {
+            newSides[i] = merkleMemory._sides[i];
+        }
+        for (uint i = 0; i < merkleMemory._zerosLengthMemory && i < newZeros.length; i++) {
+            newZeros[i] = merkleMemory._zeros[i];
+        }
+
+        merkleMemory._sides = newSides;
+        merkleMemory._zeros = newZeros;
+
+        // Test extension
+        DynamicIncrementalMerkleMemory.extendUntilEnd(merkleMemory);
+
+        // Verify extension completed
+        assertEq(merkleMemory._sidesLengthMemory, 8);
+        assertEq(merkleMemory._zerosLengthMemory, 8);
+        assertFalse(merkleMemory._needsRootRecalculation);
+
+        // Verify we can still get a valid root
+        bytes32 rootAfterExtend = merkleMemory.root();
+        assertTrue(rootAfterExtend != bytes32(0));
     }
 
     /// @dev Test comprehensive storage vs memory equivalence
