@@ -246,7 +246,8 @@ library L2GenesisForceDeploymentsHelper {
             L2_ASSET_ROUTER_ADDR,
             ICTMDeploymentTracker(_ctmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
-            L2_CHAIN_ASSET_HANDLER_ADDR
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            fixedForceDeploymentsData.aliasedChainRegistrationSender
         );
     }
 

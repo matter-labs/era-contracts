@@ -7,6 +7,12 @@ import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
+import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
+import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IGWAssetTracker} from "../bridge/asset-tracker/IGWAssetTracker.sol";
+import {BridgehubBurnCTMAssetData} from "./IBridgehub.sol";
+
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -56,12 +62,18 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
         return ASSET_ROUTER;
     }
 
+    function _assetTracker() internal view override returns (address) {
+        return ASSET_TRACKER;
+    }
+
     constructor(
         uint256 _l1ChainId,
         address _owner,
         IBridgehub _bridgehub,
         address _assetRouter,
-        IMessageRoot _messageRoot
+        IMessageRoot _messageRoot,
+        address _assetTracker,
+        IL1Nullifier _l1Nullifier
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = _bridgehub;
@@ -70,7 +82,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
         MESSAGE_ROOT = _messageRoot;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
         ASSET_TRACKER = _assetTracker;
-        L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
+        L1_NULLIFIER = _l1Nullifier;
         _transferOwnership(_owner);
     }
 
@@ -78,5 +90,16 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
+    }
+
+    function _setLegacySharedBridgeIfL1(BridgehubBurnCTMAssetData memory _bridgehubBurnData, uint256 _settlementChainId) internal override {
+        /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
+
+        bytes memory data = abi.encodeCall(
+            IGWAssetTracker.setLegacySharedBridgeAddress,
+            (_bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(_bridgehubBurnData.chainId))
+        );
+        address settlementZkChain = _bridgehub().getZKChain(_settlementChainId);
+        IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);   
     }
 }

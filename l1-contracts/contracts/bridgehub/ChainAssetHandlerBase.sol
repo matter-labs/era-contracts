@@ -21,7 +21,6 @@ import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRA
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 import {IGWAssetTracker} from "../bridge/asset-tracker/IGWAssetTracker.sol";
-import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -51,9 +50,7 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetRouter() internal view virtual returns (address);
 
-    address internal immutable ASSET_TRACKER;
-
-    IL1Nullifier internal immutable L1_NULLIFIER;
+    function _assetTracker() internal view virtual returns (address);
 
     /// @notice used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
@@ -86,7 +83,7 @@ abstract contract ChainAssetHandlerBase is
     }
 
     modifier onlyAssetTrackerOrChain(uint256 _chainId) {
-        if (msg.sender != ASSET_TRACKER && msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
+        if (msg.sender != _assetTracker() && msg.sender != _bridgehub().getZKChain(_chainId)) {
             revert OnlyAssetTrackerOrChain(msg.sender, _chainId);
         }
         _;
@@ -116,8 +113,8 @@ abstract contract ChainAssetHandlerBase is
     /// @notice Checks that the message sender is the specified ZK Chain.
     /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+        if (msg.sender != _bridgehub().getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
         }
         _;
     }
@@ -125,9 +122,9 @@ abstract contract ChainAssetHandlerBase is
     /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
         require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
-        bool isOnThisSettlementLayer = block.chainid == BRIDGE_HUB.settlementLayer(_chainId);
-        bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != L1_CHAIN_ID) ||
-            (!isOnThisSettlementLayer && block.chainid == L1_CHAIN_ID);
+        bool isOnThisSettlementLayer = block.chainid == _bridgehub().settlementLayer(_chainId);
+        bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != _l1ChainId()) ||
+            (!isOnThisSettlementLayer && block.chainid == _l1ChainId());
         /// Note we don't increment the migration number if the chain migrated to GW and back to L1 previously.
         if (shouldIncrementMigrationNumber) {
             migrationNumber[_chainId] = 1;
@@ -168,15 +165,7 @@ abstract contract ChainAssetHandlerBase is
         );
         address zkChain = _bridgehub().getZKChain(bridgehubBurnData.chainId);
 
-        /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
-        if (block.chainid == L1_CHAIN_ID) {
-            bytes memory data = abi.encodeCall(
-                IGWAssetTracker.setLegacySharedBridgeAddress,
-                (bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(bridgehubBurnData.chainId))
-            );
-            address settlementZkChain = BRIDGE_HUB.getZKChain(_settlementChainId);
-            IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);
-        }
+        _setLegacySharedBridgeIfL1(bridgehubBurnData, _settlementChainId);
 
         bytes memory ctmMintData;
         // to avoid stack too deep
@@ -204,8 +193,8 @@ abstract contract ChainAssetHandlerBase is
                 revert SLHasDifferentCTM();
             }
 
-            if (block.chainid != L1_CHAIN_ID) {
-                require(_settlementChainId == L1_CHAIN_ID, MigrationNotToL1());
+            if (block.chainid != _l1ChainId()) {
+                require(_settlementChainId == _l1ChainId(), MigrationNotToL1());
                 require(
                     GW_ASSET_TRACKER.unprocessedDeposits(bridgehubBurnData.chainId) == 0,
                     UnprocessedDepositsNotProcessed()
@@ -221,7 +210,7 @@ abstract contract ChainAssetHandlerBase is
         );
         ++migrationNumber[bridgehubBurnData.chainId];
 
-        uint256 batchNumber = MESSAGE_ROOT.currentChainBatchNumber(bridgehubBurnData.chainId);
+        uint256 batchNumber = _messageRoot().currentChainBatchNumber(bridgehubBurnData.chainId);
 
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
@@ -230,12 +219,14 @@ abstract contract ChainAssetHandlerBase is
             ctmData: ctmMintData,
             chainData: chainMintData,
             migrationNumber: migrationNumber[bridgehubBurnData.chainId],
-            v30UpgradeChainBatchNumber: MESSAGE_ROOT.v30UpgradeChainBatchNumber(bridgehubBurnData.chainId)
+            v30UpgradeChainBatchNumber: _messageRoot().v30UpgradeChainBatchNumber(bridgehubBurnData.chainId)
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
+
+    function _setLegacySharedBridgeIfL1(BridgehubBurnCTMAssetData memory _bridgehubBurnData, uint256 _settlementChainId) internal virtual {}
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
     /// @param _assetId the assetId of the chain's CTM
@@ -253,7 +244,7 @@ abstract contract ChainAssetHandlerBase is
 
         uint256 currentMigrationNumber = migrationNumber[bridgehubMintData.chainId];
         /// If we are not migrating for the first time, we check that the migration number is correct.
-        if (currentMigrationNumber != 0 && block.chainid == L1_CHAIN_ID) {
+        if (currentMigrationNumber != 0 && block.chainid == _l1ChainId()) {
             require(
                 currentMigrationNumber + 1 == bridgehubMintData.migrationNumber,
                 MigrationNumberMismatch(currentMigrationNumber + 1, bridgehubMintData.migrationNumber)
@@ -331,7 +322,7 @@ abstract contract ChainAssetHandlerBase is
         uint256 _previousSettlementLayerChainId,
         uint256 _currentSettlementLayerChainId
     ) external onlySystemContext {
-        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == L1_CHAIN_ID) {
+        if (_previousSettlementLayerChainId == 0 && _currentSettlementLayerChainId == _l1ChainId()) {
             /// For the initial call if we are settling on L1, we return, as there is no real migration.
             return;
         }

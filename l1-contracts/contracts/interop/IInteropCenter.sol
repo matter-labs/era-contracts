@@ -24,6 +24,8 @@ interface IInteropCenter {
         CallAndBundleAttributes
     }
 
+    function initL2(uint256 _l1ChainId, address _owner) external;
+
     /// Mailbox forwarder
 
     function forwardTransactionOnGatewayWithBalanceChange(

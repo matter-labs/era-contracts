@@ -146,7 +146,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes1 encodingVersion = _data[0];
 
         (bytes32 assetId, bytes memory transferData) = _getTransferData(encodingVersion, _originalCaller, _data);
-        require(BRIDGE_HUB.baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
+        require(_bridgehub().baseTokenAssetId(_chainId) != assetId, AssetIdNotSupported(assetId));
 
         bytes memory bridgeMintCalldata = _burn({
             _chainId: _chainId,

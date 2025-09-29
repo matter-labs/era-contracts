@@ -244,6 +244,4 @@ interface IBridgehub {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external;
-
-    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external;
 }

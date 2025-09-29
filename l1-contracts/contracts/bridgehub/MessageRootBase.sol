@@ -111,31 +111,31 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// On GW, the asset tracker should add it,
     /// except for PreV30 chains, which can add it directly.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
-        if (block.chainid != L1_CHAIN_ID) {
+        if (block.chainid != _l1ChainId()) {
             if (msg.sender == GW_ASSET_TRACKER_ADDR) {
                 // this case is valid.
             } else if (v30UpgradeChainBatchNumber[_chainId] != 0) {
-                address chain = BRIDGE_HUB.getZKChain(_chainId);
+                address chain = _bridgehub().getZKChain(_chainId);
                 uint32 minor;
                 (, minor, ) = IGetters(chain).getSemverProtocolVersion();
                 /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v30 quickly.
                 require(msg.sender == chain, OnlyChain(msg.sender, chain));
                 /// we only allow direct addChainBatchRoots for EraVM chains, as only they are governed directly by governance.
-                require(BRIDGE_HUB.chainTypeManager(_chainId) == eraVmChainTypeManager, OnlyChain(msg.sender, chain));
+                require(_bridgehub().chainTypeManager(_chainId) == eraVmChainTypeManager, OnlyChain(msg.sender, chain));
                 require(minor < 30, OnlyPreV30Chain(_chainId));
             } else {
                 revert OnlyAssetTracker(msg.sender, GW_ASSET_TRACKER_ADDR);
             }
         } else {
-            if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
-                revert OnlyChain(msg.sender, BRIDGE_HUB.getZKChain(_chainId));
+            if (msg.sender != _bridgehub().getZKChain(_chainId)) {
+                revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
             }
         }
         _;
     }
 
     modifier onlyL1() {
-        if (block.chainid != L1_CHAIN_ID) {
+        if (block.chainid != _l1ChainId()) {
             revert OnlyL1();
         }
         _;
@@ -151,14 +151,14 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     /// @notice Checks that the Chain ID is the Gateway chain id.
     modifier onlyGateway() {
-        if (block.chainid != GATEWAY_CHAIN_ID) {
+        if (block.chainid != _gatewayChainId()) {
             revert OnlyGateway();
         }
         _;
     }
 
     modifier onlyBridgehubOwner() {
-        address bridgehubOwner = Ownable(address(BRIDGE_HUB)).owner();
+        address bridgehubOwner = Ownable(address(_bridgehub())).owner();
         if (msg.sender != bridgehubOwner) {
             revert OnlyBridgehubOwner(msg.sender, bridgehubOwner);
         }
@@ -176,7 +176,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         uint256 allZKChainsLength = _allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
             uint256 batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY;
-            if (BRIDGE_HUB.settlementLayer(_allZKChains[i]) == L1_CHAIN_ID) {
+            if (_bridgehub().settlementLayer(_allZKChains[i]) == _l1ChainId()) {
                 /// If we are settling on L1.
                 batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
             }
@@ -184,12 +184,12 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         }
         if (allZKChainsLength > 0) {
             // On non-local environments we need to save the eraVM chain type manager to allow v29 chains to finalize.
-            eraVmChainTypeManager = BRIDGE_HUB.chainTypeManager(_allZKChains[0]);
+            eraVmChainTypeManager = _bridgehub().chainTypeManager(_allZKChains[0]);
         }
     }
 
     function saveV30UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
-        require(block.chainid == BRIDGE_HUB.settlementLayer(_chainId), OnlyOnSettlementLayer());
+        require(block.chainid == _bridgehub().settlementLayer(_chainId), OnlyOnSettlementLayer());
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
         require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
@@ -243,7 +243,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external addChainBatchRootRestriction(_chainId) {
+    ) public addChainBatchRootRestriction(_chainId) virtual {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
@@ -260,7 +260,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         ++currentChainBatchNumber[_chainId];
-        if (block.chainid == L1_CHAIN_ID) {
+        if (block.chainid == _l1ChainId()) {
             /// On L1 we only store the chainBatchRoot, but don't update the chainTree or sharedTree.
             return;
         }
@@ -355,7 +355,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         }
 
         require(
-            BRIDGE_HUB.whitelistedSettlementLayers(proofData.settlementLayerChainId),
+            _bridgehub().whitelistedSettlementLayers(proofData.settlementLayerChainId),
             NotWhitelistedSettlementLayer(proofData.settlementLayerChainId)
         );
 
@@ -378,7 +378,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         if (savedChainBatchRoot != bytes32(0)) {
             return savedChainBatchRoot;
         }
-        return IGetters(BRIDGE_HUB.getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
+        return IGetters(_bridgehub().getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
     }
 
     /// @notice Extracts and returns proof data for settlement layer verification.

@@ -58,13 +58,13 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// the old version where it was an immutable.
     bytes32 public L2_TOKEN_PROXY_BYTECODE_HASH;
 
+    /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert Unauthorized(msg.sender);
+            revert InvalidCaller(msg.sender);
         }
         _;
     }
-
 
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
@@ -93,13 +93,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
     }
 
-    /// @dev Only allows calls from the complex upgrader contract on L2.
-    modifier onlyUpgrader() {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert InvalidCaller(msg.sender);
-        }
-        _;
-    }
+
 
     /// @notice Updates the contract.
     /// @dev This function is used to initialize the new implementation of L2NativeTokenVault on existing chains during

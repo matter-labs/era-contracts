@@ -11,7 +11,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 

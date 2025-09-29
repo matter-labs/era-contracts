@@ -34,7 +34,7 @@ contract MockAssetHandler is IAssetHandler {
 contract TestAssetRouterBase is AssetRouterBase {
     address public nativeTokenVault;
 
-    constructor() AssetRouterBase(1, 1, IBridgehub(address(1))) {}
+    // constructor() AssetRouterBase(1, 1, IBridgehub(address(1))) {}
 
     function setAssetHandlerAddressThisChain(bytes32, address) external override {}
 

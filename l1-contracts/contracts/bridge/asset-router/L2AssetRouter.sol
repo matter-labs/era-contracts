@@ -107,7 +107,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert InvalidCaller(msg.sender);
+            revert Unauthorized(msg.sender);
         }
         _;
     }
@@ -253,7 +253,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         public
         payable
         override(AssetRouterBase, IAssetRouterBase)
-        onlyAssetRouterCounterpartOxwrSelf(_originChainId)
+        onlyAssetRouterCounterpartOrSelf(_originChainId)
         nonReentrant
     {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));

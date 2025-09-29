@@ -6,6 +6,9 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
+import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
+import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdAlreadyExists, ChainIdCantBeCurrentChain, ChainIdMismatch, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, IncorrectBridgeHubAddress, MigrationPaused, MsgValueMismatch, NoCTMForAssetId, NotCurrentSettlementLayer,NotL1, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, WrongMagicValue, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -36,6 +39,16 @@ contract L2Bridgehub is BridgehubBase {
     /*//////////////////////////////////////////////////////////////
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
+
+    modifier onlyChainRegistrationSender() {
+        if (
+            msg.sender != AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender) &&
+            msg.sender != SERVICE_TRANSACTION_SENDER
+        ) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
 
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
@@ -78,5 +91,16 @@ contract L2Bridgehub is BridgehubBase {
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+    }
+
+    /// @notice used to register chains on L2 for the purpose of interop.
+    /// @param _chainId the chainId of the chain to be registered.
+    /// @param _baseTokenAssetId the base token asset id of the chain.
+    function registerChainForInterop(
+        uint256 _chainId,
+        bytes32 _baseTokenAssetId
+    ) external onlyChainRegistrationSender onlyL2 {
+        baseTokenAssetId[_chainId] = _baseTokenAssetId;
+        // kl todo: should we add ctm asset id here?
     }
 }

@@ -23,7 +23,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
-import {AlreadyCurrentSL, ChainIdAlreadyPresent, ChainNotLegacy, ChainNotPresentInCTM, NotChainAssetHandler, OnlyL2, NotCurrentSL, NotInGatewayMode, NotL1, NotRelayedSender, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {AlreadyCurrentSL, NotChainAssetHandler, OnlyL2, NotInGatewayMode, NotRelayedSender, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdAlreadyExists, ChainIdCantBeCurrentChain, ChainIdMismatch, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, IncorrectBridgeHubAddress, MigrationPaused, MsgValueMismatch, NoCTMForAssetId, NotCurrentSettlementLayer,NotL1, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, WrongMagicValue, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
@@ -114,6 +114,12 @@ abstract contract BridgehubBase is
     /// @notice the chain asset handler used for chain migration.
     address public chainAssetHandler;
 
+    /// @notice the chain registration sender used for chain registration.
+    /// @notice the chainRegistrationSender is only deployed on L1.
+    /// @dev If the Bridgehub is on L1 it is the address just the chainRegistrationSender address.
+    /// @dev If the Bridgehub is on L2 the address is aliased.
+    address public chainRegistrationSender;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
@@ -153,7 +159,7 @@ abstract contract BridgehubBase is
     }
 
     modifier onlyL2() {
-        if (L1_CHAIN_ID == block.chainid) {
+        if (_l1ChainId() == block.chainid) {
             revert OnlyL2();
         }
         _;
@@ -228,7 +234,8 @@ abstract contract BridgehubBase is
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler
+        address _chainAssetHandler,
+        address _chainRegistrationSender
     ) external onlyOwnerOrUpgrader {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
@@ -374,16 +381,7 @@ abstract contract BridgehubBase is
         return _chainId;
     }
 
-    /// @notice used to register chains on L2 for the purpose of interop.
-    /// @param _chainId the chainId of the chain to be registered.
-    /// @param _baseTokenAssetId the base token asset id of the chain.
-    function registerChainForInterop(
-        uint256 _chainId,
-        bytes32 _baseTokenAssetId
-    ) external onlyChainRegistrationSender onlyL2 {
-        baseTokenAssetId[_chainId] = _baseTokenAssetId;
-        // kl todo: should we add ctm asset id here?
-    }
+
 
     /// @notice This function is used to register a new zkChain in the system.
     /// @notice see external counterpart for full natspec.

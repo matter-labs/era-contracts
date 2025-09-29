@@ -23,7 +23,7 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_NATIVE_TOKEN_VAULT_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
@@ -43,7 +43,7 @@ contract ExperimentalBridgeTest is Test {
     using stdStorage for StdStorage;
 
     address weth;
-    L1Bridgehub bridgeHub;
+    L1Bridgehub bridgehub;
     IInteropCenter interopCenter;
     DummyBridgehubSetter dummyBridgehub;
     address public bridgeOwner;
@@ -78,6 +78,7 @@ contract ExperimentalBridgeTest is Test {
 
     uint256 l1ChainId;
     uint256 eraChainId;
+    uint256 gatewayChainId;
 
     address deployerAddress;
 
@@ -106,11 +107,14 @@ contract ExperimentalBridgeTest is Test {
     function setUp() public {
         l1ChainId = 1;
         eraChainId = 320;
+        gatewayChainId = 506;
         deployerAddress = makeAddr("DEPLOYER_ADDRESS");
         bridgeOwner = makeAddr("BRIDGE_OWNER");
         dummyBridgehub = new DummyBridgehubSetter(bridgeOwner, type(uint256).max);
-        bridgeHub = L1Bridgehub(address(dummyBridgehub));
-        interopCenter = new InteropCenter(l1ChainId, bridgeOwner);
+        bridgehub = L1Bridgehub(address(dummyBridgehub));
+        interopCenter = new InteropCenter();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        interopCenter.initL2(l1ChainId, bridgeOwner);
         messageRoot = new L1MessageRoot(bridgehub, l1ChainId, 1);
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
@@ -148,7 +152,7 @@ contract ExperimentalBridgeTest is Test {
         ntv.registerToken(address(testToken));
         tokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, address(testToken));
 
-        messageRoot = new L1MessageRoot(bridgeHub, l1ChainId);
+        messageRoot = new L1MessageRoot(bridgehub, l1ChainId, gatewayChainId);
 
         sharedBridge = new L1AssetRouter(
             mockL1WethAddress,
@@ -583,7 +587,7 @@ contract ExperimentalBridgeTest is Test {
 
         vm.prank(randomCaller);
         vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, randomCaller));
-        bridgeHub.setAddresses(
+        bridgehub.setAddresses(
             randomAssetRouter,
             ICTMDeploymentTracker(randomCTMDeployer),
             IMessageRoot(randomMessageRoot),

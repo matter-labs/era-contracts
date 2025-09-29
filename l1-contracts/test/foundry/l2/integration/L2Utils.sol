@@ -13,7 +13,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
@@ -80,6 +80,8 @@ library L2Utils {
     }
         
     function initializeBridgehub(SystemContractsArgs memory _args) internal {
+        L2Bridgehub bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
+
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         bridgehub.initL2(_args.l1ChainId, _args.aliasedOwner, 100);
         vm.prank(_args.aliasedOwner);
@@ -111,43 +113,37 @@ library L2Utils {
     function forceDeployL2MessageVerification(SystemContractsArgs memory _args) internal {
         new L2MessageVerification();
 
-        forceDeployWithConstructor(
+        forceDeployWithoutConstructor(
             "L2MessageVerification",
-            address(L2_MESSAGE_VERIFICATION),
-            abi.encode(),
-            _args.broadcast
+            address(L2_MESSAGE_VERIFICATION)
         );
     }
 
     function forceDeployL2InteropRootStorage(SystemContractsArgs memory _args) internal {
         new DummyL2InteropRootStorage();
 
-        forceDeployWithConstructor(
+        forceDeployWithoutConstructor(
             "DummyL2InteropRootStorage",
-            address(L2_INTEROP_ROOT_STORAGE),
-            abi.encode(),
-            _args.broadcast
+            address(L2_INTEROP_ROOT_STORAGE)
         );
     }
 
     function forceDeployInteropCenter(SystemContractsArgs memory _args) internal {
-        new InteropCenter(_args.l1ChainId, _args.aliasedOwner);
-
-        forceDeployWithConstructor(
+        new InteropCenter();
+        
+        forceDeployWithoutConstructor(
             "InteropCenter",
-            L2_INTEROP_CENTER_ADDR,
-            abi.encode(_args.l1ChainId, _args.aliasedOwner),
-            _args.broadcast
+            L2_INTEROP_CENTER_ADDR
         );
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
-        prankOrBroadcast(_args.broadcast, _args.aliasedOwner);
-        // interopCenter.setAddresses(L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
     }
 
     function forceDeployInteropHandler(SystemContractsArgs memory _args) internal {
         new InteropHandler();
 
-        forceDeployWithConstructor("InteropHandler", L2_INTEROP_HANDLER_ADDR, abi.encode(), _args.broadcast);
+        forceDeployWithoutConstructor("InteropHandler", L2_INTEROP_HANDLER_ADDR);
         InteropHandler interopHandler = InteropHandler(L2_INTEROP_HANDLER_ADDR);
     }
 
@@ -207,7 +203,7 @@ library L2Utils {
         });
         console.logBytes32(bytecodehash);
 
-        prankOrBroadcast(_broadcast, L2_FORCE_DEPLOYER_ADDR);
+        // prankOrBroadcast(_broadcast, L2_FORCE_DEPLOYER_ADDR);
         IContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(deployments);
     }
 

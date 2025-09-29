@@ -5,6 +5,13 @@ pragma solidity 0.8.28;
 import {IBridgehub} from "./IBridgehub.sol";
 
 import {MessageRootBase} from "./MessageRootBase.sol";
+import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
+import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, LocallyNoChainsAtGenesis, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyGateway, OnlyL1, OnlyL2MessageRoot, OnlyOnSettlementLayer, OnlyPreV30Chain, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet} from "./L1BridgehubErrors.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
+import {L2MessageRoot} from "./L2MessageRoot.sol";
+
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -31,25 +38,20 @@ contract L1MessageRoot is MessageRootBase {
         BRIDGE_HUB = _bridgehub;
         L1_CHAIN_ID = _l1ChainId;
         GATEWAY_CHAIN_ID = _gatewayChainId;
-        uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+        uint256[] memory allZKChains = _bridgehub.getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
         _initialize();
         _disableInitializers();
     }
 
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
-    function initialize() external initializer {
+    function initialize() external reinitializer(2) {
         _initialize();
+        uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+        uint256 allZKChainsLength = allZKChains.length;
+        /// locally there are no chains deployed before.
+        require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
     }
-
-        /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
-        function initialize() external reinitializer(2) {
-            _initialize();
-            uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
-            uint256 allZKChainsLength = allZKChains.length;
-            /// locally there are no chains deployed before.
-            require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
-        }
     
         /// @dev The initialized used for the V30 upgrade.
     /// On L2s the initializers are disabled.
@@ -73,7 +75,7 @@ contract L1MessageRoot is MessageRootBase {
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_finalizeWithdrawalParams.message, 0);
         require(
-            bytes4(functionSignature) == this.sendV30UpgradeBlockNumberFromGateway.selector,
+            bytes4(functionSignature) == L2MessageRoot.sendV30UpgradeBlockNumberFromGateway.selector,
             IncorrectFunctionSignature()
         );
 
@@ -96,5 +98,9 @@ contract L1MessageRoot is MessageRootBase {
 
     function _l1ChainId() internal view override returns (uint256) {
         return block.chainid;
+    }
+
+    function _gatewayChainId() internal view override returns (uint256) {
+        return GATEWAY_CHAIN_ID;
     }
 }

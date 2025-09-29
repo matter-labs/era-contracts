@@ -57,11 +57,11 @@ library L2UtilsBase {
         address bridgehub = address(new L2Bridgehub());
         address assetRouter = address(new L2AssetRouter());
         address ntv = address(new L2NativeTokenVaultDev());
+        address interopCenter = address(new InteropCenter());
 
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
 
-        address messageRoot = address(new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), _args.l1ChainId, 1));
         vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId);

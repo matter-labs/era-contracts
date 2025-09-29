@@ -30,8 +30,10 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -61,7 +63,7 @@ contract ExecutorTest is UtilsTest {
     address internal rollupL1DAValidator;
     L1MessageRoot internal messageRoot;
     DummyBridgehub dummyBridgehub;
-    ChainAssetHandler internal chainAssetHandler;
+    L1ChainAssetHandler internal chainAssetHandler;
 
     uint256 eraChainId;
 
@@ -203,14 +205,14 @@ contract ExecutorTest is UtilsTest {
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
         address assetTracker = makeAddr("assetTracker");
-        chainAssetHandler = new ChainAssetHandler(
+        chainAssetHandler = new L1ChainAssetHandler(
             l1ChainID,
             owner,
             IBridgehub(address(dummyBridgehub)),
             address(sharedBridge),
-            address(assetTracker),
             messageRoot,
-            address(0)
+            address(assetTracker),
+            IL1Nullifier(address(0))
         );
         dummyBridgehub.setChainAssetHandler(address(chainAssetHandler));
 
@@ -218,7 +220,7 @@ contract ExecutorTest is UtilsTest {
 
         vm.mockCall(
                 address(messageRoot),
-                abi.encodeWithSelector(MessageRoot.addChainBatchRoot.selector, 9, 1, bytes32(0)),
+                abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
                 abi.encode()
             );
 

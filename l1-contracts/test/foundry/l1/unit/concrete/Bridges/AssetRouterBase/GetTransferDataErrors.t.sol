@@ -9,7 +9,7 @@ import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBa
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract TestAssetRouterBase is AssetRouterBase {
-    constructor() AssetRouterBase(1, 1, IBridgehub(address(1))) {}
+    // constructor() AssetRouterBase(1, 1, IBridgehub(address(1))) {}
 
     function setAssetHandlerAddressThisChain(bytes32, address) external override {}
 

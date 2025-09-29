@@ -101,14 +101,11 @@ IL2NativeTokenVault constant L2_NATIVE_TOKEN_VAULT = IL2NativeTokenVault(L2_NATI
 address constant L2_MESSAGE_ROOT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x05);
 IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(L2_MESSAGE_ROOT_ADDR);
 
-/// @dev The address of the l2 wrapped base token.
-address constant L2_WRAPPED_BASE_TOKEN_IMPL_ADDR = address(USER_CONTRACTS_OFFSET + 0x07);
-
 /// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
 address constant SLOAD_CONTRACT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x06);
 
-/// @dev The address of the WETH implementation contract
-address constant L2_WETH_IMPL_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x07);
+/// @dev The address of the l2 wrapped base token.
+address constant L2_WRAPPED_BASE_TOKEN_IMPL_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x07);
 
 /// @dev The address of the L2 interop root storage system contract
 IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(

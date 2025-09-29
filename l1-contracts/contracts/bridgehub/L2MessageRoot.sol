@@ -13,6 +13,13 @@ import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
+import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, LocallyNoChainsAtGenesis, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyGateway, OnlyL1, OnlyL2MessageRoot, OnlyOnSettlementLayer, OnlyPreV30Chain, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet} from "./L1BridgehubErrors.sol";
+import {InvalidCaller} from "../common/L1ContractErrors.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
+
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -27,6 +34,9 @@ contract L2MessageRoot is MessageRootBase {
     /// the old version where it was an immutable.
     uint256 public L1_CHAIN_ID;
 
+    /// @notice The chain id of the Gateway chain.
+    uint256 public override GATEWAY_CHAIN_ID;
+
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -37,6 +47,10 @@ contract L2MessageRoot is MessageRootBase {
 
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
+    }
+
+    function _gatewayChainId() internal view override returns (uint256) {
+        return GATEWAY_CHAIN_ID;
     }
 
     // A method for backwards compatibility with the old implementation
@@ -68,7 +82,7 @@ contract L2MessageRoot is MessageRootBase {
 
         /// On L2s the initializer/reinitializer is not called.
         function initializeL2V30Upgrade() external onlyL2 onlyUpgrader {
-            uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+            uint256[] memory allZKChains = _bridgehub().getAllZKChainChainIDs();
             _v30InitializeInner(allZKChains);
         }
 
@@ -94,7 +108,7 @@ contract L2MessageRoot is MessageRootBase {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external override onlyChain(_chainId) {
+    ) public override onlyChain(_chainId) {
         super.addChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
 
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.

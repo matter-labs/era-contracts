@@ -771,9 +771,9 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
             chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
             beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
-            interopCenterBytecodeHash: getL2BytecodeHash("InteropCenter"),
-            interopHandlerBytecodeHash: getL2BytecodeHash("InteropHandler"),
-            assetTrackerBytecodeHash: getL2BytecodeHash("AssetTracker"),
+            interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
+            interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
+            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("AssetTracker")),
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             aliasedChainRegistrationSender: AddressAliasHelper.applyL1ToL2Alias(

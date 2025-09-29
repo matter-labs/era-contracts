@@ -22,22 +22,6 @@ contract L1Bridgehub is BridgehubBase {
     /// This is the temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
 
-    /// @notice the chain registration sender used for chain registration.
-    /// @notice the chainRegistrationSender is only deployed on L1.
-    /// @dev If the Bridgehub is on L1 it is the address just the chainRegistrationSender address.
-    /// @dev If the Bridgehub is on L2 the address is aliased.
-    address public chainRegistrationSender;
-
-    modifier onlyChainRegistrationSender() {
-        if (
-            msg.sender != AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender) &&
-            msg.sender != SERVICE_TRANSACTION_SENDER
-        ) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
-
     /*//////////////////////////////////////////////////////////////
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/

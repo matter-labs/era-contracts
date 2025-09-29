@@ -39,7 +39,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 
 contract ChainTypeManagerTest is UtilsTest {
     using stdStorage for StdStorage;
@@ -48,7 +48,7 @@ contract ChainTypeManagerTest is UtilsTest {
     ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
-    ChainAssetHandler internal chainAssetHandler;
+    L1ChainAssetHandler internal chainAssetHandler;
     address internal interopCenterAddress = address(0x1010101);
     L1MessageRoot internal messageroot;
     address internal rollupL1DAValidator;

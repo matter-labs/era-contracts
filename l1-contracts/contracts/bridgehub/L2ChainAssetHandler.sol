@@ -42,6 +42,8 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// the old version where it was an immutable.
     address private ASSET_ROUTER;
 
+    address private ASSET_TRACKER;
+
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -60,6 +62,10 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     }
     function _assetRouter() internal view override returns (address) {
         return ASSET_ROUTER;
+    }
+
+    function _assetTracker() internal view override returns (address) {
+        return ASSET_TRACKER;
     }
 
     /// @dev Only allows calls from the complex upgrader contract on L2.

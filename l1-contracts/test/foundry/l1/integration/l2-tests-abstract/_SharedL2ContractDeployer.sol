@@ -24,7 +24,8 @@ import {BridgehubMintCTMAssetData} from "../../../../../contracts/bridgehub/IBri
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "../../../../../contracts/bridgehub/L1Bridgehub.sol";
+import {IBridgehub} from "../../../../../contracts/bridgehub/IBridgehub.sol";
 import {BridgehubL2TransactionRequest} from "../../../../../contracts/common/Messaging.sol";
 import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
