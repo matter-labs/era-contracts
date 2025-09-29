@@ -17,7 +17,7 @@ import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";

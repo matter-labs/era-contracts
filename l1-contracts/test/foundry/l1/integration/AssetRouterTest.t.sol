@@ -5,7 +5,7 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -35,7 +35,7 @@ import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "c
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {BridgeHelper} from "contracts/bridge/BridgeHelper.sol";
-import {BridgedStandardERC20, IBridgedStandardToken, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
+import {BridgedStandardERC20, NonSequentialVersion} from "contracts/bridge/BridgedStandardERC20.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";

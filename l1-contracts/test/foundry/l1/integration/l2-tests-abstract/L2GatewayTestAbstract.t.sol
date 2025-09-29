@@ -29,7 +29,6 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";

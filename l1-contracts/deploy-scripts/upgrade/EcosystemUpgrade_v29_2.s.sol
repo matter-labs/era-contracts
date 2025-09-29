@@ -6,21 +6,15 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {BytecodePublisher} from "./BytecodePublisher.s.sol";
+
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ProposedUpgrade} from "contracts/upgrades/BaseZkSyncUpgrade.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
