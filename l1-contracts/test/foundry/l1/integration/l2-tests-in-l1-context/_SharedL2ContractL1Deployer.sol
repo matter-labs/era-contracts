@@ -6,7 +6,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {Config, DeployUtils, DeployedAddresses} from "../../../../../deploy-scripts/DeployUtils.s.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 
 import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -29,6 +30,11 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual override {
         L2UtilsBase.initSystemContracts(_args);
+        vm.mockCall(
+            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(ISystemContext.getSettlementLayerChainId.selector),
+            abi.encode(9)
+        );
     }
 
     function deployL2Contracts(uint256 _l1ChainId) public virtual override {
