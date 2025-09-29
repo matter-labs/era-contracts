@@ -5,7 +5,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "./AccessControlEnumerablePerChainAddressUpgradeable.sol";
 import {LibMap} from "./libraries/LibMap.sol";
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
-import {TimeNotReached, NotAZKChain} from "../common/L1ContractErrors.sol";
+import {NotAZKChain, TimeNotReached} from "../common/L1ContractErrors.sol";
 import {IBridgehub} from "../bridgehub/IBridgehub.sol";
 import {IValidatorTimelock} from "./IValidatorTimelock.sol";
 
