@@ -53,20 +53,20 @@ library L2UtilsBase {
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         address wethToken = address(0x1);
         // we deploy the code to get the contract code with immutables which we then vm.etch
-        address messageRoot = address(new L2MessageRoot());
-        address bridgehub = address(new L2Bridgehub());
-        address assetRouter = address(new L2AssetRouter());
         address ntv = address(new L2NativeTokenVaultDev());
+        address assetRouter = address(new L2AssetRouter());
+        
+        address bridgehub = address(new L2Bridgehub());
+        vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         address interopCenter = address(new InteropCenter());
-
-        vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
+        {
+            address messageRoot = address(new L2MessageRoot());
+            vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId);
+        }
 
-        vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId);
-
-        vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         uint256 prevChainId = block.chainid;
         vm.chainId(_args.l1ChainId);
 
@@ -132,17 +132,18 @@ library L2UtilsBase {
 
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
-
-        vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
-            _args.l1ChainId,
-            _args.eraChainId,
-            _args.l1AssetRouter,
-            _args.legacySharedBridge,
-            baseTokenAssetId,
-            _args.aliasedOwner
-        );
+        {
+            vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
+                _args.l1ChainId,
+                _args.eraChainId,
+                _args.l1AssetRouter,
+                _args.legacySharedBridge,
+                baseTokenAssetId,
+                _args.aliasedOwner
+            );
+        }
         // Initializing reentrancy guard
         // stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
         vm.store(

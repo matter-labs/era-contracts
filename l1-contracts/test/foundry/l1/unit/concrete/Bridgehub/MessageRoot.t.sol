@@ -27,7 +27,6 @@ contract MessageRootTest is Test {
     address bridgeHub;
     L1MessageRoot messageRoot;
     uint256 L1_CHAIN_ID;
-    L1MessageRoot messageRoot;
     address assetTracker;
 
     function setUp() public {

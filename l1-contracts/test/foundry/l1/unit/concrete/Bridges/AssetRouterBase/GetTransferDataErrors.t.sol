@@ -25,6 +25,26 @@ contract TestAssetRouterBase is AssetRouterBase {
     function callGetTransferData(bytes1 encodingVersion, bytes calldata data) external returns (bytes32, bytes memory) {
         return _getTransferData(encodingVersion, address(0), data);
     }
+
+    function BRIDGE_HUB() external view override returns (IBridgehub) {
+        return IBridgehub(address(1));
+    }
+
+    function L1_CHAIN_ID() external view override returns (uint256) {
+        return 1;
+    }
+
+    function _bridgehub() internal view override returns (IBridgehub) {
+        return IBridgehub(address(1));
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {    
+        return 1;
+    }
+
+    function _eraChainId() internal view override returns (uint256) {   
+        return 1;
+    }
 }
 
 contract AssetRouterBase_GetTransferDataErrors_Test is Test {

@@ -73,16 +73,16 @@ contract ChainTypeManagerTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
-        bridgehub = new L1Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
+        bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
         messageroot = new L1MessageRoot(bridgehub, block.chainid, 1);
         chainAssetHandler = new L1ChainAssetHandler(
             block.chainid,
             governor,
             bridgehub,
             address(0),
-            address(0),
             messageroot,
-            address(0)
+            address(0),
+            IL1Nullifier(address(0))
         );
         stdstore
             .target(address(messageroot))
