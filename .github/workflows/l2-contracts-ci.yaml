@@ -33,6 +33,7 @@ jobs:
       - name: Install dependencies
         run: yarn
 
+      # In the future, we should simply take the artifacts that are built by l1-contracts.
       - name: Build l1 contracts
         working-directory: l1-contracts
         run: |
@@ -49,7 +50,7 @@ jobs:
       - name: Create cache
         uses: actions/cache/save@v3
         with:
-          key: artifacts-l1-${{ github.sha }}
+          key: artifacts-l2-${{ github.sha }}
           path: |
             l1-contracts/cache-forge
             l1-contracts/out
