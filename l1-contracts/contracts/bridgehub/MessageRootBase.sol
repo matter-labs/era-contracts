@@ -35,7 +35,8 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    ///@notice virtual getters standing in for the original immutables
+    function _bridgehub() internal view virtual returns (IBridgehub);
+
     function _l1ChainId() internal view virtual returns (uint256);
 
     /// @notice Emitted when a new chain is added to the MessageRoot.
@@ -84,14 +85,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
     /// since each new root cumulatively aggregates all prior changes — so the last root always contains (at minimum) everything
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
-
-    /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    function _bridgehub() internal view virtual returns (IBridgehub);
-
-    function _l1ChainId() internal view virtual returns (uint256);
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
@@ -147,41 +140,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
     function chainRegistered(uint256 _chainId) public view returns (bool) {
         return (_chainId == block.chainid || chainIndex[_chainId] != 0);
-    }
-
-    /// @notice Adds a new chainBatchRoot to the chainTree.
-    /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
-    /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
-    /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
-    function addChainBatchRoot(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) onlyL2 {
-        // Make sure that chain is registered.
-        if (!chainRegistered(_chainId)) {
-            revert MessageRootNotRegistered();
-        }
-
-        // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
-        bytes32 chainRoot;
-        // slither-disable-next-line unused-return
-        (, chainRoot) = chainTree[_chainId].push(MessageHashing.batchLeafHash(_chainBatchRoot, _batchNumber));
-
-        emit AppendedChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
-
-        // Update leaf corresponding to the specified chainId with newly acquired value of the chainRoot.
-        bytes32 cachedChainIdLeafHash = MessageHashing.chainIdLeafHash(chainRoot, _chainId);
-        bytes32 sharedTreeRoot = sharedTree.updateLeaf(chainIndex[_chainId], cachedChainIdLeafHash);
-
-        emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
-
-        // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
-        // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = sharedTreeRoot;
-        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
-        historicalRoot[block.number] = sharedTreeRoot;
     }
 
     /// @notice Gets the aggregated root of all chains.
