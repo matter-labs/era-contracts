@@ -48,7 +48,6 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
-import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";

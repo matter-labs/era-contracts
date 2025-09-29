@@ -28,7 +28,7 @@ import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlemen
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
-import {MessageVerification, IMessageVerification} from "./MessageVerification.sol";
+import {IMessageVerification, MessageVerification} from "./MessageVerification.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs

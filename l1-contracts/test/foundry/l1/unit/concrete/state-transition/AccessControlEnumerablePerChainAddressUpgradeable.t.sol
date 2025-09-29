@@ -3,7 +3,7 @@ pragma solidity ^0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {AccessControlEnumerablePerChainAddressUpgradeable} from "contracts/state-transition/AccessControlEnumerablePerChainAddressUpgradeable.sol";
-import {RoleAccessDenied, DefaultAdminTransferNotAllowed} from "contracts/common/L1ContractErrors.sol";
+import {DefaultAdminTransferNotAllowed, RoleAccessDenied} from "contracts/common/L1ContractErrors.sol";
 
 // Mock implementation for testing
 contract MockAccessControlEnumerable is AccessControlEnumerablePerChainAddressUpgradeable {

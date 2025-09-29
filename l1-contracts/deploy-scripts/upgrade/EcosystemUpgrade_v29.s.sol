@@ -56,7 +56,7 @@ import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol"
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {PermanentRestriction} from "contracts/governance/PermanentRestriction.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -85,7 +85,6 @@ import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol"
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
 import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 // Note that the `ProtocolUpgradeHandler` uses `OpenZeppeling v5`.
 interface ProxyAdminV5 {
