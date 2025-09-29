@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {MessageRoot, IMessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {IMessageRoot, MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {MessageRootNotRegistered, NotL2, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
 

@@ -8,7 +8,7 @@ import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
+
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {MAX_GAS_PER_TRANSACTION} from "contracts/common/Config.sol";
 import {EmptyAssetId, TooMuchGas, ZeroAddress} from "contracts/common/L1ContractErrors.sol";

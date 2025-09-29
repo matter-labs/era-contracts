@@ -4,16 +4,15 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {MessageRoot, IMessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {IMessageRoot, MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, NotL2, ChainExists, ChainBatchRootZero, ChainBatchRootAlreadyExists, NonConsecutiveBatchNumber, OnlyL1, OnlyL2, OnlyGateway, OnlyBridgehubOwner, OnlyAssetTracker, OnlyChain, OnlyL2MessageRoot, OnlyPreV30Chain, TotalBatchesExecutedZero, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet, LocallyNoChainsAtGenesis, OnlyOnSettlementLayer, BatchZeroNotAllowed, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, NotWhitelistedSettlementLayer, CurrentBatchNumberAlreadySet} from "contracts/bridgehub/L1BridgehubErrors.sol";
+import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyL2, OnlyL2MessageRoot, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberNotSet} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+
 import {ProofData} from "contracts/common/Messaging.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 contract MessageRoot_Extended_Test is Test {
     address bridgeHub;

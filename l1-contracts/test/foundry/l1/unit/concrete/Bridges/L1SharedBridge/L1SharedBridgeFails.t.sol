@@ -13,21 +13,21 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+
 import {AddressAlreadySet, AssetIdNotSupported, BurningNativeWETHNotSupported, DepositDoesNotExist, DepositExists, EmptyDeposit, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, NoFundsTransferred, NonEmptyMsgValue, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, WithdrawFailed, WithdrawalAlreadyFinalized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {InsufficientChainBalance} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
-import {DepositNotSet} from "test/foundry/L1TestsErrors.sol";
+
 import {ClaimFailedDepositFailed, EmptyToken, NativeTokenVaultAlreadySet, WrongCounterpart} from "contracts/bridge/L1BridgeContractErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+
 import {IMessageVerification} from "contracts/common/interfaces/IMessageVerification.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 

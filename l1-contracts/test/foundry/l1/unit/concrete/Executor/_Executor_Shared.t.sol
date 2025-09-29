@@ -32,9 +32,6 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";

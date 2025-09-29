@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -18,15 +18,15 @@ import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
-import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
-import {IInteropHandler, InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {InteropCenter} from "contracts/interop/InteropCenter.sol";
+import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
-import {L2_INTEROP_ACCOUNT_ADDR, L2_STANDARD_TRIGGER_ACCOUNT_ADDR} from "../../l1/integration/l2-tests-abstract/Utils.sol";
+
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {Utils} from "deploy-scripts/Utils.sol";

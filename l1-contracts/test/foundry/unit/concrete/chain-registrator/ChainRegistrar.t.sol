@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
+
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import "contracts/bridgehub/Bridgehub.sol";
