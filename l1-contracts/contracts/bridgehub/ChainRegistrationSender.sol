@@ -15,7 +15,7 @@ import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
-import {ChainAlreadyRegistered, ZKChainNotRegistered, NoEthAllowed} from "./L1BridgehubErrors.sol";
+import {ChainAlreadyRegistered, NoEthAllowed, ZKChainNotRegistered} from "./L1BridgehubErrors.sol";
 
 /// @dev The encoding version of the data.
 bytes1 constant CHAIN_REGISTRATION_SENDER_ENCODING_VERSION = 0x01;

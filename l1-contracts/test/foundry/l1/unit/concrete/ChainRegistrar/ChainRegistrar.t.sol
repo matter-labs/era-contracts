@@ -3,7 +3,6 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
@@ -12,7 +11,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {IL1SharedBridgeLegacy} from "contracts/bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
+
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts-v4/proxy/ERC1967/ERC1967Proxy.sol";
 

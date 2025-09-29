@@ -31,14 +31,10 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
-import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
-import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 
-import {Config, DeployedAddresses} from "./DeployUtils.s.sol";
+import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
+import {Config, DeployUtils, DeployedAddresses} from "./DeployUtils.s.sol";
+
 import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
