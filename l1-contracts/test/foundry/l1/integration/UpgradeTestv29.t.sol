@@ -5,7 +5,6 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 
-
 import {EcosystemUpgrade_v29} from "deploy-scripts/upgrade/EcosystemUpgrade_v29.s.sol";
 import {ChainUpgrade} from "deploy-scripts/upgrade/ChainUpgrade.s.sol";
 import {Call} from "contracts/governance/Common.sol";

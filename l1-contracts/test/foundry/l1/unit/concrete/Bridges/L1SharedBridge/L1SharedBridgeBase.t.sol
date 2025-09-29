@@ -15,7 +15,6 @@ import {IAssetRouterBase, LEGACY_ENCODING_VERSION} from "contracts/bridge/asset-
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";

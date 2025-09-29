@@ -5,43 +5,18 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-
-
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
-
-
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-
 
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../Utils.sol";
 
-
-
-
-
-
-
-
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
-
 import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-
-
-
-
-
-
-
-
-
-
-
-
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayUtils is Script {

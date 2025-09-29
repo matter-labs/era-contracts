@@ -17,19 +17,9 @@ import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandar
 // import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 // import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
-
-
-
 // import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
-
-
-
-
-
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-
-
 
 import {TokenIsLegacy, TokenNotLegacy} from "contracts/common/L1ContractErrors.sol";
 

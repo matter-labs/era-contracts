@@ -6,18 +6,6 @@ pragma solidity 0.8.28;
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-
-
-
-
-
-
-
-
-
-
-
-
 import {DefaultChainUpgrade} from "./DefaultChainUpgrade.s.sol";
 
 contract ChainUpgrade_v29 is DefaultChainUpgrade {

@@ -5,7 +5,6 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
-
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
 
 import {L2MessageVerification} from "contracts/bridgehub/L2MessageVerification.sol";

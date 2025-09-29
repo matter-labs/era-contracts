@@ -7,26 +7,16 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-
 import {Utils} from "../Utils.sol";
 
 import {Verifier} from "contracts/state-transition/Verifier.sol";
 
-
-
-
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-
 
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
-
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-
-
-
-
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
@@ -34,41 +24,12 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
-
-
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-
 
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
 
-
-
-
-
-
-
-
-
-
-
-
 import {Call} from "contracts/governance/Common.sol";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 interface IBridgehubLegacy {
     function stateTransitionManager(uint256 chainId) external returns (address);

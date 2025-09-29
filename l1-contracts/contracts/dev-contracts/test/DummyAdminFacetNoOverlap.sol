@@ -5,8 +5,6 @@ pragma solidity 0.8.28;
 import {Diamond} from "../../state-transition/libraries/Diamond.sol";
 import {ZKChainBase} from "../../state-transition/chain-deps/facets/ZKChainBase.sol";
 
-
-
 /// selectors do not overlap with normal facet selectors (getName does not count)
 contract DummyAdminFacetNoOverlap is ZKChainBase {
     // add this to be excluded from coverage report

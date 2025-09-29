@@ -6,20 +6,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
-
-
-
-
-
-
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-
-
-
-
-
-
-
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -36,7 +23,6 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-
 
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
@@ -59,7 +45,6 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
 import {DeployUtils} from "./DeployUtils.s.sol";
-
 
 abstract contract DeployL1HelperScript is Script, DeployUtils {
     function deployTuppWithContract(

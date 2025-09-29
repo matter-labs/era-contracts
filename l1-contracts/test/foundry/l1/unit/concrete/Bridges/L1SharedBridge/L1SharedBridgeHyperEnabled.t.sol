@@ -11,7 +11,6 @@ import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailbox
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-
 // note, this should be the same as where hyper is disabled
 contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
     function test_bridgehubDepositBaseToken_Eth() public {

@@ -8,7 +8,6 @@ pragma solidity ^0.8.20;
 
 /* solhint-disable-next-line no-unused-import */
 
-
 /**
  * @author Matter Labs
  * @custom:security-contact security@matterlabs.dev

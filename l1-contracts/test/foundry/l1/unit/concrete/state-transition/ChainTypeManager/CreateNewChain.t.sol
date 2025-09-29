@@ -9,9 +9,6 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
-
-
-
 contract createNewChainTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
