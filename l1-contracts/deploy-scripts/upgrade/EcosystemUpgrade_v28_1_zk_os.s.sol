@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {StateTransitionDeployedAddresses, Utils, FacetCut} from "../Utils.sol";
+import {FacetCut, StateTransitionDeployedAddresses} from "../Utils.sol";
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 /// @notice Script used for v28_1 upgrade flow

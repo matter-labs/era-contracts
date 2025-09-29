@@ -9,7 +9,7 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {OnlyEraSupported} from "contracts/common/L1ContractErrors.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+
 
 contract MailboxFinalizeWithdrawal is MailboxTest {
     bytes32[] proof;
