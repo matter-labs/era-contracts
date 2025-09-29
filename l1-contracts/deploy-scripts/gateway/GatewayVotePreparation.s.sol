@@ -85,7 +85,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
 
     GatewayCTMDeployerConfig internal gatewayCTMDeployerConfig;
 
-    function initializeConfig(string memory configPath, uint256 ctmChainId) internal virtual {
+    function initializeConfig(string memory configPath, uint256 ctmRepresentativeChainId) internal virtual {
         super.initializeConfig(configPath);
         string memory toml = vm.readFile(configPath);
 
@@ -97,7 +97,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         gatewayChainId = toml.readUint("$.gateway_chain_id");
         forceDeploymentsData = toml.readBytes(".force_deployments_data");
 
-        setAddressesBasedOnBridgehub(ctmChainId);
+        setAddressesBasedOnBridgehub(ctmRepresentativeChainId);
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress);
         gatewayCTMDeployerConfig = GatewayCTMDeployerConfig({
@@ -135,11 +135,11 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         });
     }
 
-    function setAddressesBasedOnBridgehub(uint256 ctmChainId) internal {
+    function setAddressesBasedOnBridgehub(uint256 ctmRepresentativeChainId) internal {
         config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
         address ctm;
-        if (ctmChainId != 0) {
-            ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmChainId);
+        if (ctmRepresentativeChainId != 0) {
+            ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmRepresentativeChainId);
         } else {
             ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
         }
@@ -250,13 +250,13 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         prepareForGWVoting(0);
     }
 
-    function prepareForGWVoting(uint256 ctmChainId) public {
+    function prepareForGWVoting(uint256 ctmRepresentativeChainId) public {
         console.log("Setting up the Gateway script");
 
         string memory root = vm.projectRoot();
         string memory configPath = string.concat(root, vm.envString("GATEWAY_VOTE_PREPARATION_INPUT"));
 
-        initializeConfig(configPath, ctmChainId);
+        initializeConfig(configPath, ctmRepresentativeChainId);
         _initializeGatewayGovernanceConfig(
             GatewayGovernanceConfig({
                 bridgehubProxy: addresses.bridgehub.bridgehubProxy,
@@ -303,7 +303,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
                 _gatewayValidatorTimelock: output.gatewayStateTransition.validatorTimelock,
                 _gatewayServerNotifier: output.gatewayStateTransition.serverNotifierProxy,
                 _refundRecipient: refundRecipient,
-                _ctmChainId: ctmChainId
+                _ctmRepresentativeChainId: ctmRepresentativeChainId
             })
         );
 
