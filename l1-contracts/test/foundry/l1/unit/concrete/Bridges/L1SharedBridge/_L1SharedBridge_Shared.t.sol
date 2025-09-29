@@ -14,12 +14,12 @@ import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
-import {L1Nullifier, IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {IL1AssetHandler} from "contracts/bridge/interfaces/IL1AssetHandler.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
+
+
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";

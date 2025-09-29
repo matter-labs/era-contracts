@@ -4,11 +4,11 @@ pragma solidity ^0.8.20;
 // solhint-disable gas-custom-errors
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
 
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+
+
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
-import {GW_ASSET_TRACKER_ADDR, GW_ASSET_TRACKER, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER, L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_BRIDGEHUB_ADDR, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER, GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB, L2_MESSAGE_ROOT, L2_MESSAGE_ROOT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 abstract contract L2AssetTrackerTest is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;

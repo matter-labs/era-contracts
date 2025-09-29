@@ -22,8 +22,8 @@ import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandar
 // import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+
+
 
 import {TokenIsLegacy, TokenNotLegacy} from "contracts/common/L1ContractErrors.sol";
 

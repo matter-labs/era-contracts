@@ -5,7 +5,7 @@ import {Vm} from "forge-std/Test.sol";
 
 import {SafeCast} from "@openzeppelin/contracts-v4/utils/math/SafeCast.sol";
 
-import {L2_DA_COMMITMENT_SCHEME, L2_SYSTEM_CONTEXT_ADDRESS, Utils, EVENT_INDEX} from "../../Utils/Utils.sol";
+import {EVENT_INDEX, L2_DA_COMMITMENT_SCHEME, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../../Utils/Utils.sol";
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, POINT_EVALUATION_PRECOMPILE_ADDR, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";

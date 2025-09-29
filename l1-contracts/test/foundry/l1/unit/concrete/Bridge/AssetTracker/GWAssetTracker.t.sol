@@ -3,31 +3,28 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {console} from "forge-std/console.sol";
+
 
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
-import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
-import {BalanceChange, TokenBalanceMigrationData, ConfirmBalanceMigrationData} from "contracts/common/Messaging.sol";
-import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_COMPRESSOR_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
-import {IL2ToL1Messenger} from "contracts/common/l2-helpers/IL2ToL1Messenger.sol";
-import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
-import {TOKEN_BALANCE_MIGRATION_DATA_VERSION, BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
-import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "contracts/bridgehub/IMessageRoot.sol";
-import {BUNDLE_IDENTIFIER} from "contracts/common/Messaging.sol";
-import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
-import {MAX_BUILT_IN_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidL2ShardId, InvalidServiceLog} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
-import {ChainIdNotRegistered, InvalidMessage, ReconstructionMismatch, Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {BalanceChange, ConfirmBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+
+
+
+
+
+
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
+
+
+
+import {BALANCE_CHANGE_VERSION, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
+import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
+
+import {InvalidCanonicalTxHash} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
+import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 
 contract GWAssetTrackerTest is Test {
     GWAssetTracker public gwAssetTracker;

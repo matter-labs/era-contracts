@@ -3,9 +3,9 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils} from "./Utils.sol";
+import {Utils} from "./Utils.sol";
 
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
+
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
