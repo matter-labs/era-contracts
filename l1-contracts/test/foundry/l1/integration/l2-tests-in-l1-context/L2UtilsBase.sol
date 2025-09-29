@@ -63,12 +63,7 @@ library L2UtilsBase {
         vm.chainId(_args.l1ChainId);
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(
-            _args.l1ChainId,
-            _args.aliasedOwner,
-            // TODO: use constant here
-            100
-        );
+        L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner, _args.maxNumberOfZKChains);
         vm.chainId(prevChainId);
         vm.prank(_args.aliasedOwner);
         L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
