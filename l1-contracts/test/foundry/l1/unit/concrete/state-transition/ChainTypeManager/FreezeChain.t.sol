@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {ChainTypeManagerTest} from "./_ChainTypeManager_Shared.t.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {DiamondAlreadyFrozen} from "contracts/common/L1ContractErrors.sol";
 

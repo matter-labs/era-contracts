@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
+import {Test, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
@@ -19,7 +19,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
+
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";

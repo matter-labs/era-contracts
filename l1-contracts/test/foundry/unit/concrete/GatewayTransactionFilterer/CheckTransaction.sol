@@ -3,10 +3,10 @@ pragma solidity 0.8.28;
 
 import {GatewayTransactionFiltererTest} from "./_GatewayTransactionFilterer_Shared.t.sol";
 
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
+
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted} from "contracts/common/L1ContractErrors.sol";
+import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 
 contract CheckTransactionTest is GatewayTransactionFiltererTest {
     function test_TransactionAllowedOnlyFromWhitelistedSenderWhichIsNotAssetRouter() public {

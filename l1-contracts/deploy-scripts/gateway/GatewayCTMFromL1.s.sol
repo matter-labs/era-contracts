@@ -12,10 +12,10 @@ import {stdToml} from "forge-std/StdToml.sol";
 // solhint-disable no-unused-import
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
+
+
+
+
 import {ADDRESS_ONE, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -32,8 +32,8 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+
+
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";

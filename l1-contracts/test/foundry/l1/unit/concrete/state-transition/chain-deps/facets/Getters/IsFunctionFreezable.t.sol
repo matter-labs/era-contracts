@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {GettersFacetTest} from "./_Getters_Shared.t.sol";
-import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
+
 
 contract IsFunctionFreezableTest is GettersFacetTest {
     function test_when_facetAddressIzZero() public {

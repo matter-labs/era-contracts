@@ -8,7 +8,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "contracts/state-transition/chain-interfaces/ILegacyGetters.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {PriorityOperation} from "contracts/state-transition/libraries/PriorityQueue.sol";
+
 
 contract GettersFacetWrapper is GettersFacet, Test {
     function util_setVerifier(address _verifier) external {

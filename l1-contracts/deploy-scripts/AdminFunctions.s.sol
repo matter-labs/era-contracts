@@ -14,7 +14,7 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
+
 import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";

@@ -17,7 +17,7 @@ import {DummyBridgehubSetter} from "contracts/dev-contracts/test/DummyBridgehubS
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -27,10 +27,10 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA, TWO_BRIDGES_MAGIC_VALUE} from "contracts/common/Config.sol";
-import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
-import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+
+
 import {SecondBridgeAddressTooLow} from "contracts/bridgehub/L1BridgehubErrors.sol";
-import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdTooBig, MsgValueMismatch, NonEmptyMsgValue, SharedBridgeNotSet, SlotOccupied, Unauthorized, WrongMagicValue, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
+import {AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdTooBig, MsgValueMismatch, SharedBridgeNotSet, SlotOccupied, Unauthorized, WrongMagicValue, ZeroChainId} from "contracts/common/L1ContractErrors.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 contract ExperimentalBridgeTest is Test {
