@@ -5,21 +5,8 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {StateTransitionDeployedAddresses} from "./Utils.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
-
-import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -36,13 +23,12 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
+
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -58,8 +44,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
-import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {DeployUtils} from "./DeployUtils.s.sol";
 
 abstract contract DeployL1HelperScript is Script, DeployUtils {
     function deployTuppWithContract(

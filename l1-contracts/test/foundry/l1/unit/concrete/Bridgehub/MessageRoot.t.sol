@@ -7,7 +7,7 @@ import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {MessageRootNotRegistered, NotL2, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
-import {Merkle} from "contracts/common/libraries/Merkle.sol";
+
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
