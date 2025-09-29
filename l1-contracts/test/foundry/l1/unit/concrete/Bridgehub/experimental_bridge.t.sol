@@ -37,7 +37,6 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {IL1AssetTracker, L1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 
-
 import {IMessageVerification} from "contracts/common/MessageVerification.sol";
 
 contract ExperimentalBridgeTest is Test {

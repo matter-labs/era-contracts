@@ -19,7 +19,6 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 
-
 import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";

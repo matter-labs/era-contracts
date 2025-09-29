@@ -4,7 +4,6 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";

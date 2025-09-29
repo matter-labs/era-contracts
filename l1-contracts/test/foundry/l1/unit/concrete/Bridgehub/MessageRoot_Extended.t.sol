@@ -14,7 +14,6 @@ import {ProofData} from "contracts/common/Messaging.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
-
 contract MessageRoot_Extended_Test is Test {
     address bridgeHub;
     uint256 L1_CHAIN_ID;

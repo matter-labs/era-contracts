@@ -11,25 +11,17 @@ import {CHAIN_REGISTRATION_SENDER_ENCODING_VERSION, ChainRegistrationSender} fro
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 
-
-
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
 import {ZKChainDeployer} from "./_SharedZKChainDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 
-
-
-
-
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
-
 
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-
 
 contract ChainRegistrationSenderTests is
     L1ContractDeployer,

@@ -8,8 +8,6 @@ import {console2 as console} from "forge-std/console2.sol";
 import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
-
-
 import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
@@ -19,13 +17,7 @@ import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
 
-
-
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-
-
-
-
 
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";

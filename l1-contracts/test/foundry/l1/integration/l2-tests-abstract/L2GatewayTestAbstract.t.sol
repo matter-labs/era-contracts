@@ -7,27 +7,13 @@ pragma solidity ^0.8.20;
 import {StdStorage, Test, console2 as console, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-
-
-
-
-
-
-
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common/Config.sol";
 
-
 import {BridgehubBurnCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-
-
-
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-
-
-
 
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 

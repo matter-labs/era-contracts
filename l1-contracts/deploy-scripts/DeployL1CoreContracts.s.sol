@@ -32,11 +32,8 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
-
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 import {Config, DeployUtils, DeployedAddresses} from "./DeployUtils.s.sol";
-
-
 
 import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
 

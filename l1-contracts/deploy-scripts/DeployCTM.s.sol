@@ -11,12 +11,7 @@ import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-
-
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-
-
-
 
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
@@ -34,7 +29,6 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 
 import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
-
 
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";

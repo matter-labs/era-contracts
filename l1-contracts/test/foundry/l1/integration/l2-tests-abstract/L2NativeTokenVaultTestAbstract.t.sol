@@ -23,8 +23,6 @@ import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandar
 
 import {SharedL2ContractDeployer} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
-
-
 import {TokenIsLegacy, TokenNotLegacy} from "contracts/common/L1ContractErrors.sol";
 
 import {IL2SharedBridgeLegacy} from "contracts/bridge/interfaces/IL2SharedBridgeLegacy.sol";

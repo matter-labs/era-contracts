@@ -5,13 +5,6 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {L2_BOOTLOADER_ADDRESS, L2_DA_COMMITMENT_SCHEME, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils} from "./Utils.sol";
 
-
-
-
-
-
-
-
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/UtilsCallMocker.t.sol";
 
 // solhint-enable max-line-length
