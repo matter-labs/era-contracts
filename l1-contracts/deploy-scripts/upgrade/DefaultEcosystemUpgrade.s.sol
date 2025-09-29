@@ -82,15 +82,15 @@ import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s
 import {DeployL1Script} from "../DeployL1.s.sol";
 // import {Gateway, EcosystemUpgradeConfig} from "./UpgradeUtils.sol";
 
-    // solhint-disable-next-line gas-struct-packing
-    struct Gateway {
-        StateTransitionDeployedAddresses gatewayStateTransition;
-        bytes facetCutsData;
-        bytes additionalForceDeployments;
-        uint256 chainId;
-        address baseToken;
-        bytes upgradeCutData;
-    }
+// solhint-disable-next-line gas-struct-packing
+struct Gateway {
+    StateTransitionDeployedAddresses gatewayStateTransition;
+    bytes facetCutsData;
+    bytes additionalForceDeployments;
+    uint256 chainId;
+    address baseToken;
+    bytes upgradeCutData;
+}
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
@@ -137,16 +137,12 @@ contract DefaultEcosystemUpgrade is Script, DeployL1Script {
         uint256 maxExpectedL1GasPrice;
     }
 
-
-
     // solhint-disable-next-line gas-struct-packing
     struct NewlyGeneratedData {
         bytes fixedForceDeploymentsData;
         bytes diamondCutData;
         bytes upgradeCutData;
     }
-
-
 
     AdditionalConfig internal newConfig;
     Gateway internal gatewayConfig;

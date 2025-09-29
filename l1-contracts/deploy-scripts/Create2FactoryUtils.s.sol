@@ -236,7 +236,7 @@ abstract contract Create2FactoryUtils is Script {
     /// @param a The first string.
     /// @param b The second string.
     /// @return True if the strings are identical, false otherwise.
-    function compareStrings(string memory a, string memory b) internal virtual  pure returns (bool) {
+    function compareStrings(string memory a, string memory b) internal pure virtual returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 }

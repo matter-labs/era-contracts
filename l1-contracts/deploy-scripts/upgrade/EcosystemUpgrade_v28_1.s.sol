@@ -99,7 +99,10 @@ struct InitializeDataNewChainLegacy {
 }
 
 /// @notice Script used for v29 upgrade flow
-contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, DefaultEcosystemUpgrade {
+contract EcosystemUpgrade_v28_1 is
+    Script,
+    DefaultEcosystemUpgrade //, DefaultEcosystemUpgrade {
+{
     using stdToml for string;
     string ecosystem;
 
@@ -116,20 +119,15 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-
-        initialize(
-            vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
-        );
+        initialize(vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT"));
         // ecosystem = vm.envString("V28_1_PATCH_UPGRADE_ECOSYSTEM");
-        // initializeOther( 
+        // initializeOther(
         //     vm.envString("V28_1_UPGRADE_ECOSYSTEM_INPUT"),
         //     vm.envString("V28_1_UPGRADE_ECOSYSTEM_OUTPUT")
         // );
         deployNewEcosystemContractsL1();
         // initializePreviousUpgradeFile();
         // prepareEcosystemUpgrade();
-
 
         // prepareDefaultGovernanceCalls();
     }
@@ -143,12 +141,10 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
     //     //  we need to run GW contract deployment from another script directly against the GW due to the tx filterer.
     // }
 
-
     // function publishBytecodes() public virtual override {
     //     upgradeConfig.factoryDepsPublished = true;
     //     /// GW contract deployment and publishing is done manually.
     // }
-
 
     // /// only needed for v27 to v28.1 jump upgrade
     // function initializePreviousUpgradeFile() public virtual {
@@ -216,7 +212,7 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
     //     patchedUpgradeCut = upgradeCut;
     //     NewParser parser = new NewParser();
     //     bytes memory upgradeCalldata = parser.parse(upgradeCut.initCalldata);
-        
+
     //     // bytes memory upgradeCalldata = upgradeCut.initCalldata[4:];
     //     // console.logBytes(upgradeCut.initCalldata);
     //     // console.logBytes(upgradeCalldata);
@@ -264,7 +260,6 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
         // upgradeConfig.ecosystemContractsDeployed = true;
     }
 
-
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
@@ -291,9 +286,8 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
 
     // }
 
-
     // ///// V27 -> v28.1 upgrade ignore for now
-    
+
     // function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
     //     Diamond.DiamondCutData memory upgradeCut = abi.decode(
     //         previousUpgradeData.upgradeCutDataL1,
@@ -338,7 +332,7 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
     //         gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
     //     );
     //     // kl todo should we set the deadline on GW? In practice,
-    //     // we should not have migrated chains there. 
+    //     // we should not have migrated chains there.
     // }
 
     // /// @notice Update implementations in proxies
@@ -363,7 +357,6 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
 
     // ////////////////// skip other things
 
-
     // function prepareGovernanceUpgradeTimerCheckCall() public virtual override returns (Call[] memory calls) {
     //     calls = new Call[](0);
     //     return calls;
@@ -379,7 +372,7 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
     //     calls = new Call[](0);
     //     return calls;
     // }
-    
+
     // ////////////////// skip gateway for stage start
 
     // // function prepareGatewaySpecificStage0GovernanceCalls() public virtual override returns (Call[] memory calls) {
@@ -413,7 +406,6 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
 
     // ////////////////// skip L1 for stage start
 
-
     // // function prepareCheckMigrationsPausedCalls() public virtual override returns (Call[] memory calls) {
     // //     calls = new Call[](0);
     // //     return calls;
@@ -442,8 +434,6 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
     // // }
 
     // ////////////////// skip L1 for stage end
-
-
 
     // function emptyDiamondCut() public virtual returns (Diamond.DiamondCutData memory cutData) {
     //     Diamond.FacetCut[] memory emptyArray;
@@ -515,7 +505,6 @@ contract EcosystemUpgrade_v28_1 is Script, DefaultEcosystemUpgrade { //, Default
     //     });
     // }
 }
-
 
 contract NewParser {
     function parse(bytes calldata data) public pure returns (bytes memory) {

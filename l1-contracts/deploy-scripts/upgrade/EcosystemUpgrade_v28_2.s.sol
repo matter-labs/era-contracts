@@ -113,19 +113,12 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
-        initialize(
-            vm.envString("V28_2_UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("V28_2_UPGRADE_ECOSYSTEM_OUTPUT")
-        );
+        initialize(vm.envString("V28_2_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V28_2_UPGRADE_ECOSYSTEM_OUTPUT"));
         ecosystem = vm.envString("V28_2_PATCH_UPGRADE_ECOSYSTEM");
-        initializeOther( 
-            vm.envString("V28_2_UPGRADE_ECOSYSTEM_INPUT"),
-            vm.envString("V28_2_UPGRADE_ECOSYSTEM_OUTPUT")
-        );
+        initializeOther(vm.envString("V28_2_UPGRADE_ECOSYSTEM_INPUT"), vm.envString("V28_2_UPGRADE_ECOSYSTEM_OUTPUT"));
         deployNewEcosystemContractsL1();
         initializePreviousUpgradeFile();
         prepareEcosystemUpgrade();
-
 
         prepareDefaultGovernanceCalls();
     }
@@ -135,35 +128,29 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
         //     vm.envString("V28_2_UPGRADE_ECOSYSTEM_INPUT"),
         //     vm.envString("V28_2_UPGRADE_ECOSYSTEM_OUTPUT")
         // );
-
         //  we need to run GW contract deployment from another script directly against the GW due to the tx filterer.
     }
-
 
     function publishBytecodes() public virtual override {
         upgradeConfig.factoryDepsPublished = true;
         /// GW contract deployment and publishing is done manually.
     }
 
-
     /// only needed for v27 to v28.2 jump upgrade
     function initializePreviousUpgradeFile() public virtual {
         string memory root = vm.projectRoot();
         console.log("ecosystem: %s", ecosystem);
-        string memory path = string.concat(root, string.concat("/upgrade-envs/v0.28.2-patch/output_v28_patched/",ecosystem, "/v28-ecosystem.toml"));
+        string memory path = string.concat(
+            root,
+            string.concat("/upgrade-envs/v0.28.2-patch/output_v28_patched/", ecosystem, "/v28-ecosystem.toml")
+        );
         string memory toml = vm.readFile(path);
-        bytes memory unpatchedDiamondCutL1 =  toml.readBytes("$.diamond_cut_data_l1");
-        bytes memory unpatchedDiamondCutGW =  toml.readBytes("$.diamond_cut_data_gw");
+        bytes memory unpatchedDiamondCutL1 = toml.readBytes("$.diamond_cut_data_l1");
+        bytes memory unpatchedDiamondCutGW = toml.readBytes("$.diamond_cut_data_gw");
 
-        Diamond.DiamondCutData memory upgradeCutL1 = abi.decode(
-            unpatchedDiamondCutL1,
-            (Diamond.DiamondCutData)
-        );
+        Diamond.DiamondCutData memory upgradeCutL1 = abi.decode(unpatchedDiamondCutL1, (Diamond.DiamondCutData));
 
-        Diamond.DiamondCutData memory upgradeCutGW = abi.decode(
-            unpatchedDiamondCutGW,
-            (Diamond.DiamondCutData)
-        );
+        Diamond.DiamondCutData memory upgradeCutGW = abi.decode(unpatchedDiamondCutGW, (Diamond.DiamondCutData));
 
         upgradeCutL1 = patchUpgradeDiamondCut(upgradeCutL1, addresses.stateTransition.verifier);
 
@@ -181,11 +168,17 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
 
         // console.log("Before patch chainCreationParamsL1Data.diamondCut:");
         // console.logBytes(abi.encode(chainCreationParamsL1Data.diamondCut));
-        chainCreationParamsL1Data.diamondCut = patchChainCreationDiamondCut(chainCreationParamsL1Data.diamondCut, addresses.stateTransition.verifier);
+        chainCreationParamsL1Data.diamondCut = patchChainCreationDiamondCut(
+            chainCreationParamsL1Data.diamondCut,
+            addresses.stateTransition.verifier
+        );
         // console.log("After patch chainCreationParamsL1Data.diamondCut");
         // console.logBytes(abi.encode(chainCreationParamsL1Data.diamondCut));
 
-        chainCreationParamsGWData.diamondCut = patchChainCreationDiamondCut(chainCreationParamsGWData.diamondCut, gatewayConfig.gatewayStateTransition.verifier);
+        chainCreationParamsGWData.diamondCut = patchChainCreationDiamondCut(
+            chainCreationParamsGWData.diamondCut,
+            gatewayConfig.gatewayStateTransition.verifier
+        );
 
         previousUpgradeData.chainCreationParamsL1 = abi.encode(chainCreationParamsL1Data);
         previousUpgradeData.chainCreationParamsGW = abi.encode(chainCreationParamsGWData);
@@ -195,29 +188,38 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
         previousUpgradeData.previousProtocolVersion = v27;
     }
 
-    function patchChainCreationDiamondCut(Diamond.DiamondCutData memory upgradeCut, address _verifier) public virtual returns (Diamond.DiamondCutData memory patchedUpgradeCut) {
+    function patchChainCreationDiamondCut(
+        Diamond.DiamondCutData memory upgradeCut,
+        address _verifier
+    ) public virtual returns (Diamond.DiamondCutData memory patchedUpgradeCut) {
         patchedUpgradeCut = upgradeCut;
 
         // NewParser parser = new NewParser();
         // parser.parse(upgradeCut.initCalldata);
         bytes memory upgradeCalldata = upgradeCut.initCalldata;
         // console.logBytes(upgradeCalldata);
-        InitializeDataNewChainLegacy memory initializeData = abi.decode(upgradeCalldata, (InitializeDataNewChainLegacy));
+        InitializeDataNewChainLegacy memory initializeData = abi.decode(
+            upgradeCalldata,
+            (InitializeDataNewChainLegacy)
+        );
         initializeData.verifier = IVerifier(_verifier);
         patchedUpgradeCut.initCalldata = abi.encode(initializeData);
         return patchedUpgradeCut;
     }
 
-    function patchUpgradeDiamondCut(Diamond.DiamondCutData memory upgradeCut, address _verifier) public virtual returns (Diamond.DiamondCutData memory patchedUpgradeCut) {
+    function patchUpgradeDiamondCut(
+        Diamond.DiamondCutData memory upgradeCut,
+        address _verifier
+    ) public virtual returns (Diamond.DiamondCutData memory patchedUpgradeCut) {
         patchedUpgradeCut = upgradeCut;
         NewParser parser = new NewParser();
         bytes memory upgradeCalldata = parser.parse(upgradeCut.initCalldata);
-        
+
         // bytes memory upgradeCalldata = upgradeCut.initCalldata[4:];
         // console.logBytes(upgradeCut.initCalldata);
         // console.logBytes(upgradeCalldata);
 
-        (ProposedUpgrade memory proposedUpgrade) = abi.decode(upgradeCalldata, (ProposedUpgrade));
+        ProposedUpgrade memory proposedUpgrade = abi.decode(upgradeCalldata, (ProposedUpgrade));
         proposedUpgrade.verifier = _verifier;
         patchedUpgradeCut.initCalldata = abi.encodeCall(DefaultUpgrade.upgrade, (proposedUpgrade));
         return patchedUpgradeCut;
@@ -242,7 +244,9 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
 
         string memory toml = vm.readFile(newConfigPath);
         gatewayConfig.gatewayStateTransition.verifier = toml.readAddress("$.gateway.gateway_state_transition.verifier");
-        gatewayConfig.gatewayStateTransition.defaultUpgrade = toml.readAddress("$.gateway.gateway_state_transition.default_upgrade");
+        gatewayConfig.gatewayStateTransition.defaultUpgrade = toml.readAddress(
+            "$.gateway.gateway_state_transition.default_upgrade"
+        );
         addresses.stateTransition.defaultUpgrade = toml.readAddress("$.contracts.default_upgrade");
         console.log("gatewayConfig.gatewayStateTransition.verifier: %s", gatewayConfig.gatewayStateTransition.verifier);
     }
@@ -274,12 +278,10 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
     /// all GW contracts are manually deployed before.
     function deployNewEcosystemContractsGW() public virtual override {
         require(upgradeConfig.initialized, "Not initialized");
-
     }
 
-
     ///// V27 -> v28.2 upgrade ignore for now
-    
+
     function prepareVersionSpecificStage1GovernanceCallsL1() public virtual override returns (Call[] memory calls) {
         Diamond.DiamondCutData memory upgradeCut = abi.decode(
             previousUpgradeData.upgradeCutDataL1,
@@ -303,7 +305,7 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
     function prepareVersionSpecificStage1GovernanceCallsGW(
         uint256 priorityTxsL2GasLimit,
         uint256 maxExpectedL1GasPrice
-    ) public virtual override  returns (Call[] memory calls) {
+    ) public virtual override returns (Call[] memory calls) {
         /// note check that v27 points to v28 and there is no v27.1 intermediate.
         uint256 v27 = SemVer.packSemVer(0, 27, 0);
 
@@ -312,10 +314,7 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
             (Diamond.DiamondCutData)
         );
 
-        bytes memory l2Calldata = abi.encodeCall(
-            ChainTypeManager.setUpgradeDiamondCut,
-            (upgradeCut, v27)
-        );
+        bytes memory l2Calldata = abi.encodeCall(ChainTypeManager.setUpgradeDiamondCut, (upgradeCut, v27));
 
         calls = _prepareL1ToGatewayCall(
             l2Calldata,
@@ -324,7 +323,7 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
             gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
         );
         // kl todo should we set the deadline on GW? In practice,
-        // we should not have migrated chains there. 
+        // we should not have migrated chains there.
     }
 
     /// @notice Update implementations in proxies
@@ -349,7 +348,6 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
 
     ////////////////// skip other things
 
-
     function prepareGovernanceUpgradeTimerCheckCall() public virtual override returns (Call[] memory calls) {
         calls = new Call[](0);
         return calls;
@@ -360,12 +358,14 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
         return calls;
     }
 
-    function prepareCTMImplementationUpgrade(        uint256 l2GasLimit,
-        uint256 l1GasPrice) public virtual override returns (Call[] memory calls) {
+    function prepareCTMImplementationUpgrade(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public virtual override returns (Call[] memory calls) {
         calls = new Call[](0);
         return calls;
     }
-    
+
     ////////////////// skip gateway for stage start
 
     // function prepareGatewaySpecificStage0GovernanceCalls() public virtual override returns (Call[] memory calls) {
@@ -399,7 +399,6 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
 
     ////////////////// skip L1 for stage start
 
-
     // function prepareCheckMigrationsPausedCalls() public virtual override returns (Call[] memory calls) {
     //     calls = new Call[](0);
     //     return calls;
@@ -429,15 +428,9 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
 
     ////////////////// skip L1 for stage end
 
-
-
     function emptyDiamondCut() public virtual returns (Diamond.DiamondCutData memory cutData) {
         Diamond.FacetCut[] memory emptyArray;
-        cutData = Diamond.DiamondCutData({
-            facetCuts: emptyArray,
-            initAddress: address(0),
-            initCalldata: new bytes(0)
-        });
+        cutData = Diamond.DiamondCutData({facetCuts: emptyArray, initAddress: address(0), initCalldata: new bytes(0)});
     }
 
     function getFacetCuts(
@@ -501,7 +494,6 @@ contract EcosystemUpgrade_v28_2 is Script, DefaultEcosystemUpgrade {
         });
     }
 }
-
 
 contract NewParser {
     function parse(bytes calldata data) public pure returns (bytes memory) {
