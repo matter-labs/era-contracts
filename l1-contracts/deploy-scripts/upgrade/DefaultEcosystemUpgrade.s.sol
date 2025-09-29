@@ -28,6 +28,7 @@ import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -308,9 +309,9 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         // Important, this must come after the initializeExpectedL2Addresses
         generateFixedForceDeploymentsData();
         console.log("Generated fixed force deployments data");
-        getDiamondCutData(addresses.stateTransition);
+        getChainCreationDiamondCutData(addresses.stateTransition);
         newlyGeneratedData.diamondCutData = config.contracts.diamondCutData;
-        gatewayConfig.facetCutsData = abi.encode(getDiamondCutData(gatewayConfig.gatewayStateTransition));
+        gatewayConfig.facetCutsData = abi.encode(getChainCreationDiamondCutData(gatewayConfig.gatewayStateTransition));
         console.log("Prepared diamond cut data");
         generateUpgradeCutData(addresses.stateTransition);
         generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
@@ -326,6 +327,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         prepareDefaultGovernanceCalls();
         prepareDefaultEcosystemAdminCalls();
+
+        prepareDefaultTestUpgradeCalls();
     }
 
     function getOwnerAddress() public virtual returns (address) {
@@ -386,6 +389,31 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         });
     }
 
+    /// @notice Build empty L1 -> L2 upgrade tx
+    /// @dev Only useful for patch upgrades, the above `_composeUpgradeTx` must be used otherwise.
+    function _composeEmptyUpgradeTx() internal virtual returns (L2CanonicalTransaction memory transaction) {
+        transaction = L2CanonicalTransaction({
+            txType: 0,
+            from: uint256(0),
+            to: uint256(0),
+            gasLimit: 0,
+            gasPerPubdataByteLimit: 0,
+            maxFeePerGas: 0,
+            maxPriorityFeePerGas: 0,
+            paymaster: uint256(uint160(address(0))),
+            nonce: 0,
+            value: 0,
+            reserved: [uint256(0), uint256(0), uint256(0), uint256(0)],
+            data: new bytes(0),
+            signature: new bytes(0),
+            factoryDeps: new uint256[](0),
+            paymasterInput: new bytes(0),
+            // Reserved dynamic type for the future use-case. Using it should be avoided,
+            // But it is still here, just in case we want to enable some additional functionality
+            reservedDynamic: new bytes(0)
+        });
+    }
+
     function _getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal virtual returns (address, bytes memory) {
@@ -422,7 +450,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts;
-        facetCuts = formatFacetCuts(getFacetCuts(stateTransition));
+        facetCuts = getUpgradeAddedFacetCuts(stateTransition);
         facetCuts = mergeFacets(facetCutsForDeletion, facetCuts);
 
         ProposedUpgrade memory proposedUpgrade = getProposedUpgrade(stateTransition);
@@ -616,6 +644,10 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         addresses.bridgehub.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
 
+        addresses.bridgehub.chainAssetHandlerProxy = address(
+            Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
+        );
+
         addresses.bridges.erc20BridgeProxy = address(
             L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
         );
@@ -668,7 +700,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         // TODO(refactor): do we need this?
         additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
         additionalDependencies[5] = ContractsBytecodesLib.getCreationCode("L2V29Upgrade");
-        additionalDependencies[6] = ContractsBytecodesLib.getCreationCode("ProxyAdmin");
+        additionalDependencies[6] = Utils.readSystemContractsBytecode("ProxyAdmin");
 
         for (uint256 i; i < additionalForceDeployments.length; i++) {
             additionalDependencies[6 + i] = ContractsBytecodesLib.getCreationCode(additionalForceDeployments[i]);
@@ -1026,6 +1058,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
         vm.serializeBytes("root", "ecosystem_admin_calls", new bytes(0)); // Will be populated later
+        vm.serializeBytes("root", "test_upgrade_calls", new bytes(0)); // Will be populated later
         vm.serializeBytes("root", "v29", new bytes(0)); // Will be populated later
 
         vm.serializeUint(
@@ -1107,6 +1140,22 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         );
 
         vm.writeToml(ecosystemAdminCallsSerialized, upgradeConfig.outputPath, ".ecosystem_admin_calls");
+    }
+
+    function prepareDefaultTestUpgradeCalls() public {
+        (Call[] memory testUpgradeChainCall, address ZKChainAdmin) = TESTONLY_prepareTestUpgradeChainCall();
+        vm.serializeAddress("test_upgrade_calls", "test_upgrade_chain_caller", ZKChainAdmin);
+        vm.serializeBytes("test_upgrade_calls", "test_upgrade_chain", abi.encode(testUpgradeChainCall));
+        (Call[] memory testCreateChainCall, address bridgehubAdmin) = TESTONLY_prepareCreateChainCall();
+        vm.serializeAddress("test_upgrade_calls", "test_create_chain_caller", bridgehubAdmin);
+
+        string memory testUpgradeCallsSerialized = vm.serializeBytes(
+            "test_upgrade_calls",
+            "test_create_chain",
+            abi.encode(testCreateChainCall)
+        );
+
+        vm.writeToml(testUpgradeCallsSerialized, upgradeConfig.outputPath, ".test_upgrade_calls");
     }
 
     function prepareUpgradeServerNotifierCall() public virtual returns (Call[] memory calls) {
@@ -1623,7 +1672,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             target: addresses.daAddresses.rollupDAManager,
             data: abi.encodeCall(
                 RollupDAManager.updateDAPair,
-                (addresses.daAddresses.l1RollupDAValidator, getExpectedL2Address("RollupL2DAValidator"), true)
+                (addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true) //
             ),
             value: 0
         });
@@ -1635,11 +1684,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     ) public virtual returns (Call[] memory calls) {
         bytes memory l2Calldata = abi.encodeCall(
             RollupDAManager.updateDAPair,
-            (
-                gatewayConfig.gatewayStateTransition.rollupSLDAValidator,
-                getExpectedL2Address("RollupL2DAValidator"),
-                true
-            )
+            (gatewayConfig.gatewayStateTransition.rollupSLDAValidator, getRollupL2DACommitmentScheme(), true)
         );
 
         calls = _prepareL1ToGatewayCall(
@@ -1648,6 +1693,31 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             l1GasPrice,
             gatewayConfig.gatewayStateTransition.rollupDAManager
         );
+    }
+
+    /// @notice Tests that it is possible to upgrade a chain to the new version
+    function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
+        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+            config.gatewayChainId
+        );
+        uint256 oldProtocolVersion = getOldProtocolVersion();
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
+
+        admin = IZKChain(chainDiamondProxyAddress).getAdmin();
+
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: chainDiamondProxyAddress,
+            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+            value: 0
+        });
+    }
+
+    /// @notice Tests that it is possible to create a new chain with the new version
+    function TESTONLY_prepareCreateChainCall() private returns (Call[] memory calls, address admin) {
+        admin = getBridgehubAdmin();
+        calls = new Call[](1);
+        calls[0] = prepareCreateNewChainCall(555)[0];
     }
 
     function getCreationCode(
