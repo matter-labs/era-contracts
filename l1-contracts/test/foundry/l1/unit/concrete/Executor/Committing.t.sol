@@ -8,10 +8,9 @@ import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE
 
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {POINT_EVALUATION_PRECOMPILE_ADDR} from "contracts/common/Config.sol";
-import {L2_PUBDATA_CHUNK_PUBLISHER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {BLS_MODULUS} from "../../../da-contracts-imports/DAUtils.sol";
+
 import {BLOB_DATA_OFFSET} from "../../../da-contracts-imports/CalldataDA.sol";
-import {BlobHashCommitmentError, EmptyBlobVersionHash, InvalidPubdataCommitmentsSize, NonEmptyBlobVersionHash, OperatorDAInputTooSmall, PubdataCommitmentsEmpty} from "../../../da-contracts-imports/DAContractsErrors.sol";
+import {BlobHashCommitmentError, EmptyBlobVersionHash, InvalidPubdataCommitmentsSize, NonEmptyBlobVersionHash, OperatorDAInputTooSmall} from "../../../da-contracts-imports/DAContractsErrors.sol";
 import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, HashMismatch, InvalidLogSender, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, TimeNotReached, TimestampError, UnexpectedSystemLog, ValueMismatch} from "contracts/common/L1ContractErrors.sol";
 
 contract CommittingTest is ExecutorTest {

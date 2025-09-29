@@ -13,6 +13,7 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -25,12 +26,12 @@ import {InitializeDataNewChain} from "contracts/state-transition/chain-interface
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
+
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";

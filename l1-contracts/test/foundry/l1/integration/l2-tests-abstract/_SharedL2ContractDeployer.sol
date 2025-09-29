@@ -37,7 +37,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SystemContractsArgs} from "./Utils.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 

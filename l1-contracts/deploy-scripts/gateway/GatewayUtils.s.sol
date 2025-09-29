@@ -4,44 +4,19 @@ pragma solidity 0.8.28;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-import {Vm} from "forge-std/Vm.sol";
-import {stdToml} from "forge-std/StdToml.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IAssetRouterBase, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IL2AssetRouter, L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+
+import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {Utils} from "../Utils.sol";
+
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+
 import {FinalizeL1DepositParams, IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Call} from "contracts/governance/Common.sol";
-import {IGovernance} from "contracts/governance/IGovernance.sol";
-import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-
-import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 /// @notice Scripts that is responsible for preparing the chain to become a gateway
 contract GatewayUtils is Script {

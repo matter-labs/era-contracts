@@ -18,20 +18,17 @@ import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
+
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
-import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
+
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
@@ -54,8 +51,7 @@ import {IMessageRoot, MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {CTMDeploymentTracker, ICTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IL1NativeTokenVault, L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";

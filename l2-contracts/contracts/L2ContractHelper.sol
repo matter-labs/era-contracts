@@ -3,11 +3,10 @@
 pragma solidity ^0.8.20;
 
 /* solhint-disable-next-line no-unused-import */
-import {EfficientCall} from "@matterlabs/zksync-contracts/contracts/system-contracts/libraries/EfficientCall.sol";
+
 /* solhint-disable-next-line no-unused-import */
-import {ForceDeployment, IContractDeployer} from "@matterlabs/zksync-contracts/contracts/system-contracts/interfaces/IContractDeployer.sol";
+
 /* solhint-disable-next-line no-unused-import */
-import {BytecodeError} from "./errors/L2ContractErrors.sol";
 
 /**
  * @author Matter Labs

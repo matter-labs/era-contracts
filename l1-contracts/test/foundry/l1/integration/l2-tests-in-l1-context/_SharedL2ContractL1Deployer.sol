@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
+import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
@@ -40,7 +40,7 @@ import {L2UtilsBase} from "./L2UtilsBase.sol";
 import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";
+
 import {DeployL1HelperScript} from "deploy-scripts/DeployL1HelperScript.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 
