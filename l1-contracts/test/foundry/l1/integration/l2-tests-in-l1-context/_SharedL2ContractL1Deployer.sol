@@ -38,7 +38,6 @@ import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstrac
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
-
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";
 import {DeployL1HelperScript} from "deploy-scripts/DeployL1HelperScript.s.sol";

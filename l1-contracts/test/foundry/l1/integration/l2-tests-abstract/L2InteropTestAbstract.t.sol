@@ -14,7 +14,7 @@ import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 
@@ -72,11 +72,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // assertTrue(success);
     }
 
-    function test_realData_sendBundle() public {
-        // Note: get this from real local txs
-        bytes
-            memory data = hex"f044849f0000000000000000000000000000000000000000000000000000000000000104000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000001000300000000000000000000000000000000000000000000000000000000000000800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000018000000000000000000000000000000000000000000000000000000000000000c1017a005cb19c843f9446854b7cd15e02a0d5a3bda7f843b74d7bd284551ce8e768000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000064000000000000000000000000ec5ed4c53525423385f9d6e0a7d9d78e82c563e7000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000024c8496ea7000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-
+    function test_sendBundle_simple() public {
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
             abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
@@ -87,9 +83,50 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
         );
-        address recipient = L2_INTEROP_CENTER_ADDR;
-        // (bool success, ) = recipient.call(data);
-        // assertTrue(success);
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
+            abi.encode(block.chainid)
+        );
+
+        bytes memory destinationChainId = InteroperableAddress.formatEvmV1(260);
+
+        address targetContract = makeAddr("targetContract");
+        InteropCallStarter[] memory callStarters = new InteropCallStarter[](1);
+
+        callStarters[0] = InteropCallStarter({
+            to: InteroperableAddress.formatEvmV1(targetContract),
+            data: abi.encodeWithSignature("simpleCall()"),
+            callAttributes: new bytes[](0)
+        });
+
+        address executionAddress = makeAddr("executionAddress");
+        address unbundlerAddress = makeAddr("unbundlerAddress");
+
+        bytes[] memory bundleAttributes = new bytes[](2);
+        bundleAttributes[0] = abi.encodePacked(
+            IERC7786Attributes.executionAddress.selector,
+            InteroperableAddress.formatEvmV1(260, executionAddress)
+        );
+        bundleAttributes[1] = abi.encodePacked(
+            IERC7786Attributes.unbundlerAddress.selector,
+            InteroperableAddress.formatEvmV1(260, unbundlerAddress)
+        );
+
+        (bool success, bytes memory returnData) = L2_INTEROP_CENTER_ADDR.call(
+            abi.encodeWithSelector(
+                InteropCenter.sendBundle.selector,
+                destinationChainId,
+                callStarters,
+                bundleAttributes
+            )
+        );
+
+        assertTrue(success, "sendBundle should succeed");
+
+        // Decode the returned bundle hash
+        bytes32 bundleHash = abi.decode(returnData, (bytes32));
+        assertNotEq(bundleHash, bytes32(0), "Bundle hash should not be zero");
     }
 
     function getInclusionProof(address messageSender) public view returns (MessageInclusionProof memory) {
@@ -437,28 +474,6 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         assertFalse(InteropCenter(L2_INTEROP_CENTER_ADDR).paused(), "InteropCenter should be unpaused");
     }
 
-    /// @notice Test setAddresses functionality in InteropCenter
-    function test_interopCenter_setAddresses() public {
-        // address interopCenterOwner = InteropCenter(L2_INTEROP_CENTER_ADDR).owner();
-        // address newAssetRouter = makeAddr("newAssetRouter");
-        // address newAssetTracker = makeAddr("newAssetTracker");
-        // vm.clearMockedCalls();
-        // address oldAssetRouter = InteropCenter(L2_INTEROP_CENTER_ADDR).assetRouter();
-        // address oldAssetTracker = address(InteropCenter(L2_INTEROP_CENTER_ADDR).assetTracker());
-        // vm.expectEmit(true, true, false, false);
-        // emit IInteropCenter.NewAssetRouter(oldAssetRouter, newAssetRouter);
-        // vm.expectEmit(true, true, false, false);
-        // emit IInteropCenter.NewAssetTracker(oldAssetTracker, newAssetTracker);
-        // vm.prank(interopCenterOwner);
-        // InteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(newAssetRouter, newAssetTracker);
-        // assertEq(InteropCenter(L2_INTEROP_CENTER_ADDR).assetRouter(), newAssetRouter, "Asset router not updated");
-        // assertEq(
-        //     address(InteropCenter(L2_INTEROP_CENTER_ADDR).assetTracker()),
-        //     newAssetTracker,
-        //     "Asset tracker not updated"
-        // );
-    }
-
     /// @notice Test that only owner can pause InteropCenter
     function test_interopCenter_pause_onlyOwner() public {
         address nonOwner = makeAddr("nonOwner");
@@ -478,15 +493,5 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         vm.prank(nonOwner);
         vm.expectRevert("Ownable: caller is not the owner");
         InteropCenter(L2_INTEROP_CENTER_ADDR).unpause();
-    }
-
-    /// @notice Test that only owner can call setAddresses
-    function test_interopCenter_setAddresses_onlyOwner() public {
-        // address nonOwner = makeAddr("nonOwner");
-        // address newAssetRouter = makeAddr("newAssetRouter");
-        // address newAssetTracker = makeAddr("newAssetTracker");
-        // vm.prank(nonOwner);
-        // vm.expectRevert("Ownable: caller is not the owner");
-        // InteropCenter(L2_INTEROP_CENTER_ADDR).setAddresses(newAssetRouter, newAssetTracker);
     }
 }

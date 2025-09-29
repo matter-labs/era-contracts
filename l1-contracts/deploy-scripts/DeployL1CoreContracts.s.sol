@@ -226,6 +226,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         );
         vm.serializeAddress(
             "bridgehub",
+            "chain_registration_sender_implementation_addr",
+            addresses.bridgehub.chainRegistrationSenderImplementation
+        );
+        vm.serializeAddress(
+            "bridgehub",
             "ctm_deployment_tracker_proxy_addr",
             addresses.bridgehub.ctmDeploymentTrackerProxy
         );

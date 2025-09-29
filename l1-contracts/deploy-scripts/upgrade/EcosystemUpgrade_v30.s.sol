@@ -48,7 +48,7 @@ contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
 
     // function saveAllBridgedTokens(address _bridgehub) public {
     //     //// We need to save all bridged tokens
-          //// i.e. add them to the bridged tokens list in the L1 NTV
+    //// i.e. add them to the bridged tokens list in the L1 NTV
     // }
 
     function registerBridgedTokensInNTV(address _bridgehub) public {

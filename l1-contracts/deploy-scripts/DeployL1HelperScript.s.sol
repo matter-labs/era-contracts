@@ -66,7 +66,6 @@ import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 
-
 import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 

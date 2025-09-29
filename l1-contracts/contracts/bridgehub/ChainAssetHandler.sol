@@ -149,7 +149,8 @@ contract ChainAssetHandler is
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
         require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
         bool isOnThisSettlementLayer = block.chainid == BRIDGE_HUB.settlementLayer(_chainId);
-        bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != L1_CHAIN_ID) || (!isOnThisSettlementLayer && block.chainid == L1_CHAIN_ID);
+        bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != L1_CHAIN_ID) ||
+            (!isOnThisSettlementLayer && block.chainid == L1_CHAIN_ID);
         /// Note we don't increment the migration number if the chain migrated to GW and back to L1 previously.
         if (shouldIncrementMigrationNumber) {
             migrationNumber[_chainId] = 1;
@@ -228,7 +229,10 @@ contract ChainAssetHandler is
 
             if (block.chainid != L1_CHAIN_ID) {
                 require(_settlementChainId == L1_CHAIN_ID, MigrationNotToL1());
-                require(GW_ASSET_TRACKER.unprocessedDeposits(bridgehubBurnData.chainId) == 0, UnprocessedDepositsNotProcessed());
+                require(
+                    GW_ASSET_TRACKER.unprocessedDeposits(bridgehubBurnData.chainId) == 0,
+                    UnprocessedDepositsNotProcessed()
+                );
             }
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
@@ -296,7 +300,11 @@ contract ChainAssetHandler is
             BRIDGE_HUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
-            MESSAGE_ROOT.setMigratingChainBatchRoot(bridgehubMintData.chainId, bridgehubMintData.batchNumber, bridgehubMintData.v30UpgradeChainBatchNumber);
+            MESSAGE_ROOT.setMigratingChainBatchRoot(
+                bridgehubMintData.chainId,
+                bridgehubMintData.batchNumber,
+                bridgehubMintData.v30UpgradeChainBatchNumber
+            );
         }
 
         IZKChain(zkChain).forwardedBridgeMint(bridgehubMintData.chainData, contractAlreadyDeployed);

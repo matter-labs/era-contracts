@@ -53,13 +53,13 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {ChainTypeManager, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1AssetTracker, IL1AssetTracker} from "contracts/bridge/asset-tracker/L1AssetTracker.sol";
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {IL1ERC20Bridge, L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
@@ -85,7 +85,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             "/script-config/config-deploy-l1.toml",
             "/script-out/output-deploy-l1.toml",
             bridgehub,
-            reuseGovAndAdmin, 
+            reuseGovAndAdmin,
             false
         );
     }
@@ -138,6 +138,12 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         addresses.bridgehub.messageRootImplementation = Utils.getImplementation(messageRoot);
         addresses.bridgehub.chainAssetHandlerProxy = chainAssetHandler;
         addresses.bridgehub.chainAssetHandlerImplementation = Utils.getImplementation(chainAssetHandler);
+        addresses.bridgehub.assetTrackerProxy = address(L1NativeTokenVault(nativeTokenVault).l1AssetTracker());
+        addresses.bridgehub.assetTrackerImplementation = Utils.getImplementation(addresses.bridgehub.assetTrackerProxy);
+        addresses.bridgehub.chainRegistrationSenderProxy = IBridgehub(bridgehub).chainRegistrationSender();
+        addresses.bridgehub.chainRegistrationSenderImplementation = Utils.getImplementation(
+            addresses.bridgehub.chainRegistrationSenderProxy
+        );
 
         // Bridges
         addresses.bridges.erc20BridgeProxy = erc20Bridge;

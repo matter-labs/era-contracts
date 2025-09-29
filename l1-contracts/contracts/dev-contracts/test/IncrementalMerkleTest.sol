@@ -48,4 +48,12 @@ contract IncrementalMerkleTest {
     function extendUntilEnd(uint256 _finalDepth) external {
         tree.extendUntilEnd(_finalDepth);
     }
+
+    function reset(bytes32 zero) external returns (bytes32) {
+        return tree.reset(zero);
+    }
+
+    function clear() external {
+        tree.clear();
+    }
 }
