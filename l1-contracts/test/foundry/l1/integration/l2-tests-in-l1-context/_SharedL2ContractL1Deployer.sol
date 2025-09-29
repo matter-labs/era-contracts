@@ -37,7 +37,7 @@ import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {L2UtilsBase} from "./L2UtilsBase.sol";
-import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";

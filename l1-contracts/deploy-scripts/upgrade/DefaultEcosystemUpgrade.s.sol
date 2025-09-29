@@ -716,6 +716,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
+            gatewayChainId: config.gatewayChainId,
             l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),

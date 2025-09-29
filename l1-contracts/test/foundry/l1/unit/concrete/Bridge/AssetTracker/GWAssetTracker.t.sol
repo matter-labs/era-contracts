@@ -7,7 +7,7 @@ import {console} from "forge-std/console.sol";
 
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 import {IGWAssetTracker} from "contracts/bridge/asset-tracker/IGWAssetTracker.sol";
-import {BalanceChange, TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
+import {BalanceChange, TokenBalanceMigrationData, ConfirmBalanceMigrationData} from "contracts/common/Messaging.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_INTEROP_CENTER_ADDR, L2_COMPRESSOR_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
@@ -160,14 +160,12 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_ConfirmMigrationOnGateway_Unauthorized() public {
-        TokenBalanceMigrationData memory data = TokenBalanceMigrationData({
+        ConfirmBalanceMigrationData memory data = ConfirmBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: CHAIN_ID,
             assetId: ASSET_ID,
-            tokenOriginChainId: ORIGIN_CHAIN_ID,
             amount: AMOUNT,
             migrationNumber: MIGRATION_NUMBER,
-            originToken: ORIGIN_TOKEN,
             isL1ToGateway: false
         });
 
