@@ -45,6 +45,10 @@ struct Config {
     uint256 bridgehubCreateNewChainSalt;
     address validatorSenderOperatorCommitEth;
     address validatorSenderOperatorBlobsEth;
+    // optional - if not set, then equal to 0
+    address validatorSenderOperatorProve;
+    // optional - if not set, then equal to 0
+    address validatorSenderOperatorExecute;
     address baseToken;
     bytes32 baseTokenAssetId;
     uint128 baseTokenGasPriceMultiplierNominator;
@@ -180,6 +184,20 @@ contract RegisterZKChainScript is Script {
         config.validiumMode = toml.readBool("$.chain.validium_mode");
         config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
+
+        // These were added to zkstack tool recently (9th Sept 2025).
+        // So doing this for backwards compatibility.
+        if (vm.keyExistsToml(toml, "$.chain.validator_sender_operator_prove")) {
+            config.validatorSenderOperatorProve = toml.readAddress("$.chain.validator_sender_operator_prove");
+        } else {
+            config.validatorSenderOperatorProve = address(0);
+        }
+        if (vm.keyExistsToml(toml, "$.chain.validator_sender_operator_execute")) {
+            config.validatorSenderOperatorExecute = toml.readAddress("$.chain.validator_sender_operator_execute");
+        } else {
+            config.validatorSenderOperatorExecute = address(0);
+        }
+
         config.initializeLegacyBridge = toml.readBool("$.initialize_legacy_bridge");
 
         config.governance = toml.readAddress("$.governance");
@@ -233,6 +251,10 @@ contract RegisterZKChainScript is Script {
         config.validiumMode = toml.readBool("$.chain.validium_mode");
         config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
+        // These were added to zkstack tool recently (9th Sept 2025).
+        config.validatorSenderOperatorProve = toml.readAddress("$.chain.validator_sender_operator_prove");
+        config.validatorSenderOperatorExecute = toml.readAddress("$.chain.validator_sender_operator_execute");
+
         config.baseTokenGasPriceMultiplierNominator = uint128(
             toml.readUint("$.chain.base_token_gas_price_multiplier_nominator")
         );
@@ -422,6 +444,14 @@ contract RegisterZKChainScript is Script {
         vm.startBroadcast(msg.sender);
         validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorCommitEth);
         validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorBlobsEth);
+        // Add them to validators, only if set.
+        if (config.validatorSenderOperatorProve != address(0)) {
+            validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorProve);
+        }
+        if (config.validatorSenderOperatorExecute != address(0)) {
+            validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorExecute);
+        }
+
         vm.stopBroadcast();
 
         console.log("Validators added");
@@ -517,11 +547,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function getFactoryDeps() internal view returns (bytes[] memory) {
-        bytes[] memory factoryDeps = new bytes[](4);
-        factoryDeps[0] = ContractsBytecodesLib.getCreationCode("BeaconProxy");
-        factoryDeps[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
-        factoryDeps[2] = ContractsBytecodesLib.getCreationCode("UpgradeableBeacon");
-        factoryDeps[3] = ContractsBytecodesLib.getCreationCode("SystemTransparentUpgradeableProxy");
+        bytes[] memory factoryDeps = new bytes[](0);
         return factoryDeps;
     }
 

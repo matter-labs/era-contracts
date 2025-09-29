@@ -70,26 +70,26 @@ uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface IExecutor is IZKChainBase {
-    /// @notice Rollup batch stored data
+    /// @notice Rollup batch stored data, this structure used for both: Era VM and ZKsync OS batches, however some fields have different meaning
     /// @param batchNumber Rollup batch number
-    /// @param batchHash Hash of L2 batch
-    /// @param indexRepeatedStorageChanges The serial number of the shortcut index that's used as a unique identifier for storage keys that were used twice or more
+    /// @param batchHash Hash of L2 batch, for ZKsync OS batches we'll store here full state commitment
+    /// @param indexRepeatedStorageChanges The serial number of the shortcut index that's used as a unique identifier for storage keys that were used twice or more. For ZKsync OS not used, always set to 0
     /// @param numberOfLayer1Txs Number of priority operations to be processed
     /// @param priorityOperationsHash Hash of all priority operations from this batch
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
-    /// @param timestamp Rollup batch timestamp, have the same format as Ethereum batch constant
-    /// @param commitment Verified input for the ZKsync circuit
+    /// @param timestamp Rollup batch timestamp, have the same format as Ethereum batch constant. For ZKsync OS not used, always set to 0
+    /// @param commitment Verified input for the ZKsync circuit. For ZKsync OS batches we'll store batch output hash here
     // solhint-disable-next-line gas-struct-packing
     struct StoredBatchInfo {
         uint64 batchNumber;
-        bytes32 batchHash;
-        uint64 indexRepeatedStorageChanges;
+        bytes32 batchHash; // For ZKsync OS batches we'll store here full state commitment
+        uint64 indexRepeatedStorageChanges; // For ZKsync OS not used, always set to 0
         uint256 numberOfLayer1Txs;
         bytes32 priorityOperationsHash;
         bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
-        uint256 timestamp;
-        bytes32 commitment;
+        uint256 timestamp; // For ZKsync OS not used, always set to 0
+        bytes32 commitment; // For ZKsync OS batches we'll store batch output hash here
     }
 
     /// @notice Legacy StoredBatchInfo struct
@@ -134,6 +134,33 @@ interface IExecutor is IZKChainBase {
         bytes32 bootloaderHeapInitialContentsHash;
         bytes32 eventsQueueStateHash;
         bytes systemLogs;
+        bytes operatorDAInput;
+    }
+
+    /// @notice Commit batch info for ZKsync OS
+    /// @param batchNumber Number of the committed batch
+    /// @param newStateCommitment State commitment of the new state.
+    /// @dev chain state commitment, this preimage is not opened on l1,
+    /// it's guaranteed that this commitment commits to any state that needed for execution
+    /// (state root, block number, bloch hahes)
+    /// @param numberOfLayer1Txs Number of priority operations to be processed
+    /// @param priorityOperationsHash Hash of all priority operations from this batch
+    /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
+    /// @param l2DaValidator Address of the L2 DA validator
+    /// @param daCommitment Commitment to the DA input
+    // solhint-disable-next-line gas-struct-packing
+    struct CommitBatchInfoZKsyncOS {
+        uint64 batchNumber;
+        bytes32 newStateCommitment;
+        uint256 numberOfLayer1Txs;
+        bytes32 priorityOperationsHash;
+        bytes32 dependencyRootsRollingHash;
+        bytes32 l2LogsTreeRoot;
+        address l2DaValidator;
+        bytes32 daCommitment;
+        uint64 firstBlockTimestamp;
+        uint64 lastBlockTimestamp;
+        uint256 chainId;
         bytes operatorDAInput;
     }
 

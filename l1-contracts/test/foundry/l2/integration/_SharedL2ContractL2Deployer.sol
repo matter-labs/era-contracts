@@ -54,7 +54,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         instantiateCreate2Factory();
         addresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
         addresses.stateTransition.verifier = address(
-            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
+            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE), address(0))
         );
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         addresses.stateTransition.validatorTimelock = address(
@@ -70,7 +70,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         addresses.stateTransition.mailboxFacet = address(new MailboxFacet(config.eraChainId, config.l1ChainId));
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
-        addresses.stateTransition.diamondInit = address(new DiamondInit());
+        addresses.stateTransition.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         addresses.stateTransition.chainTypeManagerImplementation = address(
             new ChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)

@@ -29,13 +29,15 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
+
+import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
 
 bytes32 constant EMPTY_PREPUBLISHED_COMMITMENT = 0x0000000000000000000000000000000000000000000000000000000000000000;
 bytes constant POINT_EVALUATION_PRECOMPILE_RESULT = hex"000000000000000000000000000000000000000000000000000000000000100073eda753299d7d483339d80809a1d80553bda402fffe5bfeffffffff00000001";
@@ -57,7 +59,7 @@ contract ExecutorTest is UtilsTest {
     DummyEraBaseTokenBridge internal sharedBridge;
     ValidatorTimelock internal validatorTimelock;
     address internal rollupL1DAValidator;
-    MessageRoot internal messageRoot;
+    L1MessageRoot internal messageRoot;
     DummyBridgehub dummyBridgehub;
     ChainAssetHandler internal chainAssetHandler;
 
@@ -197,7 +199,7 @@ contract ExecutorTest is UtilsTest {
             abi.encode(makeAddr("chainTypeManager"))
         );
         address interopCenter = makeAddr("interopCenter");
-        messageRoot = new MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID, 1);
+        messageRoot = new L1MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID, 1);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
         address assetTracker = makeAddr("assetTracker");
@@ -214,7 +216,7 @@ contract ExecutorTest is UtilsTest {
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 
-        vm.mockCall( // kl todo add back if commented out.
+        vm.mockCall(
                 address(messageRoot),
                 abi.encodeWithSelector(MessageRoot.addChainBatchRoot.selector, 9, 1, bytes32(0)),
                 abi.encode()
@@ -235,10 +237,8 @@ contract ExecutorTest is UtilsTest {
             abi.encodeWithSelector(IChainTypeManager.protocolVersionIsActive.selector),
             abi.encode(bool(true))
         );
-
+        DiamondInit diamondInit = new DiamondInit(false);
         validatorTimelock = ValidatorTimelock(deployValidatorTimelock(address(dummyBridgehub), owner, 0));
-
-        DiamondInit diamondInit = new DiamondInit();
 
         bytes8 dummyHash = 0x1234567890123456;
 
@@ -253,7 +253,11 @@ contract ExecutorTest is UtilsTest {
             timestamp: 0,
             commitment: bytes32("")
         });
-        TestnetVerifier testnetVerifier = new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)));
+        TestnetVerifier testnetVerifier = new TestnetVerifier(
+            IVerifierV2(address(0)),
+            IVerifier(address(0)),
+            address(0)
+        );
 
         InitializeData memory params = InitializeData({
             // TODO REVIEW

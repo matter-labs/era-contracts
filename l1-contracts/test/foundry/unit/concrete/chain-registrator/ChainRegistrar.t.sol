@@ -8,7 +8,7 @@ import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interf
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import "contracts/bridgehub/Bridgehub.sol";
+import "contracts/bridgehub/L1Bridgehub.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";

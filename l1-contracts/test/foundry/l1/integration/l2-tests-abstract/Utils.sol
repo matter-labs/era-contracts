@@ -18,4 +18,5 @@ struct SystemContractsArgs {
     address aliasedOwner;
     bool contractsDeployedAlready;
     address l1CtmDeployer;
+    uint256 maxNumberOfZKChains;
 }

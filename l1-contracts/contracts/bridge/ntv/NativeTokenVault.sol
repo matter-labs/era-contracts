@@ -38,18 +38,6 @@ abstract contract NativeTokenVault is
 {
     using SafeERC20 for IERC20;
 
-    /// @dev The address of the WETH token.
-    address public immutable override WETH_TOKEN;
-
-    /// @dev L1 Shared Bridge smart contract that handles communication with its counterparts on L2s
-    IAssetRouterBase public immutable override ASSET_ROUTER;
-
-    /// @dev The assetId of the base token.
-    bytes32 public immutable BASE_TOKEN_ASSET_ID;
-
-    /// @dev Chain ID of L1 for bridging reasons.
-    uint256 public immutable L1_CHAIN_ID;
-
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
@@ -81,20 +69,8 @@ abstract contract NativeTokenVault is
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
-        require(msg.sender == address(ASSET_ROUTER), Unauthorized(msg.sender));
+        require(msg.sender == address(_assetRouter()), Unauthorized(msg.sender));
         _;
-    }
-
-    /// @dev Contract is expected to be used as proxy implementation.
-    /// @dev Disable the initialization to prevent Parity hack.
-    /// @param _wethToken Address of WETH on deployed chain
-    /// @param _assetRouter Address of assetRouter
-    constructor(address _wethToken, address _assetRouter, bytes32 _baseTokenAssetId, uint256 _l1ChainId) {
-        _disableInitializers();
-        L1_CHAIN_ID = _l1ChainId;
-        ASSET_ROUTER = IAssetRouterBase(_assetRouter);
-        WETH_TOKEN = _wethToken;
-        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
 
     function _assetTracker() internal view virtual returns (IAssetTrackerBase);
@@ -122,11 +98,11 @@ abstract contract NativeTokenVault is
     }
 
     function _registerToken(address _nativeToken) internal virtual returns (bytes32 newAssetId) {
-        // We allow registering `WETH_TOKEN` inside `NativeTokenVault` only for L1 native token vault.
+        // We allow registering `_wethToken()` inside `NativeTokenVault` only for L1 native token vault.
         // It is needed to allow withdrawing such assets. We restrict all WETH-related
         // operations to deposits from L1 only to be able to upgrade their logic more easily in the
         // future.
-        require(_nativeToken != WETH_TOKEN || block.chainid == L1_CHAIN_ID, TokenNotSupported(WETH_TOKEN));
+        require(_nativeToken != _wethToken() || block.chainid == _l1ChainId(), TokenNotSupported(_wethToken()));
         require(_nativeToken.code.length > 0, EmptyToken());
         require(assetId[_nativeToken] == bytes32(0), AssetIdAlreadyRegistered());
         newAssetId = _unsafeRegisterNativeToken(_nativeToken);
@@ -370,9 +346,9 @@ abstract contract NativeTokenVault is
     ) internal virtual returns (bytes memory _bridgeMintData) {
         // This ensures that WETH_TOKEN can never be bridged from chains it is native to.
         // It can only be withdrawn from the chain where it has already gotten.
-        require(_nativeToken != WETH_TOKEN, BurningNativeWETHNotSupported());
+        require(_nativeToken != _wethToken(), BurningNativeWETHNotSupported());
 
-        if (_assetId == BASE_TOKEN_ASSET_ID) {
+        if (_assetId == _baseTokenAssetId()) {
             require(_depositAmount == msg.value, ValueMismatch(_depositAmount, msg.value));
 
             _handleBridgeToChain(_chainId, _assetId, _depositAmount);
@@ -440,7 +416,7 @@ abstract contract NativeTokenVault is
     function _unsafeRegisterNativeToken(address _nativeToken) internal returns (bytes32 newAssetId) {
         newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         _setNewTokenStorage(newAssetId, _nativeToken, block.chainid);
-        ASSET_ROUTER.setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
+        _assetRouter().setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
     function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;
@@ -482,7 +458,7 @@ abstract contract NativeTokenVault is
         // slither-disable-next-line unused-return
         (tokenOriginChainId, , , ) = DataEncoding.decodeTokenData(_erc20Data);
         if (tokenOriginChainId == 0) {
-            tokenOriginChainId = L1_CHAIN_ID;
+            tokenOriginChainId = _l1ChainId();
         }
     }
 
@@ -568,4 +544,12 @@ abstract contract NativeTokenVault is
     function unpause() external onlyOwner {
         _unpause();
     }
+
+    function _wethToken() internal view virtual returns (address);
+
+    function _assetRouter() internal view virtual returns (IAssetRouterBase);
+
+    function _baseTokenAssetId() internal view virtual returns (bytes32);
+
+    function _l1ChainId() internal view virtual returns (uint256);
 }

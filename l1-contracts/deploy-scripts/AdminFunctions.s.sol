@@ -23,7 +23,7 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {BridgehubBurnCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -470,9 +470,9 @@ contract AdminFunctions is Script {
 
         bytes memory secondBridgeData;
         {
-            bytes32 chainAssetId = Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
+            bytes32 chainAssetId = L1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
 
-            uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
+            uint256 currentSettlementLayer = L1Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
             if (currentSettlementLayer == data.gatewayChainId) {
                 console.log("Chain already using gateway as its settlement layer");
                 saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex""}));
@@ -487,7 +487,7 @@ contract AdminFunctions is Script {
                         data._gatewayDiamondCutData
                     ),
                     chainData: abi.encode(
-                        IZKChain(Bridgehub(data.bridgehub).getZKChain(data.l2ChainId)).getProtocolVersion()
+                        IZKChain(L1Bridgehub(data.bridgehub).getZKChain(data.l2ChainId)).getProtocolVersion()
                     )
                 })
             );
@@ -695,7 +695,7 @@ contract AdminFunctions is Script {
         );
 
         {
-            uint256 currentSettlementLayer = Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
+            uint256 currentSettlementLayer = L1Bridgehub(data.bridgehub).settlementLayer(data.l2ChainId);
             if (currentSettlementLayer != data.gatewayChainId) {
                 console.log("Chain does not settle on Gateway");
                 saveOutput(Output({admin: l2ChainInfo.admin, encodedData: hex""}));

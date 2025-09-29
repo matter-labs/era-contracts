@@ -22,9 +22,9 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -51,7 +51,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
 
         // In the production environment, there will be a separate script dedicated to accepting the adminship
         // but for testing purposes we'll have to do it here.
-        Bridgehub bridgehub = Bridgehub(addresses.bridgehub.bridgehubProxy);
+        L1Bridgehub bridgehub = L1Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.broadcast(addresses.chainAdmin);
         bridgehub.acceptAdmin();
     }
@@ -81,11 +81,11 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         // We set to it to zero explicitly so that it is clear to the reader.
         addresses.accessControlRestrictionAddress = address(0);
         (addresses.bridgehub.bridgehubImplementation, addresses.bridgehub.bridgehubProxy) = deployTuppWithContract(
-            "Bridgehub",
+            "L1Bridgehub",
             false
         );
         (addresses.bridgehub.messageRootImplementation, addresses.bridgehub.messageRootProxy) = deployTuppWithContract(
-            "MessageRoot",
+            "L1MessageRoot",
             false
         );
 
@@ -126,7 +126,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         (
             addresses.bridgehub.chainAssetHandlerImplementation,
             addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
+        ) = deployTuppWithContract("L1ChainAssetHandler", false);
         (
             addresses.bridgehub.chainRegistrationSenderImplementation,
             addresses.bridgehub.chainRegistrationSenderProxy

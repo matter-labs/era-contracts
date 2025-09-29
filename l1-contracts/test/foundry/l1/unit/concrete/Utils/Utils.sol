@@ -492,7 +492,7 @@ library Utils {
         address testnetVerifier,
         address bridgehub
     ) public returns (address) {
-        DiamondInit diamondInit = new DiamondInit();
+        DiamondInit diamondInit = new DiamondInit(false);
         bytes memory diamondInitData = abi.encodeWithSelector(
             diamondInit.initialize.selector,
             makeInitializeData(testnetVerifier, bridgehub)

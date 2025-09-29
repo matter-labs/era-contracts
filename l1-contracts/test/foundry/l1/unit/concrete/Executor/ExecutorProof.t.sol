@@ -49,7 +49,8 @@ contract TestExecutorFacet is ExecutorFacet {
 contract ExecutorProofTest is UtilsTest {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
     DummyBridgehub internal dummyBridgehub;
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {

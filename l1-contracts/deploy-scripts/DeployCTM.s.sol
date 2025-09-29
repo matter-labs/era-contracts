@@ -291,6 +291,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         ctm.setPendingAdmin(addresses.chainAdmin);
 
         IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
+        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
@@ -506,7 +507,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         vm.writeToml(toml, outputPath);
     }
 
-    function prepareForceDeploymentsData() internal view returns (bytes memory) {
+    function prepareForceDeploymentsData() internal returns (bytes memory) {
         require(addresses.governance != address(0), "Governance address is not set");
 
         address dangerousTestOnlyForcedBeacon;
@@ -526,14 +527,15 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
-            bridgehubBytecodeHash: getL2BytecodeHash("Bridgehub"),
-            l2AssetRouterBytecodeHash: getL2BytecodeHash("L2AssetRouter"),
-            l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
-            messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
-            chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
-            interopCenterBytecodeHash: getL2BytecodeHash("InteropCenter"),
-            interopHandlerBytecodeHash: getL2BytecodeHash("InteropHandler"),
-            assetTrackerBytecodeHash: getL2BytecodeHash("L2AssetTracker"),
+            bridgehubBytecodeInfo: abi.encode(getL2BytecodeHash("L2Bridgehub")),
+            l2AssetRouterBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetRouter")),
+            l2NtvBytecodeInfo: abi.encode(getL2BytecodeHash("L2NativeTokenVault")),
+            messageRootBytecodeInfo: abi.encode(getL2BytecodeHash("L2MessageRoot")),
+            beaconDeployerInfo: abi.encode(getL2BytecodeHash("UpgradeableBeaconDeployer")),
+            chainAssetHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("L2ChainAssetHandler")),
+            interopCenterBytecodeInfo: abi.encode(getL2BytecodeHash("InteropCenter")),
+            interopHandlerBytecodeInfo: abi.encode(getL2BytecodeHash("InteropHandler")),
+            assetTrackerBytecodeInfo: abi.encode(getL2BytecodeHash("L2AssetTracker")),
             // For newly created chains it it is expected that the following bridges are not present at the moment
             // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),

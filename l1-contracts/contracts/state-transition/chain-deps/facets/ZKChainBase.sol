@@ -10,6 +10,7 @@ import {NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
+import {PRIORITY_OPERATION_L2_TX_TYPE, SYSTEM_UPGRADE_L2_TX_TYPE, ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE, ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE} from "../../../common/Config.sol";
 
 /// @title Base contract containing functions accessible to the other facets.
 /// @author Matter Labs
@@ -133,5 +134,13 @@ contract ZKChainBase is ReentrancyGuard {
 
     function _getTotalPriorityTxs() internal view returns (uint256) {
         return s.priorityTree.getTotalPriorityTxs();
+    }
+
+    function _getPriorityTxType() internal view returns (uint256) {
+        return s.zksyncOS ? ZKSYNC_OS_PRIORITY_OPERATION_L2_TX_TYPE : PRIORITY_OPERATION_L2_TX_TYPE;
+    }
+
+    function _getUpgradeTxType() internal view returns (uint256) {
+        return s.zksyncOS ? ZKSYNC_OS_SYSTEM_UPGRADE_L2_TX_TYPE : SYSTEM_UPGRADE_L2_TX_TYPE;
     }
 }

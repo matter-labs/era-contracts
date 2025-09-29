@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
@@ -14,7 +13,6 @@ import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
 import {NativeTokenVault} from "./NativeTokenVault.sol";
 
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
-import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
 import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
 
@@ -24,19 +22,41 @@ import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2Con
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, DeployFailed, EmptyAddress, EmptyBytes32, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, DeployFailed, EmptyAddress, EmptyBytes32, InvalidCaller, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
+/// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     using SafeERC20 for IERC20;
 
-    IL2SharedBridgeLegacy public immutable L2_LEGACY_SHARED_BRIDGE;
+    /// @dev The address of the WETH token.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    address public override WETH_TOKEN;
+
+    /// @dev The assetId of the base token.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    bytes32 public BASE_TOKEN_ASSET_ID;
+
+    /// @dev Chain ID of L1 for bridging reasons.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    uint256 public override L1_CHAIN_ID;
+
+    /// @dev The address of the L2 legacy shared bridge
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    IL2SharedBridgeLegacy public L2_LEGACY_SHARED_BRIDGE;
 
     /// @dev Bytecode hash of the proxy for tokens deployed by the bridge.
-    bytes32 public immutable L2_TOKEN_PROXY_BYTECODE_HASH;
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    bytes32 public L2_TOKEN_PROXY_BYTECODE_HASH;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -45,45 +65,66 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         _;
     }
 
-    /// @notice Initializes the bridge contract for later use.
-    /// @dev this contract is deployed in the L2GenesisUpgrade, and is meant as direct deployment without a proxy.
-    /// @param _l1ChainId The L1 chain id differs between mainnet and testnets.
+
+    /// @notice Initializes the contract.
+    /// @dev This function is used to initialize the contract with the initial values.
+    /// @param _l1ChainId The chain id of L1.
+    /// @param _aliasedOwner The address of the owner of the contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
-    /// @param _aliasedOwner The address of the governor contract.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
-    /// @param _contractsDeployedAlready Ensures beacon proxy for standard ERC20 has not been deployed.
-    /// @param _wethToken Address of WETH on deployed chain
-    constructor(
+    function initL2(
         uint256 _l1ChainId,
         address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
-        bool _contractsDeployedAlready,
         address _wethToken,
         bytes32 _baseTokenAssetId
-    ) NativeTokenVault(_wethToken, L2_ASSET_ROUTER_ADDR, _baseTokenAssetId, _l1ChainId) {
+    ) public onlyUpgrader {
+        _disableInitializers();
+        // solhint-disable-next-line func-named-parameters
+        updateL2(_l1ChainId, _l2TokenProxyBytecodeHash, _legacySharedBridge, _wethToken, _baseTokenAssetId);
+        if (_aliasedOwner == address(0)) {
+            revert EmptyAddress();
+        }
+        _transferOwnership(_aliasedOwner);
+        bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
+        emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
+    }
+
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
+    /// @notice Updates the contract.
+    /// @dev This function is used to initialize the new implementation of L2NativeTokenVault on existing chains during
+    /// the upgrade.
+    /// @param _l1ChainId The chain id of L1.
+    /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
+    /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
+    /// @param _wethToken The address of the WETH token.
+    /// @param _baseTokenAssetId The asset id of the base token.
+    function updateL2(
+        uint256 _l1ChainId,
+        bytes32 _l2TokenProxyBytecodeHash,
+        address _legacySharedBridge,
+        address _wethToken,
+        bytes32 _baseTokenAssetId
+    ) public onlyUpgrader {
+        WETH_TOKEN = _wethToken;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+        L1_CHAIN_ID = _l1ChainId;
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         require(_l2TokenProxyBytecodeHash != bytes32(0), EmptyBytes32());
-        require(_aliasedOwner != address(0), EmptyAddress());
+
 
         L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
-        _transferOwnership(_aliasedOwner);
-
-        if (_contractsDeployedAlready) {
-            require(_bridgedTokenBeacon != address(0), EmptyAddress());
-            bridgedTokenBeacon = IBeacon(_bridgedTokenBeacon);
-        } else {
-            address l2StandardToken = address(new BridgedStandardERC20{salt: bytes32(0)}());
-
-            UpgradeableBeacon tokenBeacon = new UpgradeableBeacon{salt: bytes32(0)}(l2StandardToken);
-
-            tokenBeacon.transferOwnership(owner());
-            bridgedTokenBeacon = IBeacon(address(tokenBeacon));
-            emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
-        }
     }
 
     function _assetTracker() internal view override returns (IAssetTrackerBase) {
@@ -301,7 +342,27 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     /// @param _l1Token The address of token on L1.
     /// @return expectedToken The address of token on L2.
     function l2TokenAddress(address _l1Token) public view returns (address expectedToken) {
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId(), _l1Token);
         expectedToken = tokenAddress[expectedAssetId];
+    }
+
+    function ASSET_ROUTER() public view override returns (IAssetRouterBase) {
+        return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
+    }
+
+    function _wethToken() internal view override returns (address) {
+        return WETH_TOKEN;
+    }
+
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
+        return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
+    }
+
+    function _baseTokenAssetId() internal view override returns (bytes32) {
+        return BASE_TOKEN_ASSET_ID;
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
     }
 }

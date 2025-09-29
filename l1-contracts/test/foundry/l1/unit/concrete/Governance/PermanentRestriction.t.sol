@@ -2,7 +2,7 @@ pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+
 import {BridgehubBurnCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
@@ -23,7 +23,7 @@ import {ChainTypeManagerTest} from "test/foundry/l1/unit/concrete/state-transiti
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -43,6 +43,7 @@ contract TestPermanentRestriction is PermanentRestriction {
 }
 
 contract PermanentRestrictionTest is ChainTypeManagerTest {
+    uint256 internal L1_CHAIN_ID;
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     TestPermanentRestriction internal permRestriction;
@@ -64,6 +65,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
         chainAdmin = new ChainAdmin(restrictions);
+        L1_CHAIN_ID = 5;
     }
 
     function _deployPermRestriction(
@@ -365,7 +367,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
-        MessageRoot messageRootNew = new MessageRoot(bridgehub, block.chainid, 1);
+        L1MessageRoot messageRootNew = new L1MessageRoot(bridgehub, block.chainid, 1);
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
@@ -396,7 +398,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
         vm.mockCall(

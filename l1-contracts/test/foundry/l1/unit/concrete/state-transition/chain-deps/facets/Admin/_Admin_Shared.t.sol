@@ -19,7 +19,8 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 contract AdminTest is UtilsTest {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
     DummyBridgehub internal dummyBridgehub;
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {

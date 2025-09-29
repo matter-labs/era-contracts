@@ -119,8 +119,6 @@ error GasPerPubdataMismatch();
 error GenesisBatchCommitmentZero();
 // 0x7940c83f
 error GenesisBatchHashZero();
-// 0xb4fc6835
-error GenesisIndexStorageZero();
 // 0x3a1a8589
 error GenesisUpgradeZero();
 // 0xd356e6ba
@@ -134,12 +132,16 @@ error IncorrectBatchBounds(
     uint256 processFromProvided,
     uint256 processToProvided
 );
+// 0xc1b4bc7b
+error IncorrectBatchChainId(uint256, uint256);
 // 0xdd381a4c
 error IncorrectBridgeHubAddress(address bridgehub);
 // 0x1929b7de
 error IncorrectTokenAddressFromNTV(bytes32 assetId, address tokenAddress);
 // 0x9bf8b9aa
 error InvalidBatchNumber(uint256 provided, uint256 expected);
+// 0xcbd9d2e0
+error InvalidCaller(address);
 // 0x7a47c9a2
 error InvalidChainId();
 // 0x92daded2
@@ -388,6 +390,8 @@ error WrongMagicValue(uint256 expectedMagicValue, uint256 providedMagicValue);
 error ZeroAddress();
 // 0xc84885d4
 error ZeroChainId();
+// 0x1bc36e67
+error ZeroGasPriceL1TxZKSyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
 

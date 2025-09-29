@@ -14,7 +14,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
 
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
@@ -98,6 +98,6 @@ contract ChainUpgrade is Script {
         toml = vm.readFile(ecosystemInputPath);
         config.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        config.chainDiamondProxyAddress = Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
+        config.chainDiamondProxyAddress = L1Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
     }
 }

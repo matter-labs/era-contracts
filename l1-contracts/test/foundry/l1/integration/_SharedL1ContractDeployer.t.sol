@@ -4,9 +4,9 @@ pragma solidity 0.8.28;
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1CoreContractsIntegration.s.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.s.sol";
 import {RegisterCTM} from "deploy-scripts/RegisterCTM.s.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -29,7 +29,7 @@ contract L1ContractDeployer is UtilsTest {
         DeployedAddresses ecosystemAddresses;
         address bridgehubProxyAddress;
         address bridgehubOwnerAddress;
-        Bridgehub bridgehub;
+        L1Bridgehub bridgehub;
         IInteropCenter interopCenter;
         CTMDeploymentTracker ctmDeploymentTracker;
         L1AssetRouter sharedBridge;
@@ -82,7 +82,7 @@ contract L1ContractDeployer is UtilsTest {
 
         ecosystemConfig = ctmScript.getConfig();
 
-        addresses.bridgehub = Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
+        addresses.bridgehub = L1Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
         addresses.interopCenter = IInteropCenter(addresses.ecosystemAddresses.bridgehub.interopCenterProxy);
         addresses.chainTypeManager = IChainTypeManager(
             addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy

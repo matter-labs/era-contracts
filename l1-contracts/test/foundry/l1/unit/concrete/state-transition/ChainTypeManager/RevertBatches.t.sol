@@ -88,7 +88,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             {
                 bytes memory l2GenesisUpgradeCalldata = abi.encodeCall(
                     IL2GenesisUpgrade.genesisUpgrade,
-                    (chainId, l1CtmDeployer, forceDeploymentsData, "0x")
+                    (false, chainId, l1CtmDeployer, forceDeploymentsData, "0x")
                 );
                 complexUpgraderCalldata = abi.encodeCall(
                     IComplexUpgrader.upgrade,

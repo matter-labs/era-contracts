@@ -126,7 +126,8 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
-                l1CtmDeployer: l1CTMDeployer
+                l1CtmDeployer: l1CTMDeployer,
+                maxNumberOfZKChains: 100
             })
         );
         if (!_skip) {
