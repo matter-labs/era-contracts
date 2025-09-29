@@ -81,6 +81,7 @@ contract MessageRootTest is Test {
     }
 
     function test_addNewChain() public {
+        // kl todo: enable these tests if commented out.
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         uint256 betaChainId = uint256(uint160(makeAddr("betaChainId")));
 
