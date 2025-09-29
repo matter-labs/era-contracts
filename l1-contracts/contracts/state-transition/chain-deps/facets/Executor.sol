@@ -14,7 +14,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR, L2_TO_L1_
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {PriorityOpsBatchInfo, PriorityTree} from "../../libraries/PriorityTree.sol";
 import {IL1DAValidator, L1DAValidatorOutput} from "../../chain-interfaces/IL1DAValidator.sol";
-import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
+import {BatchHashMismatch, BatchNumberMismatch, CanOnlyProcessOneBatch, CantExecuteUnprovenBatches, CantRevertExecutedBatch, EmptyPrecommitData, HashMismatch, IncorrectBatchChainId, InvalidBatchNumber, InvalidLogSender, InvalidMessageRoot, InvalidNumberOfBlobs, InvalidPackedPrecommitmentLength, InvalidProof, InvalidProtocolVersion, InvalidSystemLogsLength, L2TimestampTooBig, LogAlreadyProcessed, MissingSystemLogs, NonIncreasingTimestamp, NonSequentialBatch, PrecommitmentMismatch, PriorityOperationsRollingHashMismatch, RevertedBatchNotAfterNewLastBatch, SystemLogsSizeTooBig, TimeNotReached, TimestampError, TxHashMismatch, UnexpectedSystemLog, UpgradeBatchNumberIsNotZero, ValueMismatch, VerifiedBatchesExceedsCommittedBatches} from "../../../common/L1ContractErrors.sol";
 import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, InvalidBatchesDataLength, MessageRootIsZero, MismatchL2DACommitmentScheme, MismatchNumberOfLayer1Txs} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -24,6 +24,9 @@ import {InteropRoot} from "../../../common/Messaging.sol";
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
 uint8 constant RELAYED_EXECUTOR_VERSION = 0;
+/// @dev The version that is used for the `Executor` calldata used for relaying the
+/// ZKSync OS stored batch info.
+uint8 constant RELAYED_EXECUTOR_VERSION_ZKSYNC_OS = 1;
 
 /// @title ZK chain Executor contract capable of processing events emitted in the ZK chain protocol.
 /// @author Matter Labs
@@ -136,9 +139,92 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
+    function _commitOneBatchZKsyncOS(
+        StoredBatchInfo memory _previousBatch,
+        CommitBatchInfoZKsyncOS memory _newBatch,
+        bytes32 _expectedSystemContractUpgradeTxHash
+    ) internal returns (StoredBatchInfo memory storedBatchInfo) {
+        // only commit next batch
+        if (_newBatch.batchNumber != _previousBatch.batchNumber + 1) {
+            revert BatchNumberMismatch(_previousBatch.batchNumber + 1, _newBatch.batchNumber);
+        }
+
+        // we can just ignore l1 da validator output with ZKsync OS:
+        // - used state diffs hash correctness verifier within state transition program
+        // - blobs not supported yet, and likely even once it's supported design will allow to ignore blobs related values anyway
+        // slither-disable-next-line unused-return
+        IL1DAValidator(s.l1DAValidator).checkDA({
+            _chainId: s.chainId,
+            _batchNumber: uint256(_newBatch.batchNumber),
+            _l2DAValidatorOutputHash: _newBatch.daCommitment,
+            _operatorDAInput: _newBatch.operatorDAInput,
+            _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
+        });
+
+        if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > _newBatch.firstBlockTimestamp) {
+            revert TimeNotReached(_newBatch.firstBlockTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
+        }
+        if (_newBatch.lastBlockTimestamp > block.timestamp + COMMIT_TIMESTAMP_APPROXIMATION_DELTA) {
+            revert L2TimestampTooBig();
+        }
+        if (_newBatch.chainId != s.chainId) {
+            revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
+        }
+        // Currently ZKsync OS, always generates rollup da commitment and sets l2DaValidator to 0.
+        //        if (_newBatch.l2DaValidator != s.l2DAValidator) {
+        //             revert MismatchL2DAValidator();
+        //        }
+
+        // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
+        // batch output hash commits to information about batch that needs to be opened on l1.
+        // So below we are calculating batch output hash to later include it in the batch public input and thereby verify batch values correctness.
+        bytes32 batchOutputHash = keccak256(
+            abi.encodePacked(
+                _newBatch.chainId,
+                _newBatch.firstBlockTimestamp,
+                _newBatch.lastBlockTimestamp,
+                uint160(_newBatch.l2DaValidator),
+                _newBatch.daCommitment,
+                _newBatch.numberOfLayer1Txs,
+                _newBatch.priorityOperationsHash,
+                _newBatch.l2LogsTreeRoot,
+                _expectedSystemContractUpgradeTxHash,
+                _newBatch.dependencyRootsRollingHash
+            )
+        );
+
+        // We are using same stored batch info structure as was used for Era VM state transition.
+        // But we set some fields differently:
+        // `batchHash` commitments now contains full commitment to the state and `indexRepeatedStorageChanges` not used(always set to 0)
+        // `timestamp` is not used anymore(set to 0), for Era we used it to validate that committed batch timestamp is consistent with last stored,
+        // but in ZKsync OS we are validating it within the state transition program
+        storedBatchInfo = StoredBatchInfo({
+            batchNumber: _newBatch.batchNumber,
+            batchHash: _newBatch.newStateCommitment,
+            indexRepeatedStorageChanges: 0,
+            numberOfLayer1Txs: _newBatch.numberOfLayer1Txs,
+            priorityOperationsHash: _newBatch.priorityOperationsHash,
+            l2LogsTreeRoot: _newBatch.l2LogsTreeRoot,
+            dependencyRootsRollingHash: _newBatch.dependencyRootsRollingHash,
+            timestamp: 0,
+            commitment: batchOutputHash
+        });
+
+        if (L1_CHAIN_ID != block.chainid) {
+            // If we are settling on top of Gateway, we always relay the data needed to construct
+            // a proof for a new batch (and finalize it) even if the data for Gateway transactions has been fully lost.
+            // For ZKsync OS this data includes only `StoredBatchInfo`: that is needed to commit and prove a batch on top of the previous one.
+            // slither-disable-next-line unused-return
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+                abi.encode(RELAYED_EXECUTOR_VERSION_ZKSYNC_OS, storedBatchInfo)
+            );
+        }
+    }
+
     /// @notice Verifies that a stored precommitment for a given batch matches the expected rolling hash.
     /// @param _batchNumber The batch number whose precommitment is being verified.
     /// @param _expectedL2TxsStatusRollingHash The expected rolling hash of L2 transaction statuses for the batch.
+    /// @dev Note, that precommitments are only supported for Era VM.
     function _verifyAndResetBatchPrecommitment(uint256 _batchNumber, bytes32 _expectedL2TxsStatusRollingHash) internal {
         bytes32 storedPrecommitment = s.precommitmentForTheLatestBatch;
         // The default value for the `storedPrecommitment` is expected to be `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`.
@@ -378,23 +464,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
     }
 
-    /// @inheritdoc IExecutor
-    function commitBatchesSharedBridge(
-        address, // _chainAddress
+    function _commitBatchesSharedBridgeEra(
         uint256 _processFrom,
         uint256 _processTo,
         bytes calldata _commitData
-    ) external nonReentrant onlyValidator onlySettlementLayer {
-        // check that we have the right protocol version
-        // three comments:
-        // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
-        // to solve this we will need to add the feature to create batches with only the protocol upgrade tx, without any other txs.
-        // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
-        // as their protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
-        // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
-        if (!IChainTypeManager(s.chainTypeManager).protocolVersionIsActive(s.protocolVersion)) {
-            revert InvalidProtocolVersion();
-        }
+    ) internal {
         (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfo[] memory newBatchesData) = BatchDecoder
             .decodeAndCheckCommitData(_commitData, _processFrom, _processTo);
         // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
@@ -426,6 +500,60 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+    }
+
+    function _commitBatchesSharedBridgeZKsyncOS(
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
+    ) internal {
+        (StoredBatchInfo memory lastCommittedBatchData, CommitBatchInfoZKsyncOS[] memory newBatchesData) = BatchDecoder
+            .decodeAndCheckCommitDataZKsyncOS(_commitData, _processFrom, _processTo);
+        // With the new changes for EIP-4844, namely the restriction on number of blobs per block, we only allow for a single batch to be committed at a time.
+        // Note: Don't need to check that `_processFrom` == `_processTo` because there is only one batch,
+        // and so the range checked in the `decodeAndCheckCommitData` is enough.
+        if (newBatchesData.length != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
+        // Check that we commit batches after last committed batch
+        if (s.storedBatchHashes[s.totalBatchesCommitted] != _hashStoredBatchInfo(lastCommittedBatchData)) {
+            // incorrect previous batch data
+            revert BatchHashMismatch(
+                s.storedBatchHashes[s.totalBatchesCommitted],
+                _hashStoredBatchInfo(lastCommittedBatchData)
+            );
+        }
+
+        bytes32 systemContractsUpgradeTxHash = s.l2SystemContractsUpgradeTxHash;
+        bool processSystemUpgradeTx = systemContractsUpgradeTxHash != bytes32(0) &&
+            s.l2SystemContractsUpgradeBatchNumber == 0;
+        _commitBatchesZKsyncOS(lastCommittedBatchData, newBatchesData, processSystemUpgradeTx);
+
+        s.totalBatchesCommitted = s.totalBatchesCommitted + newBatchesData.length;
+    }
+
+    /// @inheritdoc IExecutor
+    function commitBatchesSharedBridge(
+        address, // _chainAddress
+        uint256 _processFrom,
+        uint256 _processTo,
+        bytes calldata _commitData
+    ) external nonReentrant onlyValidator onlySettlementLayer {
+        // check that we have the right protocol version
+        // three comments:
+        // 1. A chain has to keep their protocol version up to date, as processing a block requires the latest or previous protocol version
+        // to solve this we will need to add the feature to create batches with only the protocol upgrade tx, without any other txs.
+        // 2. A chain might become out of sync if it launches while we are in the middle of a protocol upgrade. This would mean they cannot process their genesis upgrade
+        // as their protocolversion would be outdated, and they also cannot process the protocol upgrade tx as they have a pending upgrade.
+        // 3. The protocol upgrade is increased in the BaseZkSyncUpgrade, in the executor only the systemContractsUpgradeTxHash is checked
+        if (!IChainTypeManager(s.chainTypeManager).protocolVersionIsActive(s.protocolVersion)) {
+            revert InvalidProtocolVersion();
+        }
+        if (s.zksyncOS) {
+            _commitBatchesSharedBridgeZKsyncOS(_processFrom, _processTo, _commitData);
+        } else {
+            _commitBatchesSharedBridgeEra(_processFrom, _processTo, _commitData);
+        }
     }
 
     /// @dev Commits new batches without any system contracts upgrade.
@@ -488,6 +616,47 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _lastCommittedBatchData.batchHash,
                 _lastCommittedBatchData.commitment
             );
+        }
+    }
+
+    function _commitBatchesZKsyncOS(
+        StoredBatchInfo memory _lastCommittedBatchData,
+        CommitBatchInfoZKsyncOS[] memory _newBatchesData,
+        bool _processSystemUpgradeTx
+    ) internal {
+        bytes32 upgradeTxHash;
+        if (_processSystemUpgradeTx) {
+            // While the logic of the contract ensures that the s.l2SystemContractsUpgradeBatchNumber is 0 when _processSystemUpgradeTx is true,
+            // this check is added just in case. Since it is a hot read, it does not incur noticeable gas cost.
+            if (s.l2SystemContractsUpgradeBatchNumber != 0) {
+                revert UpgradeBatchNumberIsNotZero();
+            }
+
+            // Save the batch number where the upgrade transaction was executed.
+            s.l2SystemContractsUpgradeBatchNumber = _newBatchesData[0].batchNumber;
+            upgradeTxHash = s.l2SystemContractsUpgradeTxHash;
+        }
+
+        // We disable this check because calldata array length is cheap.
+        // solhint-disable-next-line gas-length-in-loops
+        for (uint256 i = 0; i < _newBatchesData.length; i = i.uncheckedInc()) {
+            _lastCommittedBatchData = _commitOneBatchZKsyncOS(
+                _lastCommittedBatchData,
+                _newBatchesData[i],
+                upgradeTxHash
+            );
+
+            s.storedBatchHashes[_lastCommittedBatchData.batchNumber] = _hashStoredBatchInfo(_lastCommittedBatchData);
+            emit BlockCommit(
+                _lastCommittedBatchData.batchNumber,
+                _lastCommittedBatchData.batchHash,
+                _lastCommittedBatchData.commitment
+            );
+
+            // reset upgradeTxHash after the first batch
+            if (i == 0) {
+                upgradeTxHash = bytes32(0);
+            }
         }
     }
 
@@ -597,12 +766,13 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // To ease up the migration, we never append messages to message root on L1.
         if (block.chainid != L1_CHAIN_ID) {
             // Once the batch is executed, we include its message to the message root.
-            IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+            IMessageRoot messageRootContract = IMessageRoot(address(IBridgehub(s.bridgehub).messageRoot()));
             messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
         }
     }
 
     /// @inheritdoc IExecutor
+    // Warning: removed onlyValidator - to make this permisionless.
     function executeBatchesSharedBridge(
         address, // _chainAddress
         uint256 _processFrom,
@@ -638,6 +808,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
+    // Warning: removed onlyValidator to make it permisionless.
     function proveBatchesSharedBridge(
         address, // _chainAddress
         uint256 _processBatchFrom,
@@ -667,6 +838,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         bytes32 prevBatchCommitment = prevBatch.commitment;
+        bytes32 prevBatchStateCommitment = prevBatch.batchHash;
         for (uint256 i = 0; i < committedBatchesLength; i = i.uncheckedInc()) {
             currentTotalBatchesVerified = currentTotalBatchesVerified.uncheckedInc();
             if (_hashStoredBatchInfo(committedBatches[i]) != s.storedBatchHashes[currentTotalBatchesVerified]) {
@@ -677,9 +849,25 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
             }
 
             bytes32 currentBatchCommitment = committedBatches[i].commitment;
-            proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
+            bytes32 currentBatchStateCommitment = committedBatches[i].batchHash;
+            if (s.zksyncOS) {
+                proofPublicInput[i] =
+                    uint256(
+                        keccak256(
+                            abi.encodePacked(
+                                prevBatchStateCommitment,
+                                currentBatchStateCommitment,
+                                currentBatchCommitment
+                            )
+                        )
+                    ) >>
+                    PUBLIC_INPUT_SHIFT;
+            } else {
+                proofPublicInput[i] = _getBatchProofPublicInput(prevBatchCommitment, currentBatchCommitment);
+            }
 
             prevBatchCommitment = currentBatchCommitment;
+            prevBatchStateCommitment = currentBatchStateCommitment;
         }
         if (currentTotalBatchesVerified > s.totalBatchesCommitted) {
             revert VerifiedBatchesExceedsCommittedBatches();
@@ -693,9 +881,10 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
         // We can only process 1 batch proof at a time.
-        if (proofPublicInput.length != 1) {
-            revert CanOnlyProcessOneBatch();
-        }
+        // Allow processing multiple proofs at once.
+        //if (proofPublicInput.length != 1) {
+        //    revert CanOnlyProcessOneBatch();
+        //}
 
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {

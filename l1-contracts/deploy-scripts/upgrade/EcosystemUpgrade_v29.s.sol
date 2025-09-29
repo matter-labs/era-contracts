@@ -8,16 +8,16 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -176,7 +176,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         (
             addresses.bridgehub.chainAssetHandlerImplementation,
             addresses.bridgehub.chainAssetHandlerProxy
-        ) = deployTuppWithContract("ChainAssetHandler", false);
+        ) = deployTuppWithContract("L1ChainAssetHandler", false);
 
         (
             addresses.stateTransition.validatorTimelockImplementation,
@@ -293,7 +293,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         calls = new Call[](1);
         calls[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
-            data: abi.encodeCall(Bridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
+            data: abi.encodeCall(IBridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
             value: 0
         });
     }
@@ -382,39 +382,5 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
     function deployUsedUpgradeContractGW() internal override returns (address) {
         return deployGWContract("L1V29Upgrade");
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "ValidatorTimelock")) {
-            if (!isZKBytecode) {
-                return
-                    abi.encodeCall(
-                        ValidatorTimelock.initialize,
-                        (config.ownerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
-                    );
-            } else {
-                // On Gateway, the delay is always 0.
-                return
-                    abi.encodeCall(
-                        ValidatorTimelock.initialize,
-                        (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), uint32(0))
-                    );
-            }
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
-            if (!isZKBytecode) {
-                return abi.encodeCall(ChainAssetHandler.initialize, (config.ownerAddress));
-            } else {
-                return
-                    abi.encodeCall(
-                        ChainAssetHandler.initialize,
-                        AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress)
-                    );
-            }
-        } else {
-            return super.getInitializeCalldata(contractName, isZKBytecode);
-        }
     }
 }

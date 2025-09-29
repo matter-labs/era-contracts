@@ -20,8 +20,6 @@ error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batch
 error InitialForceDeploymentMismatch(bytes32 forceDeploymentHash, bytes32 initialForceDeploymentHash);
 // 0xfbd630b8
 error InvalidBatchesDataLength(uint256 batchesDataLength, uint256 priorityOpsDataLength);
-// 0x7a47c9a2
-error InvalidChainId();
 // 0xc06789fa
 error InvalidCommitment();
 // 0xd2531c15
@@ -70,6 +68,8 @@ error NotL1(uint256 blockChainId);
 error NotMigrated();
 // 0xd0266e26
 error NotSettlementLayer();
+// 0xeee8a4d9
+error OnlyCtmOwner();
 // 0x04e05fd1
 error OnlyOneBlobWithCalldataAllowed();
 // 0x885ae069
@@ -82,6 +82,8 @@ error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protoco
 error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 totalBlobsCommitmentSize);
 // 0x9044dff9
 error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
+// 0x0baf1d48
+error UnknownVerifierVersion();
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 // 0x52595598

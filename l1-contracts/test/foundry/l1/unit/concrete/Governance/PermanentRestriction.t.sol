@@ -2,7 +2,7 @@ pragma solidity 0.8.28;
 
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+
 import {BridgehubBurnCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
@@ -21,7 +21,7 @@ import {ChainTypeManagerTest} from "test/foundry/l1/unit/concrete/state-transiti
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -41,6 +41,7 @@ contract TestPermanentRestriction is PermanentRestriction {
 }
 
 contract PermanentRestrictionTest is ChainTypeManagerTest {
+    uint256 internal L1_CHAIN_ID;
     ChainAdmin internal chainAdmin;
     AccessControlRestriction internal restriction;
     TestPermanentRestriction internal permRestriction;
@@ -62,6 +63,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         address[] memory restrictions = new address[](1);
         restrictions[0] = address(restriction);
         chainAdmin = new ChainAdmin(restrictions);
+        L1_CHAIN_ID = 5;
     }
 
     function _deployPermRestriction(
@@ -269,7 +271,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             secondBridgeCalldata: hex""
         });
         if (!correctSecondBridge) {
-            call.data = abi.encodeCall(Bridgehub.requestL2TransactionTwoBridges, (outer));
+            call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
             // 0 is not correct second bridge
             return call;
         }
@@ -289,7 +291,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
 
-        call.data = abi.encodeCall(Bridgehub.requestL2TransactionTwoBridges, (outer));
+        call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
     }
 
     function assertInvalidMigrationCall(Call memory call) public {
@@ -366,7 +368,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
-            new MessageRoot(bridgehub, block.chainid),
+            new L1MessageRoot(bridgehub, L1_CHAIN_ID),
             address(0)
         );
         vm.stopPrank();
@@ -392,7 +394,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));

@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
-import "contracts/bridgehub/Bridgehub.sol";
+import "contracts/bridgehub/L1Bridgehub.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";

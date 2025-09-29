@@ -8,7 +8,7 @@ import {ETH_TOKEN_ADDRESS, MAX_NEW_FACTORY_DEPS, REQUIRED_L2_GAS_PRICE_PER_PUBDA
 
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps} from "contracts/common/L1ContractErrors.sol";
-import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;

@@ -7,7 +7,8 @@ import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {HashMismatch, Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract createNewChainTest is ChainTypeManagerTest {
     function setUp() public {
@@ -56,7 +57,7 @@ contract createNewChainTest is ChainTypeManagerTest {
         uint256[] memory mockData = new uint256[](1);
         mockData[0] = chainId;
 
-        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getAllZKChainChainIDs, ()), abi.encode(mockData));
+        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehub.getAllZKChainChainIDs, ()), abi.encode(mockData));
         uint256[] memory chainIds = _getAllZKChainIDs();
 
         assertEq(chainIds.length, 1);

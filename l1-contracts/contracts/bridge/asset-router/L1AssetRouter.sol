@@ -36,6 +36,12 @@ import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker
 contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
+    /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
+    IBridgehub public immutable override BRIDGE_HUB;
+
+    /// @dev Chain ID of Era for legacy reasons
+    uint256 public immutable ERA_CHAIN_ID;
+
     /// @dev The address of the WETH token on L1.
     address public immutable override L1_WETH_TOKEN;
 
@@ -94,8 +100,10 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _l1Nullifier,
         uint256 _eraChainId,
         address _eraDiamondProxy
-    ) reentrancyGuardInitializer AssetRouterBase(block.chainid, _eraChainId, IBridgehub(_bridgehub)) {
+    ) reentrancyGuardInitializer {
         _disableInitializers();
+        BRIDGE_HUB = IBridgehub(_bridgehub);
+        ERA_CHAIN_ID = _eraChainId;
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
         L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
@@ -672,5 +680,21 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// the returned value is 0.
     function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
         return L1_NULLIFIER.l2BridgeAddress(_chainId);
+    }
+
+    function L1_CHAIN_ID() external view override returns (uint256) {
+        return block.chainid;
+    }
+
+    function _bridgehub() internal view override returns (IBridgehub) {
+        return BRIDGE_HUB;
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return block.chainid;
+    }
+
+    function _eraChainId() internal view override returns (uint256) {
+        return ERA_CHAIN_ID;
     }
 }

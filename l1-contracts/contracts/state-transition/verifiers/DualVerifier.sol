@@ -2,9 +2,18 @@
 
 pragma solidity 0.8.28;
 
+import {OnlyCtmOwner, UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
+
+// 0xd08a97e6
+error InvalidMockProofLength();
+// 0x09bde339
+error InvalidProof();
+
+// 0x616008dd
+error UnsupportedChainIdForMockVerifier();
 
 /// @title Dual Verifier
 /// @author Matter Labs
@@ -14,23 +23,46 @@ import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErro
 /// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type. The contract is
 /// needed for the smooth transition from PLONK based verifier to the FFLONK verifier.
 contract DualVerifier is IVerifier {
-    /// @notice The latest FFLONK verifier contract.
-    IVerifierV2 public immutable FFLONK_VERIFIER;
-
-    /// @notice PLONK verifier contract.
-    IVerifier public immutable PLONK_VERIFIER;
-
     /// @notice Type of verification for FFLONK verifier.
     uint256 internal constant FFLONK_VERIFICATION_TYPE = 0;
 
     /// @notice Type of verification for PLONK verifier.
     uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
 
+    uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
+
+    // @notice This is test only verifier (mock), and must be removed before prod.
+    uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
+
+    address public ctmOwner;
+
+    mapping(uint32 => IVerifierV2) public fflonkVerifiers;
+    mapping(uint32 => IVerifier) public plonkVerifiers;
+
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) {
-        FFLONK_VERIFIER = _fflonkVerifier;
-        PLONK_VERIFIER = _plonkVerifier;
+    /// @param _ctmOwner The address of the contract owner, who can add or remove verifiers.
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _ctmOwner) {
+        ctmOwner = _ctmOwner;
+        fflonkVerifiers[0] = _fflonkVerifier;
+        plonkVerifiers[0] = _plonkVerifier;
+    }
+
+    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external {
+        if (msg.sender != ctmOwner) {
+            revert OnlyCtmOwner();
+        }
+        // Add logic to add verifiers
+        fflonkVerifiers[version] = _fflonkVerifier;
+        plonkVerifiers[version] = _plonkVerifier;
+    }
+
+    function removeVerifier(uint32 version) external {
+        if (msg.sender != ctmOwner) {
+            revert OnlyCtmOwner();
+        }
+        delete fflonkVerifiers[version];
+        delete plonkVerifiers[version];
     }
 
     /// @notice Routes zk-SNARK proof verification to the appropriate verifier (FFLONK or PLONK) based on the proof type.
@@ -48,11 +80,34 @@ contract DualVerifier is IVerifier {
         }
 
         // The first element of `_proof` determines the verifier type (either FFLONK or PLONK).
-        uint256 verifierType = _proof[0];
+        uint256 verifierType = _proof[0] & 255;
+        uint32 verifierVersion = uint32(_proof[0] >> 8);
+        if (
+            fflonkVerifiers[verifierVersion] == IVerifierV2(address(0)) &&
+            plonkVerifiers[verifierVersion] == IVerifier(address(0))
+        ) {
+            revert UnknownVerifierVersion();
+        }
+
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
-            return FFLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
+            return fflonkVerifiers[verifierVersion].verify(_publicInputs, _extractProof(_proof));
         } else if (verifierType == PLONK_VERIFICATION_TYPE) {
-            return PLONK_VERIFIER.verify(_publicInputs, _extractProof(_proof));
+            return plonkVerifiers[verifierVersion].verify(_publicInputs, _extractProof(_proof));
+        } else if (verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
+            uint256[] memory args = new uint256[](1);
+            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
+
+            return plonkVerifiers[verifierVersion].verify(args, _extractZKSyncOSProof(_proof));
+        } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
+            // just for safety - only allowing default anvil chain and sepolia testnet
+            if (block.chainid != 31337 && block.chainid != 11155111) {
+                revert UnsupportedChainIdForMockVerifier();
+            }
+
+            uint256[] memory args = new uint256[](1);
+            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
+
+            return mockverify(args, _extractZKSyncOSProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -60,19 +115,42 @@ contract DualVerifier is IVerifier {
         }
     }
 
+    function mockverify(uint256[] memory _publicInputs, uint256[] memory _proof) public view virtual returns (bool) {
+        if (_proof.length != 2) {
+            revert InvalidMockProofLength();
+        }
+        if (_proof[0] != 13) {
+            revert InvalidProof();
+        }
+        if (_proof[1] != _publicInputs[0]) {
+            revert InvalidProof();
+        }
+        return true;
+    }
+
     /// @inheritdoc IVerifier
     /// @dev Used for backward compatibility with older Verifier implementation. Returns PLONK verification key hash.
     function verificationKeyHash() external view returns (bytes32) {
-        return PLONK_VERIFIER.verificationKeyHash();
+        return plonkVerifiers[0].verificationKeyHash();
     }
 
     /// @notice Calculates a keccak256 hash of the runtime loaded verification keys from the selected verifier.
     /// @return The keccak256 hash of the loaded verification keys based on the verifier.
     function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
-        if (_verifierType == FFLONK_VERIFICATION_TYPE) {
-            return FFLONK_VERIFIER.verificationKeyHash();
-        } else if (_verifierType == PLONK_VERIFICATION_TYPE) {
-            return PLONK_VERIFIER.verificationKeyHash();
+        uint256 verifierType = _verifierType & 255;
+        uint32 verifierVersion = uint32(verifierType >> 8);
+
+        if (
+            fflonkVerifiers[verifierVersion] == IVerifierV2(address(0)) &&
+            plonkVerifiers[verifierVersion] == IVerifier(address(0))
+        ) {
+            revert UnknownVerifierVersion();
+        }
+
+        if (verifierType == FFLONK_VERIFICATION_TYPE) {
+            return fflonkVerifiers[verifierVersion].verificationKeyHash();
+        } else if (verifierType == PLONK_VERIFICATION_TYPE) {
+            return plonkVerifiers[verifierVersion].verificationKeyHash();
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -94,5 +172,36 @@ contract DualVerifier is IVerifier {
         assembly {
             calldatacopy(add(result, 0x20), add(_proof.offset, 0x20), mul(resultLength, 0x20))
         }
+    }
+
+    function _extractZKSyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
+        uint256 resultLength = _proof.length - 1 - 1;
+
+        // Allocate memory for the new array (_proof.length - 1) since the first element is omitted.
+        result = new uint256[](resultLength);
+
+        // Copy elements starting from index 1 (the second element) of the original array.
+        assembly {
+            calldatacopy(add(result, 0x20), add(_proof.offset, 0x40), mul(resultLength, 0x20))
+        }
+    }
+
+    function computeZKSyncOSHash(
+        uint256 initialHash,
+        uint256[] calldata _publicInputs
+    ) public pure returns (uint256 result) {
+        uint256 publicInputsLength = _publicInputs.length;
+        if (initialHash == 0) {
+            initialHash = _publicInputs[0];
+            for (uint256 i = 1; i < publicInputsLength; ++i) {
+                initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
+            }
+        } else {
+            for (uint256 i = 0; i < publicInputsLength; ++i) {
+                initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
+            }
+        }
+
+        result = initialHash;
     }
 }

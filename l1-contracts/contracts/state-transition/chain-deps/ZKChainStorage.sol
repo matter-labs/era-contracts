@@ -178,6 +178,8 @@ struct ZKChainStorage {
     /// @dev Whenever the `totalBatchesCommitted` changes, this variable is reset to `DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH`
     /// (the value of the constant can be found in Config.sol).
     bytes32 precommitmentForTheLatestBatch;
+    /// @dev ZKsync OS flag, if `true` state transition is done with ZKsync OS, otherwise Era VM
+    bool zksyncOS;
     /// @dev The scheme of L2 DA commitment. Different L1 validators may use different schemes.
     L2DACommitmentScheme l2DACommitmentScheme;
 }
