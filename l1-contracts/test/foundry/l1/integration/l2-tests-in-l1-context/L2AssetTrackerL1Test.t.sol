@@ -37,7 +37,6 @@ import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-
 contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer, L2AssetTrackerTest {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
@@ -64,7 +63,6 @@ contract L2AssetTrackerL1Test is Test, SharedL2ContractL1Deployer, L2AssetTracke
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }
-
 
     function getCreationCode(
         string memory contractName,

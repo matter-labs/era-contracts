@@ -119,7 +119,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainBalance[_chainId][_assetId] += migratedBalance;
     }
 
-    /// @notice This is used to register L2NativeTokens when the chain is settling on GW. 
+    /// @notice This is used to register L2NativeTokens when the chain is settling on GW.
     /// @notice It is needed since withdrawals are blocked until the token balance is migrated to GW, and it needs to be registered before migration.
     function registerL2NativeToken(uint256 _l2ChainId, address _l2NativeToken) external onlyNativeTokenVault {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_l2ChainId);
@@ -131,14 +131,17 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         chainBalance[settlementLayer][assetId] = MAX_TOKEN_BALANCE;
 
-        _sendConfirmationToChains(settlementLayer, ConfirmBalanceMigrationData({
-            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-            isL1ToGateway: true,
-            chainId: settlementLayer,
-            assetId: assetId,
-            migrationNumber: _getChainMigrationNumber(_l2ChainId),
-            amount: MAX_TOKEN_BALANCE
-        }));
+        _sendConfirmationToChains(
+            settlementLayer,
+            ConfirmBalanceMigrationData({
+                version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+                isL1ToGateway: true,
+                chainId: settlementLayer,
+                assetId: assetId,
+                migrationNumber: _getChainMigrationNumber(_l2ChainId),
+                amount: MAX_TOKEN_BALANCE
+            })
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -311,10 +314,16 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             amount: data.amount
         });
 
-        _sendConfirmationToChains(data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId, confirmBalanceMigrationData);
+        _sendConfirmationToChains(
+            data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
+            confirmBalanceMigrationData
+        );
     }
-    
-    function _sendConfirmationToChains(uint256 _settlementLayerChainId, ConfirmBalanceMigrationData memory _confirmBalanceMigrationData) internal {
+
+    function _sendConfirmationToChains(
+        uint256 _settlementLayerChainId,
+        ConfirmBalanceMigrationData memory _confirmBalanceMigrationData
+    ) internal {
         /// We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
         /// Note: the confirmMigrationOnL2 is a L1->GW->L2 txs if the chain is settling on Gateway.
         _sendToChain(
@@ -322,7 +331,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             GW_ASSET_TRACKER_ADDR,
             abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (_confirmBalanceMigrationData))
         );
-        _sendToChain(_confirmBalanceMigrationData.chainId, L2_ASSET_TRACKER_ADDR, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (_confirmBalanceMigrationData)));
+        _sendToChain(
+            _confirmBalanceMigrationData.chainId,
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (_confirmBalanceMigrationData))
+        );
     }
 
     function _migrateFunds(
