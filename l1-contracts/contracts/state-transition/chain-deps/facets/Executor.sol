@@ -20,7 +20,6 @@ import {CommitBasedInteropNotSupported, DependencyRootsRollingHashMismatch, Inva
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {InteropRoot} from "../../../common/Messaging.sol";
-import {IL2MessageRoot} from "../../../bridgehub/IL2MessageRoot.sol";
 
 /// @dev The version that is used for the `Executor` calldata used for relaying the
 /// stored batch info.
@@ -767,7 +766,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // To ease up the migration, we never append messages to message root on L1.
         if (block.chainid != L1_CHAIN_ID) {
             // Once the batch is executed, we include its message to the message root.
-            IL2MessageRoot messageRootContract = IL2MessageRoot(address(IBridgehub(s.bridgehub).messageRoot()));
+            IMessageRoot messageRootContract = IMessageRoot(address(IBridgehub(s.bridgehub).messageRoot()));
             messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
         }
     }

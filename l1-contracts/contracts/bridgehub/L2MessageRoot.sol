@@ -11,8 +11,6 @@ import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
-import {IL2MessageRoot} from "./IL2MessageRoot.sol";
-
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 
@@ -20,7 +18,7 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
-contract L2MessageRoot is MessageRootBase, IL2MessageRoot {
+contract L2MessageRoot is MessageRootBase {
     using FullMerkle for FullMerkle.FullTree;
     using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
 
@@ -63,7 +61,7 @@ contract L2MessageRoot is MessageRootBase, IL2MessageRoot {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) external onlyChain(_chainId) {
+    ) external override onlyChain(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();
