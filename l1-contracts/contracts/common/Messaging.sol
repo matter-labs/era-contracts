@@ -327,6 +327,15 @@ struct TokenBalanceMigrationData {
     uint256 migrationNumber;
 }
 
+struct ConfirmBalanceMigrationData {
+    bytes1 version;
+    bool isL1ToGateway;
+    uint256 chainId;
+    bytes32 assetId;
+    uint256 migrationNumber;
+    uint256 amount;
+}
+
 struct BalanceChange {
     bytes1 version;
     address originToken;

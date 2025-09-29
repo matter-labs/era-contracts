@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
-import {BUNDLE_IDENTIFIER, BalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, ConfirmBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
 import {L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
@@ -18,6 +18,7 @@ import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
 import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidL2ShardId, InvalidServiceLog} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
+import {MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
@@ -161,6 +162,16 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     ) external onlyServiceTransactionSender {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
+
+    function registerL2NativeTokenFromL1(
+        uint256 _l2ChainId,
+        address _l2NativeToken
+    ) external onlyServiceTransactionSender {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l2ChainId, _l2NativeToken);
+        chainBalance[_l2ChainId][assetId] = MAX_TOKEN_BALANCE;
+        _registerToken(assetId, _l2NativeToken, _l2ChainId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/
@@ -208,7 +219,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 require(log.l2ShardId == 0, InvalidL2ShardId());
                 require(log.isService, InvalidServiceLog());
 
-
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
                     require(!onlyWithdrawals, OnlyWithdrawalsAllowedForPreV30Chains());
                     _handleInteropMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
@@ -250,7 +260,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         ///  Appends the batch message root to the global message.
         /// The logic of this function depends on the settlement layer as we support
         /// message root aggregation only on non-L1 settlement layers for ease for migration.
-        _messageRoot().addChainBatchRoot(_processLogsInputs.chainId, _processLogsInputs.batchNumber, chainBatchRootHash);
+        _messageRoot().addChainBatchRoot(
+            _processLogsInputs.chainId,
+            _processLogsInputs.batchNumber,
+            chainBatchRootHash
+        );
     }
 
     function _getEmptyMessageRoot(uint256 _chainId) internal returns (bytes32) {
@@ -368,7 +382,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _assetId: _assetId,
             _amount: amount
         });
-
     }
 
     function _handleChainBalanceChangeOnGateway(
@@ -377,11 +390,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _assetId,
         uint256 _amount
     ) internal {
-        if ( _amount > 0) {
+        if (_amount > 0) {
             /// Note, we don't track L1 chainBalance on Gateway.
             if (_sourceChainId != L1_CHAIN_ID) {
                 _decreaseChainBalance(_sourceChainId, _assetId, _amount);
-            } 
+            }
             if (_destinationChainId != L1_CHAIN_ID) {
                 chainBalance[_destinationChainId][_assetId] += _amount;
             }
@@ -426,7 +439,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         );
     }
 
-
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
@@ -459,7 +471,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
-    function _getOrSaveChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _migrationNumber) internal returns (uint256) {
+    function _getOrSaveChainBalance(
+        uint256 _chainId,
+        bytes32 _assetId,
+        uint256 _migrationNumber
+    ) internal returns (uint256) {
         SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_chainId][_migrationNumber][_assetId];
         if (!tokenSavedTotalSupply.isSaved) {
             tokenSavedTotalSupply.amount = chainBalance[_chainId][_assetId];
@@ -472,7 +488,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return tokenSavedTotalSupply.amount;
     }
 
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
+    function confirmMigrationOnGateway(
+        ConfirmBalanceMigrationData calldata _data
+    ) external onlyServiceTransactionSender {
         assetMigrationNumber[_data.chainId][_data.assetId] = _data.migrationNumber;
         if (_data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.

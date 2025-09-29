@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {TokenBalanceMigrationData, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {InvalidProof} from "../../common/L1ContractErrors.sol";
@@ -15,10 +15,11 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
+import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidSettlementLayer, InvalidTokenAddress} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
+import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
@@ -104,18 +105,43 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         } else {
             address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
             migratedBalance = IERC20(tokenAddress).totalSupply();
-            require(chainBalance[block.chainid][_assetId] == 0, "chainBalance is not 0");
+            require(chainBalance[block.chainid][_assetId] == 0, ChainBalanceNotZero());
         }
-        /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1, 
+        /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
         /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
         /// kl todo can it be the case that we set chainBalance to uint256.max twice.
         if (chainBalance[originChainId][_assetId] == 0) {
-            chainBalance[originChainId][_assetId] = type(uint256).max - migratedBalance;
+            chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - migratedBalance;
         } else {
             chainBalance[originChainId][_assetId] -= migratedBalance;
         }
         chainBalance[_chainId][_assetId] += migratedBalance;
+    }
+
+    /// @notice This is used to register L2NativeTokens when the chain is settling on GW.
+    /// @notice It is needed since withdrawals are blocked until the token balance is migrated to GW, and it needs to be registered before migration.
+    function registerL2NativeToken(uint256 _l2ChainId, address _l2NativeToken) external onlyNativeTokenVault {
+        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_l2ChainId);
+        require(settlementLayer != block.chainid, InvalidSettlementLayer());
+
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l2NativeToken);
+
+        require(NATIVE_TOKEN_VAULT.tokenAddress(assetId) == address(0), InvalidTokenAddress());
+
+        chainBalance[settlementLayer][assetId] = MAX_TOKEN_BALANCE;
+
+        _sendConfirmationToChains(
+            settlementLayer,
+            ConfirmBalanceMigrationData({
+                version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+                isL1ToGateway: true,
+                chainId: settlementLayer,
+                assetId: assetId,
+                migrationNumber: _getChainMigrationNumber(_l2ChainId),
+                amount: MAX_TOKEN_BALANCE
+            })
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -129,7 +155,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
-        uint256 _tokenOriginChainId
+        uint256 // _tokenOriginChainId
     ) external onlyNativeTokenVault {
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(_chainId);
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _assetId)) {
@@ -144,7 +170,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainBalance[chainToUpdate][_assetId] += _amount;
         _decreaseChainBalance(block.chainid, _assetId, _amount);
     }
-
 
     /// @notice We set the transient balance change so the Mailbox can consume it so the Gateway can keep track of the balance change.
     function _setTransientBalanceChange(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal {
@@ -177,7 +202,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _amount,
-        uint256 _tokenOriginChainId
+        uint256 // _tokenOriginChainId
     ) external onlyNativeTokenVault {
         uint256 chainToUpdate = _getWithdrawalChain(_chainId);
 
@@ -235,6 +260,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
+        /// We check the chainMigrationNumber to make sure the message is from a previous token migration.
         require(
             chainMigrationNumber == data.migrationNumber,
             InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
@@ -292,14 +318,37 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
 
-        /// We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
-        /// Note: the confirmMigrationOnL2 is a L1->GW->L2 txs.
-        _sendToChain(
+        ConfirmBalanceMigrationData memory confirmBalanceMigrationData = ConfirmBalanceMigrationData({
+            version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
+            isL1ToGateway: data.isL1ToGateway,
+            chainId: data.chainId,
+            assetId: data.assetId,
+            migrationNumber: data.migrationNumber,
+            amount: data.amount
+        });
+
+        _sendConfirmationToChains(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
-            GW_ASSET_TRACKER_ADDR,
-            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (data))
+            confirmBalanceMigrationData
         );
-        _sendToChain(data.chainId, L2_ASSET_TRACKER_ADDR, abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (data)));
+    }
+
+    function _sendConfirmationToChains(
+        uint256 _settlementLayerChainId,
+        ConfirmBalanceMigrationData memory _confirmBalanceMigrationData
+    ) internal {
+        /// We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
+        /// Note: the confirmMigrationOnL2 is a L1->GW->L2 txs if the chain is settling on Gateway.
+        _sendToChain(
+            _settlementLayerChainId,
+            GW_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IGWAssetTracker.confirmMigrationOnGateway, (_confirmBalanceMigrationData))
+        );
+        _sendToChain(
+            _confirmBalanceMigrationData.chainId,
+            L2_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IL2AssetTracker.confirmMigrationOnL2, (_confirmBalanceMigrationData))
+        );
     }
 
     function _migrateFunds(
@@ -307,6 +356,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _toChainId,
         bytes32 _assetId,
         uint256 _amount,
+        // solhint-disable-next-line no-unused-vars
         uint256 _tokenOriginChainId
     ) internal {
         _decreaseChainBalance(_fromChainId, _assetId, _amount);

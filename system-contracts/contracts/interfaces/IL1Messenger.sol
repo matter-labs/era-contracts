@@ -2,6 +2,8 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
+import {L2DACommitmentScheme} from "../Constants.sol";
+
 /// @dev The log passed from L2
 /// @param l2ShardId The shard identifier, 0 - rollup, 1 - porter. All other values are not used but are reserved for the future
 /// @param isService A boolean flag that is part of the log along with `key`, `value`, and `sender` address.
@@ -19,18 +21,6 @@ struct L2ToL1Log {
     bytes32 key;
     bytes32 value;
 }
-
-/// @dev Bytes in raw L2 to L1 log
-/// @dev Equal to the bytes size of the tuple - (uint8 ShardId, bool isService, uint16 txNumberInBlock, address sender, bytes32 key, bytes32 value)
-uint256 constant L2_TO_L1_LOG_SERIALIZE_SIZE = 88;
-
-/// @dev The value of default leaf hash for L2 to L1 logs Merkle tree
-/// @dev An incomplete fixed-size tree is filled with this value to be a full binary tree
-/// @dev Actually equal to the `keccak256(new bytes(L2_TO_L1_LOG_SERIALIZE_SIZE))`
-bytes32 constant L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH = 0x72abee45b59e344af8a6e520241c4744aff26ed411f4c4b00f8af09adada43ba;
-
-/// @dev The current version of state diff compression being used.
-uint256 constant STATE_DIFF_COMPRESSION_VERSION_NUMBER = 1;
 
 /**
  * @author Matter Labs
@@ -54,5 +44,8 @@ interface IL1Messenger {
     function requestBytecodeL1Publication(bytes32 _bytecodeHash) external;
 
     // This function is expected to be called only by the Bootloader system contract
-    function publishPubdataAndClearState(address _l2DAValidator, bytes calldata _operatorInput) external;
+    function publishPubdataAndClearState(
+        L2DACommitmentScheme _l2DACommitmentScheme,
+        bytes calldata _operatorInput
+    ) external;
 }

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
+import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
@@ -29,18 +29,18 @@ import {L2MessageVerification} from "../../../../../contracts/interop/L2MessageV
 import {DummyL2InteropRootStorage} from "../../../../../contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {DummyL2L1Messenger} from "../../../../../contracts/dev-contracts/test/DummyL2L1Messenger.sol";
 
-import {Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {DeployCTMIntegrationScript} from "../deploy-scripts/DeployCTMIntegration.s.sol";
 
 import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 import {L2UtilsBase} from "./L2UtilsBase.sol";
-import {FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
-
+import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";
+
 import {DeployL1HelperScript} from "deploy-scripts/DeployL1HelperScript.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 
@@ -107,9 +107,25 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
-    function getFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override(DeployCTMIntegrationScript, DeployIntegrationUtils) returns (FacetCut[] memory) {
-        return super.getFacetCuts(stateTransition);
+    )
+        internal
+        virtual
+        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+        returns (Diamond.FacetCut[] memory)
+    {
+        return super.getChainCreationFacetCuts(stateTransition);
+    }
+
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    )
+        internal
+        virtual
+        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+        returns (Diamond.FacetCut[] memory)
+    {
+        return super.getUpgradeAddedFacetCuts(stateTransition);
     }
 }

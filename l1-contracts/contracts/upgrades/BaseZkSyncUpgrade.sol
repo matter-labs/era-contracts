@@ -48,6 +48,13 @@ error UpgradeInnerFailed();
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
 abstract contract BaseZkSyncUpgrade is ZKChainBase {
+    /// @notice The address of this contract.
+    /// @dev needed if address is delegateCalled, and we delegateCall it again.
+    address public immutable THIS_ADDRESS;
+
+    constructor() {
+        THIS_ADDRESS = address(this);
+    }
 
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);

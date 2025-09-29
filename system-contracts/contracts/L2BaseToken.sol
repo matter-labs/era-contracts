@@ -29,7 +29,10 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @dev The assetId of the token.
     bytes32 public assetId;
 
-    function setAddresses(bytes32 _assetId, address _originTokenOriginAddress) external onlyCallFrom(address(COMPLEX_UPGRADER_CONTRACT))  {
+    function setAddresses(
+        bytes32 _assetId,
+        address _originTokenOriginAddress
+    ) external onlyCallFrom(address(COMPLEX_UPGRADER_CONTRACT)) {
         originToken = _originTokenOriginAddress;
         assetId = _assetId;
     }

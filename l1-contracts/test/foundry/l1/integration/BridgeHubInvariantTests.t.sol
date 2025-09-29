@@ -19,7 +19,7 @@ import {L2CanonicalTransaction, L2Message} from "contracts/common/Messaging.sol"
 import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
 contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker {

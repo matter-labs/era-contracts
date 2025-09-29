@@ -6,7 +6,7 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {DAContracts, DeployedContracts, GatewayCTMDeployer, GatewayCTMDeployerConfig, StateTransitionContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
@@ -91,7 +91,6 @@ contract GatewayCTMDeployerTest is Test {
             salt: keccak256("test-salt"),
             eraChainId: 1001,
             l1ChainId: 1,
-            rollupL2DAValidatorAddress: address(0x456),
             testnetVerifier: true,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),

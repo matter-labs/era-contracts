@@ -26,7 +26,7 @@ import {IEmergencyUpgrageBoard} from "./interfaces/IEmergencyUpgrageBoard.sol";
 import {ISecurityCouncil} from "./interfaces/ISecurityCouncil.sol";
 import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
-import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
@@ -112,19 +112,6 @@ struct SelectorToFacet {
 struct FacetToSelectors {
     bytes4[] selectors;
     uint16 facetPosition;
-}
-
-struct FacetCut {
-    address facet;
-    Action action;
-    bool isFreezable;
-    bytes4[] selectors;
-}
-
-enum Action {
-    Add,
-    Replace,
-    Remove
 }
 
 struct ChainInfoFromBridgehub {

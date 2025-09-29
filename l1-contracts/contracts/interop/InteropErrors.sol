@@ -25,8 +25,6 @@ error InteroperableAddressChainReferenceNotEmpty(bytes interoperableAddress);
 error InteroperableAddressNotEmpty(bytes interoperableAddress);
 // 0x32c2e156
 error MessageNotIncluded();
-// 0x8ad61a4c
-error SettlementLayerBatchNumberTooLow();
 // 0x89fd2c76
 error UnauthorizedMessageSender(address expected, address actual);
 // 0x0345c281
