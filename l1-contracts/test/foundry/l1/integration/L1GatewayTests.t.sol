@@ -151,23 +151,22 @@ contract L1GatewayTests is
         gatewayScript.fullGatewayRegistration();
     }
 
-    // TODO: uncomment this test once free transactions are supported on GW.
-    // function test_startMessageToL2() public {
-    //     _setUpGatewayWithFilterer();
-    //     gatewayScript.migrateChainToGateway(migratingChainId);
-    //     IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
-    //     uint256 expectedValue = 1000000000000000000000;
+    function test_startMessageToL2() public {
+        _setUpGatewayWithFilterer();
+        gatewayScript.migrateChainToGateway(migratingChainId);
+        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
+        uint256 expectedValue = 1000000000000000000000;
 
-    //     L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
-    //         migratingChainId,
-    //         expectedValue,
-    //         0,
-    //         72000000,
-    //         800,
-    //         "0x"
-    //     );
-    //     addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
-    // }
+        L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
+            migratingChainId,
+            expectedValue,
+            0,
+            72000000,
+            800,
+            "0x"
+        );
+        addresses.bridgehub.requestL2TransactionDirect{value: expectedValue}(request);
+    }
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
