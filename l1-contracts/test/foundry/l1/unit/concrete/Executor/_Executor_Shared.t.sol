@@ -10,6 +10,7 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, L2_DA_COMMITMENT_SCHEME, Utils} from "../Utils/Utils.sol";
 import {ETH_TOKEN_ADDRESS, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER} from "contracts/common/Config.sol";
 import {DummyEraBaseTokenBridge} from "contracts/dev-contracts/test/DummyEraBaseTokenBridge.sol";
+import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DummyChainTypeManagerForValidatorTimelock as DummyCTM} from "contracts/dev-contracts/test/DummyChainTypeManagerForValidatorTimelock.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";

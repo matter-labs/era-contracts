@@ -5,7 +5,7 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehub, L2TransactionRequestTwoBridgesOuter, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";

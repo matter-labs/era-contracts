@@ -13,6 +13,7 @@ import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";

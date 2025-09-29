@@ -15,6 +15,8 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 
 import {ChainTypeManagerTest} from "test/foundry/l1/unit/concrete/state-transition/ChainTypeManager/_ChainTypeManager_Shared.t.sol";
