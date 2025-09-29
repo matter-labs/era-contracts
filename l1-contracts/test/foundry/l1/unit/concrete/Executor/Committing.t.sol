@@ -990,8 +990,7 @@ contract CommittingTest is ExecutorTest {
             correctCommitBatchInfoArray
         );
         validatorTimelock.commitBatchesSharedBridge(address(executor), commitBatchFrom, commitBatchTo, commitData);
-        // FIXME: return snapshot back
-        // vm.snapshotGasLastCall("Executor", "commit");
+        vm.snapshotGasLastCall("Executor", "commit");
     }
 
     function test_commitBlockRealData() public {

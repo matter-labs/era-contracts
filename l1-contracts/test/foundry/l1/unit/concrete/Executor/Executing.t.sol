@@ -461,7 +461,6 @@ contract ExecutingTest is ExecutorTest {
             Utils.generatePriorityOps(storedBatchInfoArray.length)
         );
         validatorTimelock.executeBatchesSharedBridge(address(executor), executeBatchFrom, executeBatchTo, executeData);
-        // FIXME: return snapshot back
-        // vm.snapshotGasLastCall("Executor", "execute");
+        vm.snapshotGasLastCall("Executor", "execute");
     }
 }

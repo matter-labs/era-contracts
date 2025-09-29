@@ -50,7 +50,6 @@ contract PrecommittingTest is ExecutorTest {
     function test_MeasureGas() public {
         vm.prank(validator);
         validatorTimelock.precommitSharedBridge(address(executor), batchNumber, precommitData());
-        // FIXME: return snapshot back
-        // vm.snapshotGasLastCall("Executor", "precommit");
+        vm.snapshotGasLastCall("Executor", "precommit");
     }
 }
