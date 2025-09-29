@@ -10,7 +10,6 @@ import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {OnlyEraSupported} from "contracts/common/L1ContractErrors.sol";
 
-
 contract MailboxFinalizeWithdrawal is MailboxTest {
     bytes32[] proof;
     bytes message;

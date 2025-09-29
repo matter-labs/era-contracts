@@ -7,20 +7,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-
-
-
-
-
-
-
-
-
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-
-
-
-
 
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
@@ -34,37 +21,7 @@ import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import {Call} from "contracts/governance/Common.sol";
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
 

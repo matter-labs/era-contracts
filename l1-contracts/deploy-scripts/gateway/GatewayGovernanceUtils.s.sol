@@ -6,32 +6,22 @@ pragma solidity ^0.8.0;
 import {Script, console2 as console} from "forge-std/Script.sol";
 // import {Vm} from "forge-std/Vm.sol";
 
-
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
-
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-
 
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../Utils.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
-
-
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-
-
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-
-
-
 
 import {Call} from "contracts/governance/Common.sol";
 
@@ -40,20 +30,7 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-
-
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-
-
-
-
-
-
-
-
-
-
-
 
 abstract contract GatewayGovernanceUtils is Script {
     struct GatewayGovernanceConfig {

@@ -6,7 +6,6 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
-
 contract ChainTypeManagerSetters is ChainTypeManagerTest {
     function setUp() public {
         deploy();

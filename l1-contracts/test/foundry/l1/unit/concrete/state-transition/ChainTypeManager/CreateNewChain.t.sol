@@ -10,8 +10,6 @@ import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol"
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
-
-
 contract createNewChainTest is ChainTypeManagerTest {
     function setUp() public {
         deploy();
