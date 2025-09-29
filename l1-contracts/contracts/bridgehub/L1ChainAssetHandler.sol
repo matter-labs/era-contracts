@@ -30,6 +30,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     /// @dev The asset router contract.
     address internal immutable ASSET_ROUTER;
 
+    /// @dev The asset tracker contract.
+    address internal immutable ASSET_TRACKER;
+
+    /// @dev The L1 nullifier contract.
+    IL1Nullifier internal immutable L1_NULLIFIER;
+
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -63,6 +69,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+        ASSET_TRACKER = _assetTracker;
+        L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
         _transferOwnership(_owner);
     }
 

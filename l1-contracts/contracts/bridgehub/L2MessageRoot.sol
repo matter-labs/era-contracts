@@ -44,6 +44,19 @@ contract L2MessageRoot is MessageRootBase {
         return IBridgehub(L2_BRIDGEHUB_ADDR);
     }
 
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
+    }
+
+    modifier onlyServiceTransactionSender() {
+        require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
+        _;
+    }
+
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
@@ -52,6 +65,26 @@ contract L2MessageRoot is MessageRootBase {
         L1_CHAIN_ID = _l1ChainId;
         _initialize();
     }
+
+        /// On L2s the initializer/reinitializer is not called.
+        function initializeL2V30Upgrade() external onlyL2 onlyUpgrader {
+            uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+            _v30InitializeInner(allZKChains);
+        }
+
+        /// @notice This function is used to send the V30 upgrade block number from the Gateway to the L1 chain.
+        function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external onlyGateway {
+            uint256 sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];
+            require(
+                sentBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY && sentBlockNumber != 0,
+                V30UpgradeChainBatchNumberNotSet()
+            );
+    
+            // slither-disable-next-line unused-return
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+                abi.encodeCall(this.sendV30UpgradeBlockNumberFromGateway, (_chainId, sentBlockNumber))
+            );
+        }
 
     /// @notice Adds a new chainBatchRoot to the chainTree.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
@@ -62,10 +95,7 @@ contract L2MessageRoot is MessageRootBase {
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
     ) external override onlyChain(_chainId) {
-        // Make sure that chain is registered.
-        if (!chainRegistered(_chainId)) {
-            revert MessageRootNotRegistered();
-        }
+        super.addChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
 
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.
         bytes32 chainRoot;
@@ -80,11 +110,7 @@ contract L2MessageRoot is MessageRootBase {
 
         emit NewChainRoot(_chainId, chainRoot, cachedChainIdLeafHash);
 
-        // What happens here is we query for the current sharedTreeRoot and emit the event stating that new InteropRoot is "created".
-        // The reason for the usage of "bytes32[] memory _sides" to store the InteropRoot is explained in L2InteropRootStorage contract.
-        bytes32[] memory _sides = new bytes32[](1);
-        _sides[0] = sharedTreeRoot;
-        emit NewInteropRoot(block.chainid, block.number, 0, _sides);
+        _emitRoot(sharedTreeRoot);
         historicalRoot[block.number] = sharedTreeRoot;
     }
 }
