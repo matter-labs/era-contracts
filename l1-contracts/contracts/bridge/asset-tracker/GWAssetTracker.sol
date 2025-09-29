@@ -356,10 +356,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // slither-disable-next-line unused-return
         (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
         DataEncoding.assetIdCheck(tokenOriginalChainId, _assetId, originalToken);
-        if (originToken[_assetId] == address(0)) {
-            originToken[_assetId] = originalToken;
-            tokenOriginChainId[_assetId] = tokenOriginalChainId;
-        }
+        _registerToken(_assetId, originalToken, tokenOriginalChainId);
 
         _handleChainBalanceChangeOnGateway({
             _sourceChainId: _sourceChainId,
