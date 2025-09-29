@@ -216,7 +216,7 @@ contract ExecutorTest is UtilsTest {
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 
-        vm.mockCall(
+        vm.mockCall( // kl todo add back if commented out.
             address(messageRoot),
             abi.encodeWithSelector(MessageRoot.addChainBatchRoot.selector, 9, 1, bytes32(0)),
             abi.encode()

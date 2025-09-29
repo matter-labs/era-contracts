@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
-import {BUNDLE_IDENTIFIER, BalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BalanceChange, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, ConfirmBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
 import {L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
@@ -18,6 +18,7 @@ import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
 import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidInteropChainId, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidV30UpgradeChainBatchNumber, InvalidFunctionSignature, InvalidL2ShardId, InvalidServiceLog} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
+import {MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
 import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
@@ -146,6 +147,13 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     ) external onlyServiceTransactionSender {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
+
+    function registerL2NativeTokenFromL1(uint256 _l2ChainId, address _l2NativeToken) external onlyServiceTransactionSender {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l2ChainId, _l2NativeToken);
+        chainBalance[_l2ChainId][assetId] = MAX_TOKEN_BALANCE;
+        _registerToken(assetId, _l2NativeToken, _l2ChainId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/
@@ -462,7 +470,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return tokenSavedTotalSupply.amount;
     }
 
-    function confirmMigrationOnGateway(TokenBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
+    function confirmMigrationOnGateway(ConfirmBalanceMigrationData calldata _data) external onlyServiceTransactionSender {
         assetMigrationNumber[_data.chainId][_data.assetId] = _data.migrationNumber;
         if (_data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.

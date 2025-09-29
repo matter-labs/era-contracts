@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
-import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {TokenBalanceMigrationData, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
@@ -81,7 +81,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     function _registerTokenOnL2(bytes32 _assetId) internal {
-        assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+        /// If the chain is settling on Gateway, then withdrawals are not automatically allowed for new tokens. 
+        if (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId()) {
+            assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+        }
     }
 
     function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
@@ -238,7 +241,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
-    function confirmMigrationOnL2(TokenBalanceMigrationData calldata data) external onlyServiceTransactionSender {
+    function confirmMigrationOnL2(ConfirmBalanceMigrationData calldata data) external onlyServiceTransactionSender {
         assetMigrationNumber[block.chainid][data.assetId] = data.migrationNumber;
     }
 
