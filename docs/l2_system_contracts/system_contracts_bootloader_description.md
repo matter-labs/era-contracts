@@ -711,6 +711,8 @@ A contract that is responsible for facilitating initialization of a newly create
 
 These contracts are used to facilitate cross-chain communication as well value bridging. You can read more about then in [the asset router spec](../bridging/asset_router/overview.md).
 
+Note, that [L2AssetRouter](../../l1-contracts/contracts/bridge/asset-router/L2AssetRouter.sol) and [L2NativeTokenVault](../../l1-contracts/contracts/bridge/ntv/L2NativeTokenVault.sol) have unique code, the L2Bridgehub and L2MessageRoot share the same source code with their L1 precompiles, i.e. the L2Bridgehub has [this](../../l1-contracts/contracts/bridgehub/L2Bridgehub.sol) code and L2MessageRoot has [this](../../l1-contracts/contracts/bridgehub/L2MessageRoot.sol) code.
+
 ### SloadContract
 
 During the L2GatewayUpgrade, the system contracts will need to read the storage of some other contracts, despite those lacking getters. The how it is implemented can be read in the `forcedSload` function of the [SystemContractHelper](../../system-contracts/contracts/libraries/SystemContractHelper.sol) contract.

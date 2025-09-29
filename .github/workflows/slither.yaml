@@ -62,8 +62,9 @@ jobs:
 
       - name: Run Slither for L1 contracts
         working-directory: ./l1-contracts
+        # FIXME? --skip assembly because otherwise IR for DummyVerifierPlonk can't be generated (Slither issue).
         run: |
-          slither --config ./slither.config.json .
+          slither --config ./slither.config.json --skip-assembly .
 
       - name: Run Slither for L2 contracts
         working-directory: ./l2-contracts

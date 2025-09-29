@@ -36,11 +36,11 @@ contract L1MessageRoot is MessageRootBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
-    }
-
     function _bridgehub() internal view override returns (IBridgehub) {
         return BRIDGE_HUB;
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return block.chainid;
     }
 }

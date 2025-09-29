@@ -29,6 +29,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
@@ -262,41 +263,48 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "L1Bridgehub")) {
-            return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
-        } else if (compareStrings(contractName, "L1MessageRoot")) {
-            return abi.encodeCall(L1MessageRoot.initialize, ());
-        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-            return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
-        } else if (compareStrings(contractName, "L1Nullifier")) {
-            return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
-        } else if (compareStrings(contractName, "L1AssetRouter")) {
-            return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-            return abi.encodeCall(L1ERC20Bridge.initialize, ());
-        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-            return
-                abi.encodeCall(
-                    L1NativeTokenVault.initialize,
-                    (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
-                );
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return
-                abi.encodeCall(
-                    ChainTypeManager.initialize,
-                    getChainTypeManagerInitializeData(addresses.stateTransition)
-                );
-        } else if (compareStrings(contractName, "ServerNotifier")) {
-            return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return
-                abi.encodeCall(
-                    ValidatorTimelock.initialize,
-                    (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
-                );
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
+        if (!isZKBytecode) {
+            if (compareStrings(contractName, "L1Bridgehub")) {
+                return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return abi.encodeCall(L1MessageRoot.initialize, ());
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+                return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1Nullifier")) {
+                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+            } else if (compareStrings(contractName, "L1AssetRouter")) {
+                return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return abi.encodeCall(L1ERC20Bridge.initialize, ());
+            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+                return
+                    abi.encodeCall(
+                        L1NativeTokenVault.initialize,
+                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                    );
+            } else if (compareStrings(contractName, "ChainTypeManager")) {
+                return
+                    abi.encodeCall(
+                        ChainTypeManager.initialize,
+                        getChainTypeManagerInitializeData(addresses.stateTransition)
+                    );
+            } else if (compareStrings(contractName, "ServerNotifier")) {
+                return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
+            } else if (compareStrings(contractName, "ValidatorTimelock")) {
+                return
+                    abi.encodeCall(
+                        ValidatorTimelock.initialize,
+                        (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
+                    );
+            } else {
+                revert(string.concat("Contract ", contractName, " initialize calldata not set"));
+            }
         } else {
             revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));
         }

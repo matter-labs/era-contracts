@@ -187,11 +187,12 @@ contract ExecutorTest is Test {
 
         dummyBridgehub.setSharedBridge(address(sharedBridge));
 
-        vm.mockCall(
-            address(messageRoot),
-            abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
-            abi.encode()
-        );
+        // FIXME: amend the tests as appending chain batch roots is not allowed on L1.
+        // vm.mockCall(
+        //     address(messageRoot),
+        //     abi.encodeWithSelector(MessageRootBase.addChainBatchRoot.selector, 9, 1, bytes32(0)),
+        //     abi.encode()
+        // );
 
         eraChainId = 9;
 

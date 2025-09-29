@@ -110,7 +110,8 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
-                l1CtmDeployer: l1CTMDeployer
+                l1CtmDeployer: l1CTMDeployer,
+                maxNumberOfZKChains: 100
             })
         );
         deployL2Contracts(L1_CHAIN_ID);

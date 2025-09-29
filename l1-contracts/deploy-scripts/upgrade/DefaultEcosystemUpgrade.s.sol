@@ -212,7 +212,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
         (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
 
-        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
+        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("L1Bridgehub", false);
 
         addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
         addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
@@ -699,7 +699,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         addresses.bridgehub.messageRootProxy = address(L1Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
 
         addresses.bridgehub.chainAssetHandlerProxy = address(
-            Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
+            L1Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
         );
 
         addresses.bridges.erc20BridgeProxy = address(
@@ -1750,7 +1750,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
-        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+        address chainDiamondProxyAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
             config.gatewayChainId
         );
         uint256 oldProtocolVersion = getOldProtocolVersion();

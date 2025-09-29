@@ -14,7 +14,6 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {

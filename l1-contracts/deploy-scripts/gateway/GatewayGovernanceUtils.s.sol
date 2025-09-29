@@ -71,7 +71,7 @@ abstract contract GatewayGovernanceUtils is Script {
         address _gatewayValidatorTimelock;
         address _gatewayServerNotifier;
         address _refundRecipient;
-        uint256 _ctmChainId;
+        uint256 _ctmRepresentativeChainId;
     }
 
     GatewayGovernanceConfig internal _gatewayGovernanceConfig;
@@ -93,7 +93,7 @@ abstract contract GatewayGovernanceUtils is Script {
         PrepareGatewayGovernanceCalls memory prepareGWGovCallsStruct
     ) internal returns (Call[] memory calls) {
         {
-            if (prepareGWGovCallsStruct._ctmChainId == _gatewayGovernanceConfig.gatewayChainId) {
+            if (prepareGWGovCallsStruct._ctmRepresentativeChainId == _gatewayGovernanceConfig.gatewayChainId) {
                 calls = _getRegisterSettlementLayerCalls();
             }
         }

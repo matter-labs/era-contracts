@@ -29,10 +29,10 @@ contract DualVerifier is IVerifier {
     /// @notice Type of verification for PLONK verifier.
     uint256 internal constant PLONK_VERIFICATION_TYPE = 1;
 
-    uint256 internal constant OHBENDER_PLONK_VERIFICATION_TYPE = 2;
+    uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
     // @notice This is test only verifier (mock), and must be removed before prod.
-    uint256 internal constant OHBENDER_MOCK_VERIFICATION_TYPE = 3;
+    uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 
     address public ctmOwner;
 
@@ -93,21 +93,21 @@ contract DualVerifier is IVerifier {
             return fflonkVerifiers[verifierVersion].verify(_publicInputs, _extractProof(_proof));
         } else if (verifierType == PLONK_VERIFICATION_TYPE) {
             return plonkVerifiers[verifierVersion].verify(_publicInputs, _extractProof(_proof));
-        } else if (verifierType == OHBENDER_PLONK_VERIFICATION_TYPE) {
+        } else if (verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
             uint256[] memory args = new uint256[](1);
-            args[0] = computeOhBenderHash(_proof[1], _publicInputs);
+            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
 
-            return plonkVerifiers[verifierVersion].verify(args, _extractOhBenderProof(_proof));
-        } else if (verifierType == OHBENDER_MOCK_VERIFICATION_TYPE) {
+            return plonkVerifiers[verifierVersion].verify(args, _extractZKSyncOSProof(_proof));
+        } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
             // just for safety - only allowing default anvil chain and sepolia testnet
             if (block.chainid != 31337 && block.chainid != 11155111) {
                 revert UnsupportedChainIdForMockVerifier();
             }
 
             uint256[] memory args = new uint256[](1);
-            args[0] = computeOhBenderHash(_proof[1], _publicInputs);
+            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
 
-            return mockverify(args, _extractOhBenderProof(_proof));
+            return mockverify(args, _extractZKSyncOSProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -174,7 +174,7 @@ contract DualVerifier is IVerifier {
         }
     }
 
-    function _extractOhBenderProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
+    function _extractZKSyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
         uint256 resultLength = _proof.length - 1 - 1;
 
         // Allocate memory for the new array (_proof.length - 1) since the first element is omitted.
@@ -186,19 +186,18 @@ contract DualVerifier is IVerifier {
         }
     }
 
-    function computeOhBenderHash(
+    function computeZKSyncOSHash(
         uint256 initialHash,
         uint256[] calldata _publicInputs
     ) public pure returns (uint256 result) {
+        uint256 publicInputsLength = _publicInputs.length;
         if (initialHash == 0) {
             initialHash = _publicInputs[0];
-            // solhint-disable-next-line gas-length-in-loops
-            for (uint256 i = 1; i < _publicInputs.length; ++i) {
+            for (uint256 i = 1; i < publicInputsLength; ++i) {
                 initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
             }
         } else {
-            // solhint-disable-next-line gas-length-in-loops
-            for (uint256 i = 0; i < _publicInputs.length; ++i) {
+            for (uint256 i = 0; i < publicInputsLength; ++i) {
                 initialHash = uint256(keccak256(abi.encodePacked(initialHash, _publicInputs[i]))) >> 32;
             }
         }
