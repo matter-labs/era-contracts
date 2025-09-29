@@ -85,6 +85,7 @@ import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
+import {DeployCTMAdditional} from "../DeployCTMAdditional.s.sol";
 
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.

@@ -273,6 +273,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         ctm.setPendingAdmin(addresses.chainAdmin);
 
         IOwnable(addresses.stateTransition.serverNotifierProxy).transferOwnership(addresses.chainAdmin);
+        IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 
         IOwnable(addresses.daAddresses.rollupDAManager).transferOwnership(addresses.governance);
 

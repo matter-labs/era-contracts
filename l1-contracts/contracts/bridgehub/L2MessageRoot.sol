@@ -19,17 +19,24 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2MessageRoot is MessageRootBase {
-    using FullMerkle for FullMerkle.FullTree;
-    using DynamicIncrementalMerkle for DynamicIncrementalMerkle.Bytes32PushTree;
+    uint256 private l1ChainId;
 
-    /// @dev Chain ID of L1 for bridging reasons.
-    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
-    /// the old version where it was an immutable.
-    uint256 public L1_CHAIN_ID;
+    /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
+    /// This means we call the _initialize in both the constructor and the initialize functions.
+    /// @dev Initialize the implementation to prevent Parity hack.
+    function initL2(uint256 _l1ChainId) public onlyUpgrader {
+        l1ChainId = _l1ChainId;
+        _initialize();
+        _disableInitializers();
+    }
 
     /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
+                        IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return l1ChainId;
+    }
 
     function _bridgehub() internal view override returns (IBridgehub) {
         return IBridgehub(L2_BRIDGEHUB_ADDR);
