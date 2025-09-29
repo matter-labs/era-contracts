@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_CHAIN_ASSET_HANDLER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_ASSET_ROUTER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
@@ -25,8 +25,6 @@ import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 import {UpgradeableBeaconDeployer} from "../bridge/ntv/UpgradeableBeaconDeployer.sol";
 
 import {FixedForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
-
-address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(0x000000000000000000000000000000000001000b);
 
 /// @title L2GenesisForceDeploymentsHelper
 /// @author Matter Labs
