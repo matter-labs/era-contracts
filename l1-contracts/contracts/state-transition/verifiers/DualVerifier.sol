@@ -186,7 +186,7 @@ contract DualVerifier is IVerifier {
         }
     }
 
-    function computeZKsyncOSHash(
+    function computeZKSyncOSHash(
         uint256 initialHash,
         uint256[] calldata _publicInputs
     ) public pure returns (uint256 result) {
