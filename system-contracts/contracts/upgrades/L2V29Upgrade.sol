@@ -7,7 +7,7 @@ import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
-import {L2_ASSET_ROUTER, L2_BRIDGE_HUB, L2_NATIVE_TOKEN_VAULT, L2_CHAIN_ASSET_HANDLER} from "../Constants.sol";
+import {L2_ASSET_ROUTER, L2_BRIDGE_HUB, L2_CHAIN_ASSET_HANDLER, L2_NATIVE_TOKEN_VAULT} from "../Constants.sol";
 import {IBridgedStandardERC20} from "../interfaces/IBridgedStandardERC20.sol";
 import {LegacyBridgeNotProxy} from "../SystemContractErrors.sol";
 import {IBridgehub} from "../interfaces/IBridgehub.sol";
