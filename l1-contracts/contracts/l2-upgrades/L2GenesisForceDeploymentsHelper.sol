@@ -106,7 +106,10 @@ library L2GenesisForceDeploymentsHelper {
         // If this is a genesis upgrade, we need to initialize the MessageRoot contract.
         // We dont need to do anything for already deployed chains.
         if (_isGenesisUpgrade) {
-            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(fixedForceDeploymentsData.l1ChainId, fixedForceDeploymentsData.gatewayChainId);
+            L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(
+                fixedForceDeploymentsData.l1ChainId,
+                fixedForceDeploymentsData.gatewayChainId
+            );
         }
 
         forceDeployOnAddress(_isZKsyncOS, fixedForceDeploymentsData.bridgehubBytecodeInfo, address(L2_BRIDGEHUB_ADDR));
