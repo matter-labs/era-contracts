@@ -14,7 +14,7 @@ import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {IL2SharedBridgeLegacyFunctions} from "../interfaces/IL2SharedBridgeLegacyFunctions.sol";
 
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
@@ -55,7 +55,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     IL1Nullifier public immutable L1_NULLIFIER;
 
     /// @dev Address of native token vault.
-    INativeTokenVault public nativeTokenVault;
+    INativeTokenVaultBase public nativeTokenVault;
 
     /// @dev Address of legacy bridge.
     IL1ERC20Bridge public legacyBridge;
@@ -124,7 +124,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @notice Sets the NativeTokenVault contract address.
     /// @dev Should be called only once by the owner.
     /// @param _nativeTokenVault The address of the native token vault.
-    function setNativeTokenVault(INativeTokenVault _nativeTokenVault) external onlyOwner {
+    function setNativeTokenVault(INativeTokenVaultBase _nativeTokenVault) external onlyOwner {
         if (address(nativeTokenVault) != address(0)) {
             revert NativeTokenVaultAlreadySet();
         }
@@ -425,7 +425,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _amount,
         address _originalCaller
     ) external onlyNativeTokenVault returns (bool) {
-        address l1TokenAddress = INativeTokenVault(address(nativeTokenVault)).tokenAddress(_assetId);
+        address l1TokenAddress = INativeTokenVaultBase(address(nativeTokenVault)).tokenAddress(_assetId);
         if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
             return false;
         }

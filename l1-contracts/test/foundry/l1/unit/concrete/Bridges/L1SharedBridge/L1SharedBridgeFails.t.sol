@@ -17,7 +17,7 @@ import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AddressAlreadySet, AssetIdNotSupported, BurningNativeWETHNotSupported, DepositDoesNotExist, DepositExists, EmptyDeposit, InsufficientChainBalance, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, NoFundsTransferred, NonEmptyMsgValue, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, WithdrawFailed, WithdrawalAlreadyFinalized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -88,14 +88,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_setNativeTokenVault_alreadySet() public {
         vm.prank(owner);
         vm.expectRevert(NativeTokenVaultAlreadySet.selector);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(0)));
     }
 
     function test_setNativeTokenVault_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.nativeTokenVault.selector).checked_write(address(0));
         vm.prank(owner);
         vm.expectRevert(ZeroAddress.selector);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(0)));
     }
 
     function test_setAssetHandlerAddressOnCounterpart_wrongCounterPartAddress() public {

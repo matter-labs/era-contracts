@@ -21,7 +21,7 @@ import {ADDRESS_ONE, Utils} from "./Utils.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
@@ -300,7 +300,7 @@ contract RegisterZKChainScript is Script {
     function registerAssetIdOnBridgehub() internal {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
-        INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
+        INativeTokenVaultBase ntv = INativeTokenVaultBase(config.nativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
@@ -325,7 +325,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerTokenOnNTV() internal {
-        INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
+        INativeTokenVaultBase ntv = INativeTokenVaultBase(config.nativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 

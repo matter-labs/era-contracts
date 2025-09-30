@@ -8,9 +8,9 @@ import {IBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/IBeacon.sol";
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IL2NativeTokenVault} from "./IL2NativeTokenVault.sol";
-import {NativeTokenVault} from "./NativeTokenVault.sol";
+import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IL2AssetRouter} from "../asset-router/IL2AssetRouter.sol";
@@ -30,7 +30,7 @@ import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 /// @notice The "default" bridge implementation for the ERC20 tokens. Note, that it does not
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
-contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
+contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
@@ -276,7 +276,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
     function calculateCreate2TokenAddress(
         uint256 _tokenOriginChainId,
         address _nonNativeToken
-    ) public view virtual override(INativeTokenVault, NativeTokenVault) returns (address) {
+    ) public view virtual override(INativeTokenVaultBase, NativeTokenVaultBase) returns (address) {
         if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _tokenOriginChainId == L1_CHAIN_ID) {
             return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {
@@ -343,16 +343,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         expectedToken = tokenAddress[expectedAssetId];
     }
 
-    function ASSET_ROUTER() public view override returns (IAssetRouterBase) {
+    function ASSET_ROUTER()
+        public
+        view
+        override(INativeTokenVaultBase, NativeTokenVaultBase)
+        returns (IAssetRouterBase)
+    {
         return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
     }
 
     function _wethToken() internal view override returns (address) {
         return WETH_TOKEN;
-    }
-
-    function _assetRouter() internal view override returns (IAssetRouterBase) {
-        return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
     }
 
     function _baseTokenAssetId() internal view override returns (bytes32) {

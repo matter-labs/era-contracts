@@ -10,8 +10,8 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IL1NativeTokenVault} from "./IL1NativeTokenVault.sol";
-import {INativeTokenVault} from "./INativeTokenVault.sol";
-import {NativeTokenVault} from "./NativeTokenVault.sol";
+import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
+import {NativeTokenVaultBase} from "./NativeTokenVaultBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
 import {IL1Nullifier} from "../interfaces/IL1Nullifier.sol";
@@ -30,14 +30,14 @@ import {ClaimFailedDepositFailed, WrongAmountTransferred, WrongCounterpart, Zero
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVault {
+contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeTokenVaultBase {
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
     address public immutable override WETH_TOKEN;
 
     /// @dev The L1 asset router contract.
-    IAssetRouterBase public immutable override ASSET_ROUTER;
+    IAssetRouterBase internal immutable _assetRouter;
 
     /// @dev The assetId of the base token.
     bytes32 public immutable BASE_TOKEN_ASSET_ID;
@@ -57,7 +57,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
     constructor(address _l1WethAddress, address _l1AssetRouter, IL1Nullifier _l1Nullifier) {
         WETH_TOKEN = _l1WethAddress;
-        ASSET_ROUTER = IAssetRouterBase(_l1AssetRouter);
+        _assetRouter = IAssetRouterBase(_l1AssetRouter);
         BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         L1_NULLIFIER = _l1Nullifier;
     }
@@ -170,7 +170,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _receiver,
         address _nativeToken
     ) internal override returns (bytes memory _bridgeMintData) {
-        bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
+        bool depositChecked = IL1AssetRouter(address(_assetRouter)).transferFundsToNTV(
             _assetId,
             _depositAmount,
             _originalCaller
@@ -242,7 +242,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     function calculateCreate2TokenAddress(
         uint256 _originChainId,
         address _nonNativeToken
-    ) public view override(INativeTokenVault, NativeTokenVault) returns (address) {
+    ) public view override(INativeTokenVaultBase, NativeTokenVaultBase) returns (address) {
         bytes32 salt = _getCreate2Salt(_originChainId, _nonNativeToken);
         return
             Create2.computeAddress(
@@ -325,8 +325,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         return WETH_TOKEN;
     }
 
-    function _assetRouter() internal view override returns (IAssetRouterBase) {
-        return ASSET_ROUTER;
+    function ASSET_ROUTER()
+        public
+        view
+        override(INativeTokenVaultBase, NativeTokenVaultBase)
+        returns (IAssetRouterBase)
+    {
+        return IAssetRouterBase(_assetRouter);
     }
 
     function _baseTokenAssetId() internal view override returns (bytes32) {

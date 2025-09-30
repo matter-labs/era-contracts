@@ -10,7 +10,7 @@ import "forge-std/console.sol";
 // import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 // import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IBridgedStandardToken} from "contracts/bridge/interfaces/IBridgedStandardToken.sol";
 
@@ -43,7 +43,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
     function test_registerLegacyToken_IncorrectConfiguration() external {
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
-        INativeTokenVault l2NativeTokenVault = INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
+        INativeTokenVaultBase l2NativeTokenVault = INativeTokenVaultBase(addresses.vaults.l1NativeTokenVaultProxy);
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
 
@@ -53,13 +53,13 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
 
         stdstore
             .target(address(addresses.vaults.l1NativeTokenVaultProxy))
-            .sig(INativeTokenVault.tokenAddress.selector)
+            .sig(INativeTokenVaultBase.tokenAddress.selector)
             .with_key(assetId)
             .checked_write(l2Token);
 
         stdstore
             .target(address(addresses.vaults.l1NativeTokenVaultProxy))
-            .sig(INativeTokenVault.assetId.selector)
+            .sig(INativeTokenVaultBase.assetId.selector)
             .with_key(l2Token)
             .checked_write(assetId);
 
@@ -94,11 +94,11 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         );
 
         vm.expectRevert(TokenIsLegacy.selector);
-        INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerToken(l2Token);
+        INativeTokenVaultBase(addresses.vaults.l1NativeTokenVaultProxy).registerToken(l2Token);
     }
 
     function test_bridgeMint_CorrectlyConfiguresL2LegacyToken() external {
-        INativeTokenVault l2NativeTokenVault = INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
+        INativeTokenVaultBase l2NativeTokenVault = INativeTokenVaultBase(addresses.vaults.l1NativeTokenVaultProxy);
 
         uint256 originChainId = L1_CHAIN_ID;
         address originToken = makeAddr("l1Token");

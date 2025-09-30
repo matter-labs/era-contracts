@@ -11,7 +11,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -27,8 +27,8 @@ import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-abstract contract NativeTokenVault is
-    INativeTokenVault,
+abstract contract NativeTokenVaultBase is
+    INativeTokenVaultBase,
     IAssetHandler,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
@@ -58,13 +58,13 @@ abstract contract NativeTokenVault is
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
-        if (msg.sender != address(_assetRouter())) {
+        if (msg.sender != address(ASSET_ROUTER())) {
             revert Unauthorized(msg.sender);
         }
         _;
     }
 
-    /// @inheritdoc INativeTokenVault
+    /// @inheritdoc INativeTokenVaultBase
     function registerToken(address _nativeToken) external virtual {
         _registerToken(_nativeToken);
     }
@@ -86,7 +86,7 @@ abstract contract NativeTokenVault is
         newAssetId = _unsafeRegisterNativeToken(_nativeToken);
     }
 
-    /// @inheritdoc INativeTokenVault
+    /// @inheritdoc INativeTokenVaultBase
     function ensureTokenIsRegistered(address _nativeToken) public returns (bytes32 tokenAssetId) {
         bytes32 currentAssetId = assetId[_nativeToken];
         if (currentAssetId == bytes32(0)) {
@@ -400,7 +400,7 @@ abstract contract NativeTokenVault is
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;
-        _assetRouter().setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
+        ASSET_ROUTER().setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
     function _handleChainBalanceIncrease(
@@ -548,9 +548,9 @@ abstract contract NativeTokenVault is
 
     function _wethToken() internal view virtual returns (address);
 
-    function _assetRouter() internal view virtual returns (IAssetRouterBase);
-
     function _baseTokenAssetId() internal view virtual returns (bytes32);
 
     function _l1ChainId() internal view virtual returns (uint256);
+
+    function ASSET_ROUTER() public view virtual returns (IAssetRouterBase);
 }
