@@ -5,13 +5,12 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {IBridgehub} from "./IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IGWAssetTracker} from "../bridge/asset-tracker/IGWAssetTracker.sol";
-import {BridgehubBurnCTMAssetData} from "./IBridgehub.sol";
 
 
 /// @author Matter Labs

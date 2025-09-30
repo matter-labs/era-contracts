@@ -15,7 +15,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {

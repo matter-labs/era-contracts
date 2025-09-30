@@ -7,9 +7,9 @@ import {IBridgehub} from "./IBridgehub.sol";
 import {MessageRootBase} from "./MessageRootBase.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, LocallyNoChainsAtGenesis, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyGateway, OnlyL1, OnlyL2MessageRoot, OnlyOnSettlementLayer, OnlyPreV30Chain, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet} from "./L1BridgehubErrors.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
+import {IncorrectFunctionSignature, LocallyNoChainsAtGenesis, NotWhitelistedSettlementLayer, OnlyGateway, OnlyL1, OnlyL2MessageRoot, V30UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
+import {L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {InvalidProof} from "../common/L1ContractErrors.sol";
 import {L2MessageRoot} from "./L2MessageRoot.sol";
 
 

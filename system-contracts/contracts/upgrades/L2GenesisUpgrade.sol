@@ -2,16 +2,10 @@
 
 pragma solidity 0.8.28;
 
-<<<<<<<< HEAD:system-contracts/contracts/upgrades/L2GenesisUpgrade.sol
-import {SYSTEM_CONTEXT_CONTRACT} from "../Constants.sol";
+
 import {ISystemContext} from "../interfaces/ISystemContext.sol";
 import {InvalidChainId} from "contracts/SystemContractErrors.sol";
 import {IL2GenesisUpgrade} from "../interfaces/IL2GenesisUpgrade.sol";
-========
-import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {ISystemContext} from "../state-transition/l2-deps/ISystemContext.sol";
-import {IL2GenesisUpgrade} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
->>>>>>>> 348f7b9126a4b5434cda2745953d4cb068ce505a:l1-contracts/contracts/l2-upgrades/L2GenesisUpgrade.sol
 
 import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper.sol";
 

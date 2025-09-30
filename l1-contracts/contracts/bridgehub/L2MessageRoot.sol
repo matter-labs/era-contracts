@@ -6,18 +6,15 @@ import {IBridgehub} from "./IBridgehub.sol";
 
 import {MessageRootBase} from "./MessageRootBase.sol";
 
-import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {MessageRootNotRegistered} from "./L1BridgehubErrors.sol";
+import {V30UpgradeChainBatchNumberNotSet} from "./L1BridgehubErrors.sol";
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {InvalidProof, Unauthorized} from "../common/L1ContractErrors.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, IncorrectFunctionSignature, LocallyNoChainsAtGenesis, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyGateway, OnlyL1, OnlyL2MessageRoot, OnlyOnSettlementLayer, OnlyPreV30Chain, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberAlreadySet, V30UpgradeChainBatchNumberNotSet} from "./L1BridgehubErrors.sol";
-import {InvalidCaller} from "../common/L1ContractErrors.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "./IMessageRoot.sol";
+import {InvalidCaller, Unauthorized} from "../common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
 
 

@@ -4,11 +4,10 @@ pragma solidity 0.8.28;
 
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
-import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, ETH_TOKEN_ADDRESS, SERVICE_TRANSACTION_SENDER, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdAlreadyExists, ChainIdCantBeCurrentChain, ChainIdMismatch, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, IncorrectBridgeHubAddress, MigrationPaused, MsgValueMismatch, NoCTMForAssetId, NotCurrentSettlementLayer,NotL1, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, WrongMagicValue, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
+import {Unauthorized} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

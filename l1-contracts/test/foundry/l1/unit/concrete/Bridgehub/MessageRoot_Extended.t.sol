@@ -10,7 +10,7 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyL2, OnlyL2MessageRoot, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberNotSet} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
-import {L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR, GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProofData} from "contracts/common/Messaging.sol";
 

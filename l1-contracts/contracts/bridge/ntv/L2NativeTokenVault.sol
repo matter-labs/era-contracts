@@ -22,7 +22,7 @@ import {IContractDeployer, L2ContractHelper} from "../../common/l2-helpers/L2Con
 import {SystemContractsCaller} from "../../common/l2-helpers/SystemContractsCaller.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
-import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, DeployFailed, EmptyAddress, EmptyBytes32, InvalidCaller, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy, Unauthorized} from "../../common/L1ContractErrors.sol";
+import {AddressMismatch, AssetIdAlreadyRegistered, AssetIdNotSupported, DeployFailed, EmptyAddress, EmptyBytes32, InvalidCaller, NoLegacySharedBridge, TokenIsLegacy, TokenNotLegacy} from "../../common/L1ContractErrors.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 
 /// @author Matter Labs
