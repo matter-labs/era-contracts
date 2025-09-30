@@ -65,6 +65,8 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
 
+        s.__DEPRECATED_l2DAValidator = address(0);
+
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
 }
