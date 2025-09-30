@@ -285,11 +285,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
         require(config.contracts.defaultAAHash != bytes32(0), "default aa hash is zero");
         require(config.contracts.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
 
-        // TODO should be provided?
-        //        if (!stateTransition.isOnGateway) {
-        //            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
-        //        }
-
         return
             DiamondInitializeDataNewChain({
                 verifier: IVerifier(stateTransition.verifier),
