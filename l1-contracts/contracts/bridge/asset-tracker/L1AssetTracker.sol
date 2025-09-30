@@ -143,6 +143,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
     }
 
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
+        _assignMaxChainBalance(_originChainId, _assetId);
+    }
+
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/

@@ -95,7 +95,9 @@ abstract contract AssetTrackerBase is
                     Register token
     //////////////////////////////////////////////////////////////*/
 
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public virtual onlyNativeTokenVault {
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public virtual;
+
+    function _assignMaxChainBalance(uint256 _originChainId, bytes32 _assetId) internal {
         chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
     }
 
