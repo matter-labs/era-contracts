@@ -6,7 +6,6 @@ import {Vm} from "forge-std/Vm.sol";
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
-
 import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
@@ -55,7 +54,7 @@ library L2UtilsBase {
         // we deploy the code to get the contract code with immutables which we then vm.etch
         address ntv = address(new L2NativeTokenVaultDev());
         address assetRouter = address(new L2AssetRouter());
-        
+
         address bridgehub = address(new L2Bridgehub());
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         address interopCenter = address(new InteropCenter());

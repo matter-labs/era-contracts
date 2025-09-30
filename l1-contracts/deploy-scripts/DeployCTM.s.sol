@@ -36,10 +36,8 @@ import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
-
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
-
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 

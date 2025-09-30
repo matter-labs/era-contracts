@@ -12,7 +12,6 @@ import {L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol
 import {InvalidProof} from "../common/L1ContractErrors.sol";
 import {L2MessageRoot} from "./L2MessageRoot.sol";
 
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
@@ -52,8 +51,8 @@ contract L1MessageRoot is MessageRootBase {
         /// locally there are no chains deployed before.
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
     }
-    
-        /// @dev The initialized used for the V30 upgrade.
+
+    /// @dev The initialized used for the V30 upgrade.
     /// On L2s the initializers are disabled.
     function initializeL1V30Upgrade() external reinitializer(2) onlyL1 {
         uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();

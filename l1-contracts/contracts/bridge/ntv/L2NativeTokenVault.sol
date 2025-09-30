@@ -93,8 +93,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         emit L2TokenBeaconUpdated(address(bridgedTokenBeacon), _l2TokenProxyBytecodeHash);
     }
 
-
-
     /// @notice Updates the contract.
     /// @dev This function is used to initialize the new implementation of L2NativeTokenVault on existing chains during
     /// the upgrade.
@@ -116,7 +114,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVault {
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         require(_l2TokenProxyBytecodeHash != bytes32(0), EmptyBytes32());
-
 
         L2_TOKEN_PROXY_BYTECODE_HASH = _l2TokenProxyBytecodeHash;
     }

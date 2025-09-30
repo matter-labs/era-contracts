@@ -19,7 +19,6 @@ import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/co
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
-
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
 

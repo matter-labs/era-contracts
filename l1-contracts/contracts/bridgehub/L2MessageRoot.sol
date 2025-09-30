@@ -17,7 +17,6 @@ import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "./IM
 import {InvalidCaller, Unauthorized} from "../common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
 
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
@@ -77,35 +76,31 @@ contract L2MessageRoot is MessageRootBase {
         _initialize();
     }
 
-        /// On L2s the initializer/reinitializer is not called.
-        function initializeL2V30Upgrade() external onlyL2 onlyUpgrader {
-            uint256[] memory allZKChains = _bridgehub().getAllZKChainChainIDs();
-            _v30InitializeInner(allZKChains);
-        }
+    /// On L2s the initializer/reinitializer is not called.
+    function initializeL2V30Upgrade() external onlyL2 onlyUpgrader {
+        uint256[] memory allZKChains = _bridgehub().getAllZKChainChainIDs();
+        _v30InitializeInner(allZKChains);
+    }
 
-        /// @notice This function is used to send the V30 upgrade block number from the Gateway to the L1 chain.
-        function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external onlyGateway {
-            uint256 sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];
-            require(
-                sentBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY && sentBlockNumber != 0,
-                V30UpgradeChainBatchNumberNotSet()
-            );
-    
-            // slither-disable-next-line unused-return
-            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-                abi.encodeCall(this.sendV30UpgradeBlockNumberFromGateway, (_chainId, sentBlockNumber))
-            );
-        }
+    /// @notice This function is used to send the V30 upgrade block number from the Gateway to the L1 chain.
+    function sendV30UpgradeBlockNumberFromGateway(uint256 _chainId, uint256) external onlyGateway {
+        uint256 sentBlockNumber = v30UpgradeChainBatchNumber[_chainId];
+        require(
+            sentBlockNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY && sentBlockNumber != 0,
+            V30UpgradeChainBatchNumberNotSet()
+        );
+
+        // slither-disable-next-line unused-return
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            abi.encodeCall(this.sendV30UpgradeBlockNumberFromGateway, (_chainId, sentBlockNumber))
+        );
+    }
 
     /// @notice Adds a new chainBatchRoot to the chainTree.
     /// @param _chainId The ID of the chain whose chainBatchRoot is being added to the chainTree.
     /// @param _batchNumber The number of the batch to which _chainBatchRoot belongs.
     /// @param _chainBatchRoot The value of chainBatchRoot which is being added.
-    function addChainBatchRoot(
-        uint256 _chainId,
-        uint256 _batchNumber,
-        bytes32 _chainBatchRoot
-    ) public override {
+    function addChainBatchRoot(uint256 _chainId, uint256 _batchNumber, bytes32 _chainBatchRoot) public override {
         super.addChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
 
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.

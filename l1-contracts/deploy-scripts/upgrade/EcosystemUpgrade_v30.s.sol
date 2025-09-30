@@ -12,7 +12,6 @@ import {Governance} from "contracts/governance/Governance.sol";
 
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 
-
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";

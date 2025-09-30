@@ -153,21 +153,15 @@ contract MessageRootTest is Test {
         //     abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
         //     abi.encode(alphaChainSender)
         // );
-
         // vm.prank(bridgeHub);
         // messageRoot.addNewChain(alphaChainId);
-
         // vm.prank(alphaChainSender);
         // messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
-
         // vm.prank(bridgeHub);
         // messageRoot.addNewChain(alphaChainId, 0);
-
         // vm.prank(GW_ASSET_TRACKER_ADDR);
         // messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
-
         // messageRoot.updateFullTree();
-
         // assertEq(messageRoot.getAggregatedRoot(), 0x0ef1ac67d77f177a33449c47a8f05f0283300a81adca6f063c92c774beed140c);
     }
 

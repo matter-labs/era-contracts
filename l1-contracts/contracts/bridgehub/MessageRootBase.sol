@@ -12,16 +12,11 @@ import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, 
 import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyGateway, OnlyL1, OnlyOnSettlementLayer, OnlyPreV30Chain, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
-
 import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 
-
-
 import {MessageVerification} from "../common/MessageVerification.sol";
-
 
 import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 
@@ -43,7 +38,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     function _l1ChainId() internal view virtual returns (uint256);
 
     function _gatewayChainId() internal view virtual returns (uint256);
-
 
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
@@ -170,7 +164,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         _addNewChain(block.chainid, 0);
     }
 
-
     function _v30InitializeInner(uint256[] memory _allZKChains) internal {
         uint256 allZKChainsLength = _allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
@@ -242,7 +235,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) public addChainBatchRootRestriction(_chainId) virtual {
+    ) public virtual addChainBatchRootRestriction(_chainId) {
         // Make sure that chain is registered.
         if (!chainRegistered(_chainId)) {
             revert MessageRootNotRegistered();

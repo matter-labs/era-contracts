@@ -21,7 +21,6 @@ import {GW_ASSET_TRACKER, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../commo
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
 
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The ChainAssetHandler contract is used for migrating chains between settlement layers,
@@ -226,7 +225,10 @@ abstract contract ChainAssetHandlerBase is
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
 
-    function _setLegacySharedBridgeIfL1(BridgehubBurnCTMAssetData memory _bridgehubBurnData, uint256 _settlementChainId) internal virtual {}
+    function _setLegacySharedBridgeIfL1(
+        BridgehubBurnCTMAssetData memory _bridgehubBurnData,
+        uint256 _settlementChainId
+    ) internal virtual {}
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
     /// @param _assetId the assetId of the chain's CTM

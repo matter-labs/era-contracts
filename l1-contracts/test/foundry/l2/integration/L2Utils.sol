@@ -78,7 +78,7 @@ library L2Utils {
         forceDeployWithoutConstructor("L2Bridgehub", L2_BRIDGEHUB_ADDR);
         L2Bridgehub bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
     }
-        
+
     function initializeBridgehub(SystemContractsArgs memory _args) internal {
         L2Bridgehub bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
 
@@ -111,28 +111,19 @@ library L2Utils {
     function forceDeployL2MessageVerification(SystemContractsArgs memory _args) internal {
         new L2MessageVerification();
 
-        forceDeployWithoutConstructor(
-            "L2MessageVerification",
-            address(L2_MESSAGE_VERIFICATION)
-        );
+        forceDeployWithoutConstructor("L2MessageVerification", address(L2_MESSAGE_VERIFICATION));
     }
 
     function forceDeployL2InteropRootStorage(SystemContractsArgs memory _args) internal {
         new DummyL2InteropRootStorage();
 
-        forceDeployWithoutConstructor(
-            "DummyL2InteropRootStorage",
-            address(L2_INTEROP_ROOT_STORAGE)
-        );
+        forceDeployWithoutConstructor("DummyL2InteropRootStorage", address(L2_INTEROP_ROOT_STORAGE));
     }
 
     function forceDeployInteropCenter(SystemContractsArgs memory _args) internal {
         new InteropCenter();
-        
-        forceDeployWithoutConstructor(
-            "InteropCenter",
-            L2_INTEROP_CENTER_ADDR
-        );
+
+        forceDeployWithoutConstructor("InteropCenter", L2_INTEROP_CENTER_ADDR);
         InteropCenter interopCenter = InteropCenter(L2_INTEROP_CENTER_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);

@@ -38,11 +38,11 @@ contract TestAssetRouterBase is AssetRouterBase {
         return IBridgehub(address(1));
     }
 
-    function _l1ChainId() internal view override returns (uint256) {    
+    function _l1ChainId() internal view override returns (uint256) {
         return 1;
     }
 
-    function _eraChainId() internal view override returns (uint256) {   
+    function _eraChainId() internal view override returns (uint256) {
         return 1;
     }
 }

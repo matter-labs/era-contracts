@@ -74,7 +74,7 @@ contract InteropCenter is
     }
 
     /// @notice To avoid parity hack
-    function initL2(uint256 _l1ChainId, address _owner) reentrancyGuardInitializer onlyUpgrader public {
+    function initL2(uint256 _l1ChainId, address _owner) public reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
         L1_CHAIN_ID = _l1ChainId;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);

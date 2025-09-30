@@ -12,7 +12,6 @@ import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.so
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {IGWAssetTracker} from "../bridge/asset-tracker/IGWAssetTracker.sol";
 
-
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The ChainAssetHandler contract is used for migrating chains between settlement layers,
@@ -91,7 +90,10 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
         _transferOwnership(_owner);
     }
 
-    function _setLegacySharedBridgeIfL1(BridgehubBurnCTMAssetData memory _bridgehubBurnData, uint256 _settlementChainId) internal override {
+    function _setLegacySharedBridgeIfL1(
+        BridgehubBurnCTMAssetData memory _bridgehubBurnData,
+        uint256 _settlementChainId
+    ) internal override {
         /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
 
         bytes memory data = abi.encodeCall(
@@ -99,6 +101,6 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
             (_bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(_bridgehubBurnData.chainId))
         );
         address settlementZkChain = _bridgehub().getZKChain(_settlementChainId);
-        IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);   
+        IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);
     }
 }

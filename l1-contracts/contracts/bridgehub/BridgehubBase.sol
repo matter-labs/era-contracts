@@ -381,8 +381,6 @@ abstract contract BridgehubBase is
         return _chainId;
     }
 
-
-
     /// @notice This function is used to register a new zkChain in the system.
     /// @notice see external counterpart for full natspec.
     function _registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) internal {

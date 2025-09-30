@@ -18,8 +18,8 @@ contract DiamondInitTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
     address internal testnetVerifier =
         address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
-        DummyBridgehub internal dummyBridgehub;
-        InitializeData internal initializeData;
+    DummyBridgehub internal dummyBridgehub;
+    InitializeData internal initializeData;
 
     function setUp() public virtual {
         facetCuts.push(

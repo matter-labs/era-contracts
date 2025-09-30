@@ -57,7 +57,6 @@ contract MessageRoot_Extended_Test is Test {
         l2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID);
-
     }
 
     function test_ChainRegistered_CurrentChain() public {
@@ -118,7 +117,6 @@ contract MessageRoot_Extended_Test is Test {
 
     function test_InitializeL2V30Upgrade_NotUpgrader() public {
         // vm.chainId(2); // Set to non-L1 chain
-
         // vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
         // messageRoot.initializeL2V30Upgrade();
     }
@@ -132,14 +130,12 @@ contract MessageRoot_Extended_Test is Test {
 
     function test_SendV30UpgradeBlockNumberFromGateway_NotGateway() public {
         // vm.chainId(2); // Set to non-gateway chain
-
         // vm.expectRevert(OnlyGateway.selector);
         // messageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
     }
 
     function test_SendV30UpgradeBlockNumberFromGateway_NotSet() public {
         // vm.chainId(1); // Set to gateway chain
-
         // vm.expectRevert(V30UpgradeChainBatchNumberNotSet.selector);
         // messageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
     }
@@ -154,7 +150,6 @@ contract MessageRoot_Extended_Test is Test {
         //     l2MessageIndex: 1,
         //     merkleProof: new bytes32[](0)
         // });
-
         // vm.expectRevert(OnlyL2MessageRoot.selector);
         // messageRoot.saveV30UpgradeChainBatchNumberOnL1(params);
     }
