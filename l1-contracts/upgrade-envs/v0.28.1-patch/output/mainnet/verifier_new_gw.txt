@@ -1,0 +1,19 @@
+Script ran successfully.
+
+== Logs ==
+  VerifierFflonk has been deployed at 0x3CFB3a80Af42cBE4d82C14301690A62D53e870a5
+  forge verify-contract 0x3CFB3a80Af42cBE4d82C14301690A62D53e870a5 VerifierFflonk --verifier zksync
+  VerifierPlonk has been deployed at 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717
+  forge verify-contract 0x92A9Fd0E84354213D9c3d33128eDd6Ea55ee0717 VerifierPlonk --verifier zksync
+  Verifier has been deployed at 0xE841B98E524D827bBA664d19CB736C817707E730
+  forge verify-contract 0xE841B98E524D827bBA664d19CB736C817707E730 Verifier --constructor-args 0x0000000000000000000000003cfb3a80af42cbe4d82c14301690a62d53e870a500000000000000000000000092a9fd0e84354213d9c3d33128edd6ea55ee0717 --verifier zksync
+
+SKIPPING ON CHAIN SIMULATION.
+
+##### 9075
+✅  [Success] Hash: 0x46c50db5fd38d8c358cb2635df9aaf7aeccd72f3219549a279d31e4c884d0aa7
+Block: 16487
+Paid: 0.445174732333923936 ETH (137832 gas * 3229.835831548 gwei)
+
+✅ Sequence #1 on 9075 | Total Paid: 0.445174732333923936 ETH (137832 gas * avg 3229.835831548 gwei)
+                                                                                                          
