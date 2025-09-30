@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
-
 /// @dev The encoding version used for legacy txs.
 bytes1 constant LEGACY_ENCODING_VERSION = 0x00;
 
@@ -49,7 +47,7 @@ interface IAssetRouterBase {
 
     event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (address);
 
     function L1_CHAIN_ID() external view returns (uint256);
 

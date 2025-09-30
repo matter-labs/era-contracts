@@ -3,9 +3,15 @@
 pragma solidity 0.8.28;
 
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
+import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/EnumerableMap.sol";
 
-import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
+import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BridgehubBase} from "./BridgehubBase.sol";
+import {IL2Bridgehub} from "./IL2Bridgehub.sol";
+import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -15,7 +21,9 @@ import {BridgehubBase} from "./BridgehubBase.sol";
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
-contract L2Bridgehub is BridgehubBase {
+contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
+    using EnumerableMap for EnumerableMap.UintToAddressMap;
+
     /// @notice the asset id of Eth. This is only used on L1.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
@@ -78,5 +86,42 @@ contract L2Bridgehub is BridgehubBase {
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+    }
+
+    modifier onlySettlementLayerRelayedSender() override {
+        /// There is no sender for the wrapping, we use a virtual address.
+        if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
+            revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
+        }
+        _;
+    }
+
+    /// @notice Used to forward a transaction on the gateway to the chains mailbox.
+    /// @param _chainId the chainId of the chain
+    /// @param _canonicalTxHash the canonical transaction hash
+    /// @param _expirationTimestamp the expiration timestamp for the transaction
+    function forwardTransactionOnGateway(
+        uint256 _chainId,
+        bytes32 _canonicalTxHash,
+        uint64 _expirationTimestamp
+    ) external override(BridgehubBase, IL2Bridgehub) onlySettlementLayerRelayedSender {
+        if (_l1ChainId() == block.chainid) {
+            revert NotInGatewayMode();
+        }
+        address zkChain = zkChainMap.get(_chainId);
+        IZKChain(zkChain).bridgehubRequestL2TransactionOnGateway(_canonicalTxHash, _expirationTimestamp);
+    }
+
+    /// @notice Set addresses
+    function setAddresses(
+        address _assetRouter,
+        ICTMDeploymentTracker _l1CtmDeployer,
+        IMessageRoot _messageRoot,
+        address _chainAssetHandler
+    ) external override(BridgehubBase, IL2Bridgehub) onlyOwnerOrUpgrader {
+        assetRouter = _assetRouter;
+        l1CtmDeployer = _l1CtmDeployer;
+        messageRoot = _messageRoot;
+        chainAssetHandler = _chainAssetHandler;
     }
 }

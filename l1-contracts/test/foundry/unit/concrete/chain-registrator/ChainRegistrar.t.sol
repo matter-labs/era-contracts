@@ -44,7 +44,7 @@ contract ChainRegistrarTest is Test {
         vm.prank(admin);
 
         l1NullifierImpl = new L1NullifierDev({
-            _bridgehub: IBridgehub(address(bridgeHub)),
+            _bridgehub: IL1Bridgehub(address(bridgeHub)),
             _eraChainId: 270,
             _eraDiamondProxy: makeAddr("era")
         });

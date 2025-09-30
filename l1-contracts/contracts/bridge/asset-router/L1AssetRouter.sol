@@ -25,7 +25,8 @@ import {NativeTokenVaultAlreadySet} from "../L1BridgeContractErrors.sol";
 import {AddressAlreadySet, AssetHandlerDoesNotExist, AssetIdNotSupported, LegacyBridgeUsesNonNativeToken, LegacyEncodingUsedForNonL1Token, NonEmptyMsgValue, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, UnsupportedEncodingVersion, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
 
@@ -37,7 +38,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IBridgehub public immutable override BRIDGE_HUB;
+    address public immutable override BRIDGE_HUB;
 
     /// @dev Chain ID of Era for legacy reasons
     uint256 public immutable ERA_CHAIN_ID;
@@ -102,7 +103,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
-        BRIDGE_HUB = IBridgehub(_bridgehub);
+        BRIDGE_HUB = _bridgehub;
         ERA_CHAIN_ID = _eraChainId;
         L1_WETH_TOKEN = _l1WethAddress;
         ERA_DIAMOND_PROXY = _eraDiamondProxy;
@@ -270,7 +271,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             revert UnsupportedEncodingVersion();
         }
 
-        if (BRIDGE_HUB.baseTokenAssetId(_chainId) == assetId) {
+        if (IL1Bridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId) == assetId) {
             revert AssetIdNotSupported(assetId);
         }
 
@@ -585,7 +586,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 factoryDeps: new bytes[](0),
                 refundRecipient: refundRecipient
             });
-            txHash = BRIDGE_HUB.requestL2TransactionDirect{value: msg.value}(request);
+            txHash = IL1Bridgehub(BRIDGE_HUB).requestL2TransactionDirect{value: msg.value}(request);
         }
 
         {
@@ -686,7 +687,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         return block.chainid;
     }
 
-    function _bridgehub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (address) {
         return BRIDGE_HUB;
     }
 

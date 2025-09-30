@@ -9,7 +9,8 @@ import {ERC20} from "@openzeppelin/contracts-v4/token/ERC20/ERC20.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -130,7 +131,7 @@ contract L1AssetRouterTest is Test {
 
         token = new TestnetERC20Token("TestnetERC20Token", "TET", 18);
         l1NullifierImpl = new L1NullifierDev({
-            _bridgehub: IBridgehub(bridgehubAddress),
+            _bridgehub: IL1Bridgehub(bridgehubAddress),
             _eraChainId: eraChainId,
             _eraDiamondProxy: eraDiamondProxy
         });
@@ -200,17 +201,17 @@ contract L1AssetRouterTest is Test {
 
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, chainId),
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
+            abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
 
@@ -254,7 +255,7 @@ contract L1AssetRouterTest is Test {
         vm.mockCall(
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
     }
@@ -291,7 +292,7 @@ contract L1AssetRouterTest is Test {
         // vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector, chainId),
             abi.encode(_assetId)
         );
     }

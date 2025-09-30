@@ -14,7 +14,6 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 
@@ -29,7 +28,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view virtual returns (IBridgehub);
+    function _bridgehub() internal view virtual returns (address);
 
     function _eraChainId() internal view virtual returns (uint256);
 

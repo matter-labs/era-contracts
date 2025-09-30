@@ -3,7 +3,8 @@
 pragma solidity 0.8.28;
 
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
-import {IBridgehub} from "./IBridgehub.sol";
+import {IL2Bridgehub} from "./IL2Bridgehub.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
@@ -30,7 +31,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// @dev The bridgehub contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IBridgehub private BRIDGEHUB;
+    IL2Bridgehub private BRIDGEHUB;
 
     /// @dev The message root contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -52,7 +53,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
-    function _bridgehub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (IBridgehubBase) {
         return BRIDGEHUB;
     }
     function _messageRoot() internal view override returns (IMessageRoot) {
@@ -75,7 +76,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     function initL2(
         uint256 _l1ChainId,
         address _owner,
-        IBridgehub _bridgehub,
+        IL2Bridgehub _bridgehub,
         address _assetRouter,
         IMessageRoot _messageRoot
     ) external reentrancyGuardInitializer onlyUpgrader {
@@ -91,7 +92,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// the upgrade.
     function updateL2(
         uint256 _l1ChainId,
-        IBridgehub _bridgehub,
+        IL2Bridgehub _bridgehub,
         address _assetRouter,
         IMessageRoot _messageRoot
     ) public onlyUpgrader {

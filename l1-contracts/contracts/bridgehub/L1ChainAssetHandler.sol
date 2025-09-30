@@ -5,7 +5,8 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {IBridgehub} from "./IBridgehub.sol";
+import {IL1Bridgehub} from "./IL1Bridgehub.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 
 /// @author Matter Labs
@@ -22,7 +23,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     uint256 internal immutable L1_CHAIN_ID;
 
     /// @dev The bridgehub contract.
-    IBridgehub internal immutable BRIDGEHUB;
+    IL1Bridgehub internal immutable BRIDGEHUB;
 
     /// @dev The message root contract.
     IMessageRoot internal immutable MESSAGE_ROOT;
@@ -40,7 +41,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
-    function _bridgehub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (IBridgehubBase) {
         return BRIDGEHUB;
     }
     function _messageRoot() internal view override returns (IMessageRoot) {
@@ -53,7 +54,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     constructor(
         uint256 _l1ChainId,
         address _owner,
-        IBridgehub _bridgehub,
+        IL1Bridgehub _bridgehub,
         address _assetRouter,
         IMessageRoot _messageRoot
     ) reentrancyGuardInitializer {

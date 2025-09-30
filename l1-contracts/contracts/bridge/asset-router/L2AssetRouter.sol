@@ -11,7 +11,6 @@ import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {AddressAliasHelper} from "../../vendor/AddressAliasHelper.sol";
 import {ReentrancyGuard} from "../../common/ReentrancyGuard.sol";
 
@@ -29,7 +28,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IBridgehub public override BRIDGE_HUB;
+    address public override BRIDGE_HUB;
 
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -151,7 +150,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         L1_ASSET_ROUTER = _l1AssetRouter;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         eraChainId = _eraChainId;
-        BRIDGE_HUB = IBridgehub(L2_BRIDGEHUB_ADDR);
+        BRIDGE_HUB = L2_BRIDGEHUB_ADDR;
     }
 
     /// @inheritdoc IL2AssetRouter
@@ -420,8 +419,8 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         return L1_ASSET_ROUTER;
     }
 
-    function _bridgehub() internal pure override returns (IBridgehub) {
-        return IBridgehub(L2_BRIDGEHUB_ADDR);
+    function _bridgehub() internal pure override returns (address) {
+        return L2_BRIDGEHUB_ADDR;
     }
 
     function L1_CHAIN_ID() public view override(IAssetRouterBase, AssetRouterBase) returns (uint256) {

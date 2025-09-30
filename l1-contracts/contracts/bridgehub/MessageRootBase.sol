@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
-import {IBridgehub} from "./IBridgehub.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ChainExists, MessageRootNotRegistered, NotL2, OnlyBridgehubOrChainAssetHandler, OnlyChain} from "./L1BridgehubErrors.sol";
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
@@ -35,7 +35,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view virtual returns (IBridgehub);
+    function _bridgehub() internal view virtual returns (address);
 
     function _l1ChainId() internal view virtual returns (uint256);
 
@@ -88,11 +88,11 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
-        if (msg.sender != address(_bridgehub()) && msg.sender != address(_bridgehub().chainAssetHandler())) {
+        if (msg.sender != _bridgehub() && msg.sender != address(IBridgehubBase(_bridgehub()).chainAssetHandler())) {
             revert OnlyBridgehubOrChainAssetHandler(
                 msg.sender,
                 address(_bridgehub()),
-                address(_bridgehub().chainAssetHandler())
+                address(IBridgehubBase(_bridgehub()).chainAssetHandler())
             );
         }
         _;
@@ -101,8 +101,8 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
     /// @notice Checks that the message sender is the specified ZK Chain.
     /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != _bridgehub().getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
+        if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
         }
         _;
     }

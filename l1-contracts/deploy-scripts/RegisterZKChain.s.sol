@@ -9,7 +9,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -298,7 +298,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerAssetIdOnBridgehub() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
         INativeTokenVaultBase ntv = INativeTokenVaultBase(config.nativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
@@ -403,7 +403,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerZKChain() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
 
         IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
