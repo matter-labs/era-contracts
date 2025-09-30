@@ -343,15 +343,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
         } else if (compareStrings(contractName, "L1Bridgehub")) {
-            return abi.encode(config.l1ChainId, config.ownerAddress, config.contracts.maxNumberOfChains);
+            return abi.encode(config.ownerAddress, config.contracts.maxNumberOfChains);
         } else if (compareStrings(contractName, "L1MessageRoot")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId);
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
         } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return
                 abi.encode(
-                    config.l1ChainId,
                     config.ownerAddress,
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridges.l1AssetRouterProxy,
