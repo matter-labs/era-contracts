@@ -282,7 +282,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             /// In this case we trust the TokenBalanceMigrationData data and the settlement layer = Gateway to be honest.
             /// If the settlement layer is compromised, other chains settling on L1 are not compromised, only chains settling on Gateway.
 
-            require(currentSettlementLayer == block.chainid, NotMigratedChain());
             require(
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
