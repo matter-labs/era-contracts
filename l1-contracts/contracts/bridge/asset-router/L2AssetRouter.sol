@@ -424,7 +424,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         return IBridgehub(L2_BRIDGEHUB_ADDR);
     }
 
-    function L1_CHAIN_ID() public view override returns (uint256) {
+    function L1_CHAIN_ID() public view override(IAssetRouterBase, AssetRouterBase) returns (uint256) {
         return l1ChainId;
     }
 

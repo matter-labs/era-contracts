@@ -682,7 +682,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         return L1_NULLIFIER.l2BridgeAddress(_chainId);
     }
 
-    function L1_CHAIN_ID() public view override returns (uint256) {
+    function L1_CHAIN_ID() public view override(IAssetRouterBase, AssetRouterBase) returns (uint256) {
         return block.chainid;
     }
 
