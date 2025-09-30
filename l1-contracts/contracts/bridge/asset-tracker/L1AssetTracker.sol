@@ -124,7 +124,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_l2ChainId);
         require(settlementLayer != block.chainid, InvalidSettlementLayer());
 
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l2NativeToken);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l2ChainId, _l2NativeToken);
 
         require(NATIVE_TOKEN_VAULT.tokenAddress(assetId) == address(0), InvalidTokenAddress());
 
