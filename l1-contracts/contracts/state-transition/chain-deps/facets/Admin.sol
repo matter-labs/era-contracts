@@ -319,7 +319,8 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         /// We require that all the priority transactions are processed.
-        require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
+        // kl todo
+        // require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 
         // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
         // ie, controlled by the governance, which is currently Era Gateways and Ethereum.
