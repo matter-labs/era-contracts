@@ -243,11 +243,11 @@ library L2GenesisForceDeploymentsHelper {
         // or upon initialization, both the L2 deployment of BridgeHub, AssetRouter, and MessageRoot are deployed.
         // However, there is still some follow-up finalization that needs to be done.
         L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses({
-            assetRouter: L2_ASSET_ROUTER_ADDR,
-            ctmDeploymentTracker: ICTMDeploymentTracker(_ctmDeployer),
-            messageRoot: IMessageRoot(L2_MESSAGE_ROOT_ADDR),
-            chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
-            chainRegistrationSender: fixedForceDeploymentsData.aliasedChainRegistrationSender
+            _assetRouter: L2_ASSET_ROUTER_ADDR,
+            _l1CtmDeployer: ICTMDeploymentTracker(_ctmDeployer),
+            _messageRoot: IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+            _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
+            _chainRegistrationSender: fixedForceDeploymentsData.aliasedChainRegistrationSender
         });
     }
 
