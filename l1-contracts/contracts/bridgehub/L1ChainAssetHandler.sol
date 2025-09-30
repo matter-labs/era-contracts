@@ -39,7 +39,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
         return ETH_TOKEN_ASSET_ID;
     }
     function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
+        return block.chainid;
     }
     function _bridgehub() internal view override returns (IBridgehubBase) {
         return BRIDGEHUB;
@@ -52,7 +52,6 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     }
 
     constructor(
-        uint256 _l1ChainId,
         address _owner,
         IL1Bridgehub _bridgehub,
         address _assetRouter,
@@ -60,10 +59,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = _bridgehub;
-        L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
     }
 

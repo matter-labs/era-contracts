@@ -11,16 +11,11 @@ contract L1MessageRoot is MessageRootBase {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     address public immutable BRIDGE_HUB;
 
-    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
-    uint256 internal immutable l1ChainId;
-
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(address _bridgehub) {
         BRIDGE_HUB = _bridgehub;
-        l1ChainId = block.chainid;
         _initialize();
         _disableInitializers();
     }
@@ -39,6 +34,6 @@ contract L1MessageRoot is MessageRootBase {
     }
 
     function L1_CHAIN_ID() public view override returns (uint256) {
-        return l1ChainId;
+        return block.chainid;
     }
 }
