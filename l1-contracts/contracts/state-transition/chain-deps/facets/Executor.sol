@@ -880,11 +880,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
-        // We can only process 1 batch proof at a time.
-        // Allow processing multiple proofs at once.
-        //if (proofPublicInput.length != 1) {
-        //    revert CanOnlyProcessOneBatch();
-        //}
+        // We only allow processing of 1 batch proof at a time on Era Chains.
+        // We allow processing multiple proofs at once on ZKsync OS Chains.
+        if (!s.zksyncOS && proofPublicInput.length != 1) {
+           revert CanOnlyProcessOneBatch();
+        }
 
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {
