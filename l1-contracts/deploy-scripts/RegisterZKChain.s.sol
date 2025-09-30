@@ -12,6 +12,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -438,21 +439,68 @@ contract RegisterZKChainScript is Script {
 
     function addValidators() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
+        address chainAddress = validatorTimelock.BRIDGE_HUB().getZKChain(config.chainChainId);
 
         vm.startBroadcast(msg.sender);
-        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorBlobsEth);
-        // Add them to validators, only if set.
+
+        // Add committer role to the first two addresses (commit operators)
+        validatorTimelock.addValidatorRoles(
+            chainAddress,
+            config.validatorSenderOperatorCommitEth,
+            IValidatorTimelock.ValidatorRotationParams({
+                rotatePrecommitterRole: false,
+                rotateCommitterRole: true,
+                rotateReverterRole: false,
+                rotateProverRole: false,
+                rotateExecutorRole: false
+            })
+        );
+
+        validatorTimelock.addValidatorRoles(
+            chainAddress,
+            config.validatorSenderOperatorBlobsEth,
+            IValidatorTimelock.ValidatorRotationParams({
+                rotatePrecommitterRole: false,
+                rotateCommitterRole: true,
+                rotateReverterRole: false,
+                rotateProverRole: false,
+                rotateExecutorRole: false
+            })
+        );
+
+        // Add prover role to the third address, only if set
         if (config.validatorSenderOperatorProve != address(0)) {
-            validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorProve);
+            validatorTimelock.addValidatorRoles(
+                chainAddress,
+                config.validatorSenderOperatorProve,
+                IValidatorTimelock.ValidatorRotationParams({
+                    rotatePrecommitterRole: false,
+                    rotateCommitterRole: false,
+                    rotateReverterRole: false,
+                    rotateProverRole: true,
+                    rotateExecutorRole: false
+                })
+            );
         }
+
+        // Add executor role to the fourth address, only if set
         if (config.validatorSenderOperatorExecute != address(0)) {
-            validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorExecute);
+            validatorTimelock.addValidatorRoles(
+                chainAddress,
+                config.validatorSenderOperatorExecute,
+                IValidatorTimelock.ValidatorRotationParams({
+                    rotatePrecommitterRole: false,
+                    rotateCommitterRole: false,
+                    rotateReverterRole: false,
+                    rotateProverRole: false,
+                    rotateExecutorRole: true
+                })
+            );
         }
 
         vm.stopBroadcast();
 
-        console.log("Validators added");
+        console.log("Validators added with specific roles");
     }
 
     function configureZkSyncStateTransition() internal {
