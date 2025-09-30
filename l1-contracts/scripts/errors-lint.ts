@@ -326,39 +326,15 @@ function collectErrorUsages(directories: string[], usedErrors: Set<string>, decl
         if (st.isDirectory()) {
           collectErrorUsages([fullPath], usedErrors, declaredNames);
         } else if (file.endsWith(".sol")) {
-          let src = fs.readFileSync(fullPath, "utf8");
 
-          // Strip comments
-          src = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "");
+          const fileContent = fs.readFileSync(fullPath, "utf8");
+          const revertRegex = /revert\s+([A-Za-z0-9_]+)/g;
+          let match;
+          while ((match = revertRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
 
-          // Drop import lines and error declarations to avoid counting definitions/imports as "usage"
-          src = src.replace(/^\s*import\s+[^;]+;.*$/gm, "");
-          src = src.replace(/^\s*error\s+[A-Za-z0-9_]+\s*\([^;]*\)\s*;.*$/gm, "");
-
-          // Normalize whitespace
-          src = src.replace(/\s+/g, " ");
-
-          let m: RegExpExecArray | null;
-          while ((m = usageRe.exec(src)) !== null) {
-            // Find which capturing group hit and add that name
-            for (let i = 1; i < m.length; i++) {
-              const name = m[i];
-              if (name) {
-                if (!declaredNames || declaredNames.has(name)) {
-                  usedErrors.add(name);
-                }
-                break;
-              }
-            }
-          }
-          // const fileContent = fs.readFileSync(fullPath, "utf8");
-          // const revertRegex = /revert\s+([A-Za-z0-9_]+)/g;
-          // let match;
-          // while ((match = revertRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
-
-          // // Also check for error selector usage like ErrorName.selector
-          // const selectorRegex = /([A-Za-z0-9_]+)\.selector/g;
-          // while ((match = selectorRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
+          // Also check for error selector usage like ErrorName.selector
+          const selectorRegex = /([A-Za-z0-9_]+)\.selector/g;
+          while ((match = selectorRegex.exec(fileContent)) !== null) usedErrors.add(match[1]);
         }
       }
     } else if (stat.isFile() && absoluteDir.endsWith(".sol")) {
