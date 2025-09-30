@@ -108,7 +108,7 @@ contract L2MessageRoot is MessageRootBase {
         uint256 _chainId,
         uint256 _batchNumber,
         bytes32 _chainBatchRoot
-    ) public override onlyChain(_chainId) {
+    ) public override {
         super.addChainBatchRoot(_chainId, _batchNumber, _chainBatchRoot);
 
         // Push chainBatchRoot to the chainTree related to specified chainId and get the new root.

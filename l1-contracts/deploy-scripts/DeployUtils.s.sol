@@ -356,7 +356,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "L1Bridgehub")) {
             return abi.encode(config.l1ChainId, config.ownerAddress, config.contracts.maxNumberOfChains);
         } else if (compareStrings(contractName, "L1MessageRoot")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId);
+            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.gatewayChainId);
         } else if (compareStrings(contractName, "ChainRegistrationSender")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "InteropCenter")) {
@@ -370,8 +370,8 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     config.ownerAddress,
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridges.l1AssetRouterProxy,
-                    addresses.bridgehub.assetTrackerProxy,
                     addresses.bridgehub.messageRootProxy,
+                    addresses.bridgehub.assetTrackerProxy,
                     addresses.bridges.l1NullifierProxy
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {

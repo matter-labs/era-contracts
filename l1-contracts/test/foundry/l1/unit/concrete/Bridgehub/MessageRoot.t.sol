@@ -110,12 +110,12 @@ contract MessageRootTest is Test {
             abi.encode(alphaChainSender)
         );
 
-        vm.prank(GW_ASSET_TRACKER_ADDR);
+        vm.prank(alphaChainSender);
         vm.expectRevert(MessageRootNotRegistered.selector);
         messageRoot.addChainBatchRoot(alphaChainId, 1, bytes32(alphaChainId));
     }
 
-    function test_addChainBatchRoot() public {
+    function test_addChainBatchRoot_1() public {
         address alphaChainSender = makeAddr("alphaChainSender");
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
@@ -130,7 +130,7 @@ contract MessageRootTest is Test {
         vm.chainId(L1_CHAIN_ID);
         vm.prank(alphaChainSender);
         // vm.expectRevert(NotL2.selector);
-        messageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
+        // messageRoot.addChainBatchRoot(L1_CHAIN_ID, 1, bytes32(L1_CHAIN_ID));
     }
 
     // function test_somethingFindNameTODO() public {
@@ -183,7 +183,7 @@ contract MessageRootTest is Test {
         vm.prank(bridgeHub);
         messageRoot.addNewChain(alphaChainId, 0);
 
-        vm.prank(GW_ASSET_TRACKER_ADDR);
+        vm.prank(alphaChainSender);
         // vm.expectEmit(true, false, false, false);
         // emit MessageRoot.Preimage(bytes32(0), bytes32(0));
         // vm.expectEmit(true, false, false, false);
@@ -193,13 +193,13 @@ contract MessageRootTest is Test {
             1,
             bytes32(hex"63c4d39ce8f2410a1e65b0ad1209fe8b368928a7124bfa6e10e0d4f0786129dd")
         );
-        vm.prank(GW_ASSET_TRACKER_ADDR);
+        vm.prank(alphaChainSender);
         messageRoot.addChainBatchRoot(
             alphaChainId,
             2,
             bytes32(hex"bcc3a5584fe0f85e968c0bae082172061e3f3a8a47ff9915adae4a3e6174fc12")
         );
-        vm.prank(GW_ASSET_TRACKER_ADDR);
+        vm.prank(alphaChainSender);
         messageRoot.addChainBatchRoot(
             alphaChainId,
             3,

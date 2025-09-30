@@ -5,10 +5,12 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyL2, OnlyL2MessageRoot, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberNotSet} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_BRIDGEHUB_ADDR, GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProofData} from "contracts/common/Messaging.sol";
 
@@ -19,6 +21,7 @@ contract MessageRoot_Extended_Test is Test {
     address bridgeHub;
     uint256 L1_CHAIN_ID;
     L1MessageRoot messageRoot;
+    L2MessageRoot l2MessageRoot;
     address assetTracker;
     address chainAssetHandler;
 
@@ -51,6 +54,10 @@ contract MessageRoot_Extended_Test is Test {
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.settlementLayer.selector), abi.encode(0));
 
         messageRoot = new L1MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID, 1);
+        l2MessageRoot = new L2MessageRoot();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        l2MessageRoot.initL2(L1_CHAIN_ID);
+
     }
 
     function test_ChainRegistered_CurrentChain() public {
@@ -386,7 +393,7 @@ contract MessageRoot_Extended_Test is Test {
         address chainSender = makeAddr("chainSender");
 
         vm.mockCall(
-            bridgeHub,
+            L2_BRIDGEHUB_ADDR,
             abi.encodeWithSelector(IBridgehub.getZKChain.selector, chainId),
             abi.encode(chainSender)
         );
@@ -398,15 +405,15 @@ contract MessageRoot_Extended_Test is Test {
             abi.encode(0, 29, 0) // major, minor, patch
         );
 
-        vm.prank(bridgeHub);
-        messageRoot.addNewChain(chainId, 0);
+        vm.prank(L2_BRIDGEHUB_ADDR);
+        l2MessageRoot.addNewChain(chainId, 0);
 
         // Add a batch root
-        vm.prank(chainSender);
-        messageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
+        vm.prank(GW_ASSET_TRACKER_ADDR);
+        l2MessageRoot.addChainBatchRoot(chainId, 1, keccak256("batchRoot"));
 
         // Check that historical root is set
-        bytes32 historicalRoot = messageRoot.historicalRoot(block.number);
+        bytes32 historicalRoot = l2MessageRoot.historicalRoot(block.number);
         assertTrue(historicalRoot != bytes32(0));
     }
 }

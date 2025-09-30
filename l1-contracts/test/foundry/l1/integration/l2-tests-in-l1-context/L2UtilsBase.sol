@@ -60,6 +60,9 @@ library L2UtilsBase {
         vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
         address interopCenter = address(new InteropCenter());
         vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
+
         {
             address messageRoot = address(new L2MessageRoot());
             vm.etch(L2_MESSAGE_ROOT_ADDR, messageRoot.code);
