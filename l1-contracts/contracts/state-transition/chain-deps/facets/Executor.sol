@@ -170,10 +170,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
-        // Currently ZKsync OS, always generates rollup da commitment and sets l2DaValidator to 0.
-        //        if (_newBatch.l2DaValidator != s.l2DAValidator) {
-        //             revert MismatchL2DAValidator();
-        //        }
 
         // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
         // batch output hash commits to information about batch that needs to be opened on l1.
