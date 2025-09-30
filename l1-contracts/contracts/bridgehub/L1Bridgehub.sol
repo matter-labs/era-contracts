@@ -40,16 +40,12 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function L1_CHAIN_ID() public view override returns (uint256) {
+    function L1_CHAIN_ID() public view override(BridgehubBase, IL1Bridgehub) returns (uint256) {
         return block.chainid;
     }
 
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
-    }
-
-    function _l1ChainId() internal view override returns (uint256) {
-        return block.chainid;
     }
 
     function _maxNumberOfZKChains() internal view override returns (uint256) {
@@ -83,8 +79,8 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     }
 
     modifier onlyL1() {
-        if (_l1ChainId() != block.chainid) {
-            revert NotL1(_l1ChainId(), block.chainid);
+        if (block.chainid != block.chainid) {
+            revert NotL1(block.chainid, block.chainid);
         }
         _;
     }

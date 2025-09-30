@@ -34,17 +34,41 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
-    address public immutable override WETH_TOKEN;
+    address internal immutable _wethToken;
 
     /// @dev The L1 asset router contract.
     IAssetRouterBase internal immutable _assetRouter;
 
     /// @dev The assetId of the base token.
-    bytes32 public immutable BASE_TOKEN_ASSET_ID;
+    bytes32 internal immutable _baseTokenAssetId;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
+    /*//////////////////////////////////////////////////////////////
+                            IMMUTABLE GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    function L1_CHAIN_ID() public view override(INativeTokenVaultBase, NativeTokenVaultBase) returns (uint256) {
+        return block.chainid;
+    }
+
+    function ASSET_ROUTER()
+        public
+        view
+        override(INativeTokenVaultBase, NativeTokenVaultBase)
+        returns (IAssetRouterBase)
+    {
+        return IAssetRouterBase(_assetRouter);
+    }
+
+    function BASE_TOKEN_ASSET_ID() public view override returns (bytes32) {
+        return _baseTokenAssetId;
+    }
+
+    function WETH_TOKEN() public view override(INativeTokenVaultBase, NativeTokenVaultBase) returns (address) {
+        return _wethToken;
+    }
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
     /// NOTE: this function may be removed in the future, don't rely on it!
@@ -52,13 +76,13 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    /// @param _l1WethAddress Address of WETH on deployed chain
-    /// @param _l1AssetRouter Address of Asset Router on L1.
+    /// @param _wethTokenToSet Address of WETH on deployed chain
+    /// @param _assetRouterToSet Address of Asset Router on L1.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
-    constructor(address _l1WethAddress, address _l1AssetRouter, IL1Nullifier _l1Nullifier) {
-        WETH_TOKEN = _l1WethAddress;
-        _assetRouter = IAssetRouterBase(_l1AssetRouter);
-        BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+    constructor(address _wethTokenToSet, address _assetRouterToSet, IL1Nullifier _l1Nullifier) {
+        _wethToken = _wethTokenToSet;
+        _assetRouter = IAssetRouterBase(_assetRouterToSet);
+        _baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         L1_NULLIFIER = _l1Nullifier;
     }
 
@@ -252,7 +276,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override {
-        if (_assetId == BASE_TOKEN_ASSET_ID) {
+        if (_assetId == _baseTokenAssetId) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {
@@ -315,30 +339,5 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @return Whether The chain `_chainId` has infinite balance of the token
     function _hasInfiniteBalance(bool _isNative, bytes32 _assetId, uint256 _chainId) private view returns (bool) {
         return !_isNative && originChainId[_assetId] == _chainId;
-    }
-
-    function L1_CHAIN_ID() public view override returns (uint256) {
-        return block.chainid;
-    }
-
-    function _wethToken() internal view override returns (address) {
-        return WETH_TOKEN;
-    }
-
-    function ASSET_ROUTER()
-        public
-        view
-        override(INativeTokenVaultBase, NativeTokenVaultBase)
-        returns (IAssetRouterBase)
-    {
-        return IAssetRouterBase(_assetRouter);
-    }
-
-    function _baseTokenAssetId() internal view override returns (bytes32) {
-        return BASE_TOKEN_ASSET_ID;
-    }
-
-    function _l1ChainId() internal view override returns (uint256) {
-        return block.chainid;
     }
 }

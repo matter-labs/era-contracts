@@ -33,7 +33,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// L1 that is at the most base layer.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    uint256 public L1_CHAIN_ID;
+    uint256 internal l1ChainId;
 
     /// @notice The total number of ZK chains can be created/connected to this CTM.
     /// This is the temporary security measure.
@@ -49,12 +49,12 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         return ETH_TOKEN_ASSET_ID;
     }
 
-    function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
-    }
-
     function _maxNumberOfZKChains() internal view override returns (uint256) {
         return MAX_NUMBER_OF_ZK_CHAINS;
+    }
+
+    function L1_CHAIN_ID() public view override(BridgehubBase, IL2Bridgehub) returns (uint256) {
+        return l1ChainId;
     }
 
     /// @notice Initializes the contract.
@@ -79,13 +79,13 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @param _l1ChainId The chain id of L1.
     /// @param _maxNumberOfZKChains The maximum number of ZK chains that can be created.
     function updateL2(uint256 _l1ChainId, uint256 _maxNumberOfZKChains) public onlyUpgrader {
-        L1_CHAIN_ID = _l1ChainId;
+        l1ChainId = _l1ChainId;
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(l1ChainId, ETH_TOKEN_ADDRESS);
     }
 
     modifier onlySettlementLayerRelayedSender() override {
@@ -105,7 +105,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override(BridgehubBase, IL2Bridgehub) onlySettlementLayerRelayedSender {
-        if (_l1ChainId() == block.chainid) {
+        if (l1ChainId == block.chainid) {
             revert NotInGatewayMode();
         }
         address zkChain = zkChainMap.get(_chainId);

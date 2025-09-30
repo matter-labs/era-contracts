@@ -50,15 +50,19 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
     }
+
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
+
     function _bridgehub() internal view override returns (IBridgehubBase) {
         return BRIDGEHUB;
     }
+
     function _messageRoot() internal view override returns (IMessageRoot) {
         return MESSAGE_ROOT;
     }
+
     function _assetRouter() internal view override returns (address) {
         return ASSET_ROUTER;
     }

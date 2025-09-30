@@ -28,7 +28,7 @@ contract MessageRootTest is Test {
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
         L1_CHAIN_ID = 5;
-        messageRoot = new L1MessageRoot(bridgeHub, L1_CHAIN_ID);
+        messageRoot = new L1MessageRoot(bridgeHub);
     }
 
     function test_init() public {

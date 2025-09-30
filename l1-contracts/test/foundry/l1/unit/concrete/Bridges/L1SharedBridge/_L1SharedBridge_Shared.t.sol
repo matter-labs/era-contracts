@@ -145,11 +145,11 @@ contract L1AssetRouterTest is Test {
 
         l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
         sharedBridgeImpl = new L1AssetRouter({
-            _l1WethAddress: l1WethAddress,
-            _bridgehub: bridgehubAddress,
-            _l1Nullifier: address(l1Nullifier),
-            _eraChainId: eraChainId,
-            _eraDiamondProxy: eraDiamondProxy
+            _l1WethAddressToSet: l1WethAddress,
+            _bridgehubToSet: bridgehubAddress,
+            _l1NullifierToSet: address(l1Nullifier),
+            _eraChainIdToSet: eraChainId,
+            _eraDiamondProxyToSet: eraDiamondProxy
         });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),
@@ -158,8 +158,8 @@ contract L1AssetRouterTest is Test {
         );
         sharedBridge = L1AssetRouter(payable(sharedBridgeProxy));
         nativeTokenVaultImpl = new L1NativeTokenVault({
-            _l1WethAddress: l1WethAddress,
-            _l1AssetRouter: address(sharedBridge),
+            _wethTokenToSet: l1WethAddress,
+            _assetRouterToSet: address(sharedBridge),
             _l1Nullifier: l1Nullifier
         });
         address tokenBeacon = makeAddr("tokenBeacon");

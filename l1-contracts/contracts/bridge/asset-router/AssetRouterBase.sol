@@ -28,11 +28,11 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view virtual returns (address);
-
-    function _eraChainId() internal view virtual returns (uint256);
-
     function L1_CHAIN_ID() public view virtual returns (uint256);
+
+    function BRIDGE_HUB() public view virtual returns (address);
+
+    function ERA_CHAIN_ID() public view virtual returns (uint256);
 
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
@@ -55,7 +55,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyBridgehub() {
-        if (msg.sender != address(_bridgehub())) {
+        if (msg.sender != address(BRIDGE_HUB())) {
             revert Unauthorized(msg.sender);
         }
         _;

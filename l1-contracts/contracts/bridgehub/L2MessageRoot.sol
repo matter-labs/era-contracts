@@ -23,7 +23,7 @@ contract L2MessageRoot is MessageRootBase {
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    uint256 public L1_CHAIN_ID;
+    uint256 internal l1ChainId;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
@@ -33,13 +33,13 @@ contract L2MessageRoot is MessageRootBase {
         return L2_BRIDGEHUB_ADDR;
     }
 
-    function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
-    }
-
     // A method for backwards compatibility with the old implementation
     function BRIDGE_HUB() public view returns (address) {
         return L2_BRIDGEHUB_ADDR;
+    }
+
+    function L1_CHAIN_ID() public view override returns (uint256) {
+        return l1ChainId;
     }
 
     /// @notice Initializes the contract.
@@ -47,7 +47,7 @@ contract L2MessageRoot is MessageRootBase {
     /// @param _l1ChainId The chain id of L1.
     function initL2(uint256 _l1ChainId) public onlyUpgrader {
         _disableInitializers();
-        L1_CHAIN_ID = _l1ChainId;
+        l1ChainId = _l1ChainId;
         _initialize();
     }
 

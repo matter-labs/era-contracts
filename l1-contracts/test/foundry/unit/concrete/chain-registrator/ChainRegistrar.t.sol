@@ -50,11 +50,11 @@ contract ChainRegistrarTest is Test {
         });
 
         assetRouter = new L1AssetRouter({
-            _l1WethAddress: makeAddr("weth"),
-            _bridgehub: address(bridgeHub),
-            _l1Nullifier: address(l1NullifierImpl),
-            _eraChainId: 270,
-            _eraDiamondProxy: makeAddr("era")
+            _l1WethAddressToSet: makeAddr("weth"),
+            _bridgehubToSet: address(bridgeHub),
+            _l1NullifierToSet: address(l1NullifierImpl),
+            _eraChainIdToSet: 270,
+            _eraDiamondProxyToSet: makeAddr("era")
         });
         address defaultOwnerSb = assetRouter.owner();
         vm.prank(defaultOwnerSb);

@@ -37,7 +37,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
     function _bridgehub() internal view virtual returns (address);
 
-    function _l1ChainId() internal view virtual returns (uint256);
+    function L1_CHAIN_ID() public view virtual returns (uint256);
 
     /// @notice Emitted when a new chain is added to the MessageRoot.
     /// @param chainId The ID of the chain that is being added to the MessageRoot.
@@ -109,7 +109,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
     /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
     modifier onlyL2() {
-        if (block.chainid == _l1ChainId()) {
+        if (block.chainid == L1_CHAIN_ID()) {
             revert NotL2();
         }
         _;
