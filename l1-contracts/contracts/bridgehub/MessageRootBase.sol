@@ -74,11 +74,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @notice We fill the mapping with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE for deployed chains until the chain upgrades to V30.
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
 
-    /// @dev The chain type manager for EraVM chains. EraVM chains are upgraded directly by governance,
-    /// @dev so they can be trusted more than ZKsync OS chains, or chains from other CTMs.
-    /// @dev Introduced with V30.
-    address public eraVmChainTypeManager;
-
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
         if (msg.sender != address(_bridgehub()) && msg.sender != address(_bridgehub().chainAssetHandler())) {
@@ -113,8 +108,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
                 (, minor, ) = IGetters(chain).getSemverProtocolVersion();
                 /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v30 quickly.
                 require(msg.sender == chain, OnlyChain(msg.sender, chain));
-                /// we only allow direct addChainBatchRoots for EraVM chains, as only they are governed directly by governance.
-                require(_bridgehub().chainTypeManager(_chainId) == eraVmChainTypeManager, OnlyChain(msg.sender, chain));
                 require(minor < 30, OnlyPreV30Chain(_chainId));
             } else {
                 revert OnlyAssetTracker(msg.sender, GW_ASSET_TRACKER_ADDR);
@@ -173,10 +166,6 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
                 batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
             }
             v30UpgradeChainBatchNumber[_allZKChains[i]] = batchNumberToWrite;
-        }
-        if (allZKChainsLength > 0) {
-            // On non-local environments we need to save the eraVM chain type manager to allow v29 chains to finalize.
-            eraVmChainTypeManager = _bridgehub().chainTypeManager(_allZKChains[0]);
         }
     }
 
