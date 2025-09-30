@@ -120,7 +120,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// @notice This is used to register L2NativeTokens when the chain is settling on GW.
     /// @notice It is needed since withdrawals are blocked until the token balance is migrated to GW, and it needs to be registered before migration.
-    function registerL2NativeToken(uint256 _l2ChainId, address _l2NativeToken) external onlyNativeTokenVault {
+    function registerL2NativeToken(uint256 _l2ChainId, address _l2NativeToken) external {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_l2ChainId);
         require(settlementLayer != block.chainid, InvalidSettlementLayer());
 
