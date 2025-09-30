@@ -53,11 +53,6 @@ abstract contract AssetTrackerBase is
         _;
     }
 
-    modifier onlyChainAdmin() {
-        // require(msg.sender == , Unauthorized(msg.sender));
-        _;
-    }
-
     modifier onlyServiceTransactionSender() {
         require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
         _;
