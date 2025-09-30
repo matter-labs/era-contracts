@@ -94,7 +94,6 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
     // EcosystemUpgradeConfig internal upgradeConfig;
     // Gateway internal gatewayConfig;
 
-
     struct PreviousUpgradeData {
         // Diamond.DiamondCutData upgradeCut;
         bytes upgradeCutData;
@@ -111,7 +110,6 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
         // );
         // initializePreviousUpgradeFile();
         // prepareEcosystemUpgrade();
-
         // prepareDefaultGovernanceCalls();
     }
 
@@ -131,9 +129,8 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
         addresses.stateTransition.verifierFflonk = deployGWContractDirect("VerifierFflonk");
         addresses.stateTransition.verifierPlonk = deployGWContractDirect("VerifierPlonk");
         addresses.stateTransition.verifier = deployGWContractDirect("Verifier");
-        // addresses.defaultUpgrade = 
+        // addresses.defaultUpgrade =
         // deployGWContractDirect("DefaultUopgrade");
-
     }
 
     error HashIsNonZero(bytes32);
@@ -142,7 +139,11 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
         bytes memory creationCalldata = getCreationCalldata(contractName, true);
         bytes memory creationCode = getCreationCode(contractName, true);
         bytes32 create2salt = bytes32(0);
-        (bytes32 bytecodeHash, bytes memory deployData) = Utils.getDeploymentCalldata(create2salt, creationCode, creationCalldata);
+        (bytes32 bytecodeHash, bytes memory deployData) = Utils.getDeploymentCalldata(
+            create2salt,
+            creationCode,
+            creationCalldata
+        );
 
         address contractAddress = Utils.getL2AddressViaCreate2Factory(create2salt, bytecodeHash, creationCalldata);
 
@@ -169,10 +170,8 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
         revert("Not implemented tupp");
     }
 
-    function getInitializeCalldata(
-        string memory contractName
-    ) internal virtual override returns (bytes memory) {
-        revert ("Not implemented initialize calldata");
+    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
+        revert("Not implemented initialize calldata");
     }
 
     function getCreationCode(
@@ -195,11 +194,10 @@ contract EcosystemUpgrade_v28_1_GW is Script, DeployUtils {
     function getFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (FacetCut[] memory facetCuts) {
-        revert ("Not implemented facet cuts");
+        revert("Not implemented facet cuts");
     }
 
     function compareStrings(string memory a, string memory b) internal pure override returns (bool) {
         return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
-
-} 
+}
