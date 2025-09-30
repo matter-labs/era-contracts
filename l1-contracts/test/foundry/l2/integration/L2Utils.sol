@@ -70,7 +70,7 @@ library L2Utils {
         new L2MessageRoot();
         forceDeployWithoutConstructor("L2MessageRoot", L2_MESSAGE_ROOT_ADDR);
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId, _args.gatewayChainId);
     }
 
     function forceDeployBridgehub(SystemContractsArgs memory _args) internal {

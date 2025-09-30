@@ -9,7 +9,7 @@ import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyL2, OnlyL2MessageRoot, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberNotSet} from "contracts/bridgehub/L1BridgehubErrors.sol";
-import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProofData} from "contracts/common/Messaging.sol";
@@ -20,6 +20,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 contract MessageRoot_Extended_Test is Test {
     address bridgeHub;
     uint256 L1_CHAIN_ID;
+    uint256 gatewayChainId;
     L1MessageRoot messageRoot;
     L2MessageRoot l2MessageRoot;
     address assetTracker;
@@ -30,6 +31,7 @@ contract MessageRoot_Extended_Test is Test {
         chainAssetHandler = makeAddr("chainAssetHandler");
         assetTracker = makeAddr("assetTracker");
         L1_CHAIN_ID = 1;
+        gatewayChainId = 506;
 
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.L1_CHAIN_ID.selector), abi.encode(L1_CHAIN_ID));
         vm.mockCall(
@@ -53,10 +55,10 @@ contract MessageRoot_Extended_Test is Test {
         );
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.settlementLayer.selector), abi.encode(0));
 
-        messageRoot = new L1MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID, 1);
+        messageRoot = new L1MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID, gatewayChainId);
         l2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        l2MessageRoot.initL2(L1_CHAIN_ID);
+        l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
     }
 
     function test_ChainRegistered_CurrentChain() public {
@@ -111,14 +113,14 @@ contract MessageRoot_Extended_Test is Test {
     }
 
     function test_InitializeL2V30Upgrade_NotL2() public {
-        // vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        // messageRoot.initializeL2V30Upgrade();
+        vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
+        l2MessageRoot.initializeL2V30Upgrade();
     }
 
     function test_InitializeL2V30Upgrade_NotUpgrader() public {
-        // vm.chainId(2); // Set to non-L1 chain
-        // vm.expectRevert(abi.encodeWithSelector(Unauthorized.selector, address(this)));
-        // messageRoot.initializeL2V30Upgrade();
+        vm.chainId(2); // Set to non-L1 chain
+        vm.expectRevert(abi.encodeWithSelector(InvalidCaller.selector, address(this)));
+        l2MessageRoot.initializeL2V30Upgrade();
     }
 
     function test_InitializeL1V30Upgrade_NotL1() public {
@@ -129,29 +131,29 @@ contract MessageRoot_Extended_Test is Test {
     }
 
     function test_SendV30UpgradeBlockNumberFromGateway_NotGateway() public {
-        // vm.chainId(2); // Set to non-gateway chain
-        // vm.expectRevert(OnlyGateway.selector);
-        // messageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
+        vm.chainId(2); // Set to non-gateway chain
+        vm.expectRevert(OnlyGateway.selector);
+        l2MessageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
     }
 
     function test_SendV30UpgradeBlockNumberFromGateway_NotSet() public {
-        // vm.chainId(1); // Set to gateway chain
-        // vm.expectRevert(V30UpgradeChainBatchNumberNotSet.selector);
-        // messageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
+        vm.chainId(gatewayChainId); // Set to gateway chain
+        vm.expectRevert(V30UpgradeChainBatchNumberNotSet.selector);
+        l2MessageRoot.sendV30UpgradeBlockNumberFromGateway(271, 100);
     }
 
     function test_SaveV30UpgradeChainBatchNumberOnL1_NotL2MessageRoot() public {
-        // FinalizeL1DepositParams memory params = FinalizeL1DepositParams({
-        //     l2Sender: makeAddr("wrongSender"),
-        //     chainId: 1,
-        //     message: abi.encodeWithSelector(L1MessageRoot.sendV30UpgradeBlockNumberFromGateway.selector, 271, 100),
-        //     l2TxNumberInBatch: 1,
-        //     l2BatchNumber: 1,
-        //     l2MessageIndex: 1,
-        //     merkleProof: new bytes32[](0)
-        // });
-        // vm.expectRevert(OnlyL2MessageRoot.selector);
-        // messageRoot.saveV30UpgradeChainBatchNumberOnL1(params);
+        FinalizeL1DepositParams memory params = FinalizeL1DepositParams({
+            l2Sender: makeAddr("wrongSender"),
+            chainId: 1,
+            message: abi.encodeWithSelector(L2MessageRoot.sendV30UpgradeBlockNumberFromGateway.selector, 271, 100),
+            l2TxNumberInBatch: 1,
+            l2BatchNumber: 1,
+            l2MessageIndex: 1,
+            merkleProof: new bytes32[](0)
+        });
+        vm.expectRevert(OnlyL2MessageRoot.selector);
+        messageRoot.saveV30UpgradeChainBatchNumberOnL1(params);
     }
 
     function test_SaveV30UpgradeChainBatchNumber_NotChain() public {

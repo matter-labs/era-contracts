@@ -120,6 +120,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 broadcast: _skip,
                 l1ChainId: L1_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
+                gatewayChainId: GATEWAY_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
                 legacySharedBridge: sharedBridgeLegacy,
                 l2TokenBeacon: address(beacon),

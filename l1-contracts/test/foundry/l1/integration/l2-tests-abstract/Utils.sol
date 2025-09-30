@@ -10,6 +10,7 @@ address constant L2_STANDARD_TRIGGER_ACCOUNT_ADDR = address(0x000000000000000000
 struct SystemContractsArgs {
     bool broadcast;
     uint256 l1ChainId;
+    uint256 gatewayChainId;
     uint256 eraChainId;
     address l1AssetRouter;
     address legacySharedBridge;
