@@ -272,7 +272,7 @@ library Utils {
         }
 
         vm.broadcast();
-        (bool success, bytes memory data) = _factory.call{gas: 20_000_000}(abi.encodePacked(_salt, _bytecode));
+        (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
         contractAddress = bytesToAddress(data);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
