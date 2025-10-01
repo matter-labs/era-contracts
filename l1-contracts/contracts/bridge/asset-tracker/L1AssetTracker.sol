@@ -118,7 +118,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
         /// We do not migrate the chainBalance for the originChain directly, but indirectly by subtracting from MAX_TOKEN_BALANCE.
         /// Its important to call this for all chains in the ecosystem so that the sum is accurate.
-        require(chainId != originChainId, InvalidChainId());
+        require(_chainId != originChainId, InvalidChainId());
         uint256 migratedBalance;
         if (_chainId != block.chainid) {
             migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
@@ -171,7 +171,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     function registerUnfinalizedWithdrawal(uint256 _chainId, address _l2NativeToken) external onlyChainAdmin {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(_chainId, _l2NativeToken);
         require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned());
-        chainBalance[chainid][assetId] = MAX_TOKEN_BALANCE;
+        chainBalance[_chainId][assetId] = MAX_TOKEN_BALANCE;
         maxChainBalanceAssigned[assetId] = true;
     }
 
