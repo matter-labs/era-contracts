@@ -117,7 +117,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE;
         }
         chainBalance[originChainId][_assetId] -= migratedBalance;
-        }
         chainBalance[_chainId][_assetId] += migratedBalance;
     }
 
