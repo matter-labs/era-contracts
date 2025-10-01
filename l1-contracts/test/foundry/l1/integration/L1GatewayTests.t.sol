@@ -83,6 +83,7 @@ contract L1GatewayTests is
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS, migratingChainId);
+        // _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         acceptPendingAdmin(migratingChainId);
         _deployZKChain(ETH_TOKEN_ADDRESS, gatewayChainId);
         acceptPendingAdmin(gatewayChainId);
@@ -127,6 +128,18 @@ contract L1GatewayTests is
 
         // vm.deal(msg.sender, 100000000000000000000000000000000000);
         // vm.deal(bridgehub, 100000000000000000000000000000000000);
+    }
+
+    function _clearPriorityQueue(address _bridgehub, uint256 _chainId) internal {
+        IZKChain chain = IZKChain(IBridgehub(_bridgehub).getZKChain(_chainId));
+        uint256 totalTxs = chain.getTotalPriorityTxs();
+        uint256 unprocessedIndex = chain.getFirstUnprocessedPriorityTx();
+        console.log("totalTxs", totalTxs);
+        console.log("unprocessedIndex", unprocessedIndex);
+        for (uint256 i = 0; i < 1000; i++) {
+            vm.store(address(chain), bytes32(i), bytes32(totalTxs));
+        }
+        console.log("unprocessedIndex", chain.getFirstUnprocessedPriorityTx());
     }
 
     // This is a method to simplify porting the tests for now.
