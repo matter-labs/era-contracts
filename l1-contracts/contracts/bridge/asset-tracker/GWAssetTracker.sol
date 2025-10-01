@@ -122,8 +122,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
-        _assignMaxChainBalance(_originChainId, _assetId);
+    error RegisterNewTokenNotAllowed();
+
+    function registerNewToken(bytes32, uint256) public override onlyNativeTokenVault {
+        revert RegisterNewTokenNotAllowed();
     }
 
     function handleChainBalanceIncreaseOnGateway(
