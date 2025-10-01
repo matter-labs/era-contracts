@@ -219,9 +219,7 @@ abstract contract BridgehubBase is
         address _chainRegistrationSender
     ) external virtual;
 
-    function setAddressesV30(
-        address _chainRegistrationSender
-    ) external onlyOwnerOrUpgrader {
+    function setAddressesV30(address _chainRegistrationSender) external onlyOwnerOrUpgrader {
         chainRegistrationSender = _chainRegistrationSender;
     }
 

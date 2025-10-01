@@ -8,14 +8,13 @@ struct SharedBridgeOnChainId {
 }
 
 library LegacySharedBridgeAddresses {
+    uint256 public constant STAGE_LEGACY_BRIDGES = 0;
+    uint256 public constant TESTNET_LEGACY_BRIDGES = 0;
+    uint256 public constant MAINNET_LEGACY_BRIDGES = 0;
 
-    uint256 constant public STAGE_LEGACY_BRIDGES = 0;
-    uint256 constant public TESTNET_LEGACY_BRIDGES = 0;
-    uint256 constant public MAINNET_LEGACY_BRIDGES = 0;
-
-    uint256 constant public STAGE_GW_CHAIN_ID = 1;
-    uint256 constant public TESTNET_GW_CHAIN_ID = 2;
-    uint256 constant public MAINNET_GW_CHAIN_ID = 3;
+    uint256 public constant STAGE_GW_CHAIN_ID = 1;
+    uint256 public constant TESTNET_GW_CHAIN_ID = 2;
+    uint256 public constant MAINNET_GW_CHAIN_ID = 3;
 
     error InvalidGwChainId(uint256 gwChainId);
 
@@ -29,9 +28,12 @@ library LegacySharedBridgeAddresses {
         }
     }
 
-    /// @dev We have Stage, Testnet and Mainnet ecosystems. 
+    /// @dev We have Stage, Testnet and Mainnet ecosystems.
     /// We use the gwChainId to distinguish between them, since stage and testnet are both on Sepolia.
-    function getLegacySharedBridgeAddressOnGateway(uint256 _gwChainId, uint256 _l2ChainIndex) external pure returns (SharedBridgeOnChainId memory) {
+    function getLegacySharedBridgeAddressOnGateway(
+        uint256 _gwChainId,
+        uint256 _l2ChainIndex
+    ) external pure returns (SharedBridgeOnChainId memory) {
         SharedBridgeOnChainId[] memory stageLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
         SharedBridgeOnChainId[] memory testnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
         SharedBridgeOnChainId[] memory mainnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);

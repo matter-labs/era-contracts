@@ -207,7 +207,7 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.l2LegacySharedBridge,
                 deployedTokenBeacon,
                 wrappedBaseTokenAddress,
-                additionalForceDeploymentsData.baseTokenAssetId, 
+                additionalForceDeploymentsData.baseTokenAssetId,
                 additionalForceDeploymentsData.baseTokenOriginAddress
             );
         } else {
@@ -263,7 +263,9 @@ library L2GenesisForceDeploymentsHelper {
 
         GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(fixedForceDeploymentsData.l1ChainId);
 
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setAddresses(additionalForceDeploymentsData.baseTokenOriginChainId);
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setAddresses(
+            additionalForceDeploymentsData.baseTokenOriginChainId
+        );
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

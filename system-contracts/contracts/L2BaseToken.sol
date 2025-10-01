@@ -23,7 +23,6 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @notice The total amount of tokens that have been minted.
     uint256 public override totalSupply;
 
-
     /// @notice Transfer tokens from one address to another.
     /// @param _from The address to transfer the ETH from.
     /// @param _to The address to transfer the ETH to.

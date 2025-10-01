@@ -92,13 +92,17 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         L1_CHAIN_ID = _l1ChainId;
         uint256 length = LegacySharedBridgeAddresses.getLegacySharedBridgeLength(block.chainid);
         for (uint256 i = 0; i < length; ++i) {
-            SharedBridgeOnChainId memory sharedBridgeOnChainId = LegacySharedBridgeAddresses.getLegacySharedBridgeAddressOnGateway(block.chainid, i);
+            SharedBridgeOnChainId memory sharedBridgeOnChainId = LegacySharedBridgeAddresses
+                .getLegacySharedBridgeAddressOnGateway(block.chainid, i);
             legacySharedBridgeAddress[sharedBridgeOnChainId.chainId] = sharedBridgeOnChainId.legacySharedBridgeAddress;
         }
     }
 
     /// @dev for local testing
-    function setLegacySharedBridgeAddressForLocalTesting(uint256 _chainId, address _legacySharedBridgeAddress) external onlyUpgrader {
+    function setLegacySharedBridgeAddressForLocalTesting(
+        uint256 _chainId,
+        address _legacySharedBridgeAddress
+    ) external onlyUpgrader {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
 

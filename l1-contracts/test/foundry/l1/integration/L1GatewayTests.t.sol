@@ -184,10 +184,10 @@ contract L1GatewayTests is
     //     _setUpGatewayWithFilterer();
     //     gatewayScript.migrateChainToGateway(migratingChainId);
 
-        // Setup
-        // IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
-        // bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
-        // bytes memory transferData;
+    // Setup
+    // IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
+    // bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
+    // bytes memory transferData;
 
     //     {
     //         IZKChain chain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
@@ -272,29 +272,29 @@ contract L1GatewayTests is
 
     //     bytes32 baseTokenAssetId = eraConfig.baseTokenAssetId;
 
-        // uint256 currentChainId = block.chainid;
-        // // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
-        // vm.chainId(migratingChainId);
-        // vm.mockCall(
-        //     address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
-        //     abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
-        //     abi.encode(true)
-        // );
-        // vm.mockCall(
-        //     address(addresses.bridgehub),
-        //     abi.encodeWithSelector(IBridgehubBase.ctmAssetIdFromChainId.selector),
-        //     abi.encode(assetId)
-        // );
-        // vm.mockCall(
-        //     address(addresses.chainTypeManager),
-        //     abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
-        //     abi.encode(addresses.chainTypeManager.protocolVersion())
-        // );
-        // vm.mockCall(
-        //     address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
-        //     abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
-        //     abi.encode(2)
-        // );
+    // uint256 currentChainId = block.chainid;
+    // // we are already on L1, so we have to set another chain id, it cannot be GW or mintChainId.
+    // vm.chainId(migratingChainId);
+    // vm.mockCall(
+    //     address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
+    //     abi.encodeWithSelector(IMessageVerification.proveL2MessageInclusionShared.selector),
+    //     abi.encode(true)
+    // );
+    // vm.mockCall(
+    //     address(addresses.bridgehub),
+    //     abi.encodeWithSelector(IBridgehubBase.ctmAssetIdFromChainId.selector),
+    //     abi.encode(assetId)
+    // );
+    // vm.mockCall(
+    //     address(addresses.chainTypeManager),
+    //     abi.encodeWithSelector(IChainTypeManager.protocolVersion.selector),
+    //     abi.encode(addresses.chainTypeManager.protocolVersion())
+    // );
+    // vm.mockCall(
+    //     address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+    //     abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+    //     abi.encode(2)
+    // );
 
     //     uint256 protocolVersion = addresses.chainTypeManager.getProtocolVersion(migratingChainId);
 

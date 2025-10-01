@@ -182,7 +182,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
     }
 
-    function _readTotalSupply(bytes32 _assetId, uint256 _tokenOriginChainId, address _tokenAddress) internal view returns (uint256 _totalSupply) {
+    function _readTotalSupply(
+        bytes32 _assetId,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) internal view returns (uint256 _totalSupply) {
         if (_tokenOriginChainId == block.chainid) {
             _totalSupply = chainBalance[block.chainid][_assetId];
         } else {
@@ -254,8 +258,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev We need to force set the asset migration number for newly deployed tokens. 
-    function _needToForceSetAssetMigrationOnL2(bytes32 _assetId, uint256 _tokenOriginChainId, address _tokenAddress) internal view returns (bool) {
+    /// @dev We need to force set the asset migration number for newly deployed tokens.
+    function _needToForceSetAssetMigrationOnL2(
+        bytes32 _assetId,
+        uint256 _tokenOriginChainId,
+        address _tokenAddress
+    ) internal view returns (bool) {
         if (_tokenOriginChainId == block.chainid) {
             return false;
         }

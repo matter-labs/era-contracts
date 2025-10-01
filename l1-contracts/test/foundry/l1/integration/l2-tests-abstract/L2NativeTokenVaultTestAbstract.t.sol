@@ -53,27 +53,27 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
     //     assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
     //     assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
 
-        // stdstore
-        //     .target(address(addresses.vaults.l1NativeTokenVaultProxy))
-        //     .sig(INativeTokenVaultBase.tokenAddress.selector)
-        //     .with_key(assetId)
-        //     .checked_write(l2Token);
+    // stdstore
+    //     .target(address(addresses.vaults.l1NativeTokenVaultProxy))
+    //     .sig(INativeTokenVaultBase.tokenAddress.selector)
+    //     .with_key(assetId)
+    //     .checked_write(l2Token);
 
-        // stdstore
-        //     .target(address(addresses.vaults.l1NativeTokenVaultProxy))
-        //     .sig(INativeTokenVaultBase.assetId.selector)
-        //     .with_key(l2Token)
-        //     .checked_write(assetId);
+    // stdstore
+    //     .target(address(addresses.vaults.l1NativeTokenVaultProxy))
+    //     .sig(INativeTokenVaultBase.assetId.selector)
+    //     .with_key(l2Token)
+    //     .checked_write(assetId);
 
     //     assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
     //     assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
 
-        // vm.mockCall(
-        //     sharedBridgeLegacy,
-        //     abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-        //     abi.encode(l1Token)
-        // );
-        // L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
+    // vm.mockCall(
+    //     sharedBridgeLegacy,
+    //     abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
+    //     abi.encode(l1Token)
+    // );
+    // L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
 
     //     assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
     //     assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
