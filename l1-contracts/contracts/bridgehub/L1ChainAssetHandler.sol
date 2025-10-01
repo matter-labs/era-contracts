@@ -101,6 +101,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
             (_bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(_bridgehubBurnData.chainId))
         );
         address settlementZkChain = _bridgehub().getZKChain(_settlementChainId);
+        // slither-disable-next-line unused-return
         IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);
     }
 }

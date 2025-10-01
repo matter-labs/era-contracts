@@ -166,6 +166,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
         // TODO in V31, remove onlyWithdrawals option.
+        // slither-disable-next-line unused-return
         (, uint32 minor, ) = IZKChain(msg.sender).getSemverProtocolVersion();
         /// If a chain is pre v30, we only allow withdrawals, and don't keep track of chainBalance.
         bool onlyWithdrawals = minor < 30;
@@ -232,11 +233,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
-        // bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
-        // require(
-        //     _processLogsInputs.messageRoot == emptyMessageRootForChain,
-        //     InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
-        // );
+        bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
+        require(
+            _processLogsInputs.messageRoot == emptyMessageRootForChain,
+            InvalidEmptyMessageRoot(emptyMessageRootForChain, _processLogsInputs.messageRoot)
+        );
         bytes32 chainBatchRootHash = keccak256(bytes.concat(localLogsRootHash, _processLogsInputs.messageRoot));
 
         if (chainBatchRootHash != _processLogsInputs.chainBatchRoot) {
@@ -260,6 +261,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
         FullMerkleMemory.FullTree memory sharedTree;
         sharedTree.createTree(2);
+        // slither-disable-next-line unused-return
         sharedTree.setup(SHARED_ROOT_TREE_EMPTY_HASH);
 
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory chainTree;
@@ -328,6 +330,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// @notice L2->L1 withdrawals go through the L2AssetRouter directly.
     function _handleAssetRouterMessage(uint256 _chainId, bytes memory _message) internal {
+        // slither-disable-next-line unused-return
         (bytes4 functionSignature, , bytes32 assetId, bytes memory transferData) = DataEncoding
             .decodeAssetRouterFinalizeDepositData(_message);
         require(
@@ -403,6 +406,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _baseTokenAssetId,
         bytes memory _message
     ) internal {
+        // slither-disable-next-line unused-return
         (bytes4 functionSignature, , uint256 amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_message);
         require(
             functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector,
