@@ -57,7 +57,7 @@ contract L2V29Upgrade {
     /// @notice Calls setAddresses on L2 Bridgehub to set the address of newly appeared ChainAssetHandler contract.
     function setChainAssetHandler() internal {
         // Get the current L2 Brigehub owner.
-        address owner = IBridgehubBase(L2_BRIDGE_HUB).owner();
+        address owner = IBridgehub(L2_BRIDGE_HUB).owner();
 
         // Call L2 Bridgehub out of it's owner's name to setAddresses.
         SystemContractHelper.mimicCallWithPropagatedRevert(
