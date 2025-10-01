@@ -768,7 +768,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    // Warning: removed onlyValidator - to make this permisionless.
     function executeBatchesSharedBridge(
         address, // _chainAddress
         uint256 _processFrom,
