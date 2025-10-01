@@ -3,8 +3,6 @@ pragma solidity ^0.8.21;
 
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
-// 0xa65b4be1
-error ChainBalanceNotZero();
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0x2e19b556
