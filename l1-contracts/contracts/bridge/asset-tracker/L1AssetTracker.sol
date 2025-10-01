@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {InvalidProof, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {InvalidProof, ZeroAddress, InvalidChainId} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
@@ -100,6 +100,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @param _assetId The asset id of the token to migrate the token balance for.
     function migrateTokenBalanceFromNTVV30(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
+        uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
+        /// We do not migrate the chainBalance for the originChain directly, but indirectly by subtracting from MAX_TOKEN_BALANCE.
+        /// Its important to call this for all chains in the ecosystem so that the sum is accurate.
+        require(chainId != originChainId, InvalidChainId());
         uint256 migratedBalance;
         if (_chainId != block.chainid) {
             migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
@@ -110,7 +114,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         }
         /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
         /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
-        uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
         /// Note before the token is migrated the MAX_TOKEN_BALANCE is not assigned, since the registerNewToken is only called for new tokens.
         if (!maxTokenBalanceAssigned[_assetId]) {
             maxTokenBalanceAssigned[_assetId] = true;
