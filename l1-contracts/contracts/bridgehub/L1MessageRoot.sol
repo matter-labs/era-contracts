@@ -70,7 +70,6 @@ contract L1MessageRoot is MessageRootBase {
             BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
             NotWhitelistedSettlementLayer(_finalizeWithdrawalParams.chainId)
         );
-        require(block.chainid == L1_CHAIN_ID, OnlyL1());
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_finalizeWithdrawalParams.message, 0);
         require(
