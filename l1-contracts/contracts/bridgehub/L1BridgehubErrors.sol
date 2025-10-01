@@ -14,12 +14,6 @@ error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 error ChainBatchRootZero();
 // 0x65e8a019
 error ChainExists();
-// 0xff514c10
-error ChainIdAlreadyPresent();
-// 0x5de72107
-error ChainNotLegacy();
-// 0x4bd4ae07
-error ChainNotPresentInCTM();
 // 0x5d03f19d
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
@@ -72,16 +66,12 @@ error OnlyAssetTrackerOrChain(address, uint256);
 error OnlyBridgehub(address msgSender, address bridgehub);
 // 0x2d396674
 error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
-// 0xde9a2b95
-error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
 // 0xec76af13
 error OnlyGateway();
 // 0x8d14ca84
 error OnlyL1();
-// 0xa7a05e40
-error OnlyL2();
 // 0x605d6b86
 error OnlyL2MessageRoot();
 // 0x6b75db8c
