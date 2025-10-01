@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidTokenAddress, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidTokenAddress, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -147,7 +147,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(_l2ChainId, _l2NativeToken);
 
-        /// This guarantess the token is not a legacy
+        /// This guarantees the token is not a legacy
         require(NATIVE_TOKEN_VAULT.tokenAddress(assetId) == address(0), InvalidTokenAddress());
         require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned());
 
@@ -168,7 +168,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     /// @dev the chainAdmin should call this function for all unfinalized withdrawals after the chain migrates to GW.
-    function registerUnfinalizedWithdrawal(uint256 _chainId, address _l2NativeToken) external onlyChainAdmin {
+    function registerUnfinalizedWithdrawal(uint256 _chainId, address _l2NativeToken) external onlyChainAdmin(_chainId) {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(_chainId, _l2NativeToken);
         require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned());
         chainBalance[_chainId][assetId] = MAX_TOKEN_BALANCE;
