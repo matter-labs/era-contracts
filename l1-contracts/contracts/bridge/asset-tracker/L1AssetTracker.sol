@@ -285,9 +285,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
             // we check parity here to make sure that we migrated the token balance back to L1 from Gateway.
             // this is needed to ensure that the chainBalance on the Gateway AssetTracker is currently 0.
-            // In the future we might initialize chains on GW. So we subtract from chainMigrationNumber.
             require(
-                (chainMigrationNumber - assetMigrationNumber[data.chainId][data.assetId]) % 2 == 1,
+                (assetMigrationNumber[data.chainId][data.assetId]) % 2 == 0,
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
             );
 
