@@ -361,7 +361,6 @@ contract L1GatewayTests is
     /// to increase coverage, properly tested in L2GatewayTests
     function test_forwardToL2OnGateway() public {
         _setUpGatewayWithFilterer();
-        vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
         vm.expectRevert(NotInGatewayMode.selector);
         addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
