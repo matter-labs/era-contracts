@@ -75,8 +75,9 @@ contract ExecutorProofTest is UtilsTest {
             isFreezable: true,
             selectors: Utils.getUtilsFacetSelectors()
         });
+        bytes32 baseTokenAssetId = bytes32(uint256(uint160(makeAddr("baseTokenAssetId"))));
         dummyBridgehub = new DummyBridgehub();
-        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0));
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 
         address diamondProxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, address(dummyBridgehub));
         executor = TestExecutorFacet(diamondProxy);
