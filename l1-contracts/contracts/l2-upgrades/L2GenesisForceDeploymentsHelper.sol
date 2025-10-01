@@ -33,7 +33,6 @@ library L2GenesisForceDeploymentsHelper {
     function forceDeployEra(bytes memory _bytecodeInfo, address _newAddress) internal {
         bytes32 bytecodeHash = abi.decode(_bytecodeInfo, (bytes32));
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = new IL2ContractDeployer.ForceDeployment[](1);
-        // Configure the MessageRoot deployment.
         forceDeployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: bytecodeHash,
             newAddress: _newAddress,
