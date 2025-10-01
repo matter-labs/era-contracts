@@ -89,19 +89,4 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
     }
-
-    function _setLegacySharedBridgeIfL1(
-        BridgehubBurnCTMAssetData memory _bridgehubBurnData,
-        uint256 _settlementChainId
-    ) internal override {
-        /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
-
-        bytes memory data = abi.encodeCall(
-            IGWAssetTracker.setLegacySharedBridgeAddress,
-            (_bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(_bridgehubBurnData.chainId))
-        );
-        address settlementZkChain = _bridgehub().getZKChain(_settlementChainId);
-        // slither-disable-next-line unused-return
-        IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);
-    }
 }
