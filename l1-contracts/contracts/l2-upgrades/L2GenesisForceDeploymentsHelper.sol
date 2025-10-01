@@ -208,7 +208,8 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.l2LegacySharedBridge,
                 deployedTokenBeacon,
                 wrappedBaseTokenAddress,
-                additionalForceDeploymentsData.baseTokenAssetId
+                additionalForceDeploymentsData.baseTokenAssetId, 
+                additionalForceDeploymentsData.baseTokenOriginAddress
             );
         } else {
             // solhint-disable-next-line func-named-parameters

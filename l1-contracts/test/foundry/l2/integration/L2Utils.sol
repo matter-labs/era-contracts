@@ -173,7 +173,8 @@ library L2Utils {
             _args.legacySharedBridge,
             _args.l2TokenBeacon,
             address(0),
-            ethAssetId
+            ethAssetId,
+            ETH_TOKEN_ADDRESS
         );
     }
 

@@ -50,6 +50,7 @@ library L2UtilsBase {
     /// @dev We provide a fast form of debugging the L2 contracts using L1 foundry. We also test using zk foundry.
     function initSystemContracts(SystemContractsArgs memory _args) internal {
         bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
+        address baseTokenOriginToken = ETH_TOKEN_ADDRESS;
         address wethToken = address(0x1);
         // we deploy the code to get the contract code with immutables which we then vm.etch
         address ntv = address(new L2NativeTokenVaultDev());
@@ -164,7 +165,8 @@ library L2UtilsBase {
             _args.legacySharedBridge,
             _args.l2TokenBeacon,
             wethToken,
-            baseTokenAssetId
+            baseTokenAssetId,
+            baseTokenOriginToken
         );
 
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));
