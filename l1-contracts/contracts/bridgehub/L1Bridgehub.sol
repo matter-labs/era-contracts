@@ -95,6 +95,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         if (ctm == address(0)) {
             revert ChainNotLegacy();
         }
+        // slither-disable-next-line unused-return
         (bool exists, ) = zkChainMap.tryGet(_chainId);
         if (exists) {
             revert ChainIdAlreadyPresent();
@@ -323,6 +324,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         if (_zkChain == address(0)) {
             revert ZeroAddress();
         }
+        // slither-disable-next-line unused-return
         (bool exists, ) = zkChainMap.tryGet(_chainId);
         if (exists) {
             revert ChainIdAlreadyExists();
