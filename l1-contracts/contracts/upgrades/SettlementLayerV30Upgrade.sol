@@ -30,7 +30,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         /// We write to storage to avoid reentrancy.
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
-        
+
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
         INativeTokenVault nativeTokenVault = INativeTokenVault(
             IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault()

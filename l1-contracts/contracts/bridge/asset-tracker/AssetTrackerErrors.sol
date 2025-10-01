@@ -50,4 +50,3 @@ error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
 error InvalidEmptyMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
-
