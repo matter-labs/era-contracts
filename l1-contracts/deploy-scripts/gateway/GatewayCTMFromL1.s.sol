@@ -434,7 +434,7 @@ contract GatewayCTMFromL1 is Script {
             output.gatewayStateTransition.chainTypeManagerImplementation
         );
 
-        // TODO(EVM-745): eventually a proxy admin or something should be deplyoed here
+        // TODO(EVM-745): eventually a proxy admin or something should be deployed here
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
             facet: output.gatewayStateTransition.adminFacet,
