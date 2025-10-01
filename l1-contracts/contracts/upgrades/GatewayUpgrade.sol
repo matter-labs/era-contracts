@@ -33,6 +33,10 @@ contract GatewayUpgrade is BaseZkSyncUpgrade, L1FixedForceDeploymentsHelper, IGa
     using PriorityQueue for PriorityQueue.Queue;
     using PriorityTree for PriorityTree.Tree;
 
+    /// @notice The address of this contract.
+    /// @dev needed if address is delegateCalled, and we delegateCall it again.
+    address public immutable THIS_ADDRESS;
+
     constructor() {
         THIS_ADDRESS = address(this);
     }
