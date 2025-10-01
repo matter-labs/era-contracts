@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidTokenAddress, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion} from "./AssetTrackerErrors.sol";
+import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidTokenAddress, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -39,7 +39,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     IChainAssetHandler public chainAssetHandler;
 
+    /// Todo Deprecate after V30 is finished.
     mapping(bytes32 assetId => bool maxTokenBalanceAssigned) internal maxTokenBalanceAssigned;
+    
+    /// Todo Deprecate after V30 is finished.
+    mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
 
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
@@ -110,7 +114,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         } else {
             address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
             migratedBalance = IERC20(tokenAddress).totalSupply();
-            require(chainBalance[block.chainid][_assetId] == 0, ChainBalanceNotZero());
+            require(!l1TotalSupplyMigrated[_assetId], L1TotalSupplyAlreadyMigrated());
+            l1TotalSupplyMigrated[_assetId] = true;
         }
         /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
         /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
