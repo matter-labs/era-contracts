@@ -38,6 +38,7 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
 import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
+import {BytecodeNotSet, DeployFailed} from "../../common/L1ContractErrors.sol";
 
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
 // solhint-disable-next-line gas-struct-packing
@@ -462,7 +463,7 @@ contract GatewayCTMDeployer {
      */
     function deployViaCreate(bytes memory _bytecode) internal returns (address addr) {
         if (_bytecode.length == 0) {
-            revert("Bytecode is not set");
+            revert BytecodeNotSet();
         }
 
         assembly {
@@ -474,6 +475,8 @@ contract GatewayCTMDeployer {
             addr := create(0, ptr, size)
         }
 
-        require(addr != address(0), "Deployment failed");
+        if (addr == address(0)) {
+            revert DeployFailed();
+        }
     }
 }

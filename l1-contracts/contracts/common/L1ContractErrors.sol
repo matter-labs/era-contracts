@@ -45,6 +45,8 @@ error BridgeMintNotImplemented();
 error BurningNativeWETHNotSupported();
 // 0xccdd18d2
 error BytecodeAlreadyPublished(bytes32 bytecodeHash);
+// 0x5176994e
+error BytecodeNotSet();
 // 0x25d8333c
 error CallerNotTimerAdmin();
 // 0x3331e9c0
