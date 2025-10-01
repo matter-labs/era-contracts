@@ -149,7 +149,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 _tokenOriginChainId,
         address _tokenAddress
     ) internal {
-        if (_needToForceSetAssetMigrationOnL2(_assetId)) {
+        if (_needToForceSetAssetMigrationOnL2(_assetId, _tokenOriginChainId, _tokenAddress)) {
             _forceSetAssetMigrationNumber(block.chainid, _assetId);
         }
 
@@ -173,16 +173,20 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     ) internal returns (uint256 _totalSupply) {
         SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_migrationNumber][_assetId];
         if (!tokenSavedTotalSupply.isSaved) {
-            if (_tokenOriginChainId == block.chainid) {
-                _totalSupply = chainBalance[block.chainid][_assetId];
-            } else {
-                _totalSupply = IERC20(_tokenAddress).totalSupply();
-                /// This function saves the token supply before the first deposit after the chain migration is processed (in the same transaction).
-                /// This totalSupply is the chain's total supply at the moment of chain migration.
-            }
+            _totalSupply = _readTotalSupply(_assetId, _tokenOriginChainId, _tokenAddress);
+            /// This function saves the token supply before the first deposit after the chain migration is processed (in the same transaction).
+            /// This totalSupply is the chain's total supply at the moment of chain migration.
             savedTotalSupply[_migrationNumber][_assetId] = SavedTotalSupply({isSaved: true, amount: _totalSupply});
         } else {
             _totalSupply = tokenSavedTotalSupply.amount;
+        }
+    }
+
+    function _readTotalSupply(bytes32 _assetId, uint256 _tokenOriginChainId, address _tokenAddress) internal view returns (uint256 _totalSupply) {
+        if (_tokenOriginChainId == block.chainid) {
+            _totalSupply = chainBalance[block.chainid][_assetId];
+        } else {
+            _totalSupply = IERC20(_tokenAddress).totalSupply();
         }
     }
 
@@ -250,10 +254,13 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    function _needToForceSetAssetMigrationOnL2(bytes32 _assetId) internal view returns (bool) {
+    /// @dev We need to force set the asset migration number for newly deployed tokens. 
+    function _needToForceSetAssetMigrationOnL2(bytes32 _assetId, uint256 _tokenOriginChainId, address _tokenAddress) internal view returns (bool) {
+        if (_tokenOriginChainId == block.chainid) {
+            return false;
+        }
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
-        address tokenAddress = _tryGetTokenAddress(_assetId);
-        uint256 amount = IERC20(tokenAddress).totalSupply();
+        uint256 amount = IERC20(_tokenAddress).totalSupply();
 
         return savedAssetMigrationNumber == 0 && amount == 0;
     }
