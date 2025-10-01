@@ -158,8 +158,8 @@ contract L1AssetRouterTest is Test {
         );
         sharedBridge = L1AssetRouter(payable(sharedBridgeProxy));
         nativeTokenVaultImpl = new L1NativeTokenVault({
-            _wethTokenToSet: l1WethAddress,
-            _assetRouterToSet: address(sharedBridge),
+            _wethToken: l1WethAddress,
+            _assetRouter: address(sharedBridge),
             _l1Nullifier: l1Nullifier
         });
         address tokenBeacon = makeAddr("tokenBeacon");
