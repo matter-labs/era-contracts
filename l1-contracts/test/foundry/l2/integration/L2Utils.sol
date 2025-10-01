@@ -192,7 +192,7 @@ library L2Utils {
         });
         console.logBytes32(bytecodehash);
 
-        // prankOrBroadcast(_broadcast, L2_FORCE_DEPLOYER_ADDR);
+        prankOrBroadcast(false, L2_FORCE_DEPLOYER_ADDR);
         IContractDeployer(L2_DEPLOYER_SYSTEM_CONTRACT_ADDR).forceDeployOnAddresses(deployments);
     }
 
