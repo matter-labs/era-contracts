@@ -167,7 +167,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
-            _setTransientBalanceChange(_chainId, _assetId, _amount);
+            bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
+            if (baseTokenAssetId != _assetId) {
+                _setTransientBalanceChange(_chainId, _assetId, _amount);
+            }
         }
 
         chainBalance[chainToUpdate][_assetId] += _amount;
