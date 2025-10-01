@@ -266,6 +266,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 fromChainId;
         uint256 toChainId;
 
+        /// We check the assetId to make sure the chain is not lying about it.
+        DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+
         if (data.isL1ToGateway) {
             uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
             /// We check the chainMigrationNumber to make sure the message is not from a previous token migration.
@@ -289,9 +292,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 (assetMigrationNumber[data.chainId][data.assetId]) % 2 == 0,
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
             );
-
-            /// We check the assetId to make sure the chain is not lying about it.
-            DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
 
             fromChainId = data.chainId;
             toChainId = currentSettlementLayer;
