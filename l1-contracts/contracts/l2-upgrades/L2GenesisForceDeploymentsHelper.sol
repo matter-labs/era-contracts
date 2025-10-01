@@ -215,7 +215,8 @@ library L2GenesisForceDeploymentsHelper {
                 previousL2TokenProxyBytecodeHash,
                 l2LegacySharedBridge,
                 wrappedBaseTokenAddress,
-                additionalForceDeploymentsData.baseTokenAssetId
+                additionalForceDeploymentsData.baseTokenAssetId,
+                additionalForceDeploymentsData.baseTokenOriginAddress
             );
         }
 

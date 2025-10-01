@@ -83,13 +83,12 @@ abstract contract NativeTokenVault is
         if (originChainId[_assetId] == block.chainid) {
             return token;
         } else {
-            /// kl todo the call to the l2BaseTokenSystemContract fails for some reason, debug.
-            if (token != L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
-                return IBridgedStandardToken(token).originToken();
-            } else {
-                return address(uint160(uint256(1)));
-            }
+            _getOriginTokenFromAddress(token);
         }
+    }
+
+    function _getOriginTokenFromAddress(address _token) internal view virtual returns (address) {
+        return IBridgedStandardToken(_token).originToken();
     }
 
     /// @inheritdoc INativeTokenVault

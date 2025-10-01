@@ -23,19 +23,6 @@ contract L2BaseToken is IBaseToken, SystemContractBase {
     /// @notice The total amount of tokens that have been minted.
     uint256 public override totalSupply;
 
-    /// @dev Address of the token on its origin chain that can be deposited to mint this bridged token
-    address public originToken;
-
-    /// @dev The assetId of the token.
-    bytes32 public assetId;
-
-    function setAddresses(
-        bytes32 _assetId,
-        address _originTokenOriginAddress
-    ) external onlyCallFrom(address(COMPLEX_UPGRADER_CONTRACT)) {
-        originToken = _originTokenOriginAddress;
-        assetId = _assetId;
-    }
 
     /// @notice Transfer tokens from one address to another.
     /// @param _from The address to transfer the ETH from.
