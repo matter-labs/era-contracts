@@ -89,25 +89,25 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
 
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
-    /// @param _newL1ChainId The chain id of L1.
+    /// @param _l1ChainId The chain id of L1.
     /// @param _aliasedOwner The address of the owner of the contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
-    /// @param _newWethToken The address of the L2 weth token.
-    /// @param _newBaseTokenAssetId The asset ID of the base token.
+    /// @param _wethToken The address of the L2 weth token.
+    /// @param _baseTokenAssetId The asset ID of the base token.
     function initL2(
-        uint256 _newL1ChainId,
+        uint256 _l1ChainId,
         address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
-        address _newWethToken,
-        bytes32 _newBaseTokenAssetId
+        address _wethToken,
+        bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
-        updateL2(_newL1ChainId, _l2TokenProxyBytecodeHash, _legacySharedBridge, _newWethToken, _newBaseTokenAssetId);
+        updateL2(_l1ChainId, _l2TokenProxyBytecodeHash, _legacySharedBridge, _wethToken, _baseTokenAssetId);
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
         }
