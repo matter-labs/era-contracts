@@ -59,4 +59,5 @@ struct InitializeDataNewChain {
 
 interface IDiamondInit {
     function initialize(InitializeData calldata _initData) external returns (bytes32);
+    function IS_ZKSYNC_OS() external view returns (bool);
 }

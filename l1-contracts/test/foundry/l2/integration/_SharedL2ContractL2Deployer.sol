@@ -70,7 +70,10 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         addresses.stateTransition.mailboxFacet = address(new MailboxFacet(config.eraChainId, config.l1ChainId));
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
-        addresses.stateTransition.diamondInit = address(new DiamondInit(false));
+        DiamondInit diamondInit = new DiamondInit(false);
+        console.log("diamondInit 1", address(diamondInit));
+        addresses.stateTransition.diamondInit = address(diamondInit);
+        console.log("diamondInit 2", diamondInit.IS_ZKSYNC_OS());
         // Deploy ChainTypeManager implementation
         addresses.stateTransition.chainTypeManagerImplementation = address(
             new ChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)
