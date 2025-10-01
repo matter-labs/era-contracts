@@ -186,8 +186,6 @@ abstract contract ChainAssetHandlerBase is
         );
         address zkChain = IBridgehubBase(_bridgehub()).getZKChain(bridgehubBurnData.chainId);
 
-        _setLegacySharedBridgeIfL1(bridgehubBurnData, _settlementChainId);
-
         bytes memory ctmMintData;
         // to avoid stack too deep
         {
@@ -251,11 +249,6 @@ abstract contract ChainAssetHandlerBase is
 
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
-
-    function _setLegacySharedBridgeIfL1(
-        BridgehubBurnCTMAssetData memory _bridgehubBurnData,
-        uint256 _settlementChainId
-    ) internal virtual {}
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
     /// @param _assetId the assetId of the chain's CTM

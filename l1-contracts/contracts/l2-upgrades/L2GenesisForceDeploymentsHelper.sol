@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
@@ -14,6 +14,8 @@ import {L2NativeTokenVault} from "../bridge/ntv/L2NativeTokenVault.sol";
 import {L2MessageRoot} from "../bridgehub/L2MessageRoot.sol";
 import {L2Bridgehub} from "../bridgehub/L2Bridgehub.sol";
 import {L2AssetRouter} from "../bridge/asset-router/L2AssetRouter.sol";
+import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
+import {GWAssetTracker} from "../bridge/asset-tracker/GWAssetTracker.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
 import {DeployFailed} from "../common/L1ContractErrors.sol";
 
@@ -205,7 +207,8 @@ library L2GenesisForceDeploymentsHelper {
                 additionalForceDeploymentsData.l2LegacySharedBridge,
                 deployedTokenBeacon,
                 wrappedBaseTokenAddress,
-                additionalForceDeploymentsData.baseTokenAssetId
+                additionalForceDeploymentsData.baseTokenAssetId,
+                additionalForceDeploymentsData.baseTokenOriginAddress
             );
         } else {
             // solhint-disable-next-line func-named-parameters
@@ -214,7 +217,8 @@ library L2GenesisForceDeploymentsHelper {
                 previousL2TokenProxyBytecodeHash,
                 l2LegacySharedBridge,
                 wrappedBaseTokenAddress,
-                additionalForceDeploymentsData.baseTokenAssetId
+                additionalForceDeploymentsData.baseTokenAssetId,
+                additionalForceDeploymentsData.baseTokenOriginAddress
             );
         }
 
@@ -251,6 +255,17 @@ library L2GenesisForceDeploymentsHelper {
             _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
             _chainRegistrationSender: fixedForceDeploymentsData.aliasedChainRegistrationSender
         });
+
+        L2AssetTracker(L2_ASSET_TRACKER_ADDR).setAddresses(
+            fixedForceDeploymentsData.l1ChainId,
+            additionalForceDeploymentsData.baseTokenAssetId
+        );
+
+        GWAssetTracker(GW_ASSET_TRACKER_ADDR).setAddresses(fixedForceDeploymentsData.l1ChainId);
+
+        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setAddresses(
+            additionalForceDeploymentsData.baseTokenOriginChainId
+        );
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

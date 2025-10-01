@@ -5,11 +5,7 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {BridgehubBurnCTMAssetData, IBridgehubBase} from "./IBridgehubBase.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
-import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
-import {IGWAssetTracker} from "../bridge/asset-tracker/IGWAssetTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -86,20 +82,5 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
-    }
-
-    function _setLegacySharedBridgeIfL1(
-        BridgehubBurnCTMAssetData memory _bridgehubBurnData,
-        uint256 _settlementChainId
-    ) internal override {
-        /// We set the legacy shared bridge address on the gateway asset tracker to allow for L2->L1 asset withdrawals via the L2AssetRouter.
-
-        bytes memory data = abi.encodeCall(
-            IGWAssetTracker.setLegacySharedBridgeAddress,
-            (_bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(_bridgehubBurnData.chainId))
-        );
-        address settlementZkChain = IBridgehubBase(_bridgehub()).getZKChain(_settlementChainId);
-        // slither-disable-next-line unused-return
-        IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);
     }
 }

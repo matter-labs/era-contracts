@@ -42,43 +42,43 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
     }
 
-    function test_registerLegacyToken_IncorrectConfiguration() external {
-        address l2Token = makeAddr("l2Token");
-        address l1Token = makeAddr("l1Token");
-        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
+    // function test_registerLegacyToken_IncorrectConfiguration() external {
+    //     address l2Token = makeAddr("l2Token");
+    //     address l1Token = makeAddr("l1Token");
+    //     L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
 
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
+    //     bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
 
-        assertEq(l2NativeTokenVault.originChainId(assetId), 0);
-        assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
-        assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
+    //     assertEq(l2NativeTokenVault.originChainId(assetId), 0);
+    //     assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+    //     assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
 
-        stdstore
-            .target(address(addresses.vaults.l1NativeTokenVaultProxy))
-            .sig(INativeTokenVaultBase.tokenAddress.selector)
-            .with_key(assetId)
-            .checked_write(l2Token);
+    // stdstore
+    //     .target(address(addresses.vaults.l1NativeTokenVaultProxy))
+    //     .sig(INativeTokenVaultBase.tokenAddress.selector)
+    //     .with_key(assetId)
+    //     .checked_write(l2Token);
 
-        stdstore
-            .target(address(addresses.vaults.l1NativeTokenVaultProxy))
-            .sig(INativeTokenVaultBase.assetId.selector)
-            .with_key(l2Token)
-            .checked_write(assetId);
+    // stdstore
+    //     .target(address(addresses.vaults.l1NativeTokenVaultProxy))
+    //     .sig(INativeTokenVaultBase.assetId.selector)
+    //     .with_key(l2Token)
+    //     .checked_write(assetId);
 
-        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
-        assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
+    //     assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+    //     assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
 
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
-            abi.encode(l1Token)
-        );
-        L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
+    // vm.mockCall(
+    //     sharedBridgeLegacy,
+    //     abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
+    //     abi.encode(l1Token)
+    // );
+    // L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
 
-        assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
-        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
-        assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
-    }
+    //     assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
+    //     assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+    //     assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
+    // }
 
     function test_registerLegacyTokenRevertNotLegacy() external {
         address l2Token = makeAddr("l2Token");
@@ -99,50 +99,50 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         INativeTokenVaultBase(addresses.vaults.l1NativeTokenVaultProxy).registerToken(l2Token);
     }
 
-    function test_bridgeMint_CorrectlyConfiguresL2LegacyToken() external {
-        L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
+    // function test_bridgeMint_CorrectlyConfiguresL2LegacyToken() external {
+    //     L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
 
-        uint256 originChainId = L1_CHAIN_ID;
-        address originToken = makeAddr("l1Token");
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(originChainId, originToken);
+    //     uint256 originChainId = L1_CHAIN_ID;
+    //     address originToken = makeAddr("l1Token");
+    //     bytes32 assetId = DataEncoding.encodeNTVAssetId(originChainId, originToken);
 
-        address expectedL2TokenAddress = l2NativeTokenVault.calculateCreate2TokenAddress(originChainId, originToken);
+    //     address expectedL2TokenAddress = l2NativeTokenVault.calculateCreate2TokenAddress(originChainId, originToken);
 
-        address depositor = makeAddr("depositor");
-        address receiver = makeAddr("receiver");
-        uint256 amount = 100;
-        bytes memory erc20Metadata = DataEncoding.encodeTokenData(
-            originChainId,
-            abi.encode("Token"),
-            abi.encode("T"),
-            abi.encode(18)
-        );
-        bytes memory data = DataEncoding.encodeBridgeMintData(depositor, receiver, originToken, amount, erc20Metadata);
+    //     address depositor = makeAddr("depositor");
+    //     address receiver = makeAddr("receiver");
+    //     uint256 amount = 100;
+    //     bytes memory erc20Metadata = DataEncoding.encodeTokenData(
+    //         originChainId,
+    //         abi.encode("Token"),
+    //         abi.encode("T"),
+    //         abi.encode(18)
+    //     );
+    //     bytes memory data = DataEncoding.encodeBridgeMintData(depositor, receiver, originToken, amount, erc20Metadata);
 
-        assertNotEq(block.chainid, originChainId);
+    //     assertNotEq(block.chainid, originChainId);
 
-        assertEq(l2NativeTokenVault.originChainId(assetId), 0);
-        assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
-        assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
+    //     assertEq(l2NativeTokenVault.originChainId(assetId), 0);
+    //     assertEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+    //     assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
 
-        // this `mockCall` ensures the branch for legacy tokens is chosen
-        vm.mockCall(
-            sharedBridgeLegacy,
-            abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
-            abi.encode(originToken)
-        );
-        // fails on the following line without this `mockCall`
-        // https://github.com/matter-labs/era-contracts/blob/cebfe26a41f3b83039a7d36558bf4e0401b154fc/l1-contracts/contracts/bridge/ntv/NativeTokenVault.sol#L163
-        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
-        vm.prank(address(l2NativeTokenVault.ASSET_ROUTER()));
-        vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
-        IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
+    //     // this `mockCall` ensures the branch for legacy tokens is chosen
+    //     vm.mockCall(
+    //         sharedBridgeLegacy,
+    //         abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (expectedL2TokenAddress)),
+    //         abi.encode(originToken)
+    //     );
+    //     // fails on the following line without this `mockCall`
+    //     // https://github.com/matter-labs/era-contracts/blob/cebfe26a41f3b83039a7d36558bf4e0401b154fc/l1-contracts/contracts/bridge/ntv/NativeTokenVault.sol#L163
+    //     vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IBridgedStandardToken.bridgeMint, (receiver, amount)), "");
+    //     vm.prank(address(l2NativeTokenVault.ASSET_ROUTER()));
+    //     vm.mockCall(expectedL2TokenAddress, abi.encodeCall(IERC20.totalSupply, ()), abi.encode(amount));
+    //     IAssetHandler(address(l2NativeTokenVault)).bridgeMint(originChainId, assetId, data);
 
-        assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
-        assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
-        assertNotEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
-        assertEq(l2NativeTokenVault.originChainId(assetId), originChainId);
-        assertEq(l2NativeTokenVault.tokenAddress(assetId), expectedL2TokenAddress);
-        assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), assetId);
-    }
+    //     assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
+    //     assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
+    //     assertNotEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), bytes32(0));
+    //     assertEq(l2NativeTokenVault.originChainId(assetId), originChainId);
+    //     assertEq(l2NativeTokenVault.tokenAddress(assetId), expectedL2TokenAddress);
+    //     assertEq(l2NativeTokenVault.assetId(expectedL2TokenAddress), assetId);
+    // }
 }

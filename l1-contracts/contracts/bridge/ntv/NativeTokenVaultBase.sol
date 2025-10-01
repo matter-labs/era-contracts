@@ -23,7 +23,6 @@ import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractEr
 import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotLegacy, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -110,13 +109,12 @@ abstract contract NativeTokenVaultBase is
         if (originChainId[_assetId] == block.chainid) {
             return token;
         } else {
-            /// kl todo the call to the l2BaseTokenSystemContract fails for some reason, debug.
-            if (token != L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
-                return IBridgedStandardToken(token).originToken();
-            } else {
-                return address(uint160(uint256(1)));
-            }
+            _getOriginTokenFromAddress(token);
         }
+    }
+
+    function _getOriginTokenFromAddress(address _token) internal view virtual returns (address) {
+        return IBridgedStandardToken(_token).originToken();
     }
 
     /// @inheritdoc INativeTokenVaultBase

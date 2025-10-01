@@ -35,6 +35,8 @@ error InvalidSettlementLayer();
 error InvalidTokenAddress();
 // 0x142bd5be
 error InvalidV30UpgradeChainBatchNumber(uint256 _chainId);
+// 0xa9146eeb
+error InvalidVersion();
 // 0xf76b228a
 error InvalidWithdrawalChainId();
 // 0x7e472272

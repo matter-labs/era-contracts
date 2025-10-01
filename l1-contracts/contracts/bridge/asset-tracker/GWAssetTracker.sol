@@ -24,6 +24,7 @@ import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
+import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
@@ -89,7 +90,22 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
+        uint256 length = LegacySharedBridgeAddresses.getLegacySharedBridgeLength(block.chainid);
+        for (uint256 i = 0; i < length; ++i) {
+            SharedBridgeOnChainId memory sharedBridgeOnChainId = LegacySharedBridgeAddresses
+                .getLegacySharedBridgeAddressOnGateway(block.chainid, i);
+            legacySharedBridgeAddress[sharedBridgeOnChainId.chainId] = sharedBridgeOnChainId.legacySharedBridgeAddress;
+        }
     }
+
+    /// @dev for local testing
+    function setLegacySharedBridgeAddressForLocalTesting(
+        uint256 _chainId,
+        address _legacySharedBridgeAddress
+    ) external onlyUpgrader {
+        legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
+    }
+
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
@@ -110,8 +126,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
-        _assignMaxChainBalance(_originChainId, _assetId);
+    error RegisterNewTokenNotAllowed();
+
+    function registerNewToken(bytes32, uint256) public override onlyNativeTokenVault {
+        revert RegisterNewTokenNotAllowed();
     }
 
     function handleChainBalanceIncreaseOnGateway(

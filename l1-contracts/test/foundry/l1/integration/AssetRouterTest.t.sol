@@ -239,26 +239,25 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
     }
 
     function test_DepositToL1AndWithdraw() public {
-        // TODO fix TransientBalanceChangeAlreadySet
-        // depositToL1(ETH_TOKEN_ADDRESS);
-        // bytes memory secondBridgeCalldata = bytes.concat(
-        //     NEW_ENCODING_VERSION,
-        //     abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
-        // );
-        // IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
-        // addresses.bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
-        //     L2TransactionRequestTwoBridgesOuter({
-        //         chainId: eraZKChainId,
-        //         mintValue: 250000000000100,
-        //         l2Value: 0,
-        //         l2GasLimit: 1000000,
-        //         l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
-        //         refundRecipient: address(0),
-        //         secondBridgeAddress: address(addresses.sharedBridge),
-        //         secondBridgeValue: 0,
-        //         secondBridgeCalldata: secondBridgeCalldata
-        //     })
-        // );
+        depositToL1(ETH_TOKEN_ADDRESS);
+        bytes memory secondBridgeCalldata = bytes.concat(
+            NEW_ENCODING_VERSION,
+            abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), tokenL1Address))
+        );
+        IERC20(tokenL1Address).approve(address(addresses.l1NativeTokenVault), 100);
+        addresses.bridgehub.requestL2TransactionTwoBridges{value: 250000000000100}(
+            L2TransactionRequestTwoBridgesOuter({
+                chainId: eraZKChainId,
+                mintValue: 250000000000100,
+                l2Value: 0,
+                l2GasLimit: 1000000,
+                l2GasPerPubdataByteLimit: REQUIRED_L2_GAS_PRICE_PER_PUBDATA,
+                refundRecipient: address(0),
+                secondBridgeAddress: address(addresses.sharedBridge),
+                secondBridgeValue: 0,
+                secondBridgeCalldata: secondBridgeCalldata
+            })
+        );
     }
 
     function test_DepositDirect() public {

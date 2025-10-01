@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidTokenAddress, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
+import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidTokenAddress, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -38,6 +38,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IL1Nullifier public immutable L1_NULLIFIER;
 
     IChainAssetHandler public chainAssetHandler;
+
+    mapping(bytes32 assetId => bool maxTokenBalanceAssigned) internal maxTokenBalanceAssigned;
 
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
@@ -109,12 +111,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
         /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
-        /// kl todo can it be the case that we set chainBalance to uint256.max twice.
-        if (chainBalance[originChainId][_assetId] == 0) {
-            chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - migratedBalance;
-        } else {
-            chainBalance[originChainId][_assetId] -= migratedBalance;
+        /// Note before the token is migrated the MAX_TOKEN_BALANCE is not assigned, since the registerNewToken is only called for new tokens.
+        if (!maxTokenBalanceAssigned[_assetId]) {
+            maxTokenBalanceAssigned[_assetId] = true;
+            chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE;
         }
+        chainBalance[originChainId][_assetId] -= migratedBalance;
         chainBalance[_chainId][_assetId] += migratedBalance;
     }
 
@@ -167,7 +169,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         uint256 chainToUpdate = currentSettlementLayer == block.chainid ? _chainId : currentSettlementLayer;
         if (currentSettlementLayer != block.chainid) {
-            _setTransientBalanceChange(_chainId, _assetId, _amount);
+            bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
+            if (baseTokenAssetId != _assetId) {
+                _setTransientBalanceChange(_chainId, _assetId, _amount);
+            }
         }
 
         chainBalance[chainToUpdate][_assetId] += _amount;
@@ -245,6 +250,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             functionSignature == IAssetTrackerDataEncoding.receiveMigrationOnL1.selector,
             InvalidFunctionSignature(functionSignature)
         );
+        require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
 
         require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
 
@@ -254,7 +260,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         if (data.isL1ToGateway) {
             uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
-            /// We check the chainMigrationNumber to make sure the message is from a previous token migration.
+            /// We check the chainMigrationNumber to make sure the message is not from a previous token migration.
             require(
                 chainMigrationNumber == data.migrationNumber,
                 InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)

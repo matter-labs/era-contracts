@@ -63,6 +63,9 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// the old version where it was an immutable.
     IAssetRouterBase public override ASSET_ROUTER;
 
+    /// @dev The address of the base token on its origin chain
+    address public BASE_TOKEN_ORIGIN_TOKEN;
+
     /// @dev Only allows calls from the complex upgrader contract on L2.
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -111,11 +114,19 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
         address _wethToken,
-        bytes32 _baseTokenAssetId
+        bytes32 _baseTokenAssetId,
+        address _baseTokenOriginToken
     ) public onlyUpgrader {
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
-        updateL2(_l1ChainId, _l2TokenProxyBytecodeHash, _legacySharedBridge, _wethToken, _baseTokenAssetId);
+        updateL2(
+            _l1ChainId,
+            _l2TokenProxyBytecodeHash,
+            _legacySharedBridge,
+            _wethToken,
+            _baseTokenAssetId,
+            _baseTokenOriginToken
+        );
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
         }
@@ -137,13 +148,15 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _wethToken,
-        bytes32 _baseTokenAssetId
+        bytes32 _baseTokenAssetId,
+        address _baseTokenOriginToken
     ) public onlyUpgrader {
         WETH_TOKEN = _wethToken;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
         L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
+        BASE_TOKEN_ORIGIN_TOKEN = _baseTokenOriginToken;
 
         require(_l2TokenProxyBytecodeHash != bytes32(0), EmptyBytes32());
 
@@ -367,5 +380,12 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     function l2TokenAddress(address _l1Token) public view returns (address expectedToken) {
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         expectedToken = tokenAddress[expectedAssetId];
+    }
+
+    function _getOriginTokenFromAddress(address _token) internal view override returns (address) {
+        if (_token == L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR) {
+            return BASE_TOKEN_ORIGIN_TOKEN;
+        }
+        return super._getOriginTokenFromAddress(_token);
     }
 }

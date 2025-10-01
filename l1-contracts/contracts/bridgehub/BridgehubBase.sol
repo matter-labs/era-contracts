@@ -219,6 +219,10 @@ abstract contract BridgehubBase is
         address _chainRegistrationSender
     ) external virtual;
 
+    function setAddressesV30(address _chainRegistrationSender) external onlyOwnerOrUpgrader {
+        chainRegistrationSender = _chainRegistrationSender;
+    }
+
     /// @notice Used to set the chain asset handler address.
     /// @dev Called during v29 upgrade.
     /// @param _chainAssetHandler the chain asset handler address
