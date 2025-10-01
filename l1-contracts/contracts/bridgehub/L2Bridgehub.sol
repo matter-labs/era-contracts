@@ -100,6 +100,5 @@ contract L2Bridgehub is BridgehubBase {
         bytes32 _baseTokenAssetId
     ) external onlyChainRegistrationSender onlyL2 {
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
-        // kl todo: should we add ctm asset id here?
     }
 }

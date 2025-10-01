@@ -74,9 +74,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return L2_MESSAGE_ROOT;
     }
 
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override {
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
         _registerTokenOnL2(_assetId);
-        super.registerNewToken(_assetId, _originChainId);
+        if (_originChainId == block.chainid) {
+            _assignMaxChainBalance(_originChainId, _assetId);
+        }
     }
 
     function _registerTokenOnL2(bytes32 _assetId) internal {

@@ -26,6 +26,11 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
+
+        /// We write to storage to avoid reentrancy.
+        s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
+        s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
+        
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
         INativeTokenVault nativeTokenVault = INativeTokenVault(
             IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault()
@@ -54,9 +59,6 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
 
         chainAssetHandler.setMigrationNumberForV30(s.chainId);
 
-        s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
-        s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
-
         if (s.settlementLayer == address(0)) {
             messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
         }
@@ -64,6 +66,8 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         if (bridgehub.whitelistedSettlementLayers(s.chainId)) {
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
+
+        s.__DEPRECATED_l2DAValidator = address(0);
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

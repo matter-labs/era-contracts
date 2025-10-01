@@ -120,7 +120,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// @notice This is used to register L2NativeTokens when the chain is settling on GW.
     /// @notice It is needed since withdrawals are blocked until the token balance is migrated to GW, and it needs to be registered before migration.
-    function registerL2NativeToken(uint256 _l2ChainId, address _l2NativeToken) external onlyNativeTokenVault {
+    function registerL2NativeToken(uint256 _l2ChainId, address _l2NativeToken) external {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_l2ChainId);
         require(settlementLayer != block.chainid, InvalidSettlementLayer());
 
@@ -141,6 +141,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 amount: MAX_TOKEN_BALANCE
             })
         );
+    }
+
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
+        _assignMaxChainBalance(_originChainId, _assetId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -282,7 +286,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             /// In this case we trust the TokenBalanceMigrationData data and the settlement layer = Gateway to be honest.
             /// If the settlement layer is compromised, other chains settling on L1 are not compromised, only chains settling on Gateway.
 
-            require(currentSettlementLayer == block.chainid, NotMigratedChain());
             require(
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
