@@ -12,9 +12,14 @@ error ChainAlreadyRegistered();
 error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 // 0x655c373c
 error ChainBatchRootZero();
-error ChainIdAlreadyPresent();
 // 0x65e8a019
 error ChainExists();
+// 0xff514c10
+error ChainIdAlreadyPresent();
+// 0x5de72107
+error ChainNotLegacy();
+// 0x4bd4ae07
+error ChainNotPresentInCTM();
 // 0x5d03f19d
 error CurrentBatchNumberAlreadySet();
 // 0x68d91b49
@@ -45,6 +50,8 @@ error NotChainAssetHandler(address sender, address chainAssetHandler);
 error NotCurrentSettlementLayer(uint256 currentSettlementLayer, uint256 newSettlementLayer);
 // 0x472477e2
 error NotInGatewayMode();
+// 0x8e373aba
+error NotL1Bridgehub(uint256 l1ChainId, uint256 blockChainId);
 // 0x8eb4fc01
 error NotL2();
 // 0x23295f0e
@@ -99,6 +106,3 @@ error V30UpgradeChainBatchNumberNotSet();
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
 error ZKChainNotRegistered();
-error NotL1Bridgehub(uint256 l1ChainId, uint256 blockChainId);
-error ChainNotPresentInCTM();
-error ChainNotLegacy();
