@@ -10,7 +10,6 @@ import {IMessageRoot} from "./IMessageRoot.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Interface for L1-specific Bridgehub functionality
 interface IL1Bridgehub is IBridgehubBase {
-
     /// @notice Request L2 transaction directly
     function requestL2TransactionDirect(
         L2TransactionRequestDirect calldata _request

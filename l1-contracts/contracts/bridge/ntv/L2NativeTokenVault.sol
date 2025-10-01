@@ -36,17 +36,17 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @dev The address of the WETH token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    address internal _wethToken;
+    address public override WETH_TOKEN;
 
     /// @dev The assetId of the base token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    bytes32 internal _baseTokenAssetId;
+    bytes32 public override BASE_TOKEN_ASSET_ID;
 
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    uint256 internal _l1ChainId;
+    uint256 public override L1_CHAIN_ID;
 
     /// @dev The address of the L2 legacy shared bridge
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -58,49 +58,56 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// the old version where it was an immutable.
     bytes32 public L2_TOKEN_PROXY_BYTECODE_HASH;
 
+    /// @dev The address of the L2 asset router.
+    /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
+    /// the old version where it was an immutable.
+    IAssetRouterBase public override ASSET_ROUTER;
+
     /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
+                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function ASSET_ROUTER()
-        public
-        view
-        override(INativeTokenVaultBase, NativeTokenVaultBase)
-        returns (IAssetRouterBase)
-    {
-        return IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
+    /// @dev Returns the L2 asset router for internal use.
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
+        return IAssetRouterBase(ASSET_ROUTER);
     }
 
-    function L1_CHAIN_ID() public view override(INativeTokenVaultBase, NativeTokenVaultBase) returns (uint256) {
-        return _l1ChainId;
+    /// @dev Returns the L1 chain ID for internal use.
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
     }
 
-    function BASE_TOKEN_ASSET_ID() public view override returns (bytes32) {
-        return _baseTokenAssetId;
+    /// @dev Returns the base token asset ID for internal use.
+    function _baseTokenAssetId() internal view override returns (bytes32) {
+        return BASE_TOKEN_ASSET_ID;
     }
 
-    function WETH_TOKEN() public view override(INativeTokenVaultBase, NativeTokenVaultBase) returns (address) {
-        return _wethToken;
+    /// @dev Returns the WETH token address for internal use.
+    function _wethToken() internal view override returns (address) {
+        return WETH_TOKEN;
     }
+
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
-    /// @param _l1ChainId The chain id of L1.
+    /// @param _newL1ChainId The chain id of L1.
     /// @param _aliasedOwner The address of the owner of the contract.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
     /// @param _bridgedTokenBeacon The address of the L2 token beacon for legacy chains.
+    /// @param _newWethToken The address of the L2 weth token.
+    /// @param _newBaseTokenAssetId The asset ID of the base token.
     function initL2(
-        uint256 _l1ChainId,
+        uint256 _newL1ChainId,
         address _aliasedOwner,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
         address _bridgedTokenBeacon,
-        address _wethToken,
-        bytes32 _baseTokenAssetId
+        address _newWethToken,
+        bytes32 _newBaseTokenAssetId
     ) public onlyUpgrader {
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
-        updateL2(_l1ChainId, _l2TokenProxyBytecodeHash, _legacySharedBridge, _wethToken, _baseTokenAssetId);
+        updateL2(_newL1ChainId, _l2TokenProxyBytecodeHash, _legacySharedBridge, _newWethToken, _newBaseTokenAssetId);
         if (_aliasedOwner == address(0)) {
             revert EmptyAddress();
         }
@@ -132,9 +139,10 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _wethTokenToSet,
         bytes32 _baseTokenAssetIdToSet
     ) public onlyUpgrader {
-        _wethToken = _wethTokenToSet;
-        _baseTokenAssetId = _baseTokenAssetIdToSet;
-        _l1ChainId = _l1ChainIdToSet;
+        WETH_TOKEN = _wethTokenToSet;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetIdToSet;
+        L1_CHAIN_ID = _l1ChainIdToSet;
+        ASSET_ROUTER = IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 
         if (_l2TokenProxyBytecodeHash == bytes32(0)) {
@@ -184,11 +192,11 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _l2TokenAddress,
         address _l1TokenAddress
     ) internal returns (bytes32 newAssetId) {
-        newAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, _l1TokenAddress);
+        newAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1TokenAddress);
         IL2AssetRouter(L2_ASSET_ROUTER_ADDR).setLegacyTokenAssetHandler(newAssetId);
         tokenAddress[newAssetId] = _l2TokenAddress;
         assetId[_l2TokenAddress] = newAssetId;
-        originChainId[newAssetId] = _l1ChainId;
+        originChainId[newAssetId] = L1_CHAIN_ID;
     }
 
     /// @notice Ensures that the token is deployed.
@@ -233,7 +241,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         address _expectedToken,
         address _l1LegacyToken
     ) internal {
-        _assetIdCheck(_l1ChainId, _assetId, _originToken);
+        _assetIdCheck(L1_CHAIN_ID, _assetId, _originToken);
 
         /// token is a legacy token, no need to deploy
         if (_l1LegacyToken != _originToken) {
@@ -242,7 +250,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
 
         tokenAddress[_assetId] = _expectedToken;
         assetId[_expectedToken] = _assetId;
-        originChainId[_assetId] = _l1ChainId;
+        originChainId[_assetId] = L1_CHAIN_ID;
     }
 
     /// @notice Deploys the beacon proxy for the L2 token, while using ContractDeployer system contract.
@@ -255,7 +263,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         bytes32 _salt,
         uint256 _tokenOriginChainId
     ) internal virtual override returns (BeaconProxy proxy) {
-        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0) || _tokenOriginChainId != _l1ChainId) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) == address(0) || _tokenOriginChainId != L1_CHAIN_ID) {
             // Deploy the beacon proxy for the L2 token
 
             (bool success, bytes memory returndata) = SystemContractsCaller.systemCallWithReturndata(
@@ -281,8 +289,8 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override {
-        if (_assetId == _baseTokenAssetId) {
-            revert AssetIdNotSupported(_baseTokenAssetId);
+        if (_assetId == BASE_TOKEN_ASSET_ID) {
+            revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         } else {
             // Withdraw funds
             IERC20(_token).safeTransfer(_to, _amount);
@@ -301,7 +309,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         uint256 _tokenOriginChainId,
         address _nonNativeToken
     ) public view virtual override(INativeTokenVaultBase, NativeTokenVaultBase) returns (address) {
-        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _tokenOriginChainId == _l1ChainId) {
+        if (address(L2_LEGACY_SHARED_BRIDGE) != address(0) && _tokenOriginChainId == L1_CHAIN_ID) {
             return L2_LEGACY_SHARED_BRIDGE.l2TokenAddress(_nonNativeToken);
         } else {
             bytes32 constructorInputHash = keccak256(abi.encode(address(bridgedTokenBeacon), ""));
@@ -321,7 +329,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         uint256 _tokenOriginChainId,
         address _l1Token
     ) internal view override returns (bytes32 salt) {
-        salt = _tokenOriginChainId == _l1ChainId
+        salt = _tokenOriginChainId == L1_CHAIN_ID
             ? bytes32(uint256(uint160(_l1Token)))
             : keccak256(abi.encode(_tokenOriginChainId, _l1Token));
     }
@@ -363,7 +371,7 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @param _l1Token The address of token on L1.
     /// @return expectedToken The address of token on L2.
     function l2TokenAddress(address _l1Token) public view returns (address expectedToken) {
-        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(_l1ChainId, _l1Token);
+        bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, _l1Token);
         expectedToken = tokenAddress[expectedAssetId];
     }
 }

@@ -24,7 +24,7 @@ import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    /// @dev The asset ID of ETH token. 
+    /// @dev The asset ID of ETH token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
     bytes32 public ETH_TOKEN_ASSET_ID;

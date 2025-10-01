@@ -34,40 +34,42 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     using SafeERC20 for IERC20;
 
     /// @dev The address of the WETH token.
-    address internal immutable _wethToken;
+    address public immutable override WETH_TOKEN;
 
     /// @dev The L1 asset router contract.
-    IAssetRouterBase internal immutable _assetRouter;
+    IAssetRouterBase public immutable override ASSET_ROUTER;
 
     /// @dev The assetId of the base token.
-    bytes32 internal immutable _baseTokenAssetId;
+    bytes32 public immutable override BASE_TOKEN_ASSET_ID;
+
+    /// @dev The chain ID of L1.
+    uint256 public immutable override L1_CHAIN_ID;
 
     /// @dev L1 nullifier contract that handles legacy functions & finalize withdrawal, confirm l2 tx mappings
     IL1Nullifier public immutable override L1_NULLIFIER;
 
     /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
+                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
-    function L1_CHAIN_ID() public view override(INativeTokenVaultBase, NativeTokenVaultBase) returns (uint256) {
-        return block.chainid;
+    /// @dev Returns the L1 asset router for internal use.
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
+        return ASSET_ROUTER;
     }
 
-    function ASSET_ROUTER()
-        public
-        view
-        override(INativeTokenVaultBase, NativeTokenVaultBase)
-        returns (IAssetRouterBase)
-    {
-        return IAssetRouterBase(_assetRouter);
+    /// @dev Returns the L1 chain ID for internal use.
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
     }
 
-    function BASE_TOKEN_ASSET_ID() public view override returns (bytes32) {
-        return _baseTokenAssetId;
+    /// @dev Returns the base token asset ID for internal use.
+    function _baseTokenAssetId() internal view override returns (bytes32) {
+        return BASE_TOKEN_ASSET_ID;
     }
 
-    function WETH_TOKEN() public view override(INativeTokenVaultBase, NativeTokenVaultBase) returns (address) {
-        return _wethToken;
+    /// @dev Returns the WETH token address for internal use.
+    function _wethToken() internal view override returns (address) {
+        return WETH_TOKEN;
     }
     /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// This serves as a security measure until hyperbridging is implemented.
@@ -80,9 +82,10 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     /// @param _assetRouterToSet Address of Asset Router on L1.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
     constructor(address _wethTokenToSet, address _assetRouterToSet, IL1Nullifier _l1Nullifier) {
-        _wethToken = _wethTokenToSet;
-        _assetRouter = IAssetRouterBase(_assetRouterToSet);
-        _baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        WETH_TOKEN = _wethTokenToSet;
+        ASSET_ROUTER = IAssetRouterBase(_assetRouterToSet);
+        L1_CHAIN_ID = block.chainid;
+        BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         L1_NULLIFIER = _l1Nullifier;
     }
 
@@ -194,7 +197,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         address _receiver,
         address _nativeToken
     ) internal override returns (bytes memory _bridgeMintData) {
-        bool depositChecked = IL1AssetRouter(address(_assetRouter)).transferFundsToNTV(
+        bool depositChecked = IL1AssetRouter(address(ASSET_ROUTER)).transferFundsToNTV(
             _assetId,
             _depositAmount,
             _originalCaller
@@ -276,7 +279,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
     }
 
     function _withdrawFunds(bytes32 _assetId, address _to, address _token, uint256 _amount) internal override {
-        if (_assetId == _baseTokenAssetId) {
+        if (_assetId == BASE_TOKEN_ASSET_ID) {
             bool callSuccess;
             // Low-level assembly call, to avoid any memory copying (save gas)
             assembly {

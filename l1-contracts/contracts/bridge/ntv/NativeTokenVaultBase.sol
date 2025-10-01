@@ -37,16 +37,32 @@ abstract contract NativeTokenVaultBase is
     using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
+                            EXTERNAL GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function ASSET_ROUTER() public view virtual returns (IAssetRouterBase);
+    /// @notice The Weth token address
+    function WETH_TOKEN() external view virtual returns (address);
 
-    function L1_CHAIN_ID() public view virtual returns (uint256);
+    /// @notice The AssetRouter contract
+    function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
 
-    function BASE_TOKEN_ASSET_ID() public view virtual returns (bytes32);
+    /// @notice The chain ID of the L1 chain
+    function L1_CHAIN_ID() external view virtual returns (uint256);
 
-    function WETH_TOKEN() public view virtual returns (address);
+    /// @notice The base token asset ID
+    function BASE_TOKEN_ASSET_ID() external view virtual returns (bytes32);
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function _assetRouter() internal view virtual returns (IAssetRouterBase);
+
+    function _l1ChainId() internal view virtual returns (uint256);
+
+    function _baseTokenAssetId() internal view virtual returns (bytes32);
+
+    function _wethToken() internal view virtual returns (address);
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
@@ -69,7 +85,7 @@ abstract contract NativeTokenVaultBase is
 
     /// @notice Checks that the message sender is the bridgehub.
     modifier onlyAssetRouter() {
-        if (msg.sender != address(ASSET_ROUTER())) {
+        if (msg.sender != address(_assetRouter())) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -85,8 +101,8 @@ abstract contract NativeTokenVaultBase is
         // It is needed to allow withdrawing such assets. We restrict all WETH-related
         // operations to deposits from L1 only to be able to upgrade their logic more easily in the
         // future.
-        if (_nativeToken == WETH_TOKEN() && block.chainid != L1_CHAIN_ID()) {
-            revert TokenNotSupported(WETH_TOKEN());
+        if (_nativeToken == _wethToken() && block.chainid != _l1ChainId()) {
+            revert TokenNotSupported(_wethToken());
         }
         if (_nativeToken.code.length == 0) {
             revert EmptyToken();
@@ -328,13 +344,13 @@ abstract contract NativeTokenVaultBase is
         address _receiver,
         address _nativeToken
     ) internal virtual returns (bytes memory _bridgeMintData) {
-        if (_nativeToken == WETH_TOKEN()) {
+        if (_nativeToken == _wethToken()) {
             // This ensures that _wethToken() can never be bridged from chains it is native to.
             // It can only be withdrawn from the chain where it has already gotten.
             revert BurningNativeWETHNotSupported();
         }
 
-        if (_assetId == BASE_TOKEN_ASSET_ID()) {
+        if (_assetId == _baseTokenAssetId()) {
             if (_depositAmount != msg.value) {
                 revert ValueMismatch(_depositAmount, msg.value);
             }
@@ -411,7 +427,7 @@ abstract contract NativeTokenVaultBase is
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;
-        ASSET_ROUTER().setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
+        _assetRouter().setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
     }
 
     function _handleChainBalanceIncrease(
@@ -463,7 +479,7 @@ abstract contract NativeTokenVaultBase is
         // slither-disable-next-line unused-return
         (tokenOriginChainId, , , ) = DataEncoding.decodeTokenData(_erc20Data);
         if (tokenOriginChainId == 0) {
-            tokenOriginChainId = L1_CHAIN_ID();
+            tokenOriginChainId = _l1ChainId();
         }
     }
 
