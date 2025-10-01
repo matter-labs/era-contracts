@@ -156,7 +156,6 @@ library L2UtilsBase {
 
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
-        address baseTokenOriginToken = ETH_TOKEN_ADDRESS;
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
             _args.l1ChainId,
@@ -166,7 +165,7 @@ library L2UtilsBase {
             _args.l2TokenBeacon,
             wethToken,
             baseTokenAssetId,
-            baseTokenOriginToken
+            ETH_TOKEN_ADDRESS
         );
 
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));

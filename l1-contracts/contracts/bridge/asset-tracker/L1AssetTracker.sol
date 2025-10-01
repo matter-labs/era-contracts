@@ -258,7 +258,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         if (data.isL1ToGateway) {
             uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
-            /// We check the chainMigrationNumber to make sure the message is from a previous token migration.
+            /// We check the chainMigrationNumber to make sure the message is not from a previous token migration.
             require(
                 chainMigrationNumber == data.migrationNumber,
                 InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
