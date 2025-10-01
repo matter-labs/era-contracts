@@ -5,8 +5,6 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {IBridgehub} from "./IBridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -16,19 +14,19 @@ import {IMessageRoot} from "./IMessageRoot.sol";
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
 contract L1ChainAssetHandler is ChainAssetHandlerBase {
     /// @dev The assetId of the base token.
-    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
+    bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
-    uint256 internal immutable L1_CHAIN_ID;
+    uint256 public immutable override L1_CHAIN_ID;
 
     /// @dev The bridgehub contract.
-    IBridgehub internal immutable BRIDGEHUB;
+    address public immutable override BRIDGEHUB;
 
     /// @dev The message root contract.
-    IMessageRoot internal immutable MESSAGE_ROOT;
+    address public immutable override MESSAGE_ROOT;
 
     /// @dev The asset router contract.
-    address internal immutable ASSET_ROUTER;
+    address public immutable override ASSET_ROUTER;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
@@ -40,10 +38,10 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
-    function _bridgehub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (address) {
         return BRIDGEHUB;
     }
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view override returns (address) {
         return MESSAGE_ROOT;
     }
     function _assetRouter() internal view override returns (address) {
@@ -51,18 +49,17 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     }
 
     constructor(
-        uint256 _l1ChainId,
         address _owner,
-        IBridgehub _bridgehub,
+        address _bridgehub,
         address _assetRouter,
-        IMessageRoot _messageRoot
+        address _messageRoot
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = _bridgehub;
-        L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(_l1ChainId, ETH_TOKEN_ADDRESS);
+        L1_CHAIN_ID = block.chainid;
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
     }
 

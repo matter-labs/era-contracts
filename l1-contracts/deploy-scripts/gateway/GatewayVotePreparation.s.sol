@@ -11,7 +11,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 // solhint-disable no-unused-import
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
@@ -122,9 +122,9 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
         config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
         address ctm;
         if (ctmRepresentativeChainId != 0) {
-            ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmRepresentativeChainId);
+            ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(ctmRepresentativeChainId);
         } else {
-            ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
+            ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(gatewayChainId);
         }
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
