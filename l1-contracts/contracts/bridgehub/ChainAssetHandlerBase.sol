@@ -121,7 +121,10 @@ abstract contract ChainAssetHandlerBase is
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         if (_assetId != IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId)) {
-            revert IncorrectChainAssetId(_assetId, IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId));
+            revert IncorrectChainAssetId(
+                _assetId,
+                IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId)
+            );
         }
 
         address zkChain;
@@ -147,7 +150,10 @@ abstract contract ChainAssetHandlerBase is
             );
 
             // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
-            if (_settlementChainId != _l1ChainId() && IBridgehubBase(_bridgehub()).chainTypeManager(_settlementChainId) != ctm) {
+            if (
+                _settlementChainId != _l1ChainId() &&
+                IBridgehubBase(_bridgehub()).chainTypeManager(_settlementChainId) != ctm
+            ) {
                 revert SLHasDifferentCTM();
             }
         }
@@ -219,7 +225,9 @@ abstract contract ChainAssetHandlerBase is
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeRecoverFailedTransfer(bridgehubBurnData.chainId);
+        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeRecoverFailedTransfer(
+            bridgehubBurnData.chainId
+        );
 
         IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubBurnData.chainId,
