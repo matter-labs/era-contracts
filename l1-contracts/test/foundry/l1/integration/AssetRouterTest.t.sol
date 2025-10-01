@@ -6,6 +6,8 @@ import {Vm} from "forge-std/Vm.sol";
 import {console2 as console} from "forge-std/console2.sol";
 
 import {IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {SimpleExecutor} from "contracts/dev-contracts/SimpleExecutor.sol";
 
@@ -237,7 +239,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             });
 
             bytes memory calldataForExecutor = abi.encodeWithSelector(
-                IBridgehub.requestL2TransactionTwoBridges.selector,
+                IL1Bridgehub.requestL2TransactionTwoBridges.selector,
                 l2TxnReqTwoBridges
             );
 
