@@ -84,7 +84,6 @@ library L2UtilsBase {
             L2_CHAIN_ASSET_HANDLER_ADDR,
             aliasedL1ChainRegistrationSender
         );
-        L2Bridgehub(L2_BRIDGEHUB_ADDR).setChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
         {
             address l2messageVerification = address(new L2MessageVerification());
             vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
