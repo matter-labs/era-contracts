@@ -12,7 +12,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {BridgehubBurnCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ETH_TOKEN_ADDRESS, L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -213,7 +213,7 @@ contract GatewayPreparation is Script {
     function governanceRegisterGateway() public {
         initializeConfig();
 
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
 
         if (bridgehub.whitelistedSettlementLayers(config.gatewayChainId)) {
             console.log("Chain already whitelisted as settlement layer");
@@ -237,7 +237,7 @@ contract GatewayPreparation is Script {
     function governanceWhitelistGatewayCTM(address gatewayCTMAddress, bytes32 governanoceOperationSalt) public {
         initializeConfig();
 
-        bytes memory data = abi.encodeCall(IBridgehub.addChainTypeManager, (gatewayCTMAddress));
+        bytes memory data = abi.encodeCall(IBridgehubBase.addChainTypeManager, (gatewayCTMAddress));
 
         bytes32 l2TxHash = Utils.runGovernanceL1L2DirectTransaction(
             _getL1GasPrice(),
@@ -283,11 +283,11 @@ contract GatewayPreparation is Script {
             _delay: 0
         });
 
-        bytes32 assetId = IBridgehub(config.bridgehub).ctmAssetIdFromAddress(config.chainTypeManagerProxy);
+        bytes32 assetId = IL1Bridgehub(config.bridgehub).ctmAssetIdFromAddress(config.chainTypeManagerProxy);
 
         // This should be equivalent to `config.chainTypeManagerProxy`, but we just double checking to ensure that
         // bridgehub was initialized correctly
-        address ctmAddress = IBridgehub(config.bridgehub).ctmAssetIdToAddress(assetId);
+        address ctmAddress = IL1Bridgehub(config.bridgehub).ctmAssetIdToAddress(assetId);
         require(ctmAddress == config.chainTypeManagerProxy, "CTM asset id does not match the expected CTM address");
 
         bytes memory secondBridgeData = abi.encodePacked(
@@ -362,7 +362,7 @@ contract GatewayPreparation is Script {
     ) public {
         initializeConfig();
 
-        IBridgehub bridgehubContract = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehubContract = IL1Bridgehub(config.bridgehub);
         bytes32 gatewayBaseTokenAssetId = bridgehubContract.baseTokenAssetId(config.gatewayChainId);
         bytes32 ethTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
@@ -389,9 +389,9 @@ contract GatewayPreparation is Script {
 
         console.log("Chain Admin address:", chainAdmin);
 
-        bytes32 chainAssetId = IBridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
+        bytes32 chainAssetId = IL1Bridgehub(config.bridgehub).ctmAssetIdFromChainId(chainId);
 
-        uint256 currentSettlementLayer = IBridgehub(config.bridgehub).settlementLayer(chainId);
+        uint256 currentSettlementLayer = IL1Bridgehub(config.bridgehub).settlementLayer(chainId);
         if (currentSettlementLayer == config.gatewayChainId) {
             console.log("Chain already using gateway as its settlement layer");
             saveOutput(bytes32(0));
@@ -402,7 +402,7 @@ contract GatewayPreparation is Script {
             BridgehubBurnCTMAssetData({
                 chainId: chainId,
                 ctmData: abi.encode(l2ChainAdmin, config.gatewayDiamondCutData),
-                chainData: abi.encode(IZKChain(IBridgehub(config.bridgehub).getZKChain(chainId)).getProtocolVersion())
+                chainData: abi.encode(IZKChain(IL1Bridgehub(config.bridgehub).getZKChain(chainId)).getProtocolVersion())
             })
         );
 
@@ -433,7 +433,7 @@ contract GatewayPreparation is Script {
         uint256 chainId
     ) public {
         initializeConfig();
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
 
         uint256 currentSettlementLayer = bridgehub.settlementLayer(chainId);
         if (currentSettlementLayer != config.gatewayChainId) {
@@ -492,7 +492,7 @@ contract GatewayPreparation is Script {
         initializeConfig();
 
         L1Nullifier l1Nullifier = L1Nullifier(config.l1NullifierProxy);
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         bytes32 assetId = bridgehub.ctmAssetIdFromChainId(migratingChainId);
         vm.broadcast();
         l1Nullifier.finalizeDeposit(
@@ -597,7 +597,7 @@ contract GatewayPreparation is Script {
 
         vm.broadcast();
         GatewayTransactionFilterer impl = new GatewayTransactionFilterer(
-            IBridgehub(config.bridgehub),
+            IL1Bridgehub(config.bridgehub),
             config.sharedBridgeProxy
         );
 
@@ -610,7 +610,7 @@ contract GatewayPreparation is Script {
 
         GatewayTransactionFilterer proxyAsFilterer = GatewayTransactionFilterer(address(proxy));
 
-        IZKChain chain = IZKChain(IBridgehub(config.bridgehub).getZKChain(config.gatewayChainId));
+        IZKChain chain = IZKChain(IL1Bridgehub(config.bridgehub).getZKChain(config.gatewayChainId));
 
         // Firstly, we set the filterer
         Utils.adminExecute({

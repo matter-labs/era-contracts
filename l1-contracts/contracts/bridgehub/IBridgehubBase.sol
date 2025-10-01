@@ -56,7 +56,7 @@ struct BridgehubBurnCTMAssetData {
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-interface IBridgehub {
+interface IBridgehubBase {
     /// @notice pendingAdmin is changed
     /// @dev Also emitted when new admin is accepted and in this case, `newPendingAdmin` would be zero address
     event NewPendingAdmin(address indexed oldPendingAdmin, address indexed newPendingAdmin);
@@ -73,6 +73,14 @@ interface IBridgehub {
     );
 
     event SettlementLayerRegistered(uint256 indexed chainId, bool indexed isWhitelisted);
+
+    event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
+
+    event ChainTypeManagerAdded(address indexed chainTypeManager);
+
+    event ChainTypeManagerRemoved(address indexed chainTypeManager);
+
+    event BaseTokenAssetIdRegistered(bytes32 indexed assetId);
 
     /// @notice Starts the transfer of admin rights. Only the current admin or owner can propose a new pending one.
     /// @notice New admin can accept admin rights by calling `acceptAdmin` function.
@@ -109,8 +117,21 @@ interface IBridgehub {
 
     function chainRegistrationSender() external view returns (address);
 
-    /// Mailbox forwarder
+    function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
 
+    function settlementLayer(uint256 _chainId) external view returns (uint256);
+
+    function ctmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
+
+    function ctmAssetIdFromAddress(address _ctmAddress) external view returns (bytes32);
+
+    function l1CtmDeployer() external view returns (ICTMDeploymentTracker);
+
+    function ctmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
+
+    function chainAssetHandler() external view returns (address);
+
+    /// Mailbox forwarder
     function proveL2MessageInclusion(
         uint256 _chainId,
         uint256 _batchNumber,
@@ -137,14 +158,6 @@ interface IBridgehub {
         TxStatus _status
     ) external view returns (bool);
 
-    function requestL2TransactionDirect(
-        L2TransactionRequestDirect calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
-
-    function requestL2TransactionTwoBridges(
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable returns (bytes32 canonicalTxHash);
-
     function l2TransactionBaseCost(
         uint256 _chainId,
         uint256 _gasPrice,
@@ -152,18 +165,7 @@ interface IBridgehub {
         uint256 _l2GasPerPubdataByteLimit
     ) external view returns (uint256);
 
-    //// Registry
-
-    function createNewChain(
-        uint256 _chainId,
-        address _chainTypeManager,
-        bytes32 _baseTokenAssetId,
-        uint256 _salt,
-        address _admin,
-        bytes calldata _initData,
-        bytes[] calldata _factoryDeps
-    ) external returns (uint256 chainId);
-
+    /// Registry
     function addChainTypeManager(address _chainTypeManager) external;
 
     function removeChainTypeManager(address _chainTypeManager) external;
@@ -174,56 +176,18 @@ interface IBridgehub {
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler,
-        address _chainRegistrationSender
+        address _chainAssetHandler
     ) external;
 
     function setChainAssetHandler(address _chainAssetHandler) external;
 
-    event NewChain(uint256 indexed chainId, address chainTypeManager, address indexed chainGovernance);
-
-    event ChainTypeManagerAdded(address indexed chainTypeManager);
-
-    event ChainTypeManagerRemoved(address indexed chainTypeManager);
-
-    event BaseTokenAssetIdRegistered(bytes32 indexed assetId);
-
-    function whitelistedSettlementLayers(uint256 _chainId) external view returns (bool);
-
-    function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
-
-    function settlementLayer(uint256 _chainId) external view returns (uint256);
-
-    // function finalizeMigrationToGateway(
-    //     uint256 _chainId,
-    //     address _baseToken,
-    //     address _sharedBridge,
-    //     address _admin,
-    //     uint256 _expectedProtocolVersion,
-    //     ZKChainCommitment calldata _commitment,
-    //     bytes calldata _diamondCut
-    // ) external;
-
-    function ctmAssetIdFromChainId(uint256 _chainId) external view returns (bytes32);
-
-    function ctmAssetIdFromAddress(address _ctmAddress) external view returns (bytes32);
-
-    function l1CtmDeployer() external view returns (ICTMDeploymentTracker);
-
-    function ctmAssetIdToAddress(bytes32 _assetInfo) external view returns (address);
-
     function setCTMAssetAddress(bytes32 _additionalData, address _assetAddress) external;
-
-    function L1_CHAIN_ID() external view returns (uint256);
-
-    function chainAssetHandler() external view returns (address);
-
-    function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;
 
     function pauseMigration() external;
 
     function unpauseMigration() external;
 
+    /// Asset Handler functions
     function forwardedBridgeBurnSetSettlementLayer(
         uint256 _chainId,
         uint256 _newSettlementLayerChainId

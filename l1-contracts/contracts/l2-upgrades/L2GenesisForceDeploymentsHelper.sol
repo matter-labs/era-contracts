@@ -33,7 +33,6 @@ library L2GenesisForceDeploymentsHelper {
     function forceDeployEra(bytes memory _bytecodeInfo, address _newAddress) internal {
         bytes32 bytecodeHash = abi.decode(_bytecodeInfo, (bytes32));
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = new IL2ContractDeployer.ForceDeployment[](1);
-        // Configure the MessageRoot deployment.
         forceDeployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: bytecodeHash,
             newAddress: _newAddress,
@@ -229,16 +228,16 @@ library L2GenesisForceDeploymentsHelper {
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
-                L2Bridgehub(L2_BRIDGEHUB_ADDR),
+                L2_BRIDGEHUB_ADDR,
                 L2_ASSET_ROUTER_ADDR,
-                L2MessageRoot(L2_MESSAGE_ROOT_ADDR)
+                L2_MESSAGE_ROOT_ADDR
             );
         } else {
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
-                L2Bridgehub(L2_BRIDGEHUB_ADDR),
+                L2_BRIDGEHUB_ADDR,
                 L2_ASSET_ROUTER_ADDR,
-                L2MessageRoot(L2_MESSAGE_ROOT_ADDR)
+                L2_MESSAGE_ROOT_ADDR
             );
         }
 

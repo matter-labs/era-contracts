@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "./IBridgehub.sol";
-
 import {MessageRootBase} from "./MessageRootBase.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
@@ -17,11 +15,7 @@ import {L2MessageRoot} from "./L2MessageRoot.sol";
 /// @dev The MessageRoot contract is responsible for storing the cross message roots of the chains and the aggregated root of all chains.
 contract L1MessageRoot is MessageRootBase {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IBridgehub public immutable BRIDGE_HUB;
-
-    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
-    /// L1 that is at the most base layer.
-    uint256 public immutable L1_CHAIN_ID;
+    address public immutable BRIDGE_HUB;
 
     /// @notice The chain id of the Gateway chain.
     uint256 public immutable override GATEWAY_CHAIN_ID;
@@ -31,11 +25,9 @@ contract L1MessageRoot is MessageRootBase {
     /// Used for V30 upgrade deployment and local deployments.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _bridgehub Address of the Bridgehub.
-    /// @param _l1ChainId Chain ID of L1.
     /// @param _gatewayChainId Chain ID of the Gateway chain.
-    constructor(IBridgehub _bridgehub, uint256 _l1ChainId, uint256 _gatewayChainId) {
+    constructor(IBridgehub _bridgehub, uint256 _gatewayChainId) {
         BRIDGE_HUB = _bridgehub;
-        L1_CHAIN_ID = _l1ChainId;
         GATEWAY_CHAIN_ID = _gatewayChainId;
         uint256[] memory allZKChains = _bridgehub.getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
@@ -91,11 +83,11 @@ contract L1MessageRoot is MessageRootBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (address) {
         return BRIDGE_HUB;
     }
 
-    function _l1ChainId() internal view override returns (uint256) {
+    function L1_CHAIN_ID() public view override returns (uint256) {
         return block.chainid;
     }
 

@@ -9,7 +9,7 @@ import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
 
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
@@ -82,7 +82,7 @@ contract MessageRootTest is Test {
         );
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(chainAssetHandler)
         );
         messageRoot.addNewChain(alphaChainId, 0);

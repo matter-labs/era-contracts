@@ -7,14 +7,16 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 
-import {IBridgehub} from "./IBridgehub.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
 import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyGateway, OnlyL1, OnlyOnSettlementLayer, OnlyPreV30Chain, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
-import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {FullMerkle} from "../common/libraries/FullMerkle.sol";
+
 
 import {MessageVerification} from "../common/MessageVerification.sol";
 
@@ -33,9 +35,9 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view virtual returns (IBridgehub);
+    function _bridgehub() internal view virtual returns (address);
 
-    function _l1ChainId() internal view virtual returns (uint256);
+    function L1_CHAIN_ID() public view virtual returns (uint256);
 
     function _gatewayChainId() internal view virtual returns (uint256);
 
@@ -76,11 +78,11 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
-        if (msg.sender != address(_bridgehub()) && msg.sender != address(_bridgehub().chainAssetHandler())) {
+        if (msg.sender != _bridgehub() && msg.sender != address(IBridgehubBase(_bridgehub()).chainAssetHandler())) {
             revert OnlyBridgehubOrChainAssetHandler(
                 msg.sender,
                 address(_bridgehub()),
-                address(_bridgehub().chainAssetHandler())
+                address(IBridgehubBase(_bridgehub()).chainAssetHandler())
             );
         }
         _;
@@ -89,8 +91,8 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @notice Checks that the message sender is the specified ZK Chain.
     /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != _bridgehub().getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
+        if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
         }
         _;
     }
@@ -129,27 +131,12 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
     modifier onlyL2() {
-        if (block.chainid == _l1ChainId()) {
+        if (block.chainid == L1_CHAIN_ID()) {
             revert NotL2();
         }
         _;
     }
 
-    /// @notice Checks that the Chain ID is the Gateway chain id.
-    modifier onlyGateway() {
-        if (block.chainid != _gatewayChainId()) {
-            revert OnlyGateway();
-        }
-        _;
-    }
-
-    modifier onlyBridgehubOwner() {
-        address bridgehubOwner = Ownable(address(_bridgehub())).owner();
-        if (msg.sender != bridgehubOwner) {
-            revert OnlyBridgehubOwner(msg.sender, bridgehubOwner);
-        }
-        _;
-    }
 
     function _initialize() internal {
         // slither-disable-next-line unused-return

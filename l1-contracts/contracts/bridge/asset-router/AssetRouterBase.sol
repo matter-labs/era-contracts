@@ -15,9 +15,9 @@ import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../../common/Config.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehub.sol";
+import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 import {AssetHandlerDoesNotExist, AssetIdNotSupported, BadTransferDataLength, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -25,16 +25,6 @@ import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
 /// @dev Designed for use with a proxy for upgradability.
 abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
-
-    /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    function _bridgehub() internal view virtual returns (IBridgehub);
-
-    function _l1ChainId() internal view virtual returns (uint256);
-
-    function _eraChainId() internal view virtual returns (uint256);
 
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
@@ -54,12 +44,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
     uint256[48] private __gap;
-
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        require(msg.sender == address(_bridgehub()), Unauthorized(msg.sender));
-        _;
-    }
 
     /// @inheritdoc IAssetRouterBase
     function setAssetHandlerAddressThisChain(
@@ -258,7 +242,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
             // Note, that it may "pollute" error handling a bit: instead of getting error for asset handler not being
             // present, the user will get whatever error the native token vault will return, however, providing
             // more advanced error handling requires more extensive code and will be added in the future releases.
-            INativeTokenVault(_nativeTokenVault).tryRegisterTokenFromBurnData(_transferData, _assetId);
+            INativeTokenVaultBase(_nativeTokenVault).tryRegisterTokenFromBurnData(_transferData, _assetId);
 
             // We do not do any additional transformations here (like setting `assetHandler` in the mapping),
             // because we expect that all those happened inside `tryRegisterTokenFromBurnData`

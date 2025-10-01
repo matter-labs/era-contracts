@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "./IBridgehub.sol";
-
 import {MessageRootBase} from "./MessageRootBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
@@ -16,6 +14,7 @@ import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMe
 import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "./IMessageRoot.sol";
 import {InvalidCaller, Unauthorized} from "../common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -28,7 +27,7 @@ contract L2MessageRoot is MessageRootBase {
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    uint256 public L1_CHAIN_ID;
+    uint256 internal l1ChainId;
 
     /// @notice The chain id of the Gateway chain.
     uint256 public override GATEWAY_CHAIN_ID;
@@ -37,12 +36,8 @@ contract L2MessageRoot is MessageRootBase {
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view override returns (IBridgehub) {
-        return IBridgehub(L2_BRIDGEHUB_ADDR);
-    }
-
-    function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
+    function _bridgehub() internal view override returns (address) {
+        return L2_BRIDGEHUB_ADDR;
     }
 
     function _gatewayChainId() internal view override returns (uint256) {
@@ -50,8 +45,20 @@ contract L2MessageRoot is MessageRootBase {
     }
 
     // A method for backwards compatibility with the old implementation
-    function BRIDGE_HUB() public view returns (IBridgehub) {
-        return IBridgehub(L2_BRIDGEHUB_ADDR);
+    function BRIDGE_HUB() public view returns (address) {
+        return L2_BRIDGEHUB_ADDR;
+    }
+
+    function L1_CHAIN_ID() public view override returns (uint256) {
+        return l1ChainId;
+    }
+
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
     }
 
     /// @dev Only allows calls from the complex upgrader contract on L2.
@@ -72,8 +79,8 @@ contract L2MessageRoot is MessageRootBase {
     /// @param _l1ChainId The chain id of L1.
     function initL2(uint256 _l1ChainId, uint256 _gatewayChainId) public onlyUpgrader {
         _disableInitializers();
-        L1_CHAIN_ID = _l1ChainId;
         GATEWAY_CHAIN_ID = _gatewayChainId;
+        l1ChainId = _l1ChainId;
         _initialize();
     }
 

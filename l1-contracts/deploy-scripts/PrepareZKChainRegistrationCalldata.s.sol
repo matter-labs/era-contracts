@@ -6,7 +6,7 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/libraries/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
@@ -109,7 +109,7 @@ contract PrepareZKChainRegistrationCalldataScript is Script {
 
         IGovernance.Call[] memory calls;
         uint256 cnt = 0;
-        if (!IBridgehub(ecosystem.bridgehub).tokenIsRegistered(config.baseToken)) {
+        if (!IL1Bridgehub(ecosystem.bridgehub).tokenIsRegistered(config.baseToken)) {
             calls = new IGovernance.Call[](2);
             console.log("Adding a call to register base token on the bridgehub");
             IGovernance.Call memory baseTokenRegistrationCall = prepareRegisterBaseTokenCall();

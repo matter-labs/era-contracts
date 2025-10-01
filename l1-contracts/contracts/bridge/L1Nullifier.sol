@@ -22,7 +22,7 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, InvalidSelector, LegacyBridgeNotSet, LegacyMethodForNonL1Token, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotLegacy, Unauthorized, WithdrawalAlreadyFinalized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
@@ -38,7 +38,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IBridgehub public immutable override BRIDGE_HUB;
+    IL1Bridgehub public immutable override BRIDGE_HUB;
 
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
@@ -132,12 +132,8 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(
-        IBridgehub _bridgehub,
-        IMessageRoot _messageRoot,
-        uint256 _eraChainId,
-        address _eraDiamondProxy
-    ) reentrancyGuardInitializer {
+    constructor(IL1Bridgehub _bridgehub,         IMessageRoot _messageRoot,
+        uint256 _eraChainId, address _eraDiamondProxy) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         MESSAGE_ROOT = _messageRoot;

@@ -6,8 +6,9 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
+import {IL2Bridgehub} from "../../../bridgehub/IL2Bridgehub.sol";
+import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
@@ -249,10 +250,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         // to a chain's message root only if the chain has indeed executed its batch on top of it.
         //
         // We trust all chains whitelisted by the Bridgehub governance.
-        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
+        if (!IBridgehubBase(s.bridgehub).whitelistedSettlementLayers(proofData.settlementLayerChainId)) {
             revert NotSettlementLayer();
         }
-        address settlementLayerAddress = IBridgehub(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
+        address settlementLayerAddress = IBridgehubBase(s.bridgehub).getZKChain(proofData.settlementLayerChainId);
 
         return
             IMailbox(settlementLayerAddress).proveL2LeafInclusion(
@@ -310,10 +311,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 _baseTokenAmount,
         bool _getBalanceChange
     ) public override onlyL1 returns (bytes32 canonicalTxHash) {
-        if (!IBridgehub(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
+        if (!IBridgehubBase(s.bridgehub).whitelistedSettlementLayers(s.chainId)) {
             revert NotSettlementLayer();
         }
-        if (IBridgehub(s.bridgehub).getZKChain(_chainId) != msg.sender) {
+        if (IBridgehubBase(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
         /// We pause L1->GW->L2 deposits.
@@ -474,7 +475,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     function _requestL2Transaction(WritePriorityOpParams memory _params) internal returns (bytes32 canonicalTxHash) {
         BridgehubL2TransactionRequest memory request = _params.request;
 
-        // For ZKsync OS factory deps will be ignored
+        // Factory deps are not used in ZKsync OS in non-upgrade transactions.
         if (request.factoryDeps.length > MAX_NEW_FACTORY_DEPS) {
             revert TooManyFactoryDeps();
         }
@@ -640,7 +641,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
+        address sharedBridge = IBridgehubBase(s.bridgehub).assetRouter();
         IL1AssetRouter(sharedBridge).finalizeWithdrawal({
             _chainId: ERA_CHAIN_ID,
             _l2BatchNumber: _l2BatchNumber,
@@ -679,7 +680,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 refundRecipient: _refundRecipient
             })
         );
-        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
+        address sharedBridge = IBridgehubBase(s.bridgehub).assetRouter();
         IL1AssetRouter(sharedBridge).bridgehubDepositBaseToken{value: msg.value}(
             s.chainId,
             s.baseTokenAssetId,

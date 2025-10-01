@@ -9,7 +9,7 @@ import {PubdataPricingMode} from "../ZKChainStorage.sol";
 import {VerifierParams} from "../../../state-transition/chain-interfaces/IVerifier.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {UncheckedMath} from "../../../common/libraries/UncheckedMath.sol";
 import {IGetters} from "../../chain-interfaces/IGetters.sol";
 import {ILegacyGetters} from "../../chain-interfaces/ILegacyGetters.sol";
@@ -65,7 +65,7 @@ contract GettersFacet is ZKChainBase, IGetters, ILegacyGetters {
 
     /// @inheritdoc IGetters
     function getBaseToken() external view returns (address) {
-        return IBridgehub(s.bridgehub).baseToken(s.chainId);
+        return IL1Bridgehub(s.bridgehub).baseToken(s.chainId);
     }
 
     /// @inheritdoc IGetters

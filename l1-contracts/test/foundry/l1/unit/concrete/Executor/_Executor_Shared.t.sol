@@ -34,6 +34,9 @@ import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";

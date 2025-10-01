@@ -58,7 +58,7 @@ interface IMessageRoot is IMessageVerification {
     /// of length one, which only include the interop root itself. More on that in `L2InteropRootStorage` contract.
     event NewInteropRoot(uint256 indexed chainId, uint256 indexed blockNumber, uint256 indexed logId, bytes32[] sides);
 
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (address);
 
     function GATEWAY_CHAIN_ID() external view returns (uint256);
 

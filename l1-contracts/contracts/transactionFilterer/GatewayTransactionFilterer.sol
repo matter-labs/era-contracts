@@ -7,7 +7,7 @@ import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/ac
 import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
@@ -28,7 +28,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
     event WhitelistRevoked(address indexed sender);
 
     /// @notice The ecosystem's Bridgehub
-    IBridgehub public immutable BRIDGE_HUB;
+    IBridgehubBase public immutable BRIDGE_HUB;
 
     /// @notice The L1 asset router
     address public immutable L1_ASSET_ROUTER;
@@ -38,7 +38,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgeHub, address _assetRouter) {
+    constructor(IBridgehubBase _bridgeHub, address _assetRouter) {
         BRIDGE_HUB = _bridgeHub;
         L1_ASSET_ROUTER = _assetRouter;
         _disableInitializers();

@@ -12,7 +12,7 @@ import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {IInteropCenter, InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
-import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
 import {DummyChainTypeManagerWBH} from "contracts/dev-contracts/test/DummyChainTypeManagerWithBridgeHubAddress.sol";
 import {DummyZKChain} from "contracts/dev-contracts/test/DummyZKChain.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";

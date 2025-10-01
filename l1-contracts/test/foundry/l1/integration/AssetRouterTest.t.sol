@@ -5,7 +5,7 @@ import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
 import {console2 as console} from "forge-std/console2.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
@@ -19,8 +19,8 @@ import {L2Message} from "contracts/common/Messaging.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
+import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -231,7 +231,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         vm.store(address(bridgedToken), bytes32(uint256(207)), bytes32(0));
         vm.mockCall(
             address(L2_NATIVE_TOKEN_VAULT_ADDR),
-            abi.encodeWithSelector(INativeTokenVault.L1_CHAIN_ID.selector),
+            abi.encodeWithSelector(NativeTokenVaultBase.L1_CHAIN_ID.selector),
             abi.encode(block.chainid)
         );
         vm.broadcast(L2_NATIVE_TOKEN_VAULT_ADDR); // kl todo call ntv, or even assetRouter/bridgehub

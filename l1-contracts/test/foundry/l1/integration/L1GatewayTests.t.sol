@@ -7,7 +7,8 @@ import "forge-std/console.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
 import {TokenDeployer} from "./_SharedTokenDeployer.t.sol";
@@ -102,8 +103,8 @@ contract L1GatewayTests is
         releaseConfigLock();
 
         vm.deal(ecosystemConfig.ownerAddress, 100000000000000000000000000000000000);
-        migratingChain = IZKChain(IBridgehub(addresses.bridgehub).getZKChain(migratingChainId));
-        gatewayChain = IZKChain(IBridgehub(addresses.bridgehub).getZKChain(gatewayChainId));
+        migratingChain = IZKChain(IL1Bridgehub(addresses.bridgehub).getZKChain(migratingChainId));
+        gatewayChain = IZKChain(IL1Bridgehub(addresses.bridgehub).getZKChain(gatewayChainId));
         vm.deal(migratingChain.getAdmin(), 100000000000000000000000000000000000);
         vm.deal(gatewayChain.getAdmin(), 100000000000000000000000000000000000);
 
@@ -165,7 +166,7 @@ contract L1GatewayTests is
     function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
         uint256 expectedValue = 1000000000000000000000;
 
         L2TransactionRequestDirect memory request = _createL2TransactionRequestDirect(
@@ -184,7 +185,7 @@ contract L1GatewayTests is
         gatewayScript.migrateChainToGateway(migratingChainId);
 
         // Setup
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
         bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
         bytes memory transferData;
 
@@ -261,7 +262,7 @@ contract L1GatewayTests is
     }
 
     function migrateBackChain() public {
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub);
         IZKChain migratingChain = IZKChain(addresses.bridgehub.getZKChain(migratingChainId));
         bytes32 assetId = addresses.bridgehub.ctmAssetIdFromChainId(migratingChainId);
 
@@ -281,7 +282,7 @@ contract L1GatewayTests is
         );
         vm.mockCall(
             address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.ctmAssetIdFromChainId.selector),
+            abi.encodeWithSelector(IBridgehubBase.ctmAssetIdFromChainId.selector),
             abi.encode(assetId)
         );
         vm.mockCall(
@@ -394,7 +395,6 @@ contract L1GatewayTests is
     /// to increase coverage, properly tested in L2GatewayTests
     function test_forwardToL2OnGateway_L1() public {
         _setUpGatewayWithFilterer();
-        vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
         vm.expectRevert(NotInGatewayMode.selector);
         addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);

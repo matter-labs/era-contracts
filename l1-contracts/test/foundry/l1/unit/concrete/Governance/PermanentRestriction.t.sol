@@ -3,7 +3,8 @@ pragma solidity 0.8.28;
 import "@openzeppelin/contracts-v4/utils/Strings.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {BridgehubBurnCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
@@ -31,7 +32,7 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/IERC20Metadata.sol";
 
 contract TestPermanentRestriction is PermanentRestriction {
-    constructor(IBridgehub _bridgehub, address _l2AdminFactory) PermanentRestriction(_bridgehub, _l2AdminFactory) {}
+    constructor(IL1Bridgehub _bridgehub, address _l2AdminFactory) PermanentRestriction(_bridgehub, _l2AdminFactory) {}
 
     function isAdminOfAChain(address _chain) external view returns (bool) {
         return _isAdminOfAChain(_chain);
@@ -69,7 +70,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
     }
 
     function _deployPermRestriction(
-        IBridgehub _bridgehub,
+        IL1Bridgehub _bridgehub,
         address _l2AdminFactory,
         address _owner
     ) internal returns (TestPermanentRestriction proxy, TestPermanentRestriction impl) {
@@ -273,7 +274,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
             secondBridgeCalldata: hex""
         });
         if (!correctSecondBridge) {
-            call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
+            call.data = abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer));
             // 0 is not correct second bridge
             return call;
         }
@@ -288,12 +289,12 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
                 // Gateway chain id, we do not need it
                 chainId: 0,
                 ctmData: abi.encode(l2Admin, hex""),
-                chainData: abi.encode(IZKChain(IBridgehub(bridgehub).getZKChain(chainId)).getProtocolVersion())
+                chainData: abi.encode(IZKChain(IBridgehubBase(bridgehub).getZKChain(chainId)).getProtocolVersion())
             })
         );
         outer.secondBridgeCalldata = abi.encodePacked(bytes1(encoding), abi.encode(chainAssetId, bridgehubData));
 
-        call.data = abi.encodeCall(IBridgehub.requestL2TransactionTwoBridges, (outer));
+        call.data = abi.encodeCall(IL1Bridgehub.requestL2TransactionTwoBridges, (outer));
     }
 
     function assertInvalidMigrationCall(Call memory call) public {
@@ -398,7 +399,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
         vm.mockCall(

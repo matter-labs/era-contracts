@@ -53,7 +53,7 @@ contract ChainRegistrarTest is Test {
         vm.prank(admin);
 
         l1NullifierImpl = new L1NullifierDev({
-            _bridgehub: IBridgehub(address(bridgeHub)),
+            _bridgehub: IL1Bridgehub(address(bridgeHub)),
             _messageRoot: IMessageRoot(address(messageRoot)),
             _interopCenter: (interopCenter),
             _eraChainId: 270,
@@ -61,7 +61,7 @@ contract ChainRegistrarTest is Test {
         });
 
         assetRouter = new L1AssetRouter({
-            _l1WethAddress: makeAddr("weth"),
+            _l1WethToken: makeAddr("weth"),
             _bridgehub: address(bridgeHub),
             _l1Nullifier: address(l1NullifierImpl),
             _eraChainId: 270,

@@ -9,7 +9,7 @@ import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {Call} from "contracts/governance/Common.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
@@ -114,7 +114,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         }
 
         console.log("Initializing core contracts from BH");
-        IBridgehub bridgehubProxy = IBridgehub(bridgehub);
+        IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
         L1AssetRouter assetRouter = L1AssetRouter(bridgehubProxy.assetRouter());
         address messageRoot = address(bridgehubProxy.messageRoot());
         address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
