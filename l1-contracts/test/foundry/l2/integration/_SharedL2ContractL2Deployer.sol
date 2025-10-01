@@ -12,6 +12,7 @@ import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
 import {ADDRESS_ONE, Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
@@ -67,7 +68,9 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.adminFacet = address(
             new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager))
         );
-        addresses.stateTransition.mailboxFacet = address(new MailboxFacet(config.eraChainId, config.l1ChainId));
+        addresses.stateTransition.mailboxFacet = address(
+            new MailboxFacet(config.eraChainId, config.l1ChainId, IEIP7702Checker(address(1)))
+        );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit());
         // Deploy ChainTypeManager implementation

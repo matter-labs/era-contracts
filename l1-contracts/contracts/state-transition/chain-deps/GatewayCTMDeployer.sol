@@ -17,6 +17,7 @@ import {VerifierFflonk} from "../verifiers/VerifierFflonk.sol";
 import {VerifierPlonk} from "../verifiers/VerifierPlonk.sol";
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
+import {IEIP7702Checker} from "../chain-interfaces/IEIP7702Checker.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
@@ -35,6 +36,8 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../chain-interfaces/IDiamondInit.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../IChainTypeManager.sol";
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
+
+import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
 
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
 // solhint-disable-next-line gas-struct-packing
@@ -177,12 +180,15 @@ contract GatewayCTMDeployer {
 
         contracts.multicall3 = address(new Multicall3{salt: salt}());
 
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(deployEIP7702Checker());
+
         _deployFacetsAndUpgrades({
             _salt: salt,
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
-            _deployedContracts: contracts
+            _deployedContracts: contracts,
+            _eip7702Checker: eip7702Checker
         });
         _deployVerifier(salt, _config.testnetVerifier, contracts);
 
@@ -215,10 +221,11 @@ contract GatewayCTMDeployer {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _aliasedGovernanceAddress,
-        DeployedContracts memory _deployedContracts
+        DeployedContracts memory _deployedContracts,
+        IEIP7702Checker _eip7702Checker
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId)
+            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, _eip7702Checker)
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());
@@ -440,5 +447,31 @@ contract GatewayCTMDeployer {
         // Note, that the governance still has to accept it.
         // It will happen in a separate voting after the deployment is done.
         _serverNotifier.transferOwnership(_aliasedGovernanceAddress);
+    }
+
+    function deployEIP7702Checker() internal returns (address) {
+        bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("EIP7702Checker");
+
+        return deployViaCreate(bytecode);
+    }
+
+    /**
+     * @dev Deploys contract using CREATE.
+     */
+    function deployViaCreate(bytes memory _bytecode) internal returns (address addr) {
+        if (_bytecode.length == 0) {
+            revert("Bytecode is not set");
+        }
+
+        assembly {
+            // Allocate memory for the bytecode
+            let size := mload(_bytecode) // Load the size of the bytecode
+            let ptr := add(_bytecode, 0x20) // Skip the length prefix (32 bytes)
+
+            // Create the contract
+            addr := create(0, ptr, size)
+        }
+
+        require(addr != address(0), "Deployment failed");
     }
 }

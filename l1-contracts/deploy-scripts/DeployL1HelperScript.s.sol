@@ -176,6 +176,8 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(ServerNotifier).creationCode;
             } else if (compareStrings(contractName, "UpgradeStageValidator")) {
                 return type(UpgradeStageValidator).creationCode;
+            } else if (compareStrings(contractName, "EIP7702Checker")) {
+                return ContractsBytecodesLib.getCreationCodeEVM(contractName);
             }
         } else {
             if (compareStrings(contractName, "Verifier")) {

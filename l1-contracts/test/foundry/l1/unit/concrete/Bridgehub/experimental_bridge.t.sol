@@ -24,7 +24,9 @@ import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {Utils} from "../Utils/Utils.sol";
 
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
@@ -106,7 +108,8 @@ contract ExperimentalBridgeTest is Test {
         bridgeHub = Bridgehub(address(dummyBridgehub));
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgeHub));
-        mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid);
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
+        mockChainContract = new DummyZKChain(address(bridgeHub), eraChainId, block.chainid, eip7702Checker);
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one

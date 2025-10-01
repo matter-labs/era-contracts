@@ -20,6 +20,7 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {InitializeData} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {IExecutor, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
@@ -194,11 +195,12 @@ contract ExecutorTest is Test {
         eraChainId = 9;
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
 
         admin = new AdminFacet(block.chainid, RollupDAManager(address(0)));
         getters = new GettersFacet();
         executor = new TestExecutor();
-        mailbox = new MailboxFacet(eraChainId, block.chainid);
+        mailbox = new MailboxFacet(eraChainId, block.chainid, eip7702Checker);
 
         DummyCTM chainTypeManager = new DummyCTM(owner, address(0));
         vm.mockCall(

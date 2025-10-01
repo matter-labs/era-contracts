@@ -9,6 +9,7 @@ import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
+import {IEIP7702Checker} from "../../chain-interfaces/IEIP7702Checker.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
 import {TransactionValidator} from "../../libraries/TransactionValidator.sol";
 import {BridgehubL2TransactionRequest, L2CanonicalTransaction, L2Log, L2Message, TxStatus, WritePriorityOpParams} from "../../../common/Messaging.sol";
@@ -40,6 +41,9 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @inheritdoc IZKChainBase
     string public constant override getName = "MailboxFacet";
 
+    /// @dev Deployed utility contract to check that account is EIP7702 one
+    IEIP7702Checker internal immutable EIP_7702_CHECKER;
+
     /// @dev Era's chainID
     uint256 internal immutable ERA_CHAIN_ID;
 
@@ -54,9 +58,11 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _;
     }
 
-    constructor(uint256 _eraChainId, uint256 _l1ChainId) {
+    constructor(uint256 _eraChainId, uint256 _l1ChainId, IEIP7702Checker _eip7702Checker) {
+        require(address(_eip7702Checker) != address(0), "EIP7702Checker address is zero");
         ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
+        EIP_7702_CHECKER = _eip7702Checker;
     }
 
     /// @inheritdoc IMailboxImpl
@@ -445,18 +451,22 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             revert MsgValueTooLow(baseCost + request.l2Value, request.mintValue);
         }
 
-        request.refundRecipient = AddressAliasHelper.actualRefundRecipient(request.refundRecipient, request.sender);
+        bool is7702AccountRefundRecipient = EIP_7702_CHECKER.isEIP7702Account(request.refundRecipient);
+        bool is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during TwoBridges.
+        request.refundRecipient = AddressAliasHelper.actualRefundRecipientMailbox(
+            request.refundRecipient,
+            request.sender,
+            is7702AccountRefundRecipient
+        );
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.
         // solhint-disable avoid-tx-origin
         // slither-disable-next-line tx-origin
-        if (request.sender != tx.origin && !AddressAliasHelper.isEIP7702EOA(request.sender)) {
+        if (request.sender != tx.origin && !is7702AccountSender) {
             request.sender = AddressAliasHelper.applyL1ToL2Alias(request.sender);
         }
-
         // populate missing fields
         _params.expirationTimestamp = uint64(block.timestamp + PRIORITY_EXPIRATION); // Safe to cast
-
         L2CanonicalTransaction memory transaction;
         (transaction, canonicalTxHash) = _validateTx(_params);
 

@@ -658,6 +658,12 @@ library Utils {
         return deployViaCreate(bytecode);
     }
 
+    function deployEIP7702Checker() internal returns (address) {
+        bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("EIP7702Checker");
+
+        return deployViaCreate(bytecode);
+    }
+
     /**
      * @dev Deploys contract using CREATE.
      */

@@ -11,6 +11,7 @@ import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {AddressHasNoCode} from "./ZkSyncScriptErrors.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -133,6 +134,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             addresses.transparentProxyAdmin = deployWithCreate2AndOwner("ProxyAdmin", addresses.governance, false);
         }
 
+        deployEIP7702Checker();
         deployDAValidators();
         deployIfNeededMulticall3();
 
@@ -198,6 +200,10 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         vm.broadcast(msg.sender);
         serverNotifier.setChainTypeManager(IChainTypeManager(addresses.stateTransition.chainTypeManagerProxy));
         console.log("ChainTypeManager set in ServerNotifier");
+    }
+
+    function deployEIP7702Checker() internal {
+        addresses.daAddresses.eip7702Checker = deploySimpleContract("EIP7702Checker", false);
     }
 
     function deployDAValidators() internal {
@@ -501,7 +507,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     function saveDiamondSelectors() public {
         AdminFacet adminFacet = new AdminFacet(1, RollupDAManager(address(0)));
         GettersFacet gettersFacet = new GettersFacet();
-        MailboxFacet mailboxFacet = new MailboxFacet(1, 1);
+        MailboxFacet mailboxFacet = new MailboxFacet(1, 1, IEIP7702Checker(address(1)));
         ExecutorFacet executorFacet = new ExecutorFacet(1);
         bytes4[] memory adminFacetSelectors = Utils.getAllSelectors(address(adminFacet).code);
         bytes4[] memory gettersFacetSelectors = Utils.getAllSelectors(address(gettersFacet).code);

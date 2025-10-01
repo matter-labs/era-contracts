@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: Apache-2.0
+
+pragma solidity 0.8.28;
+
+error IncorrectLength(uint256 expected, uint256 realLength);
+error IncorrectBytes(bytes3 expected, bytes3 realBytes);
+error IncorrectBytes32(bytes32 realBytes);
+
+/// @title EIP7702Checker
+/// @notice Utility to detect EIP-7702 style EOAs (accounts with code stubs)
+/// @dev See: https://eips.ethereum.org/EIPS/eip-7702
+
+contract EIP7702Checker {
+    uint256 internal constant EIP7702_CODE_SIZE = 23;
+    bytes3 internal constant EIP7702_PREFIX = 0xef0100;
+
+    function isEIP7702Account(address _account) external view returns (bool) {
+        uint256 size;
+        assembly {
+            size := extcodesize(_account)
+        }
+        if (size != EIP7702_CODE_SIZE) return false;
+
+        bytes3 prefix;
+        assembly {
+            let ptr := mload(0x40) // load free memory pointer
+            extcodecopy(_account, ptr, 0, 3)
+            prefix := mload(ptr) // read back into stack
+        }
+
+        return prefix == EIP7702_PREFIX;
+    }
+}

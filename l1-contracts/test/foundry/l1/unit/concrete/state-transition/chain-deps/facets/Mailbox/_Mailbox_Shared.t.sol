@@ -13,6 +13,7 @@ import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 
 contract MailboxTest is Test {
     IMailbox internal mailboxFacet;
@@ -23,15 +24,18 @@ contract MailboxTest is Test {
     address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
     address diamondProxy;
     address bridgehub;
+    IEIP7702Checker eip7702Checker;
 
     function deployDiamondProxy() internal returns (address proxy) {
         sender = makeAddr("sender");
         bridgehub = makeAddr("bridgehub");
         vm.deal(sender, 100 ether);
 
+        eip7702Checker = IEIP7702Checker(Utils.deployEIP7702Checker());
+
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](3);
         facetCuts[0] = Diamond.FacetCut({
-            facet: address(new MailboxFacet(eraChainId, block.chainid)),
+            facet: address(new MailboxFacet(eraChainId, block.chainid, eip7702Checker)),
             action: Diamond.Action.Add,
             isFreezable: true,
             selectors: Utils.getMailboxSelectors()
