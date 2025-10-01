@@ -127,21 +127,21 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /// @notice Updates the contract.
     /// @dev This function is used to initialize the new implementation of L2NativeTokenVault on existing chains during
     /// the upgrade.
-    /// @param _l1ChainIdToSet The chain id of L1.
+    /// @param _l1ChainId The chain id of L1.
     /// @param _l2TokenProxyBytecodeHash The bytecode hash of the proxy for tokens deployed by the bridge.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
-    /// @param _wethTokenToSet The address of the WETH token.
-    /// @param _baseTokenAssetIdToSet The asset id of the base token.
+    /// @param _wethToken The address of the WETH token.
+    /// @param _baseTokenAssetId The asset id of the base token.
     function updateL2(
-        uint256 _l1ChainIdToSet,
+        uint256 _l1ChainId,
         bytes32 _l2TokenProxyBytecodeHash,
         address _legacySharedBridge,
-        address _wethTokenToSet,
-        bytes32 _baseTokenAssetIdToSet
+        address _wethToken,
+        bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
-        WETH_TOKEN = _wethTokenToSet;
-        BASE_TOKEN_ASSET_ID = _baseTokenAssetIdToSet;
-        L1_CHAIN_ID = _l1ChainIdToSet;
+        WETH_TOKEN = _wethToken;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+        L1_CHAIN_ID = _l1ChainId;
         ASSET_ROUTER = IAssetRouterBase(L2_ASSET_ROUTER_ADDR);
         L2_LEGACY_SHARED_BRIDGE = IL2SharedBridgeLegacy(_legacySharedBridge);
 

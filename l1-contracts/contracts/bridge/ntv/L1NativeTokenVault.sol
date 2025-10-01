@@ -78,12 +78,12 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
-    /// @param _wethTokenToSet Address of WETH on deployed chain
-    /// @param _assetRouterToSet Address of Asset Router on L1.
+    /// @param _wethToken Address of WETH on deployed chain
+    /// @param _assetRouter Address of Asset Router on L1.
     /// @param _l1Nullifier Address of the nullifier contract, which handles transaction progress between L1 and ZK chains.
-    constructor(address _wethTokenToSet, address _assetRouterToSet, IL1Nullifier _l1Nullifier) {
-        WETH_TOKEN = _wethTokenToSet;
-        ASSET_ROUTER = IAssetRouterBase(_assetRouterToSet);
+    constructor(address _wethToken, address _assetRouter, IL1Nullifier _l1Nullifier) {
+        WETH_TOKEN = _wethToken;
+        ASSET_ROUTER = IAssetRouterBase(_assetRouter);
         L1_CHAIN_ID = block.chainid;
         BASE_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         L1_NULLIFIER = _l1Nullifier;
