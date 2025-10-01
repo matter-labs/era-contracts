@@ -6,16 +6,15 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {Utils} from "../Utils.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
+
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
+
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
@@ -99,6 +98,6 @@ contract ChainUpgrade is Script {
         toml = vm.readFile(ecosystemInputPath);
         config.bridgehubProxyAddress = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
-        config.chainDiamondProxyAddress = Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
+        config.chainDiamondProxyAddress = L1Bridgehub(config.bridgehubProxyAddress).getZKChain(config.chainChainId);
     }
 }

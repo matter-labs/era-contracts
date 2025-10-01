@@ -3,17 +3,17 @@ pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
+import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {Create2AndTransfer} from "./Create2AndTransfer.sol";
-import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+
+import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -78,6 +78,7 @@ struct Config {
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
+    bool isZKsyncOS;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -139,6 +140,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
+        config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -197,29 +199,18 @@ abstract contract DeployUtils is Create2FactoryUtils {
         addresses.stateTransition.diamondInit = deploySimpleContract("DiamondInit", false);
     }
 
-    function getFacetCuts(
+    function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual returns (FacetCut[] memory facetCuts);
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    function formatFacetCuts(
-        FacetCut[] memory facetCutsUnformatted
-    ) internal returns (Diamond.FacetCut[] memory facetCuts) {
-        facetCuts = new Diamond.FacetCut[](facetCutsUnformatted.length);
-        for (uint256 i = 0; i < facetCutsUnformatted.length; i++) {
-            facetCuts[i] = Diamond.FacetCut({
-                facet: facetCutsUnformatted[i].facet,
-                action: Diamond.Action(uint8(facetCutsUnformatted[i].action)),
-                isFreezable: facetCutsUnformatted[i].isFreezable,
-                selectors: facetCutsUnformatted[i].selectors
-            });
-        }
-    }
+    function getUpgradeAddedFacetCuts(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) internal virtual returns (Diamond.FacetCut[] memory facetCuts);
 
-    function getDiamondCutData(
+    function getChainCreationDiamondCutData(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (Diamond.DiamondCutData memory diamondCut) {
-        FacetCut[] memory facetCutsUnformatted = getFacetCuts(stateTransition);
-        Diamond.FacetCut[] memory facetCuts = formatFacetCuts(facetCutsUnformatted);
+        Diamond.FacetCut[] memory facetCuts = getChainCreationFacetCuts(stateTransition);
 
         DiamondInitializeDataNewChain memory initializeData = getInitializeData(stateTransition);
 
@@ -236,7 +227,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getChainCreationParams(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal returns (ChainCreationParams memory) {
-        Diamond.DiamondCutData memory diamondCut = getDiamondCutData(stateTransition);
+        Diamond.DiamondCutData memory diamondCut = getChainCreationDiamondCutData(stateTransition);
         return
             ChainCreationParams({
                 genesisUpgrade: stateTransition.genesisUpgrade,
@@ -291,6 +282,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         FeeParams memory feeParams = getFeeParams();
 
         require(stateTransition.verifier != address(0), "verifier is zero");
+        require(config.contracts.bootloaderHash != bytes32(0), "bootloader hash is zero");
+        require(config.contracts.defaultAAHash != bytes32(0), "default aa hash is zero");
+        require(config.contracts.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
+
+        // TODO should be provided?
+        //        if (!stateTransition.isOnGateway) {
+        //            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
+        //        }
 
         return
             DiamondInitializeDataNewChain({
@@ -349,13 +348,13 @@ abstract contract DeployUtils is Create2FactoryUtils {
     ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "Bridgehub")) {
-            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
-        } else if (compareStrings(contractName, "MessageRoot")) {
+        } else if (compareStrings(contractName, "L1Bridgehub")) {
+            return abi.encode(config.l1ChainId, config.ownerAddress, config.contracts.maxNumberOfChains);
+        } else if (compareStrings(contractName, "L1MessageRoot")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return
                 abi.encode(
                     config.l1ChainId,
@@ -412,7 +411,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "EIP7702Checker")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+            /// TODO: Currently setting it to owner address (which means whole bridgehub owner).
+            /// In practice we might want to set it to CTM owner (which in production will be less restritive).
+            return
+                abi.encode(
+                    addresses.stateTransition.verifierFflonk,
+                    addresses.stateTransition.verifierPlonk,
+                    config.ownerAddress
+                );
         } else if (compareStrings(contractName, "VerifierFflonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "VerifierPlonk")) {
@@ -455,7 +461,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DiamondInit")) {
-            return abi.encode();
+            return abi.encode(config.isZKsyncOS);
         } else {
             revert(string.concat("Contract ", contractName, " creation calldata not set"));
         }

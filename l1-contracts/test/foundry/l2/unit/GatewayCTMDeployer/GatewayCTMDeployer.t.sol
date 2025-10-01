@@ -6,8 +6,9 @@ import {Test} from "forge-std/Test.sol";
 import {console2 as console} from "forge-std/Script.sol";
 
 import {DAContracts, DeployedContracts, GatewayCTMDeployer, GatewayCTMDeployerConfig, StateTransitionContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
@@ -20,7 +21,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
 import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
@@ -33,7 +33,6 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -65,7 +64,7 @@ contract GatewayCTMDeployerTest is Test {
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
 
-        new DiamondInit();
+        new DiamondInit(false);
         new L1GenesisUpgrade();
         new RollupDAManager();
         new ValidiumL1DAValidator();
@@ -76,8 +75,7 @@ contract GatewayCTMDeployerTest is Test {
         new VerifierFflonk();
         new VerifierPlonk();
 
-        new TestnetVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)));
-        new DualVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)));
+        new TestnetVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)), address(0));
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();

@@ -17,7 +17,8 @@ import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.s
 contract AdminTest is Test {
     IAdmin internal adminFacet;
     UtilsFacet internal utilsFacet;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
 
     function getAdminSelectors() public pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](14);

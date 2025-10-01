@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
+import {Test, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
-import {ADDRESS_ONE, Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {ADDRESS_ONE} from "deploy-scripts/Utils.sol";
 
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -20,7 +19,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
+
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -54,7 +53,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         instantiateCreate2Factory();
         addresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
         addresses.stateTransition.verifier = address(
-            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE))
+            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE), address(0))
         );
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         addresses.stateTransition.validatorTimelock = address(
@@ -72,7 +71,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             new MailboxFacet(config.eraChainId, config.l1ChainId, IEIP7702Checker(address(1)))
         );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
-        addresses.stateTransition.diamondInit = address(new DiamondInit());
+        addresses.stateTransition.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         addresses.stateTransition.chainTypeManagerImplementation = address(
             new ChainTypeManager(addresses.bridgehub.bridgehubProxy)

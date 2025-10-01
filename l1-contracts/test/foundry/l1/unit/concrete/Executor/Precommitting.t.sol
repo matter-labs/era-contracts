@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
 import {Vm} from "forge-std/Test.sol";
-import {Utils} from "../Utils/Utils.sol";
+
 import {ExecutorTest} from "./_Executor_Shared.t.sol";
 
 import {BatchDecoder} from "contracts/state-transition/libraries/BatchDecoder.sol";

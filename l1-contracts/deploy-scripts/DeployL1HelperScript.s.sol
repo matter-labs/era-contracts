@@ -5,31 +5,15 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {FacetCut, StateTransitionDeployedAddresses} from "./Utils.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
-import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
-import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
@@ -39,13 +23,12 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
+
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
+
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -61,8 +44,7 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
-import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
-import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {DeployUtils} from "./DeployUtils.s.sol";
 
 abstract contract DeployL1HelperScript is Script, DeployUtils {
     function deployTuppWithContract(
@@ -106,12 +88,12 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "Bridgehub")) {
-                return type(Bridgehub).creationCode;
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return type(ChainAssetHandler).creationCode;
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return type(MessageRoot).creationCode;
+            if (compareStrings(contractName, "L1Bridgehub")) {
+                return type(L1Bridgehub).creationCode;
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return type(L1ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return type(L1MessageRoot).creationCode;
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return type(CTMDeploymentTracker).creationCode;
             } else if (compareStrings(contractName, "L1Nullifier")) {
@@ -196,12 +178,12 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
         bool isZKBytecode
     ) internal virtual override returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "Bridgehub")) {
-                return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
-            } else if (compareStrings(contractName, "MessageRoot")) {
-                return abi.encodeCall(MessageRoot.initialize, ());
-            } else if (compareStrings(contractName, "ChainAssetHandler")) {
-                return abi.encodeCall(ChainAssetHandler.initialize, (config.deployerAddress));
+            if (compareStrings(contractName, "L1Bridgehub")) {
+                return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return abi.encodeCall(L1MessageRoot.initialize, ());
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1Nullifier")) {

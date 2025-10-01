@@ -2,7 +2,7 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {GatewayGovernanceUtils} from "deploy-scripts/gateway/GatewayGovernanceUtils.s.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 
 import {DeployGatewayTransactionFilterer} from "deploy-scripts/gateway/DeployGatewayTransactionFilterer.s.sol";
 
@@ -43,7 +43,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
     function governanceRegisterGateway() public {
         Call[] memory calls = _getRegisterSettlementLayerCalls();
-        Utils.executeCalls(Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
+        Utils.executeCalls(L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
     }
 
     function deployAndSetGatewayTransactionFilterer() public {
@@ -79,7 +79,7 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
 
         address[] memory addressesToGrantWhitelist = new address[](2);
         addressesToGrantWhitelist[0] = _gatewayGovernanceConfig.ctmDeploymentTrackerProxy;
-        addressesToGrantWhitelist[1] = Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner();
+        addressesToGrantWhitelist[1] = L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner();
 
         adminScript.grantGatewayWhitelist(
             _gatewayGovernanceConfig.bridgehubProxy,
@@ -116,10 +116,10 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
                 // Some non-zero address
                 _gatewayServerNotifier: address(uint160(1)),
                 _refundRecipient: msg.sender,
-                _ctmChainId: 0
+                _ctmRepresentativeChainId: 0
             })
         );
-        Utils.executeCalls(Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
+        Utils.executeCalls(L1Bridgehub(_gatewayGovernanceConfig.bridgehubProxy).owner(), bytes32(0), 0, calls);
     }
 
     function run() public {

@@ -3,29 +3,29 @@
 pragma solidity ^0.8.20;
 
 import {Vm} from "forge-std/Vm.sol";
-import {StdStorage, Test, stdStorage, stdToml} from "forge-std/Test.sol";
+
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {L2NativeTokenVault} from "contracts/bridge/ntv/L2NativeTokenVault.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {Bridgehub, IBridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
-import {SystemContractsCaller} from "contracts/common/l2-helpers/SystemContractsCaller.sol";
 import {DeployFailed} from "contracts/common/L1ContractErrors.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
+
 import {Utils} from "deploy-scripts/Utils.sol";
+import {L2ChainAssetHandler} from "contracts/bridgehub/L2ChainAssetHandler.sol";
 
 library L2Utils {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
@@ -45,26 +45,26 @@ library L2Utils {
     }
 
     function forceDeploySystemContracts(SystemContractsArgs memory _args) internal {
-        forceDeployMessageRoot();
+        forceDeployMessageRoot(_args);
         forceDeployBridgehub(_args);
         forceDeployChainAssetHandler(_args);
         forceDeployAssetRouter(_args);
         forceDeployNativeTokenVault(_args);
     }
 
-    function forceDeployMessageRoot() internal {
-        new MessageRoot(IBridgehub(L2_BRIDGEHUB_ADDR), L1_CHAIN_ID);
-        forceDeployWithConstructor("MessageRoot", L2_MESSAGE_ROOT_ADDR, abi.encode(L2_BRIDGEHUB_ADDR, L1_CHAIN_ID));
+    function forceDeployMessageRoot(SystemContractsArgs memory _args) internal {
+        new L2MessageRoot();
+        forceDeployWithoutConstructor("L2MessageRoot", L2_MESSAGE_ROOT_ADDR);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId);
     }
 
     function forceDeployBridgehub(SystemContractsArgs memory _args) internal {
-        new Bridgehub(_args.l1ChainId, _args.aliasedOwner, 100);
-        forceDeployWithConstructor(
-            "Bridgehub",
-            L2_BRIDGEHUB_ADDR,
-            abi.encode(_args.l1ChainId, _args.aliasedOwner, 100)
-        );
-        Bridgehub bridgehub = Bridgehub(L2_BRIDGEHUB_ADDR);
+        new L2Bridgehub();
+        forceDeployWithoutConstructor("L2Bridgehub", L2_BRIDGEHUB_ADDR);
+        L2Bridgehub bridgehub = L2Bridgehub(L2_BRIDGEHUB_ADDR);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        bridgehub.initL2(_args.l1ChainId, _args.aliasedOwner, 100);
         vm.prank(_args.aliasedOwner);
         bridgehub.setAddresses(
             L2_ASSET_ROUTER_ADDR,
@@ -75,23 +75,16 @@ library L2Utils {
     }
 
     function forceDeployChainAssetHandler(SystemContractsArgs memory _args) internal {
-        new ChainAssetHandler(
+        new L2ChainAssetHandler();
+        forceDeployWithoutConstructor("L2ChainAssetHandler", L2_CHAIN_ASSET_HANDLER_ADDR);
+        L2ChainAssetHandler chainAssetHandler = L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        chainAssetHandler.initL2(
             _args.l1ChainId,
             _args.aliasedOwner,
             IBridgehub(L2_BRIDGEHUB_ADDR),
             L2_ASSET_ROUTER_ADDR,
             IMessageRoot(L2_MESSAGE_ROOT_ADDR)
-        );
-        forceDeployWithConstructor(
-            "ChainAssetHandler",
-            L2_CHAIN_ASSET_HANDLER_ADDR,
-            abi.encode(
-                _args.l1ChainId,
-                _args.aliasedOwner,
-                L2_BRIDGEHUB_ADDR,
-                L2_ASSET_ROUTER_ADDR,
-                L2_MESSAGE_ROOT_ADDR
-            )
         );
     }
 
@@ -100,26 +93,18 @@ library L2Utils {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         {
-            new L2AssetRouter(
-                _args.l1ChainId,
-                _args.eraChainId,
-                _args.l1AssetRouter,
-                _args.legacySharedBridge,
-                ethAssetId,
-                _args.aliasedOwner
-            );
+            new L2AssetRouter();
         }
-        forceDeployWithConstructor(
-            "L2AssetRouter",
-            L2_ASSET_ROUTER_ADDR,
-            abi.encode(
-                _args.l1ChainId,
-                _args.eraChainId,
-                _args.l1AssetRouter,
-                _args.legacySharedBridge,
-                ethAssetId,
-                _args.aliasedOwner
-            )
+        forceDeployWithoutConstructor("L2AssetRouter", L2_ASSET_ROUTER_ADDR);
+        L2AssetRouter assetRouter = L2AssetRouter(L2_ASSET_ROUTER_ADDR);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        assetRouter.initL2(
+            _args.l1ChainId,
+            _args.eraChainId,
+            _args.l1AssetRouter,
+            _args.legacySharedBridge,
+            ethAssetId,
+            _args.aliasedOwner
         );
     }
 
@@ -128,38 +113,23 @@ library L2Utils {
         // to ensure that the bytecode is known
         bytes32 ethAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
         {
-            new L2NativeTokenVault({
-                _l1ChainId: _args.l1ChainId,
-                _aliasedOwner: _args.aliasedOwner,
-                _l2TokenProxyBytecodeHash: _args.l2TokenProxyBytecodeHash,
-                _legacySharedBridge: _args.legacySharedBridge,
-                _bridgedTokenBeacon: _args.l2TokenBeacon,
-                _contractsDeployedAlready: _args.contractsDeployedAlready,
-                _wethToken: address(0),
-                _baseTokenAssetId: ethAssetId
-            });
+            new L2NativeTokenVault();
         }
-        forceDeployWithConstructor(
-            "L2NativeTokenVault",
-            L2_NATIVE_TOKEN_VAULT_ADDR,
-            abi.encode(
-                _args.l1ChainId,
-                _args.aliasedOwner,
-                _args.l2TokenProxyBytecodeHash,
-                _args.legacySharedBridge,
-                _args.l2TokenBeacon,
-                _args.contractsDeployedAlready,
-                address(0),
-                ethAssetId
-            )
+        forceDeployWithoutConstructor("L2NativeTokenVault", L2_NATIVE_TOKEN_VAULT_ADDR);
+        L2NativeTokenVault nativeTokenVault = L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        nativeTokenVault.initL2(
+            _args.l1ChainId,
+            _args.aliasedOwner,
+            _args.l2TokenProxyBytecodeHash,
+            _args.legacySharedBridge,
+            _args.l2TokenBeacon,
+            address(0),
+            ethAssetId
         );
     }
 
-    function forceDeployWithConstructor(
-        string memory _contractName,
-        address _address,
-        bytes memory _constructorArgs
-    ) public {
+    function forceDeployWithoutConstructor(string memory _contractName, address _address) public {
         bytes memory bytecode = Utils.readZKFoundryBytecodeL1(string.concat(_contractName, ".sol"), _contractName);
 
         bytes32 bytecodehash = L2ContractHelper.hashL2Bytecode(bytecode);
@@ -168,9 +138,9 @@ library L2Utils {
         deployments[0] = IContractDeployer.ForceDeployment({
             bytecodeHash: bytecodehash,
             newAddress: _address,
-            callConstructor: true,
+            callConstructor: false,
             value: 0,
-            input: _constructorArgs
+            input: ""
         });
 
         vm.prank(L2_FORCE_DEPLOYER_ADDR);

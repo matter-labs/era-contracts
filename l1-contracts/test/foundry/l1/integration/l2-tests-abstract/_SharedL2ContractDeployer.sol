@@ -15,11 +15,11 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -34,7 +34,6 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SystemContractsArgs} from "./Utils.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
 abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
@@ -110,7 +109,8 @@ abstract contract SharedL2ContractDeployer is Test, DeployIntegrationUtils {
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
-                l1CtmDeployer: l1CTMDeployer
+                l1CtmDeployer: l1CTMDeployer,
+                maxNumberOfZKChains: 100
             })
         );
         deployL2Contracts(L1_CHAIN_ID);
