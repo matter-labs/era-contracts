@@ -32,7 +32,7 @@ import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
@@ -188,30 +188,29 @@ contract ExecutorTest is UtilsTest {
         validator = makeAddr("validator");
         randomSigner = makeAddr("randomSigner");
         dummyBridgehub = new DummyBridgehub();
-        vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IBridgehub.L1_CHAIN_ID.selector), abi.encode(1));
+        vm.mockCall(address(dummyBridgehub), abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(1));
         uint256[] memory allZKChainChainIDs = new uint256[](1);
         allZKChainChainIDs[0] = 271;
         vm.mockCall(
             address(dummyBridgehub),
-            abi.encodeWithSelector(IBridgehub.getAllZKChainChainIDs.selector),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDs)
         );
         vm.mockCall(
             address(dummyBridgehub),
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
         address interopCenter = makeAddr("interopCenter");
-        messageRoot = new L1MessageRoot(IBridgehubBase(address(dummyBridgehub)), l1ChainID, 1);
+        messageRoot = new L1MessageRoot(address(dummyBridgehub), 1);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
         address assetTracker = makeAddr("assetTracker");
         chainAssetHandler = new L1ChainAssetHandler(
-            l1ChainID,
             owner,
-            IBridgehubBase(address(dummyBridgehub)),
+            address(dummyBridgehub),
             address(sharedBridge),
-            messageRoot,
+            address(messageRoot),
             address(assetTracker),
             IL1Nullifier(address(0))
         );

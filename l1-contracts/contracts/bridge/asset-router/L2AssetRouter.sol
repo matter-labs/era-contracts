@@ -31,8 +31,6 @@ import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-I
 /// support any custom token logic, i.e. rebase tokens' functionality is not supported.
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC7786Recipient {
-
-
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
@@ -57,6 +55,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
     bytes32 public BASE_TOKEN_ASSET_ID;
+
+    /// @notice Returns the bridgehub contract.
+    function _bridgehub() internal view virtual override returns (IBridgehubBase) {
+        return IBridgehubBase(L2_BRIDGEHUB_ADDR);
+    }
 
     /// @notice Checks that the message sender is the L1 Asset Router.
     modifier onlyAssetRouterCounterpart(uint256 _originChainId) {

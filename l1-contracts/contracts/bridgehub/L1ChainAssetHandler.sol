@@ -6,7 +6,6 @@ import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {BridgehubBurnCTMAssetData, IBridgehubBase} from "./IBridgehubBase.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";

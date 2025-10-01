@@ -9,7 +9,6 @@ import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeployment
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface ICTMDeploymentTracker is IL1AssetDeploymentTracker {
-
     function BRIDGE_HUB() external view returns (IBridgehubBase);
 
     function L1_ASSET_ROUTER() external view returns (IAssetRouterBase);

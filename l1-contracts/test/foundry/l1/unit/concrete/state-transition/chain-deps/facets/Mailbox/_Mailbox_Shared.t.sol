@@ -14,7 +14,8 @@ import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerif
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 contract MailboxTest is UtilsTest {
@@ -60,7 +61,7 @@ contract MailboxTest is UtilsTest {
         mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0));
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(chainAssetHandler)
         );
         vm.mockCall(

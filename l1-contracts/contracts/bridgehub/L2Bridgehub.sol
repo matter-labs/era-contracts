@@ -44,7 +44,6 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
 
-
     modifier onlyChainRegistrationSender() {
         if (
             msg.sender != AddressAliasHelper.undoL1ToL2Alias(chainRegistrationSender) &&
@@ -89,10 +88,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @notice used to register chains on L2 for the purpose of interop.
     /// @param _chainId the chainId of the chain to be registered.
     /// @param _baseTokenAssetId the base token asset id of the chain.
-    function registerChainForInterop(
-        uint256 _chainId,
-        bytes32 _baseTokenAssetId
-    ) external onlyChainRegistrationSender {
+    function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external onlyChainRegistrationSender {
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
     }
 
@@ -144,12 +140,13 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler
+        address _chainAssetHandler,
+        address _chainRegistrationSender
     ) external override(BridgehubBase, IL2Bridgehub) onlyOwnerOrUpgrader {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
-        // chainRegistrationSender = _chainRegistrationSender;
+        chainRegistrationSender = _chainRegistrationSender;
     }
 }

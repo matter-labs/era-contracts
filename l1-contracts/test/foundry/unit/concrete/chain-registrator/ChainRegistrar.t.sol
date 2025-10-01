@@ -9,6 +9,7 @@ import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interf
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import "contracts/bridgehub/L1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import "contracts/chain-registrar/ChainRegistrar.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -46,7 +47,7 @@ contract ChainRegistrarTest is Test {
         interopCenter = new InteropCenter();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         interopCenter.initL2(block.chainid, makeAddr("admin"));
-        messageRoot = new L1MessageRoot(IBridgehubBase(address(bridgeHub)), block.chainid, 1);
+        messageRoot = new L1MessageRoot(address(bridgeHub), 1);
         ctm = new DummyChainTypeManagerWBH(address(bridgeHub));
         admin = makeAddr("admin");
         deployer = makeAddr("deployer");

@@ -7,7 +7,6 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IInteropCenter} from "../../../interop/IInteropCenter.sol";
-import {IL2Bridgehub} from "../../../bridgehub/IL2Bridgehub.sol";
 import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";

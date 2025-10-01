@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {MessageRootBase} from "./MessageRootBase.sol";
 import {FinalizeL1DepositParams} from "../bridge/interfaces/IL1Nullifier.sol";
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
-import {IncorrectFunctionSignature, LocallyNoChainsAtGenesis, NotWhitelistedSettlementLayer, OnlyGateway, OnlyL1, OnlyL2MessageRoot, V30UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
+import {IncorrectFunctionSignature, LocallyNoChainsAtGenesis, NotWhitelistedSettlementLayer, OnlyGateway, OnlyL2MessageRoot, V30UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
 import {L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {InvalidProof} from "../common/L1ContractErrors.sol";
 import {L2MessageRoot} from "./L2MessageRoot.sol";

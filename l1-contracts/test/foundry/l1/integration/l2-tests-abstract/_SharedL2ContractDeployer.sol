@@ -20,7 +20,7 @@ import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
-import {BridgehubMintCTMAssetData,IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";

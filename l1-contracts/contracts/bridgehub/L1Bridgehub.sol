@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
-import {ChainIdAlreadyPresent, ChainNotLegacy, ChainNotPresentInCTM, NotL1Bridgehub, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {NotL1Bridgehub, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../common/L1ContractErrors.sol";
 import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
@@ -274,12 +274,14 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         address _assetRouter,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler
+        address _chainAssetHandler,
+        address _chainRegistrationSender
     ) external override(BridgehubBase, IL1Bridgehub) onlyOwnerOrUpgrader {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
+        chainRegistrationSender = _chainRegistrationSender;
     }
 
     /// @dev Registers an already deployed chain with the bridgehub

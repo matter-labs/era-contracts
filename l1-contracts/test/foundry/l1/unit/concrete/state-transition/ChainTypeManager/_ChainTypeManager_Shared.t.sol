@@ -74,13 +74,12 @@ contract ChainTypeManagerTest is UtilsTest {
 
     function deploy() public {
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new L1MessageRoot(bridgehub, block.chainid, 1);
+        messageroot = new L1MessageRoot(address(bridgehub), 1);
         chainAssetHandler = new L1ChainAssetHandler(
-            block.chainid,
             governor,
-            bridgehub,
+            address(bridgehub),
             address(0),
-            messageroot,
+            address(messageroot),
             address(0),
             IL1Nullifier(address(0))
         );
@@ -95,7 +94,7 @@ contract ChainTypeManagerTest is UtilsTest {
             ICTMDeploymentTracker(address(0)),
             messageroot,
             address(chainAssetHandler),
-            address(0x000000000000000000000000000000000002000a)
+            address(0)
         );
 
         vm.mockCall(
@@ -107,7 +106,10 @@ contract ChainTypeManagerTest is UtilsTest {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ChainTypeManager(address(IBridgehubBase(address(bridgehub))), address(interopCenterAddress));
+        chainTypeManager = new ChainTypeManager(
+            address(IBridgehubBase(address(bridgehub))),
+            address(interopCenterAddress)
+        );
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 

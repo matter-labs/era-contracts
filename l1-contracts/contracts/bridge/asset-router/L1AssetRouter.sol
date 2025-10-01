@@ -104,10 +104,9 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
-    function _bridgehub() internal view virtual returns (IBridgehubBase) {
+    function _bridgehub() internal view virtual override returns (IBridgehubBase) {
         return IBridgehubBase(BRIDGE_HUB);
     }
-    
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.

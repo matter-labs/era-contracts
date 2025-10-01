@@ -11,6 +11,7 @@ import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmi
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {IChainRegistrationSender} from "contracts/bridgehub/IChainRegistrationSender.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";

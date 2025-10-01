@@ -7,7 +7,8 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {ChainExists, MessageRootNotRegistered, NotL2, OnlyChain, OnlyGateway, OnlyL2, OnlyL2MessageRoot, OnlyOnSettlementLayer, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberNotSet} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {Unauthorized, InvalidCaller} from "contracts/common/L1ContractErrors.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
@@ -33,10 +34,10 @@ contract MessageRoot_Extended_Test is Test {
         L1_CHAIN_ID = 1;
         gatewayChainId = 506;
 
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.L1_CHAIN_ID.selector), abi.encode(L1_CHAIN_ID));
+        vm.mockCall(bridgeHub, abi.encodeWithSelector(IL1Bridgehub.L1_CHAIN_ID.selector), abi.encode(L1_CHAIN_ID));
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(chainAssetHandler)
         );
         vm.mockCall(address(bridgeHub), abi.encodeWithSelector(Ownable.owner.selector), abi.encode(assetTracker));
@@ -45,17 +46,17 @@ contract MessageRoot_Extended_Test is Test {
         allZKChainChainIDs[0] = 271;
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getAllZKChainChainIDs.selector),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDs)
         );
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.settlementLayer.selector), abi.encode(0));
+        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
-        messageRoot = new L1MessageRoot(IBridgehubBase(bridgeHub), L1_CHAIN_ID, gatewayChainId);
+        messageRoot = new L1MessageRoot(bridgeHub, gatewayChainId);
         l2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
@@ -162,7 +163,7 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
             abi.encode(makeAddr("correctChain"))
         );
 
@@ -177,12 +178,12 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
             abi.encode(chainSender)
         );
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.settlementLayer.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, chainId),
             abi.encode(2) // Different settlement layer
         );
 
@@ -197,12 +198,12 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
             abi.encode(chainSender)
         );
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.settlementLayer.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector, chainId),
             abi.encode(block.chainid)
         );
 
@@ -294,7 +295,7 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
             abi.encode(chainSender)
         );
 
@@ -325,7 +326,7 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
             abi.encode(chainSender)
         );
 
@@ -359,7 +360,7 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
             abi.encode(chainSender)
         );
 
@@ -391,7 +392,7 @@ contract MessageRoot_Extended_Test is Test {
 
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, chainId),
             abi.encode(chainSender)
         );
 

@@ -186,7 +186,7 @@ contract L1AssetRouterTest is Test {
         nativeTokenVault = L1NativeTokenVault(payable(nativeTokenVaultProxy));
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(address(chainAssetHandler))
         );
         vm.mockCall(
@@ -240,7 +240,7 @@ contract L1AssetRouterTest is Test {
         );
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.settlementLayer.selector),
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector),
             abi.encode(block.chainid)
         );
         vm.mockCall(

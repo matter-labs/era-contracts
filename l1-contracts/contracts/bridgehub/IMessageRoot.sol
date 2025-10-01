@@ -2,7 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehubBase} from "./IBridgehubBase.sol";
 import {IMessageVerification} from "../common/interfaces/IMessageVerification.sol";
 import {ProofData} from "../common/Messaging.sol";
 

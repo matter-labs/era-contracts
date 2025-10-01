@@ -139,7 +139,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
     }
 
     function setBridgehubParams() internal {
-IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub.bridgehubProxy);
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub.bridgehubProxy);
         IMessageRoot messageRoot = IMessageRoot(addresses.bridgehub.messageRootProxy);
         IL1AssetTracker assetTracker = L1AssetTracker(addresses.bridgehub.assetTrackerProxy);
         vm.startBroadcast(msg.sender);

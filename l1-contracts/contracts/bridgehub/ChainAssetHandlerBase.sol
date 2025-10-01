@@ -179,7 +179,10 @@ abstract contract ChainAssetHandlerBase is
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         require(
             _assetId == IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId),
-            IncorrectChainAssetId(_assetId, IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId))
+            IncorrectChainAssetId(
+                _assetId,
+                IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId)
+            )
         );
         address zkChain = IBridgehubBase(_bridgehub()).getZKChain(bridgehubBurnData.chainId);
 
@@ -235,12 +238,14 @@ abstract contract ChainAssetHandlerBase is
 
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
-            baseTokenAssetId:IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId),
+            baseTokenAssetId: IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId),
             batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
             migrationNumber: migrationNumber[bridgehubBurnData.chainId],
-            v30UpgradeChainBatchNumber: IMessageRoot(_messageRoot()).v30UpgradeChainBatchNumber(bridgehubBurnData.chainId)
+            v30UpgradeChainBatchNumber: IMessageRoot(_messageRoot()).v30UpgradeChainBatchNumber(
+                bridgehubBurnData.chainId
+            )
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
@@ -289,10 +294,10 @@ abstract contract ChainAssetHandlerBase is
                 revert ChainIdNotRegistered(bridgehubMintData.chainId);
             }
             // We want to allow any chain to be migrated,
-IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-IMessageRoot(_messageRoot()).addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
+            IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
+            IMessageRoot(_messageRoot()).addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
-IMessageRoot(_messageRoot()).setMigratingChainBatchRoot(
+            IMessageRoot(_messageRoot()).setMigratingChainBatchRoot(
                 bridgehubMintData.chainId,
                 bridgehubMintData.batchNumber,
                 bridgehubMintData.v30UpgradeChainBatchNumber

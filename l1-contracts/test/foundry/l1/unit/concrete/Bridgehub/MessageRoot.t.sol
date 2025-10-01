@@ -35,26 +35,25 @@ contract MessageRootTest is Test {
 
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.L1_CHAIN_ID.selector), abi.encode(1));
         uint256[] memory allZKChainChainIDs = new uint256[](1);
         allZKChainChainIDs[0] = 271;
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getAllZKChainChainIDs.selector),
+            abi.encodeWithSelector(IBridgehubBase.getAllZKChainChainIDs.selector),
             abi.encode(allZKChainChainIDs)
         );
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector),
             abi.encode(makeAddr("chainTypeManager"))
         );
-        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.settlementLayer.selector), abi.encode(0));
+        vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector), abi.encode(0));
 
         assetTracker = makeAddr("assetTracker");
         bridgeHub = makeAddr("bridgeHub");
         L1_CHAIN_ID = 5;
         gatewayChainId = 506;
-        messageRoot = new L1MessageRoot(IBridgehubBase(bridgeHub), L1_CHAIN_ID, 1);
+        messageRoot = new L1MessageRoot(bridgeHub, 1);
         l2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
@@ -114,7 +113,7 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 
@@ -128,12 +127,12 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
         );
 
@@ -161,22 +160,22 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
             address(bridgeHub),
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
         vm.mockCall(
             address(bridgeHub),
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(L2_CHAIN_ASSET_HANDLER_ADDR)
         );
         vm.prank(bridgeHub);
@@ -197,7 +196,7 @@ contract MessageRootTest is Test {
         uint256 alphaChainId = 271; //uint256(uint160(makeAddr("alphaChainId")));
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector, alphaChainId),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector, alphaChainId),
             abi.encode(alphaChainSender)
         );
 

@@ -48,7 +48,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
 
     function _bridgehub() internal view virtual returns (IBridgehubBase);
 
-
     /// @inheritdoc IAssetRouterBase
     function setAssetHandlerAddressThisChain(
         bytes32 _assetRegistrationData,

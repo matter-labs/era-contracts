@@ -9,7 +9,7 @@ import {IL1SharedBridgeLegacy} from "contracts/bridge/interfaces/IL1SharedBridge
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 
 // Concrete implementation of L1FixedForceDeploymentsHelper for testing
 contract TestL1FixedForceDeploymentsHelper is L1FixedForceDeploymentsHelper {
@@ -100,12 +100,12 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         );
         vm.mockCall(
             nativeTokenVaultMock,
-            abi.encodeCall(INativeTokenVault.originChainId, (baseTokenAssetId)),
+            abi.encodeCall(INativeTokenVaultBase.originChainId, (baseTokenAssetId)),
             abi.encode(chainId)
         );
         vm.mockCall(
             nativeTokenVaultMock,
-            abi.encodeCall(INativeTokenVault.originToken, (baseTokenAssetId)),
+            abi.encodeCall(INativeTokenVaultBase.originToken, (baseTokenAssetId)),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
     }

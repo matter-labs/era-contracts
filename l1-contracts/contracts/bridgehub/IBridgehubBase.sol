@@ -176,7 +176,8 @@ interface IBridgehubBase {
         address _sharedBridge,
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
-        address _chainAssetHandler
+        address _chainAssetHandler,
+        address _chainRegistrationSender
     ) external;
 
     function setChainAssetHandler(address _chainAssetHandler) external;

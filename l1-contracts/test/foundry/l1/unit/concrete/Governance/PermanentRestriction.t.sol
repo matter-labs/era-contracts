@@ -368,13 +368,13 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         vm.startPrank(governor);
         bridgehub.addChainTypeManager(address(chainContractAddress));
         bridgehub.addTokenAssetId(DataEncoding.encodeNTVAssetId(block.chainid, baseToken));
-        L1MessageRoot messageRootNew = new L1MessageRoot(bridgehub, block.chainid, 1);
+        L1MessageRoot messageRootNew = new L1MessageRoot(address(bridgehub), 1);
         bridgehub.setAddresses(
             sharedBridge,
             ICTMDeploymentTracker(address(0)),
             messageRootNew,
             address(chainAssetHandler),
-            address(0x000000000000000000000000000000000002000a)
+            address(0)
         ); // kl todo maybe address(1)
         vm.stopPrank();
 
@@ -409,7 +409,7 @@ contract PermanentRestrictionTest is ChainTypeManagerTest {
         );
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(chainAssetHandler)
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));

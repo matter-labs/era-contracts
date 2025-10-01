@@ -152,13 +152,11 @@ contract FinalizeUpgrade is Script {
                 if (bh.baseTokenAssetId(params.chains[i]) == bytes32(0)) {
                     // Register legacy chain if needed
                     // bytes memory data = abi.encodeWithSelector(
-                        // L1Bridgehub.registerLegacyChain.selector,
-                        // params.chains[i]
+                    // L1Bridgehub.registerLegacyChain.selector,
+                    // params.chains[i]
                     // );
-
                     // Add call to aggregator calls array
                     // callIndex = addCall(calls, callIndex, params.bridgehub, data);
-
                     // If we've hit max calls, flush
                     // if (callIndex == MAX_CALLS_PER_BATCH) {
                     //     flushBatch(params.aggregator, calls, callIndex);
