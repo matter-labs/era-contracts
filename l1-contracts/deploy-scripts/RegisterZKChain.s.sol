@@ -444,15 +444,18 @@ contract RegisterZKChainScript is Script {
         vm.startBroadcast(msg.sender);
 
         // Add committer role to the first two addresses (commit operators)
+
+        // We give all roles to the committer, the reason is because the separate prover/executer roles
+        // are only provided in ZKsync OS, while on Era all of them are filled by committer.
         validatorTimelock.addValidatorRoles(
             chainAddress,
             config.validatorSenderOperatorCommitEth,
             IValidatorTimelock.ValidatorRotationParams({
-                rotatePrecommitterRole: false,
+                rotatePrecommitterRole: true,
                 rotateCommitterRole: true,
-                rotateReverterRole: false,
-                rotateProverRole: false,
-                rotateExecutorRole: false
+                rotateReverterRole: true,
+                rotateProverRole: true,
+                rotateExecutorRole: true
             })
         );
 
