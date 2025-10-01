@@ -145,11 +145,11 @@ contract L1AssetRouterTest is Test {
 
         l1Nullifier = L1Nullifier(payable(l1NullifierProxy));
         sharedBridgeImpl = new L1AssetRouter({
-            _l1WethAddressToSet: l1WethAddress,
-            _bridgehubToSet: bridgehubAddress,
-            _l1NullifierToSet: address(l1Nullifier),
-            _eraChainIdToSet: eraChainId,
-            _eraDiamondProxyToSet: eraDiamondProxy
+            _l1WethToken: l1WethAddress,
+            _bridgehub: bridgehubAddress,
+            _l1Nullifier: address(l1Nullifier),
+            _eraChainId: eraChainId,
+            _eraDiamondProxy: eraDiamondProxy
         });
         TransparentUpgradeableProxy sharedBridgeProxy = new TransparentUpgradeableProxy(
             address(sharedBridgeImpl),

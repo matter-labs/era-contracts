@@ -38,22 +38,22 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    address internal immutable _bridgehub;
+    address public immutable BRIDGE_HUB;
 
     /// @dev Chain ID of Era for legacy reasons
-    uint256 internal immutable _eraChainId;
+    uint256 public immutable ERA_CHAIN_ID;
 
     /// @dev The address of the WETH token on L1.
-    address internal immutable _l1WethToken;
+    address public immutable L1_WETH_TOKEN;
 
     /// @dev The assetId of the base token.
-    bytes32 internal immutable _ethTokenAssetId;
+    bytes32 public immutable ETH_TOKEN_ASSET_ID;
 
     /// @dev The address of ZKsync Era diamond proxy contract.
-    address internal immutable _eraDiamondProxy;
+    address public immutable ERA_DIAMOND_PROXY;
 
     /// @dev Address of nullifier.
-    IL1Nullifier internal immutable _l1Nullifier;
+    IL1Nullifier public immutable L1_NULLIFIER;
 
     /// @dev Address of native token vault.
     INativeTokenVaultBase public nativeTokenVault;
@@ -65,40 +65,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev In case the chain has been deployed after the gateway release,
     /// the returned value is 0.
     function l2BridgeAddress(uint256 _chainId) external view override returns (address) {
-        return _l1Nullifier.l2BridgeAddress(_chainId);
-    }
-
-    function L1_CHAIN_ID() public view override(IAssetRouterBase, AssetRouterBase) returns (uint256) {
-        return block.chainid;
-    }
-
-    function BRIDGE_HUB() public view override(IAssetRouterBase, AssetRouterBase) returns (address) {
-        return _bridgehub;
-    }
-
-    function ERA_CHAIN_ID() public view override returns (uint256) {
-        return _eraChainId;
-    }
-
-    function L1_WETH_TOKEN() public view returns (address) {
-        return _l1WethToken;
-    }
-
-    function L1_NULLIFIER() public view returns (IL1Nullifier) {
-        return _l1Nullifier;
-    }
-
-    function ETH_TOKEN_ASSET_ID() public view returns (bytes32) {
-        return _ethTokenAssetId;
-    }
-
-    function ERA_DIAMOND_PROXY() public view returns (address) {
-        return _eraDiamondProxy;
+        return L1_NULLIFIER.l2BridgeAddress(_chainId);
     }
 
     /// @notice Checks that the message sender is the nullifier.
     modifier onlyNullifier() {
-        if (msg.sender != address(_l1Nullifier)) {
+        if (msg.sender != address(L1_NULLIFIER)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -106,7 +78,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
     /// @notice Checks that the message sender is the bridgehub or ZKsync Era Diamond Proxy.
     modifier onlyBridgehubOrEra(uint256 _chainId) {
-        if (msg.sender != address(_bridgehub) && (_chainId != _eraChainId || msg.sender != _eraDiamondProxy)) {
+        if (msg.sender != address(BRIDGE_HUB) && (_chainId != ERA_CHAIN_ID || msg.sender != ERA_DIAMOND_PROXY)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -128,22 +100,30 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         _;
     }
 
+    /// @notice Checks that the message sender is the bridgehub.
+    modifier onlyBridgehub() {
+        if (msg.sender != address(BRIDGE_HUB)) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.
     constructor(
-        address _l1WethAddressToSet,
-        address _bridgehubToSet,
-        address _l1NullifierToSet,
-        uint256 _eraChainIdToSet,
-        address _eraDiamondProxyToSet
+        address _l1WethToken,
+        address _bridgehub,
+        address _l1Nullifier,
+        uint256 _eraChainId,
+        address _eraDiamondProxy
     ) reentrancyGuardInitializer {
         _disableInitializers();
-        _bridgehub = _bridgehubToSet;
-        _eraChainId = _eraChainIdToSet;
-        _l1WethToken = _l1WethAddressToSet;
-        _eraDiamondProxy = _eraDiamondProxyToSet;
-        _l1Nullifier = IL1Nullifier(_l1NullifierToSet);
-        _ethTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+        BRIDGE_HUB = _bridgehub;
+        ERA_CHAIN_ID = _eraChainId;
+        L1_WETH_TOKEN = _l1WethToken;
+        ERA_DIAMOND_PROXY = _eraDiamondProxy;
+        L1_NULLIFIER = IL1Nullifier(_l1Nullifier);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
     }
 
     /// @dev Initializes a contract bridge for later use. Expected to be used in the proxy.
@@ -168,7 +148,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             revert ZeroAddress();
         }
         nativeTokenVault = _nativeTokenVault;
-        _setAssetHandler(_ethTokenAssetId, address(_nativeTokenVault));
+        _setAssetHandler(ETH_TOKEN_ASSET_ID, address(_nativeTokenVault));
     }
 
     /// @notice Sets the L1ERC20Bridge contract address.
@@ -306,7 +286,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             revert UnsupportedEncodingVersion();
         }
 
-        if (IL1Bridgehub(_bridgehub).baseTokenAssetId(_chainId) == assetId) {
+        if (IL1Bridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId) == assetId) {
             revert AssetIdNotSupported(assetId);
         }
 
@@ -352,7 +332,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes32 _txDataHash,
         bytes32 _txHash
     ) external override onlyBridgehub whenNotPaused {
-        _l1Nullifier.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
+        L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(_chainId, _txDataHash, _txHash);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -401,7 +381,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external {
-        _l1Nullifier.bridgeRecoverFailedTransfer({
+        L1_NULLIFIER.bridgeRecoverFailedTransfer({
             _chainId: _chainId,
             _depositSender: _depositSender,
             _assetId: _assetId,
@@ -435,7 +415,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             revert LegacyEncodingUsedForNonL1Token();
         }
 
-        if (assetId == _ethTokenAssetId) {
+        if (assetId == ETH_TOKEN_ASSET_ID) {
             // In the old SDK/contracts the user had to always provide `0` as the deposit amount for ETH token, while
             // ultimately the provided `msg.value` was used as the deposit amount. This check is needed for backwards compatibility.
 
@@ -573,8 +553,8 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _l2TxGasPerPubdataByte,
         address _refundRecipient
     ) external payable override onlyLegacyBridge nonReentrant whenNotPaused returns (bytes32 txHash) {
-        if (_l1Token == _l1WethToken) {
-            revert TokenNotSupported(_l1WethToken);
+        if (_l1Token == L1_WETH_TOKEN) {
+            revert TokenNotSupported(L1_WETH_TOKEN);
         }
 
         bytes32 _assetId;
@@ -594,7 +574,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
 
             // Note, that starting from here `bridgeData` starts denoting bridgeMintData.
             bridgeData = _burn({
-                _chainId: _eraChainId,
+                _chainId: ERA_CHAIN_ID,
                 _nextMsgValue: 0,
                 _assetId: _assetId,
                 _originalCaller: _originalCaller,
@@ -611,7 +591,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             address refundRecipient = AddressAliasHelper.actualRefundRecipient(_refundRecipient, _originalCaller);
 
             L2TransactionRequestDirect memory request = L2TransactionRequestDirect({
-                chainId: _eraChainId,
+                chainId: ERA_CHAIN_ID,
                 l2Contract: L2_ASSET_ROUTER_ADDR,
                 mintValue: msg.value, // l2 gas + l2 msg.Value the bridgehub will withdraw the mintValue from the base token bridge for gas
                 l2Value: 0, // L2 msg.value, this contract doesn't support base token deposits or wrapping functionality, for direct deposits use bridgehub
@@ -621,14 +601,14 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                 factoryDeps: new bytes[](0),
                 refundRecipient: refundRecipient
             });
-            txHash = IL1Bridgehub(_bridgehub).requestL2TransactionDirect{value: msg.value}(request);
+            txHash = IL1Bridgehub(BRIDGE_HUB).requestL2TransactionDirect{value: msg.value}(request);
         }
 
         {
             bytes memory transferData = DataEncoding.encodeBridgeBurnData(_amount, _l2Receiver, _l1Token);
             // Save the deposited amount to claim funds on L1 if the deposit failed on L2
-            _l1Nullifier.bridgehubConfirmL2TransactionForwarded(
-                _eraChainId,
+            L1_NULLIFIER.bridgehubConfirmL2TransactionForwarded(
+                ERA_CHAIN_ID,
                 DataEncoding.encodeTxDataHash({
                     _encodingVersion: LEGACY_ENCODING_VERSION,
                     _originalCaller: _originalCaller,
@@ -641,7 +621,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
 
         emit LegacyDepositInitiated({
-            chainId: _eraChainId,
+            chainId: ERA_CHAIN_ID,
             l2DepositTxHash: txHash,
             from: _originalCaller,
             to: _l2Receiver,
@@ -659,7 +639,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         bytes calldata _message,
         bytes32[] calldata _merkleProof
     ) external override {
-        _l1Nullifier.finalizeWithdrawal({
+        L1_NULLIFIER.finalizeWithdrawal({
             _chainId: _chainId,
             _l2BatchNumber: _l2BatchNumber,
             _l2MessageIndex: _l2MessageIndex,
@@ -689,7 +669,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint16 _l2TxNumberInBatch,
         bytes32[] calldata _merkleProof
     ) external {
-        _l1Nullifier.claimFailedDeposit({
+        L1_NULLIFIER.claimFailedDeposit({
             _chainId: _chainId,
             _depositSender: _depositSender,
             _l1Token: _l1Token,
@@ -708,6 +688,6 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _l2BatchNumber,
         uint256 _l2MessageIndex
     ) external view returns (bool) {
-        return _l1Nullifier.isWithdrawalFinalized(_chainId, _l2BatchNumber, _l2MessageIndex);
+        return L1_NULLIFIER.isWithdrawalFinalized(_chainId, _l2BatchNumber, _l2MessageIndex);
     }
 }

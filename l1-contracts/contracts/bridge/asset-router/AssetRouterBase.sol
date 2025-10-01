@@ -24,16 +24,6 @@ import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, PausableUpgradeable {
     using SafeERC20 for IERC20;
 
-    /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    function L1_CHAIN_ID() public view virtual returns (uint256);
-
-    function BRIDGE_HUB() public view virtual returns (address);
-
-    function ERA_CHAIN_ID() public view virtual returns (uint256);
-
     /// @dev Maps asset ID to address of corresponding asset handler.
     /// @dev Tracks the address of Asset Handler contracts, where bridged funds are locked for each asset.
     /// @dev P.S. this liquidity was locked directly in SharedBridge before.
@@ -52,14 +42,6 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
     uint256[48] private __gap;
-
-    /// @notice Checks that the message sender is the bridgehub.
-    modifier onlyBridgehub() {
-        if (msg.sender != address(BRIDGE_HUB())) {
-            revert Unauthorized(msg.sender);
-        }
-        _;
-    }
 
     /// @inheritdoc IAssetRouterBase
     function setAssetHandlerAddressThisChain(
