@@ -27,17 +27,32 @@ abstract contract AssetTrackerBase is
 {
     using DynamicIncrementalMerkleMemory for DynamicIncrementalMerkleMemory.Bytes32PushTree;
 
-    /// @dev Maps token balances for each chain to prevent unauthorized spending across ZK chains.
+    /// @notice Maps token balances for each chain to prevent unauthorized spending across ZK chains.
     /// NOTE: this function may be removed in the future, don't rely on it!
-    /// @dev For token origin chains, the balance starts at type(uint256).max on L1AssetTracker, and decreases as withdrawals are made from the chain.
-    /// @dev On L1 the chainBalance for non origin chains equals the total supply of the token on the chain and unfinalized withdrawals to L1.
-    /// @dev On Gateway the chainBalance for non origin chains equals the total supply of the token on the chain.
-    /// @dev On non-Gateway L2s this mapping is only used to track the balance of native tokens.
+    /// @dev On L1AssetTracker:
+    /// - For token origin chains (or their settlement layer if they are connected to a settlement layer), the balance starts at type(uint256).max.
+    /// - Note that this balance is tracked even for tokens from L1, it is just that their `chainId` is `block.chainid`.
+    /// - A chain can spend its balance when finalizing withdrawals/claiming failed deposits or when migrating the balance to the settlement layer.
+    /// - A chain can increase its balance when deposits are made to the chain or when migrating the balance from the settlement layer.
+    /// @dev On GWAssetTracker:
+    /// - For each assetId, the sum of chainBalance[chainId][assetId] across all chains equals chainBalance[settlementLayerId][assetId] 
+    /// of this on L1AssetTracker. I.e. all tokens are backed by the settlement layer's balance on L1.
+    /// - Chains spend their balances when submitting withdrawals, processing failed deposits or sending tokens via interop.
+    /// - The balances are increased when deposits are made to the chains and when they receive interop from other chains.
+    /// - Also, the balances are increased or decreased when migrating the balance to/from the settlement layer.
+    /// @dev On L2AssetTracker:
+    /// - The `chainBalance` is only used to track the balance of native tokens on the L2.
+    /// - For all the other tokens it is expected to be 0. (TODO: it does not seem to be the case right now).
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
-    /// @notice Used on the L2 instead of the settlement layer
-    /// @dev Maps the migration number for each asset on the L2.
-    /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
+    /// @notice Tracks the migration number of each asset on each chain. If the migration number is the same
+    /// as the current migration number of the chain, then the token balance has been migrated to the settlement layer.
+    /// If it is not, bridging of it may be restricted.
+    /// @dev On L1AssetTracker it is mainly used as a nullifier to ensure that the token migrations are not replayed.
+    /// @dev On GWAssetTracker it is mainly used as a nullifier to ensure that the token migrations are not replayed.
+    /// @dev on L2AssetTracker it is used to block withdrawals:
+    /// - If a chain settles on GW, it blocks withdrawals or interop until the token balance has been migrated to GW.
+    /// - If a chain settles on L1, it is mostly unusued since withdrawals are always allowed.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
 
     function _l1ChainId() internal view virtual returns (uint256);

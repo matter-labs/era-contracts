@@ -60,7 +60,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// We record the number of received deposits on GW, and require that all of the deposits are processed before the chain migrates back to L1.
     mapping(uint256 chainId => uint256 unprocessedDeposits) public unprocessedDeposits;
 
-    // @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
+    /// @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
     mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply)))
         internal savedTotalSupply;
 

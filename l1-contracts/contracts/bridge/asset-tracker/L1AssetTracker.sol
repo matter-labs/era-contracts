@@ -107,10 +107,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             migratedBalance = IERC20(tokenAddress).totalSupply();
             require(chainBalance[block.chainid][_assetId] == 0, ChainBalanceNotZero());
         }
-        /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
-        /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
+        // Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
+        // in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
-        /// kl todo can it be the case that we set chainBalance to uint256.max twice.
+        // kl todo can it be the case that we set chainBalance to uint256.max twice.
         if (chainBalance[originChainId][_assetId] == 0) {
             chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - migratedBalance;
         } else {
@@ -219,13 +219,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // For all the batches smaller or equal to that, the responsibility lies with the chain itself.
         uint256 v30UpgradeChainBatchNumber = MESSAGE_ROOT.v30UpgradeChainBatchNumber(_chainId);
 
-        /// We need to wait for the proper v30UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
+        // We need to wait for the proper v30UpgradeChainBatchNumber to be set on the MessageRoot, otherwise we might decrement the chain's chainBalance instead of the gateway's.
         require(
             v30UpgradeChainBatchNumber != V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
             V30UpgradeChainBatchNumberNotSet()
         );
         if (v30UpgradeChainBatchNumber != 0) {
-            /// For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
+            // For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
             chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeChainBatchNumber
                 ? _chainId
                 : settlementLayer;
@@ -269,19 +269,19 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 toChainId;
 
         if (data.isL1ToGateway) {
-            /// In this case the TokenBalanceMigrationData data might be malicious.
-            /// We check the chainId to match the finalizeWithdrawalParams.chainId.
-            /// We check the assetId, tokenOriginChainId, originToken with an assetIdCheck.
-            /// The amount might be malicious, but that poses a restriction on users of the chain, not other chains.
-            /// The AssetTracker cannot protect individual users only other chains. Individual users rely on the proof system.
-            /// The last field is migrationNumber, which cannot be abused.
-
+            // In this case the TokenBalanceMigrationData data might be malicious.
+            // We check the chainId to match the finalizeWithdrawalParams.chainId.
+            // We check the assetId, tokenOriginChainId, originToken with an assetIdCheck.
+            // The amount might be malicious, but that poses a restriction on users of the chain, not other chains.
+            // The AssetTracker cannot protect individual users only other chains. Individual users rely on the proof system.
+            // The last field is migrationNumber, which cannot be abused.
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
 
-            // we check parity here to make sure that we migrated the token balance back to L1 from Gateway.
+            // We check parity here to make sure that we migrated the token balance back to L1 from Gateway.
             // this is needed to ensure that the chainBalance on the Gateway AssetTracker is currently 0.
             // In the future we might initialize chains on GW. So we subtract from chainMigrationNumber.
+            // Note, that this logic only works well when only a single ZK Gateway is used as a settlement layer.
             require(
                 (chainMigrationNumber - assetMigrationNumber[data.chainId][data.assetId]) % 2 == 1,
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
@@ -293,17 +293,21 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             fromChainId = data.chainId;
             toChainId = currentSettlementLayer;
         } else {
-            /// In this case we trust the TokenBalanceMigrationData data and the settlement layer = Gateway to be honest.
-            /// If the settlement layer is compromised, other chains settling on L1 are not compromised, only chains settling on Gateway.
+            // In this case we trust the TokenBalanceMigrationData data and the settlement layer = Gateway to be honest.
+            // If the settlement layer is compromised, other chains settling on L1 are not compromised, only chains settling on Gateway.
 
+            // Note, that the following check only works when chain settles on L1. This assumes that the chain will only settle either on L1 
+            // or a single ZK Gateway. Otherwise the following scenario is possible:
+            // - Chain settles on Gateway1, migrates token balance to Gateway1.
+            // - Chain migrates to L1, then migrates to Gateway2.
+            // - The check below will fail not allowing to migrate balance from Gateway1 to L1.
             require(currentSettlementLayer == block.chainid, NotMigratedChain());
             require(
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
             );
 
-            /// We trust the settlement layer to provide the correct assetId.
-
+            // We trust the settlement layer to provide the correct assetId.
             fromChainId = _finalizeWithdrawalParams.chainId;
             toChainId = data.chainId;
         }
@@ -337,8 +341,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _settlementLayerChainId,
         ConfirmBalanceMigrationData memory _confirmBalanceMigrationData
     ) internal {
-        /// We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
-        /// Note: the confirmMigrationOnL2 is a L1->GW->L2 txs if the chain is settling on Gateway.
+        // We send the confirmMigrationOnGateway first, so that withdrawals are definitely paused until the migration is confirmed on GW.
+        // Note: the confirmMigrationOnL2 is a L1->GW->L2 txs if the chain is settling on Gateway.
         _sendToChain(
             _settlementLayerChainId,
             GW_ASSET_TRACKER_ADDR,

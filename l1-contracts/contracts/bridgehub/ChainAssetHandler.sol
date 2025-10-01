@@ -300,6 +300,10 @@ contract ChainAssetHandler is
             BRIDGE_HUB.registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
             MESSAGE_ROOT.addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
+            // Note, that here we rely on the correctness of the provided data.
+            // A malicious settlement layer could provide invalid values here.
+            // To support untrusted CTMs, we would need to at the very least enforce 
+            // that the `v30UpgradeChainBatchNumber` is not in conflict with the existing values. 
             MESSAGE_ROOT.setMigratingChainBatchRoot(
                 bridgehubMintData.chainId,
                 bridgehubMintData.batchNumber,
