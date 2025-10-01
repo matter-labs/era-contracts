@@ -29,7 +29,7 @@ jobs:
 
       - name: Install dependencies
         run: yarn
-      
+
       - name: Build da-contracts artifacts
         run: yarn da build:foundry
 
