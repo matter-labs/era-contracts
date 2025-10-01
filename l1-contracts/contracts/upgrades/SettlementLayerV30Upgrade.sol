@@ -4,12 +4,12 @@ pragma solidity 0.8.28;
 
 import {Diamond} from "../state-transition/libraries/Diamond.sol";
 import {BaseZkSyncUpgrade, ProposedUpgrade} from "./BaseZkSyncUpgrade.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
 import {L2_GENESIS_UPGRADE_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IChainAssetHandler} from "../bridgehub/IChainAssetHandler.sol";
-import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "../bridge/ntv/IL1NativeTokenVault.sol";
 import {IL2V30Upgrade} from "./IL2V30Upgrade.sol";
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
@@ -25,14 +25,14 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
     /// @notice The main function that will be delegate-called by the chain.
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
-        IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
 
         /// We write to storage to avoid reentrancy.
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
 
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
-        INativeTokenVault nativeTokenVault = INativeTokenVault(
+        INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(
             IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault()
         );
 

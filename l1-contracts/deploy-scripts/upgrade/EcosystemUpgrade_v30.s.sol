@@ -51,7 +51,7 @@ contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
     // }
 
     function registerBridgedTokensInNTV(address _bridgehub) public {
-        INativeTokenVault ntv = INativeTokenVault(IBridgehub(_bridgehub).assetRouter().nativeTokenVault());
+        INativeTokenVault ntv = INativeTokenVaultBase(IBridgehubBase(_bridgehub).assetRouter().nativeTokenVault());
         address[] memory savedBridgedTokens;
         /// todo get save bridged tokens.
         /// for tokens in the bridged token list

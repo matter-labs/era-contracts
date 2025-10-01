@@ -15,7 +15,7 @@ import {L2_COMPLEX_UPGRADER_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_GENESIS_UPGRADE_ADD
 import {PRIORITY_TX_MAX_GAS_LIMIT, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "../common/Config.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 
 import {VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L1FixedForceDeploymentsHelper} from "./L1FixedForceDeploymentsHelper.sol";
@@ -38,7 +38,7 @@ contract L1GenesisUpgrade is IL1GenesisUpgrade, BaseZkSyncUpgradeGenesis, L1Fixe
         bytes calldata _fixedForceDeploymentsData,
         bytes[] calldata _factoryDeps
     ) public override returns (bytes32) {
-        address baseTokenAddress = IBridgehub(s.bridgehub).baseToken(_chainId);
+        address baseTokenAddress = IL1Bridgehub(s.bridgehub).baseToken(_chainId);
 
         L2CanonicalTransaction memory l2ProtocolUpgradeTx;
 

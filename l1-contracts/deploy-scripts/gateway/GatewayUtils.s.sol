@@ -8,7 +8,7 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../Utils.sol";
@@ -30,7 +30,7 @@ contract GatewayUtils is Script {
         bytes memory message,
         bytes32[] memory merkleProof
     ) public {
-        IBridgehub bridgehub = IBridgehub(bridgehubAddr);
+        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddr);
 
         address assetRouter = bridgehub.assetRouter();
         IL1Nullifier l1Nullifier = L1AssetRouter(assetRouter).L1_NULLIFIER();

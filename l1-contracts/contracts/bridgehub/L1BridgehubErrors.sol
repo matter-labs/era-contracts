@@ -44,6 +44,8 @@ error NotChainAssetHandler(address sender, address chainAssetHandler);
 error NotCurrentSettlementLayer(uint256 currentSettlementLayer, uint256 newSettlementLayer);
 // 0x472477e2
 error NotInGatewayMode();
+// 0x8e373aba
+error NotL1Bridgehub(uint256 l1ChainId, uint256 blockChainId);
 // 0x8eb4fc01
 error NotL2();
 // 0x23295f0e
@@ -64,16 +66,12 @@ error OnlyAssetTrackerOrChain(address, uint256);
 error OnlyBridgehub(address msgSender, address bridgehub);
 // 0x2d396674
 error OnlyBridgehubOrChainAssetHandler(address sender, address bridgehub, address chainAssetHandler);
-// 0xde9a2b95
-error OnlyBridgehubOwner(address msgSender, address zkChainAddress);
 // 0x73fe6c1b
 error OnlyChain(address msgSender, address zkChainAddress);
 // 0xec76af13
 error OnlyGateway();
 // 0x8d14ca84
 error OnlyL1();
-// 0xa7a05e40
-error OnlyL2();
 // 0x605d6b86
 error OnlyL2MessageRoot();
 // 0x6b75db8c

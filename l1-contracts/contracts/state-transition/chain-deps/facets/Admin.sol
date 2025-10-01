@@ -4,13 +4,14 @@ pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {IZKChain} from "../../../state-transition/chain-interfaces/IZKChain.sol";
+import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
@@ -296,7 +297,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function pauseDepositsAndInitiateMigration() external onlyAdmin onlyL1 {
-        address chainAssetHandler = IBridgehub(s.bridgehub).chainAssetHandler();
+        address chainAssetHandler = IBridgehubBase(s.bridgehub).chainAssetHandler();
         uint256 migrationNumber = IChainAssetHandler(chainAssetHandler).getMigrationNumber(s.chainId);
         require(
             s.pausedDepositsTimestamp[migrationNumber] + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp,
@@ -328,10 +329,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // Otherwise a malicious settlement layer could forge an interop message from an Era chain.
         if (_settlementLayer != L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS) {
             uint256 chainId = IZKChain(_settlementLayer).getChainId();
-            if (_settlementLayer != IBridgehub(s.bridgehub).getZKChain(chainId)) {
+            if (_settlementLayer != IL1Bridgehub(s.bridgehub).getZKChain(chainId)) {
                 revert NotAZKChain(_settlementLayer);
             }
-            if (s.chainTypeManager != IBridgehub(s.bridgehub).chainTypeManager(chainId)) {
+            if (s.chainTypeManager != IL1Bridgehub(s.bridgehub).chainTypeManager(chainId)) {
                 revert NotEraChain();
             }
         }
