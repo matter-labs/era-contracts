@@ -125,26 +125,26 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @notice Updates the contract.
     /// @dev This function is used to initialize the new implementation of L2AssetRouter on existing chains during
     /// the upgrade.
-    /// @param L1_CHAIN_IDToSet The chain id of L1.
-    /// @param ERA_CHAIN_IDToSet The chain id of Era.
-    /// @param L1_ASSET_ROUTERToSet The address of the L1 asset router.
+    /// @param _l1ChainId The chain id of L1.
+    /// @param _eraChainId The chain id of Era.
+    /// @param _l1AssetRouter The address of the L1 asset router.
     /// @param _legacySharedBridge The address of the L2 legacy shared bridge.
-    /// @param BASE_TOKEN_ASSET_IDToSet The asset id of the base token.
+    /// @param _baseTokenAssetId The asset id of the base token.
     function updateL2(
-        uint256 L1_CHAIN_IDToSet,
-        uint256 ERA_CHAIN_IDToSet,
-        address L1_ASSET_ROUTERToSet,
+        uint256 _l1ChainId,
+        uint256 _eraChainId,
+        address _l1AssetRouter,
         address _legacySharedBridge,
-        bytes32 BASE_TOKEN_ASSET_IDToSet
+        bytes32 _baseTokenAssetId
     ) public onlyUpgrader {
         L2_LEGACY_SHARED_BRIDGE = _legacySharedBridge;
-        if (L1_ASSET_ROUTERToSet == address(0)) {
+        if (_l1AssetRouter == address(0)) {
             revert EmptyAddress();
         }
-        L1_CHAIN_ID = L1_CHAIN_IDToSet;
-        L1_ASSET_ROUTER = L1_ASSET_ROUTERToSet;
-        BASE_TOKEN_ASSET_ID = BASE_TOKEN_ASSET_IDToSet;
-        ERA_CHAIN_ID = ERA_CHAIN_IDToSet;
+        L1_CHAIN_ID = _l1ChainId;
+        L1_ASSET_ROUTER = _l1AssetRouter;
+        BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
+        ERA_CHAIN_ID = _eraChainId;
     }
 
     /// @inheritdoc IL2AssetRouter
