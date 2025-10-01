@@ -81,7 +81,7 @@ error OperatorDAInputTooSmall(uint256 operatorDAInputLength, uint256 minAllowedL
 // 0x681150be
 error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVersion);
 // 0xfe26193e
-error PriorityQueueNotFullyProcessed();
+// error PriorityQueueNotFullyProcessed();
 // 0xc59d372c
 error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protocolVersion);
 // 0x2dc9747d
