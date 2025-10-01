@@ -9,9 +9,10 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
@@ -21,7 +22,7 @@ import {ADDRESS_ONE, Utils} from "./Utils.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
@@ -298,9 +299,9 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerAssetIdOnBridgehub() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
-        INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
+        INativeTokenVaultBase ntv = INativeTokenVaultBase(config.nativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
@@ -325,7 +326,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerTokenOnNTV() internal {
-        INativeTokenVault ntv = INativeTokenVault(config.nativeTokenVault);
+        INativeTokenVaultBase ntv = INativeTokenVaultBase(config.nativeTokenVault);
         bytes32 baseTokenAssetId = ntv.assetId(config.baseToken);
         uint256 baseTokenOriginChain = ntv.originChainId(baseTokenAssetId);
 
@@ -403,7 +404,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerZKChain() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IL1Bridgehub bridgehub = IL1Bridgehub(config.bridgehub);
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
 
         IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
@@ -438,21 +439,71 @@ contract RegisterZKChainScript is Script {
 
     function addValidators() internal {
         ValidatorTimelock validatorTimelock = ValidatorTimelock(config.validatorTimelock);
+        address chainAddress = validatorTimelock.BRIDGE_HUB().getZKChain(config.chainChainId);
 
         vm.startBroadcast(msg.sender);
-        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorCommitEth);
-        validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorBlobsEth);
-        // Add them to validators, only if set.
+
+        // Add committer role to the first two addresses (commit operators)
+
+        // We give all roles to the committer, the reason is because the separate prover/executer roles
+        // are only provided in ZKsync OS, while on Era all of them are filled by committer.
+        validatorTimelock.addValidatorRoles(
+            chainAddress,
+            config.validatorSenderOperatorCommitEth,
+            IValidatorTimelock.ValidatorRotationParams({
+                rotatePrecommitterRole: true,
+                rotateCommitterRole: true,
+                rotateReverterRole: true,
+                rotateProverRole: true,
+                rotateExecutorRole: true
+            })
+        );
+
+        validatorTimelock.addValidatorRoles(
+            chainAddress,
+            config.validatorSenderOperatorBlobsEth,
+            IValidatorTimelock.ValidatorRotationParams({
+                rotatePrecommitterRole: false,
+                rotateCommitterRole: true,
+                rotateReverterRole: false,
+                rotateProverRole: false,
+                rotateExecutorRole: false
+            })
+        );
+
+        // Add prover role to the third address, only if set
         if (config.validatorSenderOperatorProve != address(0)) {
-            validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorProve);
+            validatorTimelock.addValidatorRoles(
+                chainAddress,
+                config.validatorSenderOperatorProve,
+                IValidatorTimelock.ValidatorRotationParams({
+                    rotatePrecommitterRole: false,
+                    rotateCommitterRole: false,
+                    rotateReverterRole: false,
+                    rotateProverRole: true,
+                    rotateExecutorRole: false
+                })
+            );
         }
+
+        // Add executor role to the fourth address, only if set
         if (config.validatorSenderOperatorExecute != address(0)) {
-            validatorTimelock.addValidatorForChainId(config.chainChainId, config.validatorSenderOperatorExecute);
+            validatorTimelock.addValidatorRoles(
+                chainAddress,
+                config.validatorSenderOperatorExecute,
+                IValidatorTimelock.ValidatorRotationParams({
+                    rotatePrecommitterRole: false,
+                    rotateCommitterRole: false,
+                    rotateReverterRole: false,
+                    rotateProverRole: false,
+                    rotateExecutorRole: true
+                })
+            );
         }
 
         vm.stopBroadcast();
 
-        console.log("Validators added");
+        console.log("Validators added with specific roles");
     }
 
     function configureZkSyncStateTransition() internal {

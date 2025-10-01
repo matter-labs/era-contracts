@@ -11,7 +11,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
 import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
@@ -468,7 +468,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
             target: addresses.bridgehub.bridgehubProxy,
             value: 0,
             data: abi.encodeCall(
-                IBridgehub.createNewChain,
+                IL1Bridgehub.createNewChain,
                 (
                     chainId,
                     addresses.stateTransition.chainTypeManagerProxy,
@@ -484,10 +484,10 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 
     function setAddressesBasedOnBridgehub() internal virtual {
         config.ownerAddress = L1Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
+        address ctm = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
-        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+        addresses.stateTransition.diamondProxy = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
             config.eraChainId
         );
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
@@ -998,7 +998,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         result[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehub.pauseMigration, ())
+            data: abi.encodeCall(IL1Bridgehub.pauseMigration, ())
         });
     }
 
@@ -1009,7 +1009,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         result[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehub.unpauseMigration, ())
+            data: abi.encodeCall(IL1Bridgehub.unpauseMigration, ())
         });
     }
 
@@ -1105,7 +1105,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehub.pauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IL1Bridgehub.pauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
@@ -1114,7 +1114,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IBridgehub.unpauseMigration, ());
+        bytes memory l2Calldata = abi.encodeCall(IL1Bridgehub.unpauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
@@ -1194,7 +1194,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         address spender,
         uint256 amount
     ) public virtual returns (Call[] memory calls) {
-        address token = IBridgehub(addresses.bridgehub.bridgehubProxy).baseToken(gatewayConfig.chainId);
+        address token = IL1Bridgehub(addresses.bridgehub.bridgehubProxy).baseToken(gatewayConfig.chainId);
         require(token != address(0), "Base token for Gateway is zero");
         calls = new Call[](1);
         calls[0] = Call({target: token, data: abi.encodeCall(IERC20.approve, (spender, amount)), value: 0});

@@ -8,9 +8,9 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {StateTransitionDeployedAddresses} from "./Utils.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
@@ -128,7 +128,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
     }
 
     function setBridgehubParams() internal {
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub.bridgehubProxy);
         vm.startBroadcast(msg.sender);
         bridgehub.addTokenAssetId(bridgehub.baseTokenAssetId(config.eraChainId));
         bridgehub.setAddresses(
@@ -153,7 +153,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         IL1Nullifier l1Nullifier = IL1Nullifier(addresses.bridges.l1NullifierProxy);
         // Ownable ownable = Ownable(addresses.bridges.l1AssetRouterProxy);
         vm.broadcast(msg.sender);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
         l1Nullifier.setL1NativeTokenVault(IL1NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy));
         vm.broadcast(msg.sender);
@@ -166,7 +166,7 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
-        IBridgehub bridgehub = IBridgehub(addresses.bridgehub.bridgehubProxy);
+        IL1Bridgehub bridgehub = IL1Bridgehub(addresses.bridgehub.bridgehubProxy);
         IOwnable(address(bridgehub)).transferOwnership(addresses.governance);
         bridgehub.setPendingAdmin(addresses.chainAdmin);
 

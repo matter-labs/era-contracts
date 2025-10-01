@@ -8,8 +8,9 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
@@ -95,7 +96,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         instantiateCreate2Factory();
 
         console.log("Initializing core contracts from BH");
-        IBridgehub bridgehubProxy = IBridgehub(bridgehub);
+        IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
         L1AssetRouter assetRouter = L1AssetRouter(bridgehubProxy.assetRouter());
         address messageRoot = address(bridgehubProxy.messageRoot());
         address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());

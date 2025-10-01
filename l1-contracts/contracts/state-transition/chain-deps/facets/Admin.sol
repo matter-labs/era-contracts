@@ -10,7 +10,7 @@ import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {IZKChain} from "../../../state-transition/chain-interfaces/IZKChain.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
@@ -310,10 +310,10 @@ contract AdminFacet is ZKChainBase, IAdmin {
         // Otherwise a malicious settlement layer could forge an interop message from an Era chain.
         if (_settlementLayer != L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS) {
             uint256 chainId = IZKChain(_settlementLayer).getChainId();
-            if (_settlementLayer != IBridgehub(s.bridgehub).getZKChain(chainId)) {
+            if (_settlementLayer != IL1Bridgehub(s.bridgehub).getZKChain(chainId)) {
                 revert NotAZKChain(_settlementLayer);
             }
-            if (s.chainTypeManager != IBridgehub(s.bridgehub).chainTypeManager(chainId)) {
+            if (s.chainTypeManager != IL1Bridgehub(s.bridgehub).chainTypeManager(chainId)) {
                 revert NotEraChain();
             }
         }

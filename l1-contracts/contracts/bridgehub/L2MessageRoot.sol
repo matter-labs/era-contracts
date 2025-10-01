@@ -2,8 +2,6 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "./IBridgehub.sol";
-
 import {MessageRootBase} from "./MessageRootBase.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
@@ -13,6 +11,8 @@ import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
+import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {InvalidCaller} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -25,23 +25,31 @@ contract L2MessageRoot is MessageRootBase {
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    uint256 public L1_CHAIN_ID;
+    uint256 internal l1ChainId;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view override returns (IBridgehub) {
-        return IBridgehub(L2_BRIDGEHUB_ADDR);
-    }
-
-    function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
+    function _bridgehub() internal view override returns (address) {
+        return L2_BRIDGEHUB_ADDR;
     }
 
     // A method for backwards compatibility with the old implementation
-    function BRIDGE_HUB() public view returns (IBridgehub) {
-        return IBridgehub(L2_BRIDGEHUB_ADDR);
+    function BRIDGE_HUB() public view returns (address) {
+        return L2_BRIDGEHUB_ADDR;
+    }
+
+    function L1_CHAIN_ID() public view override returns (uint256) {
+        return l1ChainId;
+    }
+
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert InvalidCaller(msg.sender);
+        }
+        _;
     }
 
     /// @notice Initializes the contract.
@@ -49,7 +57,7 @@ contract L2MessageRoot is MessageRootBase {
     /// @param _l1ChainId The chain id of L1.
     function initL2(uint256 _l1ChainId) public onlyUpgrader {
         _disableInitializers();
-        L1_CHAIN_ID = _l1ChainId;
+        l1ChainId = _l1ChainId;
         _initialize();
     }
 
