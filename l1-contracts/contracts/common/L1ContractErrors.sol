@@ -45,8 +45,6 @@ error BridgeMintNotImplemented();
 error BurningNativeWETHNotSupported();
 // 0xccdd18d2
 error BytecodeAlreadyPublished(bytes32 bytecodeHash);
-// 0x5176994e
-error BytecodeNotSet();
 // 0x25d8333c
 error CallerNotTimerAdmin();
 // 0x3331e9c0
@@ -81,8 +79,6 @@ error DefaultAdminTransferNotAllowed();
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
 error DenominatorIsZero();
-// 0xb4f54111
-error DeployFailed();
 // 0x138ee1a3
 error DeployingBridgedTokenForNativeToken();
 // 0xc7c9660f

@@ -37,8 +37,7 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "../chain-
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "../IChainTypeManager.sol";
 import {ServerNotifier} from "../../governance/ServerNotifier.sol";
 
-import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
-import {BytecodeNotSet, DeployFailed} from "../../common/L1ContractErrors.sol";
+// import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
 
 /// @notice Configuration parameters for deploying the GatewayCTMDeployer contract.
 // solhint-disable-next-line gas-struct-packing
@@ -181,7 +180,7 @@ contract GatewayCTMDeployer {
 
         contracts.multicall3 = address(new Multicall3{salt: salt}());
 
-        IEIP7702Checker eip7702Checker = IEIP7702Checker(deployEIP7702Checker());
+        // IEIP7702Checker eip7702Checker = IEIP7702Checker(deployEIP7702Checker());
 
         _deployFacetsAndUpgrades({
             _salt: salt,
@@ -189,7 +188,7 @@ contract GatewayCTMDeployer {
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
             _deployedContracts: contracts,
-            _eip7702Checker: eip7702Checker
+            _eip7702Checker: IEIP7702Checker(address(1))
         });
         _deployVerifier(salt, _config.testnetVerifier, contracts, _config.aliasedGovernanceAddress);
 
@@ -452,31 +451,31 @@ contract GatewayCTMDeployer {
         _serverNotifier.transferOwnership(_aliasedGovernanceAddress);
     }
 
-    function deployEIP7702Checker() internal returns (address) {
-        bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("EIP7702Checker");
+    // function deployEIP7702Checker() internal returns (address) {
+    //     bytes memory bytecode = ContractsBytecodesLib.getCreationCodeEVM("EIP7702Checker");
 
-        return deployViaCreate(bytecode);
-    }
+    //     return deployViaCreate(bytecode);
+    // }
 
-    /**
-     * @dev Deploys contract using CREATE.
-     */
-    function deployViaCreate(bytes memory _bytecode) internal returns (address addr) {
-        if (_bytecode.length == 0) {
-            revert BytecodeNotSet();
-        }
+    // /**
+    //  * @dev Deploys contract using CREATE.
+    //  */
+    // function deployViaCreate(bytes memory _bytecode) internal returns (address addr) {
+    //     if (_bytecode.length == 0) {
+    //         revert BytecodeNotSet();
+    //     }
 
-        assembly {
-            // Allocate memory for the bytecode
-            let size := mload(_bytecode) // Load the size of the bytecode
-            let ptr := add(_bytecode, 0x20) // Skip the length prefix (32 bytes)
+    //     assembly {
+    //         // Allocate memory for the bytecode
+    //         let size := mload(_bytecode) // Load the size of the bytecode
+    //         let ptr := add(_bytecode, 0x20) // Skip the length prefix (32 bytes)
 
-            // Create the contract
-            addr := create(0, ptr, size)
-        }
+    //         // Create the contract
+    //         addr := create(0, ptr, size)
+    //     }
 
-        if (addr == address(0)) {
-            revert DeployFailed();
-        }
-    }
+    //     if (addr == address(0)) {
+    //         revert DeployFailed();
+    //     }
+    // }
 }
