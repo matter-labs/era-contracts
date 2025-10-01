@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -106,7 +106,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -149,7 +149,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL1ToL2TransactionStatus.selector,
+                IBridgehubBase.proveL1ToL2TransactionStatus.selector,
                 chainId,
                 txHash,
                 l2BatchNumber,
@@ -192,7 +192,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -234,7 +234,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -276,7 +276,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -318,7 +318,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 chainId
                 // l2BatchNumber,
                 // l2MessageIndex,
@@ -359,7 +359,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
             bridgehubAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 chainId,
                 l2BatchNumber,
                 l2MessageIndex,

@@ -19,7 +19,7 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {IL2GenesisUpgrade} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IComplexUpgrader} from "contracts/state-transition/l2-deps/IComplexUpgrader.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract revertBatchesTest is ChainTypeManagerTest {
     // Items for logs & commits
@@ -104,7 +104,7 @@ contract revertBatchesTest is ChainTypeManagerTest {
         newChainAddress = createNewChain(getDiamondCutData(diamondInit));
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector),
             abi.encode(newChainAddress)
         );
 

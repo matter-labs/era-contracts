@@ -7,7 +7,7 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
@@ -65,7 +65,7 @@ contract ChainTypeManagerTest is Test {
 
     function deploy() public {
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        L1MessageRoot messageroot = new L1MessageRoot(bridgehub, l1ChainId);
+        L1MessageRoot messageroot = new L1MessageRoot(address(bridgehub));
         vm.prank(governor);
         bridgehub.setAddresses(sharedBridge, ICTMDeploymentTracker(address(0)), messageRoot, address(0));
 
@@ -78,7 +78,7 @@ contract ChainTypeManagerTest is Test {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))));
+        chainTypeManager = new ChainTypeManager(address(IBridgehubBase(address(bridgehub))));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -197,7 +197,7 @@ contract ChainTypeManagerTest is Test {
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
@@ -233,7 +233,7 @@ contract ChainTypeManagerTest is Test {
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
@@ -254,7 +254,7 @@ contract ChainTypeManagerTest is Test {
         // We have to mock the call to the bridgehub's getZKChain since we are mocking calls in the ChainTypeManagerTest.createNewChain() as well...
         // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
         // So, we mock that behavior again.
-        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehub.getZKChain, chainId), abi.encode(_chainAddress));
+        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.getZKChain, chainId), abi.encode(_chainAddress));
     }
 
     function _mockMigrationPausedFromBridgehub() internal {

@@ -11,17 +11,8 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
+import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "contracts/common/Config.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common/Config.sol";
-
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
-import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -121,9 +112,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             .with_key(assetId)
             .checked_write(L2_BRIDGEHUB_ADDR);
 
-        stdstore.target(L2_BRIDGEHUB_ADDR).sig(IBridgehub.ctmAssetIdToAddress.selector).with_key(assetId).checked_write(
-            address(chainTypeManager)
-        );
+        stdstore
+            .target(L2_BRIDGEHUB_ADDR)
+            .sig(IBridgehubBase.ctmAssetIdToAddress.selector)
+            .with_key(assetId)
+            .checked_write(address(chainTypeManager));
 
         (bool success, ) = recipient.call(data);
     }

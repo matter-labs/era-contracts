@@ -11,7 +11,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {GasPerPubdataMismatch, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps} from "contracts/common/L1ContractErrors.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract MailboxRequestL2TransactionTest is MailboxTest {
     address tempAddress;
@@ -25,7 +25,7 @@ contract MailboxRequestL2TransactionTest is MailboxTest {
 
         l1SharedBridge = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(l1SharedBridge);
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehub.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
 
         tempAddress = makeAddr("temp");
         tempBytesArr = new bytes[](0);

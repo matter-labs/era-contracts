@@ -6,18 +6,11 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
-import {ITransparentUpgradeableProxy, TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {PrepareL1L2TransactionParams, StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {IBridgehub, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehub.sol";
-import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
+
+import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {GatewayUpgrade, GatewayUpgradeEncodedInput} from "contracts/upgrades/GatewayUpgrade.sol";
@@ -334,7 +327,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         calls = new Call[](1);
         calls[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
-            data: abi.encodeCall(IBridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
+            data: abi.encodeCall(IBridgehubBase.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
             value: 0
         });
     }

@@ -24,7 +24,8 @@ import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainS
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {IBridgehub, BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {BridgehubBurnCTMAssetData} from "contracts/bridgehub/IBridgehubBase.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2AssetRouter} from "contracts/bridge/asset-router/IL2AssetRouter.sol";
@@ -711,7 +712,7 @@ contract AdminFunctions is Script {
             })
         );
 
-        bytes32 ctmAssetId = IBridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
+        bytes32 ctmAssetId = IL1Bridgehub(data.bridgehub).ctmAssetIdFromChainId(data.l2ChainId);
         bytes memory l2Calldata = abi.encodeCall(IL2AssetRouter.withdraw, (ctmAssetId, bridgehubBurnData));
 
         Call[] memory calls = Utils.prepareAdminL1L2DirectTransaction(

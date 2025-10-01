@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {ZKChainBase} from "./ZKChainBase.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {IMessageRoot} from "../../../bridgehub/IMessageRoot.sol";
 import {COMMIT_TIMESTAMP_APPROXIMATION_DELTA, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE, MAINNET_CHAIN_ID, MAINNET_COMMIT_TIMESTAMP_NOT_OLDER, MAX_L2_TO_L1_LOGS_COMMITMENT_BYTES, PACKED_L2_BLOCK_TIMESTAMP_MASK, PUBLIC_INPUT_SHIFT, TESTNET_COMMIT_TIMESTAMP_NOT_OLDER, DEFAULT_PRECOMMITMENT_FOR_THE_LAST_BATCH, PACKED_L2_PRECOMMITMENT_LENGTH} from "../../../common/Config.sol";
 import {IExecutor, L2_LOG_ADDRESS_OFFSET, L2_LOG_KEY_OFFSET, L2_LOG_VALUE_OFFSET, LogProcessingOutput, MAX_LOG_KEY, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "../../chain-interfaces/IExecutor.sol";
@@ -170,10 +170,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
-        // Currently ZKsync OS, always generates rollup da commitment and sets l2DaValidator to 0.
-        //        if (_newBatch.l2DaValidator != s.l2DAValidator) {
-        //             revert MismatchL2DAValidator();
-        //        }
 
         // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
         // batch output hash commits to information about batch that needs to be opened on l1.
@@ -725,7 +721,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         InteropRoot[] memory _dependencyRoots
     ) internal view returns (bytes32 dependencyRootsRollingHash) {
         uint256 length = _dependencyRoots.length;
-        IMessageRoot messageRootContract = IBridgehub(s.bridgehub).messageRoot();
+        IMessageRoot messageRootContract = IL1Bridgehub(s.bridgehub).messageRoot();
 
         for (uint256 i = 0; i < length; i = i.uncheckedInc()) {
             InteropRoot memory interopRoot = _dependencyRoots[i];
@@ -766,13 +762,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // To ease up the migration, we never append messages to message root on L1.
         if (block.chainid != L1_CHAIN_ID) {
             // Once the batch is executed, we include its message to the message root.
-            IMessageRoot messageRootContract = IMessageRoot(address(IBridgehub(s.bridgehub).messageRoot()));
+            IMessageRoot messageRootContract = IMessageRoot(address(IL1Bridgehub(s.bridgehub).messageRoot()));
             messageRootContract.addChainBatchRoot(s.chainId, _batchNumber, _messageRoot);
         }
     }
 
     /// @inheritdoc IExecutor
-    // Warning: removed onlyValidator - to make this permisionless.
     function executeBatchesSharedBridge(
         address, // _chainAddress
         uint256 _processFrom,
@@ -880,11 +875,11 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     function _verifyProof(uint256[] memory proofPublicInput, uint256[] memory _proof) internal view {
-        // We can only process 1 batch proof at a time.
-        // Allow processing multiple proofs at once.
-        //if (proofPublicInput.length != 1) {
-        //    revert CanOnlyProcessOneBatch();
-        //}
+        // We only allow processing of 1 batch proof at a time on Era Chains.
+        // We allow processing multiple proofs at once on ZKsync OS Chains.
+        if (!s.zksyncOS && proofPublicInput.length != 1) {
+            revert CanOnlyProcessOneBatch();
+        }
 
         bool successVerifyProof = s.verifier.verify(proofPublicInput, _proof);
         if (!successVerifyProof) {

@@ -5,9 +5,9 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 import {MessageRootBase} from "contracts/bridgehub/MessageRootBase.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler, NotL2} from "contracts/bridgehub/L1BridgehubErrors.sol";
-import {Merkle} from "contracts/common/libraries/Merkle.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {MessageRootNotRegistered, OnlyBridgehubOrChainAssetHandler} from "contracts/bridgehub/L1BridgehubErrors.sol";
+
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 
 // Chain tree consists of batch commitments as their leaves. We use hash of "new bytes(96)" as the hash of an empty leaf.
@@ -28,7 +28,7 @@ contract MessageRootTest is Test {
     function setUp() public {
         bridgeHub = makeAddr("bridgeHub");
         L1_CHAIN_ID = 5;
-        messageRoot = new L1MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID);
+        messageRoot = new L1MessageRoot(bridgeHub);
     }
 
     function test_init() public {
@@ -52,7 +52,7 @@ contract MessageRootTest is Test {
         );
         vm.mockCall(
             bridgeHub,
-            abi.encodeWithSelector(IBridgehub.chainAssetHandler.selector),
+            abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
             abi.encode(chainAssetHandler)
         );
         messageRoot.addNewChain(alphaChainId);

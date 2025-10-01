@@ -5,8 +5,8 @@ pragma solidity 0.8.28;
 import {MailboxTest} from "./_Mailbox_Shared.t.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+
 import {DummySharedBridge} from "contracts/dev-contracts/test/DummySharedBridge.sol";
 import {OnlyEraSupported} from "contracts/common/L1ContractErrors.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
@@ -23,7 +23,7 @@ contract MailboxFinalizeWithdrawal is MailboxTest {
         L1AssetRouter = new DummySharedBridge(keccak256("dummyDepositHash"));
         baseTokenBridgeAddress = address(L1AssetRouter);
 
-        vm.mockCall(bridgehub, abi.encodeCall(IBridgehub.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
+        vm.mockCall(bridgehub, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(baseTokenBridgeAddress));
 
         proof = new bytes32[](0);
         message = "message";

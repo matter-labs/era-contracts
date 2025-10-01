@@ -12,12 +12,12 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {ETH_TOKEN_ADDRESS, REQUIRED_L2_GAS_PRICE_PER_PUBDATA} from "contracts/common/Config.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+
+import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {Utils} from "../Utils.sol";
+
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {GatewayTransactionFilterer} from "contracts/transactionFilterer/GatewayTransactionFilterer.sol";
@@ -85,7 +85,7 @@ abstract contract GatewayGovernanceUtils is Script {
         calls[0] = Call({
             target: _gatewayGovernanceConfig.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehub.registerSettlementLayer, (_gatewayGovernanceConfig.gatewayChainId, true))
+            data: abi.encodeCall(IL1Bridgehub.registerSettlementLayer, (_gatewayGovernanceConfig.gatewayChainId, true))
         });
     }
 
@@ -101,7 +101,7 @@ abstract contract GatewayGovernanceUtils is Script {
         // Registration of the new chain type manager inside the ZK Gateway chain
         {
             bytes memory data = abi.encodeCall(
-                IBridgehub.addChainTypeManager,
+                IBridgehubBase.addChainTypeManager,
                 (prepareGWGovCallsStruct._gatewayCTMAddress)
             );
 
