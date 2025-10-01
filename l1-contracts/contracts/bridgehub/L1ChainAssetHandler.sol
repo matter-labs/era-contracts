@@ -17,19 +17,19 @@ import {IMessageRoot} from "./IMessageRoot.sol";
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
 contract L1ChainAssetHandler is ChainAssetHandlerBase {
     /// @dev The assetId of the base token.
-    bytes32 internal immutable ETH_TOKEN_ASSET_ID;
+    bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
-    uint256 internal immutable L1_CHAIN_ID;
+    uint256 public immutable override L1_CHAIN_ID;
 
     /// @dev The bridgehub contract.
-    IL1Bridgehub internal immutable BRIDGEHUB;
+    address public immutable override BRIDGEHUB;
 
     /// @dev The message root contract.
-    IMessageRoot internal immutable MESSAGE_ROOT;
+    address public immutable override MESSAGE_ROOT;
 
     /// @dev The asset router contract.
-    address internal immutable ASSET_ROUTER;
+    address public immutable override ASSET_ROUTER;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
@@ -39,12 +39,12 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
         return ETH_TOKEN_ASSET_ID;
     }
     function _l1ChainId() internal view override returns (uint256) {
-        return block.chainid;
+        return L1_CHAIN_ID;
     }
-    function _bridgehub() internal view override returns (IBridgehubBase) {
+    function _bridgehub() internal view override returns (address) {
         return BRIDGEHUB;
     }
-    function _messageRoot() internal view override returns (IMessageRoot) {
+    function _messageRoot() internal view override returns (address) {
         return MESSAGE_ROOT;
     }
     function _assetRouter() internal view override returns (address) {
@@ -53,14 +53,15 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
 
     constructor(
         address _owner,
-        IL1Bridgehub _bridgehub,
+        address _bridgehub,
         address _assetRouter,
-        IMessageRoot _messageRoot
+        address _messageRoot
     ) reentrancyGuardInitializer {
         _disableInitializers();
         BRIDGEHUB = _bridgehub;
         ASSET_ROUTER = _assetRouter;
         MESSAGE_ROOT = _messageRoot;
+        L1_CHAIN_ID = block.chainid;
         ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
         _transferOwnership(_owner);
     }

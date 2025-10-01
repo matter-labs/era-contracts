@@ -82,9 +82,9 @@ library L2Utils {
         chainAssetHandler.initL2(
             _args.l1ChainId,
             _args.aliasedOwner,
-            IL2Bridgehub(L2_BRIDGEHUB_ADDR),
+            L2_BRIDGEHUB_ADDR,
             L2_ASSET_ROUTER_ADDR,
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+            L2_MESSAGE_ROOT_ADDR
         );
     }
 
