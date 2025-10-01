@@ -49,6 +49,7 @@ contract ChainTypeManagerTest is UtilsTest {
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
+    bytes32 internal baseTokenAssetId = bytes32(uint256(uint160(makeAddr("baseTokenAssetId"))));
     address internal interopCenterAddress = address(0x1010101);
     L1MessageRoot internal messageroot;
     address internal rollupL1DAValidator;
@@ -240,7 +241,7 @@ contract ChainTypeManagerTest is UtilsTest {
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.symbol.selector), abi.encode("TT"));
 
-        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge);
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
         return
             chainContractAddress.createNewChain({
                 _chainId: chainId,

@@ -33,7 +33,7 @@ contract DiamondInitTest is UtilsTest {
         dummyBridgehub = new DummyBridgehub();
         initializeData = Utils.makeInitializeData(testnetVerifier, address(dummyBridgehub));
 
-        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0));
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), bytes32(0));
     }
 
     // add this to be excluded from coverage report

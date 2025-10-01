@@ -62,6 +62,8 @@ contract ExecutorTest is UtilsTest {
     L1MessageRoot internal messageRoot;
     DummyBridgehub dummyBridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
+
 
     uint256 eraChainId;
 
@@ -268,7 +270,7 @@ contract ExecutorTest is UtilsTest {
             protocolVersion: 0,
             admin: owner,
             validatorTimelock: address(validatorTimelock),
-            baseTokenAssetId: DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS),
+            baseTokenAssetId: baseTokenAssetId,
             storedBatchZero: keccak256(abi.encode(genesisStoredBatchInfo)),
             verifier: IVerifier(testnetVerifier), // verifier
             verifierParams: VerifierParams({
@@ -282,7 +284,7 @@ contract ExecutorTest is UtilsTest {
             priorityTxMaxGasLimit: 1000000,
             feeParams: defaultFeeParams()
         });
-        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0));
+        mockDiamondInitInteropCenterCallsWithAddress(address(dummyBridgehub), address(0), baseTokenAssetId);
 
         bytes memory diamondInitData = abi.encodeWithSelector(diamondInit.initialize.selector, params);
 
