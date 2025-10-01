@@ -6,7 +6,7 @@ import {MessageRootBase} from "./MessageRootBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 
-import {V30UpgradeChainBatchNumberNotSet} from "./L1BridgehubErrors.sol";
+import {V30UpgradeChainBatchNumberNotSet, OnlyGateway} from "./L1BridgehubErrors.sol";
 import {MessageHashing} from "../common/libraries/MessageHashing.sol";
 
 import {FullMerkle} from "../common/libraries/FullMerkle.sol";
@@ -15,6 +15,7 @@ import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "./IM
 import {InvalidCaller, Unauthorized} from "../common/L1ContractErrors.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../common/Config.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -61,14 +62,6 @@ contract L2MessageRoot is MessageRootBase {
         _;
     }
 
-    /// @dev Only allows calls from the complex upgrader contract on L2.
-    modifier onlyUpgrader() {
-        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
-            revert InvalidCaller(msg.sender);
-        }
-        _;
-    }
-
     modifier onlyServiceTransactionSender() {
         require(msg.sender == SERVICE_TRANSACTION_SENDER, Unauthorized(msg.sender));
         _;
@@ -94,7 +87,7 @@ contract L2MessageRoot is MessageRootBase {
 
     /// On L2s the initializer/reinitializer is not called.
     function initializeL2V30Upgrade() external onlyL2 onlyUpgrader {
-        uint256[] memory allZKChains = _bridgehub().getAllZKChainChainIDs();
+        uint256[] memory allZKChains = IBridgehubBase(_bridgehub()).getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
     }
 

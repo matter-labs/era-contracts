@@ -29,6 +29,7 @@ import {IL1Bridgehub} from "../../bridgehub/IL1Bridgehub.sol";
 import {L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetDeploymentTracker} from "../interfaces/IL1AssetDeploymentTracker.sol";
+import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -102,6 +103,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         }
         _;
     }
+
+    function _bridgehub() internal view virtual returns (IBridgehubBase) {
+        return IBridgehubBase(BRIDGE_HUB);
+    }
+    
 
     /// @dev Contract is expected to be used as proxy implementation.
     /// @dev Initialize the implementation to prevent Parity hack.

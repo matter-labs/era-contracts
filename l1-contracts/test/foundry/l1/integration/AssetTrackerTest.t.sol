@@ -40,7 +40,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     address[] public users;
     address[] public l2ContractAddresses;
 
-    IBridgehub l2Bridgehub;
+    IBridgehubBase l2Bridgehub;
     IL1AssetTracker assetTracker;
     IL2AssetTracker l2AssetTracker;
     IGWAssetTracker gwAssetTracker;

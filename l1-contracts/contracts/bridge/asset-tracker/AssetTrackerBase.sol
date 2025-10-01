@@ -9,13 +9,13 @@ import {IAssetTrackerBase, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
 
 import {L2_INTEROP_CENTER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {SERVICE_TRANSACTION_SENDER} from "../../common/Config.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {InsufficientChainBalance} from "./AssetTrackerErrors.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 
@@ -42,9 +42,9 @@ abstract contract AssetTrackerBase is
 
     function _l1ChainId() internal view virtual returns (uint256);
 
-    function _bridgehub() internal view virtual returns (IBridgehub);
+    function _bridgehub() internal view virtual returns (IBridgehubBase);
 
-    function _nativeTokenVault() internal view virtual returns (INativeTokenVault);
+    function _nativeTokenVault() internal view virtual returns (INativeTokenVaultBase);
 
     function _messageRoot() internal view virtual returns (IMessageRoot);
 

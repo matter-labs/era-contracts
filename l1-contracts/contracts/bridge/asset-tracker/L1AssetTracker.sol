@@ -6,10 +6,10 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {InvalidProof, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
 import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
@@ -29,9 +29,9 @@ import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     uint256 public immutable L1_CHAIN_ID;
 
-    IBridgehub public immutable BRIDGE_HUB;
+    IBridgehubBase public immutable BRIDGE_HUB;
 
-    INativeTokenVault public immutable NATIVE_TOKEN_VAULT;
+    INativeTokenVaultBase public immutable NATIVE_TOKEN_VAULT;
 
     IMessageRoot public immutable MESSAGE_ROOT;
 
@@ -43,11 +43,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         return L1_CHAIN_ID;
     }
 
-    function _bridgehub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (IBridgehubBase) {
         return BRIDGE_HUB;
     }
 
-    function _nativeTokenVault() internal view override returns (INativeTokenVault) {
+    function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
         return NATIVE_TOKEN_VAULT;
     }
 
@@ -78,8 +78,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _disableInitializers();
 
         L1_CHAIN_ID = _l1ChainId;
-        BRIDGE_HUB = IBridgehub(_bridgehub);
-        NATIVE_TOKEN_VAULT = INativeTokenVault(_nativeTokenVault);
+        BRIDGE_HUB = IBridgehubBase(_bridgehub);
+        NATIVE_TOKEN_VAULT = INativeTokenVaultBase(_nativeTokenVault);
         MESSAGE_ROOT = IMessageRoot(_messageRoot);
         L1_NULLIFIER = IL1Nullifier(IL1NativeTokenVault(_nativeTokenVault).L1_NULLIFIER());
     }

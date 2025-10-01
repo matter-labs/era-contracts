@@ -34,7 +34,7 @@ import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
 import {IMessageVerification, MessageVerification} from "../../../common/MessageVerification.sol";
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
-import {INativeTokenVault} from "../../../bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.sol";
 import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
 import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../../bridgehub/IMessageRoot.sol";
 
@@ -326,7 +326,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         if (_getBalanceChange) {
             IL1AssetTracker assetTracker = IL1AssetTracker(s.assetTracker);
-            INativeTokenVault nativeTokenVault = INativeTokenVault(s.nativeTokenVault);
+            INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(s.nativeTokenVault);
 
             (bytes32 assetId, uint256 amount) = (assetTracker.consumeBalanceChange(s.chainId, _chainId));
             uint256 tokenOriginChainId = nativeTokenVault.originChainId(assetId);
@@ -505,7 +505,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         _writePriorityOp(transaction, _params.request.factoryDeps, canonicalTxHash, _params.expirationTimestamp);
         if (s.settlementLayer != address(0)) {
-            address assetRouter = IBridgehub(s.bridgehub).assetRouter();
+            address assetRouter = IBridgehubBase(s.bridgehub).assetRouter();
             bool getBalanceChange = _params.request.sender == AddressAliasHelper.applyL1ToL2Alias(assetRouter);
 
             // slither-disable-next-line unused-return
@@ -582,7 +582,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @notice Deposits are paused when a chain migrates to/from GW.
     function _depositsPaused() internal view returns (bool) {
         uint256 chainId = s.chainId;
-        IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
         uint256 chainMigrationNumber = IChainAssetHandler(bridgehub.chainAssetHandler()).getMigrationNumber(chainId);
         uint256 timestamp = s.pausedDepositsTimestamp[chainMigrationNumber];
         /// we provide 3.5 days window to process all deposits.
@@ -594,7 +594,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @notice Returns whether the chain has upgraded to V30 on GW.
     /// if the chain is on L1 at V30, or is deployed V30 or after, then it returns true.
     function _checkV30UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
-        IBridgehub bridgehub = IBridgehub(s.bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
         if (
             bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) ==
             V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
@@ -665,7 +665,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (s.chainId != ERA_CHAIN_ID) {
             revert OnlyEraSupported();
         }
-        address assetRouter = IBridgehub(s.bridgehub).assetRouter();
+        address assetRouter = IBridgehubBase(s.bridgehub).assetRouter();
         require(msg.sender != assetRouter, NotAssetRouter(msg.sender, assetRouter));
         canonicalTxHash = _requestL2TransactionSender(
             BridgehubL2TransactionRequest({

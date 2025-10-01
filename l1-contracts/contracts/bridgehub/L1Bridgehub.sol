@@ -15,9 +15,10 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {BridgehubL2TransactionRequest} from "../common/Messaging.sol";
-import {ChainIdAlreadyPresent, ChainNotLegacy, ChainNotPresentInCTM, NotL1, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
+import {ChainIdAlreadyPresent, ChainNotLegacy, ChainNotPresentInCTM, NotL1Bridgehub, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
 import {SettlementLayersMustSettleOnL1} from "../common/L1ContractErrors.sol";
 import {ChainIdAlreadyExists, ChainIdMismatch, IncorrectBridgeHubAddress, MsgValueMismatch, WrongMagicValue, ZeroAddress} from "../common/L1ContractErrors.sol";
+import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -83,45 +84,9 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
 
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
-            revert NotL1(block.chainid, L1_CHAIN_ID);
+            revert NotL1Bridgehub(block.chainid, L1_CHAIN_ID);
         }
         _;
-    }
-
-    /// @notice Used to set the legacy chain data for the upgrade.
-    /// @param _chainId The chainId of the legacy chain we are migrating.
-    function registerLegacyChain(uint256 _chainId) external override onlyL1 {
-        address ctm = chainTypeManager[_chainId];
-        if (ctm == address(0)) {
-            revert ChainNotLegacy();
-        }
-        // slither-disable-next-line unused-return
-        (bool exists, ) = zkChainMap.tryGet(_chainId);
-        if (exists) {
-            revert ChainIdAlreadyPresent();
-        }
-
-        // From now on, since `zkChainMap` did not contain the chain, we assume
-        // that the chain is a legacy chain in the process of migration, i.e.
-        // its stored `baseTokenAssetId`, etc.
-
-        address token = __DEPRECATED_baseToken[_chainId];
-        if (token == address(0)) {
-            revert ChainNotLegacy();
-        }
-
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, token);
-
-        baseTokenAssetId[_chainId] = assetId;
-        assetIdIsRegistered[assetId] = true;
-
-        address chainAddress = IChainTypeManager(ctm).getZKChainLegacy(_chainId);
-        if (chainAddress == address(0)) {
-            revert ChainNotPresentInCTM();
-        }
-        _registerNewZKChain(_chainId, chainAddress, false);
-        messageRoot.addNewChain(_chainId);
-        settlementLayer[_chainId] = block.chainid;
     }
 
     /// @notice Used to register a chain as a settlement layer.
@@ -201,7 +166,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1CrossChainSender(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
+            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -260,7 +225,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1CrossChainSender(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,

@@ -54,7 +54,7 @@ contract MessageRootTest is Test {
         bridgeHub = makeAddr("bridgeHub");
         L1_CHAIN_ID = 5;
         gatewayChainId = 506;
-        messageRoot = new L1MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID, 1);
+        messageRoot = new L1MessageRoot(IBridgehubBase(bridgeHub), L1_CHAIN_ID, 1);
         l2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);

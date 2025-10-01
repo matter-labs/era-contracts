@@ -18,6 +18,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-
 import {L2TransactionRequestTwoBridgesInner} from "../../bridgehub/IBridgehubBase.sol";
 import {AssetHandlerDoesNotExist, AssetIdNotSupported, BadTransferDataLength, Unauthorized, UnsupportedEncodingVersion} from "../../common/L1ContractErrors.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
+import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -44,6 +45,9 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
     uint256[48] private __gap;
+
+    function _bridgehub() internal view virtual returns (IBridgehubBase);
+
 
     /// @inheritdoc IAssetRouterBase
     function setAssetHandlerAddressThisChain(

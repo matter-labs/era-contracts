@@ -33,7 +33,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
     IAssetTrackerBase l2AssetTrackerBase = IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
     IL2AssetTracker l2AssetTracker = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-    INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+    INativeTokenVault l2NativeTokenVault = INativeTokenVaultBase(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     function startTokenMigrationOnL2OrGateway(
         bool toGateway,
@@ -79,7 +79,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
     function finishMigrationOnL1(
         bool toGateway,
-        IBridgehub bridgehub,
+        IBridgehubBase bridgehub,
         uint256 chainId,
         uint256 gatewayChainId,
         string memory l2RpcUrl,
@@ -89,7 +89,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         IL1NativeTokenVault l1NativeTokenVault = IL1NativeTokenVault(address(assetRouter.nativeTokenVault()));
 
-        uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
+        uint256 settlementLayer = IBridgehubBase(bridgehub).settlementLayer(chainId);
         bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile(toGateway ? chainId : gatewayChainId);
 
         if (msgHashes.length == 0) {

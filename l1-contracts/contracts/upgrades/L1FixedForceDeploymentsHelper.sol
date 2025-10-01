@@ -14,7 +14,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 
 /// @title L1FixedForceDeploymentsHelper
 /// @author Matter Labs
@@ -71,7 +71,7 @@ abstract contract L1FixedForceDeploymentsHelper {
             }
         }
 
-        INativeTokenVault nativeTokenVault = IL1AssetRouter(sharedBridge).nativeTokenVault();
+        INativeTokenVaultBase nativeTokenVault = IL1AssetRouter(sharedBridge).nativeTokenVault();
         bytes32 baseTokenAssetId = s.baseTokenAssetId;
 
         ZKChainSpecificForceDeploymentsData

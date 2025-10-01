@@ -20,11 +20,11 @@ contract ChainUpgrade_v30 is DefaultChainUpgrade {
     }
 
     function migrateTokenBalanceFromNTV(address _bridgehub, uint256 _chainId) public {
-        address l1AssetTrackerAddress = IBridgehub(_bridgehub).assetRouter().nativeTokenVault().l1AssetTracker();
+        address l1AssetTrackerAddress = IBridgehubBase(_bridgehub).assetRouter().nativeTokenVault().l1AssetTracker();
         IL1AssetTracker l1AssetTracker = IL1AssetTracker(l1AssetTrackerAddress);
         // For each token in the NTV bridgedTokens list, migrate the token balance to the L1AssetTracker
-        address ntvAddress = IBridgehub(_bridgehub).assetRouter().nativeTokenVault();
-        INativeTokenVault ntv = INativeTokenVault(ntvAddress);
+        address ntvAddress = IBridgehubBase(_bridgehub).assetRouter().nativeTokenVault();
+        INativeTokenVault ntv = INativeTokenVaultBase(ntvAddress);
 
         uint256 bridgedTokensCount = ntv.bridgedTokensCount();
         for (uint256 i = 0; i < bridgedTokensCount; ++i) {

@@ -101,7 +101,7 @@ abstract contract ChainAssetHandlerBase is
     }
 
     modifier onlyAssetTrackerOrChain(uint256 _chainId) {
-        if (msg.sender != _assetTracker() && msg.sender != _bridgehub().getZKChain(_chainId)) {
+        if (msg.sender != _assetTracker() && msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
             revert OnlyAssetTrackerOrChain(msg.sender, _chainId);
         }
         _;
@@ -131,8 +131,8 @@ abstract contract ChainAssetHandlerBase is
     /// @notice Checks that the message sender is the specified ZK Chain.
     /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != _bridgehub().getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
+        if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
         }
         _;
     }
@@ -140,7 +140,7 @@ abstract contract ChainAssetHandlerBase is
     /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
         require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
-        bool isOnThisSettlementLayer = block.chainid == _bridgehub().settlementLayer(_chainId);
+        bool isOnThisSettlementLayer = block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId);
         bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != _l1ChainId()) ||
             (!isOnThisSettlementLayer && block.chainid == _l1ChainId());
         /// Note we don't increment the migration number if the chain migrated to GW and back to L1 previously.
@@ -181,7 +181,7 @@ abstract contract ChainAssetHandlerBase is
             _assetId == IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId),
             IncorrectChainAssetId(_assetId, IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId))
         );
-        address zkChain = _bridgehub().getZKChain(bridgehubBurnData.chainId);
+        address zkChain = IBridgehubBase(_bridgehub()).getZKChain(bridgehubBurnData.chainId);
 
         _setLegacySharedBridgeIfL1(bridgehubBurnData, _settlementChainId);
 
@@ -231,7 +231,7 @@ abstract contract ChainAssetHandlerBase is
         );
         ++migrationNumber[bridgehubBurnData.chainId];
 
-        uint256 batchNumber = _messageRoot().currentChainBatchNumber(bridgehubBurnData.chainId);
+        uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
 
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
@@ -240,7 +240,7 @@ abstract contract ChainAssetHandlerBase is
             ctmData: ctmMintData,
             chainData: chainMintData,
             migrationNumber: migrationNumber[bridgehubBurnData.chainId],
-            v30UpgradeChainBatchNumber: _messageRoot().v30UpgradeChainBatchNumber(bridgehubBurnData.chainId)
+            v30UpgradeChainBatchNumber: IMessageRoot(_messageRoot()).v30UpgradeChainBatchNumber(bridgehubBurnData.chainId)
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 

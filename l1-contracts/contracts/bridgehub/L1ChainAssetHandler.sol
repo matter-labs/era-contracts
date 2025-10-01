@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {BridgehubBurnCTMAssetData, IBridgehub} from "./IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, IBridgehubBase} from "./IBridgehubBase.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
 import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
@@ -99,7 +99,7 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
             IGWAssetTracker.setLegacySharedBridgeAddress,
             (_bridgehubBurnData.chainId, L1_NULLIFIER.l2BridgeAddress(_bridgehubBurnData.chainId))
         );
-        address settlementZkChain = _bridgehub().getZKChain(_settlementChainId);
+        address settlementZkChain = IBridgehubBase(_bridgehub()).getZKChain(_settlementChainId);
         // slither-disable-next-line unused-return
         IZKChain(settlementZkChain).requestL2ServiceTransaction(GW_ASSET_TRACKER_ADDR, data);
     }

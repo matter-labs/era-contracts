@@ -12,6 +12,7 @@ error ChainAlreadyRegistered();
 error ChainBatchRootAlreadyExists(uint256 chainId, uint256 batchNumber);
 // 0x655c373c
 error ChainBatchRootZero();
+error ChainIdAlreadyPresent();
 // 0x65e8a019
 error ChainExists();
 // 0x5d03f19d
@@ -98,3 +99,6 @@ error V30UpgradeChainBatchNumberNotSet();
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
 error ZKChainNotRegistered();
+error NotL1Bridgehub(uint256 l1ChainId, uint256 blockChainId);
+error ChainNotPresentInCTM();
+error ChainNotLegacy();

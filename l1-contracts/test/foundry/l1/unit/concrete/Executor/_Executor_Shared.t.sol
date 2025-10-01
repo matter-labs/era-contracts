@@ -202,14 +202,14 @@ contract ExecutorTest is UtilsTest {
             abi.encode(makeAddr("chainTypeManager"))
         );
         address interopCenter = makeAddr("interopCenter");
-        messageRoot = new L1MessageRoot(IBridgehub(address(dummyBridgehub)), l1ChainID, 1);
+        messageRoot = new L1MessageRoot(IBridgehubBase(address(dummyBridgehub)), l1ChainID, 1);
         dummyBridgehub.setMessageRoot(address(messageRoot));
         sharedBridge = new DummyEraBaseTokenBridge();
         address assetTracker = makeAddr("assetTracker");
         chainAssetHandler = new L1ChainAssetHandler(
             l1ChainID,
             owner,
-            IBridgehub(address(dummyBridgehub)),
+            IBridgehubBase(address(dummyBridgehub)),
             address(sharedBridge),
             messageRoot,
             address(assetTracker),

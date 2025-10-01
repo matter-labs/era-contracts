@@ -248,8 +248,8 @@ library L2GenesisForceDeploymentsHelper {
             _assetRouter: L2_ASSET_ROUTER_ADDR,
             _l1CtmDeployer: ICTMDeploymentTracker(_ctmDeployer),
             _messageRoot: IMessageRoot(L2_MESSAGE_ROOT_ADDR),
-            _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR,
-            _chainRegistrationSender: fixedForceDeploymentsData.aliasedChainRegistrationSender
+            _chainAssetHandler: L2_CHAIN_ASSET_HANDLER_ADDR
+            // _chainRegistrationSender: fixedForceDeploymentsData.aliasedChainRegistrationSender
         });
     }
 

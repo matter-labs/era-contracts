@@ -535,7 +535,7 @@ contract RegisterZKChainScript is Script {
     }
 
     function registerOnOtherChains() internal {
-        IBridgehub bridgehub = IBridgehub(config.bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(config.bridgehub);
         uint256[] memory chainsToRegisterOn = bridgehub.getAllZKChainChainIDs();
         IChainRegistrationSender chainRegistrationSender = IChainRegistrationSender(
             bridgehub.chainRegistrationSender()

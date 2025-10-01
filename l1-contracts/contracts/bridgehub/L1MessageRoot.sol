@@ -9,6 +9,7 @@ import {IncorrectFunctionSignature, LocallyNoChainsAtGenesis, NotWhitelistedSett
 import {L2_MESSAGE_ROOT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {InvalidProof} from "../common/L1ContractErrors.sol";
 import {L2MessageRoot} from "./L2MessageRoot.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -26,10 +27,10 @@ contract L1MessageRoot is MessageRootBase {
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _bridgehub Address of the Bridgehub.
     /// @param _gatewayChainId Chain ID of the Gateway chain.
-    constructor(IBridgehub _bridgehub, uint256 _gatewayChainId) {
+    constructor(address _bridgehub, uint256 _gatewayChainId) {
         BRIDGE_HUB = _bridgehub;
         GATEWAY_CHAIN_ID = _gatewayChainId;
-        uint256[] memory allZKChains = _bridgehub.getAllZKChainChainIDs();
+        uint256[] memory allZKChains = IBridgehubBase(_bridgehub).getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
         _initialize();
         _disableInitializers();
@@ -38,7 +39,7 @@ contract L1MessageRoot is MessageRootBase {
     /// @dev Initializes a contract for later use. Expected to be used in the proxy on L1, on L2 it is a system contract without a proxy.
     function initialize() external reinitializer(2) {
         _initialize();
-        uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+        uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
         uint256 allZKChainsLength = allZKChains.length;
         /// locally there are no chains deployed before.
         require(allZKChainsLength == 0, LocallyNoChainsAtGenesis());
@@ -47,7 +48,7 @@ contract L1MessageRoot is MessageRootBase {
     /// @dev The initialized used for the V30 upgrade.
     /// On L2s the initializers are disabled.
     function initializeL1V30Upgrade() external reinitializer(2) onlyL1 {
-        uint256[] memory allZKChains = BRIDGE_HUB.getAllZKChainChainIDs();
+        uint256[] memory allZKChains = IBridgehubBase(BRIDGE_HUB).getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
     }
     function saveV30UpgradeChainBatchNumberOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
@@ -59,10 +60,9 @@ contract L1MessageRoot is MessageRootBase {
 
         require(_finalizeWithdrawalParams.chainId == GATEWAY_CHAIN_ID, OnlyGateway());
         require(
-            BRIDGE_HUB.whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
+            IBridgehubBase(BRIDGE_HUB).whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
             NotWhitelistedSettlementLayer(_finalizeWithdrawalParams.chainId)
         );
-        require(block.chainid == L1_CHAIN_ID, OnlyL1());
 
         (uint32 functionSignature, uint256 offset) = UnsafeBytes.readUint32(_finalizeWithdrawalParams.message, 0);
         require(

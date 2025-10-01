@@ -92,7 +92,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     function registerChainForInterop(
         uint256 _chainId,
         bytes32 _baseTokenAssetId
-    ) external onlyChainRegistrationSender onlyL2 {
+    ) external onlyChainRegistrationSender {
         baseTokenAssetId[_chainId] = _baseTokenAssetId;
     }
 
@@ -150,5 +150,6 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
         chainAssetHandler = _chainAssetHandler;
+        // chainRegistrationSender = _chainRegistrationSender;
     }
 }

@@ -55,7 +55,7 @@ contract MessageRoot_Extended_Test is Test {
         );
         vm.mockCall(bridgeHub, abi.encodeWithSelector(IBridgehub.settlementLayer.selector), abi.encode(0));
 
-        messageRoot = new L1MessageRoot(IBridgehub(bridgeHub), L1_CHAIN_ID, gatewayChainId);
+        messageRoot = new L1MessageRoot(IBridgehubBase(bridgeHub), L1_CHAIN_ID, gatewayChainId);
         l2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         l2MessageRoot.initL2(L1_CHAIN_ID, gatewayChainId);
