@@ -3,9 +3,6 @@
 pragma solidity 0.8.28;
 
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
-import {IL2Bridgehub} from "./IL2Bridgehub.sol";
-import {IBridgehubBase} from "./IBridgehubBase.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
