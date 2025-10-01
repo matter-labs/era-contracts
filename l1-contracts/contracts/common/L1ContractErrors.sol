@@ -79,6 +79,8 @@ error DefaultAdminTransferNotAllowed();
 error DelegateCallFailed(bytes returnData);
 // 0x0a8ed92c
 error DenominatorIsZero();
+// 0xb4f54111
+error DeployFailed();
 // 0x138ee1a3
 error DeployingBridgedTokenForNativeToken();
 // 0xc7c9660f
