@@ -8,17 +8,17 @@ struct SharedBridgeOnChainId {
 }
 
 library LegacySharedBridgeAddresses {
-    uint256 public constant STAGE_LEGACY_BRIDGES = 0;
-    uint256 public constant TESTNET_LEGACY_BRIDGES = 0;
-    uint256 public constant MAINNET_LEGACY_BRIDGES = 0;
+    uint256 internal constant STAGE_LEGACY_BRIDGES = 0;
+    uint256 internal constant TESTNET_LEGACY_BRIDGES = 0;
+    uint256 internal constant MAINNET_LEGACY_BRIDGES = 0;
 
-    uint256 public constant STAGE_GW_CHAIN_ID = 1;
-    uint256 public constant TESTNET_GW_CHAIN_ID = 2;
-    uint256 public constant MAINNET_GW_CHAIN_ID = 3;
+    uint256 internal constant STAGE_GW_CHAIN_ID = 1;
+    uint256 internal constant TESTNET_GW_CHAIN_ID = 2;
+    uint256 internal constant MAINNET_GW_CHAIN_ID = 3;
 
     error InvalidGwChainId(uint256 gwChainId);
 
-    function getLegacySharedBridgeLength(uint256 _gwChainId) external pure returns (uint256) {
+    function getLegacySharedBridgeLength(uint256 _gwChainId) internal pure returns (uint256) {
         if (_gwChainId == STAGE_GW_CHAIN_ID) {
             return STAGE_LEGACY_BRIDGES;
         } else if (_gwChainId == TESTNET_GW_CHAIN_ID) {
@@ -33,7 +33,7 @@ library LegacySharedBridgeAddresses {
     function getLegacySharedBridgeAddressOnGateway(
         uint256 _gwChainId,
         uint256 _l2ChainIndex
-    ) external pure returns (SharedBridgeOnChainId memory) {
+    ) internal pure returns (SharedBridgeOnChainId memory) {
         SharedBridgeOnChainId[] memory stageLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
         SharedBridgeOnChainId[] memory testnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
         SharedBridgeOnChainId[] memory mainnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
