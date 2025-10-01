@@ -39,6 +39,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     IChainAssetHandler public chainAssetHandler;
 
+    mapping(bytes32 assetId => bool maxTokenBalanceAssigned) internal maxTokenBalanceAssigned;
+
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
@@ -109,11 +111,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
         /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
-        /// kl todo can it be the case that we set chainBalance to uint256.max twice.
-        if (chainBalance[originChainId][_assetId] == 0) {
-            chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - migratedBalance;
-        } else {
-            chainBalance[originChainId][_assetId] -= migratedBalance;
+        /// Note before the token is migrated the MAX_TOKEN_BALANCE is not assigned, since the registerNewToken is only called for new tokens.
+        if (!maxTokenBalanceAssigned[_assetId]) {
+            maxTokenBalanceAssigned[_assetId] = true;
+            chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE;
+        }
+        chainBalance[originChainId][_assetId] -= migratedBalance;
         }
         chainBalance[_chainId][_assetId] += migratedBalance;
     }
