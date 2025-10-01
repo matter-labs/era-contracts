@@ -23,7 +23,6 @@ import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractEr
 import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotLegacy, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

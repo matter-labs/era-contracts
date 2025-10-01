@@ -35,6 +35,8 @@ error InvalidSettlementLayer();
 error InvalidTokenAddress();
 // 0x142bd5be
 error InvalidV30UpgradeChainBatchNumber(uint256 _chainId);
+// 0xa9146eeb
+error InvalidVersion();
 // 0xf76b228a
 error InvalidWithdrawalChainId();
 // 0x7e472272
@@ -51,4 +53,3 @@ error OnlyWithdrawalsAllowedForPreV30Chains();
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
-error InvalidVersion();

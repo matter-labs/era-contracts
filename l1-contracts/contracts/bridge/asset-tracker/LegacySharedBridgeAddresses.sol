@@ -9,13 +9,13 @@ struct SharedBridgeOnChainId {
 
 library LegacySharedBridgeAddresses {
 
-    uint256 constant STAGE_LEGACY_BRIDGES = 0;
-    uint256 constant TESTNET_LEGACY_BRIDGES = 0;
-    uint256 constant MAINNET_LEGACY_BRIDGES = 0;
+    uint256 constant public STAGE_LEGACY_BRIDGES = 0;
+    uint256 constant public TESTNET_LEGACY_BRIDGES = 0;
+    uint256 constant public MAINNET_LEGACY_BRIDGES = 0;
 
-    uint256 constant STAGE_GW_CHAIN_ID = 1;
-    uint256 constant TESTNET_GW_CHAIN_ID = 2;
-    uint256 constant MAINNET_GW_CHAIN_ID = 3;
+    uint256 constant public STAGE_GW_CHAIN_ID = 1;
+    uint256 constant public TESTNET_GW_CHAIN_ID = 2;
+    uint256 constant public MAINNET_GW_CHAIN_ID = 3;
 
     error InvalidGwChainId(uint256 gwChainId);
 
