@@ -138,6 +138,7 @@ library L2Utils {
 
         forceDeployWithoutConstructor("InteropHandler", L2_INTEROP_HANDLER_ADDR);
         InteropHandler interopHandler = InteropHandler(L2_INTEROP_HANDLER_ADDR);
+        interopHandler.initL2();
     }
 
     function forceDeployL2AssetTracker(SystemContractsArgs memory _args) internal {
