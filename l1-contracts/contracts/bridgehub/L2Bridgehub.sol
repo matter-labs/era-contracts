@@ -24,38 +24,22 @@ import {NotInGatewayMode, NotRelayedSender} from "./L1BridgehubErrors.sol";
 contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
-    /// @notice the asset id of Eth. This is only used on L1.
+    /// @dev The asset ID of ETH token. 
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    bytes32 internal ETH_TOKEN_ASSET_ID;
+    bytes32 public ETH_TOKEN_ASSET_ID;
 
-    /// @notice The chain id of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// @dev The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
     /// L1 that is at the most base layer.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    uint256 internal l1ChainId;
+    uint256 public L1_CHAIN_ID;
 
     /// @notice The total number of ZK chains can be created/connected to this CTM.
-    /// This is the temporary security measure.
+    /// This is a temporary security measure.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
     uint256 public MAX_NUMBER_OF_ZK_CHAINS;
-
-    /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    function _ethTokenAssetId() internal view override returns (bytes32) {
-        return ETH_TOKEN_ASSET_ID;
-    }
-
-    function _maxNumberOfZKChains() internal view override returns (uint256) {
-        return MAX_NUMBER_OF_ZK_CHAINS;
-    }
-
-    function L1_CHAIN_ID() public view override(BridgehubBase, IL2Bridgehub) returns (uint256) {
-        return l1ChainId;
-    }
 
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
@@ -79,13 +63,28 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
     /// @param _l1ChainId The chain id of L1.
     /// @param _maxNumberOfZKChains The maximum number of ZK chains that can be created.
     function updateL2(uint256 _l1ChainId, uint256 _maxNumberOfZKChains) public onlyUpgrader {
-        l1ChainId = _l1ChainId;
+        L1_CHAIN_ID = _l1ChainId;
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
         // Note that this assumes that the bridgehub only accepts transactions on chains with ETH base token only.
         // This is indeed true, since the only methods where this immutable is used are the ones with `onlyL1` modifier.
         // We will change this with interop.
-        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(l1ChainId, ETH_TOKEN_ADDRESS);
+        ETH_TOKEN_ASSET_ID = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
+    }
+
+    /// @dev Returns the asset ID of ETH token for internal use.
+    function _ethTokenAssetId() internal view override returns (bytes32) {
+        return ETH_TOKEN_ASSET_ID;
+    }
+
+    /// @dev Returns the maximum number of ZK chains for internal use.
+    function _maxNumberOfZKChains() internal view override returns (uint256) {
+        return MAX_NUMBER_OF_ZK_CHAINS;
+    }
+
+    /// @dev Returns the L1 chain ID for internal use.
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
     }
 
     modifier onlySettlementLayerRelayedSender() override {
@@ -105,7 +104,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external override(BridgehubBase, IL2Bridgehub) onlySettlementLayerRelayedSender {
-        if (l1ChainId == block.chainid) {
+        if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }
         address zkChain = zkChainMap.get(_chainId);

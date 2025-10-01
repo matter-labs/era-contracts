@@ -32,28 +32,16 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
     /// @notice the asset id of Eth. This is only used on L1.
     bytes32 internal immutable ETH_TOKEN_ASSET_ID;
 
+    /// @dev Chain ID of L1.
+    uint256 public immutable L1_CHAIN_ID;
+
     /// @notice The total number of ZK chains can be created/connected to this CTM.
-    /// This is the temporary security measure.
+    /// This is a temporary security measure.
     uint256 public immutable MAX_NUMBER_OF_ZK_CHAINS;
-
-    /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    function L1_CHAIN_ID() public view override(BridgehubBase, IL1Bridgehub) returns (uint256) {
-        return block.chainid;
-    }
-
-    function _ethTokenAssetId() internal view override returns (bytes32) {
-        return ETH_TOKEN_ASSET_ID;
-    }
-
-    function _maxNumberOfZKChains() internal view override returns (uint256) {
-        return MAX_NUMBER_OF_ZK_CHAINS;
-    }
 
     /// @notice to avoid parity hack
     constructor(address _owner, uint256 _maxNumberOfZKChains) reentrancyGuardInitializer {
+        L1_CHAIN_ID = block.chainid;
         _disableInitializers();
         MAX_NUMBER_OF_ZK_CHAINS = _maxNumberOfZKChains;
 
@@ -78,9 +66,25 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         _initializeInner();
     }
 
+
+    /// @dev Returns the asset ID of ETH token for internal use.
+    function _ethTokenAssetId() internal view override returns (bytes32) {
+        return ETH_TOKEN_ASSET_ID;
+    }
+
+    /// @dev Returns the maximum number of ZK chains for internal use.
+    function _maxNumberOfZKChains() internal view override returns (uint256) {
+        return MAX_NUMBER_OF_ZK_CHAINS;
+    }
+
+    /// @dev Returns the L1 chain ID for internal use.
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
+    }
+
     modifier onlyL1() {
-        if (block.chainid != block.chainid) {
-            revert NotL1(block.chainid, block.chainid);
+        if (block.chainid != L1_CHAIN_ID) {
+            revert NotL1(block.chainid, L1_CHAIN_ID);
         }
         _;
     }
@@ -186,7 +190,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            if (tokenAssetId == _ethTokenAssetId()) {
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
                 if (msg.value != _request.mintValue) {
                     revert MsgValueMismatch(_request.mintValue, msg.value);
                 }
@@ -243,7 +247,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         {
             bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
             uint256 baseTokenMsgValue;
-            if (tokenAssetId == _ethTokenAssetId()) {
+            if (tokenAssetId == ETH_TOKEN_ASSET_ID) {
                 if (msg.value != _request.mintValue + _request.secondBridgeValue) {
                     revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
                 }

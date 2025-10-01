@@ -10,8 +10,6 @@ import {IMessageRoot} from "./IMessageRoot.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Interface for L2-specific Bridgehub functionality
 interface IL2Bridgehub is IBridgehubBase {
-    /// @notice L1 Chain ID getter
-    function L1_CHAIN_ID() external view returns (uint256);
 
     /// @notice Forward transaction on gateway
     function forwardTransactionOnGateway(

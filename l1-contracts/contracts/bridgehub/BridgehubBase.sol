@@ -41,18 +41,14 @@ abstract contract BridgehubBase is
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
-    //////////////////////////////////////////////////////////////*/
-
-    function L1_CHAIN_ID() public view virtual returns (uint256);
-
-    /*//////////////////////////////////////////////////////////////
                             INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     function _ethTokenAssetId() internal view virtual returns (bytes32);
 
     function _maxNumberOfZKChains() internal view virtual returns (uint256);
+
+    function _l1ChainId() internal view virtual returns (uint256);
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
     address public assetRouter;
@@ -168,7 +164,7 @@ abstract contract BridgehubBase is
     /// @notice Initializes the contract
     function _initializeInner() internal {
         assetIdIsRegistered[_ethTokenAssetId()] = true;
-        whitelistedSettlementLayers[L1_CHAIN_ID()] = true;
+        whitelistedSettlementLayers[_l1ChainId()] = true;
     }
 
     //// Initialization and registration
@@ -213,12 +209,7 @@ abstract contract BridgehubBase is
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
         address _chainAssetHandler
-    ) external virtual onlyOwnerOrUpgrader {
-        assetRouter = _assetRouter;
-        l1CtmDeployer = _l1CtmDeployer;
-        messageRoot = _messageRoot;
-        chainAssetHandler = _chainAssetHandler;
-    }
+    ) external virtual;
 
     /// @notice Used to set the chain asset handler address.
     /// @dev Called during v29 upgrade.
@@ -284,7 +275,7 @@ abstract contract BridgehubBase is
         // it is double checked that `assetId` is indeed derived from the `l1CtmDeployer`.
         // TODO(EVM-703): This logic should be revised once interchain communication is implemented.
 
-        address sender = L1_CHAIN_ID() == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
+        address sender = _l1ChainId() == block.chainid ? msg.sender : AddressAliasHelper.undoL1ToL2Alias(msg.sender);
         // This method can be accessed by l1CtmDeployer only
         if (sender != address(l1CtmDeployer)) {
             revert Unauthorized(sender);
@@ -293,7 +284,7 @@ abstract contract BridgehubBase is
             revert CTMNotRegistered();
         }
 
-        bytes32 ctmAssetId = DataEncoding.encodeAssetId(L1_CHAIN_ID(), _additionalData, sender);
+        bytes32 ctmAssetId = DataEncoding.encodeAssetId(_l1ChainId(), _additionalData, sender);
         ctmAssetIdToAddress[ctmAssetId] = _assetAddress;
         ctmAssetIdFromAddress[_assetAddress] = ctmAssetId;
         emit AssetRegistered(ctmAssetId, _assetAddress, _additionalData, msg.sender);
@@ -391,7 +382,7 @@ abstract contract BridgehubBase is
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
     ) external virtual onlySettlementLayerRelayedSender {
-        if (L1_CHAIN_ID() == block.chainid) {
+        if (_l1ChainId() == block.chainid) {
             revert NotInGatewayMode();
         }
         address zkChain = zkChainMap.get(_chainId);
