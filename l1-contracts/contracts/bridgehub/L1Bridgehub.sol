@@ -172,7 +172,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             _factoryDeps: _factoryDeps
         });
         _registerNewZKChain(_chainId, chainAddress, true);
-        messageRoot.addNewChain(_chainId);
+        messageRoot.addNewChain(_chainId, 0);
 
         emit NewChain(_chainId, _chainTypeManager, _admin);
         return _chainId;
@@ -201,7 +201,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
+            IL1CrossChainSender(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -260,7 +260,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
             }
 
             // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
+            IL1CrossChainSender(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
                 _request.chainId,
                 tokenAssetId,
                 msg.sender,
@@ -269,7 +269,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         }
 
         // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1AssetRouter(_request.secondBridgeAddress)
+        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1CrossChainSender(_request.secondBridgeAddress)
             .bridgehubDeposit{value: _request.secondBridgeValue}(
             _request.chainId,
             msg.sender,
@@ -337,6 +337,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         address chainAdmin = IZKChain(_zkChain).getAdmin();
         bytes32 chainBaseTokenAssetId = IZKChain(_zkChain).getBaseTokenAssetId();
         address bridgeHub = IZKChain(_zkChain).getBridgehub();
+        uint256 batchNumber = IZKChain(_zkChain).getTotalBatchesExecuted();
 
         if (bridgeHub != address(this)) {
             revert IncorrectBridgeHubAddress(bridgeHub);
@@ -350,7 +351,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         settlementLayer[_chainId] = block.chainid;
 
         _registerNewZKChain(_chainId, _zkChain, true);
-        messageRoot.addNewChain(_chainId);
+        messageRoot.addNewChain(_chainId, batchNumber);
 
         emit NewChain(_chainId, ctm, chainAdmin);
     }

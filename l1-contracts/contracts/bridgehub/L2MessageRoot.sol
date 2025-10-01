@@ -74,6 +74,14 @@ contract L2MessageRoot is MessageRootBase {
         _;
     }
 
+        /// @notice Checks that the Chain ID is the Gateway chain id.
+        modifier onlyGateway() {
+            if (block.chainid != _gatewayChainId()) {
+                revert OnlyGateway();
+            }
+            _;
+        }
+
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
