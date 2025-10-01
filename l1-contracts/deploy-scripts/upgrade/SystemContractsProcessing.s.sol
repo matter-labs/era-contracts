@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {console2 as console} from "forge-std/Script.sol";
 import {Utils} from "../Utils.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WETH_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ContractsBytecodesLib} from "../ContractsBytecodesLib.sol";
 import {IL2ContractDeployer} from "contracts/common/interfaces/IL2ContractDeployer.sol";
@@ -349,13 +349,13 @@ library SystemContractsProcessing {
     function getOtherContractsBytecodes() internal view returns (bytes[] memory result) {
         result = new bytes[](OTHER_BUILT_IN_CONTRACTS_COUNT);
 
-        result[0] = ContractsBytecodesLib.getCreationCode("Bridgehub");
+        result[0] = ContractsBytecodesLib.getCreationCode("L2Bridgehub");
         result[1] = ContractsBytecodesLib.getCreationCode("L2AssetRouter");
         result[2] = ContractsBytecodesLib.getCreationCode("L2NativeTokenVault");
         result[3] = ContractsBytecodesLib.getCreationCode("MessageRoot");
         result[4] = ContractsBytecodesLib.getCreationCode("L2WrappedBaseToken");
         result[5] = ContractsBytecodesLib.getCreationCode("L2MessageVerification");
-        result[6] = ContractsBytecodesLib.getCreationCode("ChainAssetHandler");
+        result[6] = ContractsBytecodesLib.getCreationCode("L2ChainAssetHandler");
     }
 
     /// Note, that while proper initialization may require multiple steps,
@@ -398,7 +398,7 @@ library SystemContractsProcessing {
         });
         forceDeployments[4] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: L2ContractHelper.hashL2Bytecode(bytecodes[4]),
-            newAddress: L2_WETH_IMPL_ADDR,
+            newAddress: L2_WRAPPED_BASE_TOKEN_IMPL_ADDR,
             callConstructor: false,
             value: 0,
             input: ""

@@ -3,15 +3,15 @@
 pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, L2_TO_L1_MESSENGER, SystemLogKey, Utils} from "./Utils.sol";
+import {Utils} from "./Utils.sol";
 
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // solhint-enable max-line-length
 
@@ -22,10 +22,13 @@ contract UtilsCallMockerTest is Test {
 
     function mockDiamondInitInteropCenterCallsWithAddress(address bridgehub, address assetRouter) public {
         address assetTracker = address(0x1234567890876543567890);
+        address nativeTokenVault = address(0x1234567890876543567890);
         if (assetRouter == address(0)) {
             assetRouter = address(0x1234567890876543567890);
+        } else if (assetRouter == L2_ASSET_ROUTER_ADDR) {
+            nativeTokenVault = L2_NATIVE_TOKEN_VAULT_ADDR;
+            assetTracker = L2_ASSET_TRACKER_ADDR;
         }
-        address nativeTokenVault = address(0x1234567890876543567890);
 
         vm.mockCall(bridgehub, abi.encodeWithSelector(IBridgehub.assetRouter.selector), abi.encode(assetRouter));
         vm.mockCall(

@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 /// @notice A struct that describes a forced deployment on an address
 struct ForceDeployment {
     // The bytecode hash to put on an address
-    bytes32 bytecodeHash;
+    bytes bytecodeHash;
     // The address on which to deploy the bytecodehash to
     address newAddress;
     // Whether to run the constructor on the force deployment
@@ -42,14 +42,15 @@ struct FixedForceDeploymentsData {
     bytes32 l2TokenProxyBytecodeHash;
     address aliasedL1Governance;
     uint256 maxNumberOfZKChains;
-    bytes32 bridgehubBytecodeHash;
-    bytes32 l2AssetRouterBytecodeHash;
-    bytes32 l2NtvBytecodeHash;
-    bytes32 messageRootBytecodeHash;
-    bytes32 chainAssetHandlerBytecodeHash;
-    bytes32 interopCenterBytecodeHash;
-    bytes32 interopHandlerBytecodeHash;
-    bytes32 assetTrackerBytecodeHash;
+    bytes bridgehubBytecodeInfo;
+    bytes l2AssetRouterBytecodeInfo;
+    bytes l2NtvBytecodeInfo;
+    bytes messageRootBytecodeInfo;
+    bytes chainAssetHandlerBytecodeInfo;
+    bytes interopCenterBytecodeInfo;
+    bytes interopHandlerBytecodeInfo;
+    bytes assetTrackerBytecodeInfo;
+    bytes beaconDeployerInfo;
     address l2SharedBridgeLegacyImpl;
     address l2BridgedStandardERC20Impl;
     address aliasedChainRegistrationSender;
@@ -65,9 +66,10 @@ interface IL2GenesisUpgrade {
     event UpgradeComplete(uint256 _chainId);
 
     function genesisUpgrade(
+        bool _isZKsyncOS,
         uint256 _chainId,
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,
         bytes calldata _additionalForceDeploymentsData
-    ) external payable;
+    ) external;
 }

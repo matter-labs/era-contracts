@@ -72,18 +72,26 @@ error NotL1(uint256 blockChainId);
 error NotMigrated();
 // 0xd0266e26
 error NotSettlementLayer();
+// 0xeee8a4d9
+error OnlyCtmOwner();
 // 0x04e05fd1
 error OnlyOneBlobWithCalldataAllowed();
 // 0x885ae069
 error OperatorDAInputTooSmall(uint256 operatorDAInputLength, uint256 minAllowedLength);
 // 0x681150be
 error OutdatedProtocolVersion(uint256 protocolVersion, uint256 currentProtocolVersion);
+// 0xfe26193e
+error PriorityQueueNotFullyProcessed();
 // 0xc59d372c
 error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protocolVersion);
 // 0x2dc9747d
 error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 totalBlobsCommitmentSize);
 // 0x9044dff9
 error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
+// 0x89935a14
+error SettlementLayerChainIdMismatch();
+// 0x0baf1d48
+error UnknownVerifierVersion();
 // 0x79274f04
 error UnsupportedProofMetadataVersion(uint256 metadataVersion);
 // 0x52595598

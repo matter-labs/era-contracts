@@ -16,18 +16,16 @@ import {GatewayDeployer} from "./_SharedGatewayDeployer.t.sol";
 import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
 import {L2CanonicalTransaction, L2Message, TxStatus} from "contracts/common/Messaging.sol";
-import {IInteropCenter} from "contracts/interop/IInteropCenter.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
-import {FinalizeL1DepositParams, L1Nullifier, IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 
-import {IZKChain, IGetters} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {IGetters, IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 
+import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
@@ -40,7 +38,7 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
-import {IMessageVerification, IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
+import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,
@@ -398,6 +396,7 @@ contract L1GatewayTests is
         _setUpGatewayWithFilterer();
         vm.chainId(12345);
         vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
+        vm.expectRevert(NotInGatewayMode.selector);
         addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
         vm.stopBroadcast();
     }

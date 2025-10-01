@@ -15,16 +15,16 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/Upgrade
 import {BeaconProxy} from "@openzeppelin/contracts-v4/proxy/beacon/BeaconProxy.sol";
 
 import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2NativeTokenVault.sol";
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
-import {ETH_TOKEN_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER} from "contracts/common/Config.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {AddressAliasHelper} from "../../../../../contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubMintCTMAssetData} from "../../../../../contracts/bridgehub/IBridgehub.sol";
-import {IAdmin} from "../../../../../contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {BridgehubMintCTMAssetData, IBridgehub} from "../../../../../contracts/bridgehub/IBridgehub.sol";
+
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
 import {IL1AssetRouter} from "../../../../../contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {Bridgehub, IBridgehub} from "../../../../../contracts/bridgehub/Bridgehub.sol";
+
 import {BridgehubL2TransactionRequest} from "../../../../../contracts/common/Messaging.sol";
 import {IInteropCenter, InteropCenter} from "../../../../../contracts/interop/InteropCenter.sol";
 import {L2WrappedBaseToken} from "../../../../../contracts/bridge/L2WrappedBaseToken.sol";
@@ -120,13 +120,15 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
                 broadcast: _skip,
                 l1ChainId: L1_CHAIN_ID,
                 eraChainId: ERA_CHAIN_ID,
+                gatewayChainId: GATEWAY_CHAIN_ID,
                 l1AssetRouter: l1AssetRouter,
                 legacySharedBridge: sharedBridgeLegacy,
                 l2TokenBeacon: address(beacon),
                 l2TokenProxyBytecodeHash: beaconProxyBytecodeHash,
                 aliasedOwner: ownerWallet,
                 contractsDeployedAlready: false,
-                l1CtmDeployer: l1CTMDeployer
+                l1CtmDeployer: l1CTMDeployer,
+                maxNumberOfZKChains: 100
             })
         );
         if (!_skip) {

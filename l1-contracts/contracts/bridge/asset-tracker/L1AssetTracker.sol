@@ -4,10 +4,10 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {TokenBalanceMigrationData, ConfirmBalanceMigrationData} from "../../common/Messaging.sol";
+import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
-import {InvalidProof} from "../../common/L1ContractErrors.sol";
+import {InvalidProof, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
@@ -15,9 +15,8 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidSettlementLayer, InvalidTokenAddress} from "./AssetTrackerErrors.sol";
+import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidTokenAddress, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
-import {ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
@@ -121,11 +120,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// @notice This is used to register L2NativeTokens when the chain is settling on GW.
     /// @notice It is needed since withdrawals are blocked until the token balance is migrated to GW, and it needs to be registered before migration.
-    function registerL2NativeToken(uint256 _l2ChainId, address _l2NativeToken) external onlyNativeTokenVault {
+    function registerL2NativeToken(uint256 _l2ChainId, address _l2NativeToken) external {
         uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_l2ChainId);
         require(settlementLayer != block.chainid, InvalidSettlementLayer());
 
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(block.chainid, _l2NativeToken);
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l2ChainId, _l2NativeToken);
 
         require(NATIVE_TOKEN_VAULT.tokenAddress(assetId) == address(0), InvalidTokenAddress());
 
@@ -142,6 +141,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 amount: MAX_TOKEN_BALANCE
             })
         );
+    }
+
+    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
+        _assignMaxChainBalance(_originChainId, _assetId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -246,6 +249,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// i.e. the `amount` field in the `TokenBalanceMigrationData` and may be used by interop.
     /// If the chain downplays `amount`, it will restrict its users from additional interop,
     /// while if it overstates `amount`, it should be able to affect past withdrawals of the chain only.
+    /// TODO: SB re-review
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         _proveMessageInclusion(_finalizeWithdrawalParams);
 
@@ -259,22 +263,23 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
 
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
-        uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
-        /// We check the chainMigrationNumber to make sure the message is from a previous token migration.
-        require(
-            chainMigrationNumber == data.migrationNumber,
-            InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
-        );
         uint256 fromChainId;
         uint256 toChainId;
 
         if (data.isL1ToGateway) {
+            uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
+            /// We check the chainMigrationNumber to make sure the message is from a previous token migration.
+            require(
+                chainMigrationNumber == data.migrationNumber,
+                InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
+            );
             // In this case the TokenBalanceMigrationData data might be malicious.
             // We check the chainId to match the finalizeWithdrawalParams.chainId.
             // We check the assetId, tokenOriginChainId, originToken with an assetIdCheck.
             // The amount might be malicious, but that poses a restriction on users of the chain, not other chains.
             // The AssetTracker cannot protect individual users only other chains. Individual users rely on the proof system.
             // The last field is migrationNumber, which cannot be abused.
+
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
 
@@ -296,12 +301,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             // In this case we trust the TokenBalanceMigrationData data and the settlement layer = Gateway to be honest.
             // If the settlement layer is compromised, other chains settling on L1 are not compromised, only chains settling on Gateway.
 
-            // Note, that the following check only works when chain settles on L1. This assumes that the chain will only settle either on L1 
-            // or a single ZK Gateway. Otherwise the following scenario is possible:
-            // - Chain settles on Gateway1, migrates token balance to Gateway1.
-            // - Chain migrates to L1, then migrates to Gateway2.
-            // - The check below will fail not allowing to migrate balance from Gateway1 to L1.
-            require(currentSettlementLayer == block.chainid, NotMigratedChain());
             require(
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()

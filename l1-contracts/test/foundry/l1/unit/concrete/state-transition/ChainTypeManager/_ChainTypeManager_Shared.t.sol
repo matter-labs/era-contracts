@@ -10,9 +10,10 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/interfaces/IL1Nullifier.sol";
+import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {UtilsFacet} from "foundry-test/l1/unit/concrete/Utils/UtilsFacet.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
@@ -29,7 +30,7 @@ import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerif
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {ZeroAddress} from "contracts/common/L1ContractErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -38,7 +39,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 
 contract ChainTypeManagerTest is UtilsTest {
     using stdStorage for StdStorage;
@@ -46,10 +47,10 @@ contract ChainTypeManagerTest is UtilsTest {
     ChainTypeManager internal chainTypeManager;
     ChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
-    Bridgehub internal bridgehub;
-    ChainAssetHandler internal chainAssetHandler;
+    L1Bridgehub internal bridgehub;
+    L1ChainAssetHandler internal chainAssetHandler;
     address internal interopCenterAddress = address(0x1010101);
-    MessageRoot internal messageroot;
+    L1MessageRoot internal messageroot;
     address internal rollupL1DAValidator;
     address internal diamondInit;
     address internal constant governor = address(0x1010101);
@@ -60,8 +61,10 @@ contract ChainTypeManagerTest is UtilsTest {
     address internal constant l1Nullifier = address(0x6060606);
     address internal constant serverNotifier = address(0x7070707);
     address internal newChainAdmin;
+    uint256 l1ChainId = 5;
     uint256 chainId = 112;
-    address internal testnetVerifier = address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0))));
+    address internal testnetVerifier =
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
     bytes internal forceDeploymentsData = hex"";
 
     uint256 eraChainId = 9;
@@ -70,16 +73,16 @@ contract ChainTypeManagerTest is UtilsTest {
     Diamond.FacetCut[] internal facetCuts;
 
     function deploy() public {
-        bridgehub = new Bridgehub(block.chainid, governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new MessageRoot(bridgehub, block.chainid, 1);
-        chainAssetHandler = new ChainAssetHandler(
+        bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
+        messageroot = new L1MessageRoot(bridgehub, block.chainid, 1);
+        chainAssetHandler = new L1ChainAssetHandler(
             block.chainid,
             governor,
             bridgehub,
             address(0),
-            address(0),
             messageroot,
-            address(0)
+            address(0),
+            IL1Nullifier(address(0))
         );
         stdstore
             .target(address(messageroot))
@@ -105,7 +108,7 @@ contract ChainTypeManagerTest is UtilsTest {
 
         vm.startPrank(address(bridgehub));
         chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))), address(interopCenterAddress));
-        diamondInit = address(new DiamondInit());
+        diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
         facetCuts.push(
@@ -231,7 +234,7 @@ contract ChainTypeManagerTest is UtilsTest {
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
@@ -268,7 +271,7 @@ contract ChainTypeManagerTest is UtilsTest {
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(Bridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
@@ -289,7 +292,7 @@ contract ChainTypeManagerTest is UtilsTest {
         // We have to mock the call to the bridgehub's getZKChain since we are mocking calls in the ChainTypeManagerTest.createNewChain() as well...
         // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
         // So, we mock that behavior again.
-        vm.mockCall(address(bridgehub), abi.encodeCall(Bridgehub.getZKChain, chainId), abi.encode(_chainAddress));
+        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehub.getZKChain, chainId), abi.encode(_chainAddress));
     }
 
     function _mockMigrationPausedFromBridgehub() internal {

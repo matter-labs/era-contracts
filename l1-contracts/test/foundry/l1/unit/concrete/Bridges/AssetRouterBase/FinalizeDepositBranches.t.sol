@@ -34,7 +34,7 @@ contract MockAssetHandler is IAssetHandler {
 contract TestAssetRouterBase is AssetRouterBase {
     address public nativeTokenVault;
 
-    constructor() AssetRouterBase(1, 1, IBridgehub(address(1))) {}
+    // constructor() AssetRouterBase(1, 1, IBridgehub(address(1))) {}
 
     function setAssetHandlerAddressThisChain(bytes32, address) external override {}
 
@@ -58,6 +58,26 @@ contract TestAssetRouterBase is AssetRouterBase {
 
     function setAssetHandler(bytes32 _assetId, address _handler) external {
         assetHandlerAddress[_assetId] = _handler;
+    }
+
+    function BRIDGE_HUB() external view override returns (IBridgehub) {
+        return IBridgehub(address(1));
+    }
+
+    function L1_CHAIN_ID() external view override returns (uint256) {
+        return 1;
+    }
+
+    function _bridgehub() internal view override returns (IBridgehub) {
+        return IBridgehub(address(1));
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return 1;
+    }
+
+    function _eraChainId() internal view override returns (uint256) {
+        return 1;
     }
 }
 

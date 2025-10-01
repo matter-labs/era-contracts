@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import "./Utils.sol";
+import {Utils as Utils_old} from "./Utils.sol";
+import {BytecodeUtils as Utils} from "./BytecodeUtils.s.sol";
 
 /// @title ContractsBytecodesLib
 /// @notice Library providing functions to read bytecodes of L2 contracts individually.
@@ -24,6 +25,7 @@ library ContractsBytecodesLib {
             return getCreationCodeEVM(contractIdentifier);
         }
     }
+
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
         string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
 
@@ -43,17 +45,19 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[41] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[45] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "L2AssetTracker",
             "BeaconProxy",
             "BridgedStandardERC20",
             "BridgedTokenBeacon",
-            "Bridgehub",
+            "L1Bridgehub",
+            "L2Bridgehub",
             "BytecodesSupplier", // ???
             "ChainAdmin",
             "ChainAdminOwnable",
-            "ChainAssetHandler",
+            "L1ChainAssetHandler",
+            "L2ChainAssetHandler",
             "ChainRegistrar",
             "ChainTypeManager",
             "CTMDeploymentTracker",
@@ -73,7 +77,8 @@ library ContractsBytecodesLib {
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
-            "MessageRoot",
+            "L1MessageRoot",
+            "L2MessageRoot",
             "PermanentRestriction",
             "ProxyAdmin", // ??
             "UpgradeableBeacon",
@@ -84,7 +89,8 @@ library ContractsBytecodesLib {
             "ValidatorTimelock",
             "ValidiumL1DAValidator", // ???
             "L2MessageVerification",
-            "L1V29Upgrade"
+            "L1V29Upgrade",
+            "UpgradeableBeaconDeployer"
         ];
 
         string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [

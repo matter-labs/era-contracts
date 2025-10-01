@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {console} from "forge-std/console.sol";
 import {StdStorage, stdStorage} from "forge-std/Test.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
@@ -26,6 +25,8 @@ contract ZKChainDeployer is L1ContractDeployer {
         bool validiumMode;
         address validatorSenderOperatorCommitEth;
         address validatorSenderOperatorBlobsEth;
+        address validatorSenderOperatorProve;
+        address validatorSenderOperatorExecute;
         uint128 baseTokenGasPriceMultiplierNominator;
         uint128 baseTokenGasPriceMultiplierDenominator;
         bool allowEvmEmulator;
@@ -96,6 +97,8 @@ contract ZKChainDeployer is L1ContractDeployer {
             validiumMode: false,
             validatorSenderOperatorCommitEth: address(0),
             validatorSenderOperatorBlobsEth: address(1),
+            validatorSenderOperatorProve: address(2),
+            validatorSenderOperatorExecute: address(3),
             baseTokenGasPriceMultiplierNominator: uint128(1),
             baseTokenGasPriceMultiplierDenominator: uint128(1),
             allowEvmEmulator: false
@@ -127,6 +130,8 @@ contract ZKChainDeployer is L1ContractDeployer {
             "validator_sender_operator_blobs_eth",
             description.validatorSenderOperatorBlobsEth
         );
+        vm.serializeAddress("chain", "validator_sender_operator_prove", description.validatorSenderOperatorProve);
+        vm.serializeAddress("chain", "validator_sender_operator_execute", description.validatorSenderOperatorExecute);
         vm.serializeUint(
             "chain",
             "base_token_gas_price_multiplier_nominator",

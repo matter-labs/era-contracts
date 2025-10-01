@@ -11,9 +11,9 @@ import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/sta
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
+import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -83,6 +83,7 @@ struct Config {
     address ownerAddress;
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
+    bool isZKsyncOS;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -144,6 +145,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
+        config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -289,6 +291,11 @@ abstract contract DeployUtils is Create2FactoryUtils {
         require(config.contracts.defaultAAHash != bytes32(0), "default aa hash is zero");
         require(config.contracts.evmEmulatorHash != bytes32(0), "evm emulator hash is zero");
 
+        // TODO should be provided?
+        //        if (!stateTransition.isOnGateway) {
+        //            require(addresses.blobVersionedHashRetriever != address(0), "blobVersionedHashRetriever is zero");
+        //        }
+
         return
             DiamondInitializeDataNewChain({
                 verifier: IVerifier(stateTransition.verifier),
@@ -346,25 +353,25 @@ abstract contract DeployUtils is Create2FactoryUtils {
     ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "ChainRegistrar")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "Bridgehub")) {
-            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
+        } else if (compareStrings(contractName, "L1Bridgehub")) {
+            return abi.encode(config.l1ChainId, config.ownerAddress, config.contracts.maxNumberOfChains);
+        } else if (compareStrings(contractName, "L1MessageRoot")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.gatewayChainId);
         } else if (compareStrings(contractName, "ChainRegistrationSender")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "InteropCenter")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.ownerAddress);
-        } else if (compareStrings(contractName, "MessageRoot")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId, config.gatewayChainId);
         } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
             return
                 abi.encode(
                     config.l1ChainId,
                     config.ownerAddress,
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridges.l1AssetRouterProxy,
-                    addresses.bridgehub.assetTrackerProxy,
                     addresses.bridgehub.messageRootProxy,
+                    addresses.bridgehub.assetTrackerProxy,
                     addresses.bridges.l1NullifierProxy
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
@@ -414,7 +421,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            return abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
+            /// TODO: Currently setting it to owner address (which means whole bridgehub owner).
+            /// In practice we might want to set it to CTM owner (which in production will be less restritive).
+            return
+                abi.encode(
+                    addresses.stateTransition.verifierFflonk,
+                    addresses.stateTransition.verifierPlonk,
+                    config.ownerAddress
+                );
         } else if (compareStrings(contractName, "VerifierFflonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "VerifierPlonk")) {
@@ -457,7 +471,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DiamondInit")) {
-            return abi.encode();
+            return abi.encode(config.isZKsyncOS);
         } else if (compareStrings(contractName, "L1AssetTracker")) {
             return
                 abi.encode(

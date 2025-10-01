@@ -104,8 +104,8 @@ IMessageRoot constant L2_MESSAGE_ROOT = IMessageRoot(L2_MESSAGE_ROOT_ADDR);
 /// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots
 address constant SLOAD_CONTRACT_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x06);
 
-/// @dev The address of the WETH implementation contract
-address constant L2_WETH_IMPL_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x07);
+/// @dev The address of the l2 wrapped base token.
+address constant L2_WRAPPED_BASE_TOKEN_IMPL_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x07);
 
 /// @dev The address of the L2 interop root storage system contract
 IL2InteropRootStorage constant L2_INTEROP_ROOT_STORAGE = IL2InteropRootStorage(
@@ -119,17 +119,22 @@ IMessageVerification constant L2_MESSAGE_VERIFICATION = IMessageVerification(add
 address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0a);
 IChainAssetHandler constant L2_CHAIN_ASSET_HANDLER = IChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR);
 
+/// @dev UpgradeableBeaconDeployer that's responsible for deploying the upgradeable beacons for the bridged standard ERC20 tokens
+/// @dev Besides separation of concerns, we need it as a separate contract to ensure that L2NativeTokenVaultZKOS
+/// does not have to include BridgedStandardERC20 and UpgradeableBeacon and so can fit into the code size limit.
+address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0b);
+
 /// @dev the address of the L2 interop center
-address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0b);
+address constant L2_INTEROP_CENTER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0c);
 IInteropCenter constant L2_INTEROP_CENTER = IInteropCenter(L2_INTEROP_CENTER_ADDR);
 
 /// @dev the address of the L2 interop handler
-address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0c);
+address constant L2_INTEROP_HANDLER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0d);
 
 /// @dev the address of the L2 asset tracker
-address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0d);
+address constant L2_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0e);
 IL2AssetTracker constant L2_ASSET_TRACKER = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
 
 /// @dev the address of the GW asset tracker
-address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0e);
+address constant GW_ASSET_TRACKER_ADDR = address(BUILT_IN_CONTRACTS_OFFSET + 0x0f);
 IGWAssetTracker constant GW_ASSET_TRACKER = IGWAssetTracker(GW_ASSET_TRACKER_ADDR);

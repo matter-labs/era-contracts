@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import "forge-std/console.sol";
 import {Vm} from "forge-std/Test.sol";
-import {L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils, EVENT_INDEX} from "../Utils/Utils.sol";
+import {EVENT_INDEX, L2_BOOTLOADER_ADDRESS, L2_SYSTEM_CONTEXT_ADDRESS, Utils} from "../Utils/Utils.sol";
 import {EMPTY_PREPUBLISHED_COMMITMENT, ExecutorTest, POINT_EVALUATION_PRECOMPILE_RESULT} from "./_Executor_Shared.t.sol";
 
 import {IExecutor, SystemLogKey, TOTAL_BLOBS_IN_COMMITMENT} from "contracts/state-transition/chain-interfaces/IExecutor.sol";
@@ -1025,25 +1025,25 @@ contract CommittingTest is ExecutorTest {
         );
     }
 
-    struct MessageRoot {
+    struct InteropRoot {
         uint256 chainId;
         uint256 blockNumber;
         // We double overloading this. The sides normally contain the root, as well as the sides.
-        // Second overloading: if the length is 1, we are importing a chainBatchRoot/messageRoot instead of sides.
+        // Second overloading: if the length is 1, we are importing a chainBatchRoot/InteropRoot instead of sides.
         bytes32[] sides;
     }
 
     function test_recalculateinteropRootRollingHash() public {
-        MessageRoot[] memory interopRoots = new MessageRoot[](2);
-        MessageRoot memory interopRoot1 = MessageRoot({chainId: 260, blockNumber: 1, sides: new bytes32[](1)});
+        InteropRoot[] memory interopRoots = new InteropRoot[](2);
+        InteropRoot memory interopRoot1 = InteropRoot({chainId: 260, blockNumber: 1, sides: new bytes32[](1)});
         interopRoot1.sides[0] = 0xfb2eb93318710c98f501f6ff6b11c373baccd0ffcaefe15f97debe09cb7939e1;
         interopRoots[0] = interopRoot1;
-        MessageRoot memory interopRoot2 = MessageRoot({chainId: 506, blockNumber: 17, sides: new bytes32[](1)});
+        InteropRoot memory interopRoot2 = InteropRoot({chainId: 506, blockNumber: 17, sides: new bytes32[](1)});
         interopRoot2.sides[0] = 0xf83b13aa476ef3253e6acff5779276da7924fabaec9a8c39274cf021efe1255a;
         interopRoots[1] = interopRoot2;
         bytes32 rollingHash = 0x0000000000000000000000000000000000000000000000000000000000000000;
         for (uint256 i = 0; i < interopRoots.length; i++) {
-            MessageRoot memory interopRoot = interopRoots[i];
+            InteropRoot memory interopRoot = interopRoots[i];
             console.logBytes(
                 abi.encodePacked(
                     rollingHash,

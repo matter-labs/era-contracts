@@ -19,7 +19,6 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
 import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
@@ -63,7 +62,7 @@ contract GatewayCTMDeployerTest is Test {
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
 
-        new DiamondInit();
+        new DiamondInit(false);
         new L1GenesisUpgrade();
         new RollupDAManager();
         new ValidiumL1DAValidator();
@@ -74,8 +73,7 @@ contract GatewayCTMDeployerTest is Test {
         new VerifierFflonk();
         new VerifierPlonk();
 
-        new TestnetVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)));
-        new DualVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)));
+        new TestnetVerifier(VerifierFflonk(address(0)), VerifierPlonk(address(0)), address(0));
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();

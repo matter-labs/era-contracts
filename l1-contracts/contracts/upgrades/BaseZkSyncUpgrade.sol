@@ -8,7 +8,7 @@ import {ZKChainBase} from "../state-transition/chain-deps/facets/ZKChainBase.sol
 import {IVerifier, VerifierParams} from "../state-transition/chain-interfaces/IVerifier.sol";
 import {L2ContractHelper} from "../common/l2-helpers/L2ContractHelper.sol";
 import {TransactionValidator} from "../state-transition/libraries/TransactionValidator.sol";
-import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS, SYSTEM_UPGRADE_L2_TX_TYPE} from "../common/Config.sol";
+import {MAX_ALLOWED_MINOR_VERSION_DELTA, MAX_NEW_FACTORY_DEPS} from "../common/Config.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {InvalidTxType, L2UpgradeNonceNotEqualToNewProtocolVersion, NewProtocolMajorVersionNotZero, PatchCantSetUpgradeTxn, PatchUpgradeCantSetBootloader, PatchUpgradeCantSetDefaultAccount, PatchUpgradeCantSetEvmEmulator, PreviousProtocolMajorVersionNotZero, PreviousUpgradeNotCleaned, PreviousUpgradeNotFinalized, ProtocolVersionMinorDeltaTooBig, ProtocolVersionTooSmall, SettlementLayerUpgradeMustPrecedeChainUpgrade} from "./ZkSyncUpgradeErrors.sol";
 import {TimeNotReached, TooManyFactoryDeps} from "../common/L1ContractErrors.sol";
@@ -48,14 +48,6 @@ error UpgradeInnerFailed();
 /// @custom:security-contact security@matterlabs.dev
 /// @notice Interface to which all the upgrade implementations should adhere
 abstract contract BaseZkSyncUpgrade is ZKChainBase {
-    /// @notice The address of this contract.
-    /// @dev needed if address is delegateCalled, and we delegateCall it again.
-    address public immutable THIS_ADDRESS;
-
-    constructor() {
-        THIS_ADDRESS = address(this);
-    }
-
     /// @notice Changes the protocol version
     event NewProtocolVersion(uint256 indexed previousProtocolVersion, uint256 indexed newProtocolVersion);
 
@@ -271,7 +263,7 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
             return bytes32(0);
         }
 
-        if (_l2ProtocolUpgradeTx.txType != SYSTEM_UPGRADE_L2_TX_TYPE) {
+        if (_l2ProtocolUpgradeTx.txType != _getUpgradeTxType()) {
             revert InvalidTxType(_l2ProtocolUpgradeTx.txType);
         }
         if (_patchOnly) {
@@ -280,11 +272,13 @@ abstract contract BaseZkSyncUpgrade is ZKChainBase {
 
         bytes memory encodedTransaction = abi.encode(_l2ProtocolUpgradeTx);
 
+        // solhint-disable-next-line func-named-parameters
         TransactionValidator.validateL1ToL2Transaction(
             _l2ProtocolUpgradeTx,
             encodedTransaction,
             s.priorityTxMaxGasLimit,
-            s.feeParams.priorityTxMaxPubdata
+            s.feeParams.priorityTxMaxPubdata,
+            s.zksyncOS
         );
 
         TransactionValidator.validateUpgradeTransaction(_l2ProtocolUpgradeTx);

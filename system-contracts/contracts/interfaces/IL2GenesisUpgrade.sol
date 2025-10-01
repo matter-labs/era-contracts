@@ -20,6 +20,7 @@ struct ZKChainSpecificForceDeploymentsData {
 /// @notice The structure that describes force deployments that are the same for each chain.
 /// @dev Note, that for simplicity, the same struct is used both for upgrading to the
 /// Gateway version and for the Genesis. Some fields may not be used in either of those.
+// FIXME: not in sync with L1.
 // solhint-disable-next-line gas-struct-packing
 struct FixedForceDeploymentsData {
     uint256 l1ChainId;
@@ -52,6 +53,7 @@ interface IL2GenesisUpgrade {
     event UpgradeComplete(uint256 _chainId);
 
     function genesisUpgrade(
+        bool _isZKsyncOS,
         uint256 _chainId,
         address _ctmDeployer,
         bytes calldata _fixedForceDeploymentsData,

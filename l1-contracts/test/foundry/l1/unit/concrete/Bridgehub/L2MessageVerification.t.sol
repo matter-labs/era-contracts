@@ -3,10 +3,9 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 
 import {Merkle} from "contracts/common/libraries/Merkle.sol";
-import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
+
 import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol";
 import {L2Log, L2Message} from "contracts/common/Messaging.sol";
 // import {IL2InteropRootStorage} from "contracts/common/interfaces/IL2InteropRootStorage.sol";

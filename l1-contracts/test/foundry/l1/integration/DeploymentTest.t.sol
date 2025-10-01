@@ -12,13 +12,11 @@ import {L2TxMocker} from "./_SharedL2TxMocker.t.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+
 import {AddressesAlreadyGenerated} from "test/foundry/L1TestsErrors.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IncorrectBridgeHubAddress} from "contracts/common/L1ContractErrors.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
-import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 
 contract DeploymentTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer, L2TxMocker, ConfigSemaphore {
     uint256 constant TEST_USERS_COUNT = 10;

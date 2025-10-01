@@ -15,7 +15,8 @@ import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 
 import {Unauthorized, UnsupportedEncodingVersion} from "../common/L1ContractErrors.sol";
-import {ChainAlreadyRegistered, ZKChainNotRegistered, NoEthAllowed} from "./L1BridgehubErrors.sol";
+import {ChainAlreadyRegistered, NoEthAllowed, ZKChainNotRegistered} from "./L1BridgehubErrors.sol";
+import {IL2Bridgehub} from "./IL2Bridgehub.sol";
 
 /// @dev The encoding version of the data.
 bytes1 constant CHAIN_REGISTRATION_SENDER_ENCODING_VERSION = 0x01;
@@ -111,7 +112,7 @@ contract ChainRegistrationSender is
     /// @return the L2 transaction calldata
     function _getL2TxCalldata(uint256 chainToBeRegistered) internal view returns (bytes memory) {
         bytes32 baseTokenAssetId = BRIDGE_HUB.baseTokenAssetId(chainToBeRegistered);
-        return abi.encodeCall(IBridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
+        return abi.encodeCall(IL2Bridgehub.registerChainForInterop, (chainToBeRegistered, baseTokenAssetId));
     }
 
     /// @inheritdoc IL1CrossChainSender

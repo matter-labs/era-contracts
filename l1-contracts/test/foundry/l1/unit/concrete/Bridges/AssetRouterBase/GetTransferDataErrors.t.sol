@@ -9,7 +9,7 @@ import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBa
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 
 contract TestAssetRouterBase is AssetRouterBase {
-    constructor() AssetRouterBase(1, 1, IBridgehub(address(1))) {}
+    // constructor() AssetRouterBase(1, 1, IBridgehub(address(1))) {}
 
     function setAssetHandlerAddressThisChain(bytes32, address) external override {}
 
@@ -24,6 +24,26 @@ contract TestAssetRouterBase is AssetRouterBase {
     // Use a specific name that won't trigger fuzz testing
     function callGetTransferData(bytes1 encodingVersion, bytes calldata data) external returns (bytes32, bytes memory) {
         return _getTransferData(encodingVersion, address(0), data);
+    }
+
+    function BRIDGE_HUB() external view override returns (IBridgehub) {
+        return IBridgehub(address(1));
+    }
+
+    function L1_CHAIN_ID() external view override returns (uint256) {
+        return 1;
+    }
+
+    function _bridgehub() internal view override returns (IBridgehub) {
+        return IBridgehub(address(1));
+    }
+
+    function _l1ChainId() internal view override returns (uint256) {
+        return 1;
+    }
+
+    function _eraChainId() internal view override returns (uint256) {
+        return 1;
     }
 }
 

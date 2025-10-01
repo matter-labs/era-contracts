@@ -28,7 +28,7 @@ import {AddressAlreadySet, DepositDoesNotExist, DepositExists, InvalidProof, Inv
 import {EthAlreadyMigratedToL1NTV, NativeTokenVaultAlreadySet, WrongL2Sender} from "./L1BridgeContractErrors.sol";
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
 import {TransientPrimitivesLib} from "../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {IMessageRoot} from "../bridgehub/MessageRoot.sol";
+import {IMessageRoot} from "../bridgehub/IMessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev

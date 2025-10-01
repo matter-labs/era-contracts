@@ -26,6 +26,14 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
     /// @param _proposedUpgrade The upgrade to be executed.
     function upgrade(ProposedUpgrade memory _proposedUpgrade) public override returns (bytes32) {
         IBridgehub bridgehub = IBridgehub(s.bridgehub);
+
+        /// We write to storage to avoid reentrancy.
+        s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
+
+        // Note, that this call will revert if the native token vault has not been upgraded, i.e. 
+        // if a chain settling on Gateway tries to upgrade before ZK Gateway has done the upgrade.
+        s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
+
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
         INativeTokenVault nativeTokenVault = INativeTokenVault(
             IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault()
@@ -47,6 +55,8 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
 
+        // The lines below ensures that chains can only upgrade once the ZK Gateway itself is upgraded,
+        // i.e. its `v30UpgradeGatewayBlockNumber` is non zero.
         uint256 gwChainId = messageRoot.GATEWAY_CHAIN_ID();
         address gwChain = bridgehub.getZKChain(gwChainId);
         (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
@@ -54,13 +64,6 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
 
         chainAssetHandler.setMigrationNumberForV30(s.chainId);
 
-        s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
-        // Note, that this call will revert if the native token vault has not been upgraded, i.e. 
-        // if a chain settling on Gateway tries to upgrade before ZK Gateway has done the upgrade.
-        s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
-
-        // Note, that the line below ensures that chains can only upgrade once the ZK Gateway itself is upgraded,
-        // i.e. its `v30UpgradeGatewayBlockNumber` is non zero.
         if (s.settlementLayer == address(0)) {
             messageRoot.saveV30UpgradeChainBatchNumber(s.chainId);
         }
@@ -68,6 +71,8 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         if (bridgehub.whitelistedSettlementLayers(s.chainId)) {
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
+
+        s.__DEPRECATED_l2DAValidator = address(0);
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }

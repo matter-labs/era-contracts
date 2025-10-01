@@ -2,8 +2,6 @@
 // We use a floating point pragma here so it can be used within other projects that interact with the ZKsync ecosystem without using our exact pragma version.
 pragma solidity ^0.8.20;
 
-// 0x86bb51b8
-error AddressHasNoCode(address);
 // 0xefce78c7
 error CallerMustBeBootloader();
 // 0xbe4bf9e4
@@ -76,8 +74,6 @@ error IndexSizeError();
 error InsufficientFunds(uint256 required, uint256 actual);
 // 0xae962d4e
 error InvalidCall();
-// 0x7a47c9a2
-error InvalidChainId();
 // 0x6a84bc39
 error InvalidCodeHash(CodeHashReason);
 // 0xc74537a1
