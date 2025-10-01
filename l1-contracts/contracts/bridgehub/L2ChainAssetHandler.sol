@@ -7,7 +7,7 @@ import {IBridgehub} from "./IBridgehub.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
-import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_COMPLEX_UPGRADER_ADDR, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {InvalidCaller} from "../common/L1ContractErrors.sol";
 
 /// @author Matter Labs
@@ -42,8 +42,6 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// the old version where it was an immutable.
     address private ASSET_ROUTER;
 
-    address private ASSET_TRACKER;
-
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
@@ -65,7 +63,7 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     }
 
     function _assetTracker() internal view override returns (address) {
-        return ASSET_TRACKER;
+        return L2_ASSET_TRACKER_ADDR;
     }
 
     /// @dev Only allows calls from the complex upgrader contract on L2.
