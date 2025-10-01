@@ -39,6 +39,10 @@ error InvalidV30UpgradeChainBatchNumber(uint256 _chainId);
 error InvalidVersion();
 // 0xf76b228a
 error InvalidWithdrawalChainId();
+// 0xa16d8a80
+error L1TotalSupplyAlreadyMigrated();
+// 0x4c56a8ba
+error MaxChainBalanceAlreadyAssigned();
 // 0x7e472272
 error MissingBaseTokenAssetId();
 // 0x8dfed13a
@@ -53,5 +57,3 @@ error OnlyWithdrawalsAllowedForPreV30Chains();
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
-error L1TotalSupplyAlreadyMigrated();
-error MaxChainBalanceAlreadyAssigned();

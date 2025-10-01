@@ -42,7 +42,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     /// Todo Deprecate after V30 is finished.
     mapping(bytes32 assetId => bool maxChainBalanceAssigned) internal maxChainBalanceAssigned;
-    
+
     /// Todo Deprecate after V30 is finished.
     mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
 
@@ -71,7 +71,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _;
     }
 
-     /// @notice Modifier to ensure the caller is the administrator of the specified chain.
+    /// @notice Modifier to ensure the caller is the administrator of the specified chain.
     /// @param _chainId The ID of the chain that requires the caller to be an admin.
     modifier onlyChainAdmin(uint256 _chainId) {
         IChainTypeManager ctm = IChainTypeManager(BRIDGE_HUB.chainTypeManager(_chainId));
