@@ -32,6 +32,15 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     address constant UNBUNDLER_ADDRESS = address(0x1);
     address constant EXECUTION_ADDRESS = address(0x2);
 
+    modifier mockSettlementLayerChainId() {
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
+            abi.encode(block.chainid)
+        );
+        _;
+    }
+
     function performDeposit(address depositor, address receiver, uint256 amount) internal {
         vm.prank(aliasedL1AssetRouter);
         L2AssetRouter(L2_ASSET_ROUTER_ADDR).finalizeDeposit({
@@ -54,7 +63,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         BridgedStandardERC20(l2TokenAddress).bridgeMint(address(this), 100000);
     }
 
-    function test_shouldFinalizeERC20Deposit() public {
+    function test_shouldFinalizeERC20Deposit() public mockSettlementLayerChainId {
         address depositor = makeAddr("depositor");
         address receiver = makeAddr("receiver");
 
@@ -69,7 +78,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), TOKEN_DEFAULT_DECIMALS);
     }
 
-    function test_governanceShouldBeAbleToReinitializeToken() public {
+    function test_governanceShouldBeAbleToReinitializeToken() public mockSettlementLayerChainId {
         address l2TokenAddress = initializeTokenByDeposit();
 
         BridgedStandardERC20.ERC20Getters memory getters = BridgedStandardERC20.ERC20Getters({
@@ -86,7 +95,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         assertEq(BridgedStandardERC20(l2TokenAddress).decimals(), 18);
     }
 
-    function test_governanceShouldNotBeAbleToSkipInitializerVersions() public {
+    function test_governanceShouldNotBeAbleToSkipInitializerVersions() public mockSettlementLayerChainId {
         address l2TokenAddress = initializeTokenByDeposit();
 
         BridgedStandardERC20.ERC20Getters memory getters = BridgedStandardERC20.ERC20Getters({
@@ -100,7 +109,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         BridgedStandardERC20(l2TokenAddress).reinitializeToken(getters, "TestTokenNewName", "TTN", 20);
     }
 
-    function test_withdrawTokenNoRegistration() public {
+    function test_withdrawTokenNoRegistration() public mockSettlementLayerChainId {
         TestnetERC20Token l2NativeToken = new TestnetERC20Token("token", "T", 18);
 
         l2NativeToken.mint(address(this), 100);
@@ -121,7 +130,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         );
     }
 
-    function test_requestTokenTransferInterop() public {
+    function test_requestTokenTransferInterop() public mockSettlementLayerChainId {
         address l2TokenAddress = initializeTokenByDeposit();
         bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
         vm.deal(address(this), 1000 ether);
@@ -172,7 +181,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
     }
 
-    function test_requestSendCall() public {
+    function test_requestSendCall() public mockSettlementLayerChainId {
         address l2TokenAddress = initializeTokenByDeposit();
         bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
         vm.deal(address(this), 1000 ether);

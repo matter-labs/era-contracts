@@ -13,6 +13,7 @@ import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
@@ -59,6 +60,11 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             L2_BRIDGEHUB_ADDR,
             abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
             abi.encode(ETH_TOKEN_ADDRESS)
+        );
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
+            abi.encode()
         );
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
@@ -189,6 +195,11 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
             abi.encode(bytes(""))
         );
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
+            abi.encode(block.chainid)
+        );
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
         // Expect event
         vm.expectEmit(true, false, false, false);
@@ -223,6 +234,11 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.mint.selector),
             abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
+            abi.encode(block.chainid)
         );
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(proof.chainId, bundle);
         IInteropHandler(L2_INTEROP_HANDLER_ADDR).verifyBundle(bundle, proof);
