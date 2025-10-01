@@ -11,7 +11,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTR
 
 import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common/Config.sol";
 
-import {BridgehubBurnCTMAssetData, IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
@@ -96,9 +96,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             .with_key(assetId)
             .checked_write(L2_BRIDGEHUB_ADDR);
 
-        stdstore.target(L2_BRIDGEHUB_ADDR).sig(IBridgehub.ctmAssetIdToAddress.selector).with_key(assetId).checked_write(
-            address(chainTypeManager)
-        );
+        stdstore
+            .target(L2_BRIDGEHUB_ADDR)
+            .sig(IBridgehubBase.ctmAssetIdToAddress.selector)
+            .with_key(assetId)
+            .checked_write(address(chainTypeManager));
 
         (bool success, ) = recipient.call(data);
     }

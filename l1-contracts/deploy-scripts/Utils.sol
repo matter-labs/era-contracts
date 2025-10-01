@@ -11,8 +11,7 @@ import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IAccessControlDefaultAdminRules} from "@openzeppelin/contracts-v4/access/IAccessControlDefaultAdminRules.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
-
+import {IL1Bridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 import {Call} from "contracts/governance/Common.sol";
@@ -357,7 +356,7 @@ library Utils {
         }
 
         vm.broadcast();
-        (bool success, bytes memory data) = _factory.call{gas: 20_000_000}(abi.encodePacked(_salt, _bytecode));
+        (bool success, bytes memory data) = _factory.call(abi.encodePacked(_salt, _bytecode));
         contractAddress = bytesToAddress(data);
 
         if (!success || contractAddress == address(0) || contractAddress.code.length == 0) {
@@ -479,7 +478,7 @@ library Utils {
         view
         returns (L2TransactionRequestDirect memory l2TransactionRequestDirect, uint256 requiredValueToDeploy)
     {
-        IBridgehub bridgehub = IBridgehub(params.bridgehubAddress);
+        IL1Bridgehub bridgehub = IL1Bridgehub(params.bridgehubAddress);
 
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(
@@ -518,7 +517,7 @@ library Utils {
         view
         returns (L2TransactionRequestTwoBridgesOuter memory l2TransactionRequest, uint256 requiredValueToDeploy)
     {
-        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
+        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
 
         requiredValueToDeploy =
             bridgehub.l2TransactionBaseCost(chainId, l1GasPrice, l2GasLimit, REQUIRED_L2_GAS_PRICE_PER_PUBDATA) *
@@ -551,7 +550,7 @@ library Utils {
         address l1SharedBridgeProxy,
         address refundRecipient
     ) internal returns (bytes32 txHash) {
-        IBridgehub bridgehub = IBridgehub(bridgehubAddress);
+        IL1Bridgehub bridgehub = IL1Bridgehub(bridgehubAddress);
         PrepareL1L2TransactionParams memory params = PrepareL1L2TransactionParams({
             l1GasPrice: bytesToUint256(vm.rpc("eth_gasPrice", "[]")),
             l2Calldata: l2Calldata,
@@ -583,7 +582,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed succeassfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
 
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
@@ -645,7 +644,7 @@ library Utils {
             );
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
-            IBridgehub(bridgehubAddress),
+            IL1Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
@@ -654,7 +653,7 @@ library Utils {
         calls = mergeCalls(calls, newCalls);
 
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionDirect,
+            IL1Bridgehub.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -690,7 +689,7 @@ library Utils {
             );
 
         (uint256 ethAmountToPass, Call[] memory newCalls) = prepareApproveBaseTokenGovernanceCalls(
-            IBridgehub(bridgehubAddress),
+            IL1Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
@@ -699,7 +698,7 @@ library Utils {
         calls = mergeCalls(calls, newCalls);
 
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionTwoBridges,
+            IL1Bridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
@@ -710,7 +709,7 @@ library Utils {
     }
 
     function prepareApproveBaseTokenGovernanceCalls(
-        IBridgehub bridgehub,
+        IL1Bridgehub bridgehub,
         address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove
@@ -765,7 +764,7 @@ library Utils {
 
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
-            IBridgehub(bridgehubAddress),
+            IL1Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
@@ -776,7 +775,7 @@ library Utils {
 
         // 4) Add the actual requestL2TransactionDirect call to the Bridgehub
         bytes memory l2TransactionRequestDirectCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionDirect,
+            IL1Bridgehub.requestL2TransactionDirect,
             (l2TransactionRequestDirect)
         );
 
@@ -816,7 +815,7 @@ library Utils {
 
         // 2) Prepare approval calls if base token != ETH
         (uint256 ethAmountToPass, Call[] memory approvalCalls) = prepareApproveBaseTokenAdminCalls(
-            IBridgehub(bridgehubAddress),
+            IL1Bridgehub(bridgehubAddress),
             l1SharedBridgeProxy,
             chainId,
             requiredValueToDeploy
@@ -827,7 +826,7 @@ library Utils {
 
         // 4) Add the actual requestL2TransactionTwoBridges call to the Bridgehub
         bytes memory l2TransactionRequestCalldata = abi.encodeCall(
-            IBridgehub.requestL2TransactionTwoBridges,
+            IL1Bridgehub.requestL2TransactionTwoBridges,
             (l2TransactionRequest)
         );
 
@@ -877,7 +876,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
         console.log("L2 Transaction hash is ");
@@ -921,7 +920,7 @@ library Utils {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         console.log("Transaction executed successfully! Extracting logs...");
 
-        address expectedDiamondProxyAddress = IBridgehub(bridgehubAddress).getZKChain(chainId);
+        address expectedDiamondProxyAddress = IL1Bridgehub(bridgehubAddress).getZKChain(chainId);
         txHash = extractPriorityOpFromLogs(expectedDiamondProxyAddress, logs);
 
         console.log("L2 Transaction hash is ");
@@ -929,7 +928,7 @@ library Utils {
     }
 
     function prepareApproveBaseTokenAdminCalls(
-        IBridgehub bridgehub,
+        IL1Bridgehub bridgehub,
         address l1SharedBridgeProxy,
         uint256 chainId,
         uint256 amountToApprove

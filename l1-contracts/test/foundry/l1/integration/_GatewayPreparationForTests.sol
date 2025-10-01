@@ -39,13 +39,13 @@ contract GatewayPreparationForTests is Script, GatewayGovernanceUtils {
         // path = string.concat(root, vm.envString("GATEWAY_AS_CHAIN_OUTPUT"));
         // toml = vm.readFile(path);
 
-        // config.gatewayChainAdmin = IZKChain(IBridgehub(config.bridgehub).getZKChain(config.gatewayChainId)).getAdmin();
+        // config.gatewayChainAdmin = IZKChain(IBridgehubBase(config.bridgehub).getZKChain(config.gatewayChainId)).getAdmin();
         // // toml.readAddress("$.chain_admin_addr");
         // config.gatewayChainProxyAdmin = toml.readAddress("$.chain_proxy_admin_addr");
         // config.gatewayAccessControlRestriction = toml.readAddress(
         //     "$.deployed_addresses.access_control_restriction_addr"
         // );
-        // config.l1NullifierProxy = address(IL1AssetRouter(IBridgehub(config.bridgehub).assetRouter()).L1_NULLIFIER());
+        // config.l1NullifierProxy = address(IL1AssetRouter(IBridgehubBase(config.bridgehub).assetRouter()).L1_NULLIFIER());
 
         // console.log("chain chain id = ", config.gatewayChainId);
 

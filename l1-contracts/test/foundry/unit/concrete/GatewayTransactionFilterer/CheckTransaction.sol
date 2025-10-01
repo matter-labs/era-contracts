@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {GatewayTransactionFiltererTest} from "./_GatewayTransactionFilterer_Shared.t.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 
@@ -16,7 +16,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         vm.startPrank(owner);
         vm.mockCall(
             bridgehub,
-            abi.encodeWithSelector(IBridgehub.ctmAssetIdToAddress.selector),
+            abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
             abi.encode(address(0)) // Return any address
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
@@ -59,7 +59,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
         vm.startPrank(owner);
         vm.mockCall(
             bridgehub,
-            abi.encodeWithSelector(IBridgehub.ctmAssetIdToAddress.selector),
+            abi.encodeWithSelector(IBridgehubBase.ctmAssetIdToAddress.selector),
             abi.encode(stm) // Return random address
         );
 

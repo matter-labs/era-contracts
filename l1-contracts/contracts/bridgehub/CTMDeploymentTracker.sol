@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 
@@ -22,7 +22,7 @@ bytes1 constant CTM_DEPLOYMENT_TRACKER_ENCODING_VERSION = 0x01;
 /// @dev Contract to be deployed on L1, can link together other contracts based on AssetInfo.
 contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Ownable2StepUpgradeable {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
-    IBridgehub public immutable override BRIDGE_HUB;
+    IBridgehubBase public immutable override BRIDGE_HUB;
 
     /// @dev L1AssetRouter smart contract that is used to bridge assets (including chains) between L1 and L2.
     IAssetRouterBase public immutable override L1_ASSET_ROUTER;
@@ -45,7 +45,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
 
     /// @dev Contract is expected to be used as proxy implementation on L1.
     /// @dev Initialize the implementation to prevent Parity hack.
-    constructor(IBridgehub _bridgehub, IAssetRouterBase _l1AssetRouter) {
+    constructor(IBridgehubBase _bridgehub, IAssetRouterBase _l1AssetRouter) {
         _disableInitializers();
         BRIDGE_HUB = _bridgehub;
         L1_ASSET_ROUTER = _l1AssetRouter;
@@ -154,7 +154,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, IL1CrossChainSender, Own
         address _ctmL2Address
     ) internal pure returns (L2TransactionRequestTwoBridgesInner memory request) {
         bytes memory l2TxCalldata = abi.encodeCall(
-            IBridgehub.setCTMAssetAddress,
+            IBridgehubBase.setCTMAssetAddress,
             (bytes32(uint256(uint160(_ctmL1Address))), _ctmL2Address)
         );
 
