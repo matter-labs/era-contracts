@@ -578,11 +578,15 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// if the chain is on L1 at V30, or is deployed V30 or after, then it returns true.
     function _checkV30UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
         IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
+        uint256 chainMigrationNumber = IChainAssetHandler(bridgehub.chainAssetHandler()).getMigrationNumber(_chainId);
+        uint256 pauseTimestamp = s.pausedDepositsTimestamp[chainMigrationNumber];
+
         if (
             bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) ==
-            V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
+            V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY ||
+            block.timestamp < pauseTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END
         ) {
-            /// We pause deposits until the chain has upgraded on GW
+            /// We pause deposits until the chain has upgraded on GW and the full pause time window has elapsed
             return false;
         }
         return true;
