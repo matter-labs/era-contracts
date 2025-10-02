@@ -4,7 +4,6 @@ pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
-import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
@@ -16,7 +15,6 @@ import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
 import {AlreadyMigrated, PriorityQueueNotFullyProcessed, ContractNotDeployed, DepositsAlreadyPaused, DepositsPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
-import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -296,20 +294,14 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function pauseDepositsAndInitiateMigration() external onlyAdmin onlyL1 {
-        require(
-            s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp,
-            DepositsAlreadyPaused()
-        );
+        require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
         s.pausedDepositsTimestamp = block.timestamp;
         emit DepositsPaused(s.chainId, block.timestamp);
     }
 
     /// @inheritdoc IAdmin
     function unpauseDeposits() external onlyAdmin onlyL1 {
-        require(
-            s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END >= block.timestamp,
-            DepositsNotPaused()
-        );
+        require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END >= block.timestamp, DepositsNotPaused());
         s.pausedDepositsTimestamp = 0;
         emit DepositsUnpaused(s.chainId);
     }

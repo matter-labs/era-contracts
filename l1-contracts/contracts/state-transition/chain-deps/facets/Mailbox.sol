@@ -34,7 +34,6 @@ import {IMessageVerification, MessageVerification} from "../../../common/Message
 import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.sol";
-import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
 import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../../bridgehub/IMessageRoot.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
@@ -575,8 +574,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// if the chain is on L1 at V30, or is deployed V30 or after, then it returns true.
     function _checkV30UpgradeProcessed(uint256 _chainId) internal view returns (bool) {
         IBridgehubBase bridgehub = IBridgehubBase(s.bridgehub);
-        uint256 chainMigrationNumber = IChainAssetHandler(bridgehub.chainAssetHandler()).getMigrationNumber(_chainId);
-        uint256 pauseTimestamp = s.pausedDepositsTimestamp[chainMigrationNumber];
+        uint256 pauseTimestamp = s.pausedDepositsTimestamp;
 
         if (
             bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) ==
