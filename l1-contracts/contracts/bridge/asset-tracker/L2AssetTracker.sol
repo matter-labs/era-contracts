@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
+import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
@@ -12,11 +12,17 @@ import {Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
-import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, ChainBalanceAlreadyInitialized, TokenNotL2Native, VaultBalanceOverflow} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
 contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
+    /// @notice Event emitted when chainBalance is initialized for an L2 native token
+    /// @param assetId The asset ID of the token
+    /// @param chainBalance The calculated chain balance (MAX_TOKEN_BALANCE - nvtBalance)
+    /// @param nvtBalance The current balance held by the L2NativeTokennvt
+    event ChainBalanceInitialized(bytes32 indexed assetId, uint256 chainBalance, uint256 nvtBalance);
+
     uint256 public L1_CHAIN_ID;
 
     bytes32 public BASE_TOKEN_ASSET_ID;
@@ -58,6 +64,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
+
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
@@ -280,5 +287,50 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
         return L2_CHAIN_ASSET_HANDLER.getMigrationNumber(_chainId);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                        V30 chainBalance Initialization
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Initializes chainBalance for L2 native tokens using MAX_TOKEN_BALANCE - balanceOf(L2NTV) formula
+    /// @dev This is a one-time initialization function for V30 upgrade to properly track L2 native token balances
+    /// @param _assetIds Array of asset IDs for L2 native tokens to initialize
+    function initializeL2NativeTokenChainBalances(bytes32[] calldata _assetIds) external onlyUpgrader {
+        INativeTokenVaultBase nvt = _nativeTokenVault();
+
+        uint256 assetIdsLength = _assetIds.length;
+
+        for (uint256 i = 0; i < assetIdsLength; ++i) {
+            bytes32 assetId = _assetIds[i];
+
+            // Validate that this is an L2 native token
+            uint256 originChainId = nvt.originChainId(assetId);
+            if (originChainId != L1_CHAIN_ID) {
+                revert TokenNotL2Native(assetId, originChainId, block.chainid);
+            }
+
+            // Get token address
+            address tokenAddress = nvt.tokenAddress(assetId);
+            if (tokenAddress == address(0)) {
+                revert AssetIdNotRegistered(assetId);
+            }
+
+            // Prevent re-initialization if already set
+            if (chainBalance[block.chainid][assetId] != 0) {
+                revert ChainBalanceAlreadyInitialized(assetId);
+            }
+
+            uint256 nvtBalance = IERC20(tokenAddress).balanceOf(address(nvt));
+            if (nvtBalance > MAX_TOKEN_BALANCE) {
+                revert VaultBalanceOverflow(nvtBalance);
+            }
+
+            uint256 calculatedChainBalance = MAX_TOKEN_BALANCE - nvtBalance;
+
+            chainBalance[block.chainid][assetId] = calculatedChainBalance;
+
+            emit ChainBalanceInitialized(assetId, calculatedChainBalance, nvtBalance);
+        }
     }
 }

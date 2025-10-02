@@ -3,6 +3,8 @@ pragma solidity ^0.8.21;
 
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
+// 0xe7e9baf4
+error ChainBalanceAlreadyInitialized(bytes32 _assetId);
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0x2e19b556
@@ -53,5 +55,9 @@ error OnlyWhitelistedSettlementLayer(address, address);
 error OnlyWithdrawalsAllowedForPreV30Chains();
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
+// 0x12ef3eb1
+error TokenNotL2Native(bytes32 _assetId, uint256 _originChainId, uint256 _currentChainId);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
+// 0xd58c2a50
+error VaultBalanceOverflow(uint256 _vaultBalance);
