@@ -11,6 +11,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 // import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 // import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
@@ -31,7 +32,16 @@ import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 
-    function test_registerLegacyToken() external {
+    modifier mockSettlementLayerChainId() {
+        vm.mockCall(
+            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
+            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
+            abi.encode(block.chainid)
+        );
+        _;
+    }
+
+    function test_registerLegacyToken() external mockSettlementLayerChainId {
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
         vm.mockCall(
@@ -42,7 +52,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         IL2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
     }
 
-    function test_registerLegacyToken_IncorrectConfiguration() external {
+    function test_registerLegacyToken_IncorrectConfiguration() external mockSettlementLayerChainId {
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
         INativeTokenVault l2NativeTokenVault = INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
@@ -99,7 +109,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerToken(l2Token);
     }
 
-    function test_bridgeMint_CorrectlyConfiguresL2LegacyToken() external {
+    function test_bridgeMint_CorrectlyConfiguresL2LegacyToken() external mockSettlementLayerChainId {
         INativeTokenVault l2NativeTokenVault = INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
 
         uint256 originChainId = L1_CHAIN_ID;
