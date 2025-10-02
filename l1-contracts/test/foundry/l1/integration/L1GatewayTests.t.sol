@@ -232,14 +232,14 @@ contract L1GatewayTests is
         vm.mockCall(
             address(addresses.ecosystemAddresses.bridgehub.messageRootProxy),
             abi.encodeWithSelector(
-                IMessageVerification.proveL1ToL2TransactionStatusShared.selector
-                // migratingChainId,
-                // l2TxHash,
-                // l2BatchNumber,
-                // l2MessageIndex,
-                // l2TxNumberInBatch,
-                // merkleProof,
-                // TxStatus.Failure
+                IMessageVerification.proveL1ToL2TransactionStatusShared.selector,
+                migratingChainId,
+                l2TxHash,
+                l2BatchNumber,
+                l2MessageIndex,
+                l2TxNumberInBatch,
+                merkleProof,
+                TxStatus.Failure
             ),
             abi.encode(true)
         );
