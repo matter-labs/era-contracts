@@ -102,9 +102,8 @@ library ContractsBytecodesLib {
             "TimestampAsserter"
         ];
 
-        string[3] memory SYSTEM_CONTRACT_IDENTIFIERS = [
+        string[2] memory SYSTEM_CONTRACT_IDENTIFIERS = [
             "SystemTransparentUpgradeableProxy",
-            "L2GatewayUpgrade",
             "L2V29Upgrade"
         ];
 

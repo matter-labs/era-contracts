@@ -2,8 +2,6 @@
 
 pragma solidity ^0.8.21;
 
-// 0x388b6f68
-error GatewayUpgradeFailed();
 // 0xb334f781
 error GenesisUpgradeExpectedOnSettlementLayer();
 // 0x5cb29523
