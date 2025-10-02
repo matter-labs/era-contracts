@@ -90,7 +90,7 @@ library AddressAliasHelper {
             // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
             // solhint-disable avoid-tx-origin
             // slither-disable-next-line tx-origin
-            _recipient = (_originalCaller == tx.origin || _is7702Account)
+            _recipient = (_originalCaller == tx.origin)
                 ? _originalCaller
                 : AddressAliasHelper.applyL1ToL2Alias(_originalCaller);
             // solhint-enable avoid-tx-origin

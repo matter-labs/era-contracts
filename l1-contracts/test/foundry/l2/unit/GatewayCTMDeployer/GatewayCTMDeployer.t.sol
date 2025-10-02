@@ -60,7 +60,7 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1, 1, IEIP7702Checker(address(new MockEIP7702Checker())));
+        new MailboxFacet(1, 1, IEIP7702Checker(address(1)));
         new ExecutorFacet(1);
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
