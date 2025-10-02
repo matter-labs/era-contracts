@@ -7,7 +7,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {InvalidProof, ZeroAddress} from "../../common/L1ContractErrors.sol";
+import {InvalidProof, ZeroAddress, InvalidChainId, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {FinalizeL1DepositParams, IL1Nullifier} from "../../bridge/interfaces/IL1Nullifier.sol";
@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {ChainBalanceNotZero, InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidTokenAddress, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidSettlementLayer, InvalidTokenAddress, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -25,6 +25,7 @@ import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
+import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     uint256 public immutable L1_CHAIN_ID;
@@ -39,7 +40,11 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     IChainAssetHandler public chainAssetHandler;
 
-    mapping(bytes32 assetId => bool maxTokenBalanceAssigned) internal maxTokenBalanceAssigned;
+    /// Todo Deprecate after V30 is finished.
+    mapping(bytes32 assetId => bool maxChainBalanceAssigned) internal maxChainBalanceAssigned;
+
+    /// Todo Deprecate after V30 is finished.
+    mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
 
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
@@ -63,6 +68,16 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 _bridgehub().getZKChain(_callerChainId) == msg.sender,
             OnlyWhitelistedSettlementLayer(_bridgehub().getZKChain(_callerChainId), msg.sender)
         );
+        _;
+    }
+
+    /// @notice Modifier to ensure the caller is the administrator of the specified chain.
+    /// @param _chainId The ID of the chain that requires the caller to be an admin.
+    modifier onlyChainAdmin(uint256 _chainId) {
+        IChainTypeManager ctm = IChainTypeManager(BRIDGE_HUB.chainTypeManager(_chainId));
+        if (msg.sender != ctm.getChainAdmin(_chainId)) {
+            revert Unauthorized(msg.sender);
+        }
         _;
     }
 
@@ -100,20 +115,24 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @param _assetId The asset id of the token to migrate the token balance for.
     function migrateTokenBalanceFromNTVV30(uint256 _chainId, bytes32 _assetId) external {
         IL1NativeTokenVault l1NTV = IL1NativeTokenVault(address(NATIVE_TOKEN_VAULT));
+        uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
+        /// We do not migrate the chainBalance for the originChain directly, but indirectly by subtracting from MAX_TOKEN_BALANCE.
+        /// Its important to call this for all chains in the ecosystem so that the sum is accurate.
+        require(_chainId != originChainId, InvalidChainId());
         uint256 migratedBalance;
         if (_chainId != block.chainid) {
             migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
         } else {
             address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
             migratedBalance = IERC20(tokenAddress).totalSupply();
-            require(chainBalance[block.chainid][_assetId] == 0, ChainBalanceNotZero());
+            require(!l1TotalSupplyMigrated[_assetId], L1TotalSupplyAlreadyMigrated());
+            l1TotalSupplyMigrated[_assetId] = true;
         }
         /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
         /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
-        uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
         /// Note before the token is migrated the MAX_TOKEN_BALANCE is not assigned, since the registerNewToken is only called for new tokens.
-        if (!maxTokenBalanceAssigned[_assetId]) {
-            maxTokenBalanceAssigned[_assetId] = true;
+        if (!maxChainBalanceAssigned[_assetId]) {
+            maxChainBalanceAssigned[_assetId] = true;
             chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE;
         }
         chainBalance[originChainId][_assetId] -= migratedBalance;
@@ -128,9 +147,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(_l2ChainId, _l2NativeToken);
 
+        /// This guarantees the token is not a legacy
         require(NATIVE_TOKEN_VAULT.tokenAddress(assetId) == address(0), InvalidTokenAddress());
+        require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned());
 
         chainBalance[settlementLayer][assetId] = MAX_TOKEN_BALANCE;
+        maxChainBalanceAssigned[assetId] = true;
 
         _sendConfirmationToChains(
             settlementLayer,
@@ -145,8 +167,19 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
     }
 
+    /// @dev the chainAdmin should call this function for all unfinalized withdrawals after the chain migrates to GW.
+    function registerUnfinalizedWithdrawal(uint256 _chainId, address _l2NativeToken) external onlyChainAdmin(_chainId) {
+        bytes32 assetId = DataEncoding.encodeNTVAssetId(_chainId, _l2NativeToken);
+        require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned());
+        chainBalance[_chainId][assetId] = MAX_TOKEN_BALANCE;
+        maxChainBalanceAssigned[assetId] = true;
+    }
+
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
-        _assignMaxChainBalance(_originChainId, _assetId);
+        if (!maxChainBalanceAssigned[_assetId]) {
+            _assignMaxChainBalance(_originChainId, _assetId);
+            maxChainBalanceAssigned[_assetId] = true;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -258,6 +291,9 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 fromChainId;
         uint256 toChainId;
 
+        /// We check the assetId to make sure the chain is not lying about it.
+        DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
+
         if (data.isL1ToGateway) {
             uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
             /// We check the chainMigrationNumber to make sure the message is not from a previous token migration.
@@ -281,9 +317,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 (assetMigrationNumber[data.chainId][data.assetId]) % 2 == 0,
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
             );
-
-            /// We check the assetId to make sure the chain is not lying about it.
-            DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
 
             fromChainId = data.chainId;
             toChainId = currentSettlementLayer;
