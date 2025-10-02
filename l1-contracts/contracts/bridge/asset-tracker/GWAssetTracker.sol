@@ -35,9 +35,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// We assume that during a single deposit at most two tokens's balance for a chain are amended:
     /// - base token of the chain.
     /// - bridged token (in case it is a deposit of some sort).
-    /// @dev Only used on Gateway.
     /// @dev Whenever a failed deposit will be processed, the chain balance must be decremented accordingly.
-    /// From this follows that all failed deposit logs that are ever sent to Gateway must've been routed through L2AssetTracker,
+    /// From this follows that all failed deposit logs that are ever sent to Gateway must've been routed through this contract,
     /// i.e. a chain can not migrate on top of ZK Gateway until all deposits that were submitted through L1 have been processed 
     /// and vice versa is also enforced.
     mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
@@ -123,8 +122,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _assignMaxChainBalance(_originChainId, _assetId);
     }
 
-    /// @notice The function that is expected to be called by the InteropCenter whenever an L1->L2 transaction gets relayed through ZK Gateway
-    /// for chain `_chainId`. 
+    /// @notice The function that is expected to be called by the InteropCenter whenever an L1->L2 
+    /// transaction gets relayed through ZK Gateway for chain `_chainId`. 
     /// @dev Note on trust assumptions: `_chainId` and `_balanceChange` are trusted to be correct, since
     /// they are provided directly by the InteropCenter, which in turn, gets those from the L1 implementation of
     /// the GW Mailbox.

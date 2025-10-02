@@ -35,14 +35,14 @@ abstract contract AssetTrackerBase is
     /// - A chain can spend its balance when finalizing withdrawals/claiming failed deposits or when migrating the balance to the settlement layer.
     /// - A chain can increase its balance when deposits are made to the chain or when migrating the balance from the settlement layer.
     /// @dev On GWAssetTracker:
-    /// - For each assetId, the sum of chainBalance[chainId][assetId] across all chains equals chainBalance[settlementLayerId][assetId] 
-    /// of this on L1AssetTracker. I.e. all tokens are backed by the settlement layer's balance on L1.
+    /// - For each assetId, the sum of chainBalance[chainId][assetId] across all chains is less than or equal to
+    ///  chainBalance[settlementLayerId][assetId] on L1AssetTracker. I.e. all tokens are backed by the settlement layer's balance on L1.
     /// - Chains spend their balances when submitting withdrawals, processing failed deposits or sending tokens via interop.
     /// - The balances are increased when deposits are made to the chains and when they receive interop from other chains.
     /// - Also, the balances are increased or decreased when migrating the balance to/from the settlement layer.
     /// @dev On L2AssetTracker:
     /// - The `chainBalance` is only used to track the balance of native tokens on the L2.
-    /// - For all the other tokens it is expected to be 0. (TODO: it does not seem to be the case right now).
+    /// - For all the other tokens it is expected to be 0.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 balance)) public chainBalance;
 
     /// @notice Tracks the migration number of each asset on each chain. If the migration number is the same
