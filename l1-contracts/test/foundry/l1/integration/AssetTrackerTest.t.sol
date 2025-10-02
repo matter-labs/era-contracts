@@ -162,7 +162,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: eraZKChainId,
             assetId: assetId,
-            tokenOriginChainId: block.chainid,
+            tokenOriginChainId: originalChainId,
             amount: amount,
             migrationNumber: migrationNumber,
             originToken: tokenAddress,
@@ -216,12 +216,12 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(
             address(assetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 1)
+            bytes32(migrationNumber - 2)
         );
         vm.store(
             address(l2AssetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 1)
+            bytes32(migrationNumber - 2)
         );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
         vm.store(address(assetTracker), getTotalSupplyAcrossAllChainsLocation(assetId), bytes32(amount));
@@ -277,7 +277,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: eraZKChainId,
             assetId: assetId,
-            tokenOriginChainId: block.chainid,
+            tokenOriginChainId: originalChainId,
             amount: amount,
             migrationNumber: migrationNumber,
             originToken: tokenAddress,
