@@ -12,9 +12,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTE
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
-
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";

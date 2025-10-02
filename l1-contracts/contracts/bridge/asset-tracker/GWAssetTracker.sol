@@ -7,13 +7,13 @@ import {BUNDLE_IDENTIFIER, BalanceChange, ConfirmBalanceMigrationData, InteropBu
 import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
-import {INativeTokenVault} from "../ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
 import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidV30UpgradeChainBatchNumber, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidEmptyMessageRoot} from "./AssetTrackerErrors.sol";
@@ -24,6 +24,7 @@ import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
+import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
@@ -89,16 +90,31 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
+        uint256 length = LegacySharedBridgeAddresses.getLegacySharedBridgeLength(block.chainid);
+        for (uint256 i = 0; i < length; ++i) {
+            SharedBridgeOnChainId memory sharedBridgeOnChainId = LegacySharedBridgeAddresses
+                .getLegacySharedBridgeAddressOnGateway(block.chainid, i);
+            legacySharedBridgeAddress[sharedBridgeOnChainId.chainId] = sharedBridgeOnChainId.legacySharedBridgeAddress;
+        }
     }
+
+    /// @dev for local testing
+    function setLegacySharedBridgeAddressForLocalTesting(
+        uint256 _chainId,
+        address _legacySharedBridgeAddress
+    ) external onlyUpgrader {
+        legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
+    }
+
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
 
-    function _bridgehub() internal view override returns (IBridgehub) {
+    function _bridgehub() internal view override returns (IBridgehubBase) {
         return L2_BRIDGEHUB;
     }
 
-    function _nativeTokenVault() internal view override returns (INativeTokenVault) {
+    function _nativeTokenVault() internal view override returns (INativeTokenVaultBase) {
         return L2_NATIVE_TOKEN_VAULT;
     }
 
@@ -110,8 +126,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
-    function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
-        _assignMaxChainBalance(_originChainId, _assetId);
+    error RegisterNewTokenNotAllowed();
+
+    function registerNewToken(bytes32, uint256) public override onlyNativeTokenVault {
+        revert RegisterNewTokenNotAllowed();
     }
 
     function handleChainBalanceIncreaseOnGateway(

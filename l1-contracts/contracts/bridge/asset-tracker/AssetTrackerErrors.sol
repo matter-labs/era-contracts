@@ -3,8 +3,6 @@ pragma solidity ^0.8.21;
 
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
-// 0xa65b4be1
-error ChainBalanceNotZero();
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0x2e19b556
@@ -35,8 +33,14 @@ error InvalidSettlementLayer();
 error InvalidTokenAddress();
 // 0x142bd5be
 error InvalidV30UpgradeChainBatchNumber(uint256 _chainId);
+// 0xa9146eeb
+error InvalidVersion();
 // 0xf76b228a
 error InvalidWithdrawalChainId();
+// 0xa16d8a80
+error L1TotalSupplyAlreadyMigrated();
+// 0x4c56a8ba
+error MaxChainBalanceAlreadyAssigned();
 // 0x7e472272
 error MissingBaseTokenAssetId();
 // 0x8dfed13a

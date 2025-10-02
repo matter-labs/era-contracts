@@ -10,7 +10,8 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
 import {IL2NativeTokenVault} from "contracts/bridge/ntv/IL2NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -158,7 +159,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(baseTokenAssetId)
         );
 
@@ -211,7 +212,7 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(baseTokenAssetId)
         );
 

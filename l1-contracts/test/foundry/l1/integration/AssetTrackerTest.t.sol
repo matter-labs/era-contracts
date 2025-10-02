@@ -5,7 +5,8 @@ import {console} from "forge-std/console.sol";
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
@@ -40,7 +41,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
     address[] public users;
     address[] public l2ContractAddresses;
 
-    IBridgehub l2Bridgehub;
+    IBridgehubBase l2Bridgehub;
     IL1AssetTracker assetTracker;
     IL2AssetTracker l2AssetTracker;
     IGWAssetTracker gwAssetTracker;
@@ -106,7 +107,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.settlementLayer.selector),
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector),
             abi.encode(block.chainid)
         );
     }
@@ -161,7 +162,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: eraZKChainId,
             assetId: assetId,
-            tokenOriginChainId: block.chainid,
+            tokenOriginChainId: originalChainId,
             amount: amount,
             migrationNumber: migrationNumber,
             originToken: tokenAddress,
@@ -194,7 +195,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
         vm.mockCall(
             address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.settlementLayer.selector),
+            abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector),
             abi.encode(gwChainId)
         );
         bytes[] memory mocks1 = new bytes[](2);
@@ -210,17 +211,17 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         mocks2[0] = abi.encode(0x0000000000000000000000000000000000000011);
         mocks2[1] = abi.encode(0x0000000000000000000000000000000000000011);
 
-        vm.mockCalls(address(addresses.bridgehub), abi.encodeWithSelector(IBridgehub.getZKChain.selector), mocks2);
+        vm.mockCalls(address(addresses.bridgehub), abi.encodeWithSelector(IBridgehubBase.getZKChain.selector), mocks2);
 
         vm.store(
             address(assetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 1)
+            bytes32(migrationNumber - 2)
         );
         vm.store(
             address(l2AssetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 1)
+            bytes32(migrationNumber - 2)
         );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, eraZKChainId), bytes32(amount));
         vm.store(address(assetTracker), getTotalSupplyAcrossAllChainsLocation(assetId), bytes32(amount));
@@ -276,7 +277,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             chainId: eraZKChainId,
             assetId: assetId,
-            tokenOriginChainId: block.chainid,
+            tokenOriginChainId: originalChainId,
             amount: amount,
             migrationNumber: migrationNumber,
             originToken: tokenAddress,
@@ -310,12 +311,12 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         );
         // vm.mockCall(
         //     address(addresses.bridgehub),
-        //     abi.encodeWithSelector(IBridgehub.settlementLayer.selector),
+        //     abi.encodeWithSelector(IBridgehubBase.settlementLayer.selector),
         //     abi.encode(originalChainId)
         // );
         vm.mockCall(
             address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.whitelistedSettlementLayers.selector),
+            abi.encodeWithSelector(IBridgehubBase.whitelistedSettlementLayers.selector),
             abi.encode(true)
         );
 
@@ -329,7 +330,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
 
         vm.mockCall(
             address(addresses.bridgehub),
-            abi.encodeWithSelector(IBridgehub.getZKChain.selector),
+            abi.encodeWithSelector(IBridgehubBase.getZKChain.selector),
             abi.encode(0x0000000000000000000000000000000000000011)
         );
         vm.store(address(assetTracker), getChainBalanceLocation(assetId, gwChainId), bytes32(amount));

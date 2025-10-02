@@ -3,8 +3,6 @@
 pragma solidity 0.8.28;
 
 import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
-import {IBridgehub} from "./IBridgehub.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {L2_COMPLEX_UPGRADER_ADDR, L2_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
@@ -20,27 +18,27 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// @dev The assetId of the base token.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    bytes32 private ETH_TOKEN_ASSET_ID;
+    bytes32 public override ETH_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    uint256 private L1_CHAIN_ID;
+    uint256 public override L1_CHAIN_ID;
 
     /// @dev The bridgehub contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IBridgehub private BRIDGEHUB;
+    address public override BRIDGEHUB;
 
     /// @dev The message root contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IMessageRoot private MESSAGE_ROOT;
+    address public override MESSAGE_ROOT;
 
     /// @dev The asset router contract.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    address private ASSET_ROUTER;
+    address public override ASSET_ROUTER;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
@@ -49,15 +47,19 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     function _ethTokenAssetId() internal view override returns (bytes32) {
         return ETH_TOKEN_ASSET_ID;
     }
+
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
-    function _bridgehub() internal view override returns (IBridgehub) {
+
+    function _bridgehub() internal view override returns (address) {
         return BRIDGEHUB;
     }
-    function _messageRoot() internal view override returns (IMessageRoot) {
+
+    function _messageRoot() internal view override returns (address) {
         return MESSAGE_ROOT;
     }
+
     function _assetRouter() internal view override returns (address) {
         return ASSET_ROUTER;
     }
@@ -79,9 +81,9 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     function initL2(
         uint256 _l1ChainId,
         address _owner,
-        IBridgehub _bridgehub,
+        address _bridgehub,
         address _assetRouter,
-        IMessageRoot _messageRoot
+        address _messageRoot
     ) external reentrancyGuardInitializer onlyUpgrader {
         _disableInitializers();
 
@@ -95,9 +97,9 @@ contract L2ChainAssetHandler is ChainAssetHandlerBase {
     /// the upgrade.
     function updateL2(
         uint256 _l1ChainId,
-        IBridgehub _bridgehub,
+        address _bridgehub,
         address _assetRouter,
-        IMessageRoot _messageRoot
+        address _messageRoot
     ) public onlyUpgrader {
         BRIDGEHUB = _bridgehub;
         L1_CHAIN_ID = _l1ChainId;

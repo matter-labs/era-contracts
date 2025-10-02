@@ -5,7 +5,8 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 
 import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {IL1SharedBridgeLegacy} from "contracts/bridge/interfaces/IL1SharedBridgeLegacy.sol";
@@ -66,19 +67,19 @@ contract ChainRegistrarTest is Test {
         // Set up mocks
         vm.mockCall(
             mockBridgehub,
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector, CHAIN_ID),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector, CHAIN_ID),
             abi.encode(address(0)) // Not deployed yet
         );
 
         vm.mockCall(
             mockBridgehub,
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector, PROPOSER_CHAIN_ID),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector, PROPOSER_CHAIN_ID),
             abi.encode(mockChainTypeManager) // Already deployed
         );
 
         vm.mockCall(
             mockBridgehub,
-            abi.encodeWithSelector(IBridgehub.assetRouter.selector),
+            abi.encodeWithSelector(IBridgehubBase.assetRouter.selector),
             abi.encode(mockAssetRouter)
         );
 
@@ -282,7 +283,7 @@ contract ChainRegistrarTest is Test {
         // Mock the chain as deployed
         vm.mockCall(
             mockBridgehub,
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector, CHAIN_ID),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector, CHAIN_ID),
             abi.encode(mockChainTypeManager)
         );
 
@@ -299,7 +300,7 @@ contract ChainRegistrarTest is Test {
 
         vm.mockCall(
             mockBridgehub,
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector, nonExistentChainId),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector, nonExistentChainId),
             abi.encode(address(0))
         );
 
@@ -311,7 +312,7 @@ contract ChainRegistrarTest is Test {
         // Mock the chain as deployed
         vm.mockCall(
             mockBridgehub,
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector, CHAIN_ID),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector, CHAIN_ID),
             abi.encode(mockChainTypeManager)
         );
 
@@ -482,7 +483,7 @@ contract ChainRegistrarTest is Test {
         // Mock the second chain ID as not deployed
         vm.mockCall(
             mockBridgehub,
-            abi.encodeWithSelector(IBridgehub.chainTypeManager.selector, CHAIN_ID + 1),
+            abi.encodeWithSelector(IBridgehubBase.chainTypeManager.selector, CHAIN_ID + 1),
             abi.encode(address(0))
         );
 

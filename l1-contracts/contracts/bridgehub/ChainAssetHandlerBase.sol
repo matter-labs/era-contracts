@@ -7,7 +7,7 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehub} from "./IBridgehub.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData} from "./IBridgehubBase.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
@@ -36,16 +36,35 @@ abstract contract ChainAssetHandlerBase is
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
+                            EXTERNAL GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The asset ID of ETH token
+    function ETH_TOKEN_ASSET_ID() external view virtual returns (bytes32);
+
+    /// @notice The chain ID of L1
+    function L1_CHAIN_ID() external view virtual returns (uint256);
+
+    /// @notice The bridgehub contract
+    function BRIDGEHUB() external view virtual returns (address);
+
+    /// @notice The message root contract
+    function MESSAGE_ROOT() external view virtual returns (address);
+
+    /// @notice The asset router contract
+    function ASSET_ROUTER() external view virtual returns (address);
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     function _ethTokenAssetId() internal view virtual returns (bytes32);
 
     function _l1ChainId() internal view virtual returns (uint256);
 
-    function _bridgehub() internal view virtual returns (IBridgehub);
+    function _bridgehub() internal view virtual returns (address);
 
-    function _messageRoot() internal view virtual returns (IMessageRoot);
+    function _messageRoot() internal view virtual returns (address);
 
     function _assetRouter() internal view virtual returns (address);
 
@@ -82,7 +101,7 @@ abstract contract ChainAssetHandlerBase is
     }
 
     modifier onlyAssetTrackerOrChain(uint256 _chainId) {
-        if (msg.sender != _assetTracker() && msg.sender != _bridgehub().getZKChain(_chainId)) {
+        if (msg.sender != _assetTracker() && msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
             revert OnlyAssetTrackerOrChain(msg.sender, _chainId);
         }
         _;
@@ -112,8 +131,8 @@ abstract contract ChainAssetHandlerBase is
     /// @notice Checks that the message sender is the specified ZK Chain.
     /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != _bridgehub().getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
+        if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
         }
         _;
     }
@@ -121,7 +140,7 @@ abstract contract ChainAssetHandlerBase is
     /// @notice Sets the migration number for a chain on the Gateway when the chain's DiamondProxy upgrades.
     function setMigrationNumberForV30(uint256 _chainId) external onlyChain(_chainId) {
         require(migrationNumber[_chainId] == 0, MigrationNumberAlreadySet());
-        bool isOnThisSettlementLayer = block.chainid == _bridgehub().settlementLayer(_chainId);
+        bool isOnThisSettlementLayer = block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId);
         bool shouldIncrementMigrationNumber = (isOnThisSettlementLayer && block.chainid != _l1ChainId()) ||
             (!isOnThisSettlementLayer && block.chainid == _l1ChainId());
         /// Note we don't increment the migration number if the chain migrated to GW and back to L1 previously.
@@ -159,18 +178,19 @@ abstract contract ChainAssetHandlerBase is
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
         require(
-            _assetId == _bridgehub().ctmAssetIdFromChainId(bridgehubBurnData.chainId),
-            IncorrectChainAssetId(_assetId, _bridgehub().ctmAssetIdFromChainId(bridgehubBurnData.chainId))
+            _assetId == IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId),
+            IncorrectChainAssetId(
+                _assetId,
+                IBridgehubBase(_bridgehub()).ctmAssetIdFromChainId(bridgehubBurnData.chainId)
+            )
         );
-        address zkChain = _bridgehub().getZKChain(bridgehubBurnData.chainId);
-
-        _setLegacySharedBridgeIfL1(bridgehubBurnData, _settlementChainId);
+        address zkChain = IBridgehubBase(_bridgehub()).getZKChain(bridgehubBurnData.chainId);
 
         bytes memory ctmMintData;
         // to avoid stack too deep
         {
             address ctm;
-            (zkChain, ctm) = _bridgehub().forwardedBridgeBurnSetSettlementLayer(
+            (zkChain, ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeBurnSetSettlementLayer(
                 bridgehubBurnData.chainId,
                 _settlementChainId
             );
@@ -188,7 +208,10 @@ abstract contract ChainAssetHandlerBase is
             );
 
             // For security reasons, chain migration is temporarily restricted to settlement layers with the same CTM
-            if (_settlementChainId != _l1ChainId() && _bridgehub().chainTypeManager(_settlementChainId) != ctm) {
+            if (
+                _settlementChainId != _l1ChainId() &&
+                IBridgehubBase(_bridgehub()).chainTypeManager(_settlementChainId) != ctm
+            ) {
                 revert SLHasDifferentCTM();
             }
 
@@ -203,32 +226,29 @@ abstract contract ChainAssetHandlerBase is
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == _l1ChainId()
                 ? L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS
-                : _bridgehub().getZKChain(_settlementChainId),
+                : IBridgehubBase(_bridgehub()).getZKChain(_settlementChainId),
             _originalCaller,
             bridgehubBurnData.chainData
         );
         ++migrationNumber[bridgehubBurnData.chainId];
 
-        uint256 batchNumber = _messageRoot().currentChainBatchNumber(bridgehubBurnData.chainId);
+        uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
 
         BridgehubMintCTMAssetData memory bridgeMintStruct = BridgehubMintCTMAssetData({
             chainId: bridgehubBurnData.chainId,
-            baseTokenAssetId: _bridgehub().baseTokenAssetId(bridgehubBurnData.chainId),
+            baseTokenAssetId: IBridgehubBase(_bridgehub()).baseTokenAssetId(bridgehubBurnData.chainId),
             batchNumber: batchNumber,
             ctmData: ctmMintData,
             chainData: chainMintData,
             migrationNumber: migrationNumber[bridgehubBurnData.chainId],
-            v30UpgradeChainBatchNumber: _messageRoot().v30UpgradeChainBatchNumber(bridgehubBurnData.chainId)
+            v30UpgradeChainBatchNumber: IMessageRoot(_messageRoot()).v30UpgradeChainBatchNumber(
+                bridgehubBurnData.chainId
+            )
         });
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
     }
-
-    function _setLegacySharedBridgeIfL1(
-        BridgehubBurnCTMAssetData memory _bridgehubBurnData,
-        uint256 _settlementChainId
-    ) internal virtual {}
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.
     /// @param _assetId the assetId of the chain's CTM
@@ -254,7 +274,7 @@ abstract contract ChainAssetHandlerBase is
         }
         migrationNumber[bridgehubMintData.chainId] = bridgehubMintData.migrationNumber;
 
-        (address zkChain, address ctm) = _bridgehub().forwardedBridgeMint(
+        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeMint(
             _assetId,
             bridgehubMintData.chainId,
             bridgehubMintData.baseTokenAssetId
@@ -267,10 +287,10 @@ abstract contract ChainAssetHandlerBase is
                 revert ChainIdNotRegistered(bridgehubMintData.chainId);
             }
             // We want to allow any chain to be migrated,
-            _bridgehub().registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
-            _messageRoot().addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
+            IBridgehubBase(_bridgehub()).registerNewZKChain(bridgehubMintData.chainId, zkChain, false);
+            IMessageRoot(_messageRoot()).addNewChain(bridgehubMintData.chainId, bridgehubMintData.batchNumber);
         } else {
-            _messageRoot().setMigratingChainBatchRoot(
+            IMessageRoot(_messageRoot()).setMigratingChainBatchRoot(
                 bridgehubMintData.chainId,
                 bridgehubMintData.batchNumber,
                 bridgehubMintData.v30UpgradeChainBatchNumber
@@ -296,7 +316,9 @@ abstract contract ChainAssetHandlerBase is
     ) external payable override requireZeroValue(msg.value) onlyAssetRouter onlyL1 {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-        (address zkChain, address ctm) = _bridgehub().forwardedBridgeRecoverFailedTransfer(bridgehubBurnData.chainId);
+        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeRecoverFailedTransfer(
+            bridgehubBurnData.chainId
+        );
 
         IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
             _chainId: bridgehubBurnData.chainId,

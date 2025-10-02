@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "contracts/bridgehub/IBridgehubBase.sol";
 import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
@@ -513,7 +513,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             addresses.bridgehubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 currentChainId,
                 l2BatchNumber,
                 l2MessageIndex,
@@ -573,7 +573,7 @@ contract BridgeHubInvariantTests is L1ContractDeployer, ZKChainDeployer, TokenDe
             addresses.bridgehubProxyAddress,
             // solhint-disable-next-line func-named-parameters
             abi.encodeWithSelector(
-                IBridgehub.proveL2MessageInclusion.selector,
+                IBridgehubBase.proveL2MessageInclusion.selector,
                 currentChainId,
                 l2BatchNumber,
                 l2MessageIndex,

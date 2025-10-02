@@ -19,8 +19,6 @@ interface IBaseToken {
 
     function burnMsgValue() external payable;
 
-    function setAddresses(bytes32 _assetId, address _originTokenOriginAddress) external;
-
     event Mint(address indexed account, uint256 amount);
 
     event Transfer(address indexed from, address indexed to, uint256 value);

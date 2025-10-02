@@ -7,24 +7,21 @@ import {EnumerableMap} from "@openzeppelin/contracts-v4/utils/structs/Enumerable
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
-import {IBridgehub, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesInner, L2TransactionRequestTwoBridgesOuter} from "./IBridgehub.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
-import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1BaseTokenAssetHandler} from "../bridge/interfaces/IL1BaseTokenAssetHandler.sol";
-import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
-import {BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS, SETTLEMENT_LAYER_RELAY_SENDER, TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
+import {SETTLEMENT_LAYER_RELAY_SENDER} from "../common/Config.sol";
 import {BridgehubL2TransactionRequest, L2Log, L2Message, TxStatus} from "../common/Messaging.sol";
 import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
-import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotRelayedSender, OnlyL2, SLNotWhitelisted, SecondBridgeAddressTooLow} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdAlreadyExists, ChainIdCantBeCurrentChain, ChainIdMismatch, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, IncorrectBridgeHubAddress, MigrationPaused, MsgValueMismatch, NoCTMForAssetId, NotCurrentSettlementLayer, NotL1, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, WrongMagicValue, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
+import {AlreadyCurrentSL, NotChainAssetHandler, NotInGatewayMode, NotRelayedSender, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
+import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, MigrationPaused, NoCTMForAssetId, NotCurrentSettlementLayer, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 
@@ -36,7 +33,7 @@ import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.
 /// Bridgehub is also an IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 abstract contract BridgehubBase is
-    IBridgehub,
+    IBridgehubBase,
     ReentrancyGuard,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
@@ -45,14 +42,14 @@ abstract contract BridgehubBase is
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /*//////////////////////////////////////////////////////////////
-                            IMMUTABLE GETTERS
+                            INTERNAL FUNCTIONS
     //////////////////////////////////////////////////////////////*/
 
     function _ethTokenAssetId() internal view virtual returns (bytes32);
 
-    function _l1ChainId() internal view virtual returns (uint256);
-
     function _maxNumberOfZKChains() internal view virtual returns (uint256);
+
+    function _l1ChainId() internal view virtual returns (uint256);
 
     /// @notice all the ether and ERC20 tokens are held by NativeVaultToken managed by the asset router.
     address public assetRouter;
@@ -149,23 +146,7 @@ abstract contract BridgehubBase is
         _;
     }
 
-    /// FIXME: this modifier is not needed as we can move all the corresponding functions to the L1Bridgehub
-    /// We keep it here until we have a stable base branch to avoid merge conflicts.
-    modifier onlyL1() {
-        if (_l1ChainId() != block.chainid) {
-            revert NotL1(_l1ChainId(), block.chainid);
-        }
-        _;
-    }
-
-    modifier onlyL2() {
-        if (_l1ChainId() == block.chainid) {
-            revert OnlyL2();
-        }
-        _;
-    }
-
-    modifier onlySettlementLayerRelayedSender() {
+    modifier onlySettlementLayerRelayedSender() virtual {
         /// There is no sender for the wrapping, we use a virtual address.
         if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
             revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
@@ -195,7 +176,7 @@ abstract contract BridgehubBase is
 
     //// Initialization and registration
 
-    /// @inheritdoc IBridgehub
+    /// @inheritdoc IBridgehubBase
     /// @dev Please note, if the owner wants to enforce the admin change it must execute both `setPendingAdmin` and
     /// `acceptAdmin` atomically. Otherwise `admin` can set different pending admin and so fail to accept the admin rights.
     function setPendingAdmin(address _newPendingAdmin) external onlyOwnerOrAdmin {
@@ -209,7 +190,7 @@ abstract contract BridgehubBase is
         emit NewPendingAdmin(oldPendingAdmin, _newPendingAdmin);
     }
 
-    /// @inheritdoc IBridgehub
+    /// @inheritdoc IBridgehubBase
     function acceptAdmin() external {
         address currentPendingAdmin = pendingAdmin;
         // Only proposed by current admin address can claim the admin rights
@@ -236,11 +217,9 @@ abstract contract BridgehubBase is
         IMessageRoot _messageRoot,
         address _chainAssetHandler,
         address _chainRegistrationSender
-    ) external onlyOwnerOrUpgrader {
-        assetRouter = _assetRouter;
-        l1CtmDeployer = _l1CtmDeployer;
-        messageRoot = _messageRoot;
-        chainAssetHandler = _chainAssetHandler;
+    ) external virtual;
+
+    function setAddressesV30(address _chainRegistrationSender) external onlyOwnerOrUpgrader {
         chainRegistrationSender = _chainRegistrationSender;
     }
 
@@ -293,20 +272,6 @@ abstract contract BridgehubBase is
         emit BaseTokenAssetIdRegistered(_baseTokenAssetId);
     }
 
-    /// @notice Used to register a chain as a settlement layer.
-    /// @param _newSettlementLayerChainId the chainId of the chain
-    /// @param _isWhitelisted whether the chain is a whitelisted settlement layer
-    function registerSettlementLayer(
-        uint256 _newSettlementLayerChainId,
-        bool _isWhitelisted
-    ) external onlyOwner onlyL1 {
-        if (settlementLayer[_newSettlementLayerChainId] != block.chainid) {
-            revert SettlementLayersMustSettleOnL1();
-        }
-        whitelistedSettlementLayers[_newSettlementLayerChainId] = _isWhitelisted;
-        emit SettlementLayerRegistered(_newSettlementLayerChainId, _isWhitelisted);
-    }
-
     /// @dev Used to set the assetAddress for a given assetInfo.
     /// @param _additionalData the additional data to identify the asset
     /// @param _assetAddress the asset handler address
@@ -340,46 +305,6 @@ abstract contract BridgehubBase is
     /*//////////////////////////////////////////////////////////////
                           Chain Registration
     //////////////////////////////////////////////////////////////*/
-
-    /// @notice register new chain. New chains can be only registered on Bridgehub deployed on L1. Later they can be moved to any other layer.
-    /// @notice for Eth the baseToken address is 1
-    /// @param _chainId the chainId of the chain
-    /// @param _chainTypeManager the state transition manager address
-    /// @param _baseTokenAssetId the base token asset id of the chain
-    /// @param _salt the salt for the chainId, currently not used
-    /// @param _admin the admin of the chain
-    /// @param _initData the fixed initialization data for the chain
-    /// @param _factoryDeps the factory dependencies for the chain's deployment
-    function createNewChain(
-        uint256 _chainId,
-        address _chainTypeManager,
-        bytes32 _baseTokenAssetId,
-        // solhint-disable-next-line no-unused-vars
-        uint256 _salt,
-        address _admin,
-        bytes calldata _initData,
-        bytes[] calldata _factoryDeps
-    ) external onlyOwnerOrAdmin nonReentrant whenNotPaused onlyL1 returns (uint256) {
-        _validateChainParams({_chainId: _chainId, _assetId: _baseTokenAssetId, _chainTypeManager: _chainTypeManager});
-
-        chainTypeManager[_chainId] = _chainTypeManager;
-
-        baseTokenAssetId[_chainId] = _baseTokenAssetId;
-        settlementLayer[_chainId] = block.chainid;
-
-        address chainAddress = IChainTypeManager(_chainTypeManager).createNewChain({
-            _chainId: _chainId,
-            _baseTokenAssetId: _baseTokenAssetId,
-            _admin: _admin,
-            _initData: _initData,
-            _factoryDeps: _factoryDeps
-        });
-        _registerNewZKChain(_chainId, chainAddress, true);
-        messageRoot.addNewChain(_chainId, 0);
-
-        emit NewChain(_chainId, _chainTypeManager, _admin);
-        return _chainId;
-    }
 
     /// @notice This function is used to register a new zkChain in the system.
     /// @notice see external counterpart for full natspec.
@@ -443,132 +368,6 @@ abstract contract BridgehubBase is
                         Mailbox forwarder
     //////////////////////////////////////////////////////////////*/
 
-    /// @notice the mailbox is called directly after the assetRouter received the deposit
-    /// this assumes that either ether is the base token or
-    /// the msg.sender has approved mintValue allowance for the nativeTokenVault.
-    /// This means this is not ideal for contract calls, as the contract would have to handle token allowance of the base Token.
-    /// In case allowance is provided to the Asset Router, then it will be transferred to NTV.
-    function requestL2TransactionDirect(
-        L2TransactionRequestDirect calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        // Note: If the ZK chain with corresponding `chainId` is not yet created,
-        // the transaction will revert on `bridgehubRequestL2Transaction` as call to zero address.
-        {
-            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            if (tokenAssetId == _ethTokenAssetId()) {
-                if (msg.value != _request.mintValue) {
-                    revert MsgValueMismatch(_request.mintValue, msg.value);
-                }
-            } else {
-                if (msg.value != 0) {
-                    revert MsgValueMismatch(0, msg.value);
-                }
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: msg.value}(
-                _request.chainId,
-                tokenAssetId,
-                msg.sender,
-                _request.mintValue
-            );
-        }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: msg.sender,
-                contractL2: _request.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: _request.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: _request.factoryDeps,
-                refundRecipient: address(0)
-            })
-        );
-    }
-
-    /// @notice After depositing funds to the assetRouter, the secondBridge is called
-    ///  to return the actual L2 message which is sent to the Mailbox.
-    ///  This assumes that either ether is the base token or
-    ///  the msg.sender has approved the nativeTokenVault with the mintValue,
-    ///  and also the necessary approvals are given for the second bridge.
-    ///  In case allowance is provided to the Shared Bridge, then it will be transferred to NTV.
-    /// @notice The logic of this bridge is to allow easy depositing for bridges.
-    /// Each contract that handles the users ERC20 tokens needs approvals from the user, this contract allows
-    /// the user to approve for each token only its respective bridge
-    /// @notice This function is great for contract calls to L2, the secondBridge can be any contract.
-    /// @param _request the request for the L2 transaction
-    function requestL2TransactionTwoBridges(
-        L2TransactionRequestTwoBridgesOuter calldata _request
-    ) external payable override nonReentrant whenNotPaused onlyL1 returns (bytes32 canonicalTxHash) {
-        if (_request.secondBridgeAddress <= BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS) {
-            revert SecondBridgeAddressTooLow(_request.secondBridgeAddress, BRIDGEHUB_MIN_SECOND_BRIDGE_ADDRESS);
-        }
-
-        {
-            bytes32 tokenAssetId = baseTokenAssetId[_request.chainId];
-            uint256 baseTokenMsgValue;
-            if (tokenAssetId == _ethTokenAssetId()) {
-                if (msg.value != _request.mintValue + _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.mintValue + _request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = _request.mintValue;
-            } else {
-                if (msg.value != _request.secondBridgeValue) {
-                    revert MsgValueMismatch(_request.secondBridgeValue, msg.value);
-                }
-                baseTokenMsgValue = 0;
-            }
-
-            // slither-disable-next-line arbitrary-send-eth
-            IL1AssetRouter(assetRouter).bridgehubDepositBaseToken{value: baseTokenMsgValue}(
-                _request.chainId,
-                tokenAssetId,
-                msg.sender,
-                _request.mintValue
-            );
-        }
-
-        // slither-disable-next-line arbitrary-send-eth
-        L2TransactionRequestTwoBridgesInner memory outputRequest = IL1CrossChainSender(_request.secondBridgeAddress)
-            .bridgehubDeposit{value: _request.secondBridgeValue}(
-            _request.chainId,
-            msg.sender,
-            _request.l2Value,
-            _request.secondBridgeCalldata
-        );
-
-        if (outputRequest.magicValue != TWO_BRIDGES_MAGIC_VALUE) {
-            revert WrongMagicValue(uint256(TWO_BRIDGES_MAGIC_VALUE), uint256(outputRequest.magicValue));
-        }
-
-        canonicalTxHash = _sendRequest(
-            _request.chainId,
-            _request.refundRecipient,
-            BridgehubL2TransactionRequest({
-                sender: _request.secondBridgeAddress,
-                contractL2: outputRequest.l2Contract,
-                mintValue: _request.mintValue,
-                l2Value: _request.l2Value,
-                l2Calldata: outputRequest.l2Calldata,
-                l2GasLimit: _request.l2GasLimit,
-                l2GasPerPubdataByteLimit: _request.l2GasPerPubdataByteLimit,
-                factoryDeps: outputRequest.factoryDeps,
-                refundRecipient: address(0)
-            })
-        );
-
-        IL1CrossChainSender(_request.secondBridgeAddress).bridgehubConfirmL2Transaction(
-            _request.chainId,
-            outputRequest.txDataHash,
-            canonicalTxHash
-        );
-    }
-
     /// @notice This function is used to send a request to the ZK chain.
     /// @param _chainId the chainId of the chain
     /// @param _refundRecipient the refund recipient
@@ -594,7 +393,7 @@ abstract contract BridgehubBase is
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override onlySettlementLayerRelayedSender {
+    ) external virtual onlySettlementLayerRelayedSender {
         if (_l1ChainId() == block.chainid) {
             revert NotInGatewayMode();
         }
@@ -781,43 +580,6 @@ abstract contract BridgehubBase is
         bool _checkMaxNumberOfZKChains
     ) public onlyChainAssetHandler {
         _registerNewZKChain(_chainId, _zkChain, _checkMaxNumberOfZKChains);
-    }
-
-    /// @dev Registers an already deployed chain with the bridgehub
-    /// @param _chainId The chain Id of the chain
-    /// @param _zkChain Address of the zkChain
-    function registerAlreadyDeployedZKChain(uint256 _chainId, address _zkChain) external onlyOwner onlyL1 {
-        if (_zkChain == address(0)) {
-            revert ZeroAddress();
-        }
-        if (zkChainMap.contains(_chainId)) {
-            revert ChainIdAlreadyExists();
-        }
-        if (IZKChain(_zkChain).getChainId() != _chainId) {
-            revert ChainIdMismatch();
-        }
-
-        address ctm = IZKChain(_zkChain).getChainTypeManager();
-        address chainAdmin = IZKChain(_zkChain).getAdmin();
-        bytes32 chainBaseTokenAssetId = IZKChain(_zkChain).getBaseTokenAssetId();
-        address bridgeHub = IZKChain(_zkChain).getBridgehub();
-        uint256 batchNumber = IZKChain(_zkChain).getTotalBatchesExecuted();
-
-        if (bridgeHub != address(this)) {
-            revert IncorrectBridgeHubAddress(bridgeHub);
-        }
-
-        _validateChainParams({_chainId: _chainId, _assetId: chainBaseTokenAssetId, _chainTypeManager: ctm});
-
-        chainTypeManager[_chainId] = ctm;
-
-        baseTokenAssetId[_chainId] = chainBaseTokenAssetId;
-        settlementLayer[_chainId] = block.chainid;
-
-        _registerNewZKChain(_chainId, _zkChain, true);
-        messageRoot.addNewChain(_chainId, batchNumber);
-
-        emit NewChain(_chainId, ctm, chainAdmin);
     }
 
     function _validateChainParams(uint256 _chainId, bytes32 _assetId, address _chainTypeManager) internal view {
