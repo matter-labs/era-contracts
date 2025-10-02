@@ -102,10 +102,7 @@ library ContractsBytecodesLib {
             "TimestampAsserter"
         ];
 
-        string[2] memory SYSTEM_CONTRACT_IDENTIFIERS = [
-            "SystemTransparentUpgradeableProxy",
-            "L2V29Upgrade"
-        ];
+        string[2] memory SYSTEM_CONTRACT_IDENTIFIERS = ["SystemTransparentUpgradeableProxy", "L2V29Upgrade"];
 
         // --- Special Cases: System Contracts ---
         // These contracts are typically read from a 'system-contracts' or similar directory.
