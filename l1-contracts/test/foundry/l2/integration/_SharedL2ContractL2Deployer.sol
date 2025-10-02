@@ -19,6 +19,7 @@ import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
+import {MockEIP7702Checker} from "contracts/dev-contracts/MockEIP7702Checker.sol";
 
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
@@ -68,7 +69,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
             new AdminFacet(config.l1ChainId, RollupDAManager(addresses.daAddresses.rollupDAManager))
         );
         addresses.stateTransition.mailboxFacet = address(
-            new MailboxFacet(config.eraChainId, config.l1ChainId, IEIP7702Checker(address(1)))
+            new MailboxFacet(config.eraChainId, config.l1ChainId, IEIP7702Checker(address(new MockEIP7702Checker())))
         );
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit(false));

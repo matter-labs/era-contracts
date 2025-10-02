@@ -2,10 +2,6 @@
 
 pragma solidity 0.8.28;
 
-error IncorrectLength(uint256 expected, uint256 realLength);
-error IncorrectBytes(bytes3 expected, bytes3 realBytes);
-error IncorrectBytes32(bytes32 realBytes);
-
 /// @title EIP7702Checker
 /// @notice Utility to detect EIP-7702 style EOAs (accounts with code stubs)
 /// @dev See: https://eips.ethereum.org/EIPS/eip-7702

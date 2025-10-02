@@ -404,6 +404,8 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode();
         } else if (compareStrings(contractName, "EIP7702Checker")) {
             return abi.encode();
+        } else if (compareStrings(contractName, "MockEIP7702Checker")) {
+            return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
             /// TODO: Currently setting it to owner address (which means whole bridgehub owner).
             /// In practice we might want to set it to CTM owner (which in production will be less restritive).
