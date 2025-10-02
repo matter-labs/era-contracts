@@ -16,6 +16,8 @@ error ContractNotDeployed();
 error DependencyRootsRollingHashMismatch(bytes32 _expected, bytes32 _actual);
 // 0xacf542ab
 error DepositsAlreadyPaused();
+// 0xa4d3098c
+error DepositsNotPaused();
 // 0xdeeb6943
 error DepositsPaused();
 // 0xedae13f3

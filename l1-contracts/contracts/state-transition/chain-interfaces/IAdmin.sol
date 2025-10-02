@@ -152,8 +152,14 @@ interface IAdmin is IZKChainBase {
 
     event DepositsPaused(uint256 migrationNumber, uint256 pausedDepositsTimestamp);
 
+    event DepositsUnpaused(uint256 migrationNumber);
+
     /// @notice Pauses deposits and initiates the migration to the Gateway.
     function pauseDepositsAndInitiateMigration() external;
+
+    /// @notice Unpauses deposits. A typical migration on top of GW doesn't take too long,
+    ///         so we allow chain admin to unpause deposits earlier than default time window.
+    function unpauseDeposits() external;
 
     /// @dev Similar to IL1AssetHandler interface, used to send chains.
     function forwardedBridgeBurn(
