@@ -22,7 +22,7 @@ jobs:
         run: |
           mkdir ./foundry-zksync
           curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.29/foundry_zksync_v0.0.29_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          tar zxf foundry_zksync_v0.0.29_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
@@ -150,7 +150,7 @@ jobs:
         run: |
           mkdir ./foundry-zksync
           curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.29/foundry_zksync_v0.0.29_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          tar zxf foundry_zksync_v0.0.29_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
@@ -200,7 +200,7 @@ jobs:
         run: |
           mkdir ./foundry-zksync
           curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.29/foundry_zksync_v0.0.29_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          tar zxf foundry_zksync_v0.0.29_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
@@ -279,7 +279,7 @@ jobs:
         run: |
           mkdir ./foundry-zksync
           curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.29/foundry_zksync_v0.0.29_linux_amd64.tar.gz
-          tar zxf foundry_nightly_linux_amd64.tar.gz -C ./foundry-zksync
+          tar zxf foundry_zksync_v0.0.29_linux_amd64.tar.gz -C ./foundry-zksync
           chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
           echo "$PWD/foundry-zksync" >> $GITHUB_PATH
 
