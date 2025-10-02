@@ -134,11 +134,6 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         address l2TokenAddress = initializeTokenByDeposit();
         bytes32 l2TokenAssetId = l2NativeTokenVault.assetId(l2TokenAddress);
         vm.deal(address(this), 1000 ether);
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
-            abi.encode(block.chainid)
-        );
 
         bytes memory secondBridgeCalldata = bytes.concat(
             NEW_ENCODING_VERSION,
@@ -189,11 +184,6 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
         bytes memory secondBridgeCalldata = bytes.concat(
             NEW_ENCODING_VERSION,
             abi.encode(l2TokenAssetId, abi.encode(uint256(100), address(this), 0))
-        );
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
-            abi.encode(block.chainid)
         );
 
         InteropCallStarter[] memory calls = new InteropCallStarter[](1);
