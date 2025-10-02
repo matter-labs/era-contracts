@@ -8,7 +8,7 @@ import {IChainRegistrationSender} from "./IChainRegistrationSender.sol";
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {IL1CrossChainSender} from "../bridge/interfaces/IL1CrossChainSender.sol";
 
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "./IBridgehub.sol";
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "./IBridgehubBase.sol";
 import {IMailbox} from "../state-transition/chain-interfaces/IMailbox.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
@@ -30,7 +30,7 @@ contract ChainRegistrationSender is
     ReentrancyGuard,
     Ownable2StepUpgradeable
 {
-    IBridgehub public immutable BRIDGE_HUB;
+    IBridgehubBase public immutable BRIDGE_HUB;
 
     mapping(uint256 chainToBeRegistered => mapping(uint256 chainRegisteredOn => bool isRegistered))
         public chainRegisteredOnChain;
@@ -43,7 +43,7 @@ contract ChainRegistrationSender is
         _;
     }
 
-    constructor(IBridgehub _bridgehub) {
+    constructor(IBridgehubBase _bridgehub) {
         BRIDGE_HUB = _bridgehub;
     }
 

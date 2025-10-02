@@ -18,8 +18,9 @@ import {IL2NativeTokenVault} from "../../../../../contracts/bridge/ntv/IL2Native
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
-import {AddressAliasHelper} from "../../../../../contracts/vendor/AddressAliasHelper.sol";
-import {BridgehubMintCTMAssetData, IBridgehub} from "../../../../../contracts/bridgehub/IBridgehub.sol";
+import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
+import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
+import {BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IL2AssetRouter} from "../../../../../contracts/bridge/asset-router/IL2AssetRouter.sol";
 import {IL1Nullifier} from "../../../../../contracts/bridge/interfaces/IL1Nullifier.sol";
@@ -53,7 +54,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     BeaconProxy internal proxy;
 
     IL2AssetRouter l2AssetRouter = IL2AssetRouter(L2_ASSET_ROUTER_ADDR);
-    IBridgehub l2Bridgehub = IBridgehub(L2_BRIDGEHUB_ADDR);
+    IL2Bridgehub l2Bridgehub = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
     IInteropCenter l2InteropCenter = IInteropCenter(L2_INTEROP_CENTER_ADDR);
     IL2NativeTokenVault l2NativeTokenVault = IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
@@ -163,7 +164,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         );
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, ERA_CHAIN_ID + 1),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, ERA_CHAIN_ID + 1),
             abi.encode(address(uint160(1)))
         );
         vm.prank(L2_BRIDGEHUB_ADDR);

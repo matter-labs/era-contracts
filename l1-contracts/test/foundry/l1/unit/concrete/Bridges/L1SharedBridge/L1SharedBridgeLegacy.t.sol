@@ -6,8 +6,8 @@ import "forge-std/console.sol";
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {L2Message} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
@@ -34,7 +34,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
 
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
+            abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
 
@@ -58,7 +58,7 @@ contract L1AssetRouterLegacyTest is L1AssetRouterTest {
         _setAssetTrackerChainBalance(eraChainId, ETH_TOKEN_ADDRESS, amount);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 

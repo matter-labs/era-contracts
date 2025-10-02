@@ -2,14 +2,14 @@
 
 pragma solidity 0.8.28;
 
-import {IBridgehub} from "./IBridgehub.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
 import {IL1AssetDeploymentTracker} from "../bridge/interfaces/IL1AssetDeploymentTracker.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 interface ICTMDeploymentTracker is IL1AssetDeploymentTracker {
-    function BRIDGE_HUB() external view returns (IBridgehub);
+    function BRIDGE_HUB() external view returns (IBridgehubBase);
 
     function L1_ASSET_ROUTER() external view returns (IAssetRouterBase);
 

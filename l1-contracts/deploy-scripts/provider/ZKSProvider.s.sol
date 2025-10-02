@@ -28,7 +28,7 @@ contract ZKSProvider is Script {
     ) public {
         FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
 
-        IBridgehub bridgehub = IBridgehub(l1Bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
         IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
 
@@ -59,7 +59,7 @@ contract ZKSProvider is Script {
         uint256 chainId,
         FinalizeL1DepositParams memory params
     ) public {
-        IBridgehub bridgehub = IBridgehub(l1Bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
         // IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         // IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());

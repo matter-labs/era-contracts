@@ -16,5 +16,6 @@ contract L2V30Upgrade {
     /// @param _baseTokenOriginAddress The address of the base token on the origin chain.
     function upgrade(uint256 _baseTokenOriginChainId, address _baseTokenOriginAddress) external {
         // kl todo set baseTokenOriginChainId and baseTokenOriginAddress in some location.
+        // kl todo add all setAddresses, initL2 and updateL2s from genesis upgrade.
     }
 }

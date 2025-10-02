@@ -20,7 +20,7 @@ import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -90,7 +90,7 @@ library L2Utils {
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            address(0x000000000000000000000000000000000002000a)
+            address(0)
         );
     }
 
@@ -102,9 +102,9 @@ library L2Utils {
         chainAssetHandler.initL2(
             _args.l1ChainId,
             _args.aliasedOwner,
-            IBridgehub(L2_BRIDGEHUB_ADDR),
+            L2_BRIDGEHUB_ADDR,
             L2_ASSET_ROUTER_ADDR,
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+            L2_MESSAGE_ROOT_ADDR
         );
     }
 
@@ -173,7 +173,8 @@ library L2Utils {
             _args.legacySharedBridge,
             _args.l2TokenBeacon,
             address(0),
-            ethAssetId
+            ethAssetId,
+            ETH_TOKEN_ADDRESS
         );
     }
 

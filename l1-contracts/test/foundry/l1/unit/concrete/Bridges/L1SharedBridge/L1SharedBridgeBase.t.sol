@@ -6,8 +6,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {L1AssetRouterTest} from "./_L1SharedBridge_Shared.t.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehub, L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehub.sol";
-
+import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "contracts/bridgehub/IBridgehubBase.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 
@@ -418,7 +417,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         );
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(bytes32(uint256(2)))
         );
         //alt base token
@@ -483,7 +482,7 @@ contract L1AssetRouterTestBase is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(tokenAssetId)
         );
         // solhint-disable-next-line func-named-parameters

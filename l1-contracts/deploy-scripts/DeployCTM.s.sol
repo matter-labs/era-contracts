@@ -9,7 +9,7 @@ import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {Call} from "contracts/governance/Common.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
 
@@ -62,6 +62,7 @@ import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {Config, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
 import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract DeployCTMScript is Script, DeployL1HelperScript {
     using stdToml for string;
@@ -114,7 +115,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         }
 
         console.log("Initializing core contracts from BH");
-        IBridgehub bridgehubProxy = IBridgehub(bridgehub);
+        IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
         L1AssetRouter assetRouter = L1AssetRouter(bridgehubProxy.assetRouter());
         address messageRoot = address(bridgehubProxy.messageRoot());
         address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
@@ -133,7 +134,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         addresses.bridgehub.chainAssetHandlerImplementation = Utils.getImplementation(chainAssetHandler);
         addresses.bridgehub.assetTrackerProxy = address(L1NativeTokenVault(nativeTokenVault).l1AssetTracker());
         addresses.bridgehub.assetTrackerImplementation = Utils.getImplementation(addresses.bridgehub.assetTrackerProxy);
-        addresses.bridgehub.chainRegistrationSenderProxy = IBridgehub(bridgehub).chainRegistrationSender();
+        addresses.bridgehub.chainRegistrationSenderProxy = IBridgehubBase(bridgehub).chainRegistrationSender();
         addresses.bridgehub.chainRegistrationSenderImplementation = Utils.getImplementation(
             addresses.bridgehub.chainRegistrationSenderProxy
         );

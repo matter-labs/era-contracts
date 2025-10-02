@@ -133,16 +133,6 @@ interface IMailboxImpl is IZKChainBase {
         bool _getBalanceChange
     ) external returns (bytes32 canonicalTxHash);
 
-    /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gateway.
-    /// @param _chainId the chainId of the chain.
-    /// @param _canonicalTxHash the canonical transaction hash.
-    /// @param _expirationTimestamp the expiration timestamp.
-    function requestL2TransactionToGatewayMailbox(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external returns (bytes32 canonicalTxHash);
-
     /// @notice Estimates the cost in Ether of requesting execution of an L2 transaction from L1.
     /// @param _gasPrice expected L1 gas price at which the user requests the transaction execution.
     /// @param _l2GasLimit Maximum amount of L2 gas that transaction can consume during execution on L2.

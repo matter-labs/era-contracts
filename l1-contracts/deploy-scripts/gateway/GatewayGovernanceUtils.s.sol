@@ -10,7 +10,8 @@ import {Script, console2 as console} from "forge-std/Script.sol";
 // solhint-disable no-unused-import
 
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {Utils} from "../Utils.sol";
@@ -62,7 +63,7 @@ abstract contract GatewayGovernanceUtils is Script {
         calls[0] = Call({
             target: _gatewayGovernanceConfig.bridgehubProxy,
             value: 0,
-            data: abi.encodeCall(IBridgehub.registerSettlementLayer, (_gatewayGovernanceConfig.gatewayChainId, true))
+            data: abi.encodeCall(IL1Bridgehub.registerSettlementLayer, (_gatewayGovernanceConfig.gatewayChainId, true))
         });
     }
 
@@ -78,7 +79,7 @@ abstract contract GatewayGovernanceUtils is Script {
         // Registration of the new chain type manager inside the ZK Gateway chain
         {
             bytes memory data = abi.encodeCall(
-                IBridgehub.addChainTypeManager,
+                IBridgehubBase.addChainTypeManager,
                 (prepareGWGovCallsStruct._gatewayCTMAddress)
             );
 

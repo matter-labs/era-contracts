@@ -12,7 +12,8 @@ import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTE
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
@@ -41,7 +42,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
 
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
         vm.mockCall(
@@ -57,7 +58,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
     function test_sendBundle_simple() public {
         vm.mockCall(
             L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
         vm.mockCall(
