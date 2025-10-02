@@ -103,13 +103,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             migratedBalance = l1NTV.migrateTokenBalanceToAssetTracker(_chainId, _assetId);
         } else {
             address tokenAddress = NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
+            // FIXME: this is wrong for L1 native tokens.
             migratedBalance = IERC20(tokenAddress).totalSupply();
             require(chainBalance[block.chainid][_assetId] == 0, ChainBalanceNotZero());
         }
-        // Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
-        // in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
+        // Note it might be the case that the token's balance has not been registered on L1 yet,
+        // in this case the chainBalance[originChainId][_assetId] is set to MAX_TOKEN_BALANCE if it was not already.
         uint256 originChainId = NATIVE_TOKEN_VAULT.originChainId(_assetId);
-        // kl todo can it be the case that we set chainBalance to uint256.max twice.
+        // kl todo can it be the case that we set chainBalance to MAX_TOKEN_BALANCE twice.
         if (chainBalance[originChainId][_assetId] == 0) {
             chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - migratedBalance;
         } else {
