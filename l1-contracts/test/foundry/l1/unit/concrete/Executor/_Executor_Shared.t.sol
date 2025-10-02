@@ -67,7 +67,6 @@ contract ExecutorTest is UtilsTest {
     L1ChainAssetHandler internal chainAssetHandler;
     bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, ETH_TOKEN_ADDRESS);
 
-
     uint256 eraChainId;
 
     IExecutor.StoredBatchInfo internal genesisStoredBatchInfo;

@@ -17,8 +17,11 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_TRACKER_ADDR}
 // solhint-enable max-line-length
 
 contract UtilsCallMockerTest is Test {
-
-    function mockDiamondInitInteropCenterCallsWithAddress(address bridgehub, address assetRouter, bytes32 baseTokenAssetId) public {
+    function mockDiamondInitInteropCenterCallsWithAddress(
+        address bridgehub,
+        address assetRouter,
+        bytes32 baseTokenAssetId
+    ) public {
         address assetTracker = address(0x1234567890876543567890);
         address nativeTokenVault = address(0x1234567890876543567890);
         if (assetRouter == address(0)) {
