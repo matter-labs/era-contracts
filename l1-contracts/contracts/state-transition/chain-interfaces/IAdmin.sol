@@ -150,9 +150,9 @@ interface IAdmin is IZKChainBase {
 
     event BridgeMint(address indexed _account, uint256 _amount);
 
-    event DepositsPaused(uint256 migrationNumber, uint256 pausedDepositsTimestamp);
+    event DepositsPaused(uint256 chainId, uint256 pausedDepositsTimestamp);
 
-    event DepositsUnpaused(uint256 migrationNumber);
+    event DepositsUnpaused(uint256 chainId);
 
     /// @notice Pauses deposits and initiates the migration to the Gateway.
     function pauseDepositsAndInitiateMigration() external;

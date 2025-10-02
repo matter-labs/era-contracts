@@ -296,26 +296,22 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function pauseDepositsAndInitiateMigration() external onlyAdmin onlyL1 {
-        address chainAssetHandler = IBridgehubBase(s.bridgehub).chainAssetHandler();
-        uint256 migrationNumber = IChainAssetHandler(chainAssetHandler).getMigrationNumber(s.chainId);
         require(
-            s.pausedDepositsTimestamp[migrationNumber] + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp,
+            s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp,
             DepositsAlreadyPaused()
         );
-        s.pausedDepositsTimestamp[migrationNumber] = block.timestamp;
-        emit DepositsPaused(migrationNumber, block.timestamp);
+        s.pausedDepositsTimestamp = block.timestamp;
+        emit DepositsPaused(s.chainId, block.timestamp);
     }
 
     /// @inheritdoc IAdmin
     function unpauseDeposits() external onlyAdmin onlyL1 {
-        address chainAssetHandler = IBridgehubBase(s.bridgehub).chainAssetHandler();
-        uint256 migrationNumber = IChainAssetHandler(chainAssetHandler).getMigrationNumber(s.chainId);
         require(
-            s.pausedDepositsTimestamp[migrationNumber] + PAUSE_DEPOSITS_TIME_WINDOW_END >= block.timestamp,
+            s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END >= block.timestamp,
             DepositsNotPaused()
         );
-        s.pausedDepositsTimestamp[migrationNumber] = 0;
-        emit DepositsUnpaused(migrationNumber);
+        s.pausedDepositsTimestamp = 0;
+        emit DepositsUnpaused(s.chainId);
     }
 
     /// @inheritdoc IAdmin
