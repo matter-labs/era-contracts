@@ -41,9 +41,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     IChainAssetHandler public chainAssetHandler;
 
     /// Todo Deprecate after V30 is finished.
-    mapping(bytes32 assetId => bool maxChainBalanceAssigned) internal maxChainBalanceAssigned;
-
-    /// Todo Deprecate after V30 is finished.
     mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
 
     function _l1ChainId() internal view override returns (uint256) {

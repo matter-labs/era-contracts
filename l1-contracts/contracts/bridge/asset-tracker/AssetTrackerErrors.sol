@@ -55,9 +55,5 @@ error OnlyWhitelistedSettlementLayer(address, address);
 error OnlyWithdrawalsAllowedForPreV30Chains();
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
-// 0x12ef3eb1
-error TokenNotL2Native(bytes32 _assetId, uint256 _originChainId, uint256 _currentChainId);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
-// 0xd58c2a50
-error VaultBalanceOverflow(uint256 _vaultBalance);
