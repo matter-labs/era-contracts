@@ -262,8 +262,8 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         // Verify selector matches finalizeDeposit
         assertEq(selector, IAssetRouterBase.finalizeDeposit.selector, "Selector mismatch");
-        // Checking refund recipient is correct; commented out before foundry is not updated
-        // assert(address(uint160(request.transaction.reserved[1])) == randomCaller);
+        // TODO: remove comment to check that refund recipient is correct after foundry version is bumped to post-prague
+        // assertEq(address(uint160(request.transaction.reserved[1])), randomCaller, "Refund recipient mismatch");
 
         // Allocate new bytes without the 4-byte selector
         bytes memory args = new bytes(callData.length - 4);
@@ -290,7 +290,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
             ) = abi.decode(assetData, (address, address, address, uint256, bytes));
 
             // Checking that caller hasn't been aliased
-            assert(remoteReceiver == randomCaller);
+            assertEq(remoteReceiver, randomCaller, "Remote receiver mismatch");
         }
     }
 
