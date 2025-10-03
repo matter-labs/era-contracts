@@ -31,7 +31,7 @@ contract L2MessageRoot is MessageRootBase {
     uint256 internal l1ChainId;
 
     /// @notice The chain id of the Gateway chain.
-    uint256 public override GATEWAY_CHAIN_ID;
+    uint256 public override ERA_GATEWAY_CHAIN_ID;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
@@ -41,8 +41,8 @@ contract L2MessageRoot is MessageRootBase {
         return L2_BRIDGEHUB_ADDR;
     }
 
-    function _gatewayChainId() internal view override returns (uint256) {
-        return GATEWAY_CHAIN_ID;
+    function _eraGatewayChainId() internal view override returns (uint256) {
+        return ERA_GATEWAY_CHAIN_ID;
     }
 
     // A method for backwards compatibility with the old implementation
@@ -69,7 +69,7 @@ contract L2MessageRoot is MessageRootBase {
 
     /// @notice Checks that the Chain ID is the Gateway chain id.
     modifier onlyGateway() {
-        if (block.chainid != _gatewayChainId()) {
+        if (block.chainid != _eraGatewayChainId()) {
             revert OnlyGateway();
         }
         _;
@@ -78,9 +78,9 @@ contract L2MessageRoot is MessageRootBase {
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
-    function initL2(uint256 _l1ChainId, uint256 _gatewayChainId) public onlyUpgrader {
+    function initL2(uint256 _l1ChainId, uint256 _eraGatewayChainId) public onlyUpgrader {
         _disableInitializers();
-        GATEWAY_CHAIN_ID = _gatewayChainId;
+        ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
         l1ChainId = _l1ChainId;
         _initialize();
     }

@@ -55,7 +55,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
 
-        uint256 gwChainId = messageRoot.GATEWAY_CHAIN_ID();
+        uint256 gwChainId = messageRoot.ERA_GATEWAY_CHAIN_ID();
         address gwChain = bridgehub.getZKChain(gwChainId);
         (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
         require(gwMinor >= 30, GWNotV30(gwChainId));
