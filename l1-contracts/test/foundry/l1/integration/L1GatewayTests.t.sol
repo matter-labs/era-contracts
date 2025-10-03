@@ -83,7 +83,7 @@ contract L1GatewayTests is
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS, migratingChainId);
-        // _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         acceptPendingAdmin(migratingChainId);
         _deployZKChain(ETH_TOKEN_ADDRESS, gatewayChainId);
         acceptPendingAdmin(gatewayChainId);
