@@ -258,14 +258,13 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
 
-        
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         uint256 fromChainId;
         uint256 toChainId;
-        
+
         /// We check the assetId to make sure the chain is not lying about it.
         DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
-        
+
         if (data.isL1ToGateway) {
             uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
             /// We check the chainMigrationNumber to make sure the message is not from a previous token migration.
@@ -307,12 +306,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         }
 
         _assignMaxChainBalanceIfNeeded(data.tokenOriginChainId, data.assetId);
-        _migrateFunds({
-            _fromChainId: fromChainId,
-            _toChainId: toChainId,
-            _assetId: data.assetId,
-            _amount: data.amount
-        });
+        _migrateFunds({_fromChainId: fromChainId, _toChainId: toChainId, _assetId: data.assetId, _amount: data.amount});
 
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
 
@@ -349,12 +343,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
     }
 
-    function _migrateFunds(
-        uint256 _fromChainId,
-        uint256 _toChainId,
-        bytes32 _assetId,
-        uint256 _amount
-    ) internal {
+    function _migrateFunds(uint256 _fromChainId, uint256 _toChainId, bytes32 _assetId, uint256 _amount) internal {
         _decreaseChainBalance(_fromChainId, _assetId, _amount);
         chainBalance[_toChainId][_assetId] += _amount;
     }

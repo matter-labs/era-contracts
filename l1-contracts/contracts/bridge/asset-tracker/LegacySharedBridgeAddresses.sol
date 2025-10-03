@@ -23,9 +23,15 @@ library LegacySharedBridgeAddresses {
     function getLegacySharedBridgeAddressOnGateway(
         address _l1AssetRouter
     ) internal pure returns (SharedBridgeOnChainId[] memory) {
-        SharedBridgeOnChainId[] memory stageLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](STAGE_LEGACY_BRIDGES);
-        SharedBridgeOnChainId[] memory testnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](TESTNET_LEGACY_BRIDGES);
-        SharedBridgeOnChainId[] memory mainnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](MAINNET_LEGACY_BRIDGES);
+        SharedBridgeOnChainId[] memory stageLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](
+            STAGE_LEGACY_BRIDGES
+        );
+        SharedBridgeOnChainId[] memory testnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](
+            TESTNET_LEGACY_BRIDGES
+        );
+        SharedBridgeOnChainId[] memory mainnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](
+            MAINNET_LEGACY_BRIDGES
+        );
 
         if (_l1AssetRouter == STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {
             return stageLegacySharedBridgeAddresses;

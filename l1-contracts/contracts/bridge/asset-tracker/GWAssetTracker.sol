@@ -96,7 +96,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             .getLegacySharedBridgeAddressOnGateway(l1AssetRouter);
         uint256 length = sharedBridgeOnChainIds.length;
         for (uint256 i = 0; i < length; ++i) {
-            legacySharedBridgeAddress[sharedBridgeOnChainIds[i].chainId] = sharedBridgeOnChainIds[i].legacySharedBridgeAddress;
+            legacySharedBridgeAddress[sharedBridgeOnChainIds[i].chainId] = sharedBridgeOnChainIds[i]
+                .legacySharedBridgeAddress;
         }
     }
 
@@ -127,7 +128,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
-
 
     function registerNewToken(bytes32, uint256) public override onlyNativeTokenVault {
         revert RegisterNewTokenNotAllowed();
@@ -175,7 +175,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
-
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
         reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
 
