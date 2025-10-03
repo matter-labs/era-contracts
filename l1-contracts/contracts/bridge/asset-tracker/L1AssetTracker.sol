@@ -170,7 +170,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _assignMaxChainBalanceIfNeeded(_originChainId, _assetId);
     }
 
-    function _assignMaxChainBalanceIfNeeded(uint256 _originChainId, bytes32 _assetId) internal override {
+    function _assignMaxChainBalanceIfNeeded(uint256 _originChainId, bytes32 _assetId) internal {
         if (!maxChainBalanceAssigned[_assetId]) {
             _assignMaxChainBalance(_originChainId, _assetId);
         }

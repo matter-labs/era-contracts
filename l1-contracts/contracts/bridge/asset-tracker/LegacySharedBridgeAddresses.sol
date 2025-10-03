@@ -12,38 +12,28 @@ library LegacySharedBridgeAddresses {
     uint256 internal constant TESTNET_LEGACY_BRIDGES = 0;
     uint256 internal constant MAINNET_LEGACY_BRIDGES = 0;
 
-    uint256 internal constant STAGE_GW_CHAIN_ID = 1;
-    uint256 internal constant TESTNET_GW_CHAIN_ID = 2;
-    uint256 internal constant MAINNET_GW_CHAIN_ID = 3;
+    address internal constant STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = 0x0000000000000000000000000000000000000000;
+    address internal constant TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = 0x0000000000000000000000000000000000000000;
+    address internal constant MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = 0x0000000000000000000000000000000000000000;
 
-    error InvalidGwChainId(uint256 gwChainId);
-
-    function getLegacySharedBridgeLength(uint256 _gwChainId) internal pure returns (uint256) {
-        if (_gwChainId == STAGE_GW_CHAIN_ID) {
-            return STAGE_LEGACY_BRIDGES;
-        } else if (_gwChainId == TESTNET_GW_CHAIN_ID) {
-            return TESTNET_LEGACY_BRIDGES;
-        } else if (_gwChainId == MAINNET_GW_CHAIN_ID) {
-            return MAINNET_LEGACY_BRIDGES;
-        }
-    }
+    error InvalidL1AssetRouter(address l1AssetRouter);
 
     /// @dev We have Stage, Testnet and Mainnet ecosystems.
-    /// We use the gwChainId to distinguish between them, since stage and testnet are both on Sepolia.
+    /// We use the l1AssetRouter to distinguish between them, since stage and testnet are both on Sepolia.
     function getLegacySharedBridgeAddressOnGateway(
-        uint256 _gwChainId
+        address _l1AssetRouter
     ) internal pure returns (SharedBridgeOnChainId[] memory) {
-        SharedBridgeOnChainId[] memory stageLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
-        SharedBridgeOnChainId[] memory testnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
-        SharedBridgeOnChainId[] memory mainnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
+        SharedBridgeOnChainId[] memory stageLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](STAGE_LEGACY_BRIDGES);
+        SharedBridgeOnChainId[] memory testnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](TESTNET_LEGACY_BRIDGES);
+        SharedBridgeOnChainId[] memory mainnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](MAINNET_LEGACY_BRIDGES);
 
-        if (_gwChainId == STAGE_GW_CHAIN_ID) {
+        if (_l1AssetRouter == STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {
             return stageLegacySharedBridgeAddresses;
-        } else if (_gwChainId == TESTNET_GW_CHAIN_ID) {
+        } else if (_l1AssetRouter == TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {
             return testnetLegacySharedBridgeAddresses;
-        } else if (_gwChainId == MAINNET_GW_CHAIN_ID) {
+        } else if (_l1AssetRouter == MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS) {
             return mainnetLegacySharedBridgeAddresses;
         }
-        revert InvalidGwChainId(_gwChainId);
+        revert InvalidL1AssetRouter(_l1AssetRouter);
     }
 }
