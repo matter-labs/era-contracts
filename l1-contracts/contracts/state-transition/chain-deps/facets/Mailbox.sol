@@ -579,7 +579,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) ==
             V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
         ) {
-            /// We pause deposits until the chain has upgraded on GW and the full pause time window has elapsed
+            /// We pause deposits until the chain has upgraded on GW
             return false;
         }
         return true;
