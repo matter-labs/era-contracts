@@ -73,7 +73,7 @@
   },
   {
     "contractName": "system-contracts/DefaultAccount",
-    "zkBytecodeHash": "0x010005f7fc2bd2320582602ba8e850df381b4ada8c613b4efc7883be575083e9",
+    "zkBytecodeHash": "0x010005f755be46626efc5b94e43535363592ef50e99e3b1557dde2dd5ee72df7",
     "zkBytecodePath": "/system-contracts/zkout/DefaultAccount.sol/DefaultAccount.json",
     "evmBytecodeHash": null,
     "evmBytecodePath": null,
