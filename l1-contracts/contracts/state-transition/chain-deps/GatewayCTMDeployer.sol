@@ -179,7 +179,7 @@ contract GatewayCTMDeployer {
 
         contracts.multicall3 = address(new Multicall3{salt: salt}());
 
-        IEIP7702Checker eip7702Checker = IEIP7702Checker(new MockEIP7702Checker());
+        IEIP7702Checker eip7702Checker = IEIP7702Checker(address(new MockEIP7702Checker()));
 
         _deployFacetsAndUpgrades({
             _salt: salt,
