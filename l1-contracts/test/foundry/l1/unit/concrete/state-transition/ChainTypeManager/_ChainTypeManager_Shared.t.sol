@@ -49,7 +49,6 @@ contract ChainTypeManagerTest is UtilsTest {
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
     L1ChainAssetHandler internal chainAssetHandler;
-    bytes32 internal baseTokenAssetId = bytes32(uint256(uint160(makeAddr("baseTokenAssetId"))));
     address internal interopCenterAddress = address(0x1010101);
     L1MessageRoot internal messageroot;
     address internal rollupL1DAValidator;
@@ -61,6 +60,7 @@ contract ChainTypeManagerTest is UtilsTest {
     address internal constant validator = address(0x5050505);
     address internal constant l1Nullifier = address(0x6060606);
     address internal constant serverNotifier = address(0x7070707);
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
     address internal newChainAdmin;
     uint256 l1ChainId = 5;
     uint256 chainId = 112;

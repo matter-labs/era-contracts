@@ -75,8 +75,7 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
     address internal l1CTM = makeAddr("l1CTM");
     bytes32 internal ctmAssetId = keccak256(abi.encode(L1_CHAIN_ID, l1CTMDeployer, bytes32(uint256(uint160(l1CTM)))));
 
-    bytes32 internal baseTokenAssetId =
-        keccak256(abi.encode(L1_CHAIN_ID, L2_NATIVE_TOKEN_VAULT_ADDR, abi.encode(ETH_TOKEN_ADDRESS)));
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, ETH_TOKEN_ADDRESS);
 
     bytes internal exampleChainCommitment;
 
