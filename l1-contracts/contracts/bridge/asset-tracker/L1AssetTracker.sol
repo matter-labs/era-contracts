@@ -285,15 +285,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
 
-        require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
-
+        
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         uint256 fromChainId;
         uint256 toChainId;
-
+        
         /// We check the assetId to make sure the chain is not lying about it.
         DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
-
+        
         if (data.isL1ToGateway) {
             uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
             /// We check the chainMigrationNumber to make sure the message is not from a previous token migration.
@@ -301,6 +300,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 chainMigrationNumber == data.migrationNumber,
                 InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
             );
+            /// We only allow migration to a Gateway once the withdrawal from another gateway has been finalized.
+            require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
             /// In this case the TokenBalanceMigrationData data might be malicious.
             /// We check the chainId to match the finalizeWithdrawalParams.chainId.
             /// We check the assetId, tokenOriginChainId, originToken with an assetIdCheck.
