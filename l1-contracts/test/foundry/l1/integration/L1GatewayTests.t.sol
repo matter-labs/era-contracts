@@ -83,7 +83,6 @@ contract L1GatewayTests is
 
         _deployEra();
         _deployZKChain(ETH_TOKEN_ADDRESS, migratingChainId);
-        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         acceptPendingAdmin(migratingChainId);
         _deployZKChain(ETH_TOKEN_ADDRESS, gatewayChainId);
         acceptPendingAdmin(gatewayChainId);
@@ -165,18 +164,21 @@ contract L1GatewayTests is
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
+        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
     }
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
+        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         gatewayScript.fullGatewayRegistration();
     }
 
     function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
+        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
         uint256 expectedValue = 1000000000000000000000;
@@ -194,6 +196,7 @@ contract L1GatewayTests is
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
+        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
 
         // Setup
@@ -269,6 +272,7 @@ contract L1GatewayTests is
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
+        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         migrateBackChain();
     }
@@ -355,8 +359,8 @@ contract L1GatewayTests is
     }
 
     function test_chainMigrationWithUpgrade() public {
-        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _setUpGatewayWithFilterer();
+        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
 
         // Try to perform an upgrade
@@ -416,6 +420,7 @@ contract L1GatewayTests is
 
     function test_proveL2LogsInclusionFromData() public {
         _setUpGatewayWithFilterer();
+        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         IBridgehubBase bridgehub = IBridgehubBase(addresses.bridgehub);
 
