@@ -302,36 +302,44 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
 
+        // Here `assetMigrationNumber` serves as a "nullifier" to ensure that the same migration is not processed twice.
         require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
 
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         uint256 fromChainId;
         uint256 toChainId;
 
-        /// We check the assetId to make sure the chain is not lying about it.
+        // We check the assetId to make sure the chain is not lying about it.
         DataEncoding.assetIdCheck(data.tokenOriginChainId, data.assetId, data.originToken);
 
         if (data.isL1ToGateway) {
             uint256 chainMigrationNumber = _getChainMigrationNumber(data.chainId);
-            /// We check the chainMigrationNumber to make sure the message is not from a previous token migration.
+            // We check the chainMigrationNumber to make sure the message is not from a previous token migration.
+            // What can happen in theory is the following:
+            // - Chain starts migration to Gateway (has chainMigrationNumber = n)
+            // - Migration fails, then chain restores itself on L1 (has chainMigrationNumber = n - 1)
+            // - Chain starts migration to Gateway again (has chainMigrationNumber = n)
+            // In this case there are two valid migrations with the same chainMigrationNumber.
+            // This affects only malicious chains, since a normal chain is not expected to send such a message
+            // when on L1. In the worst case only this chain is affected.
             require(
                 chainMigrationNumber == data.migrationNumber,
                 InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
             );
-            // In this case the TokenBalanceMigrationData data might be malicious.
+
+            // The TokenBalanceMigrationData data might be malicious.
             // We check the chainId to match the finalizeWithdrawalParams.chainId.
-            // We check the assetId, tokenOriginChainId, originToken with an assetIdCheck.
             // The amount might be malicious, but that poses a restriction on users of the chain, not other chains.
             // The AssetTracker cannot protect individual users only other chains. Individual users rely on the proof system.
-            // The last field is migrationNumber, which cannot be abused.
-
+            // The last field is migrationNumber, which cannot be abused due to the check above.
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
 
             // We check parity here to make sure that we migrated the token balance back to L1 from Gateway.
             // this is needed to ensure that the chainBalance on the Gateway AssetTracker is currently 0.
             // In the future we might initialize chains on GW. So we subtract from chainMigrationNumber.
-            // Note, that this logic only works well when only a single ZK Gateway is used as a settlement layer.
+            // Note, that this logic only works well when only a single ZK Gateway can be used as a settlement layer
+            // for an individual chain.
             require(
                 (assetMigrationNumber[data.chainId][data.assetId]) % 2 == 0,
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
@@ -341,14 +349,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             toChainId = currentSettlementLayer;
         } else {
             // In this case we trust the TokenBalanceMigrationData data and the settlement layer = Gateway to be honest.
-            // If the settlement layer is compromised, other chains settling on L1 are not compromised, only chains settling on Gateway.
-
             require(
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
             );
 
-            // We trust the settlement layer to provide the correct assetId.
+            // Note, that here, unlike the case above, we do not enforce the `chainMigrationNumber`, since
+            // we always allow to finalize previous withdrawals. 
+
             fromChainId = _finalizeWithdrawalParams.chainId;
             toChainId = data.chainId;
         }
