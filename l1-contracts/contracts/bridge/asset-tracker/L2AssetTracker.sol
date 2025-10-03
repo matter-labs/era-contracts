@@ -112,12 +112,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             revert ChainBalanceAlreadyInitialized(_assetId);
         }
 
+        // Mark chainBalance as assigned
+        maxChainBalanceAssigned[_assetId] = true;
+
         // Initialize chainBalance
         uint256 ntvBalance = IERC20(tokenAddress).balanceOf(address(ntv));
         chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - ntvBalance;
-
-        // Mark chainBalance as assigned
-        maxChainBalanceAssigned[_assetId] = true;
     }
 
     /*//////////////////////////////////////////////////////////////
