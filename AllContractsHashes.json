@@ -1425,11 +1425,11 @@
   },
   {
     "contractName": "l1-contracts/SettlementLayerV30Upgrade",
-    "zkBytecodeHash": "0x010003e7cb3a221bb3984c72b61dc6cd40897b18faf767cd77642c07bcb7dfff",
+    "zkBytecodeHash": "0x010003e766868da819bffce93a12bb4e4f6d287f8e9c425b1ef7e4e60173dcd2",
     "zkBytecodePath": "/l1-contracts/zkout/SettlementLayerV30Upgrade.sol/SettlementLayerV30Upgrade.json",
-    "evmBytecodeHash": "0x966631fa64650db05b98021f1e8d7a20ecd0886dddb37d7659e9a5b6b32df21b",
+    "evmBytecodeHash": "0x77912a0935ba30c75873228e3cf57f3a6fa7bc530cf69db7291f82a8d5052006",
     "evmBytecodePath": "/l1-contracts/out/SettlementLayerV30Upgrade.sol/SettlementLayerV30Upgrade.json",
-    "evmDeployedBytecodeHash": "0xf91ee906dc0416b68711f82dd340321c354b3f926724487dec4540834111b3cf"
+    "evmDeployedBytecodeHash": "0x0b5141db6032f4f03a19fd230e445785005fb93c46510d7c7eba1f09f171dd7b"
   },
   {
     "contractName": "l1-contracts/SignedMath",
