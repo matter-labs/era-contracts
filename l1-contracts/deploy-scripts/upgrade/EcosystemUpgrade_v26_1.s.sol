@@ -79,7 +79,6 @@ contract EcosystemUpgrade_v26_1 is Script {
         address chainAdmin;
         address accessControlRestrictionAddress;
         address validatorTimelock;
-        address gatewayUpgrade;
         address create2Factory;
         address transitionaryOwner;
         address upgradeTimer;

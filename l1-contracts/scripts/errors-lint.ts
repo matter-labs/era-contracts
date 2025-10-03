@@ -171,6 +171,7 @@ function sortErrorBlocks(lines: string[]): string[] {
 async function processFile(
   filePath: string,
   fix: boolean,
+  database: boolean,
   collectedErrors: Map<string, [string, string]>
 ): Promise<boolean> {
   const content = fs.readFileSync(filePath, "utf8");
@@ -230,8 +231,8 @@ async function processFile(
         modified = true;
       }
 
-      // Optional: submit to signature DB
-      if (fix) {
+      // Submit selectors to signature DB
+      if (database) {
         const exists = await querySignatureDatabase(sig);
         if (!exists) {
           await submitSignatureToDatabase(sig);
@@ -375,11 +376,16 @@ async function main() {
   program
     .option("--fix", "Fix the errors by inserting selectors and sorting")
     .option("--check", "Check if the selectors are present without modifying files")
+    .option("--database", "Upload error selectors to the signature DB (https://openchain.xyz/signatures).")
     .parse(process.argv);
 
-  const options = program.opts<{ fix?: boolean; check?: boolean }>();
+  const options = program.opts<{ fix?: boolean; check?: boolean; database?: boolean }>();
   if ((!options.fix && !options.check) || (options.fix && options.check)) {
     console.error("Error: You must provide either --fix or --check, but not both.");
+    process.exit(1);
+  }
+  if (!options.fix && options.database) {
+    console.error("You can only upload the signatures to the database when using --fix flag.");
     process.exit(1);
   }
 
@@ -392,7 +398,7 @@ async function main() {
     // Process/validate each error definition file, collecting declared errors
     for (const customErrorFile of errorsPaths) {
       const absolutePath = path.resolve(contractsPath + "/" + customErrorFile);
-      const result = await processFile(absolutePath, !!options.fix, declaredErrors);
+      const result = await processFile(absolutePath, !!options.fix, !!options.database, declaredErrors);
       if (result && options.check) hasErrors = true;
     }
 

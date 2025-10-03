@@ -74,30 +74,6 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
         _;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            INTERNAL FUNCTIONS
-    //////////////////////////////////////////////////////////////*/
-
-    /// @dev Returns the L2 asset router for internal use.
-    function _assetRouter() internal view override returns (IAssetRouterBase) {
-        return IAssetRouterBase(ASSET_ROUTER);
-    }
-
-    /// @dev Returns the L1 chain ID for internal use.
-    function _l1ChainId() internal view override returns (uint256) {
-        return L1_CHAIN_ID;
-    }
-
-    /// @dev Returns the base token asset ID for internal use.
-    function _baseTokenAssetId() internal view override returns (bytes32) {
-        return BASE_TOKEN_ASSET_ID;
-    }
-
-    /// @dev Returns the WETH token address for internal use.
-    function _wethToken() internal view override returns (address) {
-        return WETH_TOKEN;
-    }
-
     /// @notice Initializes the contract.
     /// @dev This function is used to initialize the contract with the initial values.
     /// @param _l1ChainId The chain id of L1.
@@ -310,6 +286,26 @@ contract L2NativeTokenVault is IL2NativeTokenVault, NativeTokenVaultBase {
     /*//////////////////////////////////////////////////////////////
                             INTERNAL & HELPER FUNCTIONS
     //////////////////////////////////////////////////////////////*/
+
+    /// @dev Returns the L2 asset router for internal use.
+    function _assetRouter() internal view override returns (IAssetRouterBase) {
+        return IAssetRouterBase(ASSET_ROUTER);
+    }
+
+    /// @dev Returns the L1 chain ID for internal use.
+    function _l1ChainId() internal view override returns (uint256) {
+        return L1_CHAIN_ID;
+    }
+
+    /// @dev Returns the base token asset ID for internal use.
+    function _baseTokenAssetId() internal view override returns (bytes32) {
+        return BASE_TOKEN_ASSET_ID;
+    }
+
+    /// @dev Returns the WETH token address for internal use.
+    function _wethToken() internal view override returns (address) {
+        return WETH_TOKEN;
+    }
 
     /// @notice Calculates L2 wrapped token address given the currently stored beacon proxy bytecode hash and beacon address.
     /// @param _tokenOriginChainId The chain id of the origin token.

@@ -33,8 +33,8 @@ error InvalidVersion();
 error InvalidWithdrawalChainId();
 // 0xa16d8a80
 error L1TotalSupplyAlreadyMigrated();
-// 0x4c56a8ba
-error MaxChainBalanceAlreadyAssigned();
+// 0xda4352c4
+error MaxChainBalanceAlreadyAssigned(bytes32 assetId);
 // 0x7e472272
 error MissingBaseTokenAssetId();
 // 0x8dfed13a

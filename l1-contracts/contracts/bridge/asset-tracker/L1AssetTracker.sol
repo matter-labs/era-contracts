@@ -40,8 +40,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     IChainAssetHandler public chainAssetHandler;
 
-    mapping(bytes32 assetId => bool maxChainBalanceAssigned) internal maxChainBalanceAssigned;
-
     /// Todo Deprecate after V30 is finished.
     mapping(bytes32 assetId => bool l1TotalSupplyMigrated) internal l1TotalSupplyMigrated;
 
@@ -146,7 +144,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function _assignMaxChainBalanceRequireNotAssigned(uint256 _originChainId, bytes32 _assetId) internal {
-        require(!maxChainBalanceAssigned[_assetId], MaxChainBalanceAlreadyAssigned());
+        require(!maxChainBalanceAssigned[_assetId], MaxChainBalanceAlreadyAssigned(_assetId));
         _assignMaxChainBalance(_originChainId, _assetId);
     }
 
