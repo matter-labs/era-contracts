@@ -316,7 +316,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             revert NotHyperchain();
         }
         /// We pause L1->GW->L2 deposits.
-        require(_checkV30UpgradeProcessed(_chainId), DepositsPaused());
+        require(_checkV30UpgradeProcessed(_chainId) && !_depositsPaused(), DepositsPaused());
 
         BalanceChange memory balanceChange;
         /// baseTokenAssetId is known on Gateway.
@@ -577,8 +577,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
 
         if (
             bridgehub.messageRoot().v30UpgradeChainBatchNumber(_chainId) ==
-            V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY ||
-            _depositsPaused()
+            V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY
         ) {
             /// We pause deposits until the chain has upgraded on GW and the full pause time window has elapsed
             return false;
