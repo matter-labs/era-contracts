@@ -130,16 +130,15 @@ contract L1GatewayTests is
         // vm.deal(bridgehub, 100000000000000000000000000000000000);
     }
 
-    function _clearPriorityQueue(address _bridgehub, uint256 _chainId) internal {
+    function _clearPriorityQueue(address _bridgehub, uint256 _chainId) public {
         IZKChain chain = IZKChain(IBridgehubBase(_bridgehub).getZKChain(_chainId));
-        uint256 totalTxs = chain.getTotalPriorityTxs();
-        uint256 unprocessedIndex = chain.getFirstUnprocessedPriorityTx();
-        console.log("totalTxs", totalTxs);
-        console.log("unprocessedIndex", unprocessedIndex);
-        for (uint256 i = 0; i < 1000; i++) {
-            vm.store(address(chain), bytes32(i), bytes32(totalTxs));
-        }
-        console.log("unprocessedIndex", chain.getFirstUnprocessedPriorityTx());
+        uint256 treeSize = chain.getPriorityQueueSize();
+        // The priorityTree sits at slot 51 of ZKChainStorage
+        // unprocessedIndex is the second field (51 + 1 = 52) in PriorityTree.Tree
+        bytes32 slot = bytes32(uint256(52));
+        uint256 value = uint256(vm.load(address(chain), slot));
+        // We modify the unprocessedIndex so that the tree size is zero
+        vm.store(address(chain), slot, bytes32(value + treeSize));
     }
 
     // This is a method to simplify porting the tests for now.
@@ -356,6 +355,7 @@ contract L1GatewayTests is
     }
 
     function test_chainMigrationWithUpgrade() public {
+        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _setUpGatewayWithFilterer();
         gatewayScript.migrateChainToGateway(migratingChainId);
 
