@@ -99,9 +99,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function migrateTokenBalanceFromNTVV30(uint256 _chainId, bytes32 _assetId) external {
         INativeTokenVaultBase ntv = _nativeTokenVault();
 
-        // Validate that this is an L2 native token
+        // Validate that this is a token native to the current L2
         uint256 originChainId = ntv.originChainId(_assetId);
-        require(_chainId != L1_CHAIN_ID, InvalidChainId());
+        require(_chainId != block.chainid, InvalidChainId());
 
         // Get token address
         address tokenAddress = ntv.tokenAddress(_assetId);
