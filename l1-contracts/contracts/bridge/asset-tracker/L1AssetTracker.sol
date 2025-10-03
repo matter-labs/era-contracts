@@ -342,8 +342,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             _fromChainId: fromChainId,
             _toChainId: toChainId,
             _assetId: data.assetId,
-            _amount: data.amount,
-            _tokenOriginChainId: data.tokenOriginChainId
+            _amount: data.amount
         });
 
         assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
@@ -385,9 +384,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         uint256 _fromChainId,
         uint256 _toChainId,
         bytes32 _assetId,
-        uint256 _amount,
-        // solhint-disable-next-line no-unused-vars
-        uint256 _tokenOriginChainId
+        uint256 _amount
     ) internal {
         _decreaseChainBalance(_fromChainId, _assetId, _amount);
         chainBalance[_toChainId][_assetId] += _amount;
