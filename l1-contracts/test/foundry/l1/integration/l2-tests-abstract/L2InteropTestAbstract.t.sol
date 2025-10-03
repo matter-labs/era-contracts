@@ -33,15 +33,6 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
     address constant UNBUNDLER_ADDRESS = address(0x1);
     address constant EXECUTION_ADDRESS = address(0x2);
 
-    modifier mockSettlementLayerChainId() {
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
-            abi.encode(block.chainid)
-        );
-        _;
-    }
-
     function test_requestL2TransactionDirectWithCalldata() public {
         // Note: get this from real local txs
         bytes
@@ -57,7 +48,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         // assertTrue(success);
     }
 
-    function test_sendBundle_simple() public mockSettlementLayerChainId {
+    function test_sendBundle_simple() public {
         vm.mockCall(
             L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
@@ -173,7 +164,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         require(success);
     }
 
-    function test_executeBundle() public mockSettlementLayerChainId {
+    function test_executeBundle() public {
         InteropBundle memory interopBundle = getInteropBundle(1);
         bytes memory bundle = abi.encode(interopBundle);
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);
@@ -208,7 +199,7 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
         }
     }
 
-    function test_unbundleBundle() public mockSettlementLayerChainId {
+    function test_unbundleBundle() public {
         InteropBundle memory interopBundle = getInteropBundle(3);
         bytes memory bundle = abi.encode(interopBundle);
         MessageInclusionProof memory proof = getInclusionProof(L2_INTEROP_CENTER_ADDR);

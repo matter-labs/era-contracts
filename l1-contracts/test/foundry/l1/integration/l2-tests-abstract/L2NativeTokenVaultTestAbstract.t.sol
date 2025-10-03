@@ -32,16 +32,7 @@ import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
 abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 
-    modifier mockSettlementLayerChainId() {
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
-            abi.encode(block.chainid)
-        );
-        _;
-    }
-
-    function test_registerLegacyToken() external mockSettlementLayerChainId {
+    function test_registerLegacyToken() external {
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
         vm.mockCall(
@@ -52,7 +43,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
     }
 
-    function test_registerLegacyToken_IncorrectConfiguration() external mockSettlementLayerChainId {
+    function test_registerLegacyToken_IncorrectConfiguration() external {
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
@@ -109,7 +100,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         INativeTokenVaultBase(addresses.vaults.l1NativeTokenVaultProxy).registerToken(l2Token);
     }
 
-    function test_bridgeMint_CorrectlyConfiguresL2LegacyToken() external mockSettlementLayerChainId {
+    function test_bridgeMint_CorrectlyConfiguresL2LegacyToken() external {
         L2NativeTokenVault l2NativeTokenVault = L2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
 
         uint256 originChainId = L1_CHAIN_ID;
