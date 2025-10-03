@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidV30UpgradeChainBatchNumber, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidEmptyMessageRoot} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidV30UpgradeChainBatchNumber, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -126,7 +126,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
 
-    error RegisterNewTokenNotAllowed();
 
     function registerNewToken(bytes32, uint256) public override onlyNativeTokenVault {
         revert RegisterNewTokenNotAllowed();

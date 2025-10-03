@@ -40,7 +40,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
     IChainAssetHandler public chainAssetHandler;
 
-    /// Todo Deprecate after V30 is finished.
     mapping(bytes32 assetId => bool maxChainBalanceAssigned) internal maxChainBalanceAssigned;
 
     /// Todo Deprecate after V30 is finished.
@@ -300,8 +299,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 chainMigrationNumber == data.migrationNumber,
                 InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
             );
-            /// We only allow migration to a Gateway once the withdrawal from another gateway has been finalized.
-            require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidAssetId(data.assetId));
             /// In this case the TokenBalanceMigrationData data might be malicious.
             /// We check the chainId to match the finalizeWithdrawalParams.chainId.
             /// We check the assetId, tokenOriginChainId, originToken with an assetIdCheck.
