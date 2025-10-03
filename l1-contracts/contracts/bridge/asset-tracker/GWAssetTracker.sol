@@ -169,15 +169,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
 
-    function registerL2NativeTokenFromL1(
-        uint256 _l2ChainId,
-        address _l2NativeToken
-    ) external onlyServiceTransactionSender {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l2ChainId, _l2NativeToken);
-        chainBalance[_l2ChainId][assetId] = MAX_TOKEN_BALANCE;
-        _registerToken(assetId, _l2NativeToken, _l2ChainId);
-    }
-
     /*//////////////////////////////////////////////////////////////
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/

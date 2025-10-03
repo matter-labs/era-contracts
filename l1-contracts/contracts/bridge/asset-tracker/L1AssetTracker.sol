@@ -135,37 +135,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainBalance[_chainId][_assetId] += migratedBalance;
     }
 
-    /// @notice This is used to register L2NativeTokens when the chain is settling on GW.
-    /// @notice It is needed since withdrawals are blocked until the token balance is migrated to GW, and it needs to be registered before migration.
-    function registerL2NativeToken(uint256 _l2ChainId, address _l2NativeToken) external {
-        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_l2ChainId);
-        require(settlementLayer != block.chainid, InvalidSettlementLayer());
-
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l2ChainId, _l2NativeToken);
-
-        /// This guarantees the token is not a legacy
-        require(NATIVE_TOKEN_VAULT.tokenAddress(assetId) == address(0), InvalidTokenAddress());
-        _assignMaxChainBalanceRequireNotAssigned(settlementLayer, assetId);
-
-        _sendConfirmationToChains(
-            settlementLayer,
-            ConfirmBalanceMigrationData({
-                version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
-                isL1ToGateway: true,
-                chainId: settlementLayer,
-                assetId: assetId,
-                migrationNumber: _getChainMigrationNumber(_l2ChainId),
-                amount: MAX_TOKEN_BALANCE
-            })
-        );
-    }
-
-    /// @dev the chainAdmin should call this function for all unfinalized withdrawals after the chain migrates to GW.
-    function registerUnfinalizedWithdrawal(uint256 _chainId, address _l2NativeToken) external onlyChainAdmin(_chainId) {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(_chainId, _l2NativeToken);
-
-    }
-
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
         _assignMaxChainBalanceIfNeeded(_originChainId, _assetId);
     }
@@ -306,7 +275,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             );
             /// In this case the TokenBalanceMigrationData data might be malicious.
             /// We check the chainId to match the finalizeWithdrawalParams.chainId.
-            /// We check the assetId, tokenOriginChainId, originToken with an assetIdCheck.
             /// The amount might be malicious, but that poses a restriction on users of the chain, not other chains.
             /// The AssetTracker cannot protect individual users only other chains. Individual users rely on the proof system.
             /// The last field is migrationNumber, which cannot be abused.
@@ -338,6 +306,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             toChainId = data.chainId;
         }
 
+        _assignMaxChainBalanceIfNeeded(data.tokenOriginChainId, data.assetId);
         _migrateFunds({
             _fromChainId: fromChainId,
             _toChainId: toChainId,
