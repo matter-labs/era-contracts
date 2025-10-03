@@ -31,19 +31,18 @@ library LegacySharedBridgeAddresses {
     /// @dev We have Stage, Testnet and Mainnet ecosystems.
     /// We use the gwChainId to distinguish between them, since stage and testnet are both on Sepolia.
     function getLegacySharedBridgeAddressOnGateway(
-        uint256 _gwChainId,
-        uint256 _l2ChainIndex
-    ) internal pure returns (SharedBridgeOnChainId memory) {
+        uint256 _gwChainId
+    ) internal pure returns (SharedBridgeOnChainId[] memory) {
         SharedBridgeOnChainId[] memory stageLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
         SharedBridgeOnChainId[] memory testnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
         SharedBridgeOnChainId[] memory mainnetLegacySharedBridgeAddresses = new SharedBridgeOnChainId[](0);
 
         if (_gwChainId == STAGE_GW_CHAIN_ID) {
-            return stageLegacySharedBridgeAddresses[_l2ChainIndex];
+            return stageLegacySharedBridgeAddresses;
         } else if (_gwChainId == TESTNET_GW_CHAIN_ID) {
-            return testnetLegacySharedBridgeAddresses[_l2ChainIndex];
+            return testnetLegacySharedBridgeAddresses;
         } else if (_gwChainId == MAINNET_GW_CHAIN_ID) {
-            return mainnetLegacySharedBridgeAddresses[_l2ChainIndex];
+            return mainnetLegacySharedBridgeAddresses;
         }
         revert InvalidGwChainId(_gwChainId);
     }

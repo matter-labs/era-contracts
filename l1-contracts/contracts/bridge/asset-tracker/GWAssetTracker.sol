@@ -91,10 +91,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         uint256 length = LegacySharedBridgeAddresses.getLegacySharedBridgeLength(block.chainid);
+        SharedBridgeOnChainId[] memory sharedBridgeOnChainIds = LegacySharedBridgeAddresses
+        .getLegacySharedBridgeAddressOnGateway(block.chainid);
         for (uint256 i = 0; i < length; ++i) {
-            SharedBridgeOnChainId memory sharedBridgeOnChainId = LegacySharedBridgeAddresses
-                .getLegacySharedBridgeAddressOnGateway(block.chainid, i);
-            legacySharedBridgeAddress[sharedBridgeOnChainId.chainId] = sharedBridgeOnChainId.legacySharedBridgeAddress;
+            legacySharedBridgeAddress[sharedBridgeOnChainIds[i].chainId] = sharedBridgeOnChainIds[i].legacySharedBridgeAddress;
         }
     }
 
