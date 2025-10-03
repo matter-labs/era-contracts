@@ -30,6 +30,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         /// We write to storage to avoid reentrancy.
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
+        s.__DEPRECATED_l2DAValidator = address(0);
 
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
         INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(
@@ -66,8 +67,6 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         if (bridgehub.whitelistedSettlementLayers(s.chainId)) {
             require(IGetters(address(this)).getPriorityQueueSize() == 0, PriorityQueueNotReady());
         }
-
-        s.__DEPRECATED_l2DAValidator = address(0);
 
         return Diamond.DIAMOND_INIT_SUCCESS_RETURN_VALUE;
     }
