@@ -18,6 +18,7 @@ import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();
 error GWNotV30(uint256 chainId);
+error NotAllBatchesExecuted();
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -30,6 +31,8 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         /// We write to storage to avoid reentrancy.
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
+
+        require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
         INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(
