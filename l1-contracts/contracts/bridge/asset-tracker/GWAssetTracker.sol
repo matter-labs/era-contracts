@@ -185,18 +185,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
-        // TODO in V31, remove onlyWithdrawals option.
-        // slither-disable-next-line unused-return
-        (, uint32 minor, ) = IZKChain(msg.sender).getSemverProtocolVersion();
-        /// If a chain is pre v30, we only allow withdrawals, and don't keep track of chainBalance.
-        bool onlyWithdrawals = minor < 30;
-        /// We check that the chain has not upgraded to V30 for onlyWithdrawals case.
-        require(
-            !onlyWithdrawals ||
-                L2_MESSAGE_ROOT.v30UpgradeChainBatchNumber(_processLogsInputs.chainId) ==
-                V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
-            InvalidV30UpgradeChainBatchNumber(_processLogsInputs.chainId)
-        );
 
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
         reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
@@ -227,7 +215,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 require(log.isService, InvalidServiceLog());
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-                    require(!onlyWithdrawals, OnlyWithdrawalsAllowedForPreV30Chains());
                     _handleInteropMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
                     _handleBaseTokenSystemContractMessage(_processLogsInputs.chainId, baseTokenAssetId, message);
