@@ -316,7 +316,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             revert NotHyperchain();
         }
         /// We pause L1->GW->L2 deposits.
-        require(_checkV30UpgradeProcessed(_chainId) && !_depositsPaused(), DepositsPaused());
+        require(_checkV30UpgradeProcessed(_chainId), DepositsPaused());
 
         BalanceChange memory balanceChange;
         /// baseTokenAssetId is known on Gateway.
