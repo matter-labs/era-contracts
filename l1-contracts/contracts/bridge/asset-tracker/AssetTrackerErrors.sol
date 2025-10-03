@@ -51,8 +51,9 @@ error OnlyGatewaySettlementLayer();
 error OnlyWhitelistedSettlementLayer(address, address);
 // 0xd4f29820
 error OnlyWithdrawalsAllowedForPreV30Chains();
+// 0x174996d5
+error RegisterNewTokenNotAllowed();
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
-error RegisterNewTokenNotAllowed();
