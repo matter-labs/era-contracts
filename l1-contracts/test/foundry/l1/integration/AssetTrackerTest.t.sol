@@ -216,7 +216,7 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
         vm.store(
             address(assetTracker),
             getAssetMigrationNumberLocation(assetId, eraZKChainId),
-            bytes32(migrationNumber - 2)
+            bytes32(migrationNumber - 1)
         );
         vm.store(
             address(l2AssetTracker),
