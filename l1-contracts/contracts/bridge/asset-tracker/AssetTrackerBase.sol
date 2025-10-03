@@ -97,7 +97,7 @@ abstract contract AssetTrackerBase is
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public virtual;
 
-    function _assignMaxChainBalance(uint256 _originChainId, bytes32 _assetId) internal {
+    function _assignMaxChainBalance(uint256 _originChainId, bytes32 _assetId) internal virtual {
         chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
     }
 

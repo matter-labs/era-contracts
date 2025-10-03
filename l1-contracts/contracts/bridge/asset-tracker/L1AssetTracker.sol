@@ -130,10 +130,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         /// Note it might be the case that the tokenOriginChainId and the specified _chainId are both L1,
         /// in this case the chainBalance[L1_CHAIN_ID][_assetId] is set to uint256.max if it was not already.
         /// Note before the token is migrated the MAX_TOKEN_BALANCE is not assigned, since the registerNewToken is only called for new tokens.
-        if (!maxChainBalanceAssigned[_assetId]) {
-            maxChainBalanceAssigned[_assetId] = true;
-            chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE;
-        }
+        _assignMaxChainBalanceIfNeeded(originChainId, _assetId);
         chainBalance[originChainId][_assetId] -= migratedBalance;
         chainBalance[_chainId][_assetId] += migratedBalance;
     }
@@ -148,10 +145,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         /// This guarantees the token is not a legacy
         require(NATIVE_TOKEN_VAULT.tokenAddress(assetId) == address(0), InvalidTokenAddress());
-        require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned());
-
-        chainBalance[settlementLayer][assetId] = MAX_TOKEN_BALANCE;
-        maxChainBalanceAssigned[assetId] = true;
+        _assignMaxChainBalanceRequireNotAssigned(settlementLayer, assetId);
 
         _sendConfirmationToChains(
             settlementLayer,
@@ -169,16 +163,27 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev the chainAdmin should call this function for all unfinalized withdrawals after the chain migrates to GW.
     function registerUnfinalizedWithdrawal(uint256 _chainId, address _l2NativeToken) external onlyChainAdmin(_chainId) {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(_chainId, _l2NativeToken);
-        require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned());
-        chainBalance[_chainId][assetId] = MAX_TOKEN_BALANCE;
-        maxChainBalanceAssigned[assetId] = true;
+
     }
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public override onlyNativeTokenVault {
+        _assignMaxChainBalanceIfNeeded(_originChainId, _assetId);
+    }
+
+    function _assignMaxChainBalanceIfNeeded(uint256 _originChainId, bytes32 _assetId) internal override {
         if (!maxChainBalanceAssigned[_assetId]) {
             _assignMaxChainBalance(_originChainId, _assetId);
-            maxChainBalanceAssigned[_assetId] = true;
         }
+    }
+
+    function _assignMaxChainBalanceRequireNotAssigned(uint256 _originChainId, bytes32 _assetId) internal {
+        require(!maxChainBalanceAssigned[_assetId], MaxChainBalanceAlreadyAssigned());
+        _assignMaxChainBalance(_originChainId, _assetId);
+    }
+
+    function _assignMaxChainBalance(uint256 _originChainId, bytes32 _assetId) internal override {
+        chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
+        maxChainBalanceAssigned[_assetId] = true;
     }
 
     /*//////////////////////////////////////////////////////////////
