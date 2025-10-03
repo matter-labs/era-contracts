@@ -27,12 +27,6 @@ error InvalidMigrationNumber(uint256, uint256);
 error InvalidSender();
 // 0xaca75b50
 error InvalidServiceLog();
-// 0xd0f0bff7
-error InvalidSettlementLayer();
-// 0x1eb00b06
-error InvalidTokenAddress();
-// 0x142bd5be
-error InvalidV30UpgradeChainBatchNumber(uint256 _chainId);
 // 0xa9146eeb
 error InvalidVersion();
 // 0xf76b228a
@@ -49,8 +43,6 @@ error NotMigratedChain();
 error OnlyGatewaySettlementLayer();
 // 0x0fd3385e
 error OnlyWhitelistedSettlementLayer(address, address);
-// 0xd4f29820
-error OnlyWithdrawalsAllowedForPreV30Chains();
 // 0x174996d5
 error RegisterNewTokenNotAllowed();
 // 0x90ed63bb
