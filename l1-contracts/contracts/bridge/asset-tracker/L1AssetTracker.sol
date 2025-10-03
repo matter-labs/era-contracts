@@ -146,7 +146,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
 
         /// This guarantees the token is not a legacy
         require(NATIVE_TOKEN_VAULT.tokenAddress(assetId) == address(0), InvalidTokenAddress());
-        require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned());
+        require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned(assetId));
 
         chainBalance[settlementLayer][assetId] = MAX_TOKEN_BALANCE;
         maxChainBalanceAssigned[assetId] = true;
@@ -167,7 +167,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @dev the chainAdmin should call this function for all unfinalized withdrawals after the chain migrates to GW.
     function registerUnfinalizedWithdrawal(uint256 _chainId, address _l2NativeToken) external onlyChainAdmin(_chainId) {
         bytes32 assetId = DataEncoding.encodeNTVAssetId(_chainId, _l2NativeToken);
-        require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned());
+        require(!maxChainBalanceAssigned[assetId], MaxChainBalanceAlreadyAssigned(assetId));
         chainBalance[_chainId][assetId] = MAX_TOKEN_BALANCE;
         maxChainBalanceAssigned[assetId] = true;
     }

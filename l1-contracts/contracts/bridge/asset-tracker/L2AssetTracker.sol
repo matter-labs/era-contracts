@@ -12,7 +12,7 @@ import {Unauthorized, InvalidChainId} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
-import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, ChainBalanceAlreadyInitialized} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
@@ -108,16 +108,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
 
         // Prevent re-initialization if already set
-        if (chainBalance[block.chainid][_assetId] != 0 || maxChainBalanceAssigned[_assetId]) {
-            revert ChainBalanceAlreadyInitialized(_assetId);
-        }
+        require(!maxChainBalanceAssigned[_assetId], MaxChainBalanceAlreadyAssigned(_assetId));
 
         // Mark chainBalance as assigned
         maxChainBalanceAssigned[_assetId] = true;
 
         // Initialize chainBalance
         uint256 ntvBalance = IERC20(tokenAddress).balanceOf(address(ntv));
-        chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - ntvBalance;
+        chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - chainBalance[originChainId][_assetId];
+        chainBalance[originChainId][_assetId] -= ntvBalance;
     }
 
     /*//////////////////////////////////////////////////////////////
