@@ -2,25 +2,24 @@
 
 pragma solidity 0.8.28;
 
-import {BALANCE_CHANGE_VERSION, MAX_TOKEN_BALANCE, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
+import {BALANCE_CHANGE_VERSION, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, ConfirmBalanceMigrationData, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
 import {ChainIdNotRegistered, InvalidInteropCalldata, InvalidMessage, ReconstructionMismatch, Unauthorized} from "../../common/L1ContractErrors.sol";
-import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../bridgehub/IMessageRoot.sol";
+import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH} from "../../bridgehub/IMessageRoot.sol";
 import {ProcessLogsInput} from "../../state-transition/chain-interfaces/IExecutor.sol";
 import {DynamicIncrementalMerkleMemory} from "../../common/libraries/DynamicIncrementalMerkleMemory.sol";
 import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from "../../common/Config.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidV30UpgradeChainBatchNumber, NotMigratedChain, OnlyWithdrawalsAllowedForPreV30Chains, InvalidEmptyMessageRoot} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, NotMigratedChain, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
-import {IZKChain} from "../../state-transition/chain-interfaces/IZKChain.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
@@ -98,11 +97,15 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
-        uint256 length = LegacySharedBridgeAddresses.getLegacySharedBridgeLength(block.chainid);
+    }
+    function setLegacySharedBridgeAddress() external onlyUpgrader {
+        address l1AssetRouter = L2_ASSET_ROUTER.L1_ASSET_ROUTER();
+        SharedBridgeOnChainId[] memory sharedBridgeOnChainIds = LegacySharedBridgeAddresses
+            .getLegacySharedBridgeAddressOnGateway(l1AssetRouter);
+        uint256 length = sharedBridgeOnChainIds.length;
         for (uint256 i = 0; i < length; ++i) {
-            SharedBridgeOnChainId memory sharedBridgeOnChainId = LegacySharedBridgeAddresses
-                .getLegacySharedBridgeAddressOnGateway(block.chainid, i);
-            legacySharedBridgeAddress[sharedBridgeOnChainId.chainId] = sharedBridgeOnChainId.legacySharedBridgeAddress;
+            legacySharedBridgeAddress[sharedBridgeOnChainIds[i].chainId] = sharedBridgeOnChainIds[i]
+                .legacySharedBridgeAddress;
         }
     }
 
@@ -133,8 +136,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /*//////////////////////////////////////////////////////////////
                     Token deposits and withdrawals
     //////////////////////////////////////////////////////////////*/
-
-    error RegisterNewTokenNotAllowed();
 
     function registerNewToken(bytes32, uint256) public override onlyNativeTokenVault {
         revert RegisterNewTokenNotAllowed();
@@ -181,15 +182,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         legacySharedBridgeAddress[_chainId] = _legacySharedBridgeAddress;
     }
 
-    function registerL2NativeTokenFromL1(
-        uint256 _l2ChainId,
-        address _l2NativeToken
-    ) external onlyServiceTransactionSender {
-        bytes32 assetId = DataEncoding.encodeNTVAssetId(_l2ChainId, _l2NativeToken);
-        chainBalance[_l2ChainId][assetId] = MAX_TOKEN_BALANCE;
-        _registerToken(assetId, _l2NativeToken, _l2ChainId);
-    }
-
     /*//////////////////////////////////////////////////////////////
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/
@@ -197,19 +189,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
-        // TODO in V31, remove onlyWithdrawals option.
-        // slither-disable-next-line unused-return
-        (, uint32 minor, ) = IZKChain(msg.sender).getSemverProtocolVersion();
-        /// If a chain is pre v30, we only allow withdrawals, and don't keep track of chainBalance.
-        bool onlyWithdrawals = minor < 30;
-        /// We check that the chain has not upgraded to V30 for onlyWithdrawals case.
-        require(
-            !onlyWithdrawals ||
-                L2_MESSAGE_ROOT.v30UpgradeChainBatchNumber(_processLogsInputs.chainId) ==
-                V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY,
-            InvalidV30UpgradeChainBatchNumber(_processLogsInputs.chainId)
-        );
-
         DynamicIncrementalMerkleMemory.Bytes32PushTree memory reconstructedLogsTree;
         reconstructedLogsTree.createTree(L2_TO_L1_LOGS_MERKLE_TREE_DEPTH);
 
@@ -239,7 +218,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 require(log.isService, InvalidServiceLog());
 
                 if (log.key == bytes32(uint256(uint160(L2_INTEROP_CENTER_ADDR)))) {
-                    require(!onlyWithdrawals, OnlyWithdrawalsAllowedForPreV30Chains());
                     _handleInteropMessage(_processLogsInputs.chainId, message, baseTokenAssetId);
                 } else if (log.key == bytes32(uint256(uint160(L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR)))) {
                     _handleBaseTokenSystemContractMessage(_processLogsInputs.chainId, baseTokenAssetId, message);

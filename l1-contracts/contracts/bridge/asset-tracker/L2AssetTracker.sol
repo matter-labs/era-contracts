@@ -4,15 +4,15 @@ pragma solidity 0.8.28;
 
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
-import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
+import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
 import {ConfirmBalanceMigrationData, TokenBalanceMigrationData} from "../../common/Messaging.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
-import {Unauthorized} from "../../common/L1ContractErrors.sol";
+import {Unauthorized, InvalidChainId} from "../../common/L1ContractErrors.sol";
 import {IMessageRoot} from "../../bridgehub/IMessageRoot.sol";
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
-import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway} from "./AssetTrackerErrors.sol";
+import {AssetIdNotRegistered, MissingBaseTokenAssetId, OnlyGatewaySettlementLayer, TokenBalanceNotMigratedToGateway, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 
@@ -58,6 +58,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
     }
+
     function _l1ChainId() internal view override returns (uint256) {
         return L1_CHAIN_ID;
     }
@@ -90,6 +91,31 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
         _registerTokenOnL2(_assetId);
+    }
+
+    /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V30 upgrade.
+    /// @param _assetId The asset id of the token to migrate the token balance for.
+    function migrateTokenBalanceFromNTVV30(bytes32 _assetId) external {
+        INativeTokenVaultBase ntv = _nativeTokenVault();
+
+        // Validate that this is a token native to the current L2
+        uint256 originChainId = ntv.originChainId(_assetId);
+        require(originChainId == block.chainid, InvalidChainId());
+
+        // Get token address
+        address tokenAddress = ntv.tokenAddress(_assetId);
+        require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
+
+        // Prevent re-initialization if already set
+        require(!maxChainBalanceAssigned[_assetId], MaxChainBalanceAlreadyAssigned(_assetId));
+
+        // Mark chainBalance as assigned
+        maxChainBalanceAssigned[_assetId] = true;
+
+        // Initialize chainBalance
+        uint256 ntvBalance = IERC20(tokenAddress).balanceOf(address(ntv));
+        chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - chainBalance[originChainId][_assetId];
+        chainBalance[originChainId][_assetId] -= ntvBalance;
     }
 
     /*//////////////////////////////////////////////////////////////

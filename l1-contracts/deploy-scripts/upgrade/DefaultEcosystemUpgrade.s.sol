@@ -23,7 +23,6 @@ import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerif
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {GatewayUpgrade} from "contracts/upgrades/GatewayUpgrade.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
@@ -94,7 +93,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     // solhint-disable-next-line gas-struct-packing
     struct UpgradeDeployedAddresses {
         ExpectedL2Addresses expectedL2Addresses;
-        address gatewayUpgrade;
         address transitionaryOwner;
         address upgradeTimer;
         address bytecodesSupplier;
@@ -1076,7 +1074,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             "validium_l1_da_validator_addr",
             addresses.daAddresses.noDAValidiumL1DAValidator
         );
-        vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", upgradeAddresses.gatewayUpgrade);
         vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
         vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
@@ -1797,9 +1794,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
                 return type(ValidatorTimelock).creationCode;
             }
         } else {
-            if (compareStrings(contractName, "GatewayUpgrade")) {
-                return Utils.readZKFoundryBytecodeL1("GatewayUpgrade.sol", "GatewayUpgrade");
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
+            if (compareStrings(contractName, "DefaultUpgrade")) {
                 return Utils.readZKFoundryBytecodeL1("DefaultUpgrade.sol", "DefaultUpgrade");
             } else if (compareStrings(contractName, "BytecodesSupplier")) {
                 return Utils.readZKFoundryBytecodeL1("BytecodesSupplier.sol", "BytecodesSupplier");
@@ -1826,9 +1821,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "GatewayUpgrade")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "DefaultUpgrade")) {
+        if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();

@@ -188,6 +188,6 @@ struct ZKChainStorage {
     address assetTracker;
     /// @dev The address of the native token vault
     address nativeTokenVault;
-    /// @dev Whether we have paused deposits, used for chain migration to and from Gateway.
-    mapping(uint256 migrationNumber => uint256 pausedDepositsTimestamp) pausedDepositsTimestamp;
+    /// @dev Timestamp when deposits were paused for chain migration to/from Gateway. 0 = not paused.
+    uint256 pausedDepositsTimestamp;
 }

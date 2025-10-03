@@ -55,6 +55,9 @@ abstract contract AssetTrackerBase is
     /// - If a chain settles on L1, it is mostly unusued since withdrawals are always allowed.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
 
+    /// Note, this mapping will be deprecated after V30 upgrade is finished.
+    mapping(bytes32 assetId => bool maxChainBalanceAssigned) internal maxChainBalanceAssigned;
+
     function _l1ChainId() internal view virtual returns (uint256);
 
     function _bridgehub() internal view virtual returns (IBridgehubBase);
@@ -112,7 +115,7 @@ abstract contract AssetTrackerBase is
 
     function registerNewToken(bytes32 _assetId, uint256 _originChainId) public virtual;
 
-    function _assignMaxChainBalance(uint256 _originChainId, bytes32 _assetId) internal {
+    function _assignMaxChainBalance(uint256 _originChainId, bytes32 _assetId) internal virtual {
         chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
     }
 
