@@ -19,17 +19,17 @@ contract L1MessageRoot is MessageRootBase {
     address public immutable BRIDGE_HUB;
 
     /// @notice The chain id of the Gateway chain.
-    uint256 public immutable override GATEWAY_CHAIN_ID;
+    uint256 public immutable override ERA_GATEWAY_CHAIN_ID;
 
     /// @dev Contract is expected to be used as proxy implementation on L1, but as a system contract on L2.
     /// This means we call the _initialize in both the constructor and the initialize functions.
     /// Used for V30 upgrade deployment and local deployments.
     /// @dev Initialize the implementation to prevent Parity hack.
     /// @param _bridgehub Address of the Bridgehub.
-    /// @param _gatewayChainId Chain ID of the Gateway chain.
-    constructor(address _bridgehub, uint256 _gatewayChainId) {
+    /// @param _eraGatewayChainId Chain ID of the Gateway chain.
+    constructor(address _bridgehub, uint256 _eraGatewayChainId) {
         BRIDGE_HUB = _bridgehub;
-        GATEWAY_CHAIN_ID = _gatewayChainId;
+        ERA_GATEWAY_CHAIN_ID = _eraGatewayChainId;
         uint256[] memory allZKChains = IBridgehubBase(_bridgehub).getAllZKChainChainIDs();
         _v30InitializeInner(allZKChains);
         _initialize();
@@ -58,7 +58,7 @@ contract L1MessageRoot is MessageRootBase {
             revert InvalidProof();
         }
 
-        require(_finalizeWithdrawalParams.chainId == GATEWAY_CHAIN_ID, OnlyGateway());
+        require(_finalizeWithdrawalParams.chainId == ERA_GATEWAY_CHAIN_ID, OnlyGateway());
         require(
             IBridgehubBase(BRIDGE_HUB).whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
             NotWhitelistedSettlementLayer(_finalizeWithdrawalParams.chainId)
@@ -91,7 +91,7 @@ contract L1MessageRoot is MessageRootBase {
         return block.chainid;
     }
 
-    function _gatewayChainId() internal view override returns (uint256) {
-        return GATEWAY_CHAIN_ID;
+    function _eraGatewayChainId() internal view override returns (uint256) {
+        return ERA_GATEWAY_CHAIN_ID;
     }
 }
