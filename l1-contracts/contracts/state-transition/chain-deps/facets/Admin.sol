@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END,CHAIN_MIGRATION_TIME_WINDOW_START,  CHAIN_MIGRATION_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, CHAIN_MIGRATION_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -324,8 +324,11 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
         if (block.chainid == L1_CHAIN_ID) {
             uint256 timestamp = s.pausedDepositsTimestamp;
-            require(timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
-                block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END, DepositsNotPaused());
+            require(
+                timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
+                    block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END,
+                DepositsNotPaused()
+            );
         }
 
         // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
