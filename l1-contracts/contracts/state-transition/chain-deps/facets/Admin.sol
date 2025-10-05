@@ -322,6 +322,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
         /// We require that all the priority transactions are processed.
         require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 
+        if (block.chainid == L1_CHAIN_ID) {
+            uint256 timestamp = s.pausedDepositsTimestamp;
+            require(timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
+                block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END, DepositsNotPaused());
+        }
+
         // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
         // ie, controlled by the governance, which is currently Era Gateways and Ethereum.
         // Otherwise a malicious settlement layer could forge an interop message from an Era chain.
