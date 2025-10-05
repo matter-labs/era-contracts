@@ -279,7 +279,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             require(currentSettlementLayer != block.chainid, NotMigratedChain());
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
 
-            // we check equality here to make sure that we migrated the token balance back to L1 from Gateway.
+            // we check parity here to make sure that we migrated the token balance back to L1 from Gateway.
             // this is needed to ensure that the chainBalance on the Gateway AssetTracker is currently 0.
             require(
                 (assetMigrationNumber[data.chainId][data.assetId]) % 2 == 0,
