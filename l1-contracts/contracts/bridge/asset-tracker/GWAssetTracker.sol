@@ -152,6 +152,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
         }
         _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
+        uint256 migrationNumber = _getChainMigrationNumber(_chainId);
+
+        /// We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
+        _getOrSaveChainBalance(_chainId, _balanceChange.assetId, migrationNumber - 1, false);
 
         /// A malicious chain can cause a collision for the canonical tx hash.
         require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
@@ -439,7 +443,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // If the chain already migrated back to GW, then we need the previous migration number.
         uint256 migrationNumber = settlementLayer == block.chainid ? chainMigrationNumber - 1 : chainMigrationNumber;
         require(assetMigrationNumber[_chainId][_assetId] < migrationNumber, InvalidAssetId(_assetId));
-        uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, migrationNumber);
+        uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, migrationNumber, true);
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
@@ -458,16 +462,19 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function _getOrSaveChainBalance(
         uint256 _chainId,
         bytes32 _assetId,
-        uint256 _migrationNumber
+        uint256 _migrationNumber, 
+        bool _setToZero
     ) internal returns (uint256) {
         SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_chainId][_migrationNumber][_assetId];
         if (!tokenSavedTotalSupply.isSaved) {
             tokenSavedTotalSupply.amount = chainBalance[_chainId][_assetId];
-            chainBalance[_chainId][_assetId] = 0;
             savedTotalSupply[_chainId][_migrationNumber][_assetId] = SavedTotalSupply({
                 isSaved: true,
                 amount: tokenSavedTotalSupply.amount
             });
+            if (_setToZero) {
+                chainBalance[_chainId][_assetId] = 0;
+            }
         }
         return tokenSavedTotalSupply.amount;
     }
