@@ -59,7 +59,7 @@ contract DiamondProxyTest is UtilsTest {
         dummyBridgehub = new DummyBridgehub();
         initializeData = Utils.makeInitializeData(testnetVerifier, address(dummyBridgehub));
 
-        mockDiamondInitInteropCenterCallsWithAddress(initializeData.bridgehub, address(0));
+        mockDiamondInitInteropCenterCallsWithAddress(initializeData.bridgehub, address(0), bytes32(0));
     }
 
     function test_revertWhen_chainIdDiffersFromBlockChainId() public {
