@@ -567,6 +567,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
 
         bytes4 functionSignature = DataEncoding.getSelector(_l2ToL1message);
         if (functionSignature == IMailboxImpl.finalizeEthWithdrawal.selector) {
+            // slither-disable-next-line unused-return
             (, l1Receiver, amount) = DataEncoding.decodeBaseTokenFinalizeWithdrawalData(_l2ToL1message);
             assetId = BRIDGE_HUB.baseTokenAssetId(_chainId);
             transferData = DataEncoding.encodeBridgeMintData({
@@ -583,6 +584,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
         } else if (functionSignature == IL1ERC20Bridge.finalizeWithdrawal.selector) {
             // this message is a token withdrawal
             address l1Token;
+            // slither-disable-next-line unused-return
             (, l1Token, transferData) = DataEncoding.decodeLegacyFinalizeWithdrawalData(_l2ToL1message);
 
             assetId = l1NativeTokenVault.ensureTokenIsRegistered(l1Token);

@@ -105,6 +105,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             } else if (v30UpgradeChainBatchNumber[_chainId] != 0) {
                 address chain = IBridgehubBase(_bridgehub()).getZKChain(_chainId);
                 uint32 minor;
+                // slither-disable-next-line unused-return
                 (, minor, ) = IGetters(chain).getSemverProtocolVersion();
                 /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v30 quickly.
                 require(msg.sender == chain, OnlyChain(msg.sender, chain));
