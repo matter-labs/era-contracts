@@ -31,7 +31,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         /// We write to storage to avoid reentrancy.
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
 
-        // Note, that this call will revert if the native token vault has not been upgraded, i.e.
+        // Note that this call will revert if the native token vault has not been upgraded, i.e.
         // if a chain settling on Gateway tries to upgrade before ZK Gateway has done the upgrade.
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
         s.__DEPRECATED_l2DAValidator = address(0);
@@ -59,7 +59,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
 
-        // The lines below ensures that chains can only upgrade once the ZK Gateway itself is upgraded,
+        // The lines below ensure that chains can only upgrade once the ZK Gateway itself is upgraded,
         // i.e. its `v30UpgradeGatewayBlockNumber` is non zero.
         uint256 gwChainId = messageRoot.ERA_GATEWAY_CHAIN_ID();
         address gwChain = bridgehub.getZKChain(gwChainId);
