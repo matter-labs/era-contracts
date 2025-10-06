@@ -40,7 +40,7 @@ abstract contract AssetTrackerBase is
     /// Needs to be equal to the migration number of the chain for the token to be bridgeable.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
 
-    /// Note, this mapping will be deprecated after V30 upgrade is finished.
+    /// NOTE: this mapping may be removed in the future, don't rely on it!
     mapping(bytes32 assetId => bool maxChainBalanceAssigned) internal maxChainBalanceAssigned;
 
     function _l1ChainId() internal view virtual returns (uint256);

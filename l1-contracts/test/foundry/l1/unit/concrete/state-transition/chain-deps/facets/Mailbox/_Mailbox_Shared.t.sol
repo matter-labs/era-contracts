@@ -58,7 +58,7 @@ contract MailboxTest is UtilsTest {
             selectors: Utils.getGettersSelectors()
         });
 
-        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0));
+        mockDiamondInitInteropCenterCallsWithAddress(bridgehub, address(0), bytes32(0));
         vm.mockCall(
             address(bridgehub),
             abi.encodeWithSelector(IBridgehubBase.chainAssetHandler.selector),
