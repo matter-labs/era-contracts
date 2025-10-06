@@ -239,7 +239,7 @@ uint256 constant PAUSE_DEPOSITS_TIME_WINDOW_START = 3 days + 12 hours;
 /// @dev The start of the chain migration window, it equals the PAUSE_DEPOSITS_TIME_WINDOW_START.
 uint256 constant CHAIN_MIGRATION_TIME_WINDOW_START = 3 days + 12 hours;
 
-/// @dev The start of the chain migration window.
+/// @dev The end of the chain migration window.
 uint256 constant CHAIN_MIGRATION_TIME_WINDOW_END = 4 days + 12 hours;
 
 /// @dev The end of the pause deposits time window. We pause when migrating to/from gateway.
