@@ -179,6 +179,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
+    /// @notice Sets a legacy shared bridge address for a specific chain.
+    /// @param _chainId The chain ID for which to set the legacy bridge address.
+    /// @param _legacySharedBridgeAddress The address of the legacy shared bridge contract.
     function setLegacySharedBridgeAddress(
         uint256 _chainId,
         address _legacySharedBridgeAddress
@@ -514,6 +517,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         return tokenSavedTotalSupply.amount;
     }
 
+    /// @notice Confirms a migration operation has been completed and updates the asset migration number.
+    /// @param _data The migration confirmation data containing chain ID, asset ID, and migration number.
     function confirmMigrationOnGateway(
         ConfirmBalanceMigrationData calldata _data
     ) external onlyServiceTransactionSender {
@@ -535,12 +540,23 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
+    /// @notice Parses interop call data to extract transfer information.
+    /// @param _callData The encoded call data containing transfer information.
+    /// @return fromChainId The chain ID from which the transfer originates.
+    /// @return assetId The asset ID of the token being transferred.
+    /// @return transferData The encoded transfer data.
     function parseInteropCall(
         bytes calldata _callData
     ) external pure returns (uint256 fromChainId, bytes32 assetId, bytes memory transferData) {
         (fromChainId, assetId, transferData) = abi.decode(_callData[4:], (uint256, bytes32, bytes));
     }
 
+    /// @notice Parses token metadata from encoded token data.
+    /// @param _tokenData The encoded token metadata.
+    /// @return originChainId The chain ID where the token was originally created.
+    /// @return name The token name as encoded bytes.
+    /// @return symbol The token symbol as encoded bytes.
+    /// @return decimals The token decimals as encoded bytes.
     function parseTokenData(
         bytes calldata _tokenData
     ) external pure returns (uint256 originChainId, bytes memory name, bytes memory symbol, bytes memory decimals) {

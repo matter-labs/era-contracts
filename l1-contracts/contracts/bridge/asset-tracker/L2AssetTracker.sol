@@ -54,6 +54,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
+    /// @notice Sets the L1 chain ID and base token asset ID for this L2 chain.
+    /// @dev This function is called during contract initialization or upgrades.
+    /// @param _l1ChainId The chain ID of the L1 network.
+    /// @param _baseTokenAssetId The asset ID of the base token used for gas fees on this chain.
     function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
@@ -89,6 +93,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
     }
 
+    /// @notice Registers a legacy token on this L2 chain for backwards compatibility.
+    /// @dev This function is used during upgrades to ensure pre-V30 tokens continue to work.
+    /// @param _assetId The asset ID of the legacy token to register.
     function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
         _registerTokenOnL2(_assetId);
     }
@@ -160,12 +167,21 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         );
     }
 
+    /// @notice Handles the initiation of base token bridging operations on L2.
+    /// @dev This function is specifically for the chain's native base token used for gas payments.
+    /// @param _amount The amount of base tokens being bridged out.
     function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
         _handleInitiateBridgingOnL2Inner(baseTokenAssetId, _amount, baseTokenOriginChainId);
     }
 
+    /// @notice Handles the finalization of incoming token bridging operations on L2.
+    /// @dev This function is called when tokens are bridged into this L2 from another chain.
+    /// @param _assetId The asset ID of the token being bridged in.
+    /// @param _amount The amount of tokens being bridged in.
+    /// @param _tokenOriginChainId The chain ID where this token was originally created.
+    /// @param _tokenAddress The contract address of the token on this chain.
     function handleFinalizeBridgingOnL2(
         bytes32 _assetId,
         uint256 _amount,
@@ -226,6 +242,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
     }
 
+    /// @notice Handles the finalization of incoming base token bridging operations on L2.
+    /// @dev This function is specifically for the chain's native base token used for gas payments.
+    /// @param _amount The amount of base tokens being bridged into this chain.
     function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         if (_amount == 0) {
@@ -282,6 +301,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
+    /// @notice Confirms a migration operation has been completed and updates the asset migration number.
+    /// @dev This function is called by L1 after a migration has been processed to update local state.
+    /// @param data The migration confirmation data containing the asset ID and migration number.
     function confirmMigrationOnL2(ConfirmBalanceMigrationData calldata data) external onlyServiceTransactionSender {
         assetMigrationNumber[block.chainid][data.assetId] = data.migrationNumber;
     }
@@ -309,6 +331,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return savedAssetMigrationNumber == 0 && amount == 0;
     }
 
+    /// @notice Retrieves the token contract address for a given asset ID.
+    /// @param _assetId The asset ID to look up.
+    /// @return tokenAddress The contract address of the token.
     function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
         tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
         require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));

@@ -376,17 +376,30 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
     }
 
+    /// @notice Migrates token balance from one chain to another by updating chainBalance mappings.
+    /// @dev This is an internal accounting function that moves balance between chains without actual token transfers.
+    /// @param _fromChainId The chain ID from which to decrease the balance.
+    /// @param _toChainId The chain ID to which to increase the balance.
+    /// @param _assetId The asset ID of the token being migrated.
+    /// @param _amount The amount of tokens to migrate.
     function _migrateFunds(uint256 _fromChainId, uint256 _toChainId, bytes32 _assetId, uint256 _amount) internal {
         _decreaseChainBalance(_fromChainId, _assetId, _amount);
         chainBalance[_toChainId][_assetId] += _amount;
     }
 
+    /// @notice Sends a transaction to a specific chain through its mailbox.
+    /// @dev This is a helper function that resolves the chain address and sends an L2 service transaction.
+    /// @param _chainId The target chain ID to send the transaction to.
+    /// @param _to The address of the contract to call on the target chain.
+    /// @param _data The encoded function call data to send.
     function _sendToChain(uint256 _chainId, address _to, bytes memory _data) internal {
         address zkChain = _bridgehub().getZKChain(_chainId);
         // slither-disable-next-line unused-return
         IMailbox(zkChain).requestL2ServiceTransaction(_to, _data);
     }
 
+    /// @notice Verifies that a message was properly included in the L2->L1 message system.
+    /// @param _finalizeWithdrawalParams The parameters containing the message and its inclusion proof.
     function _proveMessageInclusion(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) internal view {
         require(_finalizeWithdrawalParams.l2Sender == L2_ASSET_TRACKER_ADDR, InvalidSender());
         bool success = MESSAGE_ROOT.proveL1DepositParamsInclusion(_finalizeWithdrawalParams);

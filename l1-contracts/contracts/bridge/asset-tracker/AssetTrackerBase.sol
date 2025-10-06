@@ -89,22 +89,40 @@ abstract contract AssetTrackerBase is
         _;
     }
 
+    /// @notice Checks if a token has been migrated on the current chain.
+    /// @dev This is a convenience function that checks migration status for the current chain.
+    /// @param _assetId The asset ID of the token to check.
+    /// @return bool True if the token has been migrated, false otherwise.
     function tokenMigratedThisChain(bytes32 _assetId) external view returns (bool) {
         return tokenMigrated(block.chainid, _assetId);
     }
 
+    /// @notice Checks if a token has been migrated on a specific chain.
+    /// @dev Compares the asset's migration number with the chain's current migration number.
+    /// @param _chainId The chain ID to check migration status for.
+    /// @param _assetId The asset ID of the token to check.
+    /// @return bool True if the token has been migrated, false otherwise.
     function tokenMigrated(uint256 _chainId, bytes32 _assetId) public view returns (bool) {
         return assetMigrationNumber[_chainId][_assetId] == _getChainMigrationNumber(_chainId);
     }
 
-    /// If we are bridging the token for the first time, then we are allowed to bridge it, and set the assetMigrationNumber.
-    /// Note it might be the case that the token was deposited and all the supply was withdrawn, and the token balance was never migrated.
-    /// It is still ok to bridge in this case, since the chainBalance does not need to be migrated, and we set the assetMigrationNumber manually on the GW and the L2 manually.
+    /// @notice Determines if a token can skip migration on the settlement layer.
+    /// @dev If we are bridging the token for the first time, then we are allowed to bridge it, and set the assetMigrationNumber.
+    /// @dev Note it might be the case that the token was deposited and all the supply was withdrawn, and the token balance was never migrated.
+    /// @dev It is still ok to bridge in this case, since the chainBalance does not need to be migrated, and we set the assetMigrationNumber manually on the GW and the L2 manually.
+    /// @param _chainId The chain ID to check.
+    /// @param _assetId The asset ID to check.
+    /// @return bool True if migration can be skipped, false otherwise.
     function _tokenCanSkipMigrationOnSettlementLayer(uint256 _chainId, bytes32 _assetId) internal view returns (bool) {
         uint256 savedAssetMigrationNumber = assetMigrationNumber[_chainId][_assetId];
         return savedAssetMigrationNumber == 0 && chainBalance[_chainId][_assetId] == 0;
     }
 
+    /// @notice Forces the asset migration number to be set to the current chain migration number.
+    /// @dev This is used when we want to mark a token as migrated without going through the normal migration process.
+    /// @dev Look through 
+    /// @param _chainId The chain ID for which to set the migration number.
+    /// @param _assetId The asset ID for which to set the migration number.
     function _forceSetAssetMigrationNumber(uint256 _chainId, bytes32 _assetId) internal {
         assetMigrationNumber[_chainId][_assetId] = _getChainMigrationNumber(_chainId);
     }
@@ -128,6 +146,9 @@ abstract contract AssetTrackerBase is
         chainBalance[_chainId][_assetId] -= _amount;
     }
 
+    /// @notice Sends token balance migration data to L1 through the L2->L1 messenger.
+    /// @dev This function is used by L2 and Gateway to initiate migration operations on L1.
+    /// @param data The migration data containing token information and amounts to migrate.
     function _sendMigrationDataToL1(TokenBalanceMigrationData memory data) internal {
         // slither-disable-next-line unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
