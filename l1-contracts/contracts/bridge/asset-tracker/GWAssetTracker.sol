@@ -24,7 +24,6 @@ import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
-import {IAdmin} from "../../state-transition/chain-interfaces/IAdmin.sol";
 import {InteropDataEncoding} from "../../interop/InteropDataEncoding.sol";
 import {IInteropHandler} from "../../interop/IInteropHandler.sol";
 
@@ -490,7 +489,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function requestPauseDepositsForChain(uint256 _chainId, uint256 _timestamp) external onlyServiceTransactionSender {
         address zkChain = _bridgehub().getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
-        IAdmin(zkChain).pauseDepositsOnGateway(_timestamp);
+        IMailboxImpl(zkChain).pauseDepositsOnGateway(_timestamp);
     }
 
     /// @notice Migrates the token balance from Gateway to L1.

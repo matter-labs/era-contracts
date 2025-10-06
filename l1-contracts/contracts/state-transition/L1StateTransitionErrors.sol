@@ -19,7 +19,7 @@ error DepositsAlreadyPaused();
 // 0xa4d3098c
 error DepositsNotPaused();
 // 0xdeeb6943
-error DepositsPaused();
+error RequireDepositsPaused();
 // 0xedae13f3
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
 // 0xc866ff2c

@@ -116,6 +116,9 @@ interface IMailboxImpl is IZKChainBase {
         bytes calldata _l2Calldata
     ) external returns (bytes32 canonicalTxHash);
 
+    /// @notice Pauses deposits on Gateway, needed as migration is only allowed with this timestamp.
+    function pauseDepositsOnGateway(uint256 _timestamp) external;
+
     /// @dev On L1 we have to forward to the Gateway's mailbox which sends to the Bridgehub on the Gateway.
     /// @param _chainId the chainId of the chain.
     /// @param _canonicalTxHash the canonical transaction hash.

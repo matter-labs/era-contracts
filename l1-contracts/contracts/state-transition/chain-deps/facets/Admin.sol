@@ -14,8 +14,7 @@ import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {OnlyGateway} from "../../../bridgehub/L1BridgehubErrors.sol";
-import {AlreadyMigrated, PriorityQueueNotFullyProcessed, ContractNotDeployed, DepositsAlreadyPaused, DepositsPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {AlreadyMigrated, PriorityQueueNotFullyProcessed, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -50,13 +49,6 @@ contract AdminFacet is ZKChainBase, IAdmin {
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
-        }
-        _;
-    }
-
-    modifier onlyGateway() {
-        if (block.chainid == L1_CHAIN_ID) {
-            revert OnlyGateway();
         }
         _;
     }
@@ -321,10 +313,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         emit DepositsPaused(s.chainId, timestamp);
     }
 
-    function pauseDepositsOnGateway(uint256 _timestamp) external onlyGatewayAssetTracker onlyGateway {
-        s.pausedDepositsTimestamp = _timestamp;
-        emit DepositsPaused(s.chainId, _timestamp);
-    }
+
 
     /// @inheritdoc IAdmin
     function unpauseDeposits() external onlyAdmin onlyL1 {

@@ -6,6 +6,7 @@ import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {PAUSE_DEPOSITS_TIME_WINDOW_START, PAUSE_DEPOSITS_TIME_WINDOW_END, CHAIN_MIGRATION_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_END} from "contracts/common/Config.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
+import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {GW_ASSET_TRACKER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -31,7 +32,7 @@ contract SharedUtils is Test {
             vm.stopBroadcast();
         } else {
             vm.prank(GW_ASSET_TRACKER_ADDR);
-            IAdmin(address(chain)).pauseDepositsOnGateway(block.timestamp);
+            IMailboxImpl(address(chain)).pauseDepositsOnGateway(block.timestamp);
         }
         vm.warp(block.timestamp + CHAIN_MIGRATION_TIME_WINDOW_START + 1);
     }
