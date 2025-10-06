@@ -1,7 +1,7 @@
 import { expect } from "chai";
 import { ethers, network } from "hardhat";
 import * as zksync from "zksync-ethers";
-import type { ComplexUpgrader, L2GenesisUpgrade } from "../typechain";
+import type { L2ComplexUpgrader, L2GenesisUpgrade } from "../typechain";
 import { ComplexUpgraderFactory, L2GenesisUpgradeFactory } from "../typechain";
 import {
   TEST_L2_GENESIS_UPGRADE_CONTRACT_ADDRESS,
@@ -18,7 +18,7 @@ import { prepareEnvironment, setResult } from "./shared/mocks";
 
 describe("L2GenesisUpgrade tests", function () {
   let l2GenesisUpgrade: L2GenesisUpgrade;
-  let complexUpgrader: ComplexUpgrader;
+  let l2ComplexUpgrader: L2ComplexUpgrader;
   const chainId = 270;
 
   const ctmDeployerAddress = ethers.utils.hexlify(ethers.utils.randomBytes(20));
@@ -58,9 +58,9 @@ describe("L2GenesisUpgrade tests", function () {
     await prepareEnvironment();
 
     const wallet = await ethers.getImpersonatedSigner(TEST_FORCE_DEPLOYER_ADDRESS);
-    await deployContractOnAddress(TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS, "ComplexUpgrader");
+    await deployContractOnAddress(TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS, "L2ComplexUpgrader");
     await deployContractOnAddress(TEST_L2_GENESIS_UPGRADE_CONTRACT_ADDRESS, "L2GenesisUpgrade");
-    complexUpgrader = ComplexUpgraderFactory.connect(TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS, wallet);
+    l2ComplexUpgrader = ComplexUpgraderFactory.connect(TEST_COMPLEX_UPGRADER_CONTRACT_ADDRESS, wallet);
     l2GenesisUpgrade = L2GenesisUpgradeFactory.connect(TEST_L2_GENESIS_UPGRADE_CONTRACT_ADDRESS, wallet);
 
     await setResult(
@@ -175,9 +175,9 @@ describe("L2GenesisUpgrade tests", function () {
       ]);
 
       // Note, that the event is emitted at the complex upgrader, but the event declaration is taken from the l2GenesisUpgrade contract.
-      await expect(complexUpgrader.upgrade(l2GenesisUpgrade.address, data))
+      await expect(l2ComplexUpgrader.upgrade(l2GenesisUpgrade.address, data))
         .to.emit(
-          new ethers.Contract(complexUpgrader.address, l2GenesisUpgrade.interface, complexUpgrader.signer),
+          new ethers.Contract(l2ComplexUpgrader.address, l2GenesisUpgrade.interface, l2ComplexUpgrader.signer),
           "UpgradeComplete"
         )
         .withArgs(chainId);
