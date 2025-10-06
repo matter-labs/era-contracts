@@ -60,7 +60,8 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
 
         // The lines below ensure that chains can only upgrade once the ZK Gateway itself is upgraded,
-        // i.e. its `v30UpgradeGatewayBlockNumber` is non zero.
+        // i.e. its minor protocol version is at least 30. Note, we use The tuple of (major, minor, patch)
+        // to denote protocol version.
         uint256 gwChainId = messageRoot.ERA_GATEWAY_CHAIN_ID();
         address gwChain = bridgehub.getZKChain(gwChainId);
         (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
