@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, NotMigratedChain, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -158,7 +158,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
         }
         _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
-
 
         /// A malicious chain can cause a collision for the canonical tx hash.
         require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
@@ -465,7 +464,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function _getOrSaveChainBalance(
         uint256 _chainId,
         bytes32 _assetId,
-        uint256 _migrationNumber, 
+        uint256 _migrationNumber,
         bool _setToZero
     ) internal returns (uint256) {
         SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_chainId][_migrationNumber][_assetId];
@@ -516,6 +515,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return L2_CHAIN_ASSET_HANDLER.getMigrationNumber(_chainId);
+        return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
     }
 }

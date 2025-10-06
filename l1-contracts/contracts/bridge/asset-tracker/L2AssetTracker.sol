@@ -85,7 +85,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function _registerTokenOnL2(bytes32 _assetId) internal {
         /// If the chain is settling on Gateway, then withdrawals are not automatically allowed for new tokens.
         if (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId()) {
-            assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+            assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
         }
     }
 
@@ -305,6 +305,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return L2_CHAIN_ASSET_HANDLER.getMigrationNumber(_chainId);
+        return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
     }
 }

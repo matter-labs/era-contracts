@@ -70,11 +70,12 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetTracker() internal view virtual returns (address);
 
-    /// @notice used to pause the migrations of chains. Used for upgrades.
+    /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
-    /// @notice used to track the number of times each chain has migrated.
-    mapping(uint256 chainId => uint256 migrationNumber) internal migrationNumber;
+    /// @notice Used to track the number of times each chain has migrated.
+    /// NOTE: this mapping may be deprecated in the future, don't rely on it!
+    mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
@@ -112,15 +113,6 @@ abstract contract ChainAssetHandlerBase is
             revert NotSystemContext(msg.sender);
         }
         _;
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            Getters
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Returns the migration number for a chain.
-    function getMigrationNumber(uint256 _chainId) external view onlyAssetTrackerOrChain(_chainId) returns (uint256) {
-        return migrationNumber[_chainId];
     }
 
     /*//////////////////////////////////////////////////////////////
