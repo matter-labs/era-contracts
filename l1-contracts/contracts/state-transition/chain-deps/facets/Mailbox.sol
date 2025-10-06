@@ -320,9 +320,6 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         require(_checkV30UpgradeProcessed(_chainId), DepositsPaused());
 
         BalanceChange memory balanceChange;
-        /// baseTokenAssetId is known on Gateway.
-        balanceChange.baseTokenAmount = _baseTokenAmount;
-
         if (_getBalanceChange) {
             IL1AssetTracker assetTracker = IL1AssetTracker(s.assetTracker);
             INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(s.nativeTokenVault);
@@ -332,12 +329,24 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             address originToken = nativeTokenVault.originToken(assetId);
             balanceChange = BalanceChange({
                 version: BALANCE_CHANGE_VERSION,
+                // baseTokenAssetId is known on Gateway.
                 baseTokenAssetId: bytes32(0),
                 baseTokenAmount: _baseTokenAmount,
                 assetId: assetId,
                 amount: amount,
                 tokenOriginChainId: tokenOriginChainId,
                 originToken: originToken
+            });
+        } else {
+            balanceChange = BalanceChange({
+                version: BALANCE_CHANGE_VERSION,
+                // baseTokenAssetId is known on Gateway.
+                baseTokenAssetId: bytes32(0),
+                baseTokenAmount: _baseTokenAmount,
+                assetId: bytes32(0),
+                amount: 0,
+                tokenOriginChainId: 0,
+                originToken: address(0)
             });
         }
 

@@ -11,7 +11,7 @@ import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
 import {Utils} from "../Utils.sol";
 import {AltL2ToL1Log, AltLog, AltTransactionReceipt, L2ToL1Log, L2ToL1LogProof, Log, TransactionReceipt} from "./ReceipTypes.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
