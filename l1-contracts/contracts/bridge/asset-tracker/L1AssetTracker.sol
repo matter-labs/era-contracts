@@ -361,6 +361,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return chainAssetHandler.getMigrationNumber(_chainId);
+        return chainAssetHandler.migrationNumber(_chainId);
     }
 }
