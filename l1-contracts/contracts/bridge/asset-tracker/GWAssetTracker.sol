@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {BALANCE_CHANGE_VERSION, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
 import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, ConfirmBalanceMigrationData, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
-import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR,L2_INTEROP_HANDLER_ADDR,  L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER} from "../../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {INativeTokenVaultBase} from "../ntv/INativeTokenVaultBase.sol";
@@ -52,8 +52,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedChainBalance)))
         internal savedChainBalance;
 
-    /// @notice We save the interop call balance change 
-    mapping(uint256 receivingChainId => mapping(bytes32 bundleHash => InteropBalanceChange interopBalanceChange)) internal interopBalanceChange;
+    /// @notice We save the interop call balance change
+    mapping(uint256 receivingChainId => mapping(bytes32 bundleHash => InteropBalanceChange interopBalanceChange))
+        internal interopBalanceChange;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -304,7 +305,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 bundleHash;
     }
 
-    function _handleInteropCenterMessage(uint256 _chainId, bytes calldata _message, bytes32 _baseTokenAssetId) internal {
+    function _handleInteropCenterMessage(
+        uint256 _chainId,
+        bytes calldata _message,
+        bytes32 _baseTokenAssetId
+    ) internal {
         if (_message[0] != BUNDLE_IDENTIFIER) {
             // This should not be possible in V30. In V31 this will be a trigger.
             return;
@@ -341,15 +346,26 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(interopCall.data);
             require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, interopBundle.destinationChainId));
 
-            uint256 amount = _handleAssetRouterMessageInner(_chainId, interopBundle.destinationChainId, assetId, transferData);
-            interopBalanceChange[_chainId][avoidViaIrStruct.bundleHash].assetBalanceChanges[callCount].assetId = assetId;
+            uint256 amount = _handleAssetRouterMessageInner(
+                _chainId,
+                interopBundle.destinationChainId,
+                assetId,
+                transferData
+            );
+            interopBalanceChange[_chainId][avoidViaIrStruct.bundleHash]
+                .assetBalanceChanges[callCount]
+                .assetId = assetId;
             interopBalanceChange[_chainId][avoidViaIrStruct.bundleHash].assetBalanceChanges[callCount].amount = amount;
         }
         _decreaseChainBalance(_chainId, _baseTokenAssetId, totalBaseTokenAmount);
         interopBalanceChange[_chainId][avoidViaIrStruct.bundleHash].baseTokenAmount = totalBaseTokenAmount;
     }
 
-    function _handleInteropHandlerReceiveMessage(uint256 _chainId, bytes calldata _message, bytes32 _baseTokenAssetId) internal {
+    function _handleInteropHandlerReceiveMessage(
+        uint256 _chainId,
+        bytes calldata _message,
+        bytes32 _baseTokenAssetId
+    ) internal {
         bytes4 functionSelector = bytes4(_message[0:4]);
         require(functionSelector == IInteropHandler.verifyBundle.selector, InvalidFunctionSignature(functionSelector));
         bytes32 bundleHash = bytes32(_message[4:36]);
@@ -395,9 +411,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         address originalToken;
         bytes memory erc20Metadata;
         // slither-disable-next-line unused-return
-        (, , originalToken, amount, erc20Metadata) = DataEncoding.decodeBridgeMintData(
-            _transferData
-        );
+        (, , originalToken, amount, erc20Metadata) = DataEncoding.decodeBridgeMintData(_transferData);
         // slither-disable-next-line unused-return
         (uint256 tokenOriginalChainId, , , ) = this.parseTokenData(erc20Metadata);
         DataEncoding.assetIdCheck(tokenOriginalChainId, _assetId, originalToken);
@@ -473,12 +487,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     //////////////////////////////////////////////////////////////*/
 
     /// @notice used to pause deposits on Gateway from L1 for migration back to L1.
-    function requestPauseDepositsForChain(uint256 _chainId, uint256 _timestamp) external onlyServiceTransactionSender() {
+    function requestPauseDepositsForChain(uint256 _chainId, uint256 _timestamp) external onlyServiceTransactionSender {
         address zkChain = _bridgehub().getZKChain(_chainId);
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
         IAdmin(zkChain).pauseDepositsOnGateway(_timestamp);
     }
-
 
     /// @notice Migrates the token balance from Gateway to L1.
     /// @dev This function can be called multiple times on the Gateway as it saves the chainBalance on the first call.

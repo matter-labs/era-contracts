@@ -54,7 +54,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         _;
     }
 
-    modifier onlyGateway() {  
+    modifier onlyGateway() {
         if (block.chainid == L1_CHAIN_ID) {
             revert OnlyGateway();
         }

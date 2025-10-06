@@ -16,6 +16,7 @@ import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {InvalidCanonicalTxHash} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 contract GWAssetTrackerTest is Test {
     GWAssetTracker public gwAssetTracker;
@@ -56,6 +57,12 @@ contract GWAssetTrackerTest is Test {
         // Set up the contract
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         gwAssetTracker.setAddresses(L1_CHAIN_ID);
+
+        vm.mockCall(
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encode(1)
+        );
     }
 
     function test_SetAddresses() public {
@@ -82,7 +89,6 @@ contract GWAssetTrackerTest is Test {
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID
         });
-
         vm.prank(L2_INTEROP_CENTER_ADDR);
         gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, CANONICAL_TX_HASH, balanceChange);
 
