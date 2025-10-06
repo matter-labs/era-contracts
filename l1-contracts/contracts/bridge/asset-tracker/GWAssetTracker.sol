@@ -141,9 +141,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 migrationNumber = _getChainMigrationNumber(_chainId);
 
         /// We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
-        if (migrationNumber > 1) {
-            _getOrSaveChainBalance(_chainId, _balanceChange.assetId, migrationNumber - 2, false);
-        }
+        _getOrSaveChainBalance(_chainId, _balanceChange.assetId, migrationNumber - 1, false);
         // we increase the chain balance of the token.
         // we don't decrease chainBalance of the source, since the source is L1, and keep track of chainBalance[L1_CHAIN_ID] on L1.
         if (_balanceChange.amount > 0) {
