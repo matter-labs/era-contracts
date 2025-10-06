@@ -206,6 +206,7 @@ abstract contract ChainAssetHandlerBase is
 
             if (block.chainid != _l1ChainId()) {
                 require(_settlementChainId == _l1ChainId(), MigrationNotToL1());
+            }
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == _l1ChainId()

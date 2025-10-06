@@ -47,8 +47,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
 
     // @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
-    mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply)))
-        internal savedTotalSupply;
+    mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedChainBalance)))
+        internal savedChainBalance;
 
     modifier onlyUpgrader() {
         if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
@@ -469,10 +469,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _migrationNumber,
         bool _setToZero
     ) internal returns (uint256) {
-        SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_chainId][_migrationNumber][_assetId];
+        SavedTotalSupply memory tokenSavedTotalSupply = savedChainBalance[_chainId][_migrationNumber][_assetId];
         if (!tokenSavedTotalSupply.isSaved) {
             tokenSavedTotalSupply.amount = chainBalance[_chainId][_assetId];
-            savedTotalSupply[_chainId][_migrationNumber][_assetId] = SavedTotalSupply({
+            savedChainBalance[_chainId][_migrationNumber][_assetId] = SavedTotalSupply({
                 isSaved: true,
                 amount: tokenSavedTotalSupply.amount
             });
