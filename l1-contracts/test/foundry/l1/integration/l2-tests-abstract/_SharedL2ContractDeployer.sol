@@ -38,11 +38,12 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainBase.sol";
 import {SystemContractsArgs} from "./Utils.sol";
+import {SharedUtils} from "../utils/SharedUtils.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
-abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegrationUtils {
+abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegrationUtils, SharedUtils {
     L2WrappedBaseToken internal weth;
     address internal l1WethAddress = address(4);
 
@@ -296,17 +297,6 @@ abstract contract SharedL2ContractDeployer is UtilsCallMockerTest, DeployIntegra
         });
         vm.prank(aliasedL1AssetRouter);
         l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
-    }
-
-    function clearPriorityQueue(address _bridgehub, uint256 _chainId) public {
-        IZKChain chain = IZKChain(IBridgehubBase(_bridgehub).getZKChain(_chainId));
-        uint256 treeSize = chain.getPriorityQueueSize();
-        // The priorityTree sits at slot 51 of ZKChainStorage
-        // unprocessedIndex is the second field (51 + 1 = 52) in PriorityTree.Tree
-        bytes32 slot = bytes32(uint256(52));
-        uint256 value = uint256(vm.load(address(chain), slot));
-        // We modify the unprocessedIndex so that the tree size is zero
-        vm.store(address(chain), slot, bytes32(value + treeSize));
     }
 
     function initSystemContracts(SystemContractsArgs memory _args) internal virtual;

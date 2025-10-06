@@ -30,6 +30,7 @@ import {NotInGatewayMode} from "contracts/bridgehub/L1BridgehubErrors.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {IAdmin} from "contracts/state-transition/chain-interfaces/IAdmin.sol";
 import {ConfigSemaphore} from "./utils/_ConfigSemaphore.sol";
+import {SharedUtils} from "./utils/SharedUtils.sol";
 import {GatewayUtils} from "deploy-scripts/gateway/GatewayUtils.s.sol";
 import {Utils} from "../unit/concrete/Utils/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -47,6 +48,7 @@ contract L1GatewayTests is
     TokenDeployer,
     L2TxMocker,
     GatewayDeployer,
+    SharedUtils,
     ConfigSemaphore
 {
     uint256 constant TEST_USERS_COUNT = 10;
@@ -129,17 +131,6 @@ contract L1GatewayTests is
         // vm.deal(bridgehub, 100000000000000000000000000000000000);
     }
 
-    function _clearPriorityQueue(address _bridgehub, uint256 _chainId) public {
-        IZKChain chain = IZKChain(IBridgehubBase(_bridgehub).getZKChain(_chainId));
-        uint256 treeSize = chain.getPriorityQueueSize();
-        // The priorityTree sits at slot 51 of ZKChainStorage
-        // unprocessedIndex is the second field (51 + 1 = 52) in PriorityTree.Tree
-        bytes32 slot = bytes32(uint256(52));
-        uint256 value = uint256(vm.load(address(chain), slot));
-        // We modify the unprocessedIndex so that the tree size is zero
-        vm.store(address(chain), slot, bytes32(value + treeSize));
-    }
-
     function _pauseDeposits(uint256 _chainId) public {
         IZKChain chain = IZKChain(IBridgehubBase(addresses.bridgehub).getZKChain(_chainId));
         vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
@@ -180,7 +171,7 @@ contract L1GatewayTests is
     //
     function test_moveChainToGateway() public {
         _setUpGatewayWithFilterer();
-        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         require(addresses.bridgehub.settlementLayer(migratingChainId) == gatewayChainId, "Migration failed");
@@ -188,7 +179,7 @@ contract L1GatewayTests is
 
     function test_l2Registration() public {
         _setUpGatewayWithFilterer();
-        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         gatewayScript.fullGatewayRegistration();
@@ -196,7 +187,7 @@ contract L1GatewayTests is
 
     function test_startMessageToL2() public {
         _setUpGatewayWithFilterer();
-        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         _unpauseDeposits(migratingChainId);
@@ -216,7 +207,7 @@ contract L1GatewayTests is
 
     function test_recoverFromFailedChainMigration() public {
         _setUpGatewayWithFilterer();
-        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
 
@@ -293,7 +284,7 @@ contract L1GatewayTests is
 
     function test_finishMigrateBackChain() public {
         _setUpGatewayWithFilterer();
-        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         migrateBackChain();
@@ -382,7 +373,7 @@ contract L1GatewayTests is
 
     function test_chainMigrationWithUpgrade() public {
         _setUpGatewayWithFilterer();
-        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
 
@@ -443,7 +434,7 @@ contract L1GatewayTests is
 
     function test_proveL2LogsInclusionFromData() public {
         _setUpGatewayWithFilterer();
-        _clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
+        clearPriorityQueue(address(addresses.bridgehub), migratingChainId);
         _pauseDeposits(migratingChainId);
         gatewayScript.migrateChainToGateway(migratingChainId);
         _unpauseDeposits(migratingChainId);
