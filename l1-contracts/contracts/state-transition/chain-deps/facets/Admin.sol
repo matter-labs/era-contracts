@@ -5,7 +5,7 @@ pragma solidity 0.8.28;
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, CHAIN_MIGRATION_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, PAUSE_DEPOSITS_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
@@ -295,8 +295,16 @@ contract AdminFacet is ZKChainBase, IAdmin {
     /// @inheritdoc IAdmin
     function pauseDepositsAndInitiateMigration() external onlyAdmin onlyL1 {
         require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
-        s.pausedDepositsTimestamp = block.timestamp;
-        emit DepositsPaused(s.chainId, block.timestamp);
+        // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.
+        // This is in place to allow for faster migration for newly spawned chains.
+        if (s.priorityTree.getTotalPriorityTxs() == 0) {
+            // We mark the start of pausedDeposits window as current timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START,
+            // meaning that starting from this point in time the deposits are immediately paused.
+            s.pausedDepositsTimestamp = block.timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START;
+        } else {
+            s.pausedDepositsTimestamp = block.timestamp;
+        }
+        emit DepositsPaused(s.chainId, s.pausedDepositsTimestamp);
     }
 
     /// @inheritdoc IAdmin
