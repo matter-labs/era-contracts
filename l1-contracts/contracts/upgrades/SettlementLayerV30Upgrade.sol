@@ -58,6 +58,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
 
         uint256 gwChainId = messageRoot.ERA_GATEWAY_CHAIN_ID();
         address gwChain = bridgehub.getZKChain(gwChainId);
+        // slither-disable-next-line unused-return
         (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
         require(gwMinor >= 30, GWNotV30(gwChainId));
 

@@ -154,6 +154,7 @@ contract InteropCenter is
         _ensureEmptyAddress(_destinationChainId);
 
         // Extract the actual chain ID from the ERC-7930 address
+        // slither-disable-next-line unused-return
         (uint256 destinationChainId, ) = InteroperableAddress.parseEvmV1Calldata(_destinationChainId);
 
         // Ensure this is an L2 to L2 transaction
@@ -169,6 +170,7 @@ contract InteropCenter is
         for (uint256 i = 0; i < callStartersLength; ++i) {
             _ensureEmptyChainReference(_callStarters[i].to);
 
+            // slither-disable-next-line unused-return
             (, address recipientAddress) = InteroperableAddress.parseEvmV1Calldata(_callStarters[i].to);
 
             // Store original attributes for MessageSent event emission
@@ -369,6 +371,7 @@ contract InteropCenter is
                 )
             );
             // Parse the returned 7930 address from actualCallStarter.to
+            // slither-disable-next-line unused-return
             (, address actualCallRecipient) = InteroperableAddress.parseEvmV1(actualCallStarter.to);
             interopCall = InteropCall({
                 version: INTEROP_CALL_VERSION,
