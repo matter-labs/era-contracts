@@ -98,6 +98,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function setAddresses(uint256 _l1ChainId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
     }
+
+    /// @notice Sets legacy shared bridge addresses for chains that used the old bridging system.
+    /// @dev This function is called during upgrades to maintain backwards compatibility with pre-V30 chains.
+    /// @dev Legacy bridges are needed to process withdrawal messages from chains that haven't upgraded yet.
     function setLegacySharedBridgeAddress() external onlyUpgrader {
         address l1AssetRouter = L2_ASSET_ROUTER.L1_ASSET_ROUTER();
         SharedBridgeOnChainId[] memory sharedBridgeOnChainIds = LegacySharedBridgeAddresses
@@ -186,6 +190,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     Chain settlement logs processing on Gateway
     //////////////////////////////////////////////////////////////*/
 
+    /// @notice Processes L2->Gateway logs and messages to update chain balances and handle cross-chain operations.
+    /// @dev This is the main function that processes a batch of L2 logs from a settling chain.
+    /// @dev It reconstructs the logs merkle tree, validates messages, and routes them to appropriate handlers.
+    /// @dev The function handles multiple types of messages: interop, base token, asset router, and system messages.
+    /// @param _processLogsInputs The input containing logs, messages, and chain information to process.
     function processLogsAndMessages(
         ProcessLogsInput calldata _processLogsInputs
     ) external onlyChain(_processLogsInputs.chainId) {
@@ -397,6 +406,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
+    /// @notice Handles withdrawal messages from legacy shared bridge contracts on pre-V30 chains.
+    /// @dev This function provides backwards compatibility for chains that used the old bridge system.
+    /// @param _chainId The chain ID that sent the legacy withdrawal message.
+    /// @param _message The raw legacy bridge message containing withdrawal data.
     function _handleLegacySharedBridgeMessage(uint256 _chainId, bytes memory _message) internal {
         (bytes4 functionSignature, address l1Token, bytes memory transferData) = DataEncoding
             .decodeLegacyFinalizeWithdrawalData(_message);
@@ -405,8 +418,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             InvalidFunctionSignature(functionSignature)
         );
         /// The legacy shared bridge message is only for L1 tokens on legacy chains where the legacy L2 shared bridge is deployed.
+        // Convert legacy L1 token to modern asset ID format
         bytes32 expectedAssetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
 
+        // Process the withdrawal using the modern asset router logic
         _handleAssetRouterMessageInner(_chainId, L1_CHAIN_ID, expectedAssetId, transferData);
     }
 
@@ -468,20 +483,34 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
+    /// @notice Gets the chain balance for migration, saving it if this is the first time it's accessed.
+    /// @dev This function implements a "snapshot and clear" pattern for chain balances during migration.
+    /// @dev On first access, it saves the current chainBalance and sets it to 0 to prevent double-spending.
+    /// @dev Subsequent accesses return the saved value without modifying the current chainBalance.
+    /// @param _chainId The chain ID whose balance is being queried.
+    /// @param _assetId The asset ID of the token.
+    /// @param _migrationNumber The migration number for this operation.
+    /// @return The saved chain balance for this migration.
     function _getOrSaveChainBalance(
         uint256 _chainId,
         bytes32 _assetId,
         uint256 _migrationNumber
     ) internal returns (uint256) {
+        // Check if we've already saved the balance for this migration
         SavedTotalSupply memory tokenSavedTotalSupply = savedTotalSupply[_chainId][_migrationNumber][_assetId];
         if (!tokenSavedTotalSupply.isSaved) {
+            // First time accessing this balance for this migration number
+            // Save the current balance and reset the chainBalance to 0
             tokenSavedTotalSupply.amount = chainBalance[_chainId][_assetId];
             chainBalance[_chainId][_assetId] = 0;
+            // Persist the saved balance for this specific migration
             savedTotalSupply[_chainId][_migrationNumber][_assetId] = SavedTotalSupply({
                 isSaved: true,
                 amount: tokenSavedTotalSupply.amount
             });
         }
+        
+        // Return the balance that was available at the time of this migration
         return tokenSavedTotalSupply.amount;
     }
 

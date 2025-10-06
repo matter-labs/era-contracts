@@ -225,6 +225,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         chainBalance[block.chainid][_assetId] += _amount;
     }
 
+    /// @notice Determines which chain's balance should be updated for a withdrawal operation.
+    /// @dev This function handles the complex logic around V30 upgrade transitions and settlement layer changes.
+    /// @dev The key insight is that before V30, withdrawals affected the chain's own balance, but after V30,
+    /// @dev withdrawals from Gateway-settled chains affect the Gateway's balance instead.
+    /// @param _chainId The ID of the chain from which the withdrawal is being processed.
+    /// @return chainToUpdate The chain ID whose balance should be decremented for this withdrawal.
     function _getWithdrawalChain(uint256 _chainId) internal view returns (uint256 chainToUpdate) {
         (uint256 settlementLayer, uint256 l2BatchNumber) = L1_NULLIFIER.getTransientSettlementLayer();
         // This is the batch starting from which it is the responsibility of all the settlement layers to ensure that
@@ -240,11 +246,15 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             V30UpgradeChainBatchNumberNotSet()
         );
         if (v30UpgradeChainBatchNumber != 0) {
-            // For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
+            /// For chains that were settling on GW before V30, we need to update the chain's chainBalance until the chain updates to V30.
+            /// Logic: If no settlement layer OR the batch number is before V30 upgrade, update the chain itself.
+            /// Otherwise, update the settlement layer (Gateway) balance.
             chainToUpdate = settlementLayer == 0 || l2BatchNumber < v30UpgradeChainBatchNumber
                 ? _chainId
                 : settlementLayer;
         } else {
+            /// For chains deployed at V30 or later, the logic is simpler:
+            /// Update the chain balance if settling on L1, otherwise update the settlement layer balance.
             chainToUpdate = settlementLayer == 0 ? _chainId : settlementLayer;
         }
     }
@@ -261,7 +271,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// i.e. the `amount` field in the `TokenBalanceMigrationData` and may be used by interop.
     /// If the chain downplays `amount`, it will restrict its users from additional interop,
     /// while if it overstates `amount`, it should be able to affect past withdrawals of the chain only.
-    /// TODO: SB re-review
     function receiveMigrationOnL1(FinalizeL1DepositParams calldata _finalizeWithdrawalParams) external {
         _proveMessageInclusion(_finalizeWithdrawalParams);
 

@@ -93,7 +93,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _registerTokenOnL2(_assetId);
     }
 
-    /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V30 upgrade.
+    /// @notice Migrates token balance tracking from NativeTokenVault to AssetTracker for V30 upgrade.
+    /// @dev This function calculates the correct chainBalance by accounting for tokens currently held in the NTV.
+    /// @dev The chainBalance represents how much of the token supply is "available" for bridging out.
     /// @param _assetId The asset id of the token to migrate the token balance for.
     function migrateTokenBalanceFromNTVV30(bytes32 _assetId) external {
         INativeTokenVaultBase ntv = _nativeTokenVault();
@@ -113,8 +115,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         maxChainBalanceAssigned[_assetId] = true;
 
         // Initialize chainBalance
+        // For origin chains, chainBalance starts at MAX_TOKEN_BALANCE and decreases as tokens are bridged out
+        // We need to account for tokens currently locked in the NTV from previous bridge operations
         uint256 ntvBalance = IERC20(tokenAddress).balanceOf(address(ntv));
+        // First, flip the existing chainBalance calculation (was tracking bridged out, now tracks available)
         chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - chainBalance[originChainId][_assetId];
+        // Then subtract tokens currently locked in NTV (these were already "bridged out" in pre-V30)
         chainBalance[originChainId][_assetId] -= ntvBalance;
     }
 
@@ -284,7 +290,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev We need to force set the asset migration number for newly deployed tokens.
+    /// @notice Determines if a token's migration number should be force-set during bridging operations.
+    /// @param _assetId The asset ID of the token to check.
+    /// @param _tokenOriginChainId The chain ID where this token originated.
+    /// @param _tokenAddress The contract address of the token on this chain.
+    /// @return bool True if the migration number should be force-set, false otherwise.
     function _needToForceSetAssetMigrationOnL2(
         bytes32 _assetId,
         uint256 _tokenOriginChainId,
