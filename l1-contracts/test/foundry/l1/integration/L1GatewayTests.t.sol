@@ -321,7 +321,7 @@ contract L1GatewayTests is
         );
         vm.mockCall(
             address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
-            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(2)
         );
 
@@ -341,7 +341,7 @@ contract L1GatewayTests is
             ctmData: ctmData,
             chainData: chainData,
             migrationNumber: IChainAssetHandler(address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
-                .getMigrationNumber(migratingChainId),
+                .migrationNumber(migratingChainId),
             v30UpgradeChainBatchNumber: 0
         });
         bytes memory bridgehubMintData = abi.encode(data);
