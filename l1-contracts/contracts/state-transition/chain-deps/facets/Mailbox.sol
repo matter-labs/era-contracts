@@ -333,12 +333,24 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             address originToken = nativeTokenVault.originToken(assetId);
             balanceChange = BalanceChange({
                 version: BALANCE_CHANGE_VERSION,
+                // baseTokenAssetId is known on Gateway.
                 baseTokenAssetId: bytes32(0),
                 baseTokenAmount: _baseTokenAmount,
                 assetId: assetId,
                 amount: amount,
                 tokenOriginChainId: tokenOriginChainId,
                 originToken: originToken
+            });
+        } else {
+            balanceChange = BalanceChange({
+                version: BALANCE_CHANGE_VERSION,
+                // baseTokenAssetId is known on Gateway.
+                baseTokenAssetId: bytes32(0),
+                baseTokenAmount: _baseTokenAmount,
+                assetId: bytes32(0),
+                amount: 0,
+                tokenOriginChainId: 0,
+                originToken: address(0)
             });
         }
 
@@ -566,9 +578,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @notice Deposits are paused when a chain migrates to/from GW.
     function _depositsPaused() internal view returns (bool) {
         uint256 timestamp = s.pausedDepositsTimestamp;
-        /// we provide 3.5 days window to process all deposits.
+        /// We provide 3.5 days window to process all deposits.
+        /// After that, the deposits are not being processed for 3.5 days.
         return
-            timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START < block.timestamp &&
+            timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
     }
 

@@ -318,7 +318,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             // Note, that this logic only works well when only a single ZK Gateway can be used as a settlement layer
             // for an individual chain.
             require(
-                (assetMigrationNumber[data.chainId][data.assetId]) + 1 == chainMigrationNumber,
+                (assetMigrationNumber[data.chainId][data.assetId]) % 2 == 0,
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
             );
 

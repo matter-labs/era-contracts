@@ -64,24 +64,24 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         l2InteropCenter.forwardTransactionOnGatewayWithBalanceChange(mintChainId, bytes32(0), 0, balanceChange);
     }
 
-    // function test_withdrawFromGateway() public {
-    //     // todo fix this test
-    //     finalizeDeposit();
-    //     address newAdmin = address(0x1);
-    //     bytes memory newDiamondCut = abi.encode();
-    //     BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
-    //         chainId: mintChainId,
-    //         ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
-    //         chainData: abi.encode(chainTypeManager.protocolVersion())
-    //     });
-    //     vm.prank(ownerWallet);
-    //     vm.mockCall(
-    //         address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
-    //         abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
-    //         abi.encode(bytes(""))
-    //     );
-    //     l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
-    // }
+    function test_withdrawFromGateway() public {
+        finalizeDeposit();
+        clearPriorityQueue(address(addresses.bridgehub.bridgehubProxy), mintChainId);
+        address newAdmin = address(0x1);
+        bytes memory newDiamondCut = abi.encode();
+        BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({
+            chainId: mintChainId,
+            ctmData: abi.encode(newAdmin, config.contracts.diamondCutData),
+            chainData: abi.encode(chainTypeManager.protocolVersion())
+        });
+        vm.prank(ownerWallet);
+        vm.mockCall(
+            address(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR),
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        l2AssetRouter.withdraw(ctmAssetId, abi.encode(data));
+    }
 
     function test_finalizeDepositWithRealChainData() public {
         // Note: get this from real local txs

@@ -100,7 +100,7 @@ contract RevertBatchesTest is ChainTypeManagerTest {
             (, uint32 minorVersion, ) = SemVer.unpackSemVer(SafeCast.toUint96(0));
         }
 
-        mockDiamondInitInteropCenterCalls();
+        mockDiamondInitInteropCenterCallsWithAddress(address(bridgehub), sharedBridge, baseTokenAssetId);
 
         newChainAddress = createNewChain(getDiamondCutData(diamondInit));
         vm.mockCall(
