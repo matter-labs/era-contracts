@@ -316,6 +316,7 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         bundleStatus[_bundleHash] = BundleStatus.Verified;
 
         /// We send the fact of verification to L1 so that the GWAssetTracker can process the chainBalance changes.
+        // slither-disable-next-line reentrancy-no-eth, unused-return
         L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(this.verifyBundle.selector, _bundleHash));
 
         // Emit event stating that the bundle was verified.
