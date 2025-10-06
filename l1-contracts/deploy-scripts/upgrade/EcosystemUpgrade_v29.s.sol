@@ -33,6 +33,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
@@ -79,8 +80,6 @@ import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-import {DeployL1Script} from "../DeployL1.s.sol";
-
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
 
 import {IL2V29Upgrade} from "contracts/upgrades/IL2V29Upgrade.sol";
@@ -88,12 +87,19 @@ import {L1V29Upgrade} from "contracts/upgrades/L1V29Upgrade.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
+// Note that the `ProtocolUpgradeHandler` uses `OpenZeppeling v5`.
+interface ProxyAdminV5 {
+    function upgradeAndCall(address proxy, address implementation, bytes memory data) external;
+}
+
 /// @notice Script used for v29 upgrade flow
 contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     using stdToml for string;
 
     address[] internal oldValidatorTimelocks;
     address[] internal oldGatewayValidatorTimelocks;
+    address protocolUpgradeHandlerImplementationAddress;
+    uint256 v28ProtocolVersion;
 
     /// @notice E2e upgrade generation
     function run() public virtual override {
@@ -103,11 +109,15 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
         prepareDefaultGovernanceCalls();
         prepareDefaultEcosystemAdminCalls();
+
+        prepareDefaultTestUpgradeCalls();
     }
 
     function initializeConfig(string memory newConfigPath) internal override {
         super.initializeConfig(newConfigPath);
         string memory toml = vm.readFile(newConfigPath);
+
+        v28ProtocolVersion = toml.readUint("$.v28_protocol_version");
 
         bytes memory encodedOldValidatorTimelocks = toml.readBytes("$.V29.encoded_old_validator_timelocks");
         oldValidatorTimelocks = abi.decode(encodedOldValidatorTimelocks, (address[]));
@@ -116,6 +126,26 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
             "$.V29.encoded_old_gateway_validator_timelocks"
         );
         oldGatewayValidatorTimelocks = abi.decode(encodedOldGatewayValidatorTimelocks, (address[]));
+
+        protocolUpgradeHandlerImplementationAddress = toml.readAddress(
+            "$.contracts.protocol_upgrade_handler_implementation_address"
+        );
+    }
+
+    function saveOutputVersionSpecific() internal override {
+        vm.serializeAddress(
+            "deployed_addresses",
+            "protocol_upgrade_handler_address_implementation",
+            protocolUpgradeHandlerImplementationAddress
+        );
+        vm.serializeBytes("v29", "encoded_old_gateway_validator_timelocks", abi.encode(oldGatewayValidatorTimelocks));
+        string memory oldValidatorTimelocksSerialized = vm.serializeBytes(
+            "v29",
+            "encoded_old_validator_timelocks",
+            abi.encode(oldValidatorTimelocks)
+        );
+
+        vm.writeToml(oldValidatorTimelocksSerialized, upgradeConfig.outputPath, ".v29");
     }
 
     function _getL2UpgradeTargetAndData(
@@ -131,6 +161,17 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
             abi.encodeCall(
                 IComplexUpgrader.forceDeployAndUpgrade,
                 (_forceDeployments, L2_VERSION_SPECIFIC_UPGRADER_ADDR, v29UpgradeCalldata)
+            )
+        );
+    }
+
+    function getProxyAdmin(address _proxyAddr) internal view returns (address proxyAdmin) {
+        // the constant is the proxy admin storage slot
+        proxyAdmin = address(
+            uint160(
+                uint256(
+                    vm.load(_proxyAddr, bytes32(0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103))
+                )
             )
         );
     }
@@ -180,13 +221,19 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
             addresses.bridgehub.chainAssetHandlerProxy
         ) = deployTuppWithContract("ChainAssetHandler", false);
 
-        (, addresses.stateTransition.validatorTimelock) = deployTuppWithContract("ValidatorTimelock", false);
+        (
+            addresses.stateTransition.validatorTimelockImplementation,
+            addresses.stateTransition.validatorTimelock
+        ) = deployTuppWithContract("ValidatorTimelock", false);
     }
 
     function deployUpgradeSpecificContractsGW() internal override {
         super.deployUpgradeSpecificContractsGW();
 
-        gatewayConfig.gatewayStateTransition.validatorTimelock = deployGWTuppWithContract("ValidatorTimelock");
+        (
+            gatewayConfig.gatewayStateTransition.validatorTimelockImplementation,
+            gatewayConfig.gatewayStateTransition.validatorTimelock
+        ) = deployGWTuppWithContract("ValidatorTimelock");
     }
 
     function encodePostUpgradeCalldata(
@@ -205,10 +252,17 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     }
 
     function prepareVersionSpecificStage1GovernanceCallsL1() public override returns (Call[] memory calls) {
-        Call[][] memory allCalls = new Call[][](3);
+        Call[][] memory allCalls = new Call[][](4);
         allCalls[0] = prepareSetValidatorTimelockPostV29L1();
         allCalls[1] = prepareSetChainAssetHandlerOnBridgehubCall();
         allCalls[2] = prepareSetCtmAssetHandlerAddressOnL1Call();
+        allCalls[3] = prepareSetUpgradeDiamondCutOnL1Call();
+        calls = mergeCallsArray(allCalls);
+    }
+
+    function prepareVersionSpecificStage2GovernanceCallsL1() public override returns (Call[] memory calls) {
+        Call[][] memory allCalls = new Call[][](1);
+        allCalls[0] = prepareUpgradePUHImplementationOnL1Call();
         calls = mergeCallsArray(allCalls);
     }
 
@@ -220,9 +274,10 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         // it is done for all ZK Chains as part of the `L2V29Upgrade` upgrade.
 
         // This is the calldata needed to set the chain asset handler as the asset handler for the CTM.
-        Call[][] memory allCalls = new Call[][](2);
+        Call[][] memory allCalls = new Call[][](3);
         allCalls[0] = prepareSetCtmAssetHandlerAddressOnGWCall(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
         allCalls[1] = prepareSetValidatorTimelockPostV29GW(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
+        allCalls[2] = prepareSetUpgradeDiamondCutOnGWCall(priorityTxsL2GasLimit, maxExpectedL1GasPrice);
 
         calls = mergeCallsArray(allCalls);
     }
@@ -257,6 +312,26 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         );
     }
 
+    function prepareSetUpgradeDiamondCutOnGWCall(
+        uint256 l2GasLimit,
+        uint256 l1GasPrice
+    ) public virtual returns (Call[] memory calls) {
+        uint256 oldProtocolVersion = v28ProtocolVersion;
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(gatewayConfig.upgradeCutData, (Diamond.DiamondCutData));
+
+        bytes memory l2Calldata = abi.encodeCall(
+            IChainTypeManager.setUpgradeDiamondCut,
+            (upgradeCut, oldProtocolVersion)
+        );
+
+        calls = _prepareL1ToGatewayCall(
+            l2Calldata,
+            l2GasLimit,
+            l1GasPrice,
+            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+        );
+    }
+
     function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
@@ -275,6 +350,39 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
             data: abi.encodeCall(
                 CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1,
                 (addresses.stateTransition.chainTypeManagerProxy)
+            ),
+            value: 0
+        });
+    }
+
+    /// @notice Sets upgrade diamond cut the same for v28 version, as it is for v29.
+    function prepareSetUpgradeDiamondCutOnL1Call() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+
+        uint256 oldProtocolVersion = v28ProtocolVersion;
+        Diamond.DiamondCutData memory upgradeCut = abi.decode(
+            newlyGeneratedData.upgradeCutData,
+            (Diamond.DiamondCutData)
+        );
+
+        calls[0] = Call({
+            target: addresses.stateTransition.chainTypeManagerProxy,
+            data: abi.encodeCall(ChainTypeManager.setUpgradeDiamondCut, (upgradeCut, oldProtocolVersion)),
+            value: 0
+        });
+    }
+
+    /// @notice Upgrades the implementation of protocol upgrade handler.
+    function prepareUpgradePUHImplementationOnL1Call() public virtual returns (Call[] memory calls) {
+        calls = new Call[](1);
+
+        address transparentProxyAdmin = getProxyAdmin(config.ownerAddress);
+
+        calls[0] = Call({
+            target: transparentProxyAdmin,
+            data: abi.encodeCall(
+                ProxyAdminV5.upgradeAndCall,
+                (config.ownerAddress, protocolUpgradeHandlerImplementationAddress, hex"")
             ),
             value: 0
         });
@@ -336,6 +444,16 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
                     abi.encodeCall(
                         ValidatorTimelock.initialize,
                         (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), uint32(0))
+                    );
+            }
+        } else if (compareStrings(contractName, "ChainAssetHandler")) {
+            if (!isZKBytecode) {
+                return abi.encodeCall(ChainAssetHandler.initialize, (config.ownerAddress));
+            } else {
+                return
+                    abi.encodeCall(
+                        ChainAssetHandler.initialize,
+                        AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress)
                     );
             }
         } else {

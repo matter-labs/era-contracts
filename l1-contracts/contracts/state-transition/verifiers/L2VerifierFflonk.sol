@@ -9,7 +9,7 @@ import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 /// @notice FFT inspired version of PlonK to optimize on-chain gas cost
 /// @dev For better understanding of the protocol follow the below papers:
 /// * Fflonk Paper: https://eprint.iacr.org/2021/1167
-/// @dev Contract was generated from a verification key with a hash of 0x17e8d7931f1314431359233e65c22657a32c335205e3c24ce292c5819becfaa7
+/// @dev Contract was generated from a verification key with a hash of 0x49eae0bf5c7ea580f4979b366e52b386adc5f42e2ce50fc1d3c4de9a86052bff
 /// @custom:security-contact security@matterlabs.dev
 contract L2VerifierFflonk is IVerifierV2 {
     // ================Constants================
@@ -24,8 +24,8 @@ contract L2VerifierFflonk is IVerifierV2 {
     // ================Verification Key================
     uint256 internal constant VK_NUM_INPUTS = 1;
     // [C0]1 = qL(X^8)+ X*qR(X^8)+ X^2*qO(X^8)+ X^3*qM(X^8)+ X^4*qC(X^8)+ X^5*Sσ1(X^8)+ X^6*Sσ2(X^8)+ X^7*Sσ3(X^8)
-    uint256 internal constant VK_C0_G1_X = 0x19bd7a8cb4cb56772e1a67453c37c9657164a60b05a2d5dbe48de94b80a8563e;
-    uint256 internal constant VK_C0_G1_Y = 0x1891e1b2512fd626bdd1e82d967ef7f327610799c6548e71283c5b932eaf5370;
+    uint256 internal constant VK_C0_G1_X = 0x196013309322dc5ce901c20b2d8079da2a3d68cd8b98c943785298ead0b2ba4d;
+    uint256 internal constant VK_C0_G1_Y = 0x1d08f60c613bfe68af690cecb6f2232c28b7eaa8fc582f76cd7112a164211890;
 
     // k1 = 5, k2 = 7
     uint256 internal constant VK_NON_RESIDUES_0 = 0x05;
