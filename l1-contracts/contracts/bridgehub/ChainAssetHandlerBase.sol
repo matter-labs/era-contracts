@@ -144,8 +144,6 @@ abstract contract ChainAssetHandlerBase is
                         Chain migration
     //////////////////////////////////////////////////////////////*/
 
-    error UnprocessedDepositsNotProcessed();
-
     /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     /// @param _settlementChainId the chainId of the settlement chain, i.e. where the message and the migrating chain is sent.
     /// @param _assetId the assetId of the migrating chain's CTM
@@ -208,11 +206,6 @@ abstract contract ChainAssetHandlerBase is
 
             if (block.chainid != _l1ChainId()) {
                 require(_settlementChainId == _l1ChainId(), MigrationNotToL1());
-                require(
-                    GW_ASSET_TRACKER.unprocessedDeposits(bridgehubBurnData.chainId) == 0,
-                    UnprocessedDepositsNotProcessed()
-                );
-            }
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == _l1ChainId()

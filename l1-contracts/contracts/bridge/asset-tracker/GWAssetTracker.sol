@@ -45,9 +45,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// empty messageRoot calculated for specific chain.
     mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
 
-    /// We record the number of received deposits on GW, and require that all of the deposits are processed before the chain migrates back to L1.
-    mapping(uint256 chainId => uint256 unprocessedDeposits) public unprocessedDeposits;
-
     // @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
     mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply)))
         internal savedTotalSupply;
@@ -161,7 +158,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
         // we save the balance change to be able to handle failed deposits.
 
-        ++unprocessedDeposits[_chainId];
         balanceChange[_chainId][_canonicalTxHash] = _balanceChange;
     }
 
@@ -278,7 +274,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function _handlePotentialFailedDeposit(uint256 _chainId, bytes32 _canonicalTxHash, bytes32 _value) internal {
         BalanceChange memory savedBalanceChange = balanceChange[_chainId][_canonicalTxHash];
         require(savedBalanceChange.version == BALANCE_CHANGE_VERSION, InvalidCanonicalTxHash(_canonicalTxHash));
-        --unprocessedDeposits[_chainId];
         if (_value == bytes32(uint256(TxStatus.Success))) {
             return;
         }

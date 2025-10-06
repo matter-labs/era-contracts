@@ -21,6 +21,4 @@ interface IGWAssetTracker {
     function confirmMigrationOnGateway(ConfirmBalanceMigrationData calldata _tokenBalanceMigrationData) external;
 
     function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
-
-    function unprocessedDeposits(uint256 _chainId) external view returns (uint256);
 }

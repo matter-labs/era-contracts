@@ -90,9 +90,6 @@ contract GWAssetTrackerTest is Test {
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), AMOUNT);
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT);
 
-        // Check that unprocessed deposits was incremented
-        assertEq(gwAssetTracker.unprocessedDeposits(CHAIN_ID), 1);
-
         // Check that token was registered (these are internal mappings, so we can't test them directly)
         // The token registration happens in the _registerToken function
     }
