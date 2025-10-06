@@ -23,6 +23,4 @@ interface IGWAssetTracker {
     function setLegacySharedBridgeAddress(uint256 _chainId, address _legacySharedBridgeAddress) external;
 
     function unprocessedDeposits(uint256 _chainId) external view returns (uint256);
-
-    function registerL2NativeTokenFromL1(uint256 _l2ChainId, address _l2NativeToken) external;
 }

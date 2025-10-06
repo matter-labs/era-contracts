@@ -42,6 +42,8 @@ contract EcosystemUpgrade_v30 is Script, DefaultEcosystemUpgrade {
         initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
         prepareEcosystemUpgrade();
 
+        /// kl todo check that no chain is on GW. We can write a contract to check it and call it in V30 stage 0 calls.
+
         prepareDefaultGovernanceCalls();
     }
 
