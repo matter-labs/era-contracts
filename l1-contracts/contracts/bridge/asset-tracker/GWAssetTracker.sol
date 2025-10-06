@@ -229,6 +229,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         reconstructedLogsTree.extendUntilEnd();
         bytes32 localLogsRootHash = reconstructedLogsTree.root();
 
+        // TODO: Debug DynamicIncrementalMerkleMemory and uncomment this part.
+        //       Unrelated to interop-specific changes.
         // bytes32 emptyMessageRootForChain = _getEmptyMessageRoot(_processLogsInputs.chainId);
         // require(
         //     _processLogsInputs.messageRoot == emptyMessageRootForChain,
