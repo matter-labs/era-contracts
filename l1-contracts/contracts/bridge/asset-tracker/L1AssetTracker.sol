@@ -25,7 +25,6 @@ import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
-import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     uint256 public immutable L1_CHAIN_ID;
@@ -254,7 +253,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             InvalidFunctionSignature(functionSignature)
         );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
-        require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidMigrationNumber(assetMigrationNumber[data.chainId][data.assetId], data.migrationNumber));
 
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         uint256 fromChainId;

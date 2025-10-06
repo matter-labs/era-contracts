@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, BundleStatus, CallStatus, InteropBundle, InteropCall, MessageInclusionProof} from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
@@ -314,6 +314,11 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         require(isIncluded, MessageNotIncluded());
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
+
+        /// We send the fact of verification to L1 so that the GWAssetTracker can process the chainBalance changes.
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
+            bytes.concat(this.verifyBundle.selector, _bundleHash)
+        );
 
         // Emit event stating that the bundle was verified.
         emit BundleVerified(_bundleHash);
