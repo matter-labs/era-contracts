@@ -52,7 +52,7 @@ abstract contract AssetTrackerBase is
     /// @dev On GWAssetTracker it is mainly used as a nullifier to ensure that the token migrations are not replayed.
     /// @dev on L2AssetTracker it is used to block withdrawals:
     /// - If a chain settles on GW, it blocks withdrawals or interop until the token balance has been migrated to GW.
-    /// - If a chain settles on L1, it is mostly unusued since withdrawals are always allowed.
+    /// - If a chain settles on L1, it is mostly unused since withdrawals are always allowed.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
 
     /// Note, this mapping will be deprecated after V30 upgrade is finished.

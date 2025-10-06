@@ -82,7 +82,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
     /// to ensure balance consistency. 
     /// @notice This value should contain the same value for both MessageRoot on L1 and on any settlement layer where the chain settles. This is ensured by the fact
-    /// that on the settlement layer the chain will provide its totalBatchesExecuted at the moment of upgrade, and on then the value will be moved to L1 and other settlement layers
+    /// that on the settlement layer the chain will provide its totalBatchesExecuted at the moment of upgrade, and only then the value will be moved to L1 and other settlement layers
     /// via bridgeMint/bridgeBurn during migration.
     /// @dev The attack that could be possible by a completely compromised chain is that it will provide an overly small `v30UpgradeChainBatchNumber` value and then migrate
     /// to a settlement layer and then finalize messages that were not actually approved by the settlement layer. However, since before v30 release chains can only migrate within the same CTM,

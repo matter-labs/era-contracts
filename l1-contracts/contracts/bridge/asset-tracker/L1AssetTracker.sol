@@ -230,7 +230,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         // This is the batch starting from which it is the responsibility of all the settlement layers to ensure that
         // all withdrawals coming from the chain are backed by the balance of this settlement layer.
         // Note, that since this method is used for claiming failed deposits, it implies that any failed deposit that has been processed
-        // why the chain settled on top of Gateway, has been accredited to Gateway's balance.
+        // while the chain settled on top of Gateway, has been accredited to Gateway's balance.
         // For all the batches smaller or equal to that, the responsibility lies with the chain itself.
         uint256 v30UpgradeChainBatchNumber = MESSAGE_ROOT.v30UpgradeChainBatchNumber(_chainId);
 
@@ -304,7 +304,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             require(data.chainId == _finalizeWithdrawalParams.chainId, InvalidWithdrawalChainId());
 
             // We check parity here to make sure that we migrated the token balance back to L1 from Gateway.
-            // this is needed to ensure that the chainBalance on the Gateway AssetTracker is currently 0.
+            // This is needed to ensure that the chainBalance on the Gateway AssetTracker is currently 0.
             // In the future we might initialize chains on GW. So we subtract from chainMigrationNumber.
             // Note, that this logic only works well when only a single ZK Gateway can be used as a settlement layer
             // for an individual chain.

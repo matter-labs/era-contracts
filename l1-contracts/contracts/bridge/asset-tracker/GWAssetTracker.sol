@@ -32,7 +32,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     uint256 public L1_CHAIN_ID;
 
     /// @notice Used to track how the balance has changed for each chain during a deposit.
-    /// We assume that during a single deposit at most two tokens's balance for a chain are amended:
+    /// We assume that during a single deposit at most two tokens' balance for a chain are amended:
     /// - base token of the chain.
     /// - bridged token (in case it is a deposit of some sort).
     /// @dev Whenever a failed deposit will be processed, the chain balance must be decremented accordingly.
@@ -56,7 +56,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// We record the number of received deposits on GW, and require that all of the deposits are processed before the chain migrates back to L1.
     mapping(uint256 chainId => uint256 unprocessedDeposits) public unprocessedDeposits;
 
-    /// @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
+    /// @notice We save the chainBalance which equals the chain's totalSupply before the first GW->L1 migration so that it can be replayed.
     mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply)))
         internal savedTotalSupply;
 
