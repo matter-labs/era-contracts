@@ -254,6 +254,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             InvalidFunctionSignature(functionSignature)
         );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
+        require(assetMigrationNumber[data.chainId][data.assetId] < data.migrationNumber, InvalidMigrationNumber(assetMigrationNumber[data.chainId][data.assetId], data.migrationNumber));
 
         uint256 currentSettlementLayer = _bridgehub().settlementLayer(data.chainId);
         uint256 fromChainId;
