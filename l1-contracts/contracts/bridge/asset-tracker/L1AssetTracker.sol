@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
+import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, MaxChainBalanceAlreadyAssigned, InvalidSettlementLayer} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -68,11 +68,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _;
     }
 
-    /// @notice Modifier to ensure the caller is the administrator of the specified chain.
-    /// @param _chainId The ID of the chain that requires the caller to be an admin.
-    modifier onlyChainAdmin(uint256 _chainId) {
-        IChainTypeManager ctm = IChainTypeManager(BRIDGE_HUB.chainTypeManager(_chainId));
-        if (msg.sender != ctm.getChainAdmin(_chainId)) {
+    /// @notice Modifier to ensure the caller is the specified chain.
+    /// @param _chainId The ID of the chain that has to be the caller.
+    modifier onlyChain(uint256 _chainId) {
+        if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -320,6 +319,17 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _sendConfirmationToChains(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
             confirmBalanceMigrationData
+        );
+    }
+
+    /// @notice used to pause deposits on Gateway from L1 for migration back to L1.
+    function requestPauseDepositsForChainOnGateway(uint256 _chainId, uint256 _timestamp) external onlyChain(_chainId) {
+        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
+        require(settlementLayer != 0, InvalidSettlementLayer());
+        _sendToChain(
+            settlementLayer,
+            GW_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IGWAssetTracker.requestPauseDepositsForChain, (_chainId, _timestamp))
         );
     }
 

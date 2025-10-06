@@ -24,6 +24,7 @@ import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
 import {IMailboxImpl} from "../../state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
 import {LegacySharedBridgeAddresses, SharedBridgeOnChainId} from "./LegacySharedBridgeAddresses.sol";
+import {IAdmin} from "../../state-transition/chain-interfaces/IAdmin.sol";
 
 contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     using FullMerkleMemory for FullMerkleMemory.FullTree;
@@ -424,6 +425,14 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /*//////////////////////////////////////////////////////////////
                     Gateway related token balance migration 
     //////////////////////////////////////////////////////////////*/
+
+    /// @notice used to pause deposits on Gateway from L1 for migration back to L1.
+    function requestPauseDepositsForChain(uint256 _chainId, uint256 _timestamp) external onlyServiceTransactionSender() {
+        address zkChain = _bridgehub().getZKChain(_chainId);
+        require(zkChain != address(0), ChainIdNotRegistered(_chainId));
+        IAdmin(zkChain).pauseDepositsOnGateway(_timestamp);
+    }
+
 
     /// @notice Migrates the token balance from Gateway to L1.
     /// @dev This function can be called multiple times on the Gateway as it saves the chainBalance on the first call.

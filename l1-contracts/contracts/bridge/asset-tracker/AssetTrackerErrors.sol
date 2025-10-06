@@ -29,6 +29,8 @@ error InvalidMigrationNumber(uint256, uint256);
 error InvalidSender();
 // 0xaca75b50
 error InvalidServiceLog();
+// 0xd0f0bff7
+error InvalidSettlementLayer();
 // 0xa9146eeb
 error InvalidVersion();
 // 0xf76b228a
