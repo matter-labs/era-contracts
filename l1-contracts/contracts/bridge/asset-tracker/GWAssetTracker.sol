@@ -138,6 +138,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _canonicalTxHash,
         BalanceChange calldata _balanceChange
     ) external onlyL2InteropCenter {
+        uint256 migrationNumber = _getChainMigrationNumber(_chainId);
+
+        /// We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
+        if (migrationNumber > 1) {
+            _getOrSaveChainBalance(_chainId, _balanceChange.assetId, migrationNumber - 2, false);
+        }
         // we increase the chain balance of the token.
         // we don't decrease chainBalance of the source, since the source is L1, and keep track of chainBalance[L1_CHAIN_ID] on L1.
         if (_balanceChange.amount > 0) {
@@ -152,12 +158,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
         }
         _registerToken(_balanceChange.assetId, _balanceChange.originToken, _balanceChange.tokenOriginChainId);
-        uint256 migrationNumber = _getChainMigrationNumber(_chainId);
 
-        /// We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
-        if (migrationNumber > 1) {
-            _getOrSaveChainBalance(_chainId, _balanceChange.assetId, migrationNumber - 2, false);
-        }
 
         /// A malicious chain can cause a collision for the canonical tx hash.
         require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
