@@ -35,8 +35,8 @@ contract L2MessageVerification is MessageVerification {
             revert DepthMoreThanOneForRecursiveMerkleProof();
         }
 
-        // Note, that here we assume that the all settlement layers that the chain has ever settled on are trustworthy, 
-        // i.e. all chains inside the ecosystem trust that they will not accept a message from a chain 
+        // Note, that here we assume that the all settlement layers that the chain has ever settled on are trustworthy,
+        // i.e. all chains inside the ecosystem trust that they will not accept a message from a chain
         // that never happened.
 
         return

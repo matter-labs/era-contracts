@@ -120,7 +120,7 @@ abstract contract AssetTrackerBase is
 
     /// @notice Forces the asset migration number to be set to the current chain migration number.
     /// @dev This is used when we want to mark a token as migrated without going through the normal migration process.
-    /// @dev Look through 
+    /// @dev Look through
     /// @param _chainId The chain ID for which to set the migration number.
     /// @param _assetId The asset ID for which to set the migration number.
     function _forceSetAssetMigrationNumber(uint256 _chainId, bytes32 _assetId) internal {

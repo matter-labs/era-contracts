@@ -235,7 +235,7 @@ contract L1NativeTokenVault is IL1NativeTokenVault, IL1AssetHandler, NativeToken
         require(_amount != 0, NoFundsTransferred());
 
         // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
-        // because otherwise the latter operation (via a malicious token or ETH recipient) 
+        // because otherwise the latter operation (via a malicious token or ETH recipient)
         // could've overwritten the transient values from L1Nullifier.
         _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: _amount});
 

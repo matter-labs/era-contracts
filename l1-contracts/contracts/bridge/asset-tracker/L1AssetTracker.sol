@@ -266,8 +266,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     /// @notice This function receives the migration from the L2 or the Gateway.
     /// @dev It sends the corresponding L1->L2 messages to the L2 and the Gateway.
     /// @dev Note, that a chain can potentially be malicious and lie about the content of the
-    /// `_finalizeWithdrawalParams`. This method is intended to ensure that a chain can tell 
-    /// how much of the token balance it has on L1 pending from previous withdrawals and how much is active, 
+    /// `_finalizeWithdrawalParams`. This method is intended to ensure that a chain can tell
+    /// how much of the token balance it has on L1 pending from previous withdrawals and how much is active,
     /// i.e. the `amount` field in the `TokenBalanceMigrationData` and may be used by interop.
     /// If the chain downplays `amount`, it will restrict its users from additional interop,
     /// while if it overstates `amount`, it should be able to affect past withdrawals of the chain only.
@@ -332,7 +332,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             );
 
             // Note, that here, unlike the case above, we do not enforce the `chainMigrationNumber`, since
-            // we always allow to finalize previous withdrawals. 
+            // we always allow to finalize previous withdrawals.
 
             fromChainId = _finalizeWithdrawalParams.chainId;
             toChainId = data.chainId;

@@ -63,7 +63,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @notice The mapping from chainId to its current executed batch number.
     /// @dev We store the current batch number for each chain once it upgrades to v30. This value is moved between settlement layers
     /// during migration to ensure consistency. For now, only using a settlement layer from the same CTM is allowed,
-    /// so the value can be trusted on top of settlement layer. 
+    /// so the value can be trusted on top of settlement layer.
     mapping(uint256 chainId => uint256 currentChainBatchNumber) public currentChainBatchNumber;
 
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
@@ -72,7 +72,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @dev We only update the chainTree on GW as of V30.
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
-    /// @notice The mapping storing the batch number at the moment the chain was updated to V30. 
+    /// @notice The mapping storing the batch number at the moment the chain was updated to V30.
     /// Starting from this batch, if a settlement layer has agreed to a proof, it will be held accountable for the content of the message, e.g.
     /// if a withdrawal happens, the balance of the settlement layer will be reduced and not the chain.
     /// @notice This is also the first batch starting from which we store batch roots on L1.
@@ -80,7 +80,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// For the chains that existed at the moment of the upgrade, it value will be populated either with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE until
     /// they call this contract to establish the batch when the upgrade has happened.
     /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
-    /// to ensure balance consistency. 
+    /// to ensure balance consistency.
     /// @notice This value should contain the same value for both MessageRoot on L1 and on any settlement layer where the chain settles. This is ensured by the fact
     /// that on the settlement layer the chain will provide its totalBatchesExecuted at the moment of upgrade, and only then the value will be moved to L1 and other settlement layers
     /// via bridgeMint/bridgeBurn during migration.
