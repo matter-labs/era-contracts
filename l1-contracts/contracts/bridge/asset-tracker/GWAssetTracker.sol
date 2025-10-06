@@ -434,9 +434,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
 
         uint256 settlementLayer = L2_BRIDGEHUB.settlementLayer(_chainId);
-        require(settlementLayer != block.chainid, NotMigratedChain());
+        uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
 
-        uint256 migrationNumber = _getChainMigrationNumber(_chainId);
+        // If the chain already migrated back to GW, then we need the previous migration number.
+        uint256 migrationNumber = settlementLayer == block.chainid ? chainMigrationNumber - 1 : chainMigrationNumber;
         require(assetMigrationNumber[_chainId][_assetId] < migrationNumber, InvalidAssetId(_assetId));
         uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, migrationNumber);
 
