@@ -155,7 +155,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 migrationNumber = _getChainMigrationNumber(_chainId);
 
         /// We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
-        _getOrSaveChainBalance(_chainId, _balanceChange.assetId, migrationNumber - 1, false);
+        if (migrationNumber > 1) {
+            _getOrSaveChainBalance(_chainId, _balanceChange.assetId, migrationNumber - 2, false);
+        }
 
         /// A malicious chain can cause a collision for the canonical tx hash.
         require(balanceChange[_chainId][_canonicalTxHash].version == 0, InvalidCanonicalTxHash(_canonicalTxHash));
