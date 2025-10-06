@@ -12,9 +12,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTE
 import {Transaction} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 
-import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
-import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
-
+import {IBaseToken} from "contracts/common/l2-helpers/IBaseToken.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
@@ -41,11 +39,6 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
             memory data = hex"d52471c1000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000001f9000000000000000000000000000000000000000000000001158e460913d000000000000000000000000000009ca26d77cde9cff9145d06725b400b2ec4bbc6160000000000000000000000000000000000000000000000008ac7230489e8000000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000023c34600000000000000000000000000000000000000000000000000000000000000032000000000000000000000000000000000000000000000000000000000000001400000000000000000000000009ca26d77cde9cff9145d06725b400b2ec4bbc61600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
         vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(ETH_TOKEN_ADDRESS)
-        );
-        vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
@@ -57,19 +50,14 @@ abstract contract L2InteropTestAbstract is Test, SharedL2ContractDeployer {
 
     function test_sendBundle_simple() public {
         vm.mockCall(
-            L2_BRIDGEHUB_ADDR,
-            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
-            abi.encode(ETH_TOKEN_ADDRESS)
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(IBaseToken.burnMsgValue.selector),
+            abi.encode()
         );
         vm.mockCall(
             L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
             abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
             abi.encode(bytes32(0))
-        );
-        vm.mockCall(
-            address(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT),
-            abi.encodeWithSelector(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId.selector),
-            abi.encode(block.chainid)
         );
 
         bytes memory destinationChainId = InteroperableAddress.formatEvmV1(260);

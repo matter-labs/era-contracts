@@ -24,6 +24,9 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
     /// @notice Tracks the individual call statuses within a bundle.
     mapping(bytes32 bundleHash => mapping(uint256 callIndex => CallStatus callStatus)) public callStatus;
 
+    /// @notice Initializes the reentrancy guard.
+    function initL2() public reentrancyGuardInitializer {}
+
     /// @notice Executes a full bundle atomically.
     /// @dev Reverts if any call fails, or if bundle has been processed already.
     /// @param _bundle ABI-encoded InteropBundle to execute.

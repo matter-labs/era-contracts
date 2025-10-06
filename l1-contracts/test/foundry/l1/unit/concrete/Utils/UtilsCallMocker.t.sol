@@ -17,11 +17,11 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_ASSET_TRACKER_ADDR}
 // solhint-enable max-line-length
 
 contract UtilsCallMockerTest is Test {
-    function mockDiamondInitInteropCenterCalls() public {
-        mockDiamondInitInteropCenterCallsWithAddress(address(0x1234567890876543567890), address(0));
-    }
-
-    function mockDiamondInitInteropCenterCallsWithAddress(address bridgehub, address assetRouter) public {
+    function mockDiamondInitInteropCenterCallsWithAddress(
+        address bridgehub,
+        address assetRouter,
+        bytes32 baseTokenAssetId
+    ) public {
         address assetTracker = address(0x1234567890876543567890);
         address nativeTokenVault = address(0x1234567890876543567890);
         if (assetRouter == address(0)) {
@@ -42,15 +42,14 @@ contract UtilsCallMockerTest is Test {
             abi.encodeWithSelector(IL1NativeTokenVault.l1AssetTracker.selector),
             abi.encode(assetTracker)
         );
-        bytes32 baseTokenAssetId = bytes32(uint256(uint160(makeAddr("baseTokenAssetId"))));
         vm.mockCall(
             nativeTokenVault,
-            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector),
+            abi.encodeWithSelector(INativeTokenVaultBase.originChainId.selector, baseTokenAssetId),
             abi.encode(block.chainid)
         );
         vm.mockCall(
             nativeTokenVault,
-            abi.encodeWithSelector(INativeTokenVaultBase.originToken.selector),
+            abi.encodeWithSelector(INativeTokenVaultBase.originToken.selector, baseTokenAssetId),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
     }
