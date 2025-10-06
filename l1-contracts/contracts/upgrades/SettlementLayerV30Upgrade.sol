@@ -18,6 +18,7 @@ import {IGetters} from "../state-transition/chain-interfaces/IGetters.sol";
 error PriorityQueueNotReady();
 error V30UpgradeGatewayBlockNumberNotSet();
 error GWNotV30(uint256 chainId);
+error NotAllBatchesExecuted();
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -31,6 +32,8 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         s.nativeTokenVault = address(IL1AssetRouter(bridgehub.assetRouter()).nativeTokenVault());
         s.assetTracker = address(IL1NativeTokenVault(s.nativeTokenVault).l1AssetTracker());
         s.__DEPRECATED_l2DAValidator = address(0);
+
+        require(s.totalBatchesCommitted == s.totalBatchesExecuted, NotAllBatchesExecuted());
 
         bytes32 baseTokenAssetId = bridgehub.baseTokenAssetId(s.chainId);
         INativeTokenVaultBase nativeTokenVault = INativeTokenVaultBase(
@@ -53,7 +56,7 @@ contract SettlementLayerV30Upgrade is BaseZkSyncUpgrade {
         IChainAssetHandler chainAssetHandler = IChainAssetHandler(bridgehub.chainAssetHandler());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());
 
-        uint256 gwChainId = messageRoot.GATEWAY_CHAIN_ID();
+        uint256 gwChainId = messageRoot.ERA_GATEWAY_CHAIN_ID();
         address gwChain = bridgehub.getZKChain(gwChainId);
         (, uint256 gwMinor, ) = IGetters(gwChain).getSemverProtocolVersion();
         require(gwMinor >= 30, GWNotV30(gwChainId));

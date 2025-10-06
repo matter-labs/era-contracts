@@ -37,7 +37,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     function L1_CHAIN_ID() public view virtual returns (uint256);
 
-    function _gatewayChainId() internal view virtual returns (uint256);
+    function _eraGatewayChainId() internal view virtual returns (uint256);
 
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
