@@ -329,8 +329,12 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
             );
+            /// The assetMigrationNumber on GW is set via forceSetAssetMigrationNumber to the chainMigrationNumber
+            /// which asset migration number + 1 or it is set by confirmMigrationOnL2 to the actual asset migration number.
+            uint256 readAssetMigrationNumber = assetMigrationNumber[data.chainId][data.assetId];
             require(
-                assetMigrationNumber[data.chainId][data.assetId] == data.assetMigrationNumber,
+                readAssetMigrationNumber == data.assetMigrationNumber ||
+                    readAssetMigrationNumber + 1 == data.assetMigrationNumber,
                 InvalidAssetMigrationNumber()
             );
 
