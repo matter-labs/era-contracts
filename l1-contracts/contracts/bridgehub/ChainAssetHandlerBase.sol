@@ -215,6 +215,8 @@ abstract contract ChainAssetHandlerBase is
             _originalCaller,
             bridgehubBurnData.chainData
         );
+        // Iterated migrations are not supported to avoid asset migration number complications related to token balance migration.
+        // This means a chain can migrate to GW and back to L1 but only once.
         require(migrationNumber[bridgehubBurnData.chainId] < 2, IteratedMigrationsNotSupported());
         ++migrationNumber[bridgehubBurnData.chainId];
 
