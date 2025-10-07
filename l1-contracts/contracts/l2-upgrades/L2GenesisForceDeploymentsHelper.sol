@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {GW_ASSET_TRACKER_ADDR, L2_ASSET_TRACKER_ADDR, L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_INTEROP_HANDLER_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
@@ -18,6 +18,7 @@ import {L2AssetTracker} from "../bridge/asset-tracker/L2AssetTracker.sol";
 import {GWAssetTracker} from "../bridge/asset-tracker/GWAssetTracker.sol";
 import {L2ChainAssetHandler} from "../bridgehub/L2ChainAssetHandler.sol";
 import {DeployFailed} from "../common/L1ContractErrors.sol";
+import {InteropHandler} from "../interop/InteropHandler.sol";
 
 import {L2NativeTokenVaultZKOS} from "../bridge/ntv/L2NativeTokenVaultZKOS.sol";
 
@@ -266,6 +267,8 @@ library L2GenesisForceDeploymentsHelper {
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setAddresses(
             additionalForceDeploymentsData.baseTokenOriginChainId
         );
+
+        InteropHandler(L2_INTEROP_HANDLER_ADDR).initL2(fixedForceDeploymentsData.l1ChainId);
     }
 
     /// @notice Constructs the initialization calldata for the L2WrappedBaseToken.

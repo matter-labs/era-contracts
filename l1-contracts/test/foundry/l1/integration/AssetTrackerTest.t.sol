@@ -232,8 +232,17 @@ contract AssetTrackerTests is L1ContractDeployer, ZKChainDeployer, TokenDeployer
             abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(migrationNumber)
         );
+        vm.mockCall(
+            address(L2_CHAIN_ASSET_HANDLER_ADDR),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encode(migrationNumber)
+        );
         console.log("chainAssetHandler", address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy));
-
+        vm.mockCall(
+            address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encode(migrationNumber)
+        );
         IL1AssetTracker(assetTracker).receiveMigrationOnL1(finalizeWithdrawalParamsL1ToGateway);
 
         vm.prank(SERVICE_TRANSACTION_SENDER);
