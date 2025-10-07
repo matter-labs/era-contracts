@@ -14,7 +14,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered} from "./L1BridgehubErrors.sol";
+import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter, NotL1} from "../common/L1ContractErrors.sol";
 import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
@@ -215,6 +215,7 @@ abstract contract ChainAssetHandlerBase is
             _originalCaller,
             bridgehubBurnData.chainData
         );
+        require(migrationNumber[bridgehubBurnData.chainId] < 2, IteratedMigrationsNotSupported());
         ++migrationNumber[bridgehubBurnData.chainId];
 
         uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);
