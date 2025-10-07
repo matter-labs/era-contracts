@@ -28,7 +28,7 @@ contract SharedUtils is Test {
         if (block.chainid == l1ChainId) {
             vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
             vm.startBroadcast(chain.getAdmin());
-            IAdmin(address(chain)).pauseDepositsAndInitiateMigration();
+            IAdmin(address(chain)).pauseDepositsBeforeInitiatingMigration();
             vm.stopBroadcast();
         } else {
             vm.prank(GW_ASSET_TRACKER_ADDR);
