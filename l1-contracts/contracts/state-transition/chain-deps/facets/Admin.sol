@@ -4,19 +4,17 @@ pragma solidity 0.8.28;
 
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
-import {IBridgehub} from "../../../bridgehub/IBridgehub.sol";
 import {Diamond} from "../../libraries/Diamond.sol";
-import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
+import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS, L2DACommitmentScheme, MAX_GAS_PER_TRANSACTION, PAUSE_DEPOSITS_TIME_WINDOW_END, PAUSE_DEPOSITS_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_START, CHAIN_MIGRATION_TIME_WINDOW_END, ZKChainCommitment} from "../../../common/Config.sol";
 import {FeeParams, PubdataPricingMode} from "../ZKChainStorage.sol";
 import {PriorityTree} from "../../../state-transition/libraries/PriorityTree.sol";
 import {PriorityQueue} from "../../../state-transition/libraries/PriorityQueue.sol";
 import {IZKChain} from "../../../state-transition/chain-interfaces/IZKChain.sol";
+import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {AlreadyMigrated, ContractNotDeployed, DepositsAlreadyPaused, DepositsPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
-// PriorityQueueNotFullyProcessed
-import {IChainAssetHandler} from "../../../bridgehub/IChainAssetHandler.sol";
+import {AlreadyMigrated, PriorityQueueNotFullyProcessed, ContractNotDeployed, DepositsAlreadyPaused, DepositsPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
@@ -296,14 +294,24 @@ contract AdminFacet is ZKChainBase, IAdmin {
 
     /// @inheritdoc IAdmin
     function pauseDepositsAndInitiateMigration() external onlyAdmin onlyL1 {
-        address chainAssetHandler = IBridgehub(s.bridgehub).chainAssetHandler();
-        uint256 migrationNumber = IChainAssetHandler(chainAssetHandler).getMigrationNumber(s.chainId);
-        require(
-            s.pausedDepositsTimestamp[migrationNumber] + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp,
-            DepositsAlreadyPaused()
-        );
-        s.pausedDepositsTimestamp[migrationNumber] = block.timestamp;
-        emit DepositsPaused(migrationNumber, block.timestamp);
+        require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
+        // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.
+        // This is in place to allow for faster migration for newly spawned chains.
+        if (s.priorityTree.getTotalPriorityTxs() == 0) {
+            // We mark the start of pausedDeposits window as current timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START,
+            // meaning that starting from this point in time the deposits are immediately paused.
+            s.pausedDepositsTimestamp = block.timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START;
+        } else {
+            s.pausedDepositsTimestamp = block.timestamp;
+        }
+        emit DepositsPaused(s.chainId, s.pausedDepositsTimestamp);
+    }
+
+    /// @inheritdoc IAdmin
+    function unpauseDeposits() external onlyAdmin onlyL1 {
+        require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END >= block.timestamp, DepositsNotPaused());
+        s.pausedDepositsTimestamp = 0;
+        emit DepositsUnpaused(s.chainId);
     }
 
     /// @inheritdoc IAdmin
@@ -320,18 +328,26 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         /// We require that all the priority transactions are processed.
-        // kl todo
-        // require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
+        require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
+
+        if (block.chainid == L1_CHAIN_ID) {
+            uint256 timestamp = s.pausedDepositsTimestamp;
+            require(
+                timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
+                    block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END,
+                DepositsNotPaused()
+            );
+        }
 
         // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
         // ie, controlled by the governance, which is currently Era Gateways and Ethereum.
         // Otherwise a malicious settlement layer could forge an interop message from an Era chain.
         if (_settlementLayer != L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS) {
             uint256 chainId = IZKChain(_settlementLayer).getChainId();
-            if (_settlementLayer != IBridgehub(s.bridgehub).getZKChain(chainId)) {
+            if (_settlementLayer != IL1Bridgehub(s.bridgehub).getZKChain(chainId)) {
                 revert NotAZKChain(_settlementLayer);
             }
-            if (s.chainTypeManager != IBridgehub(s.bridgehub).chainTypeManager(chainId)) {
+            if (s.chainTypeManager != IL1Bridgehub(s.bridgehub).chainTypeManager(chainId)) {
                 revert NotEraChain();
             }
         }

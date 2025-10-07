@@ -5,7 +5,8 @@ import {Test} from "forge-std/Test.sol";
 
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {IAssetHandler} from "contracts/bridge/interfaces/IAssetHandler.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 contract MockAssetHandler is IAssetHandler {
     bool public called;
@@ -34,7 +35,7 @@ contract MockAssetHandler is IAssetHandler {
 contract TestAssetRouterBase is AssetRouterBase {
     address public nativeTokenVault;
 
-    // constructor() AssetRouterBase(1, 1, IBridgehub(address(1))) {}
+    // constructor() AssetRouterBase(1, 1, IBridgehubBase(address(1))) {}
 
     function setAssetHandlerAddressThisChain(bytes32, address) external override {}
 
@@ -60,23 +61,23 @@ contract TestAssetRouterBase is AssetRouterBase {
         assetHandlerAddress[_assetId] = _handler;
     }
 
-    function BRIDGE_HUB() external view override returns (IBridgehub) {
-        return IBridgehub(address(1));
+    function BRIDGE_HUB() external view returns (IBridgehubBase) {
+        return IBridgehubBase(address(1));
     }
 
-    function L1_CHAIN_ID() external view override returns (uint256) {
+    function L1_CHAIN_ID() external view returns (uint256) {
         return 1;
     }
 
-    function _bridgehub() internal view override returns (IBridgehub) {
-        return IBridgehub(address(1));
+    function _bridgehub() internal view override returns (IBridgehubBase) {
+        return IBridgehubBase(address(1));
     }
 
-    function _l1ChainId() internal view override returns (uint256) {
+    function _l1ChainId() internal view returns (uint256) {
         return 1;
     }
 
-    function _eraChainId() internal view override returns (uint256) {
+    function _eraChainId() internal view returns (uint256) {
         return 1;
     }
 }

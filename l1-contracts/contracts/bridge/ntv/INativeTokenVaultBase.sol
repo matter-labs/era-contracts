@@ -2,23 +2,12 @@
 
 pragma solidity 0.8.28;
 
-import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
-
 /// @title Base Native token vault contract interface
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @notice The NTV is an Asset Handler for the L1AssetRouter to handle native tokens
-interface INativeTokenVault {
+interface INativeTokenVaultBase {
     event BridgedTokenBeaconUpdated(address bridgedTokenBeacon, bytes32 bridgedTokenProxyBytecodeHash);
-
-    /// @notice The Weth token address
-    function WETH_TOKEN() external view returns (address);
-
-    /// @notice The AssetRouter contract
-    function ASSET_ROUTER() external view returns (IAssetRouterBase);
-
-    /// @notice The chain ID of the L1 chain
-    function L1_CHAIN_ID() external view returns (uint256);
 
     /// @notice Returns the chain ID of the origin chain for a given asset ID
     function originChainId(bytes32 assetId) external view returns (uint256);

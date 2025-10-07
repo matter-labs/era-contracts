@@ -11,7 +11,7 @@ import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
-import {INativeTokenVault} from "./INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
@@ -23,14 +23,13 @@ import {EmptyToken, TokenAlreadyInBridgedTokensList} from "../L1BridgeContractEr
 import {AddressMismatch, AmountMustBeGreaterThanZero, AssetIdAlreadyRegistered, AssetIdMismatch, BurningNativeWETHNotSupported, DeployingBridgedTokenForNativeToken, EmptyDeposit, NonEmptyMsgValue, TokenNotLegacy, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, ZeroAddress} from "../../common/L1ContractErrors.sol";
 import {AssetHandlerModifiers} from "../interfaces/AssetHandlerModifiers.sol";
 import {IAssetTrackerBase} from "../asset-tracker/IAssetTrackerBase.sol";
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Vault holding L1 native ETH and ERC20 tokens bridged into the ZK chains.
 /// @dev Designed for use with a proxy for upgradability.
-abstract contract NativeTokenVault is
-    INativeTokenVault,
+abstract contract NativeTokenVaultBase is
+    INativeTokenVaultBase,
     IAssetHandler,
     Ownable2StepUpgradeable,
     PausableUpgradeable,
@@ -38,6 +37,33 @@ abstract contract NativeTokenVault is
 {
     using SafeERC20 for IERC20;
 
+    /*//////////////////////////////////////////////////////////////
+                            EXTERNAL GETTERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice The Weth token address
+    function WETH_TOKEN() external view virtual returns (address);
+
+    /// @notice The AssetRouter contract
+    function ASSET_ROUTER() external view virtual returns (IAssetRouterBase);
+
+    /// @notice The chain ID of the L1 chain
+    function L1_CHAIN_ID() external view virtual returns (uint256);
+
+    /// @notice The base token asset ID
+    function BASE_TOKEN_ASSET_ID() external view virtual returns (bytes32);
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERNAL FUNCTIONS
+    //////////////////////////////////////////////////////////////*/
+
+    function _assetRouter() internal view virtual returns (IAssetRouterBase);
+
+    function _l1ChainId() internal view virtual returns (uint256);
+
+    function _baseTokenAssetId() internal view virtual returns (bytes32);
+
+    function _wethToken() internal view virtual returns (address);
     /// @dev Contract that stores the implementation address for token.
     /// @dev For more details see https://docs.openzeppelin.com/contracts/3.x/api/proxy#UpgradeableBeacon.
     IBeacon public bridgedTokenBeacon;
@@ -91,7 +117,7 @@ abstract contract NativeTokenVault is
         return IBridgedStandardToken(_token).originToken();
     }
 
-    /// @inheritdoc INativeTokenVault
+    /// @inheritdoc INativeTokenVaultBase
     function registerToken(address _nativeToken) external virtual {
         _registerToken(_nativeToken);
     }
@@ -107,7 +133,7 @@ abstract contract NativeTokenVault is
         newAssetId = _unsafeRegisterNativeToken(_nativeToken);
     }
 
-    /// @inheritdoc INativeTokenVault
+    /// @inheritdoc INativeTokenVaultBase
     function ensureTokenIsRegistered(address _nativeToken) public returns (bytes32 tokenAssetId) {
         bytes32 currentAssetId = assetId[_nativeToken];
         if (currentAssetId == bytes32(0)) {
@@ -180,6 +206,10 @@ abstract contract NativeTokenVault is
         if (token == address(0)) {
             token = _ensureAndSaveTokenDeployed(_assetId, originToken, erc20Data);
         }
+
+        // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
+        // because otherwise the latter operation (via a malicious token or ETH recipient)
+        // could've overwritten the transient values from L1Nullifier.
         _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: amount});
         IBridgedStandardToken(token).bridgeMint(receiver, amount);
     }
@@ -193,6 +223,9 @@ abstract contract NativeTokenVault is
         // slither-disable-next-line unused-return
         (, receiver, , amount, ) = DataEncoding.decodeBridgeMintData(_data);
 
+        // IMPORTANT: We must handle chain balance decrease before giving out funds to the user,
+        // because otherwise the latter operation (via a malicious token or ETH recipient)
+        // could've overwritten the transient values from L1Nullifier.
         _handleBridgeFromChain({_chainId: _chainId, _assetId: _assetId, _amount: amount});
         _withdrawFunds(_assetId, receiver, token, amount);
     }
@@ -543,12 +576,4 @@ abstract contract NativeTokenVault is
     function unpause() external onlyOwner {
         _unpause();
     }
-
-    function _wethToken() internal view virtual returns (address);
-
-    function _assetRouter() internal view virtual returns (IAssetRouterBase);
-
-    function _baseTokenAssetId() internal view virtual returns (bytes32);
-
-    function _l1ChainId() internal view virtual returns (uint256);
 }

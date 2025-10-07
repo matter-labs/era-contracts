@@ -3,8 +3,6 @@ pragma solidity ^0.8.21;
 
 // 0xda72d995
 error AssetIdNotRegistered(bytes32 _assetId);
-// 0xa65b4be1
-error ChainBalanceNotZero();
 // 0x07859b3b
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0x2e19b556
@@ -29,14 +27,14 @@ error InvalidMigrationNumber(uint256, uint256);
 error InvalidSender();
 // 0xaca75b50
 error InvalidServiceLog();
-// 0xd0f0bff7
-error InvalidSettlementLayer();
-// 0x1eb00b06
-error InvalidTokenAddress();
-// 0x142bd5be
-error InvalidV30UpgradeChainBatchNumber(uint256 _chainId);
+// 0xa9146eeb
+error InvalidVersion();
 // 0xf76b228a
 error InvalidWithdrawalChainId();
+// 0xa16d8a80
+error L1TotalSupplyAlreadyMigrated();
+// 0xda4352c4
+error MaxChainBalanceAlreadyAssigned(bytes32 assetId);
 // 0x7e472272
 error MissingBaseTokenAssetId();
 // 0x8dfed13a
@@ -45,10 +43,9 @@ error NotMigratedChain();
 error OnlyGatewaySettlementLayer();
 // 0x0fd3385e
 error OnlyWhitelistedSettlementLayer(address, address);
-// 0xd4f29820
-error OnlyWithdrawalsAllowedForPreV30Chains();
+// 0x174996d5
+error RegisterNewTokenNotAllowed();
 // 0x90ed63bb
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
-error InvalidVersion();

@@ -6,7 +6,7 @@ pragma solidity ^0.8.0;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL2AssetTracker} from "contracts/bridge/asset-tracker/IL2AssetTracker.sol";
@@ -15,7 +15,7 @@ import {IAssetTrackerBase} from "contracts/bridge/asset-tracker/IAssetTrackerBas
 import {TokenBalanceMigrationData} from "contracts/common/Messaging.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {IAssetTrackerDataEncoding} from "contracts/bridge/asset-tracker/IAssetTrackerDataEncoding.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
 
@@ -33,7 +33,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
     IAssetTrackerBase l2AssetTrackerBase = IAssetTrackerBase(L2_ASSET_TRACKER_ADDR);
     IL2AssetTracker l2AssetTracker = IL2AssetTracker(L2_ASSET_TRACKER_ADDR);
-    INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
+    INativeTokenVaultBase l2NativeTokenVault = INativeTokenVaultBase(L2_NATIVE_TOKEN_VAULT_ADDR);
 
     function startTokenMigrationOnL2OrGateway(
         bool toGateway,
@@ -79,7 +79,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
 
     function finishMigrationOnL1(
         bool toGateway,
-        IBridgehub bridgehub,
+        IBridgehubBase bridgehub,
         uint256 chainId,
         uint256 gatewayChainId,
         string memory l2RpcUrl,
@@ -89,7 +89,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         IL1NativeTokenVault l1NativeTokenVault = IL1NativeTokenVault(address(assetRouter.nativeTokenVault()));
 
-        uint256 settlementLayer = IBridgehub(bridgehub).settlementLayer(chainId);
+        uint256 settlementLayer = IBridgehubBase(bridgehub).settlementLayer(chainId);
         bytes32[] memory msgHashes = loadHashesFromStartTokenMigrationFile(toGateway ? chainId : gatewayChainId);
 
         if (msgHashes.length == 0) {

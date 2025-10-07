@@ -4,12 +4,12 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 import {L1FixedForceDeploymentsHelper} from "contracts/upgrades/L1FixedForceDeploymentsHelper.sol"; // Adjust the import path accordingly
 import {ZKChainStorage} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IL1SharedBridgeLegacy} from "contracts/bridge/interfaces/IL1SharedBridgeLegacy.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 
 // Concrete implementation of L1FixedForceDeploymentsHelper for testing
 contract TestL1FixedForceDeploymentsHelper is L1FixedForceDeploymentsHelper {
@@ -87,7 +87,7 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         // Set base token asset ID
         testGateway.setBaseTokenAssetId(baseTokenAssetId);
 
-        vm.mockCall(bridgehubMock, abi.encodeCall(IBridgehub.assetRouter, ()), abi.encode(sharedBridgeMock));
+        vm.mockCall(bridgehubMock, abi.encodeCall(IBridgehubBase.assetRouter, ()), abi.encode(sharedBridgeMock));
         vm.mockCall(
             sharedBridgeMock,
             abi.encodeCall(IL1SharedBridgeLegacy.l2BridgeAddress, (chainId)),
@@ -100,12 +100,12 @@ contract L1FixedForceDeploymentsHelperTest is Test {
         );
         vm.mockCall(
             nativeTokenVaultMock,
-            abi.encodeCall(INativeTokenVault.originChainId, (baseTokenAssetId)),
+            abi.encodeCall(INativeTokenVaultBase.originChainId, (baseTokenAssetId)),
             abi.encode(chainId)
         );
         vm.mockCall(
             nativeTokenVaultMock,
-            abi.encodeCall(INativeTokenVault.originToken, (baseTokenAssetId)),
+            abi.encodeCall(INativeTokenVaultBase.originToken, (baseTokenAssetId)),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
     }

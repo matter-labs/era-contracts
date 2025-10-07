@@ -3,18 +3,18 @@
 pragma solidity 0.8.28;
 
 import {Initializable} from "@openzeppelin/contracts-v4/proxy/utils/Initializable.sol";
-import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {DynamicIncrementalMerkle} from "../common/libraries/DynamicIncrementalMerkle.sol";
 
-import {IBridgehub} from "./IBridgehub.sol";
 import {CHAIN_TREE_EMPTY_ENTRY_HASH, IMessageRoot, SHARED_ROOT_TREE_EMPTY_HASH, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY, V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1} from "./IMessageRoot.sol";
-import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyBridgehubOwner, OnlyChain, OnlyGateway, OnlyL1, OnlyOnSettlementLayer, OnlyPreV30Chain, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
-import {FullMerkle} from "../common/libraries/FullMerkle.sol";
+import {BatchZeroNotAllowed, ChainBatchRootAlreadyExists, ChainBatchRootZero, ChainExists, CurrentBatchNumberAlreadySet, DepthMoreThanOneForRecursiveMerkleProof, MessageRootNotRegistered, NonConsecutiveBatchNumber, NotL2, NotWhitelistedSettlementLayer, OnlyAssetTracker, OnlyBridgehubOrChainAssetHandler, OnlyChain, OnlyL1, OnlyOnSettlementLayer, OnlyPreV30Chain, TotalBatchesExecutedLessThanV30UpgradeChainBatchNumber, TotalBatchesExecutedZero, V30UpgradeChainBatchNumberAlreadySet} from "./L1BridgehubErrors.sol";
 
 import {GW_ASSET_TRACKER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {MessageHashing, ProofData} from "../common/libraries/MessageHashing.sol";
+import {IBridgehubBase} from "./IBridgehubBase.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {FullMerkle} from "../common/libraries/FullMerkle.sol";
 
 import {MessageVerification} from "../common/MessageVerification.sol";
 
@@ -33,11 +33,11 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
                             IMMUTABLE GETTERS
     //////////////////////////////////////////////////////////////*/
 
-    function _bridgehub() internal view virtual returns (IBridgehub);
+    function _bridgehub() internal view virtual returns (address);
 
-    function _l1ChainId() internal view virtual returns (uint256);
+    function L1_CHAIN_ID() public view virtual returns (uint256);
 
-    function _gatewayChainId() internal view virtual returns (uint256);
+    function _eraGatewayChainId() internal view virtual returns (uint256);
 
     /// @notice The number of chains that are registered.
     uint256 public chainCount;
@@ -60,7 +60,10 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
-    /// We store the current batch number for each chain.
+    /// @notice The mapping from chainId to its current executed batch number.
+    /// @dev We store the current batch number for each chain once it upgrades to v30. This value is moved between settlement layers
+    /// during migration to ensure consistency. For now, only using a settlement layer from the same CTM is allowed,
+    /// so the value can be trusted on top of the settlement layer.
     mapping(uint256 chainId => uint256 currentChainBatchNumber) public currentChainBatchNumber;
 
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
@@ -70,17 +73,29 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
     /// @notice The mapping storing the batch number at the moment the chain was updated to V30.
-    /// @notice We store this, as we did not store chainBatchRoots prior to V30 on L1, so we need to get them from the diamond proxies of the chains.
-    /// @notice We fill the mapping with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE for deployed chains until the chain upgrades to V30.
+    /// Starting from this batch, if a settlement layer has agreed to a proof, it will be held accountable for the content of the message, e.g.
+    /// if a withdrawal happens, the balance of the settlement layer will be reduced and not the chain.
+    /// @notice This is also the first batch starting from which we store batch roots on L1.
+    /// @notice Due to the definition above, this mapping will have the default value (0) for newly added chains, so all their batches are under v30 rules.
+    /// For chains that existed at the moment of the upgrade, its value will be populated either with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE until
+    /// they call this contract to establish the batch when the upgrade has happened.
+    /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
+    /// to ensure balance consistency.
+    /// @notice This value should contain the same value for both MessageRoot on L1 and on any settlement layer where the chain settles. This is ensured by the fact
+    /// that on the settlement layer the chain will provide its totalBatchesExecuted at the moment of upgrade, and only then the value will be moved to L1 and other settlement layers
+    /// via bridgeMint/bridgeBurn during migration.
+    /// @dev The attack that could be possible by a completely compromised chain is that it will provide an overly small `v30UpgradeChainBatchNumber` value and then migrate
+    /// to a settlement layer and then finalize messages that were not actually approved by the settlement layer. However, since before v30 release chains can only migrate within the same CTM,
+    /// this attack is not considered viable as the chains belong to the same CTM as the settlement layer and so the SL can trust their `getTotalBatchesExecuted` value.
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
     modifier onlyBridgehubOrChainAssetHandler() {
-        if (msg.sender != address(_bridgehub()) && msg.sender != address(_bridgehub().chainAssetHandler())) {
+        if (msg.sender != _bridgehub() && msg.sender != address(IBridgehubBase(_bridgehub()).chainAssetHandler())) {
             revert OnlyBridgehubOrChainAssetHandler(
                 msg.sender,
                 address(_bridgehub()),
-                address(_bridgehub().chainAssetHandler())
+                address(IBridgehubBase(_bridgehub()).chainAssetHandler())
             );
         }
         _;
@@ -89,8 +104,8 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// @notice Checks that the message sender is the specified ZK Chain.
     /// @param _chainId The ID of the chain that is required to be the caller.
     modifier onlyChain(uint256 _chainId) {
-        if (msg.sender != _bridgehub().getZKChain(_chainId)) {
-            revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
+        if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
+            revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
         }
         _;
     }
@@ -99,12 +114,13 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// On GW, the asset tracker should add it,
     /// except for PreV30 chains, which can add it directly.
     modifier addChainBatchRootRestriction(uint256 _chainId) {
-        if (block.chainid != _l1ChainId()) {
+        if (block.chainid != L1_CHAIN_ID()) {
             if (msg.sender == GW_ASSET_TRACKER_ADDR) {
                 // this case is valid.
             } else if (v30UpgradeChainBatchNumber[_chainId] != 0) {
-                address chain = _bridgehub().getZKChain(_chainId);
+                address chain = IBridgehubBase(_bridgehub()).getZKChain(_chainId);
                 uint32 minor;
+                // slither-disable-next-line unused-return
                 (, minor, ) = IGetters(chain).getSemverProtocolVersion();
                 /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v30 quickly.
                 require(msg.sender == chain, OnlyChain(msg.sender, chain));
@@ -113,15 +129,15 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
                 revert OnlyAssetTracker(msg.sender, GW_ASSET_TRACKER_ADDR);
             }
         } else {
-            if (msg.sender != _bridgehub().getZKChain(_chainId)) {
-                revert OnlyChain(msg.sender, _bridgehub().getZKChain(_chainId));
+            if (msg.sender != IBridgehubBase(_bridgehub()).getZKChain(_chainId)) {
+                revert OnlyChain(msg.sender, IBridgehubBase(_bridgehub()).getZKChain(_chainId));
             }
         }
         _;
     }
 
     modifier onlyL1() {
-        if (block.chainid != _l1ChainId()) {
+        if (block.chainid != L1_CHAIN_ID()) {
             revert OnlyL1();
         }
         _;
@@ -129,24 +145,8 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
     /// @notice Checks that the Chain ID is not L1 when adding chain batch root.
     modifier onlyL2() {
-        if (block.chainid == _l1ChainId()) {
+        if (block.chainid == L1_CHAIN_ID()) {
             revert NotL2();
-        }
-        _;
-    }
-
-    /// @notice Checks that the Chain ID is the Gateway chain id.
-    modifier onlyGateway() {
-        if (block.chainid != _gatewayChainId()) {
-            revert OnlyGateway();
-        }
-        _;
-    }
-
-    modifier onlyBridgehubOwner() {
-        address bridgehubOwner = Ownable(address(_bridgehub())).owner();
-        if (msg.sender != bridgehubOwner) {
-            revert OnlyBridgehubOwner(msg.sender, bridgehubOwner);
         }
         _;
     }
@@ -161,7 +161,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         uint256 allZKChainsLength = _allZKChains.length;
         for (uint256 i = 0; i < allZKChainsLength; ++i) {
             uint256 batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY;
-            if (_bridgehub().settlementLayer(_allZKChains[i]) == _l1ChainId()) {
+            if (IBridgehubBase(_bridgehub()).settlementLayer(_allZKChains[i]) == L1_CHAIN_ID()) {
                 /// If we are settling on L1.
                 batchNumberToWrite = V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_L1;
             }
@@ -170,7 +170,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     }
 
     function saveV30UpgradeChainBatchNumber(uint256 _chainId) external onlyChain(_chainId) {
-        require(block.chainid == _bridgehub().settlementLayer(_chainId), OnlyOnSettlementLayer());
+        require(block.chainid == IBridgehubBase(_bridgehub()).settlementLayer(_chainId), OnlyOnSettlementLayer());
         uint256 totalBatchesExecuted = IGetters(msg.sender).getTotalBatchesExecuted();
         require(totalBatchesExecuted > 0, TotalBatchesExecutedZero());
         require(
@@ -241,7 +241,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
 
         chainBatchRoots[_chainId][_batchNumber] = _chainBatchRoot;
         ++currentChainBatchNumber[_chainId];
-        if (block.chainid == _l1ChainId()) {
+        if (block.chainid == L1_CHAIN_ID()) {
             /// On L1 we only store the chainBatchRoot, but don't update the chainTree or sharedTree.
             return;
         }
@@ -335,8 +335,12 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             revert DepthMoreThanOneForRecursiveMerkleProof();
         }
 
+        // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
+        // to a chain's message root only if the chain has indeed executed its batch on top of it.
+        //
+        // We trust all chains whitelisted by the Bridgehub governance.
         require(
-            _bridgehub().whitelistedSettlementLayers(proofData.settlementLayerChainId),
+            IBridgehubBase(_bridgehub()).whitelistedSettlementLayers(proofData.settlementLayerChainId),
             NotWhitelistedSettlementLayer(proofData.settlementLayerChainId)
         );
 
@@ -359,7 +363,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
         if (savedChainBatchRoot != bytes32(0)) {
             return savedChainBatchRoot;
         }
-        return IGetters(_bridgehub().getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
+        return IGetters(IBridgehubBase(_bridgehub()).getZKChain(_chainId)).l2LogsRootHash(_batchNumber);
     }
 
     /// @notice Extracts and returns proof data for settlement layer verification.

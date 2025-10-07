@@ -7,7 +7,7 @@ import {console2 as console} from "forge-std/Script.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {Utils} from "foundry-test/l1/unit/concrete/Utils/Utils.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
@@ -61,6 +61,7 @@ contract ChainTypeManagerTest is UtilsTest {
     address internal constant validator = address(0x5050505);
     address internal constant l1Nullifier = address(0x6060606);
     address internal constant serverNotifier = address(0x7070707);
+    bytes32 internal baseTokenAssetId = DataEncoding.encodeNTVAssetId(block.chainid, baseToken);
     address internal newChainAdmin;
     uint256 l1ChainId = 5;
     uint256 chainId = 112;
@@ -75,13 +76,12 @@ contract ChainTypeManagerTest is UtilsTest {
 
     function deploy() public {
         bridgehub = new L1Bridgehub(governor, MAX_NUMBER_OF_ZK_CHAINS);
-        messageroot = new L1MessageRoot(bridgehub, block.chainid, 1);
+        messageroot = new L1MessageRoot(address(bridgehub), 1);
         chainAssetHandler = new L1ChainAssetHandler(
-            block.chainid,
             governor,
-            bridgehub,
+            address(bridgehub),
             address(0),
-            messageroot,
+            address(messageroot),
             address(0),
             IL1Nullifier(address(0))
         );
@@ -96,7 +96,7 @@ contract ChainTypeManagerTest is UtilsTest {
             ICTMDeploymentTracker(address(0)),
             messageroot,
             address(chainAssetHandler),
-            address(0x000000000000000000000000000000000002000a)
+            address(0)
         );
 
         vm.mockCall(
@@ -108,7 +108,10 @@ contract ChainTypeManagerTest is UtilsTest {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ChainTypeManager(address(IBridgehub(address(bridgehub))), address(interopCenterAddress));
+        chainTypeManager = new ChainTypeManager(
+            address(IBridgehubBase(address(bridgehub))),
+            address(interopCenterAddress)
+        );
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -235,7 +238,7 @@ contract ChainTypeManagerTest is UtilsTest {
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
@@ -272,7 +275,7 @@ contract ChainTypeManagerTest is UtilsTest {
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, chainId),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, chainId),
             abi.encode(baseToken)
         );
         vm.mockCall(address(baseToken), abi.encodeWithSelector(IERC20Metadata.name.selector), abi.encode("TestToken"));
@@ -293,7 +296,7 @@ contract ChainTypeManagerTest is UtilsTest {
         // We have to mock the call to the bridgehub's getZKChain since we are mocking calls in the ChainTypeManagerTest.createNewChain() as well...
         // So, although ideally the bridgehub SHOULD have responded with the correct address for the chain when we call getZKChain(chainId), in our case it will not
         // So, we mock that behavior again.
-        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehub.getZKChain, chainId), abi.encode(_chainAddress));
+        vm.mockCall(address(bridgehub), abi.encodeCall(IBridgehubBase.getZKChain, chainId), abi.encode(_chainAddress));
     }
 
     function _mockMigrationPausedFromBridgehub() internal {

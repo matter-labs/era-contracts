@@ -165,6 +165,8 @@ struct ZKChainStorage {
     bytes32 baseTokenAssetId;
     /// @dev If this ZKchain settles on this chain, then this is zero. Otherwise it is the address of the ZKchain that is a
     /// settlement layer for this ZKchain. (think about it as a 'forwarding' address for the chain that migrated away).
+    /// @dev Note, that while we cannot trust the operator of the settlement layer, it is assumed that the settlement layer
+    /// belongs to the same CTM and has a trusted implementation, i.e., its implementation consists of the expected facets: Mailbox, Executor, etc.
     address settlementLayer;
     /// @dev Priority tree, the new data structure for priority queue
     PriorityTree.Tree priorityTree;
@@ -186,6 +188,6 @@ struct ZKChainStorage {
     address assetTracker;
     /// @dev The address of the native token vault
     address nativeTokenVault;
-    /// @dev Whether we have paused deposits, used for chain migration to and from Gateway.
-    mapping(uint256 migrationNumber => uint256 pausedDepositsTimestamp) pausedDepositsTimestamp;
+    /// @dev Timestamp when deposits were paused for chain migration to/from Gateway. 0 = not paused.
+    uint256 pausedDepositsTimestamp;
 }

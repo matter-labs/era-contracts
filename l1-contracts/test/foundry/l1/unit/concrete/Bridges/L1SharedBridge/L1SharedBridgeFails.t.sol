@@ -12,13 +12,13 @@ import {NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} fr
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {AddressAlreadySet, AssetIdNotSupported, BurningNativeWETHNotSupported, DepositDoesNotExist, DepositExists, EmptyDeposit, InvalidProof, InvalidSelector, L2WithdrawalMessageWrongLength, NoFundsTransferred, NonEmptyMsgValue, SharedBridgeKey, SharedBridgeValueNotSet, TokenNotSupported, TokensWithFeesNotSupported, Unauthorized, ValueMismatch, WithdrawFailed, WithdrawalAlreadyFinalized, ZeroAddress} from "contracts/common/L1ContractErrors.sol";
@@ -94,14 +94,14 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
     function test_setNativeTokenVault_alreadySet() public {
         vm.prank(owner);
         vm.expectRevert(NativeTokenVaultAlreadySet.selector);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(0)));
     }
 
     function test_setNativeTokenVault_emptyAddressProvided() public {
         stdstore.target(address(sharedBridge)).sig(sharedBridge.nativeTokenVault.selector).checked_write(address(0));
         vm.prank(owner);
         vm.expectRevert(ZeroAddress.selector);
-        sharedBridge.setNativeTokenVault(INativeTokenVault(address(0)));
+        sharedBridge.setNativeTokenVault(INativeTokenVaultBase(address(0)));
     }
 
     function test_setAssetHandlerAddressOnCounterpart_wrongCounterPartAddress() public {
@@ -187,7 +187,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
         vm.expectRevert(abi.encodeWithSelector(AssetIdNotSupported.selector, ETH_TOKEN_ASSET_ID));
@@ -200,7 +200,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(tokenAssetId)
         );
         vm.expectRevert(abi.encodeWithSelector(ValueMismatch.selector, amount, 0));
@@ -212,7 +212,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseTokenAssetId.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
             abi.encode(ETH_TOKEN_ASSET_ID)
         );
         vm.expectRevert(NonEmptyMsgValue.selector);
@@ -233,7 +233,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
         vm.prank(bridgehubAddress);
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseToken.selector),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector),
             abi.encode(address(token))
         );
         vm.expectRevert(EmptyDeposit.selector);
@@ -766,7 +766,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.baseToken.selector, alice, amount),
+            abi.encodeWithSelector(IBridgehubBase.baseToken.selector, alice, amount),
             abi.encode(ETH_TOKEN_ADDRESS)
         );
 
@@ -835,7 +835,7 @@ contract L1AssetRouterFailTest is L1AssetRouterTest {
 
         vm.mockCall(
             bridgehubAddress,
-            abi.encodeWithSelector(IBridgehub.requestL2TransactionDirect.selector),
+            abi.encodeWithSelector(IL1Bridgehub.requestL2TransactionDirect.selector),
             abi.encode(txHash)
         );
 

@@ -8,7 +8,8 @@ import {stdToml} from "forge-std/StdToml.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {Governance} from "contracts/governance/Governance.sol";
 
@@ -293,7 +294,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         calls = new Call[](1);
         calls[0] = Call({
             target: addresses.bridgehub.bridgehubProxy,
-            data: abi.encodeCall(IBridgehub.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
+            data: abi.encodeCall(IBridgehubBase.setChainAssetHandler, (addresses.bridgehub.chainAssetHandlerProxy)),
             value: 0
         });
     }

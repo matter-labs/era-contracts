@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {IL1SharedBridgeLegacy} from "../bridge/interfaces/IL1SharedBridgeLegacy.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
@@ -14,7 +14,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts-v4/token/ERC20/extensions/
 
 import {UnsafeBytes} from "../common/libraries/UnsafeBytes.sol";
 import {IL1AssetRouter} from "../bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "../bridge/ntv/INativeTokenVault.sol";
+import {INativeTokenVaultBase} from "../bridge/ntv/INativeTokenVaultBase.sol";
 
 /// @title L1FixedForceDeploymentsHelper
 /// @author Matter Labs
@@ -34,7 +34,7 @@ abstract contract L1FixedForceDeploymentsHelper {
         address _wrappedBaseTokenStore,
         address _baseTokenAddress
     ) internal view returns (bytes memory) {
-        address sharedBridge = IBridgehub(s.bridgehub).assetRouter();
+        address sharedBridge = IL1Bridgehub(s.bridgehub).assetRouter();
         address legacySharedBridge = IL1SharedBridgeLegacy(sharedBridge).l2BridgeAddress(s.chainId);
 
         address l2WBaseToken;
@@ -71,7 +71,7 @@ abstract contract L1FixedForceDeploymentsHelper {
             }
         }
 
-        INativeTokenVault nativeTokenVault = IL1AssetRouter(sharedBridge).nativeTokenVault();
+        INativeTokenVaultBase nativeTokenVault = IL1AssetRouter(sharedBridge).nativeTokenVault();
         bytes32 baseTokenAssetId = s.baseTokenAssetId;
 
         ZKChainSpecificForceDeploymentsData

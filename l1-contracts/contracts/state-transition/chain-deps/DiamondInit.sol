@@ -12,7 +12,7 @@ import {EmptyAssetId, EmptyBytes32, TooMuchGas, ZeroAddress} from "../../common/
 import {L2_ASSET_TRACKER_ADDR, L2_BRIDGEHUB_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {IL1AssetRouter} from "../../bridge/asset-router/IL1AssetRouter.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
-import {IBridgehub} from "../../bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 
 /// @author Matter Labs
 /// @dev The contract is used only once to initialize the diamond proxy.
@@ -76,7 +76,7 @@ contract DiamondInit is ZKChainBase, IDiamondInit {
             s.assetTracker = L2_ASSET_TRACKER_ADDR;
         } else {
             address nativeTokenVault = address(
-                IL1AssetRouter(IBridgehub(_initializeData.bridgehub).assetRouter()).nativeTokenVault()
+                IL1AssetRouter(IBridgehubBase(_initializeData.bridgehub).assetRouter()).nativeTokenVault()
             );
             s.nativeTokenVault = nativeTokenVault;
             s.assetTracker = address(IL1NativeTokenVault(nativeTokenVault).l1AssetTracker());

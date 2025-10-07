@@ -6,7 +6,7 @@ import {Vm} from "forge-std/Vm.sol";
 
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_COMPLEX_UPGRADER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_INTEROP_CENTER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_ASSET_TRACKER_ADDR, GW_ASSET_TRACKER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IContractDeployer, L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 
 import {L2AssetRouter} from "contracts/bridge/asset-router/L2AssetRouter.sol";
@@ -18,9 +18,11 @@ import {L2MessageVerification} from "contracts/interop/L2MessageVerification.sol
 import {DummyL2InteropRootStorage} from "contracts/dev-contracts/test/DummyL2InteropRootStorage.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
 import {InteropHandler} from "contracts/interop/InteropHandler.sol";
+import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
+import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 // import {InteropAccount} from "contracts/interop/InteropAccount.sol";
 import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IL2Bridgehub} from "contracts/bridgehub/IL2Bridgehub.sol";
 import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
@@ -62,6 +64,8 @@ library L2Utils {
         forceDeployL2InteropRootStorage(_args);
         forceDeployInteropCenter(_args);
         forceDeployInteropHandler(_args);
+        forceDeployL2AssetTracker(_args);
+        forceDeployGWAssetTracker(_args);
 
         initializeBridgehub(_args);
     }
@@ -90,7 +94,7 @@ library L2Utils {
             ICTMDeploymentTracker(_args.l1CtmDeployer),
             IMessageRoot(L2_MESSAGE_ROOT_ADDR),
             L2_CHAIN_ASSET_HANDLER_ADDR,
-            address(0x000000000000000000000000000000000002000a)
+            address(0)
         );
     }
 
@@ -102,9 +106,9 @@ library L2Utils {
         chainAssetHandler.initL2(
             _args.l1ChainId,
             _args.aliasedOwner,
-            IBridgehub(L2_BRIDGEHUB_ADDR),
+            L2_BRIDGEHUB_ADDR,
             L2_ASSET_ROUTER_ADDR,
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR)
+            L2_MESSAGE_ROOT_ADDR
         );
     }
 
@@ -134,6 +138,19 @@ library L2Utils {
 
         forceDeployWithoutConstructor("InteropHandler", L2_INTEROP_HANDLER_ADDR);
         InteropHandler interopHandler = InteropHandler(L2_INTEROP_HANDLER_ADDR);
+        interopHandler.initL2();
+    }
+
+    function forceDeployL2AssetTracker(SystemContractsArgs memory _args) internal {
+        new L2AssetTracker();
+
+        forceDeployWithoutConstructor("L2AssetTracker", L2_ASSET_TRACKER_ADDR);
+    }
+
+    function forceDeployGWAssetTracker(SystemContractsArgs memory _args) internal {
+        new GWAssetTracker();
+
+        forceDeployWithoutConstructor("GWAssetTracker", GW_ASSET_TRACKER_ADDR);
     }
 
     /// @notice Deploys the L2AssetRouter contract.

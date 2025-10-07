@@ -11,7 +11,7 @@ import {FinalizeL1DepositParams} from "contracts/common/Messaging.sol";
 import {Utils} from "../Utils.sol";
 import {AltL2ToL1Log, AltLog, AltTransactionReceipt, L2ToL1Log, L2ToL1LogProof, Log, TransactionReceipt} from "./ReceipTypes.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IL1Nullifier} from "contracts/bridge/L1Nullifier.sol";
@@ -28,7 +28,7 @@ contract ZKSProvider is Script {
     ) public {
         FinalizeL1DepositParams memory params = getFinalizeWithdrawalParams(chainId, l2RpcUrl, withdrawalHash, index);
 
-        IBridgehub bridgehub = IBridgehub(l1Bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
         IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
 
@@ -59,7 +59,7 @@ contract ZKSProvider is Script {
         uint256 chainId,
         FinalizeL1DepositParams memory params
     ) public {
-        IBridgehub bridgehub = IBridgehub(l1Bridgehub);
+        IBridgehubBase bridgehub = IBridgehubBase(l1Bridgehub);
         // IL1AssetRouter assetRouter = IL1AssetRouter(bridgehub.assetRouter());
         // IL1Nullifier nullifier = IL1Nullifier(assetRouter.L1_NULLIFIER());
         IMessageRoot messageRoot = IMessageRoot(bridgehub.messageRoot());

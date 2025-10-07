@@ -4,11 +4,11 @@ pragma solidity 0.8.28;
 
 import {L2_NATIVE_TOKEN_VAULT_ADDR} from "../l2-helpers/L2ContractAddresses.sol";
 import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "../../bridge/asset-router/IAssetRouterBase.sol";
-import {INativeTokenVault} from "../../bridge/ntv/INativeTokenVault.sol";
 import {AssetIdMismatch, IncorrectTokenAddressFromNTV, InvalidNTVBurnData, L2WithdrawalMessageWrongLength, UnsupportedEncodingVersion} from "../L1ContractErrors.sol";
 import {WrongMsgLength} from "../../bridge/L1BridgeContractErrors.sol";
 import {UnsafeBytes} from "./UnsafeBytes.sol";
 import {TokenBalanceMigrationData} from "../../common/Messaging.sol";
+import {INativeTokenVaultBase} from "../../bridge/ntv/INativeTokenVaultBase.sol";
 
 /**
  * @author Matter Labs
@@ -144,7 +144,7 @@ library DataEncoding {
         bytes memory _transferData
     ) internal view returns (bytes32 txDataHash) {
         if (_encodingVersion == LEGACY_ENCODING_VERSION) {
-            address tokenAddress = INativeTokenVault(_nativeTokenVault).tokenAddress(_assetId);
+            address tokenAddress = INativeTokenVaultBase(_nativeTokenVault).tokenAddress(_assetId);
 
             // This is a double check to ensure that the used token for the legacy encoding is correct.
             // This revert should never be emitted and in real life and should only serve as a guard in
