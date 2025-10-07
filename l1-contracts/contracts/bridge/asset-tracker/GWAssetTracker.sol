@@ -388,9 +388,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(functionSelector == IInteropHandler.verifyBundle.selector, InvalidFunctionSignature(functionSelector));
         bytes32 bundleHash = bytes32(_message[4:36]);
 
-        
         InteropBalanceChange memory receivedInteropBalanceChange = interopBalanceChange[_chainId][bundleHash];
-        require(receivedInteropBalanceChange.version == INTEROP_BALANCE_CHANGE_VERSION, InvalidInteropBalanceChange(bundleHash));
+        require(
+            receivedInteropBalanceChange.version == INTEROP_BALANCE_CHANGE_VERSION,
+            InvalidInteropBalanceChange(bundleHash)
+        );
         interopBalanceChange[_chainId][bundleHash].version = 0;
 
         uint256 length = receivedInteropBalanceChange.assetBalanceChanges.length;
