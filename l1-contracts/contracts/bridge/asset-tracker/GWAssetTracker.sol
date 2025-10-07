@@ -334,24 +334,34 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 revert InvalidInteropCalldata(bytes4(interopCall.data));
             }
 
-            {
-                (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(
-                    interopCall.data
-                );
-                require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, interopBundle.destinationChainId));
-
-                uint256 amount = _handleAssetRouterMessageInner(
-                    _chainId,
-                    interopBundle.destinationChainId,
-                    assetId,
-                    transferData
-                );
-                interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[callCount].assetId = assetId;
-                interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[callCount].amount = amount;
-            }
+            _processInteropCall(_chainId, bundleHash, callCount, interopCall, interopBundle.destinationChainId);
         }
         _decreaseChainBalance(_chainId, _baseTokenAssetId, totalBaseTokenAmount);
         interopBalanceChange[_chainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
+    }
+
+    function _processInteropCall(
+        uint256 _chainId,
+        bytes32 _bundleHash,
+        uint256 _callCount,
+        InteropCall memory _interopCall,
+        uint256 _destinationChainId
+    ) internal {
+        (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(
+            _interopCall.data
+        );
+
+        require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, _destinationChainId));
+
+        uint256 amount = _handleAssetRouterMessageInner(
+            _chainId,
+            _destinationChainId,
+            assetId,
+            transferData
+        );
+        
+        interopBalanceChange[_chainId][_bundleHash].assetBalanceChanges[_callCount].assetId = assetId;
+        interopBalanceChange[_chainId][_bundleHash].assetBalanceChanges[_callCount].amount = amount;
     }
 
     function _handleInteropHandlerReceiveMessage(
