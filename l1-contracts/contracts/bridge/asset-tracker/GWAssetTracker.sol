@@ -159,10 +159,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 _canonicalTxHash,
         BalanceChange calldata _balanceChange
     ) external onlyL2InteropCenter {
-        uint256 migrationNumber = _getChainMigrationNumber(_chainId);
+        uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
 
         /// We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
-        _getOrSaveChainBalance(_chainId, _balanceChange.assetId, migrationNumber - 1, true);
+        _getOrSaveChainBalance(_chainId, _balanceChange.assetId, chainMigrationNumber - 1, true);
         // we increase the chain balance of the token.
         // we don't decrease chainBalance of the source, since the source is L1, and keep track of chainBalance[L1_CHAIN_ID] on L1.
         if (_balanceChange.amount > 0) {
@@ -592,12 +592,20 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         ConfirmBalanceMigrationData calldata _data
     ) external onlyServiceTransactionSender {
         assetMigrationNumber[_data.chainId][_data.assetId] = _data.migrationNumber;
+        uint256 chainMigrationNumber = _getChainMigrationNumber(_data.chainId);
+        SavedTotalSupply memory savedBalance = savedChainBalance[_data.chainId][chainMigrationNumber - 1][_data.assetId];
         if (_data.isL1ToGateway) {
             /// In this case the balance might never have been migrated back to L1.
             chainBalance[_data.chainId][_data.assetId] += _data.amount;
+            if (savedBalance.isSaved) {
+                savedChainBalance[_data.chainId][chainMigrationNumber - 1][_data.assetId].amount = savedBalance.amount + _data.amount;
+            }
         } else {
             _decreaseChainBalance(_data.chainId, _data.assetId, _data.amount);
-        }    
+            if (savedBalance.isSaved) {
+                savedChainBalance[_data.chainId][chainMigrationNumber - 1][_data.assetId].amount = savedBalance.amount - _data.amount;
+            }
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
