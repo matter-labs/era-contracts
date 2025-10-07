@@ -329,7 +329,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
             );
-            require(assetMigrationNumber[data.chainId][data.assetId] == data.assetMigrationNumber, InvalidAssetMigrationNumber());
+            require(
+                assetMigrationNumber[data.chainId][data.assetId] == data.assetMigrationNumber,
+                InvalidAssetMigrationNumber()
+            );
 
             // Note, that here, unlike the case above, we do not enforce the `chainMigrationNumber`, since
             // we always allow to finalize previous withdrawals.

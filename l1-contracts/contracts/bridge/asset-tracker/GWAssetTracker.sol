@@ -531,7 +531,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 readChainMigrationNumber = _getChainMigrationNumber(_chainId);
 
         // If the chain already migrated back to GW, then we need the previous migration number.
-        uint256 chainMigrationNumber = settlementLayer == block.chainid ? readChainMigrationNumber - 1 : readChainMigrationNumber;
+        uint256 chainMigrationNumber = settlementLayer == block.chainid
+            ? readChainMigrationNumber - 1
+            : readChainMigrationNumber;
         require(assetMigrationNumber[_chainId][_assetId] < chainMigrationNumber, InvalidAssetId(_assetId));
         uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, chainMigrationNumber, true);
 

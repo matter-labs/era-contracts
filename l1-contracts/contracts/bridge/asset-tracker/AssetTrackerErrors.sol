@@ -7,6 +7,8 @@ error AssetIdNotRegistered(bytes32 _assetId);
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0x2e19b556
 error InvalidAssetId(bytes32);
+// 0x95bddd6c
+error InvalidAssetMigrationNumber();
 // 0xd24c490f
 error InvalidBuiltInContractMessage(uint256 logCount, uint256 msgCount, bytes32 key);
 // 0x7ad8c2c9
@@ -53,4 +55,3 @@ error RegisterNewTokenNotAllowed();
 error TokenBalanceNotMigratedToGateway(bytes32, uint256, uint256);
 // 0x03a5ba47
 error TransientBalanceChangeAlreadySet(uint256 storedAssetId, uint256 storedAmount);
-error InvalidAssetMigrationNumber();
