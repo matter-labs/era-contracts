@@ -36,7 +36,7 @@ abstract contract AssetTrackerBase is
     /// - A chain can increase its balance when deposits are made to the chain or when migrating the balance from the settlement layer.
     /// @dev On GWAssetTracker:
     /// - For each assetId, the sum of chainBalance[chainId][assetId] across all chains is less than or equal to
-    ///  chainBalance[settlementLayerId][assetId] on L1AssetTracker. I.e. all tokens are backed by the settlement layer's balance on L1.
+    ///  chainBalance[settlementLayerId][assetId] on L1AssetTracker, i.e., all tokens are backed by the settlement layer's balance on L1.
     /// - Chains spend their balances when submitting withdrawals, processing failed deposits or sending tokens via interop.
     /// - The balances are increased when deposits are made to the chains and when they receive interop from other chains.
     /// - Also, the balances are increased or decreased when migrating the balance to/from the settlement layer.
@@ -47,10 +47,10 @@ abstract contract AssetTrackerBase is
 
     /// @notice Tracks the migration number of each asset on each chain. If the migration number is the same
     /// as the current migration number of the chain, then the token balance has been migrated to the settlement layer.
-    /// If it is not, bridging of it may be restricted.
+    /// If it is not, bridging it may be restricted.
     /// @dev On L1AssetTracker it is mainly used as a nullifier to ensure that the token migrations are not replayed.
     /// @dev On GWAssetTracker it is mainly used as a nullifier to ensure that the token migrations are not replayed.
-    /// @dev on L2AssetTracker it is used to block withdrawals:
+    /// @dev On L2AssetTracker it is used to block withdrawals:
     /// - If a chain settles on GW, it blocks withdrawals or interop until the token balance has been migrated to GW.
     /// - If a chain settles on L1, it is mostly unused since withdrawals are always allowed.
     mapping(uint256 chainId => mapping(bytes32 assetId => uint256 migrationNumber)) public assetMigrationNumber;
@@ -109,7 +109,7 @@ abstract contract AssetTrackerBase is
     /// @notice Determines if a token can skip migration on the settlement layer.
     /// @dev If we are bridging the token for the first time, then we are allowed to bridge it, and set the assetMigrationNumber.
     /// @dev Note it might be the case that the token was deposited and all the supply was withdrawn, and the token balance was never migrated.
-    /// @dev It is still ok to bridge in this case, since the chainBalance does not need to be migrated, and we set the assetMigrationNumber manually on the GW and the L2 manually.
+    /// @dev It is still ok to bridge in this case, since the chainBalance does not need to be migrated, and we set the assetMigrationNumber on the GW and the L2 manually.
     /// @param _chainId The chain ID to check.
     /// @param _assetId The asset ID to check.
     /// @return bool True if migration can be skipped, false otherwise.

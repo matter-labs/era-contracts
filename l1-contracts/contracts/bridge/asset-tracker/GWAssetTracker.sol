@@ -32,22 +32,22 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     uint256 public L1_CHAIN_ID;
 
     /// @notice Used to track how the balance has changed for each chain during a deposit.
-    /// We assume that during a single deposit at most two tokens' balance for a chain are amended:
+    /// We assume that during a single deposit at most two token balances for a chain are amended:
     /// - base token of the chain.
     /// - bridged token (in case it is a deposit of some sort).
-    /// @dev Whenever a failed deposit will be processed, the chain balance must be decremented accordingly.
-    /// From this follows that all failed deposit logs that are ever sent to Gateway must've been routed through this contract,
-    /// i.e. a chain can not migrate on top of ZK Gateway until all deposits that were submitted through L1 have been processed
-    /// and vice versa is also enforced.
+    /// @dev Whenever a failed deposit is processed, the chain balance must be decremented accordingly.
+    /// From this, it follows that all failed deposit logs that are ever sent to Gateway must have been routed through this contract,
+    /// i.e., a chain cannot migrate on top of ZK Gateway until all deposits that were submitted through L1 have been processed
+    /// and vice versa.
     mapping(uint256 chainId => mapping(bytes32 canonicalTxHash => BalanceChange balanceChange)) internal balanceChange;
 
-    /// used only on Gateway.
+    /// Used only on Gateway.
     mapping(bytes32 assetId => address originToken) internal originToken;
 
-    /// used only on Gateway.
+    /// Used only on Gateway.
     mapping(bytes32 assetId => uint256 originChainId) internal tokenOriginChainId;
 
-    /// used only on Gateway.
+    /// Used only on Gateway.
     mapping(uint256 chainId => address legacySharedBridgeAddress) internal legacySharedBridgeAddress;
 
     /// empty messageRoot calculated for specific chain.
@@ -195,7 +195,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     /// @notice Processes L2->Gateway logs and messages to update chain balances and handle cross-chain operations.
     /// @dev This is the main function that processes a batch of L2 logs from a settling chain.
-    /// @dev It reconstructs the logs merkle tree, validates messages, and routes them to appropriate handlers.
+    /// @dev It reconstructs the logs Merkle tree, validates messages, and routes them to appropriate handlers.
     /// @dev The function handles multiple types of messages: interop, base token, asset router, and system messages.
     /// @param _processLogsInputs The input containing logs, messages, and chain information to process.
     function processLogsAndMessages(
