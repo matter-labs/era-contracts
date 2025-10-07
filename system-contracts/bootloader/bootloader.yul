@@ -860,7 +860,7 @@ object "Bootloader" {
                 // (`assertSuccess` = true), then we should panic.
                 if iszero(success) {
                     if assertSuccess {
-                        // The call must've succeeded, but it didn't. So we revert the bootloader.
+                        // The call must have succeeded, but it didn't. So we revert the bootloader.
                         assertionError("getRawCodeHash failed")
                     }
 

@@ -398,6 +398,8 @@ contract InteropCenter is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Forwards a transaction from the gateway to a chain mailbox (from L1).
+    /// @dev Note, that `_canonicalTxHash` is provided by the chain and so should not be trusted to be unique,
+    /// while the rest of the fields are trusted to be populated correctly inside the `Mailbox` of the Gateway.
     /// @param _chainId Target chain ID.
     /// @param _canonicalTxHash Canonical L1 transaction hash.
     /// @param _expirationTimestamp Expiration for gateway replay protection.
