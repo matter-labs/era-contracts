@@ -555,10 +555,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
     function _calculatePreviousChainMigrationNumber(uint256 _chainId) internal view returns (uint256) {
         uint256 settlementLayer = L2_BRIDGEHUB.settlementLayer(_chainId);
-       uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
+        uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
         // If the chain already migrated back to GW, then we need the previous migration number.
         if (settlementLayer == block.chainid) {
-            chainMigrationNumber = chainMigrationNumber - 1;
+            --chainMigrationNumber;
         }
         return chainMigrationNumber;
     }
