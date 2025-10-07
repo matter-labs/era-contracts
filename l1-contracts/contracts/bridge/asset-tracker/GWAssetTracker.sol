@@ -333,7 +333,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             if (bytes4(interopCall.data) != IAssetRouterBase.finalizeDeposit.selector) {
                 revert InvalidInteropCalldata(bytes4(interopCall.data));
             }
-
+            // solhint-disable-next-line
             _processInteropCall(_chainId, bundleHash, callCount, interopCall, interopBundle.destinationChainId);
         }
         _decreaseChainBalance(_chainId, _baseTokenAssetId, totalBaseTokenAmount);
@@ -347,19 +347,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         InteropCall memory _interopCall,
         uint256 _destinationChainId
     ) internal {
-        (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(
-            _interopCall.data
-        );
+        (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(_interopCall.data);
 
         require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, _destinationChainId));
 
-        uint256 amount = _handleAssetRouterMessageInner(
-            _chainId,
-            _destinationChainId,
-            assetId,
-            transferData
-        );
-        
+        uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData);
+
         interopBalanceChange[_chainId][_bundleHash].assetBalanceChanges[_callCount].assetId = assetId;
         interopBalanceChange[_chainId][_bundleHash].assetBalanceChanges[_callCount].amount = amount;
     }
