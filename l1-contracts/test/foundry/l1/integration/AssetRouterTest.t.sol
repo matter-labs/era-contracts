@@ -96,7 +96,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         vm.mockCall(
             address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
-            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(0)
         );
         vm.mockCall(

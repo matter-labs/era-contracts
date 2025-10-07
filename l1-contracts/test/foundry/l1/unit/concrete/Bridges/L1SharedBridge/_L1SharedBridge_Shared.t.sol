@@ -191,7 +191,7 @@ contract L1AssetRouterTest is Test {
         );
         vm.mockCall(
             chainAssetHandler,
-            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(0)
         );
         l1AssetTracker = new L1AssetTracker(

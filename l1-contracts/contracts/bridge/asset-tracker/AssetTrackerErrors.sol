@@ -7,6 +7,8 @@ error AssetIdNotRegistered(bytes32 _assetId);
 error InsufficientChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount);
 // 0x2e19b556
 error InvalidAssetId(bytes32);
+// 0x95bddd6c
+error InvalidAssetMigrationNumber();
 // 0xd24c490f
 error InvalidBuiltInContractMessage(uint256 logCount, uint256 msgCount, bytes32 key);
 // 0x7ad8c2c9
@@ -19,6 +21,8 @@ error InvalidEmptyMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessa
 error InvalidFunctionSignature(bytes4 functionSignature);
 // 0x203d8be5
 error InvalidInteropChainId(uint256 fromChainId, uint256 toChainId);
+// 0xeaa867a8
+error InvalidL1AssetRouter(address l1AssetRouter);
 // 0xe1fe041e
 error InvalidL2ShardId();
 // 0x9530c5e1
@@ -27,6 +31,8 @@ error InvalidMigrationNumber(uint256, uint256);
 error InvalidSender();
 // 0xaca75b50
 error InvalidServiceLog();
+// 0xd0f0bff7
+error InvalidSettlementLayer();
 // 0xa9146eeb
 error InvalidVersion();
 // 0xf76b228a

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 
 import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-InteroperableAddress.sol";
 
-import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_INTEROP_CENTER_ADDR, L2_MESSAGE_VERIFICATION, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IInteropHandler} from "./IInteropHandler.sol";
 import {BUNDLE_IDENTIFIER, BundleStatus, CallStatus, InteropBundle, InteropCall, MessageInclusionProof} from "../common/Messaging.sol";
 import {IERC7786Recipient} from "./IERC7786Recipient.sol";
@@ -12,20 +12,35 @@ import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 import {InteropDataEncoding} from "./InteropDataEncoding.sol";
 import {BundleAlreadyProcessed, BundleVerifiedAlready, CallAlreadyExecuted, CallNotExecutable, CanNotUnbundle, ExecutingNotAllowed, MessageNotIncluded, UnauthorizedMessageSender, UnbundlingNotAllowed, WrongCallStatusLength, WrongDestinationChainId, WrongSourceChainId} from "./InteropErrors.sol";
 import {InvalidSelector, Unauthorized} from "../common/L1ContractErrors.sol";
+import {NotInGatewayMode} from "../bridgehub/L1BridgehubErrors.sol";
 
 /// @title InteropHandler
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev This contract serves as the entry-point for executing, verifying and unbundling interop bundles.
 contract InteropHandler is IInteropHandler, ReentrancyGuard {
+    /// @notice The chain ID of L1. This contract can be deployed on multiple layers, but this value is still equal to the
+    /// L1 that is at the most base layer.
+    uint256 public L1_CHAIN_ID;
+
     /// @notice Tracks the processing status of a bundle by its hash.
     mapping(bytes32 bundleHash => BundleStatus bundleStatus) public bundleStatus;
 
     /// @notice Tracks the individual call statuses within a bundle.
     mapping(bytes32 bundleHash => mapping(uint256 callIndex => CallStatus callStatus)) public callStatus;
 
+    /// @dev Only allows calls from the complex upgrader contract on L2.
+    modifier onlyUpgrader() {
+        if (msg.sender != L2_COMPLEX_UPGRADER_ADDR) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @notice Initializes the reentrancy guard.
-    function initL2() public reentrancyGuardInitializer {}
+    function initL2(uint256 _l1ChainId) public reentrancyGuardInitializer onlyUpgrader {
+        L1_CHAIN_ID = _l1ChainId;
+    }
 
     /// @notice Executes a full bundle atomically.
     /// @dev Reverts if any call fails, or if bundle has been processed already.
@@ -314,6 +329,12 @@ contract InteropHandler is IInteropHandler, ReentrancyGuard {
         require(isIncluded, MessageNotIncluded());
 
         bundleStatus[_bundleHash] = BundleStatus.Verified;
+
+        /// We send the fact of verification to L1 so that the GWAssetTracker can process the chainBalance changes.
+        require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
+
+        // slither-disable-next-line reentrancy-no-eth,unused-return
+        L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(this.verifyBundle.selector, _bundleHash));
 
         // Emit event stating that the bundle was verified.
         emit BundleVerified(_bundleHash);

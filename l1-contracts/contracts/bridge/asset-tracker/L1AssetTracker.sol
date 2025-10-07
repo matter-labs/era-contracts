@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, MaxChainBalanceAlreadyAssigned} from "./AssetTrackerErrors.sol";
+import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, InvalidAssetMigrationNumber, MaxChainBalanceAlreadyAssigned, InvalidSettlementLayer} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -25,7 +25,6 @@ import {IL1AssetTracker} from "./IL1AssetTracker.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IChainAssetHandler} from "../../bridgehub/IChainAssetHandler.sol";
 import {IAssetTrackerDataEncoding} from "./IAssetTrackerDataEncoding.sol";
-import {IChainTypeManager} from "../../state-transition/IChainTypeManager.sol";
 
 contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     uint256 public immutable L1_CHAIN_ID;
@@ -68,11 +67,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _;
     }
 
-    /// @notice Modifier to ensure the caller is the administrator of the specified chain.
-    /// @param _chainId The ID of the chain that requires the caller to be an admin.
-    modifier onlyChainAdmin(uint256 _chainId) {
-        IChainTypeManager ctm = IChainTypeManager(BRIDGE_HUB.chainTypeManager(_chainId));
-        if (msg.sender != ctm.getChainAdmin(_chainId)) {
+    /// @notice Modifier to ensure the caller is the specified chain.
+    /// @param _chainId The ID of the chain that has to be the caller.
+    modifier onlyChain(uint256 _chainId) {
+        if (msg.sender != BRIDGE_HUB.getZKChain(_chainId)) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -301,8 +299,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             // This affects only malicious chains, since a normal chain is not expected to send such a message
             // when on L1. In the worst case only this chain is affected.
             require(
-                chainMigrationNumber == data.migrationNumber,
-                InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
+                chainMigrationNumber == data.chainMigrationNumber,
+                InvalidChainMigrationNumber(chainMigrationNumber, data.chainMigrationNumber)
             );
 
             // The TokenBalanceMigrationData data might be malicious.
@@ -331,6 +329,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
             );
+            /// The assetMigrationNumber on GW is set via forceSetAssetMigrationNumber to the chainMigrationNumber
+            /// which asset migration number + 1 or it is set by confirmMigrationOnL2 to the actual asset migration number.
+            uint256 readAssetMigrationNumber = assetMigrationNumber[data.chainId][data.assetId];
+            require(
+                readAssetMigrationNumber == data.assetMigrationNumber ||
+                    readAssetMigrationNumber + 1 == data.assetMigrationNumber,
+                InvalidAssetMigrationNumber()
+            );
 
             // Note, that here, unlike the case above, we do not enforce the `chainMigrationNumber`, since
             // we always allow to finalize previous withdrawals.
@@ -342,20 +348,31 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _assignMaxChainBalanceIfNeeded(data.tokenOriginChainId, data.assetId);
         _migrateFunds({_fromChainId: fromChainId, _toChainId: toChainId, _assetId: data.assetId, _amount: data.amount});
 
-        assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
+        assetMigrationNumber[data.chainId][data.assetId] = data.chainMigrationNumber;
 
         ConfirmBalanceMigrationData memory confirmBalanceMigrationData = ConfirmBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             isL1ToGateway: data.isL1ToGateway,
             chainId: data.chainId,
             assetId: data.assetId,
-            migrationNumber: data.migrationNumber,
+            migrationNumber: data.chainMigrationNumber,
             amount: data.amount
         });
 
         _sendConfirmationToChains(
             data.isL1ToGateway ? currentSettlementLayer : _finalizeWithdrawalParams.chainId,
             confirmBalanceMigrationData
+        );
+    }
+
+    /// @notice used to pause deposits on Gateway from L1 for migration back to L1.
+    function requestPauseDepositsForChainOnGateway(uint256 _chainId, uint256 _timestamp) external onlyChain(_chainId) {
+        uint256 settlementLayer = BRIDGE_HUB.settlementLayer(_chainId);
+        require(settlementLayer != 0, InvalidSettlementLayer());
+        _sendToChain(
+            settlementLayer,
+            GW_ASSET_TRACKER_ADDR,
+            abi.encodeCall(IGWAssetTracker.requestPauseDepositsForChain, (_chainId, _timestamp))
         );
     }
 
@@ -410,6 +427,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return chainAssetHandler.getMigrationNumber(_chainId);
+        return chainAssetHandler.migrationNumber(_chainId);
     }
 }

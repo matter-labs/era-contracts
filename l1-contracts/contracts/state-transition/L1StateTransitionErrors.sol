@@ -18,8 +18,6 @@ error DependencyRootsRollingHashMismatch(bytes32 _expected, bytes32 _actual);
 error DepositsAlreadyPaused();
 // 0xa4d3098c
 error DepositsNotPaused();
-// 0xdeeb6943
-error DepositsPaused();
 // 0xedae13f3
 error ExecutedIsNotConsistentWithVerified(uint256 batchesExecuted, uint256 batchesVerified);
 // 0xc866ff2c
@@ -90,6 +88,8 @@ error ProtocolVersionNotUpToDate(uint256 currentProtocolVersion, uint256 protoco
 error PubdataInputTooSmall(uint256 pubdataInputLength, uint256 totalBlobsCommitmentSize);
 // 0x9044dff9
 error PubdataLengthTooBig(uint256 pubdataLength, uint256 totalBlobSizeBytes);
+// 0x1cbfa1b9
+error RequireDepositsPaused();
 // 0x89935a14
 error SettlementLayerChainIdMismatch();
 // 0x0baf1d48

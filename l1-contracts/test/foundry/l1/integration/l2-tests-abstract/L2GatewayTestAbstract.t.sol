@@ -7,7 +7,7 @@ pragma solidity ^0.8.20;
 import {StdStorage, Test, console2 as console, stdStorage} from "forge-std/Test.sol";
 import "forge-std/console.sol";
 
-import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common/Config.sol";
 
@@ -21,6 +21,7 @@ import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
 import {BALANCE_CHANGE_VERSION} from "contracts/bridge/asset-tracker/IAssetTrackerBase.sol";
 import {BalanceChange} from "contracts/common/Messaging.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
@@ -52,6 +53,11 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         // todo fix this test
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
+        vm.mockCall(
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encode(1)
+        );
         BalanceChange memory balanceChange = BalanceChange({
             version: BALANCE_CHANGE_VERSION,
             baseTokenAssetId: bytes32(0),
@@ -67,6 +73,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
     function test_withdrawFromGateway() public {
         finalizeDeposit();
         clearPriorityQueue(address(addresses.bridgehub.bridgehubProxy), mintChainId);
+        _pauseDeposits(L2_BRIDGEHUB_ADDR, mintChainId);
         address newAdmin = address(0x1);
         bytes memory newDiamondCut = abi.encode();
         BridgehubBurnCTMAssetData memory data = BridgehubBurnCTMAssetData({

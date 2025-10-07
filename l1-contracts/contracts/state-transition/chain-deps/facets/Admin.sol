@@ -14,11 +14,12 @@ import {IL1Bridgehub} from "../../../bridgehub/IL1Bridgehub.sol";
 import {ZKChainBase} from "./ZKChainBase.sol";
 import {IChainTypeManager} from "../../IChainTypeManager.sol";
 import {IL1GenesisUpgrade} from "../../../upgrades/IL1GenesisUpgrade.sol";
-import {AlreadyMigrated, PriorityQueueNotFullyProcessed, ContractNotDeployed, DepositsAlreadyPaused, DepositsPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
+import {AlreadyMigrated, PriorityQueueNotFullyProcessed, ContractNotDeployed, DepositsAlreadyPaused, DepositsNotPaused, ExecutedIsNotConsistentWithVerified, InvalidNumberOfBatchHashes, L1DAValidatorAddressIsZero, NotAllBatchesExecuted, NotChainAdmin, NotEraChain, NotHistoricalRoot, NotL1, NotMigrated, OutdatedProtocolVersion, ProtocolVersionNotUpToDate, VerifiedIsNotConsistentWithCommitted} from "../../L1StateTransitionErrors.sol";
 import {AlreadyPermanentRollup, DenominatorIsZero, DiamondAlreadyFrozen, DiamondNotFrozen, HashMismatch, InvalidDAForPermanentRollup, InvalidL2DACommitmentScheme, InvalidPubdataPricingMode, NotAZKChain, PriorityTxPubdataExceedsMaxPubDataPerBatch, ProtocolIdMismatch, ProtocolIdNotGreater, TooMuchGas, Unauthorized} from "../../../common/L1ContractErrors.sol";
 import {RollupDAManager} from "../../data-availability/RollupDAManager.sol";
 import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../../../common/l2-helpers/L2ContractAddresses.sol";
 import {AllowedBytecodeTypes, IL2ContractDeployer} from "../../../common/interfaces/IL2ContractDeployer.sol";
+import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
 import {IZKChainBase} from "../../chain-interfaces/IZKChainBase.sol";
@@ -293,18 +294,23 @@ contract AdminFacet is ZKChainBase, IAdmin {
     //////////////////////////////////////////////////////////////*/
 
     /// @inheritdoc IAdmin
-    function pauseDepositsAndInitiateMigration() external onlyAdmin onlyL1 {
+    function pauseDepositsBeforeInitiatingMigration() external onlyAdmin onlyL1 {
         require(s.pausedDepositsTimestamp + PAUSE_DEPOSITS_TIME_WINDOW_END < block.timestamp, DepositsAlreadyPaused());
+        uint256 timestamp;
         // Note, if the chain is new (total number of priority transactions is 0) we allow admin to pause the deposits with immediate effect.
         // This is in place to allow for faster migration for newly spawned chains.
         if (s.priorityTree.getTotalPriorityTxs() == 0) {
             // We mark the start of pausedDeposits window as current timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START,
             // meaning that starting from this point in time the deposits are immediately paused.
-            s.pausedDepositsTimestamp = block.timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START;
+            timestamp = block.timestamp - PAUSE_DEPOSITS_TIME_WINDOW_START;
         } else {
-            s.pausedDepositsTimestamp = block.timestamp;
+            timestamp = block.timestamp;
         }
-        emit DepositsPaused(s.chainId, s.pausedDepositsTimestamp);
+        s.pausedDepositsTimestamp = timestamp;
+        if (s.settlementLayer != address(0)) {
+            IL1AssetTracker(s.assetTracker).requestPauseDepositsForChainOnGateway(s.chainId, timestamp);
+        }
+        emit DepositsPaused(s.chainId, timestamp);
     }
 
     /// @inheritdoc IAdmin
@@ -330,14 +336,12 @@ contract AdminFacet is ZKChainBase, IAdmin {
         /// We require that all the priority transactions are processed.
         require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 
-        if (block.chainid == L1_CHAIN_ID) {
-            uint256 timestamp = s.pausedDepositsTimestamp;
-            require(
-                timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
-                    block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END,
-                DepositsNotPaused()
-            );
-        }
+        uint256 timestamp = s.pausedDepositsTimestamp;
+        require(
+            timestamp + CHAIN_MIGRATION_TIME_WINDOW_START < block.timestamp &&
+                block.timestamp < timestamp + CHAIN_MIGRATION_TIME_WINDOW_END,
+            DepositsNotPaused()
+        );
 
         // We want to trust interop messages coming from Era chains which implies they can use only trusted settlement layers,
         // ie, controlled by the governance, which is currently Era Gateways and Ethereum.

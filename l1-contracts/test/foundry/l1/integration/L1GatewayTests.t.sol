@@ -132,12 +132,7 @@ contract L1GatewayTests is
     }
 
     function _pauseDeposits(uint256 _chainId) public {
-        IZKChain chain = IZKChain(IBridgehubBase(addresses.bridgehub).getZKChain(_chainId));
-        vm.warp(block.timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END + 1);
-        vm.startBroadcast(chain.getAdmin());
-        IAdmin(address(chain)).pauseDepositsAndInitiateMigration();
-        vm.stopBroadcast();
-        vm.warp(block.timestamp + CHAIN_MIGRATION_TIME_WINDOW_START + 1);
+        _pauseDeposits(address(addresses.bridgehub), _chainId);
     }
 
     function _unpauseDeposits(uint256 _chainId) public {
@@ -321,7 +316,7 @@ contract L1GatewayTests is
         );
         vm.mockCall(
             address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy),
-            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(2)
         );
 
@@ -341,7 +336,7 @@ contract L1GatewayTests is
             ctmData: ctmData,
             chainData: chainData,
             migrationNumber: IChainAssetHandler(address(addresses.ecosystemAddresses.bridgehub.chainAssetHandlerProxy))
-                .getMigrationNumber(migratingChainId),
+                .migrationNumber(migratingChainId),
             v30UpgradeChainBatchNumber: 0
         });
         bytes memory bridgehubMintData = abi.encode(data);

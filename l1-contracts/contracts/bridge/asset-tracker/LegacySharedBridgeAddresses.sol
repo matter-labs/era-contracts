@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {InvalidL1AssetRouter} from "./AssetTrackerErrors.sol";
+
 struct SharedBridgeOnChainId {
     uint256 chainId;
     address legacySharedBridgeAddress;
@@ -15,8 +17,6 @@ library LegacySharedBridgeAddresses {
     address internal constant STAGE_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = 0x0000000000000000000000000000000000000000;
     address internal constant TESTNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = 0x0000000000000000000000000000000000000000;
     address internal constant MAINNET_ECOSYSTEM_L1_ASSET_ROUTER_ADDRESS = 0x0000000000000000000000000000000000000000;
-
-    error InvalidL1AssetRouter(address l1AssetRouter);
 
     /// @dev We have Stage, Testnet and Mainnet ecosystems.
     /// We use the l1AssetRouter to distinguish between them, since stage and testnet are both on Sepolia.

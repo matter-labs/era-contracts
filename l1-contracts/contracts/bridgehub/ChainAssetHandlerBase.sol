@@ -14,9 +14,9 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
-import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered} from "./L1BridgehubErrors.sol";
+import {IncorrectChainAssetId, IncorrectSender, MigrationNotToL1, MigrationNumberAlreadySet, MigrationNumberMismatch, NotSystemContext, OnlyAssetTrackerOrChain, OnlyChain, SLHasDifferentCTM, ZKChainNotRegistered, IteratedMigrationsNotSupported} from "./L1BridgehubErrors.sol";
 import {ChainIdNotRegistered, MigrationPaused, NotAssetRouter, NotL1} from "../common/L1ContractErrors.sol";
-import {GW_ASSET_TRACKER, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
@@ -70,11 +70,12 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetTracker() internal view virtual returns (address);
 
-    /// @notice used to pause the migrations of chains. Used for upgrades.
+    /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
-    /// @notice used to track the number of times each chain has migrated.
-    mapping(uint256 chainId => uint256 migrationNumber) internal migrationNumber;
+    /// @notice Used to track the number of times each chain has migrated.
+    /// NOTE: this mapping may be deprecated in the future, don't rely on it!
+    mapping(uint256 chainId => uint256 migrationNumber) public migrationNumber;
 
     /// @notice Only the asset router can call.
     modifier onlyAssetRouter() {
@@ -115,16 +116,6 @@ abstract contract ChainAssetHandlerBase is
     }
 
     /*//////////////////////////////////////////////////////////////
-                            Getters
-    //////////////////////////////////////////////////////////////*/
-
-    /// @notice Returns the migration number for a chain.
-    function getMigrationNumber(uint256 _chainId) external view returns (uint256) {
-        // onlyAssetTrackerOrChain(_chainId) returns (uint256) {
-        return migrationNumber[_chainId];
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             V30 Upgrade
     //////////////////////////////////////////////////////////////*/
 
@@ -152,8 +143,6 @@ abstract contract ChainAssetHandlerBase is
     /*//////////////////////////////////////////////////////////////
                         Chain migration
     //////////////////////////////////////////////////////////////*/
-
-    error UnprocessedDepositsNotProcessed();
 
     /// @notice IL1AssetHandler interface, used to migrate (transfer) a chain to the settlement layer.
     /// @param _settlementChainId the chainId of the settlement chain, i.e. where the message and the migrating chain is sent.
@@ -217,10 +206,6 @@ abstract contract ChainAssetHandlerBase is
 
             if (block.chainid != _l1ChainId()) {
                 require(_settlementChainId == _l1ChainId(), MigrationNotToL1());
-                require(
-                    GW_ASSET_TRACKER.unprocessedDeposits(bridgehubBurnData.chainId) == 0,
-                    UnprocessedDepositsNotProcessed()
-                );
             }
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
@@ -230,6 +215,9 @@ abstract contract ChainAssetHandlerBase is
             _originalCaller,
             bridgehubBurnData.chainData
         );
+        // Iterated migrations are not supported to avoid asset migration number complications related to token balance migration.
+        // This means a chain can migrate to GW and back to L1 but only once.
+        require(migrationNumber[bridgehubBurnData.chainId] < 2, IteratedMigrationsNotSupported());
         ++migrationNumber[bridgehubBurnData.chainId];
 
         uint256 batchNumber = IMessageRoot(_messageRoot()).currentChainBatchNumber(bridgehubBurnData.chainId);

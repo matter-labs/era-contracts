@@ -89,7 +89,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function _registerTokenOnL2(bytes32 _assetId) internal {
         /// If the chain is settling on Gateway, then withdrawals are not automatically allowed for new tokens.
         if (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId()) {
-            assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+            assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
         }
     }
 
@@ -281,12 +281,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
         address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);
 
-        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
-        if (migrationNumber == assetMigrationNumber[block.chainid][_assetId]) {
+        uint256 chainMigrationNumber = _getChainMigrationNumber(block.chainid);
+        if (chainMigrationNumber == assetMigrationNumber[block.chainid][_assetId]) {
             /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
             return;
         }
-        uint256 amount = _getOrSaveTotalSupply(_assetId, migrationNumber, originChainId, tokenAddress);
+        uint256 amount = _getOrSaveTotalSupply(_assetId, chainMigrationNumber, originChainId, tokenAddress);
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
@@ -294,7 +294,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             assetId: _assetId,
             tokenOriginChainId: originChainId,
             amount: amount,
-            migrationNumber: migrationNumber,
+            chainMigrationNumber: chainMigrationNumber,
+            assetMigrationNumber: assetMigrationNumber[block.chainid][_assetId],
             originToken: originalToken,
             isL1ToGateway: true
         });
@@ -340,6 +341,6 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return L2_CHAIN_ASSET_HANDLER.getMigrationNumber(_chainId);
+        return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
     }
 }
