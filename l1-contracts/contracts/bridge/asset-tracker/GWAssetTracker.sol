@@ -528,12 +528,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         require(zkChain != address(0), ChainIdNotRegistered(_chainId));
 
         uint256 settlementLayer = L2_BRIDGEHUB.settlementLayer(_chainId);
-        uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
+        uint256 readChainMigrationNumber = _getChainMigrationNumber(_chainId);
 
         // If the chain already migrated back to GW, then we need the previous migration number.
-        uint256 migrationNumber = settlementLayer == block.chainid ? chainMigrationNumber - 1 : chainMigrationNumber;
-        require(assetMigrationNumber[_chainId][_assetId] < migrationNumber, InvalidAssetId(_assetId));
-        uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, migrationNumber, true);
+        uint256 chainMigrationNumber = settlementLayer == block.chainid ? readChainMigrationNumber - 1 : readChainMigrationNumber;
+        require(assetMigrationNumber[_chainId][_assetId] < chainMigrationNumber, InvalidAssetId(_assetId));
+        uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, chainMigrationNumber, true);
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
@@ -541,7 +541,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             assetId: _assetId,
             tokenOriginChainId: tokenOriginChainId[_assetId],
             amount: amount,
-            migrationNumber: migrationNumber,
+            chainMigrationNumber: chainMigrationNumber,
+            assetMigrationNumber: assetMigrationNumber[_chainId][_assetId],
             originToken: originToken[_assetId],
             isL1ToGateway: false
         });

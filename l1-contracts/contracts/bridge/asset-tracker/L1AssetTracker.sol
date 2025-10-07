@@ -15,7 +15,7 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, MaxChainBalanceAlreadyAssigned, InvalidSettlementLayer} from "./AssetTrackerErrors.sol";
+import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, InvalidAssetMigrationNumber, MaxChainBalanceAlreadyAssigned, InvalidSettlementLayer} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
@@ -299,8 +299,8 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             // This affects only malicious chains, since a normal chain is not expected to send such a message
             // when on L1. In the worst case only this chain is affected.
             require(
-                chainMigrationNumber == data.migrationNumber,
-                InvalidChainMigrationNumber(chainMigrationNumber, data.migrationNumber)
+                chainMigrationNumber == data.chainMigrationNumber,
+                InvalidChainMigrationNumber(chainMigrationNumber, data.chainMigrationNumber)
             );
 
             // The TokenBalanceMigrationData data might be malicious.
@@ -329,6 +329,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
             );
+            require(assetMigrationNumber[data.chainId][data.assetId] == data.assetMigrationNumber, InvalidAssetMigrationNumber());
 
             // Note, that here, unlike the case above, we do not enforce the `chainMigrationNumber`, since
             // we always allow to finalize previous withdrawals.
@@ -340,14 +341,14 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         _assignMaxChainBalanceIfNeeded(data.tokenOriginChainId, data.assetId);
         _migrateFunds({_fromChainId: fromChainId, _toChainId: toChainId, _assetId: data.assetId, _amount: data.amount});
 
-        assetMigrationNumber[data.chainId][data.assetId] = data.migrationNumber;
+        assetMigrationNumber[data.chainId][data.assetId] = data.chainMigrationNumber;
 
         ConfirmBalanceMigrationData memory confirmBalanceMigrationData = ConfirmBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
             isL1ToGateway: data.isL1ToGateway,
             chainId: data.chainId,
             assetId: data.assetId,
-            migrationNumber: data.migrationNumber,
+            migrationNumber: data.chainMigrationNumber,
             amount: data.amount
         });
 
