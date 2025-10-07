@@ -337,7 +337,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));
 
         bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(_chainId, _message[1:]);
-        interopBalanceChange[_chainId][bundleHash].version = INTEROP_BALANCE_CHANGE_VERSION;
+        interopBalanceChange[interopBundle.destinationChainId][bundleHash].version = INTEROP_BALANCE_CHANGE_VERSION;
 
         uint256 totalBaseTokenAmount = 0;
 
@@ -362,7 +362,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             _processInteropCall(_chainId, bundleHash, callCount, interopCall, interopBundle.destinationChainId);
         }
         _decreaseChainBalance(_chainId, _baseTokenAssetId, totalBaseTokenAmount);
-        interopBalanceChange[_chainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
+        interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
     }
 
     function _processInteropCall(
