@@ -161,18 +161,10 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     ) external onlyL2InteropCenter {
         uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
 
-        /// We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
-        _getOrSaveChainBalance(_chainId, _balanceChange.assetId, chainMigrationNumber - 1, true);
-        // we increase the chain balance of the token.
-        // we don't decrease chainBalance of the source, since the source is L1, and keep track of chainBalance[L1_CHAIN_ID] on L1.
-        if (_balanceChange.amount > 0) {
-            chainBalance[_chainId][_balanceChange.assetId] += _balanceChange.amount;
-            /// Note we don't decrease L1ChainBalance here, since we don't track L1 chainBalance on Gateway.
-        }
-        // we increase the chain balance of the base token.
-        if (_balanceChange.baseTokenAmount > 0) {
-            chainBalance[_chainId][_balanceChange.baseTokenAssetId] += _balanceChange.baseTokenAmount;
-        }
+        /// Note we don't decrease L1ChainBalance here, since we don't track L1 chainBalance on Gateway.
+        _increaseAndSaveChainBalance(_chainId, _balanceChange.assetId, _balanceChange.amount, chainMigrationNumber);
+        _increaseAndSaveChainBalance(_chainId, _balanceChange.baseTokenAssetId, _balanceChange.baseTokenAmount, chainMigrationNumber);
+
         if (_tokenCanSkipMigrationOnSettlementLayer(_chainId, _balanceChange.assetId)) {
             _forceSetAssetMigrationNumber(_chainId, _balanceChange.assetId);
         }
@@ -393,15 +385,12 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         InteropBalanceChange memory receivedInteropBalanceChange = interopBalanceChange[_chainId][bundleHash];
         uint256 length = receivedInteropBalanceChange.assetBalanceChanges.length;
+        uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
         for (uint256 i = 0; i < length; ++i) {
             uint256 amount = receivedInteropBalanceChange.assetBalanceChanges[i].amount;
-            if (amount > 0) {
-                chainBalance[_chainId][receivedInteropBalanceChange.assetBalanceChanges[i].assetId] += amount;
-            }
+            _increaseAndSaveChainBalance(_chainId, receivedInteropBalanceChange.assetBalanceChanges[i].assetId, amount, chainMigrationNumber);
         }
-        if (receivedInteropBalanceChange.baseTokenAmount > 0) {
-            chainBalance[_chainId][_baseTokenAssetId] += receivedInteropBalanceChange.baseTokenAmount;
-        }
+        _increaseAndSaveChainBalance(_chainId, _baseTokenAssetId, receivedInteropBalanceChange.baseTokenAmount, chainMigrationNumber);
     }
 
     /// @notice L2->L1 withdrawals go through the L2AssetRouter directly.
@@ -458,7 +447,8 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 _decreaseChainBalance(_sourceChainId, _assetId, _amount);
             }
             if (_destinationChainId != L1_CHAIN_ID) {
-                chainBalance[_destinationChainId][_assetId] += _amount;
+                uint256 chainMigrationNumber = _getChainMigrationNumber(_destinationChainId);
+                _increaseAndSaveChainBalance(_destinationChainId, _assetId, _amount, chainMigrationNumber);
             }
         }
     }
@@ -611,6 +601,15 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /*//////////////////////////////////////////////////////////////
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
+
+    function _increaseAndSaveChainBalance(uint256 _chainId, bytes32 _assetId, uint256 _amount, uint256 _chainMigrationNumber) internal {
+        /// We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
+        _getOrSaveChainBalance(_chainId, _assetId, _chainMigrationNumber - 1, true);
+        // we increase the chain balance of the token.
+        if (_amount > 0) {
+            chainBalance[_chainId][_assetId] += _amount;
+        }
+    }
 
     function _registerToken(bytes32 _assetId, address _originalToken, uint256 _tokenOriginChainId) internal {
         if (originToken[_assetId] == address(0)) {
