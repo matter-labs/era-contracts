@@ -19,6 +19,8 @@ error InvalidChainMigrationNumber(uint256, uint256);
 error InvalidEmptyMessageRoot(bytes32 expectedMessageRoot, bytes32 providedMessageRoot);
 // 0x532a43fc
 error InvalidFunctionSignature(bytes4 functionSignature);
+// 0xfbf8ed35
+error InvalidInteropBalanceChange(bytes32 bundleHash);
 // 0x203d8be5
 error InvalidInteropChainId(uint256 fromChainId, uint256 toChainId);
 // 0xeaa867a8

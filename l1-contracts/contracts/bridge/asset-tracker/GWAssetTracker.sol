@@ -16,7 +16,7 @@ import {L2_L1_LOGS_TREE_DEFAULT_LEAF_HASH, L2_TO_L1_LOGS_MERKLE_TREE_DEPTH} from
 import {IBridgehubBase} from "../../bridgehub/IBridgehubBase.sol";
 import {FullMerkleMemory} from "../../common/libraries/FullMerkleMemory.sol";
 
-import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed} from "./AssetTrackerErrors.sol";
+import {InvalidAssetId, InvalidBuiltInContractMessage, InvalidCanonicalTxHash, InvalidFunctionSignature, InvalidInteropChainId, InvalidL2ShardId, InvalidServiceLog, InvalidEmptyMessageRoot, RegisterNewTokenNotAllowed, InvalidInteropBalanceChange} from "./AssetTrackerErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {MessageHashing} from "../../common/libraries/MessageHashing.sol";
@@ -389,10 +389,18 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         bytes32 bundleHash = bytes32(_message[4:36]);
 
         InteropBalanceChange memory receivedInteropBalanceChange = interopBalanceChange[_chainId][bundleHash];
+        require(
+            receivedInteropBalanceChange.version == INTEROP_BALANCE_CHANGE_VERSION,
+            InvalidInteropBalanceChange(bundleHash)
+        );
+        interopBalanceChange[_chainId][bundleHash].version = 0;
+
         uint256 length = receivedInteropBalanceChange.assetBalanceChanges.length;
         uint256 chainMigrationNumber = _getChainMigrationNumber(_chainId);
         for (uint256 i = 0; i < length; ++i) {
             uint256 amount = receivedInteropBalanceChange.assetBalanceChanges[i].amount;
+            interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[i].assetId = bytes32(0);
+            interopBalanceChange[_chainId][bundleHash].assetBalanceChanges[i].amount = 0;
             _increaseAndSaveChainBalance(
                 _chainId,
                 receivedInteropBalanceChange.assetBalanceChanges[i].assetId,
@@ -400,6 +408,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 chainMigrationNumber
             );
         }
+        interopBalanceChange[_chainId][bundleHash].baseTokenAmount = 0;
         _increaseAndSaveChainBalance(
             _chainId,
             _baseTokenAssetId,
