@@ -56,6 +56,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     mapping(uint256 chainId => bytes32 emptyMessageRoot) internal emptyMessageRoot;
 
     /// @notice We save the chainBalance which equals the chains totalSupply before the first GW->L1 migration so that it can be replayed.
+    /// @dev Note, that the balance is only saved for even migration numbers, i.e. when the chain did not settle on top of Gateway.
+    /// This is needed so that in the future after e.g. a chain migrated with number N (odd number), we would remember how much funds did it
+    /// have right before the migration (when N - 1 was the migration number).
     mapping(uint256 chainId => mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedChainBalance)))
         internal savedChainBalance;
 
@@ -535,7 +538,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         // If the chain already migrated back to GW, then we need the previous migration number.
         uint256 chainMigrationNumber = _calculatePreviousChainMigrationNumber(_chainId);
         require(assetMigrationNumber[_chainId][_assetId] < chainMigrationNumber, InvalidAssetId(_assetId));
-        /// We don't save chainBalance here since it might not be the final chainBalance for this value of the chainMigrationNumber.
+        // We don't save chainBalance here since it might not be the final chainBalance for this value of the chainMigrationNumber.
         uint256 amount = _getOrSaveChainBalance(_chainId, _assetId, chainMigrationNumber);
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
@@ -627,7 +630,9 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         uint256 _amount,
         uint256 _chainMigrationNumber
     ) internal {
-        /// We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
+        // We save the chainBalance for the previous migration number so that the chain balance can be migrated back to GW in case it was not migrated.
+        // Note, that for this logic to be correct, we need to ensure that `_chainMigrationNumber` is odd, i.e. the chain actually
+        // actively settles on top of Gateway.
         _getOrSaveChainBalance(_chainId, _assetId, _chainMigrationNumber - 1);
         // we increase the chain balance of the token.
         if (_amount > 0) {

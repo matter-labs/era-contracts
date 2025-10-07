@@ -315,7 +315,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
             // This is needed to ensure that the chainBalance on the Gateway AssetTracker is currently 0.
             // In the future we might initialize chains on GW. So we subtract from chainMigrationNumber.
             // Note, that this logic only works well when only a single ZK Gateway can be used as a settlement layer
-            // for an individual chain.
+            // for an individual chain as well as the fact that chains can only migrate once on top of Gateway.
+            // Since `currentSettlementLayer != block.chainid` is checked above, it implies that the current
+            // `data.chainMigrationNumber` is odd and so after this migration is processed once, it will not be able to be reprocessed,
+            // due to `assetMigrationNumber` being assigned later.H
             require(
                 (assetMigrationNumber[data.chainId][data.assetId]) % 2 == 0,
                 InvalidMigrationNumber(chainMigrationNumber, assetMigrationNumber[data.chainId][data.assetId])
@@ -329,8 +332,10 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
                 _bridgehub().whitelistedSettlementLayers(_finalizeWithdrawalParams.chainId),
                 InvalidWithdrawalChainId()
             );
-            /// The assetMigrationNumber on GW is set via forceSetAssetMigrationNumber to the chainMigrationNumber
-            /// which asset migration number + 1 or it is set by confirmMigrationOnL2 to the actual asset migration number.
+            // The assetMigrationNumber on GW is set via forceSetAssetMigrationNumber to the chainMigrationNumber
+            // which asset migration number + 1 or it is set by confirmMigrationOnL2 to the actual asset migration number.
+            // This line also serves for replay protection as later the assetMigrationNumber is set to the chainMigrationNumber.
+            // We assume that data.chainMigrationNumber is > data.assetMigrationNumber.
             uint256 readAssetMigrationNumber = assetMigrationNumber[data.chainId][data.assetId];
             require(
                 readAssetMigrationNumber == data.assetMigrationNumber ||
