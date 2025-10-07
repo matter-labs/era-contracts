@@ -298,12 +298,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
         }
     }
 
-    struct AvoidViaIrStruct {
-        uint256 totalBaseTokenAmount;
-        uint256 callLength;
-        bytes32 bundleHash;
-    }
-
     function _handleInteropCenterMessage(
         uint256 _chainId,
         bytes calldata _message,
@@ -316,19 +310,15 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         InteropBundle memory interopBundle = abi.decode(_message[1:], (InteropBundle));
 
-        InteropCall memory interopCall;
-        AvoidViaIrStruct memory avoidViaIrStruct = AvoidViaIrStruct({
-            totalBaseTokenAmount: 0,
-            callLength: interopBundle.calls.length,
-            bundleHash: InteropDataEncoding.encodeInteropBundleHash(_chainId, _message[1:])
-        });
-
-        interopBalanceChange[_chainId][avoidViaIrStruct.bundleHash].version = INTEROP_BALANCE_CHANGE_VERSION;
+        bytes32 bundleHash = InteropDataEncoding.encodeInteropBundleHash(_chainId, _message[1:]);
+        interopBalanceChange[_chainId][bundleHash].version = INTEROP_BALANCE_CHANGE_VERSION;
 
         uint256 totalBaseTokenAmount = 0;
 
-        for (uint256 callCount = 0; callCount < avoidViaIrStruct.callLength; ++callCount) {
-            interopCall = interopBundle.calls[callCount];
+        uint256 interopBundleCallsLength = interopBundle.calls.length;
+
+        for (uint256 callCount = 0; callCount < interopBundleCallsLength; ++callCount) {
+            InteropCall memory interopCall = interopBundle.calls[callCount];
 
             if (interopCall.value > 0) {
                 totalBaseTokenAmount += interopCall.value;
@@ -342,22 +332,28 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
             if (bytes4(interopCall.data) != IAssetRouterBase.finalizeDeposit.selector) {
                 revert InvalidInteropCalldata(bytes4(interopCall.data));
             }
-            (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(interopCall.data);
-            require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, interopBundle.destinationChainId));
-
-            uint256 amount = _handleAssetRouterMessageInner(
-                _chainId,
-                interopBundle.destinationChainId,
-                assetId,
-                transferData
-            );
-            interopBalanceChange[_chainId][avoidViaIrStruct.bundleHash]
-                .assetBalanceChanges[callCount]
-                .assetId = assetId;
-            interopBalanceChange[_chainId][avoidViaIrStruct.bundleHash].assetBalanceChanges[callCount].amount = amount;
+            // solhint-disable-next-line
+            _processInteropCall(_chainId, bundleHash, callCount, interopCall, interopBundle.destinationChainId);
         }
         _decreaseChainBalance(_chainId, _baseTokenAssetId, totalBaseTokenAmount);
-        interopBalanceChange[_chainId][avoidViaIrStruct.bundleHash].baseTokenAmount = totalBaseTokenAmount;
+        interopBalanceChange[_chainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
+    }
+
+    function _processInteropCall(
+        uint256 _chainId,
+        bytes32 _bundleHash,
+        uint256 _callCount,
+        InteropCall memory _interopCall,
+        uint256 _destinationChainId
+    ) internal {
+        (uint256 fromChainId, bytes32 assetId, bytes memory transferData) = this.parseInteropCall(_interopCall.data);
+
+        require(_chainId == fromChainId, InvalidInteropChainId(fromChainId, _destinationChainId));
+
+        uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData);
+
+        interopBalanceChange[_chainId][_bundleHash].assetBalanceChanges[_callCount].assetId = assetId;
+        interopBalanceChange[_chainId][_bundleHash].assetBalanceChanges[_callCount].amount = amount;
     }
 
     function _handleInteropHandlerReceiveMessage(
