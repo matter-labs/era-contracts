@@ -21,7 +21,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     bytes32 public BASE_TOKEN_ASSET_ID;
 
-    /// @notice We save the total supply of the token in the first deposit after chain migration. See _handleFinalizeBridgingOnL2Inner for details.
+    /// @notice We save the token balance in the first deposit after chain migration. For native tokens, this is the chainBalance; for foreign tokens, this is the total supply. See _handleFinalizeBridgingOnL2Inner for details.
     /// We need this to be able to migrate token balance to Gateway AssetTracker from the L1AssetTracker.
     mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply))
         internal savedTotalSupply;
