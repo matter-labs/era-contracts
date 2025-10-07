@@ -324,10 +324,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (IBridgehubBase(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
-        /// We pause L1->GW->L2 deposits.
+        // We pause L1->GW->L2 deposits.
         require(_checkV30UpgradeProcessed(_chainId), RequireDepositsPaused());
 
         BalanceChange memory balanceChange;
+        // baseTokenAssetId is known on Gateway, we do not read it here for gas-saving purposes.
+        // Note, that here we trust the calling chain to provide the correct _baseTokenAmount.
+        // This means that only CTMs that ZK Gateways can trust can exist in this release.
+        balanceChange.baseTokenAmount = _baseTokenAmount;
 
         if (_getBalanceChange) {
             IL1AssetTracker assetTracker = IL1AssetTracker(s.assetTracker);
@@ -406,7 +410,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             });
     }
 
-    ///  @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailboxImpl
     function requestL2ServiceTransaction(
         address _contractL2,
         bytes calldata _l2Calldata
