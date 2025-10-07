@@ -281,7 +281,7 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         );
         require(data.version == TOKEN_BALANCE_MIGRATION_DATA_VERSION, InvalidVersion());
         require(
-            assetMigrationNumber[data.chainId][data.assetId] < data.assetMigrationNumber,
+            assetMigrationNumber[data.chainId][data.assetId] < data.chainMigrationNumber,
             InvalidAssetMigrationNumber()
         );
 
