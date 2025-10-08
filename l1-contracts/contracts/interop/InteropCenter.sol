@@ -253,22 +253,30 @@ contract InteropCenter is
 
     /// @notice Ensures the received base token value matches expected for the destination chain.
     /// @param _destinationChainId Destination chain ID.
-    /// @param _totalValue Sum of requested interop call values.
-    function _ensureCorrectTotalValue(uint256 _destinationChainId, uint256 _totalValue) internal {
+    /// @param _totalBurnedCallsValue Sum of requested interop call values.
+    /// @param _totalIndirectCallsValue Sum of requested indirect call values.
+    function _ensureCorrectTotalValue(
+        uint256 _destinationChainId,
+        uint256 _totalBurnedCallsValue,
+        uint256 _totalIndirectCallsValue
+    ) internal {
         bytes32 destinationChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(_destinationChainId);
         // We burn the value that is passed along the bundle here, on source chain.
         bytes32 thisChainBaseTokenAssetId = L2_BRIDGEHUB.baseTokenAssetId(block.chainid);
         if (destinationChainBaseTokenAssetId == thisChainBaseTokenAssetId) {
-            require(msg.value == _totalValue, MsgValueMismatch(_totalValue, msg.value));
+            require(
+                msg.value == _totalBurnedCallsValue + _totalIndirectCallsValue,
+                MsgValueMismatch(_totalBurnedCallsValue + _totalIndirectCallsValue, msg.value)
+            );
             // slither-disable-next-line arbitrary-send-eth
-            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalValue}();
+            L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue{value: _totalBurnedCallsValue}();
         } else {
-            require(msg.value == 0, MsgValueMismatch(0, msg.value));
+            require(msg.value == _totalIndirectCallsValue, MsgValueMismatch(_totalIndirectCallsValue, msg.value));
             L2_ASSET_ROUTER.bridgehubDepositBaseToken(
                 _destinationChainId,
                 destinationChainBaseTokenAssetId,
                 msg.sender,
-                _totalValue
+                _totalBurnedCallsValue
             );
         }
     }
@@ -287,9 +295,6 @@ contract InteropCenter is
     ) internal returns (bytes32 bundleHash) {
         require(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID, NotInGatewayMode());
 
-        // This will calculate how much value does all of the calls use cumulatively.
-        uint256 totalCallsValue;
-
         // Form an InteropBundle.
         InteropBundle memory bundle = InteropBundle({
             version: INTEROP_BUNDLE_VERSION,
@@ -303,29 +308,34 @@ contract InteropCenter is
         // Update interopBundleNonce for the msg.sender
         ++interopBundleNonce[msg.sender];
 
+        // This will calculate how much value does all of the calls use cumulatively.
+        uint256 totalBurnedCallsValue;
+        uint256 totalIndirectCallsValue;
+
         // Fill the formed InteropBundle with calls.
         uint256 callStartersLength = _callStarters.length;
         for (uint256 i = 0; i < callStartersLength; ++i) {
             InteropCall memory interopCall = _processCallStarter(_callStarters[i], _destinationChainId, msg.sender);
             bundle.calls[i] = interopCall;
-            totalCallsValue += _callStarters[i].callAttributes.interopCallValue;
+            totalBurnedCallsValue += _callStarters[i].callAttributes.interopCallValue;
             // For indirect calls, also account for the bridge message value that gets sent to the AssetRouter
             if (_callStarters[i].callAttributes.indirectCall) {
-                totalCallsValue += _callStarters[i].callAttributes.indirectCallMessageValue;
+                totalIndirectCallsValue += _callStarters[i].callAttributes.indirectCallMessageValue;
             }
         }
 
         // Ensure that tokens required for bundle execution were received.
-        _ensureCorrectTotalValue(bundle.destinationChainId, totalCallsValue);
+        _ensureCorrectTotalValue(bundle.destinationChainId, totalBurnedCallsValue, totalIndirectCallsValue);
 
-        bytes memory interopBundleBytes = abi.encode(bundle);
+        bytes32 msgHash;
+        /// To avoid stack too deep error
+        {
+            bytes memory interopBundleBytes = abi.encode(bundle);
 
-        // Send the message corresponding to the relevant InteropBundle to L1.
-        bytes32 msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(
-            bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes)
-        );
-
-        bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
+            // Send the message corresponding to the relevant InteropBundle to L1.
+            msgHash = L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1(bytes.concat(BUNDLE_IDENTIFIER, interopBundleBytes));
+            bundleHash = InteropDataEncoding.encodeInteropBundleHash(block.chainid, interopBundleBytes);
+        }
 
         // Emit ERC-7786 MessageSent event for each call in the bundle
         for (uint256 i = 0; i < callStartersLength; ++i) {

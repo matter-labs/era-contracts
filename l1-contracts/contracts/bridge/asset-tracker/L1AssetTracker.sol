@@ -15,10 +15,10 @@ import {IMailbox} from "../../state-transition/chain-interfaces/IMailbox.sol";
 import {IL1NativeTokenVault} from "../../bridge/ntv/IL1NativeTokenVault.sol";
 
 import {TransientPrimitivesLib} from "../../common/libraries/TransientPrimitives/TransientPrimitives.sol";
-import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, InvalidAssetMigrationNumber, MaxChainBalanceAlreadyAssigned, InvalidSettlementLayer} from "./AssetTrackerErrors.sol";
+import {InvalidChainMigrationNumber, InvalidFunctionSignature, InvalidMigrationNumber, InvalidSender, InvalidWithdrawalChainId, NotMigratedChain, OnlyWhitelistedSettlementLayer, TransientBalanceChangeAlreadySet, InvalidVersion, L1TotalSupplyAlreadyMigrated, InvalidAssetMigrationNumber, InvalidSettlementLayer} from "./AssetTrackerErrors.sol";
 import {V30UpgradeChainBatchNumberNotSet} from "../../bridgehub/L1BridgehubErrors.sol";
 import {AssetTrackerBase} from "./AssetTrackerBase.sol";
-import {MAX_TOKEN_BALANCE, TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
+import {TOKEN_BALANCE_MIGRATION_DATA_VERSION} from "./IAssetTrackerBase.sol";
 import {IL2AssetTracker} from "./IL2AssetTracker.sol";
 import {IGWAssetTracker} from "./IGWAssetTracker.sol";
 import {IL1AssetTracker} from "./IL1AssetTracker.sol";
@@ -142,16 +142,6 @@ contract L1AssetTracker is AssetTrackerBase, IL1AssetTracker {
         if (!maxChainBalanceAssigned[_assetId]) {
             _assignMaxChainBalance(_originChainId, _assetId);
         }
-    }
-
-    function _assignMaxChainBalanceRequireNotAssigned(uint256 _originChainId, bytes32 _assetId) internal {
-        require(!maxChainBalanceAssigned[_assetId], MaxChainBalanceAlreadyAssigned(_assetId));
-        _assignMaxChainBalance(_originChainId, _assetId);
-    }
-
-    function _assignMaxChainBalance(uint256 _originChainId, bytes32 _assetId) internal override {
-        chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
-        maxChainBalanceAssigned[_assetId] = true;
     }
 
     /*//////////////////////////////////////////////////////////////

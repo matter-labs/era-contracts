@@ -135,6 +135,7 @@ abstract contract AssetTrackerBase is
 
     function _assignMaxChainBalance(uint256 _originChainId, bytes32 _assetId) internal virtual {
         chainBalance[_originChainId][_assetId] = MAX_TOKEN_BALANCE;
+        maxChainBalanceAssigned[_assetId] = true;
     }
 
     /// @dev This function is used to decrease the chain balance of a token on a chain.
