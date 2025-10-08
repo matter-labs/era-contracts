@@ -53,6 +53,7 @@ library GatewayCTMDeployerHelper {
         uint256 l1ChainId = config.l1ChainId;
 
         contracts.multicall3 = _deployInternal("Multicall3", "Multicall3.sol", hex"", innerConfig);
+        contracts.eip7702Checker = _deployInternal("MockEIP7702Checker", "MockEIP7702Checker.sol", hex"", innerConfig);
 
         contracts = _deployFacetsAndUpgrades(
             salt,
@@ -136,7 +137,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.mailboxFacet = _deployInternal(
             "MailboxFacet",
             "Mailbox.sol",
-            abi.encode(_eraChainId, _l1ChainId, IEIP7702Checker(address(1))),
+            abi.encode(_eraChainId, _l1ChainId, IEIP7702Checker(_deployedContracts.eip7702Checker)),
             innerConfig
         );
 

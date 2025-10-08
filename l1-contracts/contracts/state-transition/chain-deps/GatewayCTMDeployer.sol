@@ -138,6 +138,8 @@ struct DAContracts {
 struct DeployedContracts {
     /// @notice Address of the Multicall3 contract.
     address multicall3;
+    /// @notice Address of the EIP7702Checker contract.
+    address eip7702Checker;
     /// @notice Struct containing state transition related contracts.
     StateTransitionContracts stateTransition;
     /// @notice Struct containing Data Availability related contracts.
@@ -178,16 +180,14 @@ contract GatewayCTMDeployer {
         DeployedContracts memory contracts;
 
         contracts.multicall3 = address(new Multicall3{salt: salt}());
-
-        IEIP7702Checker eip7702Checker = IEIP7702Checker(address(new MockEIP7702Checker()));
+        contracts.eip7702Checker = address(new MockEIP7702Checker{salt: salt}());
 
         _deployFacetsAndUpgrades({
             _salt: salt,
             _eraChainId: eraChainId,
             _l1ChainId: l1ChainId,
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
-            _deployedContracts: contracts,
-            _eip7702Checker: eip7702Checker
+            _deployedContracts: contracts
         });
         _deployVerifier(salt, _config.testnetVerifier, contracts, _config.aliasedGovernanceAddress);
 
@@ -220,11 +220,10 @@ contract GatewayCTMDeployer {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _aliasedGovernanceAddress,
-        DeployedContracts memory _deployedContracts,
-        IEIP7702Checker _eip7702Checker
+        DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, _eip7702Checker)
+            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, IEIP7702Checker(_deployedContracts.eip7702Checker))
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());
