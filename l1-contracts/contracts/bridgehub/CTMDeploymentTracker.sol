@@ -8,6 +8,7 @@ import {IBridgehubBase, L2TransactionRequestTwoBridgesInner} from "./IBridgehubB
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 
 import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
 import {TWO_BRIDGES_MAGIC_VALUE} from "../common/Config.sol";
 import {L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {NoEthAllowed, NotOwner, NotOwnerViaRouter, OnlyBridgehub, WrongCounterPart} from "./L1BridgehubErrors.sol";
@@ -64,7 +65,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
         if (!BRIDGE_HUB.chainTypeManagerIsRegistered(_ctmAddress)) {
             revert CTMNotRegistered();
         }
-        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(
+        AssetRouterBase(address(L1_ASSET_ROUTER)).setAssetHandlerAddressThisChain(
             bytes32(uint256(uint160(_ctmAddress))),
             BRIDGE_HUB.chainAssetHandler()
         );
@@ -76,7 +77,7 @@ contract CTMDeploymentTracker is ICTMDeploymentTracker, Ownable2StepUpgradeable 
     /// @dev while `registerCTMAssetOnL1` is called during the ecosystem genesis process.
     /// @param _ctmAddress the address of the ctm asset.
     function setCtmAssetHandlerAddressOnL1(address _ctmAddress) external onlyOwner {
-        L1_ASSET_ROUTER.setAssetHandlerAddressThisChain(
+        AssetRouterBase(address(L1_ASSET_ROUTER)).setAssetHandlerAddressThisChain(
             bytes32(uint256(uint160(_ctmAddress))),
             BRIDGE_HUB.chainAssetHandler()
         );

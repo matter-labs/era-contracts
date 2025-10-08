@@ -14,6 +14,7 @@ import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {INativeTokenVaultBase} from "./INativeTokenVaultBase.sol";
 import {IAssetHandler} from "../interfaces/IAssetHandler.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "../asset-router/AssetRouterBase.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 
 import {BridgedStandardERC20} from "../BridgedStandardERC20.sol";
@@ -427,7 +428,10 @@ abstract contract NativeTokenVaultBase is
         tokenAddress[newAssetId] = _nativeToken;
         assetId[_nativeToken] = newAssetId;
         originChainId[newAssetId] = block.chainid;
-        _assetRouter().setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
+        AssetRouterBase(address(_assetRouter())).setAssetHandlerAddressThisChain(
+            bytes32(uint256(uint160(_nativeToken))),
+            address(this)
+        );
     }
 
     function _handleChainBalanceIncrease(
@@ -517,7 +521,7 @@ abstract contract NativeTokenVaultBase is
     function calculateCreate2TokenAddress(
         uint256 _tokenOriginChainId,
         address _bridgeToken
-    ) public view virtual override returns (address);
+    ) public view virtual returns (address);
 
     /// @notice Deploys and initializes the bridged token for the native counterpart.
     /// @param _tokenOriginChainId The chain id of the origin token.

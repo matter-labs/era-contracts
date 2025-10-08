@@ -8,7 +8,8 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/securi
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.sol";
 
-import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./asset-router/IAssetRouterBase.sol";
+import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION} from "./asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "./asset-router/AssetRouterBase.sol";
 import {IL1NativeTokenVault} from "./ntv/IL1NativeTokenVault.sol";
 
 import {IL1ERC20Bridge} from "./interfaces/IL1ERC20Bridge.sol";
@@ -426,7 +427,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
             }
         }
 
-        l1AssetRouter.finalizeDeposit(chainId, assetId, transferData);
+        AssetRouterBase(address(l1AssetRouter)).finalizeDeposit(chainId, assetId, transferData);
     }
 
     /// @dev Determines if an eth withdrawal was initiated on ZKsync Era before the upgrade to the Shared Bridge.
@@ -608,7 +609,7 @@ contract L1Nullifier is IL1Nullifier, ReentrancyGuard, Ownable2StepUpgradeable, 
                 _amount: amount,
                 _erc20Metadata: new bytes(0)
             });
-        } else if (bytes4(functionSignature) == IAssetRouterBase.finalizeDeposit.selector) {
+        } else if (bytes4(functionSignature) == AssetRouterBase.finalizeDeposit.selector) {
             // The data is expected to be at least 68 bytes long to contain assetId.
             if (_l2ToL1message.length < 68) {
                 revert WrongMsgLength(68, _l2ToL1message.length);
