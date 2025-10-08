@@ -3,7 +3,7 @@
 pragma solidity 0.8.28;
 
 import {BALANCE_CHANGE_VERSION, SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, INTEROP_BALANCE_CHANGE_VERSION} from "./IAssetTrackerBase.sol";
-import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, ConfirmBalanceMigrationData, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus} from "../../common/Messaging.sol";
+import {BUNDLE_IDENTIFIER, BalanceChange, InteropBalanceChange, ConfirmBalanceMigrationData, InteropBundle, InteropCall, L2Log, TokenBalanceMigrationData, TxStatus, AssetBalanceChange} from "../../common/Messaging.sol";
 import {L2_ASSET_ROUTER_ADDR, L2_ASSET_TRACKER_ADDR, L2_BASE_TOKEN_SYSTEM_CONTRACT, L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR, L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB, L2_CHAIN_ASSET_HANDLER, L2_COMPLEX_UPGRADER_ADDR, L2_INTEROP_HANDLER_ADDR, L2_COMPRESSOR_ADDR, L2_INTEROP_CENTER_ADDR, L2_KNOWN_CODE_STORAGE_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT, L2_NATIVE_TOKEN_VAULT, L2_NATIVE_TOKEN_VAULT_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, MAX_BUILT_IN_CONTRACT_ADDR, L2_ASSET_ROUTER} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {DataEncoding} from "../../common/libraries/DataEncoding.sol";
 import {IAssetRouterBase} from "../asset-router/IAssetRouterBase.sol";
@@ -253,7 +253,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                     // This Log is not supported
                     revert InvalidBuiltInContractMessage(logCount, msgCount - 1, log.key);
                 } else {
-                    address legacySharedBridge = legacySharedBridgeAddress[block.chainid];
+                    address legacySharedBridge = legacySharedBridgeAddress[_processLogsInputs.chainId];
                     if (log.key == bytes32(uint256(uint160(legacySharedBridge))) && legacySharedBridge != address(0)) {
                         _handleLegacySharedBridgeMessage(_processLogsInputs.chainId, message);
                     }
@@ -359,7 +359,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
                 revert InvalidInteropCalldata(bytes4(interopCall.data));
             }
             // solhint-disable-next-line
-            _processInteropCall(_chainId, bundleHash, callCount, interopCall, interopBundle.destinationChainId);
+            _processInteropCall(_chainId, bundleHash, interopCall, interopBundle.destinationChainId);
         }
         _decreaseChainBalance(_chainId, _baseTokenAssetId, totalBaseTokenAmount);
         interopBalanceChange[interopBundle.destinationChainId][bundleHash].baseTokenAmount = totalBaseTokenAmount;
@@ -368,7 +368,6 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     function _processInteropCall(
         uint256 _chainId,
         bytes32 _bundleHash,
-        uint256 _callCount,
         InteropCall memory _interopCall,
         uint256 _destinationChainId
     ) internal {
@@ -378,8 +377,11 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData);
 
-        interopBalanceChange[_destinationChainId][_bundleHash].assetBalanceChanges[_callCount].assetId = assetId;
-        interopBalanceChange[_destinationChainId][_bundleHash].assetBalanceChanges[_callCount].amount = amount;
+        AssetBalanceChange memory change = AssetBalanceChange({
+            assetId: assetId,
+            amount: amount
+        });
+        interopBalanceChange[_destinationChainId][_bundleHash].assetBalanceChanges.push(change);
     }
 
     function _handleInteropHandlerReceiveMessage(
