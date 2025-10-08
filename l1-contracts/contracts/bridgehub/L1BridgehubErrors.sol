@@ -24,6 +24,8 @@ error IncorrectChainAssetId(bytes32 assetId, bytes32 assetIdFromChainId);
 error IncorrectFunctionSignature();
 // 0xf5e39c1f
 error IncorrectSender(address prevMsgSender, address chainAdmin);
+// 0x47d42b1b
+error IteratedMigrationsNotSupported();
 // 0xc3bd3c65
 error LocallyNoChainsAtGenesis();
 // 0x913183d8

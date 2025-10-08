@@ -16,6 +16,7 @@ import {SERVICE_TRANSACTION_SENDER} from "contracts/common/Config.sol";
 
 import {InvalidCanonicalTxHash} from "contracts/bridge/asset-tracker/AssetTrackerErrors.sol";
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 contract GWAssetTrackerTest is Test {
     GWAssetTracker public gwAssetTracker;
@@ -56,6 +57,12 @@ contract GWAssetTrackerTest is Test {
         // Set up the contract
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         gwAssetTracker.setAddresses(L1_CHAIN_ID);
+
+        vm.mockCall(
+            L2_CHAIN_ASSET_HANDLER_ADDR,
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
+            abi.encode(1)
+        );
     }
 
     function test_SetAddresses() public {
@@ -82,16 +89,12 @@ contract GWAssetTrackerTest is Test {
             originToken: ORIGIN_TOKEN,
             tokenOriginChainId: ORIGIN_CHAIN_ID
         });
-
         vm.prank(L2_INTEROP_CENTER_ADDR);
         gwAssetTracker.handleChainBalanceIncreaseOnGateway(CHAIN_ID, CANONICAL_TX_HASH, balanceChange);
 
         // Check that chain balance was increased
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, ASSET_ID), AMOUNT);
         assertEq(gwAssetTracker.chainBalance(CHAIN_ID, BASE_TOKEN_ASSET_ID), BASE_TOKEN_AMOUNT);
-
-        // Check that unprocessed deposits was incremented
-        assertEq(gwAssetTracker.unprocessedDeposits(CHAIN_ID), 1);
 
         // Check that token was registered (these are internal mappings, so we can't test them directly)
         // The token registration happens in the _registerToken function

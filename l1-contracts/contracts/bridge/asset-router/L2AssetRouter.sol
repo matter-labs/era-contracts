@@ -292,7 +292,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // The _value parameter represents the amount being bridged and is encoded
         // as an ERC-7786 attribute to ensure proper value transfer in the interop call.
         bytes[] memory attributes = new bytes[](1);
-        attributes[0] = abi.encode(IERC7786Attributes.interopCallValue.selector, _value);
+        attributes[0] = abi.encodeCall(IERC7786Attributes.interopCallValue, _value);
         interopCallStarter = InteropCallStarter({
             to: InteroperableAddress.formatEvmV1(request.l2Contract),
             data: request.l2Calldata,

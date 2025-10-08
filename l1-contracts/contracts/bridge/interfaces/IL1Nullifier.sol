@@ -126,6 +126,9 @@ interface IL1Nullifier {
     /// @notice When verifying recursive proofs, we mark the transient settlement layer,
     /// this function retrieves the currently stored transient settlement layer chain ID.
     /// @dev The transient settlement layer is cleared at the end of each transaction.
+    /// @dev Note, that it is hard assumption that must be enforced by all the users of this function:
+    /// Any operations that reads this value, must be preceded by a successful invocation of L1Nullifier
+    /// that has set this value. Otherwise, it is possible that the same value is reused multiple times.
     /// @return The chain ID of the settlement layer that processed the current proof, or 0 if none is set.
     function getTransientSettlementLayer() external view returns (uint256, uint256);
 }

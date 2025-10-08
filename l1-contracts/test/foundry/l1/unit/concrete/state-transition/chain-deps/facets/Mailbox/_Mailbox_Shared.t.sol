@@ -66,7 +66,7 @@ contract MailboxTest is UtilsTest {
         );
         vm.mockCall(
             address(chainAssetHandler),
-            abi.encodeWithSelector(IChainAssetHandler.getMigrationNumber.selector),
+            abi.encodeWithSelector(IChainAssetHandler.migrationNumber.selector),
             abi.encode(1)
         );
         proxy = Utils.makeDiamondProxy(facetCuts, testnetVerifier, bridgehub);

@@ -60,7 +60,10 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     /// from the earlier ones.
     mapping(uint256 blockNumber => bytes32 globalMessageRoot) public historicalRoot;
 
-    /// We store the current batch number for each chain.
+    /// @notice The mapping from chainId to its current executed batch number.
+    /// @dev We store the current batch number for each chain once it upgrades to v30. This value is moved between settlement layers
+    /// during migration to ensure consistency. For now, only using a settlement layer from the same CTM is allowed,
+    /// so the value can be trusted on top of the settlement layer.
     mapping(uint256 chainId => uint256 currentChainBatchNumber) public currentChainBatchNumber;
 
     /// @notice The mapping from chainId to batchNumber to chainBatchRoot.
@@ -70,8 +73,20 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
     mapping(uint256 chainId => mapping(uint256 batchNumber => bytes32 chainRoot)) public chainBatchRoots;
 
     /// @notice The mapping storing the batch number at the moment the chain was updated to V30.
-    /// @notice We store this, as we did not store chainBatchRoots prior to V30 on L1, so we need to get them from the diamond proxies of the chains.
-    /// @notice We fill the mapping with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE for deployed chains until the chain upgrades to V30.
+    /// Starting from this batch, if a settlement layer has agreed to a proof, it will be held accountable for the content of the message, e.g.
+    /// if a withdrawal happens, the balance of the settlement layer will be reduced and not the chain.
+    /// @notice This is also the first batch starting from which we store batch roots on L1.
+    /// @notice Due to the definition above, this mapping will have the default value (0) for newly added chains, so all their batches are under v30 rules.
+    /// For chains that existed at the moment of the upgrade, its value will be populated either with V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE until
+    /// they call this contract to establish the batch when the upgrade has happened.
+    /// @notice Also, as a consequence of the above, the MessageRoot on a settlement layer will require that all messages after this batch go through the asset tracker
+    /// to ensure balance consistency.
+    /// @notice This value should contain the same value for both MessageRoot on L1 and on any settlement layer where the chain settles. This is ensured by the fact
+    /// that on the settlement layer the chain will provide its totalBatchesExecuted at the moment of upgrade, and only then the value will be moved to L1 and other settlement layers
+    /// via bridgeMint/bridgeBurn during migration.
+    /// @dev The attack that could be possible by a completely compromised chain is that it will provide an overly small `v30UpgradeChainBatchNumber` value and then migrate
+    /// to a settlement layer and then finalize messages that were not actually approved by the settlement layer. However, since before v30 release chains can only migrate within the same CTM,
+    /// this attack is not considered viable as the chains belong to the same CTM as the settlement layer and so the SL can trust their `getTotalBatchesExecuted` value.
     mapping(uint256 chainId => uint256 batchNumber) public v30UpgradeChainBatchNumber;
 
     /// @notice Checks that the message sender is the bridgehub or the chain asset handler.
@@ -105,6 +120,7 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             } else if (v30UpgradeChainBatchNumber[_chainId] != 0) {
                 address chain = IBridgehubBase(_bridgehub()).getZKChain(_chainId);
                 uint32 minor;
+                // slither-disable-next-line unused-return
                 (, minor, ) = IGetters(chain).getSemverProtocolVersion();
                 /// This might be a security issue if v29 has prover bugs. We should upgrade GW chains to v30 quickly.
                 require(msg.sender == chain, OnlyChain(msg.sender, chain));
@@ -319,6 +335,10 @@ abstract contract MessageRootBase is IMessageRoot, Initializable, MessageVerific
             revert DepthMoreThanOneForRecursiveMerkleProof();
         }
 
+        // Assuming that `settlementLayerChainId` is an honest chain, the `chainIdLeaf` should belong
+        // to a chain's message root only if the chain has indeed executed its batch on top of it.
+        //
+        // We trust all chains whitelisted by the Bridgehub governance.
         require(
             IBridgehubBase(_bridgehub()).whitelistedSettlementLayers(proofData.settlementLayerChainId),
             NotWhitelistedSettlementLayer(proofData.settlementLayerChainId)

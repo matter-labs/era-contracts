@@ -25,7 +25,7 @@ import {L2_INTEROP_CENTER_ADDR} from "../../../common/l2-helpers/L2ContractAddre
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
 import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, NotAssetRouter, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed} from "../../../common/L1ContractErrors.sol";
-import {DepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
+import {RequireDepositsPaused, LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 import {DepthMoreThanOneForRecursiveMerkleProof} from "../../../bridgehub/L1BridgehubErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -35,6 +35,8 @@ import {IL1AssetTracker} from "../../../bridge/asset-tracker/IL1AssetTracker.sol
 import {BALANCE_CHANGE_VERSION} from "../../../bridge/asset-tracker/IAssetTrackerBase.sol";
 import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.sol";
 import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../../bridgehub/IMessageRoot.sol";
+import {OnlyGateway} from "../../../bridgehub/L1BridgehubErrors.sol";
+import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -56,6 +58,13 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
+        }
+        _;
+    }
+
+    modifier onlyGateway() {
+        if (block.chainid == L1_CHAIN_ID) {
+            revert OnlyGateway();
         }
         _;
     }
@@ -315,8 +324,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         if (IBridgehubBase(s.bridgehub).getZKChain(_chainId) != msg.sender) {
             revert NotHyperchain();
         }
-        /// We pause L1->GW->L2 deposits.
-        require(_checkV30UpgradeProcessed(_chainId), DepositsPaused());
+        // We pause L1->GW->L2 deposits.
+        require(_checkV30UpgradeProcessed(_chainId), RequireDepositsPaused());
 
         BalanceChange memory balanceChange;
         if (_getBalanceChange) {
@@ -396,7 +405,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             });
     }
 
-    ///  @inheritdoc IMailboxImpl
+    /// @inheritdoc IMailboxImpl
     function requestL2ServiceTransaction(
         address _contractL2,
         bytes calldata _l2Calldata
@@ -427,6 +436,11 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
                 _getBalanceChange: false
             });
         }
+    }
+
+    function pauseDepositsOnGateway(uint256 _timestamp) external onlyGatewayAssetTracker onlyGateway {
+        s.pausedDepositsTimestamp = _timestamp;
+        emit IAdmin.DepositsPaused(s.chainId, _timestamp);
     }
 
     function _requestL2TransactionSender(
@@ -573,9 +587,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// @notice Deposits are paused when a chain migrates to/from GW.
     function _depositsPaused() internal view returns (bool) {
         uint256 timestamp = s.pausedDepositsTimestamp;
-        /// we provide 3.5 days window to process all deposits.
+        /// We provide 3.5 days window to process all deposits.
+        /// After that, the deposits are not being processed for 3.5 days.
         return
-            timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START < block.timestamp &&
+            timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
     }
 
@@ -603,7 +618,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) internal {
         _writePriorityOpHash(_canonicalTxHash, _expirationTimestamp);
 
-        require(!_depositsPaused(), DepositsPaused());
+        /// We only check deposits paused on L1 to keep the GW and L1 Priority queues the same.
+        if (block.chainid == L1_CHAIN_ID) {
+            require(!_depositsPaused(), RequireDepositsPaused());
+        }
 
         // Data that is needed for the operator to simulate priority queue offchain
         // solhint-disable-next-line func-named-parameters

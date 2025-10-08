@@ -21,7 +21,7 @@ use zksync_multivm::interface::{ExecutionResult, Halt};
 use zksync_types::bytecode::BytecodeHash;
 use zksync_types::system_contracts::get_system_smart_contracts_from_dir;
 use zksync_types::{
-    block::L2BlockHasher, u256_to_h256, Address, L1BatchNumber, L2BlockNumber, U256,
+    block::L2BlockHasher, settlement::SettlementLayer, u256_to_h256, Address, L1BatchNumber, L2BlockNumber, SLChainId, U256,
 };
 use zksync_types::{L2ChainId, Transaction};
 
@@ -93,6 +93,7 @@ fn execute_internal_bootloader_test() {
             max_virtual_blocks_to_create: 1,
             interop_roots: vec![],
         },
+        settlement_layer: SettlementLayer::L1(SLChainId(10)),
     };
 
     // First - get the number of tests.

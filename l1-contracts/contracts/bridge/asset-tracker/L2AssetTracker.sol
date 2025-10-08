@@ -21,7 +21,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
 
     bytes32 public BASE_TOKEN_ASSET_ID;
 
-    /// @notice We save the total supply of the token in the first deposit after chain migration. See _handleFinalizeBridgingOnL2Inner for details.
+    /// @notice We save the token balance in the first deposit after chain migration. For native tokens, this is the chainBalance; for foreign tokens, this is the total supply. See _handleFinalizeBridgingOnL2Inner for details.
     /// We need this to be able to migrate token balance to Gateway AssetTracker from the L1AssetTracker.
     mapping(uint256 migrationNumber => mapping(bytes32 assetId => SavedTotalSupply savedTotalSupply))
         internal savedTotalSupply;
@@ -54,6 +54,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         _;
     }
 
+    /// @notice Sets the L1 chain ID and base token asset ID for this L2 chain.
+    /// @dev This function is called during contract initialization or upgrades.
+    /// @param _l1ChainId The chain ID of the L1 network.
+    /// @param _baseTokenAssetId The asset ID of the base token used for gas fees on this chain.
     function setAddresses(uint256 _l1ChainId, bytes32 _baseTokenAssetId) external onlyUpgrader {
         L1_CHAIN_ID = _l1ChainId;
         BASE_TOKEN_ASSET_ID = _baseTokenAssetId;
@@ -85,15 +89,20 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     function _registerTokenOnL2(bytes32 _assetId) internal {
         /// If the chain is settling on Gateway, then withdrawals are not automatically allowed for new tokens.
         if (L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId()) {
-            assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.getMigrationNumber(block.chainid);
+            assetMigrationNumber[block.chainid][_assetId] = L2_CHAIN_ASSET_HANDLER.migrationNumber(block.chainid);
         }
     }
 
+    /// @notice Registers a legacy token on this L2 chain for backwards compatibility.
+    /// @dev This function is used during upgrades to ensure pre-V30 tokens continue to work.
+    /// @param _assetId The asset ID of the legacy token to register.
     function registerLegacyTokenOnChain(bytes32 _assetId) external onlyNativeTokenVault {
         _registerTokenOnL2(_assetId);
     }
 
-    /// @notice This function is used to migrate the token balance from the NTV to the AssetTracker for V30 upgrade.
+    /// @notice Migrates token balance tracking from NativeTokenVault to AssetTracker for V30 upgrade.
+    /// @dev This function calculates the correct chainBalance by accounting for tokens currently held in the NTV.
+    /// @dev The chainBalance represents how much of the token supply is "available" for bridging out.
     /// @param _assetId The asset id of the token to migrate the token balance for.
     function migrateTokenBalanceFromNTVV30(bytes32 _assetId) external {
         INativeTokenVaultBase ntv = _nativeTokenVault();
@@ -113,8 +122,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         maxChainBalanceAssigned[_assetId] = true;
 
         // Initialize chainBalance
+        // For origin chains, chainBalance starts at MAX_TOKEN_BALANCE and decreases as tokens are bridged out
+        // We need to account for tokens currently locked in the NTV from previous bridge operations
         uint256 ntvBalance = IERC20(tokenAddress).balanceOf(address(ntv));
+        // First, flip the existing chainBalance calculation (was tracking bridged out, now tracks available)
         chainBalance[originChainId][_assetId] = MAX_TOKEN_BALANCE - chainBalance[originChainId][_assetId];
+        // Then subtract tokens currently locked in NTV (these were already "bridged out" in pre-V30)
         chainBalance[originChainId][_assetId] -= ntvBalance;
     }
 
@@ -146,7 +159,7 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 savedAssetMigrationNumber = assetMigrationNumber[block.chainid][_assetId];
         /// Note we always allow bridging when settling on L1.
         /// On Gateway we require that the tokenBalance be migrated to Gateway from L1,
-        /// otherwise withdrawals might fail in the Gateway L2AssetTracker when the chain settles.
+        /// otherwise withdrawals might fail in the GWAssetTracker when the chain settles.
         require(
             savedAssetMigrationNumber == migrationNumber ||
                 L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() == _l1ChainId(),
@@ -154,12 +167,21 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         );
     }
 
+    /// @notice Handles the initiation of base token bridging operations on L2.
+    /// @dev This function is specifically for the chain's native base token used for gas payments.
+    /// @param _amount The amount of base tokens being bridged out.
     function handleInitiateBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         uint256 baseTokenOriginChainId = L2_NATIVE_TOKEN_VAULT.originChainId(baseTokenAssetId);
         _handleInitiateBridgingOnL2Inner(baseTokenAssetId, _amount, baseTokenOriginChainId);
     }
 
+    /// @notice Handles the finalization of incoming token bridging operations on L2.
+    /// @dev This function is called when tokens are bridged into this L2 from another chain.
+    /// @param _assetId The asset ID of the token being bridged in.
+    /// @param _amount The amount of tokens being bridged in.
+    /// @param _tokenOriginChainId The chain ID where this token was originally created.
+    /// @param _tokenAddress The contract address of the token on this chain.
     function handleFinalizeBridgingOnL2(
         bytes32 _assetId,
         uint256 _amount,
@@ -220,6 +242,9 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         }
     }
 
+    /// @notice Handles the finalization of incoming base token bridging operations on L2.
+    /// @dev This function is specifically for the chain's native base token used for gas payments.
+    /// @param _amount The amount of base tokens being bridged into this chain.
     function handleFinalizeBaseTokenBridgingOnL2(uint256 _amount) external onlyL2BaseTokenSystemContract {
         bytes32 baseTokenAssetId = BASE_TOKEN_ASSET_ID;
         if (_amount == 0) {
@@ -256,12 +281,12 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);
         address originalToken = L2_NATIVE_TOKEN_VAULT.originToken(_assetId);
 
-        uint256 migrationNumber = _getChainMigrationNumber(block.chainid);
-        if (migrationNumber == assetMigrationNumber[block.chainid][_assetId]) {
+        uint256 chainMigrationNumber = _getChainMigrationNumber(block.chainid);
+        if (chainMigrationNumber == assetMigrationNumber[block.chainid][_assetId]) {
             /// In this case the token was either already migrated, or the migration number was set using _forceSetAssetMigrationNumber.
             return;
         }
-        uint256 amount = _getOrSaveTotalSupply(_assetId, migrationNumber, originChainId, tokenAddress);
+        uint256 amount = _getOrSaveTotalSupply(_assetId, chainMigrationNumber, originChainId, tokenAddress);
 
         TokenBalanceMigrationData memory tokenBalanceMigrationData = TokenBalanceMigrationData({
             version: TOKEN_BALANCE_MIGRATION_DATA_VERSION,
@@ -269,13 +294,17 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
             assetId: _assetId,
             tokenOriginChainId: originChainId,
             amount: amount,
-            migrationNumber: migrationNumber,
+            chainMigrationNumber: chainMigrationNumber,
+            assetMigrationNumber: assetMigrationNumber[block.chainid][_assetId],
             originToken: originalToken,
             isL1ToGateway: true
         });
         _sendMigrationDataToL1(tokenBalanceMigrationData);
     }
 
+    /// @notice Confirms a migration operation has been completed and updates the asset migration number.
+    /// @dev This function is called by L1 after a migration has been processed to update local state.
+    /// @param data The migration confirmation data containing the asset ID and migration number.
     function confirmMigrationOnL2(ConfirmBalanceMigrationData calldata data) external onlyServiceTransactionSender {
         assetMigrationNumber[block.chainid][data.assetId] = data.migrationNumber;
     }
@@ -284,7 +313,11 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
                             Helper Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @dev We need to force set the asset migration number for newly deployed tokens.
+    /// @notice Determines if a token's migration number should be force-set during bridging operations.
+    /// @param _assetId The asset ID of the token to check.
+    /// @param _tokenOriginChainId The chain ID where this token originated.
+    /// @param _tokenAddress The contract address of the token on this chain.
+    /// @return bool True if the migration number should be force-set, false otherwise.
     function _needToForceSetAssetMigrationOnL2(
         bytes32 _assetId,
         uint256 _tokenOriginChainId,
@@ -299,12 +332,15 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
         return savedAssetMigrationNumber == 0 && amount == 0;
     }
 
+    /// @notice Retrieves the token contract address for a given asset ID.
+    /// @param _assetId The asset ID to look up.
+    /// @return tokenAddress The contract address of the token.
     function _tryGetTokenAddress(bytes32 _assetId) internal view returns (address tokenAddress) {
         tokenAddress = L2_NATIVE_TOKEN_VAULT.tokenAddress(_assetId);
         require(tokenAddress != address(0), AssetIdNotRegistered(_assetId));
     }
 
     function _getChainMigrationNumber(uint256 _chainId) internal view override returns (uint256) {
-        return L2_CHAIN_ASSET_HANDLER.getMigrationNumber(_chainId);
+        return L2_CHAIN_ASSET_HANDLER.migrationNumber(_chainId);
     }
 }
