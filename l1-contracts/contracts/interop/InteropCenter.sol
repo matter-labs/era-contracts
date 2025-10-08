@@ -328,7 +328,7 @@ contract InteropCenter is
         _ensureCorrectTotalValue(bundle.destinationChainId, totalBurnedCallsValue, totalIndirectCallsValue);
 
         bytes32 msgHash;
-        /// to avoid stack too deep error
+        /// To avoid stack too deep error
         {
             bytes memory interopBundleBytes = abi.encode(bundle);
 
