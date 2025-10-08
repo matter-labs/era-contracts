@@ -377,10 +377,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
 
         uint256 amount = _handleAssetRouterMessageInner(_chainId, _destinationChainId, assetId, transferData);
 
-        AssetBalanceChange memory change = AssetBalanceChange({
-            assetId: assetId,
-            amount: amount
-        });
+        AssetBalanceChange memory change = AssetBalanceChange({assetId: assetId, amount: amount});
         interopBalanceChange[_destinationChainId][_bundleHash].assetBalanceChanges.push(change);
     }
 
