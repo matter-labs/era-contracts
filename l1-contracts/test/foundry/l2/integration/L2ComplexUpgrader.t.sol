@@ -14,7 +14,6 @@ contract L2ComplexUpgraderTest is Test {
     MockContract public dummyUpgrade;
 
     function setUp() public {
-        //L2ComplexUpgrader l2ComplexUpgrader = new L2ComplexUpgrader();
         bytes memory code = Utils.readZKFoundryBytecodeL1("L2ComplexUpgrader.sol", "L2ComplexUpgrader");
         vm.etch(L2_COMPLEX_UPGRADER_ADDR, code);
         dummyUpgrade = new MockContract();
