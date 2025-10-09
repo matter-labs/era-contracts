@@ -1849,7 +1849,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             return abi.encode();
         } else if (compareStrings(contractName, "EraVerifierPlonk")) {
             return abi.encode();
-        }  else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();

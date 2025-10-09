@@ -387,7 +387,9 @@ contract GatewayCTMFromL1 is Script {
             _deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierFflonk"), hex"")
         );
         console.log("EraVerifierFflonk deployed at", verifierFflonk);
-        address verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierPlonk"), hex""));
+        address verifierPlonk = address(
+            _deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierPlonk"), hex"")
+        );
         console.log("EraVerifierPlonk deployed at", verifierPlonk);
 
         if (config.testnetVerifier) {
