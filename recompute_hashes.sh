@@ -9,7 +9,7 @@ EXPECTED_COMMIT="362c9aa7c"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
-  echo "Foundry is not installed. Please install it using \"foundryup-zksync --i 0.0.29\"."
+  echo "Foundry is not installed. Please install it using \"foundryup-zksync -i 0.0.29\"."
   exit 1
 fi
 
@@ -22,7 +22,7 @@ if [[ "$FORGE_VERSION" != "$EXPECTED_VERSION" ]]; then
   echo "Incorrect Foundry version."
   echo "Expected: ${EXPECTED_VERSION}"
   echo "Found:    ${FORGE_VERSION}"
-  echo "Run: foundryup-zksync --i 0.0.29"
+  echo "Run: foundryup-zksync -i 0.0.29"
   exit 1
 fi
 
