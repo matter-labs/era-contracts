@@ -13,8 +13,8 @@ import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.so
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
 import {DualVerifier} from "../verifiers/DualVerifier.sol";
-import {VerifierFflonk} from "../verifiers/VerifierFflonk.sol";
-import {VerifierPlonk} from "../verifiers/VerifierPlonk.sol";
+import {VerifierFflonk} from "../verifiers/Era_VerifierFflonk.sol";
+import {VerifierPlonk} from "../verifiers/Era_VerifierPlonk.sol";
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";

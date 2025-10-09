@@ -2,7 +2,7 @@
 
 pragma solidity 0.8.28;
 
-import {VerifierPlonk} from "../../state-transition/verifiers/VerifierPlonk.sol";
+import {VerifierPlonk} from "../../state-transition/verifiers/Era_VerifierPlonk.sol";
 
 /// @author Matter Labs
 contract PlonkVerifierRecursiveTest is VerifierPlonk {

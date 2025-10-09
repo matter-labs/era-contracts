@@ -3,7 +3,7 @@ pragma solidity 0.8.28;
 
 import {Test} from "forge-std/Test.sol";
 
-import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
+import {VerifierPlonk} from "contracts/state-transition/verifiers/Era_VerifierPlonk.sol";
 import {PlonkVerifierTest} from "contracts/dev-contracts/test/PlonkVerifierTest.sol";
 
 contract PlonkVerifierTestTest is Test {
