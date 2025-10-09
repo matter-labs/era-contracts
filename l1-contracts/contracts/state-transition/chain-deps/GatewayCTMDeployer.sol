@@ -13,8 +13,8 @@ import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.so
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
 import {DualVerifier} from "../verifiers/DualVerifier.sol";
-import {VerifierFflonk} from "../verifiers/Era_VerifierFflonk.sol";
-import {VerifierPlonk} from "../verifiers/Era_VerifierPlonk.sol";
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
@@ -299,9 +299,9 @@ contract GatewayCTMDeployer {
         DeployedContracts memory _deployedContracts,
         address _verifierOwner
     ) internal {
-        VerifierFflonk fflonkVerifier = new VerifierFflonk{salt: _salt}();
+        EraVerifierFflonk fflonkVerifier = new EraVerifierFflonk{salt: _salt}();
         _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);
-        VerifierPlonk verifierPlonk = new VerifierPlonk{salt: _salt}();
+        EraVerifierPlonk verifierPlonk = new EraVerifierPlonk{salt: _salt}();
         _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(

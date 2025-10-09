@@ -410,9 +410,13 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     addresses.stateTransition.verifierPlonk,
                     config.ownerAddress
                 );
-        } else if (compareStrings(contractName, "VerifierFflonk")) {
+        } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
+        } else if (compareStrings(contractName, "EraVerifierPlonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "DefaultUpgrade")) {
             return abi.encode();

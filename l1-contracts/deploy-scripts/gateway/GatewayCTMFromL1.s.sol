@@ -382,12 +382,13 @@ contract GatewayCTMFromL1 is Script {
     }
 
     function deployGatewayVerifier() internal returns (address verifier) {
+        // vg todo depend on zksync os flag?
         address verifierFflonk = address(
-            _deployInternal(ContractsBytecodesLib.getCreationCode("VerifierFflonk"), hex"")
+            _deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierFflonk"), hex"")
         );
-        console.log("VerifierFflonk deployed at", verifierFflonk);
-        address verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("VerifierPlonk"), hex""));
-        console.log("VerifierPlonk deployed at", verifierPlonk);
+        console.log("EraVerifierFflonk deployed at", verifierFflonk);
+        address verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierPlonk"), hex""));
+        console.log("EraVerifierPlonk deployed at", verifierPlonk);
 
         if (config.testnetVerifier) {
             verifier = address(

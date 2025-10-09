@@ -187,8 +187,9 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     }
 
     function deployVerifiers() internal {
-        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
-        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
+        // vg todo depend on zksync os flag?
+        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("EraVerifierFflonk", false);
+        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("EraVerifierPlonk", false);
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
     }
 
