@@ -4,8 +4,8 @@
 set -e
 
 # Expected Foundry version and commit
-EXPECTED_VERSION="forge 0.0.4"
-EXPECTED_COMMIT="ae913af65"
+EXPECTED_VERSION="forge Version: 1.3.5-foundry-zksync-v0.0.29"
+EXPECTED_COMMIT="362c9aa7c41962ac7af5133c71095fd82986d6cf"
 
 # Check if Foundry is installed
 if ! command -V forge &> /dev/null; then
@@ -16,8 +16,8 @@ fi
 # Get installed Foundry version (first line only)
 FORGE_OUTPUT=$(forge --version | head -n 1)
 
-# Accept anything that begins with: "${EXPECTED_VERSION} (${EXPECTED_COMMIT}"
-EXPECTED_PREFIX="${EXPECTED_VERSION} (${EXPECTED_COMMIT}"
+# Accept anything that begins with: "${EXPECTED_VERSION}"
+EXPECTED_PREFIX="${EXPECTED_VERSION}"
 if [[ "$FORGE_OUTPUT" != "$EXPECTED_PREFIX"* ]]; then
   echo "Incorrect Foundry version."
   echo "Expected something starting with: ${EXPECTED_PREFIX}"
