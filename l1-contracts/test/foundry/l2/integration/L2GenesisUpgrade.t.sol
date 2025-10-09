@@ -99,8 +99,8 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
             })
         );
 
-        bytes memory interopRootBytecode = Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
-        bytes memory messageRootBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(interopRootBytecode));
+        bytes memory messageRootBytecode = Utils.readZKFoundryBytecodeL1("L2MessageRoot.sol", "L2MessageRoot");
+        bytes memory messageRootBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(messageRootBytecode));
 
         bytes memory l2NativeTokenVaultBytecode = Utils.readZKFoundryBytecodeL1(
             "L2NativeTokenVault.sol",
