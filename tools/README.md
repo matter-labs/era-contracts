@@ -13,7 +13,7 @@ cargo run --bin zksync_verifier_contract_generator --release -- --variant era
 
 This will:
 - Use input files: `data/Era_plonk_scheduler_key.json`, `data/Era_fflonk_scheduler_key.json`
-- Generate outputs: `data/Era_VerifierPlonk.sol`, `data/Era_VerifierFflonk.sol`
+- Generate outputs: `data/EraVerifierPlonk.sol`, `data/EraVerifierFflonk.sol`
 
 ### 2. ZKsyncOS Variant
 Automatically uses ZKsyncOS-prefixed key files and generates ZKsyncOS-prefixed output files:
@@ -24,7 +24,7 @@ cargo run --bin zksync_verifier_contract_generator --release -- --variant zksync
 
 This will:
 - Use input files: `data/ZKsyncOS_plonk_scheduler_key.json`, `data/ZKsyncOS_fflonk_scheduler_key.json`
-- Generate outputs: `data/ZKsyncOS_VerifierPlonk.sol`, `data/ZKsyncOS_VerifierFflonk.sol`
+- Generate outputs: `data/ZKsyncOSVerifierPlonk.sol`, `data/ZKsyncOSVerifierFflonk.sol`
 
 ### 3. Custom Variant (Default)
 Allows specifying custom paths for both input and output files:

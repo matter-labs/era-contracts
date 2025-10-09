@@ -79,14 +79,14 @@ fn resolve_paths(opt: &Opt) -> (String, String, String, String) {
         Variant::Era => (
             "data/Era_plonk_scheduler_key.json".to_string(),
             "data/Era_fflonk_scheduler_key.json".to_string(),
-            "data/Era_VerifierPlonk.sol".to_string(),
-            "data/Era_VerifierFflonk.sol".to_string(),
+            "data/EraVerifierPlonk.sol".to_string(),
+            "data/EraVerifierFflonk.sol".to_string(),
         ),
         Variant::ZKsyncOS => (
             "data/ZKsyncOS_plonk_scheduler_key.json".to_string(),
             "data/ZKsyncOS_fflonk_scheduler_key.json".to_string(),
-            "data/ZKsyncOS_VerifierPlonk.sol".to_string(),
-            "data/ZKsyncOS_VerifierFflonk.sol".to_string(),
+            "data/ZKsyncOSVerifierPlonk.sol".to_string(),
+            "data/ZKsyncOSVerifierFflonk.sol".to_string(),
         ),
         Variant::Custom => (
             opt.plonk_input_path.clone(),
@@ -97,10 +97,19 @@ fn resolve_paths(opt: &Opt) -> (String, String, String, String) {
     }
 }
 
+fn resolve_contract_name(variant: &Variant) -> String {
+    match variant {
+        Variant::Era => "Era".to_string(),
+        Variant::ZKsyncOS => "ZKsyncOS".to_string(),
+        Variant::Custom => "".to_string(),
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
     let (plonk_input_path, fflonk_input_path, plonk_output_path, fflonk_output_path) = resolve_paths(&opt);
+    let contract_name = resolve_contract_name(&opt.variant);
 
     let plonk_reader = BufReader::new(File::open(&plonk_input_path)?);
     let fflonk_reader = BufReader::new(File::open(&fflonk_input_path)?);
@@ -135,12 +144,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         &plonk_verifier_contract_template,
         &plonk_vk,
         &plonk_vk_hash,
+        &contract_name,
     )?;
 
     let fflonk_verifier_contract_template = fflonk_insert_residue_elements_and_commitments(
         &fflonk_verifier_contract_template,
         &fflonk_vk,
         &fflonk_vk_hash,
+        &contract_name,
     )?;
 
     let mut plonk_file = File::create(plonk_output_path)?;
