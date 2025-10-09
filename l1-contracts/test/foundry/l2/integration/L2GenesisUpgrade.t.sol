@@ -130,7 +130,7 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
 
         fixedForceDeploymentsData = abi.encode(
             FixedForceDeploymentsData({
-                l1ChainId: 10,
+                l1ChainId: 1,
                 eraChainId: CHAIN_ID,
                 l1AssetRouter: address(1),
                 l2TokenProxyBytecodeHash: bytes32(0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70),
