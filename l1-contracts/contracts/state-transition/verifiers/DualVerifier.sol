@@ -90,12 +90,22 @@ contract DualVerifier is IVerifier {
         }
 
         if (verifierType == FFLONK_VERIFICATION_TYPE) {
+            if (fflonkVerifiers[verifierVersion] == IVerifierV2(address(0))) {
+                revert UnknownVerifierVersion();
+            }
             return fflonkVerifiers[verifierVersion].verify(_publicInputs, _extractProof(_proof));
         } else if (verifierType == PLONK_VERIFICATION_TYPE) {
+            if (plonkVerifiers[verifierVersion] == IVerifier(address(0))) {
+                revert UnknownVerifierVersion();
+            }
             return plonkVerifiers[verifierVersion].verify(_publicInputs, _extractProof(_proof));
         } else if (verifierType == OHBENDER_PLONK_VERIFICATION_TYPE) {
             uint256[] memory args = new uint256[](1);
             args[0] = computeOhBenderHash(_proof[1], _publicInputs);
+
+            if (plonkVerifiers[verifierVersion] == IVerifier(address(0))) {
+                revert UnknownVerifierVersion();
+            }
 
             return plonkVerifiers[verifierVersion].verify(args, _extractOhBenderProof(_proof));
         } else if (verifierType == OHBENDER_MOCK_VERIFICATION_TYPE) {
