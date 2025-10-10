@@ -186,10 +186,9 @@ contract GWAssetTrackerTest is Test {
     }
 
     function test_emptyRootEquivalence() public {
-        bytes32 emptyRoot = gwAssetTracker.getEmptyMessageRoot(271);
-        console.logBytes32(emptyRoot);
+        bytes32 emptyRoot = gwAssetTracker.getEmptyMessageRoot(CHAIN_ID);
 
-        vm.chainId(271);
+        vm.chainId(CHAIN_ID);
         L2MessageRoot dummyL2MessageRoot = new L2MessageRoot();
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         dummyL2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
