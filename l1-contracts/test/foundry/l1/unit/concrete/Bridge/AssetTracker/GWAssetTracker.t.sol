@@ -3,7 +3,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-
+import {console2 as console} from "forge-std/console2.sol";
 import {GWAssetTracker} from "contracts/bridge/asset-tracker/GWAssetTracker.sol";
 
 import {BalanceChange, ConfirmBalanceMigrationData} from "contracts/common/Messaging.sol";
@@ -18,8 +18,16 @@ import {InvalidCanonicalTxHash} from "contracts/bridge/asset-tracker/AssetTracke
 import {Unauthorized} from "contracts/common/L1ContractErrors.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
+import {L2MessageRoot} from "contracts/bridgehub/L2MessageRoot.sol";
+
+contract GWAssetTrackerTestHelper is GWAssetTracker {
+    function getEmptyMessageRoot(uint256 _chainId) external returns (bytes32) {
+        return _getEmptyMessageRoot(_chainId);
+    }
+}
+
 contract GWAssetTrackerTest is Test {
-    GWAssetTracker public gwAssetTracker;
+    GWAssetTrackerTestHelper public gwAssetTracker;
     address public mockBridgehub;
     address public mockMessageRoot;
     address public mockNativeTokenVault;
@@ -38,8 +46,8 @@ contract GWAssetTrackerTest is Test {
     uint256 public constant BASE_TOKEN_AMOUNT = 500;
 
     function setUp() public {
-        // Deploy GWAssetTracker
-        gwAssetTracker = new GWAssetTracker();
+        // Deploy GWAssetTrackerTestHelper
+        gwAssetTracker = new GWAssetTrackerTestHelper();
 
         // Create mock addresses
         mockBridgehub = makeAddr("mockBridgehub");
@@ -175,5 +183,17 @@ contract GWAssetTrackerTest is Test {
         assertEq(fromChainId, CHAIN_ID);
         assertEq(assetId, ASSET_ID);
         assertEq(transferData, abi.encode("transferData"));
+    }
+
+    function test_emptyRootEquivalence() public {
+        bytes32 emptyRoot = gwAssetTracker.getEmptyMessageRoot(271);
+        console.logBytes32(emptyRoot);
+
+        vm.chainId(271);
+        L2MessageRoot dummyL2MessageRoot = new L2MessageRoot();
+        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+        dummyL2MessageRoot.initL2(L1_CHAIN_ID, block.chainid);
+
+        assertEq(dummyL2MessageRoot.getAggregatedRoot(), emptyRoot);
     }
 }
