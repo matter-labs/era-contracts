@@ -110,34 +110,37 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         );
         bytes memory l2NtvBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(l2NativeTokenVaultBytecode));
 
-        bytes memory l2AssetRouterBytecode = Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter");
-        bytes memory l2AssetRouterBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(l2AssetRouterBytecode));
-
-        bytes memory bridgehubBytecode = Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub");
-        bytes memory bridgehubBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(bridgehubBytecode));
-
-        bytes memory chainAssetHandlerBytecode = Utils.readZKFoundryBytecodeL1(
-            "L2ChainAssetHandler.sol",
-            "L2ChainAssetHandler"
+        bytes memory l2AssetRouterBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2AssetRouter.sol", "L2AssetRouter"))
         );
+
+        bytes memory bridgehubBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2Bridgehub.sol", "L2Bridgehub"))
+        );
+
         bytes memory chainAssetHandlerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(chainAssetHandlerBytecode)
+            L2ContractHelper.hashL2Bytecode(
+                Utils.readZKFoundryBytecodeL1("L2ChainAssetHandler.sol", "L2ChainAssetHandler")
+            )
         );
 
-        bytes memory beaconDeployerBytecode = Utils.readZKFoundryBytecodeL1(
-            "UpgradeableBeaconDeployer.sol",
-            "UpgradeableBeaconDeployer"
+        bytes memory beaconDeployerBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(
+                Utils.readZKFoundryBytecodeL1("UpgradeableBeaconDeployer.sol", "UpgradeableBeaconDeployer")
+            )
         );
-        bytes memory beaconDeployerBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(beaconDeployerBytecode));
 
-        bytes memory interopCenterBytecode = Utils.readZKFoundryBytecodeL1("InteropCenter.sol", "InteropCenter");
-        bytes memory interopCenterBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(interopCenterBytecode));
+        bytes memory interopCenterBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("InteropCenter.sol", "InteropCenter"))
+        );
 
-        bytes memory interopHandlerBytecode = Utils.readZKFoundryBytecodeL1("InteropHandler.sol", "InteropHandler");
-        bytes memory interopHandlerBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(interopHandlerBytecode));
+        bytes memory interopHandlerBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("InteropHandler.sol", "InteropHandler"))
+        );
 
-        bytes memory assetTrackerBytecode = Utils.readZKFoundryBytecodeL1("AssetTracker.sol", "AssetTracker");
-        bytes memory assetTrackerBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(assetTrackerBytecode));
+        bytes memory assetTrackerBytecodeInfo = abi.encode(
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("AssetTracker.sol", "AssetTracker"))
+        );
 
         fixedForceDeploymentsData = abi.encode(
             FixedForceDeploymentsData({
