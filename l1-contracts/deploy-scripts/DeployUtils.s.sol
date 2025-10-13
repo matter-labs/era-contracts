@@ -420,10 +420,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
                         );
                 } else {
                     return
-                        abi.encode(
-                            addresses.stateTransition.verifierFflonk,
-                            addresses.stateTransition.verifierPlonk
-                        );
+                        abi.encode(addresses.stateTransition.verifierFflonk, addresses.stateTransition.verifierPlonk);
                 }
             }
         } else if (compareStrings(contractName, "EraVerifierFflonk")) {
