@@ -408,15 +408,27 @@ contract GatewayCTMFromL1 is Script {
 
         if (config.testnetVerifier) {
             verifier = address(
-                _deployInternal(ContractsBytecodesLib.getCreationCode("TestnetVerifier"), abi.encode(config.l1ChainId))
-            );
-        } else {
-            verifier = address(
                 _deployInternal(
-                    ContractsBytecodesLib.getCreationCode("DualVerifier"),
-                    abi.encode(verifierFflonk, verifierPlonk)
+                    ContractsBytecodesLib.getCreationCode("TestnetVerifier"),
+                    abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr, config.isZKsyncOS)
                 )
             );
+        } else {
+            if (config.isZKsyncOS) {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("ZKsyncOSDualVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk, config.governanceAddr)
+                    )
+                );
+            } else {
+                verifier = address(
+                    _deployInternal(
+                        ContractsBytecodesLib.getCreationCode("EraDualVerifier"),
+                        abi.encode(verifierFflonk, verifierPlonk)
+                    )
+                );
+            }
         }
 
         console.log("Verifier deployed at", verifier);

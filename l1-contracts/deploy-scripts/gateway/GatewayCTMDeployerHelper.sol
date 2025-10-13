@@ -225,12 +225,21 @@ library GatewayCTMDeployerHelper {
                 innerConfig
             );
         } else {
-            _deployedContracts.stateTransition.verifier = _deployInternal(
-                "DualVerifier",
-                "DualVerifier.sol",
-                constructorParams,
-                innerConfig
-            );
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = _deployInternal(
+                    "ZKsyncOSDualVerifier",
+                    "ZKsyncOSDualVerifier.sol",
+                    constructorParams,
+                    innerConfig
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = _deployInternal(
+                    "EraDualVerifier",
+                    "EraDualVerifier.sol",
+                    constructorParams,
+                    innerConfig
+                );
+            }
         }
         return _deployedContracts;
     }

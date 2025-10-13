@@ -2,7 +2,8 @@
 
 pragma solidity 0.8.28;
 
-import {DualVerifier} from "./DualVerifier.sol";
+import {EraDualVerifier} from "./EraDualVerifier.sol";
+import {ZKsyncOSDualVerifier} from "./ZKsyncOSDualVerifier.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 
@@ -12,13 +13,17 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// @dev This contract is used to skip the zkp verification for the testnet environment.
 /// If the proof is not empty, it will verify it using the main verifier contract,
 /// otherwise, it will skip the verification.
-contract TestnetVerifier is DualVerifier {
-    constructor(
-        IVerifierV2 _fflonkVerifier,
-        IVerifier _plonkVerifier,
-        address _ctmOwner
-    ) DualVerifier(_fflonkVerifier, _plonkVerifier, _ctmOwner) {
+contract TestnetVerifier is IVerifier {
+    IVerifier public immutable dualVerifier;
+
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address /* _ctmOwner */, bool _isZKsyncOS) {
         assert(block.chainid != 1);
+
+        if (_isZKsyncOS) {
+            dualVerifier = new ZKsyncOSDualVerifier(_fflonkVerifier, _plonkVerifier, address(this));
+        } else {
+            dualVerifier = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
+        }
     }
 
     /// @dev Verifies a zk-SNARK proof, skipping the verification if the proof is empty.
@@ -30,6 +35,11 @@ contract TestnetVerifier is DualVerifier {
             return true;
         }
 
-        return super.verify(_publicInputs, _proof);
+        return dualVerifier.verify(_publicInputs, _proof);
+    }
+
+    /// @inheritdoc IVerifier
+    function verificationKeyHash() external view override returns (bytes32) {
+        return dualVerifier.verificationKeyHash();
     }
 }

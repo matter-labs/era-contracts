@@ -75,7 +75,7 @@ contract GatewayCTMDeployerTest is Test {
         new EraVerifierFflonk();
         new EraVerifierPlonk();
 
-        new TestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)), address(0));
+        new TestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)), address(0), false);
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();
@@ -92,6 +92,7 @@ contract GatewayCTMDeployerTest is Test {
             eraChainId: 1001,
             l1ChainId: 1,
             testnetVerifier: true,
+            isZKsyncOS: false,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),

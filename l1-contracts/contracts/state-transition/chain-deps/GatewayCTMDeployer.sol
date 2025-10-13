@@ -12,13 +12,15 @@ import {RollupDAManager} from "../data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
-import {DualVerifier} from "../verifiers/DualVerifier.sol";
+import {EraDualVerifier} from "../verifiers/EraDualVerifier.sol";
+import {ZKsyncOSDualVerifier} from "../verifiers/ZKsyncOSDualVerifier.sol";
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
 import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
+import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
@@ -321,12 +323,27 @@ contract GatewayCTMDeployer {
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(IVerifier(fflonkVerifier), IVerifier(verifierPlonk), _verifierOwner)
+                new TestnetVerifier{salt: _salt}(
+                    IVerifierV2(fflonkVerifier),
+                    IVerifier(verifierPlonk),
+                    _verifierOwner,
+                    _isZKsyncOS
+                )
             );
         } else {
-            _deployedContracts.stateTransition.verifier = address(
-                new DualVerifier{salt: _salt}(IVerifier(fflonkVerifier), IVerifier(verifierPlonk), _verifierOwner)
-            );
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = address(
+                    new ZKsyncOSDualVerifier{salt: _salt}(
+                        IVerifierV2(fflonkVerifier),
+                        IVerifier(verifierPlonk),
+                        _verifierOwner
+                    )
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = address(
+                    new EraDualVerifier{salt: _salt}(IVerifierV2(fflonkVerifier), IVerifier(verifierPlonk))
+                );
+            }
         }
     }
 

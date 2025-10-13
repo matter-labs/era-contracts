@@ -24,7 +24,8 @@ import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
+import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
+import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
 import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
@@ -130,7 +131,11 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 if (config.testnetVerifier) {
                     return type(TestnetVerifier).creationCode;
                 } else {
-                    return type(DualVerifier).creationCode;
+                    if (config.isZKsyncOS) {
+                        return type(ZKsyncOSDualVerifier).creationCode;
+                    } else {
+                        return type(EraDualVerifier).creationCode;
+                    }
                 }
             } else if (compareStrings(contractName, "EraVerifierFflonk")) {
                 return type(EraVerifierFflonk).creationCode;
