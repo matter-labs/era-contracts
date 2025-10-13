@@ -30,7 +30,6 @@ import {ChainTypeManager} from "../ChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
-import {MockEIP7702Checker} from "../../dev-contracts/MockEIP7702Checker.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -180,7 +179,7 @@ contract GatewayCTMDeployer {
         DeployedContracts memory contracts;
 
         contracts.multicall3 = address(new Multicall3{salt: salt}());
-        contracts.eip7702Checker = address(new MockEIP7702Checker{salt: salt}());
+        contracts.eip7702Checker = address(0);
 
         _deployFacetsAndUpgrades({
             _salt: salt,

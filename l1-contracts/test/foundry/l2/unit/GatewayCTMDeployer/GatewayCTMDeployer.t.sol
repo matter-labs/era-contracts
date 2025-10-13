@@ -8,7 +8,6 @@ import {console2 as console} from "forge-std/Script.sol";
 import {DAContracts, DeployedContracts, GatewayCTMDeployer, GatewayCTMDeployerConfig, StateTransitionContracts} from "contracts/state-transition/chain-deps/GatewayCTMDeployer.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {IEIP7702Checker} from "contracts/state-transition/chain-interfaces/IEIP7702Checker.sol";
-import {MockEIP7702Checker} from "contracts/dev-contracts/MockEIP7702Checker.sol";
 
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
@@ -60,7 +59,7 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1, 1, IEIP7702Checker(address(1)));
+        new MailboxFacet(1, 1, IEIP7702Checker(address(0)));
         new ExecutorFacet(1);
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));
@@ -80,7 +79,6 @@ contract GatewayCTMDeployerTest is Test {
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();
-        new MockEIP7702Checker();
 
         // This call will likely fail due to various checks, but we just need to get the bytecode published
         try new TransparentUpgradeableProxy(address(0), address(0), hex"") {} catch {}

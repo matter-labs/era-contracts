@@ -25,7 +25,7 @@ import {L2_BOOTLOADER_ADDRESS, L2_BRIDGEHUB_ADDR} from "../../../common/l2-helpe
 
 import {IL1AssetRouter} from "../../../bridge/asset-router/IL1AssetRouter.sol";
 
-import {BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
+import {AddressNotZero, BaseTokenGasPriceDenominatorNotSet, BatchNotExecuted, GasPerPubdataMismatch, InvalidChainId, MsgValueTooLow, OnlyEraSupported, TooManyFactoryDeps, TransactionNotAllowed, ZeroAddress} from "../../../common/L1ContractErrors.sol";
 import {LocalRootIsZero, LocalRootMustBeZero, NotHyperchain, NotL1, NotSettlementLayer} from "../../L1StateTransitionErrors.sol";
 
 // While formally the following import is not used, it is needed to inherit documentation from it
@@ -60,8 +60,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     }
 
     constructor(uint256 _eraChainId, uint256 _l1ChainId, IEIP7702Checker _eip7702Checker) {
-        if (address(_eip7702Checker) == address(0)) {
+        if (address(_eip7702Checker) == address(0) && block.chainid == _l1ChainId) {
             revert ZeroAddress();
+        } else if (address(_eip7702Checker) != address(0) && block.chainid != _l1ChainId) {
+            revert AddressNotZero();
         }
         ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
@@ -455,8 +457,14 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
             revert MsgValueTooLow(baseCost + request.l2Value, request.mintValue);
         }
 
-        bool is7702AccountRefundRecipient = EIP_7702_CHECKER.isEIP7702Account(request.refundRecipient);
-        bool is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during TwoBridges.
+        bool is7702AccountRefundRecipient = false;
+        bool is7702AccountSender = false;
+
+        if (block.chainid == L1_CHAIN_ID) {
+            is7702AccountRefundRecipient = EIP_7702_CHECKER.isEIP7702Account(request.refundRecipient);
+            is7702AccountSender = EIP_7702_CHECKER.isEIP7702Account(request.sender); // This is not the same as refundRecipient, as it appears to be the AR during TwoBridges.
+        }
+
         request.refundRecipient = AddressAliasHelper.actualRefundRecipientMailbox(
             request.refundRecipient,
             request.sender,
