@@ -61,7 +61,13 @@ library GatewayCTMDeployerHelper {
             contracts,
             innerConfig
         );
-        contracts = _deployVerifier(config.testnetVerifier, contracts, innerConfig, config.aliasedGovernanceAddress);
+        contracts = _deployVerifier(
+            config.testnetVerifier,
+            config.isZKsyncOS,
+            contracts,
+            innerConfig,
+            config.aliasedGovernanceAddress
+        );
 
         contracts.stateTransition.validatorTimelockImplementation = _deployInternal(
             "ValidatorTimelock",
@@ -185,13 +191,26 @@ library GatewayCTMDeployerHelper {
 
     function _deployVerifier(
         bool _testnetVerifier,
+        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
         address _verifierOwner
     ) internal returns (DeployedContracts memory) {
-        // vg todo depend on zksync os flag?
-        address verifierFflonk = _deployInternal("EraVerifierFflonk", "EraVerifierFflonk.sol", hex"", innerConfig);
-        address verifierPlonk = _deployInternal("EraVerifierPlonk", "EraVerifierPlonk.sol", hex"", innerConfig);
+        address verifierFflonk;
+        address verifierPlonk;
+
+        if (_isZKsyncOS) {
+            verifierFflonk = _deployInternal(
+                "ZKsyncOSVerifierFflonk",
+                "ZKsyncOSVerifierFflonk.sol",
+                hex"",
+                innerConfig
+            );
+            verifierPlonk = _deployInternal("ZKsyncOSVerifierPlonk", "ZKsyncOSVerifierPlonk.sol", hex"", innerConfig);
+        } else {
+            verifierFflonk = _deployInternal("EraVerifierFflonk", "EraVerifierFflonk.sol", hex"", innerConfig);
+            verifierPlonk = _deployInternal("EraVerifierPlonk", "EraVerifierPlonk.sol", hex"", innerConfig);
+        }
 
         _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;

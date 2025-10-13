@@ -80,6 +80,7 @@ contract GatewayCTMFromL1 is Script {
         bytes32 genesisBatchCommitment;
         uint256 latestProtocolVersion;
         bytes forceDeploymentsData;
+        bool isZKsyncOS;
     }
 
     struct Output {
@@ -222,7 +223,8 @@ contract GatewayCTMFromL1 is Script {
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
             latestProtocolVersion: toml.readUint("$.latest_protocol_version"),
-            forceDeploymentsData: toml.readBytes("$.force_deployments_data")
+            forceDeploymentsData: toml.readBytes("$.force_deployments_data"),
+            isZKsyncOS: toml.readBool("$.is_zk_sync_os")
         });
 
         address aliasedGovernor = AddressAliasHelper.applyL1ToL2Alias(config.governanceAddr);
@@ -232,6 +234,7 @@ contract GatewayCTMFromL1 is Script {
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
+            isZKsyncOS: config.isZKsyncOS,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
@@ -382,15 +385,26 @@ contract GatewayCTMFromL1 is Script {
     }
 
     function deployGatewayVerifier() internal returns (address verifier) {
-        // vg todo depend on zksync os flag?
-        address verifierFflonk = address(
-            _deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierFflonk"), hex"")
-        );
-        console.log("EraVerifierFflonk deployed at", verifierFflonk);
-        address verifierPlonk = address(
-            _deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierPlonk"), hex"")
-        );
-        console.log("EraVerifierPlonk deployed at", verifierPlonk);
+        address verifierFflonk;
+        address verifierPlonk;
+
+        if (config.isZKsyncOS) {
+            verifierFflonk = address(
+                _deployInternal(ContractsBytecodesLib.getCreationCode("ZKsyncOSVerifierFflonk"), hex"")
+            );
+            console.log("ZKsyncOSVerifierFflonk deployed at", verifierFflonk);
+            verifierPlonk = address(
+                _deployInternal(ContractsBytecodesLib.getCreationCode("ZKsyncOSVerifierPlonk"), hex"")
+            );
+            console.log("ZKsyncOSVerifierPlonk deployed at", verifierPlonk);
+        } else {
+            verifierFflonk = address(
+                _deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierFflonk"), hex"")
+            );
+            console.log("EraVerifierFflonk deployed at", verifierFflonk);
+            verifierPlonk = address(_deployInternal(ContractsBytecodesLib.getCreationCode("EraVerifierPlonk"), hex""));
+            console.log("EraVerifierPlonk deployed at", verifierPlonk);
+        }
 
         if (config.testnetVerifier) {
             verifier = address(
