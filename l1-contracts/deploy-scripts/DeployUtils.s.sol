@@ -402,14 +402,30 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "DummyAvailBridge")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
-            /// TODO: Currently setting it to owner address (which means whole bridgehub owner).
-            /// In practice we might want to set it to CTM owner (which in production will be less restritive).
-            return
-                abi.encode(
-                    addresses.stateTransition.verifierFflonk,
-                    addresses.stateTransition.verifierPlonk,
-                    config.ownerAddress
-                );
+            if (config.testnetVerifier) {
+                return
+                    abi.encode(
+                        addresses.stateTransition.verifierFflonk,
+                        addresses.stateTransition.verifierPlonk,
+                        config.ownerAddress,
+                        config.isZKsyncOS
+                    );
+            } else {
+                if (config.isZKsyncOS) {
+                    return
+                        abi.encode(
+                            addresses.stateTransition.verifierFflonk,
+                            addresses.stateTransition.verifierPlonk,
+                            config.ownerAddress
+                        );
+                } else {
+                    return
+                        abi.encode(
+                            addresses.stateTransition.verifierFflonk,
+                            addresses.stateTransition.verifierPlonk
+                        );
+                }
+            }
         } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "EraVerifierPlonk")) {
