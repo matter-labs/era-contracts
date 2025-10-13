@@ -3,8 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {IBridgehubBase, L2TransactionRequestDirect, L2TransactionRequestTwoBridgesOuter} from "./IBridgehubBase.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -33,14 +31,6 @@ interface IL1Bridgehub is IBridgehubBase {
 
     /// @notice Register settlement layer
     function registerSettlementLayer(uint256 _newSettlementLayerChainId, bool _isWhitelisted) external;
-
-    /// @notice Set addresses (L1 specific)
-    function setAddresses(
-        address _assetRouter,
-        ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
-        address _chainAssetHandler
-    ) external;
 
     /// @notice Register already deployed ZK chain
     function registerAlreadyDeployedZKChain(uint256 _chainId, address _hyperchain) external;

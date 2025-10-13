@@ -9,7 +9,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// @notice Modified version of the Permutations over Lagrange-bases for Oecumenical Noninteractive arguments of
 /// Knowledge (PLONK) verifier.
 /// Modifications have been made to optimize the proof system for ZK chain circuits.
-/// @dev Contract was generated from a verification key with a hash of 0x{{vk_hash}}
+/// @dev Contract was generated from a verification key with a hash of 0x6a4509801ec284b8921c63dc6aaba668a0d71382d87ae4095ffc2235154e9fa3
 /// @dev It uses a custom memory layout inside the inline assembly block. Each reserved memory cell is declared in the
 /// constants below.
 /// @dev For a better understanding of the verifier algorithm please refer to the following papers:
@@ -18,7 +18,7 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 /// * Plonk for ZKsync v1.1: https://github.com/matter-labs/solidity_plonk_verifier/raw/recursive/bellman_vk_codegen_recursive/RecursivePlonkUnrolledForEthereum.pdf
 /// The notation used in the code is the same as in the papers.
 /* solhint-enable max-line-length */
-contract {{contract_name}}VerifierPlonk is IVerifier {
+contract ZKsyncOSVerifierPlonk is IVerifier {
     /*//////////////////////////////////////////////////////////////
                              Verification keys
     //////////////////////////////////////////////////////////////*/
@@ -241,7 +241,21 @@ contract {{contract_name}}VerifierPlonk is IVerifier {
     /// @dev flip of 0xe000000000000000000000000000000000000000000000000000000000000000;
     uint256 internal constant FR_MASK = 0x1fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff;
 
-    {{residue_g2_elements}}
+    // non residues
+    uint256 internal constant NON_RESIDUES_0 = 0x05;
+    uint256 internal constant NON_RESIDUES_1 = 0x07;
+    uint256 internal constant NON_RESIDUES_2 = 0x0a;
+
+    // trusted setup g2 elements
+    uint256 internal constant G2_ELEMENTS_0_X1 = 0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2;
+    uint256 internal constant G2_ELEMENTS_0_X2 = 0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed;
+    uint256 internal constant G2_ELEMENTS_0_Y1 = 0x090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b;
+    uint256 internal constant G2_ELEMENTS_0_Y2 = 0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa;
+    uint256 internal constant G2_ELEMENTS_1_X1 = 0x260e01b251f6f1c7e7ff4e580791dee8ea51d87a358e038b4efe30fac09383c1;
+    uint256 internal constant G2_ELEMENTS_1_X2 = 0x0118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b0;
+    uint256 internal constant G2_ELEMENTS_1_Y1 = 0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4;
+    uint256 internal constant G2_ELEMENTS_1_Y2 = 0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55;
+
     /// @inheritdoc IVerifier
     function verificationKeyHash() external pure returns (bytes32 vkHash) {
         _loadVerificationKey();
@@ -269,7 +283,58 @@ contract {{contract_name}}VerifierPlonk is IVerifier {
     /// [table_type]                                 - lookup table type commitment
     function _loadVerificationKey() internal pure virtual {
         assembly {
-{{commitments}}
+            // gate setup commitments
+            mstore(VK_GATE_SETUP_0_X_SLOT, 0x219d2213cfcb8af0868c83d659e49052d72d2e4119809034e96e82685a727ec8)
+            mstore(VK_GATE_SETUP_0_Y_SLOT, 0x2a48c8d09206cb271404359c31d3088a7c5cecc2e380738300e90600ab6425bf)
+            mstore(VK_GATE_SETUP_1_X_SLOT, 0x0feda978f4639d0a725df74c4738bf178adca34e6a4f7cc38d6a9ae9ee49f695)
+            mstore(VK_GATE_SETUP_1_Y_SLOT, 0x2f7068beedb881aea392246c33ccc026ea9c8f6ea558a055b6df00ebfdf210a3)
+            mstore(VK_GATE_SETUP_2_X_SLOT, 0x06eccb685da5c8cc09a13698b2a22e383025abc75393d68c1da5a7dbacffbd9b)
+            mstore(VK_GATE_SETUP_2_Y_SLOT, 0x2fdec4198afacb1100a01ced19e44a1a6febeb4ffcf8abb17a3f3d66105dcb70)
+            mstore(VK_GATE_SETUP_3_X_SLOT, 0x29b770817d0b0dec872b16748541d19052503979fccf123ceddbae53278a8d2f)
+            mstore(VK_GATE_SETUP_3_Y_SLOT, 0x2ce58ae47dbbe600272d0e05ec7336c86c34925852a700d6f4b64c6357ca4c7e)
+            mstore(VK_GATE_SETUP_4_X_SLOT, 0x0c9c10bbbe0ce680bbff4415ce6a6f60909f228f7432371513434c6aa14005e1)
+            mstore(VK_GATE_SETUP_4_Y_SLOT, 0x1ac2f036e3de6e4a9bacd5eacc778fa3fbdf5fd4b06e551038c704adecbeb639)
+            mstore(VK_GATE_SETUP_5_X_SLOT, 0x048e2130f16d54d7e07df66330b4d892753b5141ecacb4007573d9ea4a8ff028)
+            mstore(VK_GATE_SETUP_5_Y_SLOT, 0x13a3819d4cb80114e51de741a5fb48ce4ba20e82c5d39d16f70ca0461f49a131)
+            mstore(VK_GATE_SETUP_6_X_SLOT, 0x0b7a2ef1fabe150bf63039a13cebf4d2ea7f0146781d22dcdf0a3dddca452fa8)
+            mstore(VK_GATE_SETUP_6_Y_SLOT, 0x19e1fff4dd608b8860bf384e6bec543af0e1ef5efd3bae85c293401b2d665a96)
+            mstore(VK_GATE_SETUP_7_X_SLOT, 0x1affeacdceb1b6f018bbb6762bb5aebcd54c3e24801ce01d06146d1bf0938b2c)
+            mstore(VK_GATE_SETUP_7_Y_SLOT, 0x19a277dd9eaac40538f3177e3390ec21d097f88afb04158dd59e963a327fe9da)
+
+            // gate selectors commitments
+            mstore(VK_GATE_SELECTORS_0_X_SLOT, 0x0c1b062db6ce4bce6d7399f1cbe8d6699f4f1347cb12ee03a29a6f866f097157)
+            mstore(VK_GATE_SELECTORS_0_Y_SLOT, 0x2ccd1faf9fbcb74d9065cf41200c6abc231cfe35ca63635f63a78504546cac32)
+            mstore(VK_GATE_SELECTORS_1_X_SLOT, 0x28b4bfae1424569b8d16c3cfd032dde76e3d20d1fa371c9c075ab48df15293cb)
+            mstore(VK_GATE_SELECTORS_1_Y_SLOT, 0x26feac8f167c72597b96268386d1fa846979ad70b135aeff7f502dace923ff37)
+
+            // permutation commitments
+            mstore(VK_PERMUTATION_0_X_SLOT, 0x2a18b299ceb0147394e977efd325f396aa3a71030f0e35769bc73d47c715a9bc)
+            mstore(VK_PERMUTATION_0_Y_SLOT, 0x148faf98afff1e3432cb3d5d12b51b3f3b5920d7cbaac6f90c1139bda4cde25b)
+            mstore(VK_PERMUTATION_1_X_SLOT, 0x1b7a1b73eb7db8f8dc98f406f831d3ac8b096f82d95ebba2e4bd246f4ecda392)
+            mstore(VK_PERMUTATION_1_Y_SLOT, 0x028bbe6f5e7ed35dfd6b6223005dffa0a33f4eef2baf3a2ceededbd2b160be38)
+            mstore(VK_PERMUTATION_2_X_SLOT, 0x27098508285af56d01f548e81c087eee9a6159f894bf24e3f95e170e36b8d071)
+            mstore(VK_PERMUTATION_2_Y_SLOT, 0x0100393b56d329ea167ca8e20022045077305f486fde53673c56f972b68d8d40)
+            mstore(VK_PERMUTATION_3_X_SLOT, 0x0477507b2bdb4e5dbd6ee360a753d547f7bf6f8429c7878e487cda8c98668105)
+            mstore(VK_PERMUTATION_3_Y_SLOT, 0x1f78c9aa4d4850197f46dc08a2410e83d9747eff8b438b32e1982a58f3473f54)
+
+            // lookup tables commitments
+            mstore(VK_LOOKUP_TABLE_0_X_SLOT, 0x2c513ed74d9d57a5ec901e074032741036353a2c4513422e96e7b53b302d765b)
+            mstore(VK_LOOKUP_TABLE_0_Y_SLOT, 0x04dd964427e430f16004076d708c0cb21e225056cc1d57418cfbd3d472981468)
+            mstore(VK_LOOKUP_TABLE_1_X_SLOT, 0x1ea83e5e65c6f8068f4677e2911678cf329b28259642a32db1f14b8347828aac)
+            mstore(VK_LOOKUP_TABLE_1_Y_SLOT, 0x1d22bc884a2da4962a893ba8de13f57aaeb785ed52c5e686994839cab8f7475d)
+            mstore(VK_LOOKUP_TABLE_2_X_SLOT, 0x0b2e7212d0d9cff26d0bdf3d79b2cac029a25dfeb1cafdf49e2349d7db348d89)
+            mstore(VK_LOOKUP_TABLE_2_Y_SLOT, 0x1301f9b252419ea240eb67fda720ca0b16d92364027285f95e9b1349490fa283)
+            mstore(VK_LOOKUP_TABLE_3_X_SLOT, 0x02f7b99fdfa5b418548c2d777785820e02383cfc87e7085e280a375a358153bf)
+            mstore(VK_LOOKUP_TABLE_3_Y_SLOT, 0x09d004fe08dc4d19c382df36fad22ef676185663543703e6a4b40203e50fd8a6)
+
+            // lookup selector commitment
+            mstore(VK_LOOKUP_SELECTOR_X_SLOT, 0x08fa12af80386a748fc92c096fe68daf692678bbe46fe594a131bf79ca1b0918)
+            mstore(VK_LOOKUP_SELECTOR_Y_SLOT, 0x260335f894e5b49890730e4f32435427ea20695302d97a6a2d85e7d81549987d)
+
+            // table type commitment
+            mstore(VK_LOOKUP_TABLE_TYPE_X_SLOT, 0x12f2dd86299ff99099d8408e8940d7c05e66b60040fe9e1aaf3351057cc53998)
+            mstore(VK_LOOKUP_TABLE_TYPE_Y_SLOT, 0x008e376cb09b70ce3180f1b4c40fe05904cab4f02ec8a1ca393c1470ba8fa8b2)
+
             // flag for using recursive part
             mstore(VK_RECURSIVE_FLAG_SLOT, 0)
         }
@@ -308,7 +373,18 @@ contract {{contract_name}}VerifierPlonk is IVerifier {
             }
 
             /// @dev Performs modular exponentiation using the formula (value ^ power) mod R_MOD.
-            {{modexp_function}}
+            function modexp(value, power) -> res {
+                mstore(0x00, 0x20)
+                mstore(0x20, 0x20)
+                mstore(0x40, 0x20)
+                mstore(0x60, value)
+                mstore(0x80, power)
+                mstore(0xa0, R_MOD)
+                if iszero(staticcall(gas(), 5, 0, 0xc0, 0x00, 0x20)) {
+                    revertWithMessage(24, "modexp precompile failed")
+                }
+                res := mload(0x00)
+            }
 
             /// @dev Performs a point multiplication operation and stores the result in a given memory destination.
             function pointMulIntoDest(point, s, dest) {

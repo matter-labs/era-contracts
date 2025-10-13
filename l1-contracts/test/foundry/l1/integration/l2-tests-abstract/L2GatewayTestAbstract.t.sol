@@ -11,8 +11,10 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_TO_L1_MESSENGER_SYSTEM_CONTR
 import {SETTLEMENT_LAYER_RELAY_SENDER, ZKChainCommitment} from "contracts/common/Config.sol";
 
 import {BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 
@@ -48,7 +50,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
         // todo fix this test
         finalizeDeposit();
         vm.prank(SETTLEMENT_LAYER_RELAY_SENDER);
-        l2Bridgehub.forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
+        BridgehubBase(address(l2Bridgehub)).forwardTransactionOnGateway(mintChainId, bytes32(0), 0);
     }
 
     function test_withdrawFromGateway() public {
@@ -89,7 +91,7 @@ abstract contract L2GatewayTestAbstract is Test, SharedL2ContractDeployer {
             chainData: chainData
         });
         vm.prank(aliasedL1AssetRouter);
-        l2AssetRouter.finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
+        AssetRouterBase(address(l2AssetRouter)).finalizeDeposit(L1_CHAIN_ID, ctmAssetId, abi.encode(data));
     }
 
     function test_finalizeDepositWithRealChainData() public {

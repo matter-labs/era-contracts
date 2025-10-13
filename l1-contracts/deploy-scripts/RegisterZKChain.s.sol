@@ -43,7 +43,7 @@ struct Config {
     uint256 chainChainId;
     bool validiumMode;
     uint256 bridgehubCreateNewChainSalt;
-    address validatorSenderOperatorCommitEth;
+    address validatorSenderOperatorEth;
     address validatorSenderOperatorBlobsEth;
     // optional - if not set, then equal to 0
     address validatorSenderOperatorProve;
@@ -181,7 +181,7 @@ contract RegisterZKChainScript is Script {
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.validiumMode = toml.readBool("$.chain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorEth = toml.readAddress("$.chain.validator_sender_operator_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
 
         // These were added to zkstack tool recently (9th Sept 2025).
@@ -248,7 +248,7 @@ contract RegisterZKChainScript is Script {
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.baseToken = toml.readAddress("$.chain.base_token_addr");
         config.validiumMode = toml.readBool("$.chain.validium_mode");
-        config.validatorSenderOperatorCommitEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
+        config.validatorSenderOperatorEth = toml.readAddress("$.chain.validator_sender_operator_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
         // These were added to zkstack tool recently (9th Sept 2025).
         config.validatorSenderOperatorProve = toml.readAddress("$.chain.validator_sender_operator_prove");
@@ -449,10 +449,10 @@ contract RegisterZKChainScript is Script {
         // are only provided in ZKsync OS, while on Era all of them are filled by committer.
         validatorTimelock.addValidatorRoles(
             chainAddress,
-            config.validatorSenderOperatorCommitEth,
+            config.validatorSenderOperatorEth,
             IValidatorTimelock.ValidatorRotationParams({
                 rotatePrecommitterRole: true,
-                rotateCommitterRole: true,
+                rotateCommitterRole: false,
                 rotateReverterRole: true,
                 rotateProverRole: true,
                 rotateExecutorRole: true

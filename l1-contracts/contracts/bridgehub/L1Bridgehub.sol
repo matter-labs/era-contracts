@@ -310,7 +310,7 @@ contract L1Bridgehub is BridgehubBase, IL1Bridgehub {
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
         address _chainAssetHandler
-    ) external override(BridgehubBase, IL1Bridgehub) onlyOwnerOrUpgrader {
+    ) external override onlyOwnerOrUpgrader {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;

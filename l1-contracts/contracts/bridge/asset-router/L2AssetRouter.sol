@@ -3,10 +3,10 @@
 pragma solidity 0.8.28;
 
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {IAssetRouterBase} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL2NativeTokenVault} from "../ntv/IL2NativeTokenVault.sol";
+import {NativeTokenVaultBase} from "../ntv/NativeTokenVaultBase.sol";
 import {IL2SharedBridgeLegacy} from "../interfaces/IL2SharedBridgeLegacy.sol";
 import {IBridgedStandardToken} from "../interfaces/IBridgedStandardToken.sol";
 import {IL1ERC20Bridge} from "../interfaces/IL1ERC20Bridge.sol";
@@ -156,11 +156,11 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         _setAssetHandler(_assetId, _assetHandlerAddress);
     }
 
-    /// @inheritdoc IAssetRouterBase
+    /// @inheritdoc AssetRouterBase
     function setAssetHandlerAddressThisChain(
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
-    ) external override(AssetRouterBase, IAssetRouterBase) {
+    ) external override {
         _setAssetHandlerAddressThisChain(L2_NATIVE_TOKEN_VAULT_ADDR, _assetRegistrationData, _assetHandlerAddress);
     }
 
@@ -182,13 +182,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         uint256,
         bytes32 _assetId,
         bytes calldata _transferData
-    )
-        public
-        payable
-        override(AssetRouterBase, IAssetRouterBase)
-        onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID)
-        nonReentrant
-    {
+    ) public payable override onlyAssetRouterCounterpartOrSelf(L1_CHAIN_ID) nonReentrant {
         if (_assetId == BASE_TOKEN_ASSET_ID) {
             revert AssetIdNotSupported(BASE_TOKEN_ASSET_ID);
         }
@@ -265,7 +259,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         bytes memory _l1bridgeMintData
     ) internal view returns (bytes memory) {
         // solhint-disable-next-line func-named-parameters
-        return abi.encodePacked(IAssetRouterBase.finalizeDeposit.selector, block.chainid, _assetId, _l1bridgeMintData);
+        return abi.encodePacked(AssetRouterBase.finalizeDeposit.selector, block.chainid, _assetId, _l1bridgeMintData);
     }
 
     /// @notice Encodes the message for l2ToL1log sent during withdraw initialization.
@@ -404,7 +398,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
 
         // For backwards compatibility, the bridge smust return the address of the token even if it
         // has not been deployed yet.
-        return l2NativeTokenVault.calculateCreate2TokenAddress(L1_CHAIN_ID, _l1Token);
+        return NativeTokenVaultBase(address(l2NativeTokenVault)).calculateCreate2TokenAddress(L1_CHAIN_ID, _l1Token);
     }
 
     /// @notice Returns the address of the L1 asset router.
