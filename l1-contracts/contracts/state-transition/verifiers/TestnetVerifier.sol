@@ -16,11 +16,11 @@ import {IVerifier} from "../chain-interfaces/IVerifier.sol";
 contract TestnetVerifier is IVerifier {
     IVerifier public immutable dualVerifier;
 
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address /* _ctmOwner */, bool _isZKsyncOS) {
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _ctmOwner, bool _isZKsyncOS) {
         assert(block.chainid != 1);
 
         if (_isZKsyncOS) {
-            dualVerifier = new ZKsyncOSDualVerifier(_fflonkVerifier, _plonkVerifier, address(this));
+            dualVerifier = new ZKsyncOSDualVerifier(_fflonkVerifier, _plonkVerifier, _ctmOwner);
         } else {
             dualVerifier = new EraDualVerifier(_fflonkVerifier, _plonkVerifier);
         }
