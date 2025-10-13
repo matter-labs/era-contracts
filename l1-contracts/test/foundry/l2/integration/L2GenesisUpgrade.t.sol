@@ -21,7 +21,7 @@ import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {SystemContractsArgs} from "./L2Utils.sol";
 import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
-import {ISystemContext} from "contracts/state-transition/l2-deps/ISystemContext.sol";
+import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
 import {L2GatewayTestAbstract} from "../../l1/integration/l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
@@ -95,7 +95,9 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
                 predeployedL2WethAddress: address(1),
                 baseTokenL1Address: address(1),
                 baseTokenName: "Ether",
-                baseTokenSymbol: "ETH"
+                baseTokenSymbol: "ETH",
+                baseTokenOriginChainId: 1,
+                baseTokenOriginAddress: address(1)
             })
         );
 
@@ -128,9 +130,19 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         );
         bytes memory beaconDeployerBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(beaconDeployerBytecode));
 
+        bytes memory interopCenterBytecode = Utils.readZKFoundryBytecodeL1("InteropCenter.sol", "InteropCenter");
+        bytes memory interopCenterBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(interopCenterBytecode));
+
+        bytes memory interopHandlerBytecode = Utils.readZKFoundryBytecodeL1("InteropHandler.sol", "InteropHandler");
+        bytes memory interopHandlerBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(interopHandlerBytecode));
+
+        bytes memory assetTrackerBytecode = Utils.readZKFoundryBytecodeL1("AssetTracker.sol", "AssetTracker");
+        bytes memory assetTrackerBytecodeInfo = abi.encode(L2ContractHelper.hashL2Bytecode(assetTrackerBytecode));
+
         fixedForceDeploymentsData = abi.encode(
             FixedForceDeploymentsData({
                 l1ChainId: 1,
+                gatewayChainId: 1,
                 eraChainId: CHAIN_ID,
                 l1AssetRouter: address(1),
                 l2TokenProxyBytecodeHash: bytes32(0x0100056f53fd9e940906d998a80ed53392e5c50a8eb198baf9f78fd84ce7ec70),
@@ -141,10 +153,14 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
                 l2NtvBytecodeInfo: l2NtvBytecodeInfo,
                 messageRootBytecodeInfo: messageRootBytecodeInfo,
                 chainAssetHandlerBytecodeInfo: chainAssetHandlerBytecodeInfo,
+                interopCenterBytecodeInfo: interopCenterBytecodeInfo,
+                interopHandlerBytecodeInfo: interopHandlerBytecodeInfo,
+                assetTrackerBytecodeInfo: assetTrackerBytecodeInfo,
                 beaconDeployerInfo: beaconDeployerBytecodeInfo,
                 // For genesis upgrade these values will always be zero
                 l2SharedBridgeLegacyImpl: address(0),
                 l2BridgedStandardERC20Impl: address(0),
+                aliasedChainRegistrationSender: address(1),
                 dangerousTestOnlyForcedBeacon: address(0)
             })
         );
