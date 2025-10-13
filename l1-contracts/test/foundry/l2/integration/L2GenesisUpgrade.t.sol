@@ -139,7 +139,7 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
         );
 
         bytes memory assetTrackerBytecodeInfo = abi.encode(
-            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("AssetTracker.sol", "AssetTracker"))
+            L2ContractHelper.hashL2Bytecode(Utils.readZKFoundryBytecodeL1("L2AssetTracker.sol", "L2AssetTracker"))
         );
 
         fixedForceDeploymentsData = abi.encode(
