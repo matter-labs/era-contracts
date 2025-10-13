@@ -19,9 +19,10 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {RelayedSLDAValidator} from "contracts/state-transition/data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 
@@ -72,11 +73,10 @@ contract GatewayCTMDeployerTest is Test {
         new ChainTypeManager(address(0));
         new ProxyAdmin();
 
-        new L1VerifierFflonk();
-        new L1VerifierPlonk();
+        new EraVerifierFflonk();
+        new EraVerifierPlonk();
 
-        new TestnetVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
-        new DualVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
+        new TestnetVerifier(EraVerifierFflonk(address(0)), EraVerifierPlonk(address(0)), address(0), false);
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();
@@ -93,6 +93,7 @@ contract GatewayCTMDeployerTest is Test {
             eraChainId: 1001,
             l1ChainId: 1,
             testnetVerifier: true,
+            isZKsyncOS: false,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),

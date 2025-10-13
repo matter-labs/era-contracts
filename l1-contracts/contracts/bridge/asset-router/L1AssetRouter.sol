@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts-v4/token/ERC20/utils/SafeERC20.
 
 import {IL1AssetRouter} from "./IL1AssetRouter.sol";
 import {IL2AssetRouter} from "./IL2AssetRouter.sol";
-import {IAssetRouterBase, LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
+import {LEGACY_ENCODING_VERSION, NEW_ENCODING_VERSION, SET_ASSET_HANDLER_COUNTERPART_ENCODING_VERSION} from "./IAssetRouterBase.sol";
 import {AssetRouterBase} from "./AssetRouterBase.sol";
 
 import {IL1AssetHandler} from "../interfaces/IL1AssetHandler.sol";
@@ -176,11 +176,11 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         emit AssetDeploymentTrackerSet(assetId, _assetDeploymentTracker, _assetRegistrationData);
     }
 
-    /// @inheritdoc IAssetRouterBase
+    /// @inheritdoc AssetRouterBase
     function setAssetHandlerAddressThisChain(
         bytes32 _assetRegistrationData,
         address _assetHandlerAddress
-    ) external override(AssetRouterBase, IAssetRouterBase) {
+    ) external override {
         _setAssetHandlerAddressThisChain(address(nativeTokenVault), _assetRegistrationData, _assetHandlerAddress);
     }
 
@@ -339,12 +339,12 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
                             Receive transaction Functions
     //////////////////////////////////////////////////////////////*/
 
-    /// @inheritdoc IAssetRouterBase
+    /// @inheritdoc AssetRouterBase
     function finalizeDeposit(
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) public payable override(AssetRouterBase, IAssetRouterBase) onlyNullifier {
+    ) public payable override onlyNullifier {
         _finalizeDeposit(_chainId, _assetId, _transferData, address(nativeTokenVault));
         emit DepositFinalizedAssetRouter(_chainId, _assetId, _transferData);
     }
@@ -509,7 +509,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
             (nativeTokenVault.tokenAddress(_assetId) == address(0)) ||
             (nativeTokenVault.originChainId(_assetId) != block.chainid)
         ) {
-            return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
+            return abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
         } else {
             // slither-disable-next-line unused-return
             (, address _receiver, address _parsedNativeToken, uint256 _amount, bytes memory _gettersData) = DataEncoding

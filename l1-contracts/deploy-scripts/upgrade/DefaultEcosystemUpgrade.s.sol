@@ -17,6 +17,10 @@ import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_A
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -1381,8 +1385,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
     function deployNewEcosystemContractsGW() public virtual {
         require(upgradeConfig.initialized, "Not initialized");
 
-        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("VerifierFflonk");
-        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("VerifierPlonk");
+        gatewayConfig.gatewayStateTransition.verifierFflonk = deployGWContract("EraVerifierFflonk");
+        gatewayConfig.gatewayStateTransition.verifierPlonk = deployGWContract("EraVerifierPlonk");
         gatewayConfig.gatewayStateTransition.verifier = deployGWContract("Verifier");
 
         gatewayConfig.gatewayStateTransition.executorFacet = deployGWContract("ExecutorFacet");
@@ -1850,9 +1854,13 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
             } else {
                 return abi.encode(L2_BRIDGEHUB_ADDR);
             }
-        } else if (compareStrings(contractName, "VerifierFflonk")) {
+        } else if (compareStrings(contractName, "EraVerifierFflonk")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "VerifierPlonk")) {
+        } else if (compareStrings(contractName, "EraVerifierPlonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
+            return abi.encode();
+        } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
             return abi.encode();
         } else if (compareStrings(contractName, "Verifier")) {
             if (!isZKBytecode) {

@@ -3,25 +3,8 @@
 pragma solidity ^0.8.21;
 
 import {IBridgehubBase} from "./IBridgehubBase.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Interface for L2-specific Bridgehub functionality
-interface IL2Bridgehub is IBridgehubBase {
-    /// @notice Forward transaction on gateway
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
-
-    /// @notice Set addresses
-    function setAddresses(
-        address _assetRouter,
-        ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
-        address _chainAssetHandler
-    ) external;
-}
+interface IL2Bridgehub is IBridgehubBase {}

@@ -9,9 +9,9 @@ import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 /// @notice FFT inspired version of PlonK to optimize on-chain gas cost
 /// @dev For better understanding of the protocol follow the below papers:
 /// * Fflonk Paper: https://eprint.iacr.org/2021/1167
-/// @dev Contract was generated from a verification key with a hash of 0x{{vk_hash}}
+/// @dev Contract was generated from a verification key with a hash of 0x6f36a08c517b060fa97308cdb3e23b04842ff839d451a753ec8fae1a5408304a
 /// @custom:security-contact security@matterlabs.dev
-contract {{contract_name}}VerifierFflonk is IVerifierV2 {
+contract ZKsyncOSVerifierFflonk is IVerifierV2 {
     // ================Constants================
     uint32 internal constant DST_0 = 0;
     uint32 internal constant DST_1 = 1;
@@ -23,8 +23,24 @@ contract {{contract_name}}VerifierFflonk is IVerifierV2 {
 
     // ================Verification Key================
     uint256 internal constant VK_NUM_INPUTS = 1;
-    {{{c0}}}
-    {{{residue_g2_elements}}}
+    // [C0]1 = qL(X^8)+ X*qR(X^8)+ X^2*qO(X^8)+ X^3*qM(X^8)+ X^4*qC(X^8)+ X^5*Sσ1(X^8)+ X^6*Sσ2(X^8)+ X^7*Sσ3(X^8)
+    uint256 internal constant VK_C0_G1_X = 0x183ae375b758fc764f96e7846c43499f62282531a6b717e789179c6da8cfef41;
+    uint256 internal constant VK_C0_G1_Y = 0x088d7b4d525ea29bfc5a6f0464589e4eaa4d85d9dd6849a5708b29002626ca36;
+
+    // k1 = 5, k2 = 7
+    uint256 internal constant VK_NON_RESIDUES_0 = 0x05;
+    uint256 internal constant VK_NON_RESIDUES_1 = 0x07;
+
+    // G2 Elements = [1]_2, [s]_2
+    uint256 internal constant VK_G2_ELEMENT_0_X1 = 0x198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c2;
+    uint256 internal constant VK_G2_ELEMENT_0_X2 = 0x1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed;
+    uint256 internal constant VK_G2_ELEMENT_0_Y1 = 0x090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b;
+    uint256 internal constant VK_G2_ELEMENT_0_Y2 = 0x12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa;
+    uint256 internal constant VK_G2_ELEMENT_1_X1 = 0x260e01b251f6f1c7e7ff4e580791dee8ea51d87a358e038b4efe30fac09383c1;
+    uint256 internal constant VK_G2_ELEMENT_1_X2 = 0x0118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b0;
+    uint256 internal constant VK_G2_ELEMENT_1_Y1 = 0x04fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe4;
+    uint256 internal constant VK_G2_ELEMENT_1_Y2 = 0x22febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55;
+
     // Memory slots from 0x000 to 0x200 are reserved for intermediate computations and call to precompiles.
 
     // ================Transcript================
@@ -1588,7 +1604,18 @@ contract {{contract_name}}VerifierFflonk is IVerifierV2 {
              * @notice Stores values starting from the 0x00 memory slot.
              * The free memory pointer is not updated as it stays unused throughout the code execution.
              */
-            {{modexp_function}}
+            function modexp(value, power) -> res {
+                mstore(0x00, 0x20)
+                mstore(0x20, 0x20)
+                mstore(0x40, 0x20)
+                mstore(0x60, value)
+                mstore(0x80, power)
+                mstore(0xa0, R_MOD)
+                if iszero(staticcall(gas(), 5, 0, 0xc0, 0x00, 0x20)) {
+                    revertWithMessage(24, "modexp precompile failed")
+                }
+                res := mload(0x00)
+            }
         }
     }
 }

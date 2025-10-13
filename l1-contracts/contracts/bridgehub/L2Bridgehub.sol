@@ -103,7 +103,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override(BridgehubBase, IL2Bridgehub) onlySettlementLayerRelayedSender {
+    ) external override onlySettlementLayerRelayedSender {
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }
@@ -117,7 +117,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         ICTMDeploymentTracker _l1CtmDeployer,
         IMessageRoot _messageRoot,
         address _chainAssetHandler
-    ) external override(BridgehubBase, IL2Bridgehub) onlyOwnerOrUpgrader {
+    ) external override onlyOwnerOrUpgrader {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;

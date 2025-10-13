@@ -77,6 +77,7 @@ pub fn insert_residue_elements_and_commitments(
     vk: &HashMap<String, Value>,
     vk_hash: &str,
     l2_mode: bool,
+    contract_name: &str,
 ) -> Result<String, Box<dyn Error>> {
     let reg = Handlebars::new();
     let residue_g2_elements = generate_residue_g2_elements(vk);
@@ -93,7 +94,8 @@ pub fn insert_residue_elements_and_commitments(
         &verifier_contract_template,
         &json!({"residue_g2_elements": residue_g2_elements,
                         "commitments": commitments,
-                        "vk_hash": vk_hash}),
+                        "vk_hash": vk_hash,
+                        "contract_name": contract_name}),
     )?)
 }
 

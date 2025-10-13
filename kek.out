@@ -1,0 +1,36 @@
+yarn install v1.22.22
+[1/4] Resolving packages...
+success Already up-to-date.
+Done in 0.13s.
+yarn run v1.22.22
+$ hardhat clean && CONTRACTS_BASE_NETWORK_ZKSYNC=true hardhat clean
+Done in 1.13s.
+yarn run v1.22.22
+$ hardhat clean
+Done in 0.47s.
+yarn run v1.22.22
+$ yarn clean:bootloader && yarn clean:system-contracts
+$ rm -rf ./bootloader/build ./bootloader/tests/artifacts
+$ rm -rf ./contracts-preprocessed && hardhat clean
+Done in 0.83s.
+yarn run v1.22.22
+$ forge build
+Compiling 12 files with Solc 0.8.28
+Solc 0.8.28 finished in 155.49ms
+Compiler run successful with warnings:
+Warning (2018): Function state mutability can be restricted to pure
+ --> contracts/da-layers/avail/DummyVectorX.sol:8:5:
+  |
+8 |     function rangeStartBlocks(bytes32) external view returns (uint32 startBlock) {
+  |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Warning (2018): Function state mutability can be restricted to pure
+  --> contracts/da-layers/avail/DummyAvailBridge.sol:20:5:
+   |
+20 |     function verifyBlobLeaf(MerkleProofInput calldata) external view returns (bool) {
+   |     ^ (Relevant source part starts here and spans across multiple lines).
+
+Done in 0.29s.
+yarn run v1.22.22
+$ forge build && forge build --zksync --skip '*/l1-contracts/test/*'
+Compiling 568 files with Solc 0.8.28
