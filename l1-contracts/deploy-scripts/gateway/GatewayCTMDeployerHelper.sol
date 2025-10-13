@@ -215,13 +215,11 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
 
-        bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk, _verifierOwner);
-
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(
                 "TestnetVerifier",
                 "TestnetVerifier.sol",
-                constructorParams,
+                abi.encode(verifierFflonk, verifierPlonk, _verifierOwner, _isZKsyncOS),
                 innerConfig
             );
         } else {
@@ -229,14 +227,14 @@ library GatewayCTMDeployerHelper {
                 _deployedContracts.stateTransition.verifier = _deployInternal(
                     "ZKsyncOSDualVerifier",
                     "ZKsyncOSDualVerifier.sol",
-                    constructorParams,
+                    abi.encode(verifierFflonk, verifierPlonk, _verifierOwner),
                     innerConfig
                 );
             } else {
                 _deployedContracts.stateTransition.verifier = _deployInternal(
                     "EraDualVerifier",
                     "EraDualVerifier.sol",
-                    constructorParams,
+                    abi.encode(verifierFflonk, verifierPlonk),
                     innerConfig
                 );
             }
@@ -381,7 +379,7 @@ library GatewayCTMDeployerHelper {
     /// @notice List of factory dependencies needed for the correct execution of
     /// CTMDeployer and healthy functionaling of the system overall
     function getListOfFactoryDeps() external returns (bytes[] memory dependencies) {
-        uint256 totalDependencies = 21;
+        uint256 totalDependencies = 24;
         dependencies = new bytes[](totalDependencies);
         uint256 index = 0;
 
@@ -396,11 +394,14 @@ library GatewayCTMDeployerHelper {
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("Admin.sol", "AdminFacet");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("DiamondInit.sol", "DiamondInit");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("L1GenesisUpgrade.sol", "L1GenesisUpgrade");
+        // Include all verifiers since we cannot determine which one will be used
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierFflonk.sol", "EraVerifierFflonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
-        // Include both verifiers since we cannot determine which one will be used
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("TestnetVerifier.sol", "TestnetVerifier");
-        dependencies[index++] = Utils.readZKFoundryBytecodeL1("DualVerifier.sol", "DualVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("EraDualVerifier.sol", "EraDualVerifier");
+        dependencies[index++] = Utils.readZKFoundryBytecodeL1("ZKsyncOSDualVerifier.sol", "ZKsyncOSDualVerifier");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ValidatorTimelock.sol", "ValidatorTimelock");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ChainTypeManager.sol", "ChainTypeManager");
         dependencies[index++] = Utils.readZKFoundryBytecodeL1("ProxyAdmin.sol", "ProxyAdmin");
