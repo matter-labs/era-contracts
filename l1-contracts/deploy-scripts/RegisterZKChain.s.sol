@@ -451,7 +451,7 @@ contract RegisterZKChainScript is Script {
             chainAddress,
             config.validatorSenderOperatorEth,
             IValidatorTimelock.ValidatorRotationParams({
-                rotatePrecommitterRole: false,
+                rotatePrecommitterRole: true,
                 rotateCommitterRole: false,
                 rotateReverterRole: true,
                 rotateProverRole: true,
