@@ -14,6 +14,7 @@ import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-de
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -188,6 +189,41 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
 
+    function deployTuppWithContract(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual returns (address implementation, address proxy) {
+        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
+            contractName,
+            addresses.transparentProxyAdmin,
+            isZKBytecode
+        );
+    }
+
+    function deployTuppWithContractAndProxyAdmin(
+        string memory contractName,
+        address proxyAdmin,
+        bool isZKBytecode
+    ) internal returns (address implementation, address proxy) {
+        implementation = deployViaCreate2AndNotify(
+            getCreationCode(contractName, false),
+            getCreationCalldata(contractName, false),
+            contractName,
+            string.concat(contractName, " Implementation"),
+            isZKBytecode
+        );
+
+        proxy = deployViaCreate2AndNotify(
+            type(TransparentUpgradeableProxy).creationCode,
+            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName, false)),
+            contractName,
+            string.concat(contractName, " Proxy"),
+            isZKBytecode
+        );
+        return (implementation, proxy);
+    }
+
+
     function deployStateTransitionDiamondFacets() internal {
         addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet", false);
         addresses.stateTransition.adminFacet = deploySimpleContract("AdminFacet", false);
@@ -324,15 +360,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         );
     }
 
-    function deployTuppWithContract(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual returns (address implementation, address proxy);
 
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual returns (bytes memory);
+    ) internal view virtual returns (bytes memory) {
+
+        return ("Not implemented initialize calldata");
+    }
 
     function getCreationCalldata(
         string memory contractName,
@@ -461,7 +496,9 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual returns (bytes memory);
+    ) internal virtual returns (bytes memory) {
+        return ("Not implemented initialize calldata");
+    }
 
     function test() internal virtual {}
 }

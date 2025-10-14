@@ -76,7 +76,7 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
-import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
+import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployCTMUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
@@ -1388,7 +1388,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
                 return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             } else {
-                return super.getCreationCode(contractName, isZKBytecode);
+                revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
             }
         } else {
             if (compareStrings(contractName, "GatewayUpgrade")) {
@@ -1410,7 +1410,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
             } else if (compareStrings(contractName, "NoDAL2DAValidator")) {
                 return ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
             } else {
-                return super.getCreationCode(contractName, isZKBytecode);
+                revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
             }
         }
     }

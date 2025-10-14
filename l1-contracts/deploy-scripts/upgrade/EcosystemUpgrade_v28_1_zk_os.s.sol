@@ -76,7 +76,7 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
-import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
+import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployCTMUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
@@ -129,10 +129,10 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
             evmEmulatorHash: bytes32(0),
             verifier: stateTransition.verifier,
             verifierParams: VerifierParams({
-                recursionNodeLevelVkHash: bytes32(0),
-                recursionLeafLevelVkHash: bytes32(0),
-                recursionCircuitsSetVksHash: bytes32(0)
-            }),
+            recursionNodeLevelVkHash: bytes32(0),
+            recursionLeafLevelVkHash: bytes32(0),
+            recursionCircuitsSetVksHash: bytes32(0)
+        }),
             l1ContractsUpgradeCalldata: new bytes(0),
             postUpgradeCalldata: new bytes(0),
             upgradeTimestamp: 0,
@@ -158,8 +158,8 @@ contract EcosystemUpgrade_v28_1_zk_os is Script, DefaultEcosystemUpgrade {
             signature: new bytes(0),
             factoryDeps: new uint256[](0),
             paymasterInput: new bytes(0),
-            // Reserved dynamic type for the future use-case. Using it should be avoided,
-            // But it is still here, just in case we want to enable some additional functionality
+        // Reserved dynamic type for the future use-case. Using it should be avoided,
+        // But it is still here, just in case we want to enable some additional functionality
             reservedDynamic: new bytes(0)
         });
     }

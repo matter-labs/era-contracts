@@ -31,7 +31,7 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
-import {Config, DeployedAddresses} from "./DeployUtils.s.sol";
+import {Config, DeployedAddresses} from "./DeployL1CoreUtils.s.sol";
 import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
 
 contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
@@ -249,22 +249,6 @@ contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
         string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
 
         vm.writeToml(toml, outputPath);
-    }
-
-    /// @notice Get all four facet cuts
-    function getChainCreationFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        // We still want to reuse DeployUtils, but this function is not used in this script
-        revert("not implemented");
-    }
-
-    /// @notice Get new facet cuts that were added in the upgrade
-    function getUpgradeAddedFacetCuts(
-        StateTransitionDeployedAddresses memory stateTransition
-    ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        // We still want to reuse DeployUtils, but this function is not used in this script
-        revert("not implemented");
     }
 
     // add this to be excluded from coverage report

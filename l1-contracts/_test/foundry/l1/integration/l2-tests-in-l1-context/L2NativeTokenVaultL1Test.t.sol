@@ -29,14 +29,14 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
-import {L2GatewayTestAbstract} from "../l2-tests-abstract/L2GatewayTestAbstract.t.sol";
+import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
+import {L2NativeTokenVaultTestAbstract} from "../l2-tests-abstract/L2NativeTokenVaultTestAbstract.t.sol";
 
 import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 
-contract L2GatewayL1Test is Test, SharedL2ContractL1Deployer, L2GatewayTestAbstract {
+contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeTokenVaultTestAbstract {
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL1Deployer) {}
 
     function initSystemContracts(

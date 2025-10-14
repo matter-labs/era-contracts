@@ -77,7 +77,7 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
-import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployUtils.s.sol";
+import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployCTMUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {DefaultEcosystemUpgrade} from "../upgrade/DefaultEcosystemUpgrade.s.sol";
@@ -200,7 +200,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
                 return ContractsBytecodesLib.getCreationCode("L1V29Upgrade", true);
             }
         }
-        return super.getCreationCode(contractName, isZKBytecode);
+        revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
     }
 
     function getCreationCalldata(
@@ -457,7 +457,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
                     );
             }
         } else {
-            return super.getInitializeCalldata(contractName, isZKBytecode);
+            revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
         }
     }
 }

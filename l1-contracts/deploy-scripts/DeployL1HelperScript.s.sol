@@ -60,8 +60,9 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
-import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
+import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployL1CoreUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
 abstract contract DeployL1HelperScript is Script, DeployUtils {
     function deployTuppWithContract(
@@ -137,52 +138,6 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(ChainAdmin).creationCode;
             } else if (compareStrings(contractName, "ProxyAdmin")) {
                 return type(ProxyAdmin).creationCode;
-            } else if (compareStrings(contractName, "RollupDAManager")) {
-                return type(RollupDAManager).creationCode;
-            } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
-                return type(ValidiumL1DAValidator).creationCode;
-            } else if (compareStrings(contractName, "Verifier")) {
-                if (config.testnetVerifier) {
-                    return type(TestnetVerifier).creationCode;
-                } else {
-                    return type(DualVerifier).creationCode;
-                }
-            } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return type(L1VerifierFflonk).creationCode;
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return type(L1VerifierPlonk).creationCode;
-            } else if (compareStrings(contractName, "DefaultUpgrade")) {
-                return type(DefaultUpgrade).creationCode;
-            } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
-                return type(L1GenesisUpgrade).creationCode;
-            } else if (compareStrings(contractName, "ValidatorTimelock")) {
-                return type(ValidatorTimelock).creationCode;
-            } else if (compareStrings(contractName, "ChainTypeManager")) {
-                return type(ChainTypeManager).creationCode;
-            } else if (compareStrings(contractName, "BytecodesSupplier")) {
-                return type(BytecodesSupplier).creationCode;
-            } else if (compareStrings(contractName, "ExecutorFacet")) {
-                return type(ExecutorFacet).creationCode;
-            } else if (compareStrings(contractName, "AdminFacet")) {
-                return type(AdminFacet).creationCode;
-            } else if (compareStrings(contractName, "MailboxFacet")) {
-                return type(MailboxFacet).creationCode;
-            } else if (compareStrings(contractName, "GettersFacet")) {
-                return type(GettersFacet).creationCode;
-            } else if (compareStrings(contractName, "DiamondInit")) {
-                return type(DiamondInit).creationCode;
-            } else if (compareStrings(contractName, "ServerNotifier")) {
-                return type(ServerNotifier).creationCode;
-            } else if (compareStrings(contractName, "UpgradeStageValidator")) {
-                return type(UpgradeStageValidator).creationCode;
-            }
-        } else {
-            if (compareStrings(contractName, "Verifier")) {
-                if (config.testnetVerifier) {
-                    return getCreationCode("TestnetVerifier", true);
-                } else {
-                    return getCreationCode("DualVerifier", true);
-                }
             }
         }
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
@@ -210,23 +165,9 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
                 return
                     abi.encodeCall(
-                        L1NativeTokenVault.initialize,
-                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
-                    );
-            } else if (compareStrings(contractName, "ChainTypeManager")) {
-                return
-                    abi.encodeCall(
-                        ChainTypeManager.initialize,
-                        getChainTypeManagerInitializeData(addresses.stateTransition)
-                    );
-            } else if (compareStrings(contractName, "ServerNotifier")) {
-                return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
-            } else if (compareStrings(contractName, "ValidatorTimelock")) {
-                return
-                    abi.encodeCall(
-                        ValidatorTimelock.initialize,
-                        (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
-                    );
+                    L1NativeTokenVault.initialize,
+                    (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                );
             } else {
                 revert(string.concat("Contract ", contractName, " initialize calldata not set"));
             }

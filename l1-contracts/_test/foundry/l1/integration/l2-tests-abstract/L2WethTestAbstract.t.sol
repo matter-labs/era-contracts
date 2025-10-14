@@ -27,7 +27,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SystemContractsArgs} from "./Utils.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 
 abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     function test_shouldDepositWethByCallingDeposit() public {
@@ -43,7 +43,7 @@ abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function test_revertWhenDepositingWithRandomCalldata() public {
-        (bool success, ) = address(weth).call{value: 100}(hex"00000000");
+        (bool success,) = address(weth).call{value: 100}(hex"00000000");
         assertEq(success, false);
     }
 
