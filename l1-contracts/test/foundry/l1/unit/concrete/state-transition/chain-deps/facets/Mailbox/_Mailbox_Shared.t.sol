@@ -22,7 +22,7 @@ contract MailboxTest is Test {
     address sender;
     uint256 constant eraChainId = 9;
     address internal testnetVerifier =
-        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0), false));
     address diamondProxy;
     address bridgehub;
     IEIP7702Checker eip7702Checker;

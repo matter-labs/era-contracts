@@ -230,7 +230,8 @@ contract ExecutorTest is Test {
         TestnetVerifier testnetVerifier = new TestnetVerifier(
             IVerifierV2(address(0)),
             IVerifier(address(0)),
-            address(0)
+            address(0),
+            false
         );
 
         InitializeData memory params = InitializeData({

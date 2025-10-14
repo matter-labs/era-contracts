@@ -25,9 +25,12 @@ import {MockEIP7702Checker} from "contracts/dev-contracts/MockEIP7702Checker.sol
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
-import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
+import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
+import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -129,12 +132,20 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 if (config.testnetVerifier) {
                     return type(TestnetVerifier).creationCode;
                 } else {
-                    return type(DualVerifier).creationCode;
+                    if (config.isZKsyncOS) {
+                        return type(ZKsyncOSDualVerifier).creationCode;
+                    } else {
+                        return type(EraDualVerifier).creationCode;
+                    }
                 }
-            } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return type(VerifierFflonk).creationCode;
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return type(VerifierPlonk).creationCode;
+            } else if (compareStrings(contractName, "EraVerifierFflonk")) {
+                return type(EraVerifierFflonk).creationCode;
+            } else if (compareStrings(contractName, "EraVerifierPlonk")) {
+                return type(EraVerifierPlonk).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
+                return type(ZKsyncOSVerifierFflonk).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
+                return type(ZKsyncOSVerifierPlonk).creationCode;
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {

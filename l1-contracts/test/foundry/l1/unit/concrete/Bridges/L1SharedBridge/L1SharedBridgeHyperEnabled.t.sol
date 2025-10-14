@@ -9,6 +9,7 @@ import {L2Message, TxStatus} from "contracts/common/Messaging.sol";
 import {IMailboxImpl} from "contracts/state-transition/chain-interfaces/IMailboxImpl.sol";
 
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 // note, this should be the same as where hyper is disabled
@@ -218,7 +219,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setBaseTokenAssetId(ETH_TOKEN_ASSET_ID);
 
         bytes memory message = abi.encodePacked(
-            IAssetRouterBase.finalizeDeposit.selector,
+            AssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
             abi.encode(0, alice, 0, amount, new bytes(0))
@@ -260,7 +261,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setBaseTokenAssetId(tokenAssetId);
 
         bytes memory message = abi.encodePacked(
-            IAssetRouterBase.finalizeDeposit.selector,
+            AssetRouterBase.finalizeDeposit.selector,
             chainId,
             ETH_TOKEN_ASSET_ID,
             abi.encode(0, alice, 0, amount, new bytes(0))
@@ -302,7 +303,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
         _setBaseTokenAssetId(tokenAssetId);
 
         bytes memory message = abi.encodePacked(
-            IAssetRouterBase.finalizeDeposit.selector,
+            AssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
             abi.encode(0, alice, 0, amount, new bytes(0))
@@ -342,7 +343,7 @@ contract L1AssetRouterHyperEnabledTest is L1AssetRouterTest {
 
     function test_finalizeWithdrawal_NonBaseErcOnErc2() public {
         bytes memory message = abi.encodePacked(
-            IAssetRouterBase.finalizeDeposit.selector,
+            AssetRouterBase.finalizeDeposit.selector,
             chainId,
             tokenAssetId,
             abi.encode(0, alice, 0, amount, new bytes(0))

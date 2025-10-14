@@ -5,12 +5,13 @@ import {GatewayTransactionFiltererTest} from "./_GatewayTransactionFilterer_Shar
 
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {InvalidSelector} from "contracts/common/L1ContractErrors.sol";
 
 contract CheckTransactionTest is GatewayTransactionFiltererTest {
     function test_TransactionAllowedOnlyFromWhitelistedSenderWhichIsNotAssetRouter() public {
         bytes memory txCalladata = abi.encodeCall(
-            IAssetRouterBase.finalizeDeposit,
+            AssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), bytes("0x23456"))
         );
         vm.startPrank(owner);
@@ -53,7 +54,7 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
     function test_TransactionAllowedFromWhitelistedSenderForChainBridging() public {
         address stm = address(0x6060606);
         bytes memory txCalladata = abi.encodeCall(
-            IAssetRouterBase.finalizeDeposit,
+            AssetRouterBase.finalizeDeposit,
             (uint256(10), bytes32("0x12345"), bytes("0x23456"))
         );
         vm.startPrank(owner);
@@ -80,12 +81,12 @@ contract CheckTransactionTest is GatewayTransactionFiltererTest {
 
     function test_TransactionFailsWithInvalidSelectorEvenIfTheSenderIsAR() public {
         bytes memory txCalladata = abi.encodeCall(
-            IAssetRouterBase.setAssetHandlerAddressThisChain,
+            AssetRouterBase.setAssetHandlerAddressThisChain,
             (bytes32("0x12345"), address(0x01234567890123456789))
         );
         vm.prank(owner);
         vm.expectRevert(
-            abi.encodeWithSelector(InvalidSelector.selector, IAssetRouterBase.setAssetHandlerAddressThisChain.selector)
+            abi.encodeWithSelector(InvalidSelector.selector, AssetRouterBase.setAssetHandlerAddressThisChain.selector)
         );
         bool isTxAllowed = transactionFiltererProxy.isTransactionAllowed(
             assetRouter,

@@ -50,7 +50,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[42] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[43] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
@@ -68,7 +68,8 @@ library ContractsBytecodesLib {
             "DiamondInit",
             "DiamondProxy",
             "DefaultUpgrade",
-            "DualVerifier",
+            "EraDualVerifier",
+            "ZKsyncOSDualVerifier",
             "L1GenesisUpgrade",
             "L2AdminFactory",
             "L2AssetRouter",
@@ -134,10 +135,14 @@ library ContractsBytecodesLib {
         } else if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
             // Original: Getters.sol
             return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
-        } else if (Utils.compareStrings(contractIdentifier, "VerifierFflonk")) {
-            return Utils.readZKFoundryBytecodeL1("VerifierFflonk.sol", "VerifierFflonk");
-        } else if (Utils.compareStrings(contractIdentifier, "VerifierPlonk")) {
-            return Utils.readZKFoundryBytecodeL1("VerifierPlonk.sol", "VerifierPlonk");
+        } else if (Utils.compareStrings(contractIdentifier, "EraVerifierFflonk")) {
+            return Utils.readZKFoundryBytecodeL1("EraVerifierFflonk.sol", "EraVerifierFflonk");
+        } else if (Utils.compareStrings(contractIdentifier, "EraVerifierPlonk")) {
+            return Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
+        } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierFflonk")) {
+            return Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
+        } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierPlonk")) {
+            return Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         }
 
         // --- General Cases ---

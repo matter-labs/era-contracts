@@ -22,7 +22,7 @@ error UnsupportedChainIdForMockVerifier();
 /// to the correct verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
 /// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type. The contract is
 /// needed for the smooth transition from PLONK based verifier to the FFLONK verifier.
-contract DualVerifier is IVerifier {
+contract ZKsyncOSDualVerifier is IVerifier {
     /// @notice Type of verification for FFLONK verifier.
     uint256 internal constant FFLONK_VERIFICATION_TYPE = 0;
 

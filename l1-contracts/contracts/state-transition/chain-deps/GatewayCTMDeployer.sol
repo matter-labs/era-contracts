@@ -12,12 +12,16 @@ import {RollupDAManager} from "../data-availability/RollupDAManager.sol";
 import {RelayedSLDAValidator} from "../data-availability/RelayedSLDAValidator.sol";
 import {ValidiumL1DAValidator} from "../data-availability/ValidiumL1DAValidator.sol";
 
-import {DualVerifier} from "../verifiers/DualVerifier.sol";
-import {VerifierFflonk} from "../verifiers/VerifierFflonk.sol";
-import {VerifierPlonk} from "../verifiers/VerifierPlonk.sol";
+import {EraDualVerifier} from "../verifiers/EraDualVerifier.sol";
+import {ZKsyncOSDualVerifier} from "../verifiers/ZKsyncOSDualVerifier.sol";
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 
 import {IVerifier, VerifierParams} from "../chain-interfaces/IVerifier.sol";
 import {IEIP7702Checker} from "../chain-interfaces/IEIP7702Checker.sol";
+import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {TestnetVerifier} from "../verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "../ValidatorTimelock.sol";
 import {FeeParams} from "../chain-deps/ZKChainStorage.sol";
@@ -50,6 +54,8 @@ struct GatewayCTMDeployerConfig {
     uint256 l1ChainId;
     /// @notice Flag indicating whether to use the testnet verifier.
     bool testnetVerifier;
+    /// @notice Flag indicating whether to use ZKsync OS mode.
+    bool isZKsyncOS;
     /// @notice Array of function selectors for the Admin facet.
     bytes4[] adminSelectors;
     /// @notice Array of function selectors for the Executor facet.
@@ -185,7 +191,8 @@ contract GatewayCTMDeployer {
             _aliasedGovernanceAddress: _config.aliasedGovernanceAddress,
             _deployedContracts: contracts
         });
-        _deployVerifier(salt, _config.testnetVerifier, contracts, _config.aliasedGovernanceAddress);
+        // solhint-disable-next-line func-named-parameters
+        _deployVerifier(salt, _config.testnetVerifier, _config.isZKsyncOS, contracts, _config.aliasedGovernanceAddress);
 
         _deployProxyAdmin(salt, _config.aliasedGovernanceAddress, contracts);
 
@@ -291,27 +298,53 @@ contract GatewayCTMDeployer {
     /// @notice Deploys verifier.
     /// @param _salt Salt used for CREATE2 deployments.
     /// @param _testnetVerifier Whether testnet verifier should be used.
+    /// @param _isZKsyncOS Whether ZKsync OS mode should be used.
     /// @param _deployedContracts The struct with deployed contracts, that will be mofiied
     /// @param _verifierOwner The owner that can add additional verification keys.
     /// in the process of the execution of this function.
     function _deployVerifier(
         bytes32 _salt,
         bool _testnetVerifier,
+        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts,
         address _verifierOwner
     ) internal {
-        VerifierFflonk fflonkVerifier = new VerifierFflonk{salt: _salt}();
-        _deployedContracts.stateTransition.verifierFflonk = address(fflonkVerifier);
-        VerifierPlonk verifierPlonk = new VerifierPlonk{salt: _salt}();
-        _deployedContracts.stateTransition.verifierPlonk = address(verifierPlonk);
+        address fflonkVerifier;
+        address verifierPlonk;
+
+        if (_isZKsyncOS) {
+            fflonkVerifier = address(new ZKsyncOSVerifierFflonk{salt: _salt}());
+            verifierPlonk = address(new ZKsyncOSVerifierPlonk{salt: _salt}());
+        } else {
+            fflonkVerifier = address(new EraVerifierFflonk{salt: _salt}());
+            verifierPlonk = address(new EraVerifierPlonk{salt: _salt}());
+        }
+
+        _deployedContracts.stateTransition.verifierFflonk = fflonkVerifier;
+        _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = address(
-                new TestnetVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, _verifierOwner)
+                new TestnetVerifier{salt: _salt}(
+                    IVerifierV2(fflonkVerifier),
+                    IVerifier(verifierPlonk),
+                    _verifierOwner,
+                    _isZKsyncOS
+                )
             );
         } else {
-            _deployedContracts.stateTransition.verifier = address(
-                new DualVerifier{salt: _salt}(fflonkVerifier, verifierPlonk, _verifierOwner)
-            );
+            if (_isZKsyncOS) {
+                _deployedContracts.stateTransition.verifier = address(
+                    new ZKsyncOSDualVerifier{salt: _salt}(
+                        IVerifierV2(fflonkVerifier),
+                        IVerifier(verifierPlonk),
+                        _verifierOwner
+                    )
+                );
+            } else {
+                _deployedContracts.stateTransition.verifier = address(
+                    new EraDualVerifier{salt: _salt}(IVerifierV2(fflonkVerifier), IVerifier(verifierPlonk))
+                );
+            }
         }
     }
 
