@@ -247,7 +247,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function deployTuppWithContract(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual returns (address implementation, address proxy) {
+    ) internal returns (address implementation, address proxy) {
         (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
             contractName,
             addresses.transparentProxyAdmin,

@@ -86,17 +86,17 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual override(DeployIntegrationUtils, DeployUtils) returns (bytes memory) {
+    ) internal virtual override returns (bytes memory) {
         revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
     }
 
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
+    internal
+    virtual
+    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+    returns (Diamond.FacetCut[] memory)
     {
         return super.getChainCreationFacetCuts(stateTransition);
     }
@@ -104,10 +104,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
+    internal
+    virtual
+    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+    returns (Diamond.FacetCut[] memory)
     {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }

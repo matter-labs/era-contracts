@@ -99,27 +99,4 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
     // add this to be excluded from coverage report
     function test() internal virtual override {}
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        revert("Not implemented");
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        revert("Not implemented initialize calldata");
-    }
-
-    function deployTuppWithContract(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (address implementation, address proxy) {
-        revert("Not implemented tupp");
-    }
-
-    // function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
-    // }
 }
