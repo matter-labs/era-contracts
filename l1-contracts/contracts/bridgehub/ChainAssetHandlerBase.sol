@@ -15,7 +15,7 @@ import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
 import {L1_SETTLEMENT_LAYER_VIRTUAL_ADDRESS} from "../common/Config.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {HyperchainNotRegistered, IncorrectChainAssetId, IncorrectSender, NotAssetRouter, NotL1, SLHasDifferentCTM} from "./L1BridgehubErrors.sol";
-import {ChainIdNotRegistered, MigrationPaused} from "../common/L1ContractErrors.sol";
+import {ChainIdNotRegistered} from "../common/L1ContractErrors.sol";
 
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 import {IChainAssetHandler} from "./IChainAssetHandler.sol";
@@ -67,9 +67,6 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetRouter() internal view virtual returns (address);
 
-    /// @notice Used to pause the migrations of chains. Used for upgrades.
-    bool public migrationPaused;
-
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
@@ -81,14 +78,6 @@ abstract contract ChainAssetHandlerBase is
     modifier onlyAssetRouter() {
         if (msg.sender != _assetRouter()) {
             revert NotAssetRouter(msg.sender, _assetRouter());
-        }
-        _;
-    }
-
-    /// @notice Only when migrations are not paused.
-    modifier whenMigrationsNotPaused() {
-        if (migrationPaused) {
-            revert MigrationPaused();
         }
         _;
     }
@@ -123,7 +112,7 @@ abstract contract ChainAssetHandlerBase is
         override
         requireZeroValue(_l2MsgValue + msg.value)
         onlyAssetRouter
-        whenMigrationsNotPaused
+        whenNotPaused
         returns (bytes memory bridgehubMintData)
     {
         BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
@@ -190,7 +179,7 @@ abstract contract ChainAssetHandlerBase is
         uint256, // originChainId
         bytes32 _assetId,
         bytes calldata _bridgehubMintData
-    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenMigrationsNotPaused {
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter whenNotPaused {
         BridgehubMintCTMAssetData memory bridgehubMintData = abi.decode(
             _bridgehubMintData,
             (BridgehubMintCTMAssetData)
@@ -256,12 +245,12 @@ abstract contract ChainAssetHandlerBase is
     //////////////////////////////////////////////////////////////*/
 
     /// @notice Pauses migration functions.
-    function pauseMigration() external onlyOwner {
-        migrationPaused = true;
+    function pause() external onlyOwner {
+        _pause();
     }
 
     /// @notice Unpauses migration functions.
-    function unpauseMigration() external onlyOwner {
-        migrationPaused = false;
+    function unpause() external onlyOwner {
+        _unpause();
     }
 }
