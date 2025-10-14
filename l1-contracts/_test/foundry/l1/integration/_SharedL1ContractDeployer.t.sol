@@ -42,7 +42,7 @@ contract L1ContractDeployer is Test {
         l1CoreContractsScript = new DeployL1CoreContractsIntegrationScript();
         l1CoreContractsScript.runForTest();
         revert("Deployed L1 core contracts");
-//        addresses = l1CoreContractsScript.getAddresses();
+        //        addresses = l1CoreContractsScript.getAddresses();
     }
 
     function registerCTM(address bridgehub, address ctm) public {
@@ -128,11 +128,11 @@ contract L1ContractDeployer is Test {
 
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
-        .target(address(addresses.l1Nullifier))
-        .sig(addresses.l1Nullifier.chainBalance.selector)
-        .with_key(_chainId)
-        .with_key(_token)
-        .checked_write(_value);
+            .target(address(addresses.l1Nullifier))
+            .sig(addresses.l1Nullifier.chainBalance.selector)
+            .with_key(_chainId)
+            .with_key(_token)
+            .checked_write(_value);
     }
 
     function _setSharedBridgeIsWithdrawalFinalized(
@@ -142,12 +142,12 @@ contract L1ContractDeployer is Test {
         bool _isFinalized
     ) internal {
         stdstore
-        .target(address(addresses.l1Nullifier))
-        .sig(addresses.l1Nullifier.isWithdrawalFinalized.selector)
-        .with_key(_chainId)
-        .with_key(_l2BatchNumber)
-        .with_key(_l2ToL1MessageNumber)
-        .checked_write(_isFinalized);
+            .target(address(addresses.l1Nullifier))
+            .sig(addresses.l1Nullifier.isWithdrawalFinalized.selector)
+            .with_key(_chainId)
+            .with_key(_l2BatchNumber)
+            .with_key(_l2ToL1MessageNumber)
+            .checked_write(_isFinalized);
     }
 
     // add this to be excluded from coverage report
