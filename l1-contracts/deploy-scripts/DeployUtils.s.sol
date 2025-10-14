@@ -28,6 +28,7 @@ struct DeployedAddresses {
     address accessControlRestrictionAddress;
     address create2Factory;
     address chainRegistrar;
+    address eip7702Checker;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -42,7 +43,6 @@ struct DataAvailabilityDeployedAddresses {
     address noDAValidiumL1DAValidator;
     address availBridge;
     address availL1DAValidator;
-    address eip7702Checker;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -451,7 +451,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else if (compareStrings(contractName, "AdminFacet")) {
             return abi.encode(config.l1ChainId, addresses.daAddresses.rollupDAManager);
         } else if (compareStrings(contractName, "MailboxFacet")) {
-            return abi.encode(config.eraChainId, config.l1ChainId, addresses.daAddresses.eip7702Checker);
+            return abi.encode(config.eraChainId, config.l1ChainId, addresses.eip7702Checker);
         } else if (compareStrings(contractName, "GettersFacet")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ServerNotifier")) {

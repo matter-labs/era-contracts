@@ -262,8 +262,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
 
         // Verify selector matches finalizeDeposit
         assertEq(selector, IAssetRouterBase.finalizeDeposit.selector, "Selector mismatch");
-        // TODO: remove comment to check that refund recipient is correct after foundry version is bumped to post-prague
-        // assertEq(address(uint160(request.transaction.reserved[1])), randomCaller, "Refund recipient mismatch");
+        assertEq(address(uint160(request.transaction.reserved[1])), randomCaller, "Refund recipient mismatch");
 
         // Allocate new bytes without the 4-byte selector
         bytes memory args = new bytes(callData.length - 4);

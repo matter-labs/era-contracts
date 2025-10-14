@@ -5,7 +5,6 @@ pragma solidity 0.8.28;
 /// @title EIP7702Checker
 /// @notice Utility to detect EIP-7702 style EOAs (accounts with code stubs)
 /// @dev See: https://eips.ethereum.org/EIPS/eip-7702
-
 contract EIP7702Checker {
     uint256 internal constant EIP7702_CODE_SIZE = 23;
     bytes3 internal constant EIP7702_PREFIX = 0xef0100;

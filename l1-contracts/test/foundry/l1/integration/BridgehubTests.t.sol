@@ -743,8 +743,7 @@ contract BoundedBridgeHubInvariantTests is BridgeHubInvariantTests {
 
         NewPriorityRequest memory request = _getNewPriorityQueueFromLogs(logs);
 
-        // TODO: remove comment after foundry version is bumped to post-prague
-        // assertEq(currentUser, address(uint160(request.transaction.from)));
+        assertEq(currentUser, address(uint160(request.transaction.from)));
         assertNotEq(request.txHash, bytes32(0));
         _handleRequestByMockL2Contract(request, RequestType.DIRECT);
 

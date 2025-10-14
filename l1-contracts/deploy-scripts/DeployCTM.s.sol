@@ -202,7 +202,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     }
 
     function deployEIP7702Checker() internal {
-        addresses.daAddresses.eip7702Checker = deploySimpleContract("EIP7702Checker", false);
+        addresses.eip7702Checker = deploySimpleContract("EIP7702Checker", false);
     }
 
     function deployDAValidators() internal {

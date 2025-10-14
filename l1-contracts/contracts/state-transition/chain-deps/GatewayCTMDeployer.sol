@@ -137,8 +137,6 @@ struct DAContracts {
 struct DeployedContracts {
     /// @notice Address of the Multicall3 contract.
     address multicall3;
-    /// @notice Address of the EIP7702Checker contract.
-    address eip7702Checker;
     /// @notice Struct containing state transition related contracts.
     StateTransitionContracts stateTransition;
     /// @notice Struct containing Data Availability related contracts.
@@ -179,7 +177,6 @@ contract GatewayCTMDeployer {
         DeployedContracts memory contracts;
 
         contracts.multicall3 = address(new Multicall3{salt: salt}());
-        contracts.eip7702Checker = address(0);
 
         _deployFacetsAndUpgrades({
             _salt: salt,
@@ -222,7 +219,7 @@ contract GatewayCTMDeployer {
         DeployedContracts memory _deployedContracts
     ) internal {
         _deployedContracts.stateTransition.mailboxFacet = address(
-            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, IEIP7702Checker(_deployedContracts.eip7702Checker))
+            new MailboxFacet{salt: _salt}(_eraChainId, _l1ChainId, IEIP7702Checker(address(0)))
         );
         _deployedContracts.stateTransition.executorFacet = address(new ExecutorFacet{salt: _salt}(_l1ChainId));
         _deployedContracts.stateTransition.gettersFacet = address(new GettersFacet{salt: _salt}());

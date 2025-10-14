@@ -169,7 +169,6 @@ contract GatewayCTMDeployerTest is Test {
 library DeployedContractsComparator {
     function compareDeployedContracts(DeployedContracts memory a, DeployedContracts memory b) internal pure {
         require(a.multicall3 == b.multicall3, "multicall3 differs");
-        require(a.eip7702Checker == b.eip7702Checker, "eip7702Checker differs");
         compareStateTransitionContracts(a.stateTransition, b.stateTransition);
         compareDAContracts(a.daContracts, b.daContracts);
         compareBytes(a.diamondCutData, b.diamondCutData, "diamondCutData");
