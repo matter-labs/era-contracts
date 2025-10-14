@@ -26,6 +26,12 @@ contract AddressAliasHelperTest {
         bool _is7702AccountRefundRecipient,
         bool _is7702AccountSender
     ) external view returns (address) {
-        return AddressAliasHelper.actualRefundRecipientMailbox(_recipient, _prevMessageSender, _is7702AccountRefundRecipient, _is7702AccountSender);
-}
+        return
+            AddressAliasHelper.actualRefundRecipientMailbox(
+                _recipient,
+                _prevMessageSender,
+                _is7702AccountRefundRecipient,
+                _is7702AccountSender
+            );
+    }
 }

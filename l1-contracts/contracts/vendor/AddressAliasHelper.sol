@@ -74,7 +74,7 @@ library AddressAliasHelper {
     ) internal view returns (address _recipient) {
         if (_refundRecipient == address(0)) {
             // If the `_refundRecipient` is not provided, we use the `_originalCaller` as the recipient.
-            // Or if the `_sender` is EIP7702, then we also do not want to apply aliasing to original caller. 
+            // Or if the `_sender` is EIP7702, then we also do not want to apply aliasing to original caller.
             // solhint-disable avoid-tx-origin
             // slither-disable-next-line tx-origin
             _recipient = (_originalCaller == tx.origin || _is7702AccountSender)
