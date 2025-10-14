@@ -75,15 +75,15 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 struct DeployedAddresses {
     BridgehubDeployedAddresses bridgehub;
     StateTransitionDeployedAddresses stateTransition;
-    BridgesDeployedAddresses bridges;
-    L1NativeTokenVaultAddresses vaults;
+//    BridgesDeployedAddresses bridges;
+//    L1NativeTokenVaultAddresses vaults;
     DataAvailabilityDeployedAddresses daAddresses;
     address transparentProxyAdmin;
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
-    address create2Factory;
-    address chainRegistrar;
+//    address create2Factory;
+//    address chainRegistrar;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -102,37 +102,37 @@ struct DataAvailabilityDeployedAddresses {
 
 // solhint-disable-next-line gas-struct-packing
 struct BridgehubDeployedAddresses {
-    address bridgehubImplementation;
+//    address bridgehubImplementation;
     address bridgehubProxy;
-    address ctmDeploymentTrackerImplementation;
-    address ctmDeploymentTrackerProxy;
-    address messageRootImplementation;
-    address messageRootProxy;
-    address chainAssetHandlerImplementation;
-    address chainAssetHandlerProxy;
+//    address ctmDeploymentTrackerImplementation;
+//    address ctmDeploymentTrackerProxy;
+//    address messageRootImplementation;
+//    address messageRootProxy;
+//    address chainAssetHandlerImplementation;
+//    address chainAssetHandlerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
-    address erc20BridgeImplementation;
-    address erc20BridgeProxy;
-    address l1AssetRouterImplementation;
-    address l1AssetRouterProxy;
-    address l1NullifierImplementation;
-    address l1NullifierProxy;
-    address bridgedStandardERC20Implementation;
-    address bridgedTokenBeacon;
+//    address erc20BridgeImplementation;
+//    address erc20BridgeProxy;
+//    address l1AssetRouterImplementation;
+//    address l1AssetRouterProxy;
+//    address l1NullifierImplementation;
+//    address l1NullifierProxy;
+//    address bridgedStandardERC20Implementation;
+//    address bridgedTokenBeacon;
 }
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
-    uint256 l1ChainId;
+//    uint256 l1ChainId;
     address deployerAddress;
-    uint256 eraChainId;
-    uint256 gatewayChainId;
+//    uint256 eraChainId;
+//    uint256 gatewayChainId;
     address ownerAddress;
-    bool testnetVerifier;
-    bool supportL2LegacySharedBridgeTest;
+//    bool testnetVerifier;
+//    bool supportL2LegacySharedBridgeTest;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -141,28 +141,28 @@ struct Config {
 struct ContractsConfig {
     address multicall3Addr;
     uint256 validatorTimelockExecutionDelay;
-    bytes32 genesisRoot;
-    uint256 genesisRollupLeafIndex;
-    bytes32 genesisBatchCommitment;
-    uint256 latestProtocolVersion;
-    bytes32 recursionNodeLevelVkHash;
-    bytes32 recursionLeafLevelVkHash;
-    bytes32 recursionCircuitsSetVksHash;
-    uint256 priorityTxMaxGasLimit;
-    PubdataPricingMode diamondInitPubdataPricingMode;
-    uint256 diamondInitBatchOverheadL1Gas;
-    uint256 diamondInitMaxPubdataPerBatch;
-    uint256 diamondInitMaxL2GasPerBatch;
-    uint256 diamondInitPriorityTxMaxPubdata;
-    uint256 diamondInitMinimalL2GasPrice;
+//    bytes32 genesisRoot;
+//    uint256 genesisRollupLeafIndex;
+//    bytes32 genesisBatchCommitment;
+//    uint256 latestProtocolVersion;
+//    bytes32 recursionNodeLevelVkHash;
+//    bytes32 recursionLeafLevelVkHash;
+//    bytes32 recursionCircuitsSetVksHash;
+//    uint256 priorityTxMaxGasLimit;
+//    PubdataPricingMode diamondInitPubdataPricingMode;
+//    uint256 diamondInitBatchOverheadL1Gas;
+//    uint256 diamondInitMaxPubdataPerBatch;
+//    uint256 diamondInitMaxL2GasPerBatch;
+//    uint256 diamondInitPriorityTxMaxPubdata;
+//    uint256 diamondInitMinimalL2GasPrice;
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;
-    uint256 maxNumberOfChains;
-    bytes diamondCutData;
-    bytes32 bootloaderHash;
-    bytes32 defaultAAHash;
-    bytes32 evmEmulatorHash;
-    address availL1DAValidator;
+//    uint256 maxNumberOfChains;
+//    bytes diamondCutData;
+//    bytes32 bootloaderHash;
+//    bytes32 defaultAAHash;
+//    bytes32 evmEmulatorHash;
+//    address availL1DAValidator;
 }
 
 struct TokensConfig {
@@ -190,7 +190,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
         // Config file must be parsed key by key, otherwise values returned
         // are parsed alfabetically and not by key.
         // https://book.getfoundry.sh/cheatcodes/parse-toml
-        config.eraChainId = toml.readUint("$.era_chain_id");
         config.ownerAddress = toml.readAddress("$.owner_address");
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
@@ -498,62 +497,14 @@ abstract contract DeployUtils is Create2FactoryUtils {
         string memory contractName,
         bool isZKBytecode
     ) internal view virtual returns (bytes memory) {
-        if (compareStrings(contractName, "ChainRegistrar")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "Bridgehub")) {
-            return abi.encode(config.l1ChainId, config.ownerAddress, (config.contracts.maxNumberOfChains));
-        } else if (compareStrings(contractName, "MessageRoot")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, config.l1ChainId);
-        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, addresses.bridges.l1AssetRouterProxy);
-        } else if (compareStrings(contractName, "ChainAssetHandler")) {
-            return
-                abi.encode(
-                    config.l1ChainId,
-                    config.ownerAddress,
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    addresses.bridgehub.messageRootProxy
-                );
-        } else if (compareStrings(contractName, "L1Nullifier")) {
-            return
-                abi.encode(
-                    addresses.bridgehub.bridgehubProxy,
-                    config.eraChainId,
-                    addresses.stateTransition.diamondProxy
-                );
-        } else if (compareStrings(contractName, "L1AssetRouter")) {
-            return
-                abi.encode(
-                    config.tokens.tokenWethAddress,
-                    addresses.bridgehub.bridgehubProxy,
-                    addresses.bridges.l1NullifierProxy,
-                    config.eraChainId,
-                    addresses.stateTransition.diamondProxy
-                );
-        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-            return
-                abi.encode(
-                    addresses.bridges.l1NullifierProxy,
-                    addresses.bridges.l1AssetRouterProxy,
-                    addresses.vaults.l1NativeTokenVaultProxy,
-                    config.eraChainId
-                );
-        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-            return
-                abi.encode(
-                    config.tokens.tokenWethAddress,
-                    addresses.bridges.l1AssetRouterProxy,
-                    addresses.bridges.l1NullifierProxy
-                );
-        } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+        if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
         } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
             return abi.encode(addresses.bridges.bridgedStandardERC20Implementation);
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return abi.encode(addresses.daAddresses.l1RollupDAValidator);
+            return abi.encode();
         } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AvailL1DAValidator")) {
@@ -629,7 +580,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
                 getChainTypeManagerInitializeData(addresses.stateTransition)
             );
         } else if (compareStrings(contractName, "ServerNotifier")) {
-            return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
+            return abi.encodeCall(ServerNotifier.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
             return
                 abi.encodeCall(
