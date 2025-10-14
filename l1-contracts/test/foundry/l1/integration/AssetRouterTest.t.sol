@@ -21,7 +21,7 @@ import {L2_ASSET_ROUTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common
 
 import {NativeTokenVaultBase} from "contracts/bridge/ntv/NativeTokenVaultBase.sol";
 import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.sol";
-import {IAssetRouterBase, NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
+import {NEW_ENCODING_VERSION} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {L2CanonicalTransaction} from "contracts/common/Messaging.sol";
@@ -262,7 +262,7 @@ contract AssetRouterIntegrationTest is L1ContractDeployer, ZKChainDeployer, Toke
         }
 
         // Verify selector matches finalizeDeposit
-        assertEq(selector, IAssetRouterBase.finalizeDeposit.selector, "Selector mismatch");
+        assertEq(selector, AssetRouterBase.finalizeDeposit.selector, "Selector mismatch");
         assertEq(address(uint160(request.transaction.reserved[1])), randomCaller, "Refund recipient mismatch");
 
         // Allocate new bytes without the 4-byte selector
