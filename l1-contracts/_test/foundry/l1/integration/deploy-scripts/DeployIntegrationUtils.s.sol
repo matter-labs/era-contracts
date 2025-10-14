@@ -6,7 +6,7 @@ pragma solidity ^0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
@@ -14,11 +14,6 @@ abstract contract DeployIntegrationUtils is Script, DeployUtils {
     using stdToml for string;
 
     function test() internal virtual override {}
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory);
 
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition

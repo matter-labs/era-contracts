@@ -2,19 +2,23 @@
 
 pragma solidity ^0.8.20;
 
+// solhint-disable gas-custom-errors
+
 import {Test} from "forge-std/Test.sol";
+// import "forge-std/console.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployUtils.s.sol";
+import {SystemContractsArgs} from "./L2Utils.sol";
 
-import {DeployIntegrationUtils} from "../../l1/integration/deploy-scripts/DeployIntegrationUtils.s.sol";
-
+import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
+import {L2NativeTokenVaultTestAbstract} from "../../l1/integration/l2-tests-abstract/L2NativeTokenVaultTestAbstract.t.sol";
+import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
-import {L2WethTestAbstract} from "../../l1/integration/l2-tests-abstract/L2WethTestAbstract.t.sol";
-
-import {SharedL2ContractL2Deployer, SystemContractsArgs} from "./_SharedL2ContractL2Deployer.sol";
+import {DeployIntegrationUtils} from "../../l1/integration/deploy-scripts/DeployIntegrationUtils.s.sol";
 import {Create2FactoryUtils} from "deploy-scripts/Create2FactoryUtils.s.sol";
 
-contract WethTest is Test, L2WethTestAbstract, SharedL2ContractL2Deployer {
+contract L2NativeTokenVaultTest is Test, SharedL2ContractL2Deployer, L2NativeTokenVaultTestAbstract {
+    // We need to emulate a L1->L2 transaction from the L1 bridge to L2 counterpart.
+    // It is a bit easier to use EOA and it is sufficient for the tests.
     function test() internal virtual override(SharedL2ContractDeployer, SharedL2ContractL2Deployer) {}
 
     function initSystemContracts(

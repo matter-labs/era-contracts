@@ -11,7 +11,7 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Config, DeployUtils, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
+import {Config, DeployUtils, DeployedAddresses} from "deploy-scripts/DeployCTMUtils.s.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_INTEROP_ROOT_STORAGE, L2_MESSAGE_ROOT_ADDR, L2_MESSAGE_VERIFICATION, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
@@ -79,24 +79,24 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual override(DeployUtils, DeployL1HelperScript) returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
+    ) internal view virtual override returns (bytes memory) {
+        revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
     }
 
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual override(DeployIntegrationUtils, DeployL1HelperScript) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
+    ) internal virtual override(DeployIntegrationUtils, DeployUtils) returns (bytes memory) {
+        revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
     }
 
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
+    internal
+    virtual
+    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+    returns (Diamond.FacetCut[] memory)
     {
         return super.getChainCreationFacetCuts(stateTransition);
     }
@@ -104,10 +104,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getUpgradeFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
+    internal
+    virtual
+    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+    returns (Diamond.FacetCut[] memory)
     {
         return super.getUpgradeFacetCuts(stateTransition);
     }

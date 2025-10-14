@@ -46,11 +46,10 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {Config, DeployedAddresses, GeneratedData} from "./DeployUtils.s.sol";
-import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
+import {Config, DeployedAddresses, GeneratedData, DeployUtils} from "./DeployCTMUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-contract DeployCTMScript is Script, DeployL1HelperScript {
+contract DeployCTMScript is Script, DeployUtils {
     using stdToml for string;
 
     function run() public virtual {
@@ -478,7 +477,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         address dangerousTestOnlyForcedBeacon;
         if (config.supportL2LegacySharedBridgeTest) {
-            (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
+            (dangerousTestOnlyForcedBeacon,) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
                 addresses.bridges.erc20BridgeProxy,
                 addresses.bridges.l1NullifierProxy,
                 addresses.governance
@@ -497,8 +496,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
             messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
             chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
-            // For newly created chains it it is expected that the following bridges are not present at the moment
-            // of creation of the chain
+        // For newly created chains it it is expected that the following bridges are not present at the moment
+        // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon
