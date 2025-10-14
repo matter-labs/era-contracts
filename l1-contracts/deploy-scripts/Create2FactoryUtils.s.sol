@@ -72,10 +72,10 @@ abstract contract Create2FactoryUtils is Script {
     function deployViaCreate2(bytes memory bytecode) internal virtual returns (address) {
         return
             Utils.deployViaCreate2(
-            bytecode,
-            create2FactoryParams.factorySalt,
-            create2FactoryState.create2FactoryAddress
-        );
+                bytecode,
+                create2FactoryParams.factorySalt,
+                create2FactoryState.create2FactoryAddress
+            );
     }
 
     /// @notice Deploys a contract via Create2 by concatenating the creation code and constructor arguments.
@@ -88,10 +88,10 @@ abstract contract Create2FactoryUtils is Script {
     ) internal virtual returns (address) {
         return
             Utils.deployViaCreate2(
-            abi.encodePacked(creationCode, constructorArgs),
-            create2FactoryParams.factorySalt,
-            create2FactoryState.create2FactoryAddress
-        );
+                abi.encodePacked(creationCode, constructorArgs),
+                create2FactoryParams.factorySalt,
+                create2FactoryState.create2FactoryAddress
+            );
     }
 
     /// @notice Deploys a contract via Create2 and notifies via console logs.

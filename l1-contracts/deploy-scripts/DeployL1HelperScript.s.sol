@@ -165,9 +165,9 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
                 return
                     abi.encodeCall(
-                    L1NativeTokenVault.initialize,
-                    (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
-                );
+                        L1NativeTokenVault.initialize,
+                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                    );
             } else {
                 revert(string.concat("Contract ", contractName, " initialize calldata not set"));
             }

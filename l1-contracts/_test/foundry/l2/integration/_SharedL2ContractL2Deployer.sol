@@ -110,7 +110,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         string memory contractName,
         bool isZKBytecode
     ) internal virtual override returns (bytes memory) {
-        return ("Not implemented initialize calldata");
+        revert("Not implemented initialize calldata");
     }
 
     function deployTuppWithContract(
