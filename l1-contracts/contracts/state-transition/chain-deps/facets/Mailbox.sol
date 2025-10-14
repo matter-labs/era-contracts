@@ -468,7 +468,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         request.refundRecipient = AddressAliasHelper.actualRefundRecipientMailbox(
             request.refundRecipient,
             request.sender,
-            is7702AccountRefundRecipient
+            is7702AccountRefundRecipient,
+            is7702AccountSender
         );
         // Change the sender address if it is a smart contract to prevent address collision between L1 and L2.
         // Please note, currently ZKsync address derivation is different from Ethereum one, but it may be changed in the future.

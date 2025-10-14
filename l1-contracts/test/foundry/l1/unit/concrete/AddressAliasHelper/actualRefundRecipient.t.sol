@@ -37,7 +37,7 @@ contract ActualRefundRecipient is AddressAliasHelperSharedTest {
 
         address expectedRecipient = addressAliasHelper.applyL1ToL2Alias(prevMessageSender);
 
-        address actualRecipient = addressAliasHelper.actualRefundRecipientMailbox(recipient, prevMessageSender, false);
+        address actualRecipient = addressAliasHelper.actualRefundRecipientMailbox(recipient, prevMessageSender, false, false);
 
         assertEq(actualRecipient, expectedRecipient);
     }
@@ -48,7 +48,7 @@ contract ActualRefundRecipient is AddressAliasHelperSharedTest {
 
         address expectedRecipient = addressAliasHelper.applyL1ToL2Alias(recipient);
 
-        address actualRecipient = addressAliasHelper.actualRefundRecipientMailbox(recipient, prevMessageSender, false);
+        address actualRecipient = addressAliasHelper.actualRefundRecipientMailbox(recipient, prevMessageSender, false, false);
 
         assertEq(actualRecipient, expectedRecipient);
     }
