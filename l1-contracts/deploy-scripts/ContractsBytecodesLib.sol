@@ -45,7 +45,7 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[43] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[44] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
@@ -58,7 +58,8 @@ library ContractsBytecodesLib {
             "L1ChainAssetHandler",
             "L2ChainAssetHandler",
             "ChainRegistrar",
-            "ChainTypeManager",
+            "EraChainTypeManager",
+            "ZKsyncOSChainTypeManager",
             "CTMDeploymentTracker",
             "DiamondInit",
             "DiamondProxy",

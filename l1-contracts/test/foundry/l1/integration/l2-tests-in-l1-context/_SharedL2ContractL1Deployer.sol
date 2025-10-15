@@ -66,10 +66,11 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         addresses.stateTransition.verifier = deploySimpleContract("Verifier", true);
         addresses.stateTransition.validatorTimelock = deploySimpleContract("ValidatorTimelock", true);
         deployStateTransitionDiamondFacets();
+        string memory ctmContractName = config.isZKsyncOS ? "ZKsyncOSChainTypeManager" : "EraChainTypeManager";
         (
             addresses.stateTransition.chainTypeManagerImplementation,
             addresses.stateTransition.chainTypeManagerProxy
-        ) = deployTuppWithContract("ChainTypeManager", true);
+        ) = deployTuppWithContract(ctmContractName, true);
     }
 
     // add this to be excluded from coverage report
