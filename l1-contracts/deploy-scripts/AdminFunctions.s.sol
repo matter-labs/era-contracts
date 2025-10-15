@@ -10,7 +10,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {IChainAdmin} from "contracts/governance/IChainAdmin.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 import {Call} from "contracts/governance/Common.sol";
 import {ChainInfoFromBridgehub, Utils} from "./Utils.sol";
@@ -708,7 +708,7 @@ contract AdminFunctions is Script {
             BridgehubBurnCTMAssetData({
                 chainId: data.l2ChainId,
                 ctmData: abi.encode(l2ChainInfo.admin, data.l1DiamondCutData),
-                chainData: abi.encode(ChainTypeManager(l2ChainInfo.ctm).getProtocolVersion(data.l2ChainId))
+                chainData: abi.encode(IChainTypeManager(l2ChainInfo.ctm).getProtocolVersion(data.l2ChainId))
             })
         );
 

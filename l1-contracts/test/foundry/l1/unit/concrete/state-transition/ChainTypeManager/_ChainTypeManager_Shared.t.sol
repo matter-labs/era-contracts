@@ -21,7 +21,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {InitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
@@ -37,8 +37,8 @@ import {IVerifierV2} from "contracts/state-transition/chain-interfaces/IVerifier
 import {IVerifier} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 
 contract ChainTypeManagerTest is Test {
-    ChainTypeManager internal chainTypeManager;
-    ChainTypeManager internal chainContractAddress;
+    EraChainTypeManager internal chainTypeManager;
+    EraChainTypeManager internal chainContractAddress;
     L1GenesisUpgrade internal genesisUpgradeContract;
     L1Bridgehub internal bridgehub;
     L1MessageRoot internal messageRoot;
@@ -78,7 +78,7 @@ contract ChainTypeManagerTest is Test {
         newChainAdmin = makeAddr("chainadmin");
 
         vm.startPrank(address(bridgehub));
-        chainTypeManager = new ChainTypeManager(address(IBridgehubBase(address(bridgehub))));
+        chainTypeManager = new EraChainTypeManager(address(IBridgehubBase(address(bridgehub))));
         diamondInit = address(new DiamondInit(false));
         genesisUpgradeContract = new L1GenesisUpgrade();
 
@@ -136,7 +136,7 @@ contract ChainTypeManagerTest is Test {
         new TransparentUpgradeableProxy(
             address(chainTypeManager),
             admin,
-            abi.encodeCall(ChainTypeManager.initialize, ctmInitializeDataNoGovernor)
+            abi.encodeCall(EraChainTypeManager.initialize, ctmInitializeDataNoGovernor)
         );
 
         ChainTypeManagerInitializeData memory ctmInitializeData = ChainTypeManagerInitializeData({
@@ -150,9 +150,9 @@ contract ChainTypeManagerTest is Test {
         TransparentUpgradeableProxy transparentUpgradeableProxy = new TransparentUpgradeableProxy(
             address(chainTypeManager),
             admin,
-            abi.encodeCall(ChainTypeManager.initialize, ctmInitializeData)
+            abi.encodeCall(EraChainTypeManager.initialize, ctmInitializeData)
         );
-        chainContractAddress = ChainTypeManager(address(transparentUpgradeableProxy));
+        chainContractAddress = EraChainTypeManager(address(transparentUpgradeableProxy));
 
         rollupL1DAValidator = Utils.deployL1RollupDAValidatorBytecode();
 

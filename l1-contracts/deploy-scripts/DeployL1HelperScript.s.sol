@@ -53,7 +53,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
@@ -171,8 +172,10 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 return type(L1GenesisUpgrade).creationCode;
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return type(ValidatorTimelock).creationCode;
-            } else if (compareStrings(contractName, "ChainTypeManager")) {
-                return type(ChainTypeManager).creationCode;
+            } else if (compareStrings(contractName, "EraChainTypeManager")) {
+                return type(EraChainTypeManager).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+                return type(ZKsyncOSChainTypeManager).creationCode;
             } else if (compareStrings(contractName, "BytecodesSupplier")) {
                 return type(BytecodesSupplier).creationCode;
             } else if (compareStrings(contractName, "ExecutorFacet")) {
@@ -296,10 +299,16 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                         L1NativeTokenVault.initialize,
                         (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
                     );
-            } else if (compareStrings(contractName, "ChainTypeManager")) {
+            } else if (compareStrings(contractName, "EraChainTypeManager")) {
                 return
                     abi.encodeCall(
-                        ChainTypeManager.initialize,
+                        EraChainTypeManager.initialize,
+                        getChainTypeManagerInitializeData(addresses.stateTransition)
+                    );
+            } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+                return
+                    abi.encodeCall(
+                        ZKsyncOSChainTypeManager.initialize,
                         getChainTypeManagerInitializeData(addresses.stateTransition)
                     );
             } else if (compareStrings(contractName, "ServerNotifier")) {

@@ -25,7 +25,7 @@ import {IMultisig} from "./interfaces/IMultisig.sol";
 import {ISafe} from "./interfaces/ISafe.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IGetters} from "contracts/state-transition/chain-interfaces/IGetters.sol";
 
 /// @dev EIP-712 TypeHash for the emergency protocol upgrade execution approved by the guardians.
@@ -1311,7 +1311,7 @@ library Utils {
         info.diamondProxy = L1Bridgehub(_bridgehub).getZKChain(_chainId);
         info.admin = IGetters(info.diamondProxy).getAdmin();
         info.ctm = L1Bridgehub(_bridgehub).chainTypeManager(_chainId);
-        info.serverNotifier = ChainTypeManager(info.ctm).serverNotifierAddress();
+        info.serverNotifier = IChainTypeManager(info.ctm).serverNotifierAddress();
     }
 
     function getZKOSBytecodeInfo(bytes memory bytecode) internal returns (bytes memory bytecodeInfo) {

@@ -30,7 +30,8 @@ import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {L2DACommitmentScheme} from "contracts/common/Config.sol";
@@ -70,7 +71,8 @@ contract GatewayCTMDeployerTest is Test {
         new RollupDAManager();
         new ValidiumL1DAValidator();
         new RelayedSLDAValidator();
-        new ChainTypeManager(address(0));
+        new ZKsyncOSChainTypeManager(address(0));
+        new EraChainTypeManager(address(0));
         new ProxyAdmin();
 
         new EraVerifierFflonk();
