@@ -130,6 +130,45 @@ jobs:
       - name: Check hashes
         run: yarn calculate-hashes:check
 
+  check-selectors:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Restore artifacts cache
+        uses: actions/cache/restore@v3
+        with:
+          fail-on-cache-miss: true
+          key: artifacts-l1-${{ github.sha }}
+          path: |
+            da-contracts/out
+            l1-contracts/cache-forge
+            l1-contracts/out
+            l1-contracts/zkout
+            l2-contracts/cache-forge
+            l2-contracts/zkout
+            system-contracts/zkout
+
+      - name: Install foundry-zksync
+        run: |
+          mkdir ./foundry-zksync
+          curl -LO https://github.com/matter-labs/foundry-zksync/releases/download/foundry-zksync-v0.0.30/foundry_zksync_v0.0.30_linux_amd64.tar.gz
+          tar zxf foundry_zksync_v0.0.30_linux_amd64.tar.gz -C ./foundry-zksync
+          chmod +x ./foundry-zksync/forge ./foundry-zksync/cast
+          echo "$PWD/foundry-zksync" >> $GITHUB_PATH
+
+      - name: Check selectors
+        working-directory: l1-contracts
+        run: |
+          forge selectors list > /tmp/selectors
+          echo "Comparing generated selectors with l1-contracts/selectors"
+          diff -u /tmp/selectors selectors
+
   test-foundry:
     needs: [build, lint]
     runs-on: ubuntu-latest
