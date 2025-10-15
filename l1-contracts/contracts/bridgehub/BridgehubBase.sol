@@ -462,7 +462,7 @@ abstract contract BridgehubBase is
         uint256 _gasPrice,
         uint256 _l2GasLimit,
         uint256 _l2GasPerPubdataByteLimit
-    ) external view override returns (uint256) {
+    ) external view returns (uint256) {
         address zkChain = zkChainMap.get(_chainId);
         return IZKChain(zkChain).l2TransactionBaseCost(_gasPrice, _l2GasLimit, _l2GasPerPubdataByteLimit);
     }
