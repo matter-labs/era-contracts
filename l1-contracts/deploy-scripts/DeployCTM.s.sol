@@ -61,8 +61,8 @@ contract DeployCTMScript is Script, DeployUtils {
         console.log("Deploying CTM related contracts");
 
         runInner(
-            "/script-config/config-deploy-l1.toml",
-            "/script-out/output-deploy-l1.toml",
+            "/script-config/config-deploy-ctm.toml",
+            "/script-out/output-deploy-ctm.toml",
             bridgehub,
             reuseGovAndAdmin
         );
@@ -105,23 +105,9 @@ contract DeployCTMScript is Script, DeployUtils {
         address erc20Bridge = address(assetRouter.legacyBridge());
         address l1Nullifier = address(assetRouter.L1_NULLIFIER());
 
-//        addresses.bridgehub.bridgehubProxy = bridgehub;
-//        addresses.bridgehub.bridgehubImplementation = Utils.getImplementation(bridgehub);
-//        addresses.bridgehub.ctmDeploymentTrackerProxy = l1CtmDeployer;
-//        addresses.bridgehub.ctmDeploymentTrackerImplementation = Utils.getImplementation(l1CtmDeployer);
-//        addresses.bridgehub.messageRootProxy = messageRoot;
-//        addresses.bridgehub.messageRootImplementation = Utils.getImplementation(messageRoot);
-//        addresses.bridgehub.chainAssetHandlerProxy = chainAssetHandler;
-//        addresses.bridgehub.chainAssetHandlerImplementation = Utils.getImplementation(chainAssetHandler);
-
         // Bridges
         addresses.bridges.erc20BridgeProxy = erc20Bridge;
-//        addresses.bridges.erc20BridgeImplementation = Utils.getImplementation(erc20Bridge);
         addresses.bridges.l1NullifierProxy = l1Nullifier;
-//        addresses.bridges.l1NullifierImplementation = Utils.getImplementation(l1Nullifier);
-//        addresses.bridges.l1AssetRouterProxy = address(assetRouter);
-//        addresses.bridges.l1AssetRouterImplementation = Utils.getImplementation(address(assetRouter));
-//        addresses.vaults.l1NativeTokenVaultProxy = nativeTokenVault;
 
         if (reuseGovAndAdmin) {
             addresses.governance = IOwnable(bridgehub).owner();
@@ -233,26 +219,6 @@ contract DeployCTMScript is Script, DeployUtils {
         }
     }
 
-    function deployDiamondProxy() internal {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: addresses.stateTransition.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        });
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: ""
-        });
-        address contractAddress = deployViaCreate2(
-            type(DiamondProxy).creationCode,
-            abi.encode(config.l1ChainId, diamondCut)
-        );
-        console.log("DiamondProxy deployed at:", contractAddress);
-        addresses.stateTransition.diamondProxy = contractAddress;
-    }
 
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
@@ -273,8 +239,14 @@ contract DeployCTMScript is Script, DeployUtils {
     }
 
     function saveOutput(string memory outputPath) internal virtual {
-        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
-
+        string memory bridgehub = vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
+        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
+        string memory bridges = vm.serializeAddress(
+            "bridges",
+            "shared_bridge_proxy_addr",
+            addresses.bridges.l1AssetRouterProxy
+        );
         // TODO(EVM-744): this has to be renamed to chain type manager
         vm.serializeAddress(
             "state_transition",
@@ -284,7 +256,7 @@ contract DeployCTMScript is Script, DeployUtils {
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
-        vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
+        string memory stateTransition = vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
 
         vm.serializeBytes("contracts_config", "diamond_cut_data", config.contracts.diamondCutData);
 
@@ -301,6 +273,7 @@ contract DeployCTMScript is Script, DeployUtils {
 
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
+        vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
 
         vm.serializeAddress(
@@ -324,8 +297,11 @@ contract DeployCTMScript is Script, DeployUtils {
             "avail_l1_da_validator_addr",
             addresses.daAddresses.availL1DAValidator
         );
+        string memory deployedAddresses = vm.serializeString("deployed_addresses", "state_transition", stateTransition);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
-        vm.serializeAddress(
+        vm.serializeString("root", "deployed_addresses", deployedAddresses);
+        vm.serializeString("root", "contracts_config", contractsConfig);
+        string memory toml = vm.serializeAddress(
             "root",
             "expected_rollup_l2_da_validator_addr",
             calculateExpectedL2Address("RollupL2DAValidator")

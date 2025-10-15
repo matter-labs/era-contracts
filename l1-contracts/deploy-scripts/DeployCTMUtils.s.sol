@@ -151,6 +151,7 @@ struct ContractsConfig {
 }
 
 struct TokensConfig {
+    address test;
 }
 
 // solhint-disable-next-line gas-struct-packing
