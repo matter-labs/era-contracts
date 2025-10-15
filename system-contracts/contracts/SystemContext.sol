@@ -107,7 +107,7 @@ contract SystemContext is ISystemContext, ISystemContextDeprecated, SystemContra
         }
     }
 
-    function getSettlementLayerChainId() external view onlyL2AssetTrackerOrInteropCenter returns (uint256) {
+    function getSettlementLayerChainId() external view  returns (uint256) { //onlyL2AssetTrackerOrInteropCenter
         return currentSettlementLayerChainId;
     }
 

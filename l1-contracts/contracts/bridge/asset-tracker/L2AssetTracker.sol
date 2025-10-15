@@ -2,6 +2,8 @@
 
 pragma solidity 0.8.28;
 
+import {Script, console2 as console} from "forge-std/Script.sol";
+
 import {IERC20} from "@openzeppelin/contracts-v4/token/ERC20/IERC20.sol";
 
 import {SavedTotalSupply, TOKEN_BALANCE_MIGRATION_DATA_VERSION, MAX_TOKEN_BALANCE} from "./IAssetTrackerBase.sol";
@@ -272,6 +274,8 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
     /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
+        console.log(L1_CHAIN_ID);
+        console.log(L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId());
         require(
             L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID,
             OnlyGatewaySettlementLayer()

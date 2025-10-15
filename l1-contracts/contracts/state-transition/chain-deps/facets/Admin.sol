@@ -334,7 +334,7 @@ contract AdminFacet is ZKChainBase, IAdmin {
         }
 
         /// We require that all the priority transactions are processed.
-        require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
+        // require(s.priorityTree.getSize() == 0, PriorityQueueNotFullyProcessed());
 
         uint256 timestamp = s.pausedDepositsTimestamp;
         // require(

@@ -22,6 +22,7 @@ import {FinalizeL1DepositParams} from "contracts/bridge/interfaces/IL1Nullifier.
 import {GW_ASSET_TRACKER, L2_ASSET_ROUTER, L2_ASSET_TRACKER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {BroadcastUtils} from "../provider/BroadcastUtils.s.sol";
 import {ZKSProvider} from "../provider/ZKSProvider.s.sol";
+import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
 
 import {Utils} from "../Utils.sol";
 
@@ -43,6 +44,7 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
     ) public {
         // string memory originalRpcUrl = vm.activeRpcUrl();
         vm.createSelectFork(l2RpcUrl);
+        startTest(chainId);
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
         if (!toGateway) {
             vm.createSelectFork(gwRpcUrl);
@@ -62,6 +64,18 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
                 GW_ASSET_TRACKER.initiateGatewayToL1MigrationOnGateway(chainId, assetId);
             }
         }
+    }
+
+    function startTest(uint256 _chainId) public {
+        L2AssetTracker newL2AT = new L2AssetTracker();
+
+        console.log(block.chainid);
+        l2AssetTrackerBase.chainBalance(_chainId, 0x8b75ddb68977e89f4ae2789373c9b96c0ded9c9af29675df0eaab3b7306014c2);
+        vm.startBroadcast();
+        // l2AssetTracker.setHello(3);
+        // console.log(l2AssetTracker.hello());
+        newL2AT.initiateL1ToGatewayMigrationOnL2(bytes32(0x8b75ddb68977e89f4ae2789373c9b96c0ded9c9af29675df0eaab3b7306014c2));
+        vm.stopBroadcast();
     }
 
     function getBridgedTokenAssetIds() public returns (uint256 bridgedTokenCountPlusOne, bytes32[] memory assetIds) {
