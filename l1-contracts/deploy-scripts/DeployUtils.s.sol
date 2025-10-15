@@ -454,6 +454,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "ChainTypeManager")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "EraChainTypeManager")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
+        } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+            return abi.encode(addresses.bridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
