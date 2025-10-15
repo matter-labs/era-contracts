@@ -19,6 +19,7 @@ import {AdminZero, InitialForceDeploymentMismatch, OutdatedProtocolVersion} from
 import {ChainAlreadyLive, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero, HashMismatch, MigrationsNotPaused, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
@@ -275,7 +276,7 @@ contract EraChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2Step
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
     ) external onlyOwner {
-        if (!IL1Bridgehub(BRIDGE_HUB).migrationPaused()) {
+        if (!PausableUpgradeable(IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()).paused()) {
             revert MigrationsNotPaused();
         }
 

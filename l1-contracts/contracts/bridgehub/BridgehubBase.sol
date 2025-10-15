@@ -20,7 +20,7 @@ import {AddressAliasHelper} from "../vendor/AddressAliasHelper.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, NotCurrentSL, NotInGatewayMode, NotRelayedSender, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
-import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, MigrationPaused, NoCTMForAssetId, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
+import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, NoCTMForAssetId, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 
@@ -105,7 +105,7 @@ abstract contract BridgehubBase is
     mapping(bytes32 baseTokenAssetId => bool) public assetIdIsRegistered;
 
     /// @notice used to pause the migrations of chains. Used for stopping migrations during upgrades.
-    bool public migrationPaused;
+    bool public __DEPRECATED_migrationPaused;
 
     /// @notice the chain asset handler used for chain migration.
     address public chainAssetHandler;
@@ -143,13 +143,6 @@ abstract contract BridgehubBase is
         /// There is no sender for the wrapping, we use a virtual address.
         if (msg.sender != SETTLEMENT_LAYER_RELAY_SENDER) {
             revert NotRelayedSender(msg.sender, SETTLEMENT_LAYER_RELAY_SENDER);
-        }
-        _;
-    }
-
-    modifier whenMigrationsNotPaused() {
-        if (migrationPaused) {
-            revert MigrationPaused();
         }
         _;
     }
@@ -606,17 +599,6 @@ abstract contract BridgehubBase is
     /// @notice Unpauses the contract, allowing all functions marked with the `whenNotPaused` modifier to be called again.
     function unpause() external onlyOwner {
         _unpause();
-    }
-
-    /// @notice Pauses migration functions.
-    /// @dev Remove this with V30, the functionality was moved to the ChainAssetHandler in V29.
-    function pauseMigration() external onlyOwner {
-        migrationPaused = true;
-    }
-
-    /// @notice Unpauses migration functions.
-    function unpauseMigration() external onlyOwner {
-        migrationPaused = false;
     }
 
     /*//////////////////////////////////////////////////////////////

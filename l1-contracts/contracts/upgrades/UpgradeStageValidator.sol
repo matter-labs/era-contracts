@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/security/PausableUpgradeable.sol";
 import {MigrationPaused, MigrationsNotPaused, ProtocolIdMismatch, ZeroAddress} from "../common/L1ContractErrors.sol";
 
 /// @title Rules to validate that different upgrade stages have passed.
@@ -36,14 +37,14 @@ contract UpgradeStageValidator {
 
     /// @notice Check if migrations are paused
     function checkMigrationsPaused() external {
-        if (!BRIDGEHUB.migrationPaused()) {
+        if (!PausableUpgradeable(BRIDGEHUB.chainAssetHandler()).paused()) {
             revert MigrationsNotPaused();
         }
     }
 
     /// @notice Check if migrations are unpaused
     function checkMigrationsUnpaused() external {
-        if (BRIDGEHUB.migrationPaused()) {
+        if (PausableUpgradeable(BRIDGEHUB.chainAssetHandler()).paused()) {
             revert MigrationPaused();
         }
     }

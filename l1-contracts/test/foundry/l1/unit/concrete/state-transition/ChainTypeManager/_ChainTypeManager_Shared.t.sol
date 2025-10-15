@@ -259,7 +259,13 @@ contract ChainTypeManagerTest is Test {
     }
 
     function _mockMigrationPausedFromBridgehub() internal {
-        vm.mockCall(address(bridgehub), abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
+        address mockChainAssetHandler = address(0x202020202020202020202);
+        vm.mockCall(
+            address(bridgehub),
+            abi.encodeWithSignature("chainAssetHandler()"),
+            abi.encode(mockChainAssetHandler)
+        );
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("paused()"), abi.encode(true));
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////
