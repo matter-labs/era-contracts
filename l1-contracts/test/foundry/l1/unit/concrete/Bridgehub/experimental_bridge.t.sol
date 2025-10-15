@@ -118,7 +118,7 @@ contract ExperimentalBridgeTest is Test {
         messageRoot = new L1MessageRoot(address(bridgehub), 1);
         weth = makeAddr("WETH");
         mockCTM = new DummyChainTypeManagerWBH(address(bridgehub));
-        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid);
+        mockChainContract = new DummyZKChain(address(bridgehub), eraChainId, block.chainid, address(0));
 
         mockL2Contract = makeAddr("mockL2Contract");
         // mocks to use in bridges instead of using a dummy one

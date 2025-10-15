@@ -98,3 +98,5 @@ error V30UpgradeChainBatchNumberNotSet();
 error WrongCounterPart(address addressOnCounterPart, address l2BridgehubAddress);
 // 0x7b968d06
 error ZKChainNotRegistered();
+
+error MigrationNotInProgress();

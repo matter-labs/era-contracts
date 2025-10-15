@@ -30,7 +30,7 @@ import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 
-import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {L2_BRIDGEHUB_ADDR, L2_CREATE2_FACTORY_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -57,7 +57,7 @@ contract GatewayCTMDeployerTest is Test {
 
     // This is done merely to publish the respective bytecodes.
     function _predeployContracts() internal {
-        new MailboxFacet(1, 1);
+        new MailboxFacet(1, 1, L2_CHAIN_ASSET_HANDLER_ADDR);
         new ExecutorFacet(1);
         new GettersFacet();
         new AdminFacet(1, RollupDAManager(address(0)));

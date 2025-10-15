@@ -41,6 +41,7 @@ import {SemVer} from "contracts/common/libraries/SemVer.sol";
 import {ProofData} from "contracts/common/libraries/MessageHashing.sol";
 import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 import {IMessageRoot, IMessageVerification} from "contracts/bridgehub/IMessageRoot.sol";
+import {IL1ChainAssetHandler} from "contracts/bridgehub/IL1ChainAssetHandler.sol";
 
 contract L1GatewayTests is
     L1ContractDeployer,
@@ -139,6 +140,22 @@ contract L1GatewayTests is
         IZKChain chain = IZKChain(IBridgehubBase(addresses.bridgehub).getZKChain(_chainId));
         vm.startBroadcast(chain.getAdmin());
         IAdmin(address(chain)).unpauseDeposits();
+        vm.mockCall(
+            addresses.ecosystemAddresses.bridgehub.messageRootProxy,
+            abi.encodeWithSelector(IMessageVerification.proveL1ToL2TransactionStatusShared.selector),
+            abi.encode(true)
+        );
+        IL1ChainAssetHandler(address(addresses.bridgehub.chainAssetHandler())).confirmSuccessfulMigrationToGateway(
+            _chainId,
+            address(0),
+            bytes32(0),
+            bytes(""),
+            bytes32(0),
+            0,
+            0,
+            0,
+            new bytes32[](0)
+        );
         vm.stopBroadcast();
     }
 

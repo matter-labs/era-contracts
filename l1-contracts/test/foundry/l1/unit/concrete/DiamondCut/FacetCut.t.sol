@@ -31,7 +31,7 @@ contract FacetCutTest is DiamondCutTest {
     function setUp() public {
         eraChainId = 9;
         diamondCutTestContract = new DiamondCutTestContract();
-        mailboxFacet = new MailboxFacet(eraChainId, block.chainid);
+        mailboxFacet = new MailboxFacet(eraChainId, block.chainid, address(0));
         gettersFacet = new GettersFacet();
         executorFacet1 = new ExecutorFacet(block.chainid);
         executorFacet2 = new ExecutorFacet(block.chainid);

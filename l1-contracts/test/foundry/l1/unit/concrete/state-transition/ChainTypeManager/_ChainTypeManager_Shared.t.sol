@@ -148,7 +148,7 @@ contract ChainTypeManagerTest is UtilsTest {
         );
         facetCuts.push(
             Diamond.FacetCut({
-                facet: address(new MailboxFacet(eraChainId, block.chainid)),
+                facet: address(new MailboxFacet(eraChainId, block.chainid, address(0))),
                 action: Diamond.Action.Add,
                 isFreezable: false,
                 selectors: Utils.getMailboxSelectors()

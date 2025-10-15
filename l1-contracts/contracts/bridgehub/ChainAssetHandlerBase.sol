@@ -207,6 +207,7 @@ abstract contract ChainAssetHandlerBase is
             if (block.chainid != _l1ChainId()) {
                 require(_settlementChainId == _l1ChainId(), MigrationNotToL1());
             }
+            _setMigrationInProgressOnL1(bridgehubBurnData.chainId);
         }
         bytes memory chainMintData = IZKChain(zkChain).forwardedBridgeBurn(
             _settlementChainId == _l1ChainId()
@@ -236,6 +237,9 @@ abstract contract ChainAssetHandlerBase is
         bridgehubMintData = abi.encode(bridgeMintStruct);
 
         emit MigrationStarted(bridgehubBurnData.chainId, _assetId, _settlementChainId);
+    }
+
+    function _setMigrationInProgressOnL1(uint256 _chainId) internal virtual {
     }
 
     /// @dev IL1AssetHandler interface, used to receive a chain on the settlement layer.

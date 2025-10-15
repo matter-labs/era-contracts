@@ -37,6 +37,7 @@ import {INativeTokenVaultBase} from "../../../bridge/ntv/INativeTokenVaultBase.s
 import {V30_UPGRADE_CHAIN_BATCH_NUMBER_PLACEHOLDER_VALUE_FOR_GATEWAY} from "../../../bridgehub/IMessageRoot.sol";
 import {OnlyGateway} from "../../../bridgehub/L1BridgehubErrors.sol";
 import {IAdmin} from "../../chain-interfaces/IAdmin.sol";
+import {IL1ChainAssetHandler} from "../../../bridgehub/IL1ChainAssetHandler.sol";
 
 /// @title ZKsync Mailbox contract providing interfaces for L1 <-> L2 interaction.
 /// @author Matter Labs
@@ -55,6 +56,8 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     /// L1 that is at the most base layer.
     uint256 internal immutable L1_CHAIN_ID;
 
+    address internal immutable CHAIN_ASSET_HANDLER;
+
     modifier onlyL1() {
         if (block.chainid != L1_CHAIN_ID) {
             revert NotL1(block.chainid);
@@ -69,9 +72,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         _;
     }
 
-    constructor(uint256 _eraChainId, uint256 _l1ChainId) {
+    constructor(uint256 _eraChainId, uint256 _l1ChainId, address _chainAssetHandler) {
         ERA_CHAIN_ID = _eraChainId;
         L1_CHAIN_ID = _l1ChainId;
+        CHAIN_ASSET_HANDLER = _chainAssetHandler;
     }
 
     /// @inheritdoc IMailboxImpl
@@ -594,9 +598,10 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
         uint256 timestamp = s.pausedDepositsTimestamp;
         /// We provide 3.5 days window to process all deposits.
         /// After that, the deposits are not being processed for 3.5 days.
-        return
+        bool inPausedWindow = 
             timestamp + PAUSE_DEPOSITS_TIME_WINDOW_START <= block.timestamp &&
             block.timestamp < timestamp + PAUSE_DEPOSITS_TIME_WINDOW_END;
+        return inPausedWindow || IL1ChainAssetHandler(CHAIN_ASSET_HANDLER).isMigrationInProgress(s.chainId);
     }
 
     /// @notice Returns whether the chain has upgraded to V30 on GW.

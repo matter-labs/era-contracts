@@ -6,6 +6,10 @@ import {ChainAssetHandlerBase} from "./ChainAssetHandlerBase.sol";
 import {ETH_TOKEN_ADDRESS} from "../common/Config.sol";
 import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 import {IL1Nullifier} from "../bridge/interfaces/IL1Nullifier.sol";
+import {TxStatus} from "../common/Messaging.sol";
+import {InvalidProof} from "../common/L1ContractErrors.sol";
+import {IMessageRoot} from "./IMessageRoot.sol";
+import {MigrationNotInProgress} from "./L1BridgehubErrors.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -34,6 +38,9 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
 
     /// @dev The L1 nullifier contract.
     IL1Nullifier internal immutable L1_NULLIFIER;
+
+    /// @dev The mapping showing for each chain if migration is in progress or not, used for freezing deposits.abi
+    mapping(uint256 chainId => bool isMigrationInProgress) public isMigrationInProgress;
 
     /*//////////////////////////////////////////////////////////////
                         IMMUTABLE GETTERS
@@ -82,5 +89,34 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
     /// @param _owner the owner of the contract
     function initialize(address _owner) external reentrancyGuardInitializer {
         _transferOwnership(_owner);
+    }
+
+    function confirmSuccessfulMigrationToGateway(
+        uint256 _chainId,
+        address _depositSender,
+        bytes32 _assetId,
+        bytes memory _assetData,
+        bytes32 _l2TxHash,
+        uint256 _l2BatchNumber,
+        uint256 _l2MessageIndex,
+        uint16 _l2TxNumberInBatch,
+        bytes32[] calldata _merkleProof
+    ) public nonReentrant {
+        bool proofValid = IMessageRoot(MESSAGE_ROOT).proveL1ToL2TransactionStatusShared({
+            _chainId: _chainId,
+            _l2TxHash: _l2TxHash,
+            _l2BatchNumber: _l2BatchNumber,
+            _l2MessageIndex: _l2MessageIndex,
+            _l2TxNumberInBatch: _l2TxNumberInBatch,
+            _merkleProof: _merkleProof,
+            _status: TxStatus.Success
+        });
+        require(proofValid, InvalidProof());
+        require(isMigrationInProgress[_chainId], MigrationNotInProgress());
+        isMigrationInProgress[_chainId] = false;
+    }
+
+    function _setMigrationInProgressOnL1(uint256 _chainId) internal override {
+        isMigrationInProgress[_chainId] = true;
     }
 }
