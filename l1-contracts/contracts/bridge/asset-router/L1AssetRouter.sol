@@ -441,7 +441,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
         uint256 _amount,
         address _originalCaller
     ) external onlyNativeTokenVault returns (bool) {
-        address l1TokenAddress = INativeTokenVaultBase(address(nativeTokenVault)).tokenAddress(_assetId);
+        address l1TokenAddress = nativeTokenVault.tokenAddress(_assetId);
         if (l1TokenAddress == address(0) || l1TokenAddress == ETH_TOKEN_ADDRESS) {
             return false;
         }
