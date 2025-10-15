@@ -67,6 +67,10 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetRouter() internal view virtual returns (address);
 
+    /// @notice Was used to pause the migrations of chains.
+    ///         Currently we're using OZ's PausableUpgradeable functionality.
+    bool public ___DEPRECATED_migrationPaused;
+
     /**
      * @dev This empty reserved space is put in place to allow future versions to add new
      * variables without shifting down storage in the inheritance chain.
