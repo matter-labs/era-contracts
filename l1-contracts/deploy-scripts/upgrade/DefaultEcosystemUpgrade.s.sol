@@ -160,7 +160,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     Gateway internal gatewayConfig;
     NewlyGeneratedData internal newlyGeneratedData;
     UpgradeDeployedAddresses internal upgradeAddresses;
-
+    L1NativeTokenVault internal vaults;
+    BridgehubDeployedAddresses internal bridgehub_addresses;
     uint256[] internal factoryDepsHashes;
     mapping(bytes32 => bool) internal isHashInFactoryDeps;
 
@@ -194,44 +195,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     /// @notice Deploy everything that should be deployed
     function deployNewEcosystemContractsL1() public virtual {
-//        require(upgradeConfig.initialized, "Not initialized");
-//
-//        instantiateCreate2Factory();
-//
-//        deployVerifiers();
-//        deployUpgradeStageValidator();
-//
-//        // Note, that this is the upgrade that will be used, despite the naming of the variable here.
-//        // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
-//
-//        // TODO(refactor): rename to "upgrade contract", it is not a default upgrade.
-//        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
-//        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
-//
-//        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
-//
-//        addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
-//        addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
-//        addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault", false);
-//        addresses.bridges.erc20BridgeImplementation = deploySimpleContract("L1ERC20Bridge", false);
-//        addresses.bridges.bridgedStandardERC20Implementation = deploySimpleContract("BridgedStandardERC20", false);
-//
-//        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
-//        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
-//        addresses.bridgehub.ctmDeploymentTrackerImplementation = deploySimpleContract("CTMDeploymentTracker", false);
-//
-//        deployStateTransitionDiamondFacets();
-//
-//        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
-//
-//        addresses.stateTransition.serverNotifierImplementation = deploySimpleContract("ServerNotifier", false);
-//
-//        /// for forge verification.
-//        deploySimpleContract("DiamondProxy", false);
-//
-//        deployUpgradeSpecificContractsL1();
-//
-//        upgradeConfig.ecosystemContractsDeployed = true;
+
     }
 
     function deployUpgradeSpecificContractsL1() internal virtual {
@@ -537,13 +501,13 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     function initializeConfig(string memory newConfigPath) internal virtual override {
 //        super.initializeConfig(newConfigPath);
-//        string memory toml = vm.readFile(newConfigPath);
+        string memory toml = vm.readFile(newConfigPath);
 //
 //        addresses.stateTransition.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
 //
-//        addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
-//
-//        setAddressesBasedOnBridgehub();
+        addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
+
+        setAddressesBasedOnBridgehub();
 //
 //        addresses.transparentProxyAdmin = address(
 //            uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
@@ -554,35 +518,34 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 //        );
 //
 //        config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
-//        newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
-//
-//        newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
-//
-//        newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
-//        newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
-//
-//        addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
-//
-//        gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
-//            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
-//        );
-//
-//        gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
-//            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
-//        );
-//
-//        gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
-//            "$.gateway.gateway_state_transition.rollup_da_manager"
-//        );
-//
-//        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
-//            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
-//        );
-//
-//        gatewayConfig.gatewayStateTransition.isOnGateway = true;
-//
-//        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
-//        config.gatewayChainId = gatewayConfig.chainId;
+        newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
+
+        newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
+
+        newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
+        newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
+
+        addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
+
+        gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
+            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
+        );
+
+        gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
+            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
+        );
+
+        gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
+            "$.gateway.gateway_state_transition.rollup_da_manager"
+        );
+
+        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
+            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
+        );
+
+        gatewayConfig.gatewayStateTransition.isOnGateway = true;
+
+        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
@@ -614,53 +577,53 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
-//        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-//        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
-//        addresses.stateTransition.chainTypeManagerProxy = ctm;
-//        // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
-//        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
-//            config.eraChainId
-//        );
-//        uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
-//        require(
-//            ctmProtocolVersion != getNewProtocolVersion(),
-//            "The new protocol version is already present on the ChainTypeManager"
-//        );
-//        addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
+        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
+        addresses.stateTransition.chainTypeManagerProxy = ctm;
+        // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
+        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+            config.eraChainId
+        );
+        uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
+        require(
+            ctmProtocolVersion != getNewProtocolVersion(),
+            "The new protocol version is already present on the ChainTypeManager"
+        );
+        addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+
+        vaults.l1NativeTokenVaultProxy = address(
+            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
+        );
+        addresses.bridges.l1NullifierProxy = address(
+            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
+        );
+        addresses.bridges.erc20BridgeProxy = address(
+            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
+        );
+
+        bridgehub_addresses.ctmDeploymentTrackerProxy = address(
+            Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
+        );
+
+//        bridgehub_addresses.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
 //
-//        addresses.vaults.l1NativeTokenVaultProxy = address(
-//            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
-//        );
-//        addresses.bridges.l1NullifierProxy = address(
-//            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
-//        );
-//        addresses.bridges.erc20BridgeProxy = address(
-//            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-//        );
-//
-//        addresses.bridgehub.ctmDeploymentTrackerProxy = address(
-//            Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
-//        );
-//
-//        addresses.bridgehub.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
-//
-//        addresses.bridgehub.chainAssetHandlerProxy = address(
+//        bridgehub_addresses.chainAssetHandlerProxy = address(
 //            Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
 //        );
-//
-//        addresses.bridges.erc20BridgeProxy = address(
-//            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-//        );
-//        newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
-//            .validatorTimelock();
-//        addresses.stateTransition.serverNotifierProxy = ChainTypeManager(
-//            addresses.stateTransition.chainTypeManagerProxy
-//        ).serverNotifierAddress();
-//
-//        newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
-//
-//        address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
-//        (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
+
+        addresses.bridges.erc20BridgeProxy = address(
+            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
+        );
+        newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
+            .validatorTimelock();
+        addresses.stateTransition.serverNotifierProxy = ChainTypeManager(
+            addresses.stateTransition.chainTypeManagerProxy
+        ).serverNotifierAddress();
+
+        newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+
+        address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
+        (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
@@ -1587,18 +1550,18 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](8);
-//
-//        calls[0] = _buildCallProxyUpgrade(
-//            addresses.stateTransition.chainTypeManagerProxy,
-//            addresses.stateTransition.chainTypeManagerImplementation
-//        );
-//
+
+        calls[0] = _buildCallProxyUpgrade(
+            addresses.stateTransition.chainTypeManagerProxy,
+            addresses.stateTransition.chainTypeManagerImplementation
+        );
+
 //        calls[1] = _buildCallProxyUpgrade(
 //            addresses.bridgehub.bridgehubProxy,
 //            addresses.bridgehub.bridgehubImplementation
 //        );
-//
-//        // Note, that we do not need to run the initializer
+
+        // Note, that we do not need to run the initializer
 //        calls[2] = _buildCallProxyUpgrade(
 //            addresses.bridges.l1NullifierProxy,
 //            addresses.bridges.l1NullifierImplementation
@@ -1610,20 +1573,20 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 //        );
 //
 //        calls[4] = _buildCallProxyUpgrade(
-//            addresses.vaults.l1NativeTokenVaultProxy,
-//            addresses.vaults.l1NativeTokenVaultImplementation
+//            vaults.l1NativeTokenVaultProxy,
+//            vaults.l1NativeTokenVaultImplementation
 //        );
-//
+
 //        calls[5] = _buildCallProxyUpgrade(
-//            addresses.bridgehub.messageRootProxy,
-//            addresses.bridgehub.messageRootImplementation
+//            bridgehub_addresses.messageRootProxy,
+//            bridgehub_addresses.messageRootImplementation
 //        );
 //
 //        calls[6] = _buildCallProxyUpgrade(
-//            addresses.bridgehub.ctmDeploymentTrackerProxy,
-//            addresses.bridgehub.ctmDeploymentTrackerImplementation
+//            bridgehub_addresses.ctmDeploymentTrackerProxy,
+//            bridgehub_addresses.ctmDeploymentTrackerImplementation
 //        );
-//
+
 //        calls[7] = _buildCallProxyUpgrade(
 //            addresses.bridges.erc20BridgeProxy,
 //            addresses.bridges.erc20BridgeImplementation
@@ -1694,9 +1657,9 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
-//        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
-//            config.gatewayChainId
-//        );
+        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+           gatewayConfig.chainId
+        );
 //        uint256 oldProtocolVersion = getOldProtocolVersion();
 //        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
 //

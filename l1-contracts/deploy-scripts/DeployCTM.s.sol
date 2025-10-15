@@ -46,10 +46,10 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {Config, DeployedAddresses, GeneratedData, DeployUtils} from "./DeployCTMUtils.s.sol";
+import {Config, DeployedAddresses, GeneratedData, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
-contract DeployCTMScript is Script, DeployUtils {
+contract DeployCTMScript is Script, DeployCTMUtils {
     using stdToml for string;
 
     function run() public virtual {

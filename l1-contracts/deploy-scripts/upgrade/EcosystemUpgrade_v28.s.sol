@@ -84,86 +84,86 @@ import {DeployCTMScript} from "../DeployCTM.s.sol";
 /// @notice Script used for default upgrade flow
 /// @dev For more complex upgrades, this script can be inherited and its functionality overridden if needed.
 contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
-//    using stdToml for string;
-//
-//    /**
-//     * @dev Storage slot with the admin of the contract.
-//     * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
-//     * validated in the constructor.
-//     */
-//    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
-//
-//    // solhint-disable-next-line gas-struct-packing
-//    struct UpgradeDeployedAddresses {
-//        ExpectedL2Addresses expectedL2Addresses;
-//        address gatewayUpgrade;
-//        address transitionaryOwner;
-//        address upgradeTimer;
-//        address bytecodesSupplier;
-//        address l2WrappedBaseTokenStore;
-//        address upgradeStageValidator;
-//    }
-//
-//    struct ExpectedL2Addresses {
-//        address expectedRollupL2DAValidator;
-//        address expectedValidiumL2DAValidator;
-//        address l2SharedBridgeLegacyImpl;
-//        address l2BridgedStandardERC20Impl;
-//    }
-//
-//    // solhint-disable-next-line gas-struct-packing
-//    struct AdditionalConfig {
-//        // This is the address of the ecosystem admin.
-//        // Note, that it is not the owner, but rather the address that is responsible
-//        // for facilitating partially trusted, but not critical tasks.
-//        address ecosystemAdminAddress;
-//        uint256 governanceUpgradeTimerInitialDelay;
-//        uint256 oldProtocolVersion;
-//        address oldValidatorTimelock;
-//        uint256 priorityTxsL2GasLimit;
-//        uint256 maxExpectedL1GasPrice;
-//    }
-//
-//    // solhint-disable-next-line gas-struct-packing
-//    struct Gateway {
-//        StateTransitionDeployedAddresses gatewayStateTransition;
-//        bytes facetCutsData;
-//        bytes additionalForceDeployments;
-//        uint256 chainId;
-//        address baseToken;
-//        bytes upgradeCutData;
-//    }
-//
-//    // solhint-disable-next-line gas-struct-packing
-//    struct NewlyGeneratedData {
-//        bytes fixedForceDeploymentsData;
-//        bytes diamondCutData;
-//        bytes upgradeCutData;
-//    }
-//
-//    /// @notice Internal state of the upgrade script
-//    struct EcosystemUpgradeConfig {
-//        bool initialized;
-//        bool expectedL2AddressesInitialized;
-//        bool fixedForceDeploymentsDataGenerated;
-//        bool diamondCutPrepared;
-//        bool upgradeCutPrepared;
-//        bool factoryDepsPublished;
-//        bool ecosystemContractsDeployed;
-//        string outputPath;
-//    }
-//
-//    AdditionalConfig internal newConfig;
-//    Gateway internal gatewayConfig;
-//    NewlyGeneratedData internal newlyGeneratedData;
-//    UpgradeDeployedAddresses internal upgradeAddresses;
-//
-//    uint256[] internal factoryDepsHashes;
-//    mapping(bytes32 => bool) internal isHashInFactoryDeps;
-//
-//    EcosystemUpgradeConfig internal upgradeConfig;
-//
-//    function initialize(string memory newConfigPath, string memory _outputPath) public virtual {
+    using stdToml for string;
+
+    /**
+     * @dev Storage slot with the admin of the contract.
+     * This is the keccak-256 hash of "eip1967.proxy.admin" subtracted by 1, and is
+     * validated in the constructor.
+     */
+    bytes32 internal constant ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;
+
+    // solhint-disable-next-line gas-struct-packing
+    struct UpgradeDeployedAddresses {
+        ExpectedL2Addresses expectedL2Addresses;
+        address gatewayUpgrade;
+        address transitionaryOwner;
+        address upgradeTimer;
+        address bytecodesSupplier;
+        address l2WrappedBaseTokenStore;
+        address upgradeStageValidator;
+    }
+
+    struct ExpectedL2Addresses {
+        address expectedRollupL2DAValidator;
+        address expectedValidiumL2DAValidator;
+        address l2SharedBridgeLegacyImpl;
+        address l2BridgedStandardERC20Impl;
+    }
+
+    //  solhint-disable-next-line gas-struct-packing
+    struct AdditionalConfig {
+        // This is the address of the ecosystem admin.
+        // Note, that it is not the owner, but rather the address that is responsible
+        // for facilitating partially trusted, but not critical tasks.
+        address ecosystemAdminAddress;
+        uint256 governanceUpgradeTimerInitialDelay;
+        uint256 oldProtocolVersion;
+        address oldValidatorTimelock;
+        uint256 priorityTxsL2GasLimit;
+        uint256 maxExpectedL1GasPrice;
+    }
+
+    // solhint-disable-next-line gas-struct-packing
+    struct Gateway {
+        StateTransitionDeployedAddresses gatewayStateTransition;
+        bytes facetCutsData;
+        bytes additionalForceDeployments;
+        uint256 chainId;
+        address baseToken;
+        bytes upgradeCutData;
+    }
+
+    // solhint-disable-next-line gas-struct-packing
+    struct NewlyGeneratedData {
+        bytes fixedForceDeploymentsData;
+        bytes diamondCutData;
+        bytes upgradeCutData;
+    }
+
+    /// @notice Internal state of the upgrade script
+    struct EcosystemUpgradeConfig {
+        bool initialized;
+        bool expectedL2AddressesInitialized;
+        bool fixedForceDeploymentsDataGenerated;
+        bool diamondCutPrepared;
+        bool upgradeCutPrepared;
+        bool factoryDepsPublished;
+        bool ecosystemContractsDeployed;
+        string outputPath;
+    }
+
+    AdditionalConfig internal newConfig;
+    Gateway internal gatewayConfig;
+    NewlyGeneratedData internal newlyGeneratedData;
+    UpgradeDeployedAddresses internal upgradeAddresses;
+
+    uint256[] internal factoryDepsHashes;
+    mapping(bytes32 => bool) internal isHashInFactoryDeps;
+
+    EcosystemUpgradeConfig internal upgradeConfig;
+
+    function initialize(string memory newConfigPath, string memory _outputPath) public virtual {
 //        string memory root = vm.projectRoot();
 //        newConfigPath = string.concat(root, newConfigPath);
 //
@@ -171,10 +171,10 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 //
 //        upgradeConfig.outputPath = string.concat(root, _outputPath);
 //        upgradeConfig.initialized = true;
-//    }
+    }
 //
 //    /// @notice Full default upgrade preparation flow
-//    function prepareEcosystemUpgrade() public virtual {
+    function prepareEcosystemUpgrade() public virtual {
 //        deployNewEcosystemContracts();
 //        console.log("Ecosystem contracts are deployed!");
 //        deployNewEcosystemContractsGW();
@@ -183,10 +183,10 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 //        console.log("Bytecodes published!");
 //        generateUpgradeData();
 //        console.log("Upgrade data generated!");
-//    }
+    }
 //
 //    /// @notice Deploy everything that should be deployed
-//    function deployNewEcosystemContracts() public virtual {
+    function deployNewEcosystemContracts() public virtual {
 //        require(upgradeConfig.initialized, "Not initialized");
 //
 //        instantiateCreate2Factory();
@@ -211,7 +211,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 //        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
 //
 //        upgradeConfig.ecosystemContractsDeployed = true;
-//    }
+    }
 //
 //    function deployGWContract(string memory contractName) internal returns (address contractAddress) {
 //        bytes memory creationCalldata = getCreationCalldata(contractName, true);
@@ -229,7 +229,7 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 //    }
 //
 //    /// @notice Generate data required for the upgrade
-//    function generateUpgradeData() public virtual {
+    function generateUpgradeData() public virtual {
 //        require(upgradeConfig.initialized, "Not initialized");
 //        require(upgradeConfig.ecosystemContractsDeployed, "Ecosystem contracts not deployed");
 //
@@ -244,19 +244,19 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 //        generateUpgradeCutData(gatewayConfig.gatewayStateTransition);
 //        console.log("UpgradeCutGenerated");
 //        saveOutput(upgradeConfig.outputPath);
-//    }
+    }
 //
 //    /// @notice E2e upgrade generation
-//    function run() public virtual override {
+    function run() public virtual override {
 //        initialize(vm.envString("UPGRADE_ECOSYSTEM_INPUT"), vm.envString("UPGRADE_ECOSYSTEM_OUTPUT"));
 //        prepareEcosystemUpgrade();
 //
 //        prepareDefaultGovernanceCalls();
-//    }
+    }
 //
-//    function getOwnerAddress() public virtual returns (address) {
-//        return config.ownerAddress;
-//    }
+    function getOwnerAddress() public virtual returns (address) {
+        return config.ownerAddress;
+    }
 //
 //    /// @notice Get facet cuts that should be removed
 //    function getFacetCutsForDeletion() internal virtual returns (Diamond.FacetCut[] memory facetCuts) {
@@ -320,20 +320,22 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 //        return (getNewProtocolVersion() >> 32);
 //    }
 //
-//    function getOldProtocolDeadline() public virtual returns (uint256) {
-//        // Note, that it is this way by design, on stage2 it
-//        // will be set to 0
-//        return type(uint256).max;
-//    }
-//
-//    function getOldProtocolVersion() public virtual returns (uint256) {
-//        return newConfig.oldProtocolVersion;
-//    }
-//
-//    /// @notice Generate upgrade cut data
-//    function generateUpgradeCutData(
-//        StateTransitionDeployedAddresses memory stateTransition
-//    ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
+    function getOldProtocolDeadline() public virtual returns (uint256) {
+        // Note, that it is this way by design, on stage2 it
+        // will be set to 0
+        return type(uint256).max;
+    }
+
+    function getOldProtocolVersion() public virtual returns (uint256) {
+        return newConfig.oldProtocolVersion;
+    }
+
+    /// @notice Generate upgrade cut data
+    function generateUpgradeCutData(
+        StateTransitionDeployedAddresses memory stateTransition
+    ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
+        revert("Not implemented");
+    }
 //        require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
 //
 //        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
@@ -399,9 +401,9 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 //            });
 //    }
 //
-//    function getEcosystemAdmin() external virtual returns (address) {
-//        return newConfig.ecosystemAdminAddress;
-//    }
+    function getEcosystemAdmin() external virtual returns (address) {
+        return newConfig.ecosystemAdminAddress;
+    }
 //
 //    function initializeConfig(string memory newConfigPath) internal virtual override {
 //        super.initializeConfig(newConfigPath);
@@ -453,12 +455,14 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 //        config.gatewayChainId = gatewayConfig.chainId;
 //    }
 //
-//    function getBridgehubAdmin() public virtual returns (address admin) {
-//        admin = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
-//    }
-//
-//    /// @notice This function is meant to only be used in tests
-//    function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
+    function getBridgehubAdmin() public virtual returns (address admin) {
+        admin = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+    }
+
+    /// @notice This function is meant to only be used in tests
+    function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
+        revert("Not implemented");
+    }
 //        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 //
 //        bytes32 newChainAssetId = Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(gatewayConfig.chainId);
@@ -906,11 +910,13 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
 //
 //    ////////////////////////////// Preparing calls /////////////////////////////////
 //
-//    function prepareDefaultGovernanceCalls()
-//        public
-//        virtual
-//        returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
-//    {
+    function prepareDefaultGovernanceCalls()
+    public
+    virtual
+    returns (Call[] memory stage0Calls, Call[] memory stage1Calls, Call[] memory stage2Calls)
+    {
+        revert("Not implemented in the base class");
+    }
 //        // Default upgrade is done it 3 stages:
 //        // 0. Pause migration to/from Gateway
 //        // 1. Perform upgrade

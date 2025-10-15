@@ -60,47 +60,12 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 
-import {Config, DeployUtils, DeployedAddresses, GeneratedData} from "./DeployL1CoreUtils.s.sol";
+import {Config, DeployL1CoreUtils, DeployedAddresses, GeneratedData} from "./DeployL1CoreUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 
-abstract contract DeployL1HelperScript is Script, DeployUtils {
-    function deployTuppWithContract(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (address implementation, address proxy) {
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
-            contractName,
-            addresses.transparentProxyAdmin,
-            isZKBytecode
-        );
-    }
-
-    function deployTuppWithContractAndProxyAdmin(
-        string memory contractName,
-        address proxyAdmin,
-        bool isZKBytecode
-    ) internal returns (address implementation, address proxy) {
-        implementation = deployViaCreate2AndNotify(
-            getCreationCode(contractName, false),
-            getCreationCalldata(contractName, false),
-            contractName,
-            string.concat(contractName, " Implementation"),
-            isZKBytecode
-        );
-
-        proxy = deployViaCreate2AndNotify(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName, false)),
-            contractName,
-            string.concat(contractName, " Proxy"),
-            isZKBytecode
-        );
-        return (implementation, proxy);
-    }
-
+abstract contract DeployL1HelperScript is Script, DeployL1CoreUtils {
     ////////////////////////////// GetContract data  /////////////////////////////////
-
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
@@ -165,9 +130,9 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
             } else if (compareStrings(contractName, "L1NativeTokenVault")) {
                 return
                     abi.encodeCall(
-                        L1NativeTokenVault.initialize,
-                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
-                    );
+                    L1NativeTokenVault.initialize,
+                    (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                );
             } else {
                 revert(string.concat("Contract ", contractName, " initialize calldata not set"));
             }

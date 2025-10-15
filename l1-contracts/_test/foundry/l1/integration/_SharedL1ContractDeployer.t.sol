@@ -65,7 +65,6 @@ contract L1ContractDeployer is Test {
             "GATEWAY_PREPARATION_L1_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml"
         );
-
         DeployedAddresses memory coreContractsAddresses = deployEcosystem();
         ctmScript = new DeployCTMIntegrationScript();
         ctmScript.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy);
@@ -82,14 +81,12 @@ contract L1ContractDeployer is Test {
             addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy
         );
         addresses.ctmDeploymentTracker = CTMDeploymentTracker(
-            addresses.ecosystemAddresses.bridgehub.ctmDeploymentTrackerProxy
+            address(addresses.bridgehub.l1CtmDeployer())
         );
 
         addresses.sharedBridge = L1AssetRouter(addresses.ecosystemAddresses.bridges.l1AssetRouterProxy);
         addresses.l1Nullifier = L1Nullifier(addresses.ecosystemAddresses.bridges.l1NullifierProxy);
-        addresses.l1NativeTokenVault = L1NativeTokenVault(
-            payable(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy)
-        );
+        addresses.l1NativeTokenVault = L1NativeTokenVault(payable(address(addresses.l1Nullifier.l1NativeTokenVault())));
 
         _acceptOwnership();
         _setEraBatch();
@@ -128,11 +125,11 @@ contract L1ContractDeployer is Test {
 
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
-            .target(address(addresses.l1Nullifier))
-            .sig(addresses.l1Nullifier.chainBalance.selector)
-            .with_key(_chainId)
-            .with_key(_token)
-            .checked_write(_value);
+        .target(address(addresses.l1Nullifier))
+        .sig(addresses.l1Nullifier.chainBalance.selector)
+        .with_key(_chainId)
+        .with_key(_token)
+        .checked_write(_value);
     }
 
     function _setSharedBridgeIsWithdrawalFinalized(
@@ -142,12 +139,12 @@ contract L1ContractDeployer is Test {
         bool _isFinalized
     ) internal {
         stdstore
-            .target(address(addresses.l1Nullifier))
-            .sig(addresses.l1Nullifier.isWithdrawalFinalized.selector)
-            .with_key(_chainId)
-            .with_key(_l2BatchNumber)
-            .with_key(_l2ToL1MessageNumber)
-            .checked_write(_isFinalized);
+        .target(address(addresses.l1Nullifier))
+        .sig(addresses.l1Nullifier.isWithdrawalFinalized.selector)
+        .with_key(_chainId)
+        .with_key(_l2BatchNumber)
+        .with_key(_l2ToL1MessageNumber)
+        .checked_write(_isFinalized);
     }
 
     // add this to be excluded from coverage report

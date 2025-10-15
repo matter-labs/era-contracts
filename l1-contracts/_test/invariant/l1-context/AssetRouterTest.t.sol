@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 
 import {L1AssetRouterActorHandler} from "../handlers/L1AssetRouterActorHandler.sol";
 import {UserActorHandler} from "../handlers/UserActorHandler.sol";
@@ -15,13 +15,13 @@ import {SharedL2ContractL1Deployer, SystemContractsArgs} from "../../foundry/l1/
 import {SharedL2ContractDeployer} from "../../foundry/l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 contract AssetRouterTest is
-    Test,
-    SharedL2ContractL1Deployer,
-    SharedL2ContractDeployer,
-    AssetRouterProperties,
-    AssetRouter_ActorHandler_Deployer
+Test,
+SharedL2ContractL1Deployer,
+SharedL2ContractDeployer,
+AssetRouterProperties,
+AssetRouter_ActorHandler_Deployer
 {
-    function test() internal virtual override(DeployUtils, SharedL2ContractL1Deployer) {}
+    function test() internal virtual override(DeployCTMUtils, SharedL2ContractL1Deployer) {}
 
     function initSystemContracts(
         SystemContractsArgs memory _args

@@ -29,7 +29,7 @@ import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.so
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 import {SharedL2ContractL1Deployer, SystemContractsArgs} from "./_SharedL2ContractL1Deployer.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {L2NativeTokenVaultTestAbstract} from "../l2-tests-abstract/L2NativeTokenVaultTestAbstract.t.sol";
 
 import {StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
@@ -66,14 +66,14 @@ contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeT
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
+    ) internal view virtual override(DeployCTMUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
         return super.getCreationCode(contractName, false);
     }
 
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual override(DeployUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
+    ) internal virtual override(DeployCTMUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
         return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 }

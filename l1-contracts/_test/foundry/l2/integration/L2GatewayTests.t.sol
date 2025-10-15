@@ -28,7 +28,7 @@ import {SharedL2ContractL2Deployer} from "./_SharedL2ContractL2Deployer.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
 
-import {DeployUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {L2GatewayTestAbstract} from "../../l1/integration/l2-tests-abstract/L2GatewayTestAbstract.t.sol";
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {DeployIntegrationUtils} from "../../l1/integration/deploy-scripts/DeployIntegrationUtils.s.sol";

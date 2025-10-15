@@ -68,8 +68,7 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
-
-
+import {DeployUtils} from "./DeployUtils.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -100,6 +99,7 @@ struct DataAvailabilityDeployedAddresses {
 // solhint-disable-next-line gas-struct-packing
 struct BridgehubDeployedAddresses {
     address bridgehubProxy;
+    address ctmDeploymentTrackerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -159,7 +159,7 @@ struct GeneratedData {
     bytes forceDeploymentsData;
 }
 
-abstract contract DeployUtils is Create2FactoryUtils {
+abstract contract DeployCTMUtils is DeployUtils{
     using stdToml for string;
 
     Config public config;
@@ -225,40 +225,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
         }
 
-    }
-
-    function deployTuppWithContract(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal returns (address implementation, address proxy) {
-        (implementation, proxy) = deployTuppWithContractAndProxyAdmin(
-            contractName,
-            addresses.transparentProxyAdmin,
-            isZKBytecode
-        );
-    }
-
-    function deployTuppWithContractAndProxyAdmin(
-        string memory contractName,
-        address proxyAdmin,
-        bool isZKBytecode
-    ) internal returns (address implementation, address proxy) {
-        implementation = deployViaCreate2AndNotify(
-            getCreationCode(contractName, false),
-            getCreationCalldata(contractName, false),
-            contractName,
-            string.concat(contractName, " Implementation"),
-            isZKBytecode
-        );
-
-        proxy = deployViaCreate2AndNotify(
-            type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName, false)),
-            contractName,
-            string.concat(contractName, " Proxy"),
-            isZKBytecode
-        );
-        return (implementation, proxy);
     }
 
     function deployStateTransitionDiamondFacets() internal {
@@ -370,37 +336,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
 
     ////////////////////////////// Contract deployment modes /////////////////////////////////
 
-    function deploySimpleContract(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal returns (address contractAddress) {
-        contractAddress = deployViaCreate2AndNotify(
-            getCreationCode(contractName, false),
-            getCreationCalldata(contractName, false),
-            contractName,
-            isZKBytecode
-        );
-    }
-
-    function deployWithCreate2AndOwner(
-        string memory contractName,
-        address owner,
-        bool isZKBytecode
-    ) internal returns (address contractAddress) {
-        contractAddress = deployWithOwnerAndNotify(
-            getCreationCode(contractName, false),
-            getCreationCalldata(contractName, false),
-            owner,
-            contractName,
-            string.concat(contractName, " Implementation"),
-            isZKBytecode
-        );
-    }
-
     function getCreationCode(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual returns (bytes memory) {
+    ) internal view virtual override returns (bytes memory) {
         if (!isZKBytecode) {
             if (compareStrings(contractName, "L1AssetRouter")) {
                 return type(L1AssetRouter).creationCode;
@@ -472,7 +411,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getCreationCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal view virtual returns (bytes memory) {
+    ) internal view override virtual returns (bytes memory) {
         if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupDAManager")) {
@@ -546,7 +485,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
     function getInitializeCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal virtual returns (bytes memory) {
+    ) internal virtual override returns (bytes memory) {
         if (compareStrings(contractName, "ChainTypeManager")) {
             return
                 abi.encodeCall(
@@ -564,6 +503,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }
+    }
+
+    function transparentProxyAdmin() internal view override returns (address) {
+        return addresses.transparentProxyAdmin;
     }
 
     function test() internal virtual {}
