@@ -17,7 +17,6 @@ import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.so
 
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
@@ -325,7 +324,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
 
         calls[0] = Call({
             target: addresses.stateTransition.chainTypeManagerProxy,
-            data: abi.encodeCall(ChainTypeManager.setUpgradeDiamondCut, (upgradeCut, oldProtocolVersion)),
+            data: abi.encodeCall(IChainTypeManager.setUpgradeDiamondCut, (upgradeCut, oldProtocolVersion)),
             value: 0
         });
     }

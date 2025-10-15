@@ -18,7 +18,6 @@ import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {ChainCreationParams} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";

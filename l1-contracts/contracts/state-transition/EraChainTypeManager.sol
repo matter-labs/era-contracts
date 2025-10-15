@@ -22,10 +22,10 @@ import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-/// @title Chain Type Manager contract
+/// @title Era Chain Type Manager contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
+contract EraChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub

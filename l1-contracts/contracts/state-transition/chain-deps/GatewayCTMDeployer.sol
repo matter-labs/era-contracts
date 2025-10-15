@@ -29,7 +29,8 @@ import {DiamondInit} from "./DiamondInit.sol";
 import {L1GenesisUpgrade} from "../../upgrades/L1GenesisUpgrade.sol";
 import {Diamond} from "../libraries/Diamond.sol";
 
-import {ChainTypeManager} from "../ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "../ZKsyncOSChainTypeManager.sol";
+import {EraChainTypeManager} from "../EraChainTypeManager.sol";
 
 import {L2_BRIDGEHUB_ADDR} from "../../common/l2-helpers/L2ContractAddresses.sol";
 import {ROLLUP_L2_DA_COMMITMENT_SCHEME} from "../../common/Config.sol";
@@ -384,9 +385,15 @@ contract GatewayCTMDeployer {
         GatewayCTMDeployerConfig memory _config,
         DeployedContracts memory _deployedContracts
     ) internal {
-        _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
-        );
+        if (_config.isZKsyncOS) {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
+                new ZKsyncOSChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
+            );
+        } else {
+            _deployedContracts.stateTransition.chainTypeManagerImplementation = address(
+                new EraChainTypeManager{salt: _salt}(L2_BRIDGEHUB_ADDR)
+            );
+        }
 
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
@@ -450,11 +457,18 @@ contract GatewayCTMDeployer {
             serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
+        bytes memory initCalldata;
+        if (_config.isZKsyncOS) {
+            initCalldata = abi.encodeCall(ZKsyncOSChainTypeManager.initialize, (diamondInitData));
+        } else {
+            initCalldata = abi.encodeCall(EraChainTypeManager.initialize, (diamondInitData));
+        }
+
         _deployedContracts.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy{salt: _salt}(
                 _deployedContracts.stateTransition.chainTypeManagerImplementation,
                 address(_deployedContracts.stateTransition.chainTypeManagerProxyAdmin),
-                abi.encodeCall(ChainTypeManager.initialize, (diamondInitData))
+                initCalldata
             )
         );
     }

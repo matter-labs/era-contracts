@@ -31,7 +31,7 @@ import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.s
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 
 abstract contract GatewayGovernanceUtils is Script {
     struct GatewayGovernanceConfig {
