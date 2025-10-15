@@ -22,4 +22,10 @@ interface IChainAssetHandler is IAssetHandler, IL1AssetHandler {
 
     /// @dev Denotes whether the migrations of chains is paused.
     function migrationPaused() external view returns (bool);
+
+    /// @notice Pauses migration functions.
+    function pauseMigration() external;
+
+    /// @notice Unpauses migration functions.
+    function unpauseMigration() external;
 }

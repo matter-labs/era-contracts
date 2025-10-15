@@ -67,7 +67,7 @@ abstract contract ChainAssetHandlerBase is
 
     function _assetRouter() internal view virtual returns (address);
 
-    /// @notice Used to pause the migrations of chains.
+    /// @notice Used to pause the migrations of chains. Used for upgrades.
     bool public migrationPaused;
 
     /**

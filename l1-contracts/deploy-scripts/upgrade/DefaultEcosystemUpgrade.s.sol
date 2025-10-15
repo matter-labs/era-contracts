@@ -16,6 +16,7 @@ import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
+import {IChainAssetHandler} from "contracts/bridgehub/IChainAssetHandler.sol";
 
 import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
 import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
@@ -1342,7 +1343,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         result[0] = Call({
             target: addresses.bridgehub.chainAssetHandlerProxy,
             value: 0,
-            data: abi.encodeWithSignature("pause()")
+            data: abi.encodeCall(IChainAssetHandler.pauseMigration, ())
         });
     }
 
@@ -1356,7 +1357,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         result[0] = Call({
             target: addresses.bridgehub.chainAssetHandlerProxy,
             value: 0,
-            data: abi.encodeWithSignature("unpause()")
+            data: abi.encodeCall(IChainAssetHandler.unpauseMigration, ())
         });
     }
 
@@ -1468,7 +1469,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeWithSignature("pause()");
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.pauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
@@ -1477,7 +1478,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeWithSignature("unpause()");
+        bytes memory l2Calldata = abi.encodeCall(IChainAssetHandler.unpauseMigration, ());
 
         calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_CHAIN_ASSET_HANDLER_ADDR);
     }
