@@ -46,14 +46,14 @@ contract GatewayMigrateTokenBalances is BroadcastUtils, ZKSProvider {
         (uint256 bridgedTokenCount, bytes32[] memory assetIds) = getBridgedTokenAssetIds();
         if (!toGateway) {
             vm.createSelectFork(gwRpcUrl);
+            console.log("Forked to", gwRpcUrl);
         }
-        console.log("Forked to", gwRpcUrl);
 
         // Set L2 RPC for each token and migrate balances
         for (uint256 i = 0; i < bridgedTokenCount; i++) {
             bytes32 assetId = assetIds[i];
 
-            console.log("Migrating token balance for assetId:", uint256(assetId));
+            console.log("Migrating token balance for assetId:", vm.toString(assetId));
             vm.broadcast();
             if (toGateway) {
                 l2AssetTracker.initiateL1ToGatewayMigrationOnL2(assetId);

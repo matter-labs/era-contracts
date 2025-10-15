@@ -47,20 +47,30 @@ library L2UtilsBase {
     address internal constant VM_ADDRESS = address(uint160(uint256(keccak256("hevm cheat code"))));
     Vm internal constant vm = Vm(VM_ADDRESS);
 
+    struct AvoidStackTooDeep {
+        address wethToken;
+        bytes32 baseTokenAssetId;
+        address ntv;
+        address assetRouter;
+    }
+
     /// @dev We provide a fast form of debugging the L2 contracts using L1 foundry. We also test using zk foundry.
     function initSystemContracts(SystemContractsArgs memory _args) internal {
-        bytes32 baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
-        address wethToken = address(0x1);
+        AvoidStackTooDeep memory avoidStackTooDeep;
+        avoidStackTooDeep.baseTokenAssetId = DataEncoding.encodeNTVAssetId(_args.l1ChainId, ETH_TOKEN_ADDRESS);
+        avoidStackTooDeep.wethToken = address(0x1);
         // we deploy the code to get the contract code with immutables which we then vm.etch
-        address ntv = address(new L2NativeTokenVaultDev());
-        address assetRouter = address(new L2AssetRouter());
+        avoidStackTooDeep.ntv = address(new L2NativeTokenVaultDev());
+        avoidStackTooDeep.assetRouter = address(new L2AssetRouter());
 
-        address bridgehub = address(new L2Bridgehub());
-        vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
-        address interopCenter = address(new InteropCenter());
-        vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
+        {
+            address bridgehub = address(new L2Bridgehub());
+            vm.etch(L2_BRIDGEHUB_ADDR, bridgehub.code);
+            address interopCenter = address(new InteropCenter());
+            vm.etch(L2_INTEROP_CENTER_ADDR, interopCenter.code);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            InteropCenter(L2_INTEROP_CENTER_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner);
+        }
 
         {
             address messageRoot = address(new L2MessageRoot());
@@ -135,14 +145,14 @@ library L2UtilsBase {
         // DummyL2L1Messenger dummyL2L1Messenger = new DummyL2L1Messenger();
         // vm.etch(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR, address(dummyL2L1Messenger).code);
         {
-            vm.etch(L2_ASSET_ROUTER_ADDR, assetRouter.code);
+            vm.etch(L2_ASSET_ROUTER_ADDR, avoidStackTooDeep.assetRouter.code);
             vm.prank(L2_COMPLEX_UPGRADER_ADDR);
             L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
                 _args.l1ChainId,
                 _args.eraChainId,
                 _args.l1AssetRouter,
                 _args.legacySharedBridge,
-                baseTokenAssetId,
+                avoidStackTooDeep.baseTokenAssetId,
                 _args.aliasedOwner
             );
         }
@@ -154,7 +164,7 @@ library L2UtilsBase {
             bytes32(uint256(1))
         );
 
-        vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
+        vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, avoidStackTooDeep.ntv.code);
 
         vm.prank(L2_COMPLEX_UPGRADER_ADDR);
         L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
@@ -163,9 +173,10 @@ library L2UtilsBase {
             _args.l2TokenProxyBytecodeHash,
             _args.legacySharedBridge,
             _args.l2TokenBeacon,
-            wethToken,
-            baseTokenAssetId,
-            ETH_TOKEN_ADDRESS
+            avoidStackTooDeep.wethToken,
+            avoidStackTooDeep.baseTokenAssetId,
+            ETH_TOKEN_ADDRESS,
+            _args.l1ChainId
         );
 
         vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));
