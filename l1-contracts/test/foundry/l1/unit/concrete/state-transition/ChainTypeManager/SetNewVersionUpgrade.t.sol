@@ -17,7 +17,7 @@ contract setNewVersionUpgradeTest is ChainTypeManagerTest {
             abi.encodeWithSignature("chainAssetHandler()"),
             abi.encode(mockChainAssetHandler)
         );
-        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("paused()"), abi.encode(true));
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
 
         address randomDiamondInit = address(0x303030303030303030303);
         Diamond.DiamondCutData memory newDiamondCutData = getDiamondCutData(address(randomDiamondInit));

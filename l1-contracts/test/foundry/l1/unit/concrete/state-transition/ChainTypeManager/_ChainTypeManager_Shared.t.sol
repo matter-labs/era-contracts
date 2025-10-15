@@ -265,7 +265,7 @@ contract ChainTypeManagerTest is Test {
             abi.encodeWithSignature("chainAssetHandler()"),
             abi.encode(mockChainAssetHandler)
         );
-        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("paused()"), abi.encode(true));
+        vm.mockCall(mockChainAssetHandler, abi.encodeWithSignature("migrationPaused()"), abi.encode(true));
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////
