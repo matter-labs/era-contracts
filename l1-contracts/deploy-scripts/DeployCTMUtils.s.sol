@@ -75,15 +75,12 @@ import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.so
 struct DeployedAddresses {
     BridgehubDeployedAddresses bridgehub;
     StateTransitionDeployedAddresses stateTransition;
-//    BridgesDeployedAddresses bridges;
-//    L1NativeTokenVaultAddresses vaults;
+    BridgesDeployedAddresses bridges;
     DataAvailabilityDeployedAddresses daAddresses;
     address transparentProxyAdmin;
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
-//    address create2Factory;
-//    address chainRegistrar;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -102,71 +99,58 @@ struct DataAvailabilityDeployedAddresses {
 
 // solhint-disable-next-line gas-struct-packing
 struct BridgehubDeployedAddresses {
-//    address bridgehubImplementation;
     address bridgehubProxy;
-//    address ctmDeploymentTrackerImplementation;
-//    address ctmDeploymentTrackerProxy;
-//    address messageRootImplementation;
-//    address messageRootProxy;
-//    address chainAssetHandlerImplementation;
-//    address chainAssetHandlerProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
-//    address erc20BridgeImplementation;
-//    address erc20BridgeProxy;
-//    address l1AssetRouterImplementation;
-//    address l1AssetRouterProxy;
-//    address l1NullifierImplementation;
-//    address l1NullifierProxy;
-//    address bridgedStandardERC20Implementation;
-//    address bridgedTokenBeacon;
+    address erc20BridgeProxy;
+    address l1AssetRouterProxy;
+    address l1NullifierProxy;
+    address bridgedStandardERC20Implementation;
 }
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
-//    uint256 l1ChainId;
+    uint256 l1ChainId;
     address deployerAddress;
-//    uint256 eraChainId;
-//    uint256 gatewayChainId;
+    uint256 eraChainId;
     address ownerAddress;
-//    bool testnetVerifier;
-//    bool supportL2LegacySharedBridgeTest;
+    bool testnetVerifier;
+    bool supportL2LegacySharedBridgeTest;
     ContractsConfig contracts;
-    TokensConfig tokens;
 }
 
 // solhint-disable-next-line gas-struct-packing
 struct ContractsConfig {
     address multicall3Addr;
     uint256 validatorTimelockExecutionDelay;
-//    bytes32 genesisRoot;
-//    uint256 genesisRollupLeafIndex;
-//    bytes32 genesisBatchCommitment;
-//    uint256 latestProtocolVersion;
-//    bytes32 recursionNodeLevelVkHash;
-//    bytes32 recursionLeafLevelVkHash;
-//    bytes32 recursionCircuitsSetVksHash;
-//    uint256 priorityTxMaxGasLimit;
-//    PubdataPricingMode diamondInitPubdataPricingMode;
-//    uint256 diamondInitBatchOverheadL1Gas;
-//    uint256 diamondInitMaxPubdataPerBatch;
-//    uint256 diamondInitMaxL2GasPerBatch;
-//    uint256 diamondInitPriorityTxMaxPubdata;
-//    uint256 diamondInitMinimalL2GasPrice;
+    bytes32 genesisRoot;
+    uint256 genesisRollupLeafIndex;
+    bytes32 genesisBatchCommitment;
+    uint256 latestProtocolVersion;
+    bytes32 recursionNodeLevelVkHash;
+    bytes32 recursionLeafLevelVkHash;
+    bytes32 recursionCircuitsSetVksHash;
+    uint256 priorityTxMaxGasLimit;
+    PubdataPricingMode diamondInitPubdataPricingMode;
+    uint256 diamondInitBatchOverheadL1Gas;
+    uint256 diamondInitMaxPubdataPerBatch;
+    uint256 diamondInitMaxL2GasPerBatch;
+    uint256 diamondInitPriorityTxMaxPubdata;
+    uint256 diamondInitMinimalL2GasPrice;
     address governanceSecurityCouncilAddress;
     uint256 governanceMinDelay;
-//    uint256 maxNumberOfChains;
-//    bytes diamondCutData;
-//    bytes32 bootloaderHash;
-//    bytes32 defaultAAHash;
-//    bytes32 evmEmulatorHash;
-//    address availL1DAValidator;
+    bytes diamondCutData;
+    bytes32 bootloaderHash;
+    bytes32 defaultAAHash;
+    bytes32 evmEmulatorHash;
+    uint256 maxNumberOfChains;
+    // questionable
+    address availL1DAValidator;
 }
 
 struct TokensConfig {
-    address tokenWethAddress;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -240,7 +224,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
         }
 
-        config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
 
     function deployTuppWithContract(
@@ -418,13 +401,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         bool isZKBytecode
     ) internal view virtual returns (bytes memory) {
         if (!isZKBytecode) {
-            if (compareStrings(contractName, "L1Nullifier")) {
-                if (config.supportL2LegacySharedBridgeTest) {
-                    return type(L1NullifierDev).creationCode;
-                } else {
-                    return type(L1Nullifier).creationCode;
-                }
-            } else if (compareStrings(contractName, "L1AssetRouter")) {
+            if (compareStrings(contractName, "L1AssetRouter")) {
                 return type(L1AssetRouter).creationCode;
             } else if (compareStrings(contractName, "L1ERC20Bridge")) {
                 return type(L1ERC20Bridge).creationCode;
@@ -432,8 +409,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
                 return type(L1NativeTokenVault).creationCode;
             } else if (compareStrings(contractName, "BridgedStandardERC20")) {
                 return type(BridgedStandardERC20).creationCode;
-            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
-                return type(UpgradeableBeacon).creationCode;
             } else if (compareStrings(contractName, "Governance")) {
                 return type(Governance).creationCode;
             } else if (compareStrings(contractName, "ChainAdminOwnable")) {
@@ -499,8 +474,6 @@ abstract contract DeployUtils is Create2FactoryUtils {
     ) internal view virtual returns (bytes memory) {
         if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
-        } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
-            return abi.encode(addresses.bridges.bridgedStandardERC20Implementation);
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {

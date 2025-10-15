@@ -194,44 +194,44 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     /// @notice Deploy everything that should be deployed
     function deployNewEcosystemContractsL1() public virtual {
-        require(upgradeConfig.initialized, "Not initialized");
-
-        instantiateCreate2Factory();
-
-        deployVerifiers();
-        deployUpgradeStageValidator();
-
-        // Note, that this is the upgrade that will be used, despite the naming of the variable here.
-        // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
-
-        // TODO(refactor): rename to "upgrade contract", it is not a default upgrade.
-        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
-        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
-
-        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
-
-        addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
-        addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
-        addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault", false);
-        addresses.bridges.erc20BridgeImplementation = deploySimpleContract("L1ERC20Bridge", false);
-        addresses.bridges.bridgedStandardERC20Implementation = deploySimpleContract("BridgedStandardERC20", false);
-
-        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
-        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
-        addresses.bridgehub.ctmDeploymentTrackerImplementation = deploySimpleContract("CTMDeploymentTracker", false);
-
-        deployStateTransitionDiamondFacets();
-
-        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
-
-        addresses.stateTransition.serverNotifierImplementation = deploySimpleContract("ServerNotifier", false);
-
-        /// for forge verification.
-        deploySimpleContract("DiamondProxy", false);
-
-        deployUpgradeSpecificContractsL1();
-
-        upgradeConfig.ecosystemContractsDeployed = true;
+//        require(upgradeConfig.initialized, "Not initialized");
+//
+//        instantiateCreate2Factory();
+//
+//        deployVerifiers();
+//        deployUpgradeStageValidator();
+//
+//        // Note, that this is the upgrade that will be used, despite the naming of the variable here.
+//        // To use the custom upgrade simply override the `deployUsedUpgradeContract` function.
+//
+//        // TODO(refactor): rename to "upgrade contract", it is not a default upgrade.
+//        (addresses.stateTransition.defaultUpgrade) = deployUsedUpgradeContract();
+//        (addresses.stateTransition.genesisUpgrade) = deploySimpleContract("L1GenesisUpgrade", false);
+//
+//        addresses.bridgehub.bridgehubImplementation = deploySimpleContract("Bridgehub", false);
+//
+//        addresses.bridges.l1NullifierImplementation = deploySimpleContract("L1Nullifier", false);
+//        addresses.bridges.l1AssetRouterImplementation = deploySimpleContract("L1AssetRouter", false);
+//        addresses.vaults.l1NativeTokenVaultImplementation = deploySimpleContract("L1NativeTokenVault", false);
+//        addresses.bridges.erc20BridgeImplementation = deploySimpleContract("L1ERC20Bridge", false);
+//        addresses.bridges.bridgedStandardERC20Implementation = deploySimpleContract("BridgedStandardERC20", false);
+//
+//        upgradeAddresses.upgradeTimer = deploySimpleContract("GovernanceUpgradeTimer", false);
+//        addresses.bridgehub.messageRootImplementation = deploySimpleContract("MessageRoot", false);
+//        addresses.bridgehub.ctmDeploymentTrackerImplementation = deploySimpleContract("CTMDeploymentTracker", false);
+//
+//        deployStateTransitionDiamondFacets();
+//
+//        addresses.stateTransition.chainTypeManagerImplementation = deploySimpleContract("ChainTypeManager", false);
+//
+//        addresses.stateTransition.serverNotifierImplementation = deploySimpleContract("ServerNotifier", false);
+//
+//        /// for forge verification.
+//        deploySimpleContract("DiamondProxy", false);
+//
+//        deployUpgradeSpecificContractsL1();
+//
+//        upgradeConfig.ecosystemContractsDeployed = true;
     }
 
     function deployUpgradeSpecificContractsL1() internal virtual {
@@ -536,53 +536,53 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     function initializeConfig(string memory newConfigPath) internal virtual override {
-        super.initializeConfig(newConfigPath);
-        string memory toml = vm.readFile(newConfigPath);
-
-        addresses.stateTransition.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
-
-        addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
-
-        setAddressesBasedOnBridgehub();
-
-        addresses.transparentProxyAdmin = address(
-            uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
-        );
-        require(
-            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
-            "Incorrect owner"
-        );
-
-        config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
-        newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
-
-        newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
-
-        newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
-        newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
-
-        addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
-
-        gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
-        );
-
-        gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
-            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
-        );
-
-        gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_da_manager"
-        );
-
-        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
-            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
-        );
-
-        gatewayConfig.gatewayStateTransition.isOnGateway = true;
-
-        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
-        config.gatewayChainId = gatewayConfig.chainId;
+//        super.initializeConfig(newConfigPath);
+//        string memory toml = vm.readFile(newConfigPath);
+//
+//        addresses.stateTransition.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
+//
+//        addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
+//
+//        setAddressesBasedOnBridgehub();
+//
+//        addresses.transparentProxyAdmin = address(
+//            uint160(uint256(vm.load(addresses.bridgehub.bridgehubProxy, ADMIN_SLOT)))
+//        );
+//        require(
+//            Ownable2StepUpgradeable(addresses.bridgehub.bridgehubProxy).owner() == config.ownerAddress,
+//            "Incorrect owner"
+//        );
+//
+//        config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
+//        newConfig.governanceUpgradeTimerInitialDelay = toml.readUint("$.governance_upgrade_timer_initial_delay");
+//
+//        newConfig.oldProtocolVersion = toml.readUint("$.old_protocol_version");
+//
+//        newConfig.priorityTxsL2GasLimit = toml.readUint("$.priority_txs_l2_gas_limit");
+//        newConfig.maxExpectedL1GasPrice = toml.readUint("$.max_expected_l1_gas_price");
+//
+//        addresses.daAddresses.rollupDAManager = toml.readAddress("$.contracts.rollup_da_manager");
+//
+//        gatewayConfig.gatewayStateTransition.chainTypeManagerProxy = toml.readAddress(
+//            "$.gateway.gateway_state_transition.chain_type_manager_proxy_addr"
+//        );
+//
+//        gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin = toml.readAddress(
+//            "$.gateway.gateway_state_transition.chain_type_manager_proxy_admin"
+//        );
+//
+//        gatewayConfig.gatewayStateTransition.rollupDAManager = toml.readAddress(
+//            "$.gateway.gateway_state_transition.rollup_da_manager"
+//        );
+//
+//        gatewayConfig.gatewayStateTransition.rollupSLDAValidator = toml.readAddress(
+//            "$.gateway.gateway_state_transition.rollup_sl_da_validator"
+//        );
+//
+//        gatewayConfig.gatewayStateTransition.isOnGateway = true;
+//
+//        gatewayConfig.chainId = toml.readUint("$.gateway.chain_id");
+//        config.gatewayChainId = gatewayConfig.chainId;
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
@@ -614,53 +614,53 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
-        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
-        addresses.stateTransition.chainTypeManagerProxy = ctm;
-        // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
-        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
-            config.eraChainId
-        );
-        uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
-        require(
-            ctmProtocolVersion != getNewProtocolVersion(),
-            "The new protocol version is already present on the ChainTypeManager"
-        );
-        addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
-
-        addresses.vaults.l1NativeTokenVaultProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
-        );
-        addresses.bridges.l1NullifierProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
-        );
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
-
-        addresses.bridgehub.ctmDeploymentTrackerProxy = address(
-            Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
-        );
-
-        addresses.bridgehub.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
-
-        addresses.bridgehub.chainAssetHandlerProxy = address(
-            Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
-        );
-
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
-        newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
-            .validatorTimelock();
-        addresses.stateTransition.serverNotifierProxy = ChainTypeManager(
-            addresses.stateTransition.chainTypeManagerProxy
-        ).serverNotifierAddress();
-
-        newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
-
-        address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
-        (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
+//        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
+//        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
+//        addresses.stateTransition.chainTypeManagerProxy = ctm;
+//        // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
+//        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+//            config.eraChainId
+//        );
+//        uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
+//        require(
+//            ctmProtocolVersion != getNewProtocolVersion(),
+//            "The new protocol version is already present on the ChainTypeManager"
+//        );
+//        addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+//
+//        addresses.vaults.l1NativeTokenVaultProxy = address(
+//            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
+//        );
+//        addresses.bridges.l1NullifierProxy = address(
+//            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
+//        );
+//        addresses.bridges.erc20BridgeProxy = address(
+//            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
+//        );
+//
+//        addresses.bridgehub.ctmDeploymentTrackerProxy = address(
+//            Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
+//        );
+//
+//        addresses.bridgehub.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
+//
+//        addresses.bridgehub.chainAssetHandlerProxy = address(
+//            Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
+//        );
+//
+//        addresses.bridges.erc20BridgeProxy = address(
+//            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
+//        );
+//        newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
+//            .validatorTimelock();
+//        addresses.stateTransition.serverNotifierProxy = ChainTypeManager(
+//            addresses.stateTransition.chainTypeManagerProxy
+//        ).serverNotifierAddress();
+//
+//        newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+//
+//        address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
+//        (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
 
     function generateFixedForceDeploymentsData() internal virtual {
@@ -734,337 +734,337 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     function saveOutputVersionSpecific() internal virtual {}
 
     function saveOutput(string memory outputPath) internal virtual override {
-        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
-        vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
-        vm.serializeAddress(
-            "bridgehub",
-            "ctm_deployment_tracker_implementation_addr",
-            addresses.bridgehub.ctmDeploymentTrackerImplementation
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "ctm_deployment_tracker_proxy_addr",
-            addresses.bridgehub.ctmDeploymentTrackerProxy
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "chain_asset_handler_implementation_addr",
-            addresses.bridgehub.chainAssetHandlerImplementation
-        );
-        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
-        vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
-        string memory bridgehub = vm.serializeAddress(
-            "bridgehub",
-            "message_root_implementation_addr",
-            addresses.bridgehub.messageRootImplementation
-        );
-
-        // TODO(EVM-744): this has to be renamed to chain type manager
-        vm.serializeAddress(
-            "state_transition",
-            "state_transition_implementation_addr",
-            addresses.stateTransition.chainTypeManagerImplementation
-        );
-        vm.serializeAddress(
-            "state_transition",
-            "chain_type_manager_implementation_addr",
-            addresses.stateTransition.chainTypeManagerImplementation
-        );
-        vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
-        vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
-        vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
-        vm.serializeAddress("state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
-        vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
-        vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
-        vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
-        vm.serializeAddress("state_transition", "verifier_fflonk_addr", addresses.stateTransition.verifierFflonk);
-        vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
-        string memory stateTransition = vm.serializeAddress(
-            "state_transition",
-            "default_upgrade_addr",
-            addresses.stateTransition.defaultUpgrade
-        );
-
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "chain_type_manager_implementation_addr",
-            gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "chain_type_manager_proxy",
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "chain_type_manager_proxy_admin",
-            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "rollup_da_manager",
-            gatewayConfig.gatewayStateTransition.rollupDAManager
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "rollup_l2_da_validator",
-            gatewayConfig.gatewayStateTransition.rollupSLDAValidator
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "admin_facet_addr",
-            gatewayConfig.gatewayStateTransition.adminFacet
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "mailbox_facet_addr",
-            gatewayConfig.gatewayStateTransition.mailboxFacet
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "executor_facet_addr",
-            gatewayConfig.gatewayStateTransition.executorFacet
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "getters_facet_addr",
-            gatewayConfig.gatewayStateTransition.gettersFacet
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "diamond_init_addr",
-            gatewayConfig.gatewayStateTransition.diamondInit
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "default_upgrade_addr",
-            gatewayConfig.gatewayStateTransition.defaultUpgrade
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "genesis_upgrade_addr",
-            gatewayConfig.gatewayStateTransition.genesisUpgrade
-        );
-        vm.serializeAddress("gateway_state_transition", "verifier_addr", gatewayConfig.gatewayStateTransition.verifier);
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "verifier_fflonk_addr",
-            gatewayConfig.gatewayStateTransition.verifierFflonk
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "validator_timelock_implementation_addr",
-            gatewayConfig.gatewayStateTransition.validatorTimelockImplementation
-        );
-        vm.serializeAddress(
-            "gateway_state_transition",
-            "validator_timelock_addr",
-            gatewayConfig.gatewayStateTransition.validatorTimelock
-        );
-
-        string memory gateway_state_transition = vm.serializeAddress(
-            "gateway_state_transition",
-            "verifier_plonk_addr",
-            gatewayConfig.gatewayStateTransition.verifierPlonk
-        );
-
-        vm.serializeBytes("gateway", "diamond_cut_data", gatewayConfig.facetCutsData);
-        vm.serializeBytes("gateway", "upgrade_cut_data", gatewayConfig.upgradeCutData);
-        string memory gateway = vm.serializeString("gateway", "gateway_state_transition", gateway_state_transition);
-
-        vm.serializeUint("root", "gateway_chain_id", gatewayConfig.chainId);
-        vm.serializeUint("root", "priority_txs_l2_gas_limit", newConfig.priorityTxsL2GasLimit);
-        vm.serializeUint("root", "max_expected_l1_gas_price", newConfig.maxExpectedL1GasPrice);
-
-        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
-        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
-        vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
-        vm.serializeAddress(
-            "bridges",
-            "l1_asset_router_implementation_addr",
-            addresses.bridges.l1AssetRouterImplementation
-        );
-        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", addresses.bridges.l1AssetRouterProxy);
-        // TODO: legacy name
-        vm.serializeAddress(
-            "bridges",
-            "shared_bridge_implementation_addr",
-            addresses.bridges.l1AssetRouterImplementation
-        );
-        vm.serializeAddress(
-            "bridges",
-            "bridged_standard_erc20_impl",
-            addresses.bridges.bridgedStandardERC20Implementation
-        );
-
-        string memory bridges = vm.serializeAddress(
-            "bridges",
-            "bridged_token_beacon",
-            addresses.bridges.bridgedTokenBeacon
-        );
-
-        vm.serializeUint(
-            "contracts_newConfig",
-            "diamond_init_max_l2_gas_per_batch",
-            config.contracts.diamondInitMaxL2GasPerBatch
-        );
-        vm.serializeUint(
-            "contracts_newConfig",
-            "diamond_init_batch_overhead_l1_gas",
-            config.contracts.diamondInitBatchOverheadL1Gas
-        );
-        vm.serializeUint(
-            "contracts_newConfig",
-            "diamond_init_max_pubdata_per_batch",
-            config.contracts.diamondInitMaxPubdataPerBatch
-        );
-        vm.serializeUint(
-            "contracts_newConfig",
-            "diamond_init_minimal_l2_gas_price",
-            config.contracts.diamondInitMinimalL2GasPrice
-        );
-        vm.serializeUint(
-            "contracts_newConfig",
-            "diamond_init_priority_tx_max_pubdata",
-            config.contracts.diamondInitPriorityTxMaxPubdata
-        );
-        vm.serializeUint(
-            "contracts_newConfig",
-            "diamond_init_pubdata_pricing_mode",
-            uint256(config.contracts.diamondInitPubdataPricingMode)
-        );
-        vm.serializeUint("contracts_newConfig", "priority_tx_max_gas_limit", config.contracts.priorityTxMaxGasLimit);
-        vm.serializeBytes32(
-            "contracts_newConfig",
-            "recursion_circuits_set_vks_hash",
-            config.contracts.recursionCircuitsSetVksHash
-        );
-        vm.serializeBytes32(
-            "contracts_newConfig",
-            "recursion_leaf_level_vk_hash",
-            config.contracts.recursionLeafLevelVkHash
-        );
-        vm.serializeBytes32(
-            "contracts_newConfig",
-            "recursion_node_level_vk_hash",
-            config.contracts.recursionNodeLevelVkHash
-        );
-
-        vm.serializeAddress(
-            "contracts_newConfig",
-            "expected_rollup_l2_da_validator",
-            getExpectedL2Address("RollupL2DAValidator")
-        );
-        vm.serializeAddress(
-            "contracts_newConfig",
-            "expected_validium_l2_da_validator",
-            getExpectedL2Address("NoDAL2DAValidator")
-        );
-        vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
-
-        vm.serializeBytes(
-            "contracts_newConfig",
-            "force_deployments_data",
-            newlyGeneratedData.fixedForceDeploymentsData
-        );
-
-        vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
-
-        vm.serializeUint("contracts_newConfig", "old_protocol_version", newConfig.oldProtocolVersion);
-
-        vm.serializeAddress("contracts_newConfig", "old_validator_timelock", newConfig.oldValidatorTimelock);
-
-        string memory contractsConfig = vm.serializeAddress(
-            "contracts_newConfig",
-            "l1_legacy_shared_bridge",
-            addresses.bridges.l1AssetRouterProxy
-        );
-
-        vm.serializeAddress(
-            "deployed_addresses",
-            "validator_timelock_implementation_addr",
-            addresses.stateTransition.validatorTimelockImplementation
-        );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "validator_timelock_addr",
-            addresses.stateTransition.validatorTimelock
-        );
-        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
-        vm.serializeAddress(
-            "deployed_addresses",
-            "access_control_restriction_addr",
-            addresses.accessControlRestrictionAddress
-        );
-        vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
-        vm.serializeString("deployed_addresses", "bridges", bridges);
-        vm.serializeString("deployed_addresses", "state_transition", stateTransition);
-        vm.serializeAddress(
-            "deployed_addresses",
-            "l1_bytecodes_supplier_addr",
-            addresses.stateTransition.bytecodesSupplier
-        );
-        vm.serializeAddress("deployed_addresses", "native_token_vault_addr", addresses.vaults.l1NativeTokenVaultProxy);
-        vm.serializeAddress(
-            "deployed_addresses",
-            "native_token_vault_implementation_addr",
-            addresses.vaults.l1NativeTokenVaultImplementation
-        );
-
-        vm.serializeAddress(
-            "deployed_addresses",
-            "rollup_l1_da_validator_addr",
-            addresses.daAddresses.l1RollupDAValidator
-        );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "validium_l1_da_validator_addr",
-            addresses.daAddresses.noDAValidiumL1DAValidator
-        );
-        vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", upgradeAddresses.gatewayUpgrade);
-        vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
-        vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
-        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
-        vm.serializeAddress(
-            "deployed_addresses",
-            "l2_wrapped_base_token_store_addr",
-            upgradeAddresses.l2WrappedBaseTokenStore
-        );
-
-        string memory deployedAddresses = vm.serializeAddress(
-            "deployed_addresses",
-            "l1_governance_upgrade_timer",
-            upgradeAddresses.upgradeTimer
-        );
-
-        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
-        vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
-        vm.serializeUint("root", "era_chain_id", config.eraChainId);
-        vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
-        vm.serializeString("root", "deployed_addresses", deployedAddresses);
-        vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress("root", "owner_address", config.ownerAddress);
-        vm.serializeAddress("root", "transparent_proxy_admin", addresses.transparentProxyAdmin);
-        vm.serializeString("root", "gateway", gateway);
-
-        vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
-        vm.serializeBytes("root", "ecosystem_admin_calls", new bytes(0)); // Will be populated later
-        vm.serializeBytes("root", "test_upgrade_calls", new bytes(0)); // Will be populated later
-        vm.serializeBytes("root", "v29", new bytes(0)); // Will be populated later
-
-        vm.serializeUint(
-            "root",
-            "governance_upgrade_timer_initial_delay",
-            newConfig.governanceUpgradeTimerInitialDelay
-        );
-
-        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
-
-        vm.writeToml(toml, outputPath);
-
-        saveOutputVersionSpecific();
+//        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
+//        vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
+//        vm.serializeAddress(
+//            "bridgehub",
+//            "ctm_deployment_tracker_implementation_addr",
+//            addresses.bridgehub.ctmDeploymentTrackerImplementation
+//        );
+//        vm.serializeAddress(
+//            "bridgehub",
+//            "ctm_deployment_tracker_proxy_addr",
+//            addresses.bridgehub.ctmDeploymentTrackerProxy
+//        );
+//        vm.serializeAddress(
+//            "bridgehub",
+//            "chain_asset_handler_implementation_addr",
+//            addresses.bridgehub.chainAssetHandlerImplementation
+//        );
+//        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
+//        vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
+//        string memory bridgehub = vm.serializeAddress(
+//            "bridgehub",
+//            "message_root_implementation_addr",
+//            addresses.bridgehub.messageRootImplementation
+//        );
+//
+//        // TODO(EVM-744): this has to be renamed to chain type manager
+//        vm.serializeAddress(
+//            "state_transition",
+//            "state_transition_implementation_addr",
+//            addresses.stateTransition.chainTypeManagerImplementation
+//        );
+//        vm.serializeAddress(
+//            "state_transition",
+//            "chain_type_manager_implementation_addr",
+//            addresses.stateTransition.chainTypeManagerImplementation
+//        );
+//        vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
+//        vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
+//        vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
+//        vm.serializeAddress("state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
+//        vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
+//        vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
+//        vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
+//        vm.serializeAddress("state_transition", "verifier_fflonk_addr", addresses.stateTransition.verifierFflonk);
+//        vm.serializeAddress("state_transition", "verifier_plonk_addr", addresses.stateTransition.verifierPlonk);
+//        string memory stateTransition = vm.serializeAddress(
+//            "state_transition",
+//            "default_upgrade_addr",
+//            addresses.stateTransition.defaultUpgrade
+//        );
+//
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "chain_type_manager_implementation_addr",
+//            gatewayConfig.gatewayStateTransition.chainTypeManagerImplementation
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "chain_type_manager_proxy",
+//            gatewayConfig.gatewayStateTransition.chainTypeManagerProxy
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "chain_type_manager_proxy_admin",
+//            gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "rollup_da_manager",
+//            gatewayConfig.gatewayStateTransition.rollupDAManager
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "rollup_l2_da_validator",
+//            gatewayConfig.gatewayStateTransition.rollupSLDAValidator
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "admin_facet_addr",
+//            gatewayConfig.gatewayStateTransition.adminFacet
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "mailbox_facet_addr",
+//            gatewayConfig.gatewayStateTransition.mailboxFacet
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "executor_facet_addr",
+//            gatewayConfig.gatewayStateTransition.executorFacet
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "getters_facet_addr",
+//            gatewayConfig.gatewayStateTransition.gettersFacet
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "diamond_init_addr",
+//            gatewayConfig.gatewayStateTransition.diamondInit
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "default_upgrade_addr",
+//            gatewayConfig.gatewayStateTransition.defaultUpgrade
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "genesis_upgrade_addr",
+//            gatewayConfig.gatewayStateTransition.genesisUpgrade
+//        );
+//        vm.serializeAddress("gateway_state_transition", "verifier_addr", gatewayConfig.gatewayStateTransition.verifier);
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "verifier_fflonk_addr",
+//            gatewayConfig.gatewayStateTransition.verifierFflonk
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "validator_timelock_implementation_addr",
+//            gatewayConfig.gatewayStateTransition.validatorTimelockImplementation
+//        );
+//        vm.serializeAddress(
+//            "gateway_state_transition",
+//            "validator_timelock_addr",
+//            gatewayConfig.gatewayStateTransition.validatorTimelock
+//        );
+//
+//        string memory gateway_state_transition = vm.serializeAddress(
+//            "gateway_state_transition",
+//            "verifier_plonk_addr",
+//            gatewayConfig.gatewayStateTransition.verifierPlonk
+//        );
+//
+//        vm.serializeBytes("gateway", "diamond_cut_data", gatewayConfig.facetCutsData);
+//        vm.serializeBytes("gateway", "upgrade_cut_data", gatewayConfig.upgradeCutData);
+//        string memory gateway = vm.serializeString("gateway", "gateway_state_transition", gateway_state_transition);
+//
+//        vm.serializeUint("root", "gateway_chain_id", gatewayConfig.chainId);
+//        vm.serializeUint("root", "priority_txs_l2_gas_limit", newConfig.priorityTxsL2GasLimit);
+//        vm.serializeUint("root", "max_expected_l1_gas_price", newConfig.maxExpectedL1GasPrice);
+//
+//        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
+//        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
+//        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
+//        vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
+//        vm.serializeAddress(
+//            "bridges",
+//            "l1_asset_router_implementation_addr",
+//            addresses.bridges.l1AssetRouterImplementation
+//        );
+//        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", addresses.bridges.l1AssetRouterProxy);
+//        // TODO: legacy name
+//        vm.serializeAddress(
+//            "bridges",
+//            "shared_bridge_implementation_addr",
+//            addresses.bridges.l1AssetRouterImplementation
+//        );
+//        vm.serializeAddress(
+//            "bridges",
+//            "bridged_standard_erc20_impl",
+//            addresses.bridges.bridgedStandardERC20Implementation
+//        );
+//
+//        string memory bridges = vm.serializeAddress(
+//            "bridges",
+//            "bridged_token_beacon",
+//            addresses.bridges.bridgedTokenBeacon
+//        );
+//
+//        vm.serializeUint(
+//            "contracts_newConfig",
+//            "diamond_init_max_l2_gas_per_batch",
+//            config.contracts.diamondInitMaxL2GasPerBatch
+//        );
+//        vm.serializeUint(
+//            "contracts_newConfig",
+//            "diamond_init_batch_overhead_l1_gas",
+//            config.contracts.diamondInitBatchOverheadL1Gas
+//        );
+//        vm.serializeUint(
+//            "contracts_newConfig",
+//            "diamond_init_max_pubdata_per_batch",
+//            config.contracts.diamondInitMaxPubdataPerBatch
+//        );
+//        vm.serializeUint(
+//            "contracts_newConfig",
+//            "diamond_init_minimal_l2_gas_price",
+//            config.contracts.diamondInitMinimalL2GasPrice
+//        );
+//        vm.serializeUint(
+//            "contracts_newConfig",
+//            "diamond_init_priority_tx_max_pubdata",
+//            config.contracts.diamondInitPriorityTxMaxPubdata
+//        );
+//        vm.serializeUint(
+//            "contracts_newConfig",
+//            "diamond_init_pubdata_pricing_mode",
+//            uint256(config.contracts.diamondInitPubdataPricingMode)
+//        );
+//        vm.serializeUint("contracts_newConfig", "priority_tx_max_gas_limit", config.contracts.priorityTxMaxGasLimit);
+//        vm.serializeBytes32(
+//            "contracts_newConfig",
+//            "recursion_circuits_set_vks_hash",
+//            config.contracts.recursionCircuitsSetVksHash
+//        );
+//        vm.serializeBytes32(
+//            "contracts_newConfig",
+//            "recursion_leaf_level_vk_hash",
+//            config.contracts.recursionLeafLevelVkHash
+//        );
+//        vm.serializeBytes32(
+//            "contracts_newConfig",
+//            "recursion_node_level_vk_hash",
+//            config.contracts.recursionNodeLevelVkHash
+//        );
+//
+//        vm.serializeAddress(
+//            "contracts_newConfig",
+//            "expected_rollup_l2_da_validator",
+//            getExpectedL2Address("RollupL2DAValidator")
+//        );
+//        vm.serializeAddress(
+//            "contracts_newConfig",
+//            "expected_validium_l2_da_validator",
+//            getExpectedL2Address("NoDAL2DAValidator")
+//        );
+//        vm.serializeBytes("contracts_newConfig", "diamond_cut_data", newlyGeneratedData.diamondCutData);
+//
+//        vm.serializeBytes(
+//            "contracts_newConfig",
+//            "force_deployments_data",
+//            newlyGeneratedData.fixedForceDeploymentsData
+//        );
+//
+//        vm.serializeUint("contracts_newConfig", "new_protocol_version", getNewProtocolVersion());
+//
+//        vm.serializeUint("contracts_newConfig", "old_protocol_version", newConfig.oldProtocolVersion);
+//
+//        vm.serializeAddress("contracts_newConfig", "old_validator_timelock", newConfig.oldValidatorTimelock);
+//
+//        string memory contractsConfig = vm.serializeAddress(
+//            "contracts_newConfig",
+//            "l1_legacy_shared_bridge",
+//            addresses.bridges.l1AssetRouterProxy
+//        );
+//
+//        vm.serializeAddress(
+//            "deployed_addresses",
+//            "validator_timelock_implementation_addr",
+//            addresses.stateTransition.validatorTimelockImplementation
+//        );
+//        vm.serializeAddress(
+//            "deployed_addresses",
+//            "validator_timelock_addr",
+//            addresses.stateTransition.validatorTimelock
+//        );
+//        vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
+//        vm.serializeAddress(
+//            "deployed_addresses",
+//            "access_control_restriction_addr",
+//            addresses.accessControlRestrictionAddress
+//        );
+//        vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
+//        vm.serializeString("deployed_addresses", "bridges", bridges);
+//        vm.serializeString("deployed_addresses", "state_transition", stateTransition);
+//        vm.serializeAddress(
+//            "deployed_addresses",
+//            "l1_bytecodes_supplier_addr",
+//            addresses.stateTransition.bytecodesSupplier
+//        );
+//        vm.serializeAddress("deployed_addresses", "native_token_vault_addr", addresses.vaults.l1NativeTokenVaultProxy);
+//        vm.serializeAddress(
+//            "deployed_addresses",
+//            "native_token_vault_implementation_addr",
+//            addresses.vaults.l1NativeTokenVaultImplementation
+//        );
+//
+//        vm.serializeAddress(
+//            "deployed_addresses",
+//            "rollup_l1_da_validator_addr",
+//            addresses.daAddresses.l1RollupDAValidator
+//        );
+//        vm.serializeAddress(
+//            "deployed_addresses",
+//            "validium_l1_da_validator_addr",
+//            addresses.daAddresses.noDAValidiumL1DAValidator
+//        );
+//        vm.serializeAddress("deployed_addresses", "l1_gateway_upgrade", upgradeAddresses.gatewayUpgrade);
+//        vm.serializeAddress("deployed_addresses", "l1_transitionary_owner", upgradeAddresses.transitionaryOwner);
+//        vm.serializeAddress("deployed_addresses", "upgrade_stage_validator", upgradeAddresses.upgradeStageValidator);
+//        vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
+//        vm.serializeAddress(
+//            "deployed_addresses",
+//            "l2_wrapped_base_token_store_addr",
+//            upgradeAddresses.l2WrappedBaseTokenStore
+//        );
+//
+//        string memory deployedAddresses = vm.serializeAddress(
+//            "deployed_addresses",
+//            "l1_governance_upgrade_timer",
+//            upgradeAddresses.upgradeTimer
+//        );
+//
+//        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
+//        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
+//        vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
+//        vm.serializeUint("root", "era_chain_id", config.eraChainId);
+//        vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
+//        vm.serializeString("root", "deployed_addresses", deployedAddresses);
+//        vm.serializeString("root", "contracts_config", contractsConfig);
+//        vm.serializeAddress("root", "owner_address", config.ownerAddress);
+//        vm.serializeAddress("root", "transparent_proxy_admin", addresses.transparentProxyAdmin);
+//        vm.serializeString("root", "gateway", gateway);
+//
+//        vm.serializeBytes("root", "governance_calls", new bytes(0)); // Will be populated later
+//        vm.serializeBytes("root", "ecosystem_admin_calls", new bytes(0)); // Will be populated later
+//        vm.serializeBytes("root", "test_upgrade_calls", new bytes(0)); // Will be populated later
+//        vm.serializeBytes("root", "v29", new bytes(0)); // Will be populated later
+//
+//        vm.serializeUint(
+//            "root",
+//            "governance_upgrade_timer_initial_delay",
+//            newConfig.governanceUpgradeTimerInitialDelay
+//        );
+//
+//        string memory toml = vm.serializeBytes("root", "chain_upgrade_diamond_cut", newlyGeneratedData.upgradeCutData);
+//
+//        vm.writeToml(toml, outputPath);
+//
+//        saveOutputVersionSpecific();
     }
 
     /////////////////////////// Blockchain interactions ////////////////////////////
@@ -1587,47 +1587,47 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     /// @notice Update implementations in proxies
     function prepareUpgradeProxiesCalls() public virtual returns (Call[] memory calls) {
         calls = new Call[](8);
-
-        calls[0] = _buildCallProxyUpgrade(
-            addresses.stateTransition.chainTypeManagerProxy,
-            addresses.stateTransition.chainTypeManagerImplementation
-        );
-
-        calls[1] = _buildCallProxyUpgrade(
-            addresses.bridgehub.bridgehubProxy,
-            addresses.bridgehub.bridgehubImplementation
-        );
-
-        // Note, that we do not need to run the initializer
-        calls[2] = _buildCallProxyUpgrade(
-            addresses.bridges.l1NullifierProxy,
-            addresses.bridges.l1NullifierImplementation
-        );
-
-        calls[3] = _buildCallProxyUpgrade(
-            addresses.bridges.l1AssetRouterProxy,
-            addresses.bridges.l1AssetRouterImplementation
-        );
-
-        calls[4] = _buildCallProxyUpgrade(
-            addresses.vaults.l1NativeTokenVaultProxy,
-            addresses.vaults.l1NativeTokenVaultImplementation
-        );
-
-        calls[5] = _buildCallProxyUpgrade(
-            addresses.bridgehub.messageRootProxy,
-            addresses.bridgehub.messageRootImplementation
-        );
-
-        calls[6] = _buildCallProxyUpgrade(
-            addresses.bridgehub.ctmDeploymentTrackerProxy,
-            addresses.bridgehub.ctmDeploymentTrackerImplementation
-        );
-
-        calls[7] = _buildCallProxyUpgrade(
-            addresses.bridges.erc20BridgeProxy,
-            addresses.bridges.erc20BridgeImplementation
-        );
+//
+//        calls[0] = _buildCallProxyUpgrade(
+//            addresses.stateTransition.chainTypeManagerProxy,
+//            addresses.stateTransition.chainTypeManagerImplementation
+//        );
+//
+//        calls[1] = _buildCallProxyUpgrade(
+//            addresses.bridgehub.bridgehubProxy,
+//            addresses.bridgehub.bridgehubImplementation
+//        );
+//
+//        // Note, that we do not need to run the initializer
+//        calls[2] = _buildCallProxyUpgrade(
+//            addresses.bridges.l1NullifierProxy,
+//            addresses.bridges.l1NullifierImplementation
+//        );
+//
+//        calls[3] = _buildCallProxyUpgrade(
+//            addresses.bridges.l1AssetRouterProxy,
+//            addresses.bridges.l1AssetRouterImplementation
+//        );
+//
+//        calls[4] = _buildCallProxyUpgrade(
+//            addresses.vaults.l1NativeTokenVaultProxy,
+//            addresses.vaults.l1NativeTokenVaultImplementation
+//        );
+//
+//        calls[5] = _buildCallProxyUpgrade(
+//            addresses.bridgehub.messageRootProxy,
+//            addresses.bridgehub.messageRootImplementation
+//        );
+//
+//        calls[6] = _buildCallProxyUpgrade(
+//            addresses.bridgehub.ctmDeploymentTrackerProxy,
+//            addresses.bridgehub.ctmDeploymentTrackerImplementation
+//        );
+//
+//        calls[7] = _buildCallProxyUpgrade(
+//            addresses.bridges.erc20BridgeProxy,
+//            addresses.bridges.erc20BridgeImplementation
+//        );
     }
 
     function _buildCallProxyUpgrade(
@@ -1694,20 +1694,20 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
-        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
-            config.gatewayChainId
-        );
-        uint256 oldProtocolVersion = getOldProtocolVersion();
-        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
-
-        admin = IZKChain(chainDiamondProxyAddress).getAdmin();
-
-        calls = new Call[](1);
-        calls[0] = Call({
-            target: chainDiamondProxyAddress,
-            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
-            value: 0
-        });
+//        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+//            config.gatewayChainId
+//        );
+//        uint256 oldProtocolVersion = getOldProtocolVersion();
+//        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
+//
+//        admin = IZKChain(chainDiamondProxyAddress).getAdmin();
+//
+//        calls = new Call[](1);
+//        calls[0] = Call({
+//            target: chainDiamondProxyAddress,
+//            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+//            value: 0
+//        });
     }
 
     /// @notice Tests that it is possible to create a new chain with the new version
