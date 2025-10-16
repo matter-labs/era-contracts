@@ -8,7 +8,6 @@ import {stdToml} from "forge-std/StdToml.sol";
 
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
-import {TestnetERC20Token} from "contracts/dev-contracts/TestnetERC20Token.sol";
 // solhint-disable no-unused-import
 import {WETH9} from "contracts/dev-contracts/WETH9.sol";
 

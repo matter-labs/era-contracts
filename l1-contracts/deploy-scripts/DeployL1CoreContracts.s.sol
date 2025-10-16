@@ -5,8 +5,6 @@ pragma solidity ^0.8.24;
 
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {StateTransitionDeployedAddresses} from "./Utils.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
@@ -20,7 +18,6 @@ import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
-import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";

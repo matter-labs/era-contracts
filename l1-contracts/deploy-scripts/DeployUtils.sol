@@ -3,8 +3,6 @@ pragma solidity ^0.8.10;
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct L1NativeTokenVaultAddresses {

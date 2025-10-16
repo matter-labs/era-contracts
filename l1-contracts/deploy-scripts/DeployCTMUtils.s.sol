@@ -3,51 +3,31 @@ pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {Create2AndTransfer} from "./Create2AndTransfer.sol";
-import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
-import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
-import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
-
-import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
-import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
-import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
-import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
-import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
 import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
@@ -217,6 +197,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
         }
     }
+
 
     function deployStateTransitionDiamondFacets() internal {
         addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet", false);

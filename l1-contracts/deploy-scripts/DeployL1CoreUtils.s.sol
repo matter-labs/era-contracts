@@ -3,25 +3,14 @@ pragma solidity ^0.8.24;
 
 // solhint-disable no-console, gas-custom-errors
 
-import {Script, console2 as console} from "forge-std/Script.sol";
+import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
-import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
-import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-import {Create2AndTransfer} from "./Create2AndTransfer.sol";
-import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
 import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {DeployUtils} from "./DeployUtils.sol";
-import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
-import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
@@ -30,7 +19,6 @@ import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
 import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
-import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";

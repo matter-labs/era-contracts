@@ -6,15 +6,12 @@ import {Script} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
 import {Utils} from "./Utils.sol";
-import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {AddressAliasHelper} from "contracts/vendor/AddressAliasHelper.sol";
-import {ChainRegistrar} from "contracts/chain-registrar/ChainRegistrar.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {Call} from "contracts/governance/Common.sol";
-// import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
-
+// 
 contract DeployL2Script is Script {
     using stdToml for string;
 
