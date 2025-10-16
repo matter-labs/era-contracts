@@ -43,7 +43,7 @@ abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     }
 
     function test_revertWhenDepositingWithRandomCalldata() public {
-        (bool success,) = address(weth).call{value: 100}(hex"00000000");
+        (bool success, ) = address(weth).call{value: 100}(hex"00000000");
         assertEq(success, false);
     }
 

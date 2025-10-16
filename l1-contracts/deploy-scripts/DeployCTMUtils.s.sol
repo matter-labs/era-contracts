@@ -80,6 +80,8 @@ struct DeployedAddresses {
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
+    // TODO remove it
+    L1NativeTokenVaultAddresses vaults;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -159,7 +161,7 @@ struct GeneratedData {
     bytes forceDeploymentsData;
 }
 
-abstract contract DeployCTMUtils is DeployUtils{
+abstract contract DeployCTMUtils is DeployUtils {
     using stdToml for string;
 
     Config public config;
@@ -224,7 +226,6 @@ abstract contract DeployCTMUtils is DeployUtils{
         if (vm.keyExistsToml(toml, "$.contracts.avail_l1_da_validator")) {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
         }
-
     }
 
     function deployStateTransitionDiamondFacets() internal {
@@ -411,7 +412,7 @@ abstract contract DeployCTMUtils is DeployUtils{
     function getCreationCalldata(
         string memory contractName,
         bool isZKBytecode
-    ) internal view override virtual returns (bytes memory) {
+    ) internal view virtual override returns (bytes memory) {
         if (compareStrings(contractName, "BridgedStandardERC20")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupDAManager")) {
@@ -489,17 +490,17 @@ abstract contract DeployCTMUtils is DeployUtils{
         if (compareStrings(contractName, "ChainTypeManager")) {
             return
                 abi.encodeCall(
-                ChainTypeManager.initialize,
-                getChainTypeManagerInitializeData(addresses.stateTransition)
-            );
+                    ChainTypeManager.initialize,
+                    getChainTypeManagerInitializeData(addresses.stateTransition)
+                );
         } else if (compareStrings(contractName, "ServerNotifier")) {
             return abi.encodeCall(ServerNotifier.initialize, (config.deployerAddress));
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
             return
                 abi.encodeCall(
-                ValidatorTimelock.initialize,
-                (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
-            );
+                    ValidatorTimelock.initialize,
+                    (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
+                );
         } else {
             revert(string.concat("Contract ", contractName, " initialize calldata not set"));
         }

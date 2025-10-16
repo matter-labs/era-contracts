@@ -98,5 +98,4 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
-
 }

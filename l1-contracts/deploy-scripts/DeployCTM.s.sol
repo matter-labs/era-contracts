@@ -219,7 +219,6 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         }
     }
 
-
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
@@ -239,7 +238,11 @@ contract DeployCTMScript is Script, DeployCTMUtils {
     }
 
     function saveOutput(string memory outputPath) internal virtual {
-        string memory bridgehub = vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
+        string memory bridgehub = vm.serializeAddress(
+            "bridgehub",
+            "bridgehub_proxy_addr",
+            addresses.bridgehub.bridgehubProxy
+        );
         vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
         string memory bridges = vm.serializeAddress(
@@ -256,7 +259,11 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
-        string memory stateTransition = vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
+        string memory stateTransition = vm.serializeAddress(
+            "state_transition",
+            "bytecodes_supplier_addr",
+            addresses.stateTransition.bytecodesSupplier
+        );
 
         vm.serializeBytes("contracts_config", "diamond_cut_data", config.contracts.diamondCutData);
 
@@ -314,7 +321,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
 
         address dangerousTestOnlyForcedBeacon;
         if (config.supportL2LegacySharedBridgeTest) {
-            (dangerousTestOnlyForcedBeacon,) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
+            (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
                 addresses.bridges.erc20BridgeProxy,
                 addresses.bridges.l1NullifierProxy,
                 addresses.governance
@@ -333,8 +340,8 @@ contract DeployCTMScript is Script, DeployCTMUtils {
             l2NtvBytecodeHash: getL2BytecodeHash("L2NativeTokenVault"),
             messageRootBytecodeHash: getL2BytecodeHash("MessageRoot"),
             chainAssetHandlerBytecodeHash: getL2BytecodeHash("ChainAssetHandler"),
-        // For newly created chains it it is expected that the following bridges are not present at the moment
-        // of creation of the chain
+            // For newly created chains it it is expected that the following bridges are not present at the moment
+            // of creation of the chain
             l2SharedBridgeLegacyImpl: address(0),
             l2BridgedStandardERC20Impl: address(0),
             dangerousTestOnlyForcedBeacon: dangerousTestOnlyForcedBeacon

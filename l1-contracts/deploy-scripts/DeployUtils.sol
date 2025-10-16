@@ -7,10 +7,10 @@ import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 
 // solhint-disable-next-line gas-struct-packing
-    struct L1NativeTokenVaultAddresses {
-        address l1NativeTokenVaultImplementation;
-        address l1NativeTokenVaultProxy;
-    }
+struct L1NativeTokenVaultAddresses {
+    address l1NativeTokenVaultImplementation;
+    address l1NativeTokenVaultProxy;
+}
 
 abstract contract DeployUtils is Create2FactoryUtils {
     function deployTuppWithContract(

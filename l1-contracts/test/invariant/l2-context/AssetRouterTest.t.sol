@@ -16,11 +16,11 @@ import {SharedL2ContractL1Deployer} from "../../foundry/l1/integration/l2-tests-
 import {SharedL2ContractDeployer} from "../../foundry/l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 
 contract AssetRouterTest is
-Test,
-SharedL2ContractL2Deployer,
-SharedL2ContractDeployer,
-AssetRouterProperties,
-AssetRouter_ActorHandler_Deployer
+    Test,
+    SharedL2ContractL2Deployer,
+    SharedL2ContractDeployer,
+    AssetRouterProperties,
+    AssetRouter_ActorHandler_Deployer
 {
     function test() internal virtual override(DeployCTMUtils, SharedL2ContractL2Deployer) {}
 
