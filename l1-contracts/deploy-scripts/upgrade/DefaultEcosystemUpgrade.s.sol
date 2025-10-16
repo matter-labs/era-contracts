@@ -77,7 +77,7 @@ import {L2WrappedBaseTokenStore} from "contracts/bridge/L2WrappedBaseTokenStore.
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {Create2AndTransfer} from "../Create2AndTransfer.sol";
 
-import {ContractsConfig, DeployedAddresses, TokensConfig} from "../DeployCTMUtils.s.sol";
+import {BridgehubDeployedAddresses, L1NativeTokenVaultAddresses, DeployedAddresses, BridgesDeployedAddresses} from "../DeployL1CoreUtils.s.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 import {DeployCTMScript} from "../DeployCTM.s.sol";
@@ -160,8 +160,9 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     Gateway internal gatewayConfig;
     NewlyGeneratedData internal newlyGeneratedData;
     UpgradeDeployedAddresses internal upgradeAddresses;
-    L1NativeTokenVault internal vaults;
-    BridgehubDeployedAddresses internal bridgehub_addresses;
+    L1NativeTokenVaultAddresses internal vaults;
+    BridgehubDeployedAddresses internal bridgehubAddresses;
+    BridgesDeployedAddresses internal bridges;
     uint256[] internal factoryDepsHashes;
     mapping(bytes32 => bool) internal isHashInFactoryDeps;
 
@@ -219,8 +220,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             newConfig.priorityTxsL2GasLimit,
             new bytes[](0),
             gatewayConfig.chainId,
-            addresses.bridgehub.bridgehubProxy,
-            addresses.bridges.l1AssetRouterProxy
+            bridgehubAddresses.bridgehubProxy,
+            bridges.l1AssetRouterProxy
         );
         notifyAboutDeployment(contractAddress, contractName, creationCalldata, contractName, true);
     }
@@ -236,8 +237,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             newConfig.priorityTxsL2GasLimit,
             new bytes[](0),
             gatewayConfig.chainId,
-            addresses.bridgehub.bridgehubProxy,
-            addresses.bridges.l1AssetRouterProxy
+            bridgehubAddresses.bridgehubProxy,
+            bridges.l1AssetRouterProxy
         );
         notifyAboutDeployment(implementationAddress, contractName, creationCalldata, contractName, true);
 
@@ -253,8 +254,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             newConfig.priorityTxsL2GasLimit,
             new bytes[](0),
             gatewayConfig.chainId,
-            addresses.bridgehub.bridgehubProxy,
-            addresses.bridges.l1AssetRouterProxy
+            bridgehubAddresses.bridgehubProxy,
+            bridges.l1AssetRouterProxy
         );
         notifyAboutDeployment(
             proxyAddress,
@@ -505,7 +506,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 //
 //        addresses.stateTransition.bytecodesSupplier = toml.readAddress("$.contracts.l1_bytecodes_supplier_addr");
 //
-        addresses.bridgehub.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
+        bridgehubAddresses.bridgehubProxy = toml.readAddress("$.contracts.bridgehub_proxy_address");
 
         setAddressesBasedOnBridgehub();
 //
@@ -549,17 +550,17 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     function getBridgehubAdmin() public virtual returns (address admin) {
-        admin = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
+        admin = Bridgehub(bridgehubAddresses.bridgehubProxy).admin();
     }
 
     /// @notice This function is meant to only be used in tests
     function prepareCreateNewChainCall(uint256 chainId) public view virtual returns (Call[] memory result) {
-        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(bridgehubAddresses.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
-        bytes32 newChainAssetId = Bridgehub(addresses.bridgehub.bridgehubProxy).baseTokenAssetId(gatewayConfig.chainId);
+        bytes32 newChainAssetId = Bridgehub(bridgehubAddresses.bridgehubProxy).baseTokenAssetId(gatewayConfig.chainId);
         result = new Call[](1);
         result[0] = Call({
-            target: addresses.bridgehub.bridgehubProxy,
+            target: bridgehubAddresses.bridgehubProxy,
             value: 0,
             data: abi.encodeCall(
                 IBridgehub.createNewChain,
@@ -577,11 +578,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     }
 
     function setAddressesBasedOnBridgehub() internal virtual {
-        config.ownerAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).owner();
-        address ctm = IBridgehub(addresses.bridgehub.bridgehubProxy).chainTypeManager(config.eraChainId);
+        config.ownerAddress = Bridgehub(bridgehubAddresses.bridgehubProxy).owner();
+        address ctm = IBridgehub(bridgehubAddresses.bridgehubProxy).chainTypeManager(config.eraChainId);
         addresses.stateTransition.chainTypeManagerProxy = ctm;
         // We have to set the diamondProxy address here - as it is used by multiple constructors (for example L1Nullifier etc)
-        addresses.stateTransition.diamondProxy = IBridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+        addresses.stateTransition.diamondProxy = IBridgehub(bridgehubAddresses.bridgehubProxy).getZKChain(
             config.eraChainId
         );
         uint256 ctmProtocolVersion = IChainTypeManager(ctm).protocolVersion();
@@ -589,30 +590,30 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             ctmProtocolVersion != getNewProtocolVersion(),
             "The new protocol version is already present on the ChainTypeManager"
         );
-        addresses.bridges.l1AssetRouterProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).assetRouter();
+        bridges.l1AssetRouterProxy = Bridgehub(bridgehubAddresses.bridgehubProxy).assetRouter();
 
         vaults.l1NativeTokenVaultProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).nativeTokenVault()
+            L1AssetRouter(bridges.l1AssetRouterProxy).nativeTokenVault()
         );
-        addresses.bridges.l1NullifierProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).L1_NULLIFIER()
+        bridges.l1NullifierProxy = address(
+            L1AssetRouter(bridges.l1AssetRouterProxy).L1_NULLIFIER()
         );
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
-        );
-
-        bridgehub_addresses.ctmDeploymentTrackerProxy = address(
-            Bridgehub(addresses.bridgehub.bridgehubProxy).l1CtmDeployer()
+        bridges.erc20BridgeProxy = address(
+            L1AssetRouter(bridges.l1AssetRouterProxy).legacyBridge()
         );
 
-//        bridgehub_addresses.messageRootProxy = address(Bridgehub(addresses.bridgehub.bridgehubProxy).messageRoot());
-//
-//        bridgehub_addresses.chainAssetHandlerProxy = address(
-//            Bridgehub(addresses.bridgehub.bridgehubProxy).chainAssetHandler()
-//        );
+        bridgehubAddresses.ctmDeploymentTrackerProxy = address(
+            Bridgehub(bridgehubAddresses.bridgehubProxy).l1CtmDeployer()
+        );
 
-        addresses.bridges.erc20BridgeProxy = address(
-            L1AssetRouter(addresses.bridges.l1AssetRouterProxy).legacyBridge()
+        bridgehubAddresses.messageRootProxy = address(Bridgehub(bridgehubAddresses.bridgehubProxy).messageRoot());
+
+        bridgehubAddresses.chainAssetHandlerProxy = address(
+            Bridgehub(bridgehubAddresses.bridgehubProxy).chainAssetHandler()
+        );
+
+        bridges.erc20BridgeProxy = address(
+            L1AssetRouter(bridges.l1AssetRouterProxy).legacyBridge()
         );
         newConfig.oldValidatorTimelock = ChainTypeManager(addresses.stateTransition.chainTypeManagerProxy)
             .validatorTimelock();
@@ -622,7 +623,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
         newConfig.ecosystemAdminAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).admin();
 
-        address eraDiamondProxy = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(config.eraChainId);
+        address eraDiamondProxy = Bridgehub(bridgehubAddresses.bridgehubProxy).getZKChain(config.eraChainId);
         (addresses.daAddresses.l1RollupDAValidator, ) = GettersFacet(eraDiamondProxy).getDAValidatorPair();
     }
 
@@ -679,7 +680,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
-            l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
+            l1AssetRouter: bridges.l1AssetRouterProxy,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,
@@ -839,32 +840,32 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 //        vm.serializeUint("root", "priority_txs_l2_gas_limit", newConfig.priorityTxsL2GasLimit);
 //        vm.serializeUint("root", "max_expected_l1_gas_price", newConfig.maxExpectedL1GasPrice);
 //
-//        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
-//        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
-//        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
-//        vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
+//        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", bridges.erc20BridgeImplementation);
+//        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", bridges.erc20BridgeProxy);
+//        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", bridges.l1NullifierProxy);
+//        vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", bridges.l1NullifierImplementation);
 //        vm.serializeAddress(
 //            "bridges",
 //            "l1_asset_router_implementation_addr",
-//            addresses.bridges.l1AssetRouterImplementation
+//            bridges.l1AssetRouterImplementation
 //        );
-//        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", addresses.bridges.l1AssetRouterProxy);
+//        vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", bridges.l1AssetRouterProxy);
 //        // TODO: legacy name
 //        vm.serializeAddress(
 //            "bridges",
 //            "shared_bridge_implementation_addr",
-//            addresses.bridges.l1AssetRouterImplementation
+//            bridges.l1AssetRouterImplementation
 //        );
 //        vm.serializeAddress(
 //            "bridges",
 //            "bridged_standard_erc20_impl",
-//            addresses.bridges.bridgedStandardERC20Implementation
+//            bridges.bridgedStandardERC20Implementation
 //        );
 //
 //        string memory bridges = vm.serializeAddress(
 //            "bridges",
 //            "bridged_token_beacon",
-//            addresses.bridges.bridgedTokenBeacon
+//            bridges.bridgedTokenBeacon
 //        );
 //
 //        vm.serializeUint(
@@ -941,7 +942,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 //        string memory contractsConfig = vm.serializeAddress(
 //            "contracts_newConfig",
 //            "l1_legacy_shared_bridge",
-//            addresses.bridges.l1AssetRouterProxy
+//            bridges.l1AssetRouterProxy
 //        );
 //
 //        vm.serializeAddress(
@@ -1440,8 +1441,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
     ) internal view returns (Call[] memory calls) {
         require(gatewayConfig.chainId != 0, "Chain id of gateway is zero in newConfig");
 
-        require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
-        require(addresses.bridges.l1AssetRouterProxy != address(0), "l1AssetRouterProxyAddress is zero in newConfig");
+        require(bridgehubAddresses.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
+        require(bridges.l1AssetRouterProxy != address(0), "l1AssetRouterProxyAddress is zero in newConfig");
 
         calls = Utils.prepareGovernanceL1L2DirectTransaction(
             l1GasPrice,
@@ -1450,8 +1451,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             new bytes[](0),
             dstAddress,
             gatewayConfig.chainId,
-            addresses.bridgehub.bridgehubProxy,
-            addresses.bridges.l1AssetRouterProxy,
+            bridgehubAddresses.bridgehubProxy,
+            bridges.l1AssetRouterProxy,
             msg.sender
         );
     }
@@ -1556,41 +1557,41 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             addresses.stateTransition.chainTypeManagerImplementation
         );
 
-//        calls[1] = _buildCallProxyUpgrade(
-//            addresses.bridgehub.bridgehubProxy,
-//            addresses.bridgehub.bridgehubImplementation
-//        );
+        calls[1] = _buildCallProxyUpgrade(
+            bridgehubAddresses.bridgehubProxy,
+            bridgehubAddresses.bridgehubImplementation
+        );
 
         // Note, that we do not need to run the initializer
-//        calls[2] = _buildCallProxyUpgrade(
-//            addresses.bridges.l1NullifierProxy,
-//            addresses.bridges.l1NullifierImplementation
-//        );
-//
-//        calls[3] = _buildCallProxyUpgrade(
-//            addresses.bridges.l1AssetRouterProxy,
-//            addresses.bridges.l1AssetRouterImplementation
-//        );
-//
-//        calls[4] = _buildCallProxyUpgrade(
-//            vaults.l1NativeTokenVaultProxy,
-//            vaults.l1NativeTokenVaultImplementation
-//        );
+        calls[2] = _buildCallProxyUpgrade(
+            bridges.l1NullifierProxy,
+            bridges.l1NullifierImplementation
+        );
 
-//        calls[5] = _buildCallProxyUpgrade(
-//            bridgehub_addresses.messageRootProxy,
-//            bridgehub_addresses.messageRootImplementation
-//        );
-//
-//        calls[6] = _buildCallProxyUpgrade(
-//            bridgehub_addresses.ctmDeploymentTrackerProxy,
-//            bridgehub_addresses.ctmDeploymentTrackerImplementation
-//        );
+        calls[3] = _buildCallProxyUpgrade(
+            bridges.l1AssetRouterProxy,
+            bridges.l1AssetRouterImplementation
+        );
 
-//        calls[7] = _buildCallProxyUpgrade(
-//            addresses.bridges.erc20BridgeProxy,
-//            addresses.bridges.erc20BridgeImplementation
-//        );
+        calls[4] = _buildCallProxyUpgrade(
+            vaults.l1NativeTokenVaultProxy,
+            vaults.l1NativeTokenVaultImplementation
+        );
+
+        calls[5] = _buildCallProxyUpgrade(
+            bridgehubAddresses.messageRootProxy,
+            bridgehubAddresses.messageRootImplementation
+        );
+
+        calls[6] = _buildCallProxyUpgrade(
+            bridgehubAddresses.ctmDeploymentTrackerProxy,
+            bridgehubAddresses.ctmDeploymentTrackerImplementation
+        );
+
+        calls[7] = _buildCallProxyUpgrade(
+            bridges.erc20BridgeProxy,
+            bridges.erc20BridgeImplementation
+        );
     }
 
     function _buildCallProxyUpgrade(
@@ -1657,7 +1658,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
 
     /// @notice Tests that it is possible to upgrade a chain to the new version
     function TESTONLY_prepareTestUpgradeChainCall() private returns (Call[] memory calls, address admin) {
-        address chainDiamondProxyAddress = Bridgehub(addresses.bridgehub.bridgehubProxy).getZKChain(
+        address chainDiamondProxyAddress = Bridgehub(bridgehubAddresses.bridgehubProxy).getZKChain(
            gatewayConfig.chainId
         );
 //        uint256 oldProtocolVersion = getOldProtocolVersion();
@@ -1756,7 +1757,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             return abi.encode();
         } else if (compareStrings(contractName, "ChainTypeManager")) {
             if (!isZKBytecode) {
-                return abi.encode(addresses.bridgehub.bridgehubProxy);
+                return abi.encode(bridgehubAddresses.bridgehubProxy);
             } else {
                 return abi.encode(L2_BRIDGEHUB_ADDR);
             }
@@ -1792,7 +1793,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             return abi.encode(block.chainid, diamondCut);
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
             if (!isZKBytecode) {
-                return abi.encode(addresses.bridgehub.bridgehubProxy);
+                return abi.encode(bridgehubAddresses.bridgehubProxy);
             } else {
                 return abi.encode(L2_BRIDGEHUB_ADDR);
             }
