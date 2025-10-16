@@ -1639,17 +1639,17 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         address chainDiamondProxyAddress = Bridgehub(bridgehubAddresses.bridgehubProxy).getZKChain(
             gatewayConfig.chainId
         );
-        //        uint256 oldProtocolVersion = getOldProtocolVersion();
-        //        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
-        //
-        //        admin = IZKChain(chainDiamondProxyAddress).getAdmin();
-        //
-        //        calls = new Call[](1);
-        //        calls[0] = Call({
-        //            target: chainDiamondProxyAddress,
-        //            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
-        //            value: 0
-        //        });
+        uint256 oldProtocolVersion = getOldProtocolVersion();
+        Diamond.DiamondCutData memory upgradeCutData = generateUpgradeCutData(getAddresses().stateTransition);
+
+        admin = IZKChain(chainDiamondProxyAddress).getAdmin();
+
+        calls = new Call[](1);
+        calls[0] = Call({
+            target: chainDiamondProxyAddress,
+            data: abi.encodeCall(IAdmin.upgradeChainFromVersion, (oldProtocolVersion, upgradeCutData)),
+            value: 0
+        });
     }
 
     /// @notice Tests that it is possible to create a new chain with the new version
@@ -1706,8 +1706,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
                 return ContractsBytecodesLib.getCreationCode("ValidatorTimelock");
             }
         }
-        revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
-        //        return super.getCreationCode(contractName, isZKBytecode);
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getCreationCalldata(

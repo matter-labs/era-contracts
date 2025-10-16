@@ -161,9 +161,7 @@ abstract contract Create2FactoryUtils is Script {
         string memory displayName,
         bool isZKBytecode
     ) internal returns (address contractAddress) {
-        console.log("test1");
         contractAddress = create2WithDeterministicOwner(abi.encodePacked(initCode, constructorParams), owner);
-        console.log("test2");
         notifyAboutDeployment(contractAddress, contractName, constructorParams, displayName, isZKBytecode);
     }
 

@@ -31,10 +31,9 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 
-import {Config, DeployedAddresses} from "./DeployL1CoreUtils.s.sol";
-import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
+import {Config, DeployedAddresses, DeployL1CoreUtils} from "./DeployL1CoreUtils.s.sol";
 
-contract DeployL1CoreContractsScript is Script, DeployL1HelperScript {
+contract DeployL1CoreContractsScript is Script, DeployL1CoreUtils {
     using stdToml for string;
 
     function run() public virtual {

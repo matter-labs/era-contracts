@@ -152,10 +152,6 @@ struct ContractsConfig {
     address availL1DAValidator;
 }
 
-struct TokensConfig {
-    address test;
-}
-
 // solhint-disable-next-line gas-struct-packing
 struct GeneratedData {
     bytes forceDeploymentsData;
@@ -418,7 +414,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "RollupDAManager")) {
             return abi.encode();
         } else if (compareStrings(contractName, "RollupL1DAValidator")) {
-            return abi.encode();
+            return abi.encode(addresses.daAddresses.l1RollupDAValidator);
         } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
             return abi.encode();
         } else if (compareStrings(contractName, "AvailL1DAValidator")) {

@@ -13,8 +13,27 @@ import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
+import {Bridgehub} from "contracts/bridgehub/Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {DeployUtils} from "./DeployUtils.sol";
+import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {Governance} from "contracts/governance/Governance.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
+import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
+import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
+import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
+import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
+import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {MessageRoot} from "contracts/bridgehub/MessageRoot.sol";
+import {ChainAssetHandler} from "contracts/bridgehub/ChainAssetHandler.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
+import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
+import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -198,6 +217,81 @@ abstract contract DeployL1CoreUtils is DeployUtils {
 
     function transparentProxyAdmin() internal virtual override returns (address) {
         return addresses.transparentProxyAdmin;
+    }
+
+    function getCreationCode(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal view virtual override returns (bytes memory) {
+        if (!isZKBytecode) {
+            if (compareStrings(contractName, "Bridgehub")) {
+                return type(Bridgehub).creationCode;
+            } else if (compareStrings(contractName, "ChainAssetHandler")) {
+                return type(ChainAssetHandler).creationCode;
+            } else if (compareStrings(contractName, "MessageRoot")) {
+                return type(MessageRoot).creationCode;
+            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+                return type(CTMDeploymentTracker).creationCode;
+            } else if (compareStrings(contractName, "L1Nullifier")) {
+                if (config.supportL2LegacySharedBridgeTest) {
+                    return type(L1NullifierDev).creationCode;
+                } else {
+                    return type(L1Nullifier).creationCode;
+                }
+            } else if (compareStrings(contractName, "L1AssetRouter")) {
+                return type(L1AssetRouter).creationCode;
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return type(L1ERC20Bridge).creationCode;
+            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+                return type(L1NativeTokenVault).creationCode;
+            } else if (compareStrings(contractName, "BridgedStandardERC20")) {
+                return type(BridgedStandardERC20).creationCode;
+            } else if (compareStrings(contractName, "BridgedTokenBeacon")) {
+                return type(UpgradeableBeacon).creationCode;
+            } else if (compareStrings(contractName, "Governance")) {
+                return type(Governance).creationCode;
+            } else if (compareStrings(contractName, "ChainAdminOwnable")) {
+                return type(ChainAdminOwnable).creationCode;
+            } else if (compareStrings(contractName, "ChainAdmin")) {
+                return type(ChainAdmin).creationCode;
+            } else if (compareStrings(contractName, "ProxyAdmin")) {
+                return type(ProxyAdmin).creationCode;
+            }
+        }
+        return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
+    }
+
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
+        if (!isZKBytecode) {
+            if (compareStrings(contractName, "Bridgehub")) {
+                return abi.encodeCall(Bridgehub.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "MessageRoot")) {
+                return abi.encodeCall(MessageRoot.initialize, ());
+            } else if (compareStrings(contractName, "ChainAssetHandler")) {
+                return abi.encodeCall(ChainAssetHandler.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+                return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1Nullifier")) {
+                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+            } else if (compareStrings(contractName, "L1AssetRouter")) {
+                return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return abi.encodeCall(L1ERC20Bridge.initialize, ());
+            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+                return
+                    abi.encodeCall(
+                        L1NativeTokenVault.initialize,
+                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                    );
+            } else {
+                revert(string.concat("Contract ", contractName, " initialize calldata not set"));
+            }
+        } else {
+            revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));
+        }
     }
 
     function test() internal virtual {}
