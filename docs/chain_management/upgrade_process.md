@@ -11,7 +11,7 @@ Upgrading the ecosystem of ZKChains is a complicated process. ZKSync is a comple
 Where each upgrade consists of two parameters:
 
 - Facet cuts - change of the internal implementation of the diamond proxy
-- Diamond Initialization - delegate call to the specified address wit`h specified data
+- Diamond Initialization - delegate call to the specified address with specified data
 
 The second parameter is very powerful and flexible enough to move majority of upgrade logic there.
 
