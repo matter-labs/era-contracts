@@ -176,7 +176,7 @@ library L2GenesisForceDeploymentsHelper {
             _baseTokenSymbol: additionalForceDeploymentsData.baseTokenSymbol
         });
 
-        // Now initialiazing the upgradeable token beacon
+        // Now initializing the upgradeable token beacon
         forceDeployOnAddress(_isZKsyncOS, fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
 
         if (_isGenesisUpgrade) {
