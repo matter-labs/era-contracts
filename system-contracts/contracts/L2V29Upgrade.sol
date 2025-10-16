@@ -10,7 +10,6 @@ import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 import {L2_ASSET_ROUTER, L2_BRIDGE_HUB, L2_NATIVE_TOKEN_VAULT, L2_CHAIN_ASSET_HANDLER} from "./Constants.sol";
 import {IBridgedStandardERC20} from "./interfaces/IBridgedStandardERC20.sol";
 import {LegacyBridgeNotProxy} from "./SystemContractErrors.sol";
-import {IBridgehub} from "./interfaces/IBridgehub.sol";
 
 /// @dev Storage slot with the admin of the contract used for EIP‑1967 proxies (e.g., TUP, BeaconProxy, etc.).
 bytes32 constant PROXY_ADMIN_SLOT = 0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103;

@@ -13,8 +13,6 @@ import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
 import {L2_BRIDGEHUB_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 
-import {VerifierFflonk} from "contracts/state-transition/verifiers/VerifierFflonk.sol";
-import {VerifierPlonk} from "contracts/state-transition/verifiers/VerifierPlonk.sol";
 import {VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
@@ -40,7 +38,6 @@ import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {AddressHasNoCode} from "../ZkSyncScriptErrors.sol";
 import {ICTMDeploymentTracker} from "contracts/bridgehub/ICTMDeploymentTracker.sol";
@@ -1002,22 +999,22 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
         result = new Call[](1);
-        result[0] = Call({
-            target: addresses.bridgehub.bridgehubProxy,
-            value: 0,
-            data: abi.encodeCall(IL1Bridgehub.pauseMigration, ())
-        });
+        // result[0] = Call({
+        //     target: addresses.bridgehub.bridgehubProxy,
+        //     value: 0,
+        //     data: abi.encodeCall(IL1Bridgehub.pauseMigration, ())
+        // });
     }
 
     function prepareUnpauseGatewayMigrationsCall() public view virtual returns (Call[] memory result) {
         require(addresses.bridgehub.bridgehubProxy != address(0), "bridgehubProxyAddress is zero in newConfig");
 
         result = new Call[](1);
-        result[0] = Call({
-            target: addresses.bridgehub.bridgehubProxy,
-            value: 0,
-            data: abi.encodeCall(IL1Bridgehub.unpauseMigration, ())
-        });
+        // result[0] = Call({
+        //     target: addresses.bridgehub.bridgehubProxy,
+        //     value: 0,
+        //     data: abi.encodeCall(IL1Bridgehub.unpauseMigration, ())
+        // });
     }
 
     function prepareGatewaySpecificStage0GovernanceCalls() public virtual returns (Call[] memory calls) {
@@ -1112,18 +1109,16 @@ contract EcosystemUpgrade_v28 is Script, DeployCTMScript {
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IL1Bridgehub.pauseMigration, ());
-
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
+        // bytes memory l2Calldata = abi.encodeCall(IL1Bridgehub.pauseMigration, ());
+        // calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
 
     function prepareUnpauseMigrationCallForGateway(
         uint256 l2GasLimit,
         uint256 l1GasPrice
     ) public virtual returns (Call[] memory calls) {
-        bytes memory l2Calldata = abi.encodeCall(IL1Bridgehub.unpauseMigration, ());
-
-        calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
+        // bytes memory l2Calldata = abi.encodeCall(IL1Bridgehub.unpauseMigration, ());
+        // calls = _prepareL1ToGatewayCall(l2Calldata, l2GasLimit, l1GasPrice, L2_BRIDGEHUB_ADDR);
     }
 
     function prepareNewChainCreationParamsCallForGateway(
