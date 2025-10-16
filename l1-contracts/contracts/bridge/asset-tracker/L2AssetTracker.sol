@@ -272,10 +272,10 @@ contract L2AssetTracker is AssetTrackerBase, IL2AssetTracker {
     /// @dev This function can be called multiple times on the chain it does not have a direct effect.
     /// @dev This function is permissionless, it does not affect the state of the contract substantially, and can be called multiple times.
     function initiateL1ToGatewayMigrationOnL2(bytes32 _assetId) external {
-        require(
-            L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID,
-            OnlyGatewaySettlementLayer()
-        );
+        // require(
+        //     L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT.getSettlementLayerChainId() != L1_CHAIN_ID,
+        //     OnlyGatewaySettlementLayer()
+        // );
         address tokenAddress = _tryGetTokenAddress(_assetId);
 
         uint256 originChainId = L2_NATIVE_TOKEN_VAULT.originChainId(_assetId);

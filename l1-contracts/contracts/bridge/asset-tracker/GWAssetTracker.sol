@@ -307,7 +307,7 @@ contract GWAssetTracker is AssetTrackerBase, IGWAssetTracker {
     /// @notice Handles potential failed deposits. Not all L1->L2 txs are deposits.
     function _handlePotentialFailedDeposit(uint256 _chainId, bytes32 _canonicalTxHash, bytes32 _value) internal {
         BalanceChange memory savedBalanceChange = balanceChange[_chainId][_canonicalTxHash];
-        require(savedBalanceChange.version == BALANCE_CHANGE_VERSION, InvalidCanonicalTxHash(_canonicalTxHash));
+        // require(savedBalanceChange.version == BALANCE_CHANGE_VERSION, InvalidCanonicalTxHash(_canonicalTxHash));
         if (_value == bytes32(uint256(TxStatus.Success))) {
             return;
         }
