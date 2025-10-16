@@ -107,6 +107,7 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
             testnetVerifier: config.testnetVerifier,
+            isZKsyncOS: config.isZKsyncOS,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
             mailboxSelectors: Utils.getAllSelectorsForFacet("Mailbox"),
