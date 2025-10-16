@@ -36,7 +36,6 @@ import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstrac
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";
-import {DeployL1HelperScript} from "deploy-scripts/DeployL1HelperScript.s.sol";
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegrationScript {
@@ -75,20 +74,6 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
 
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployCTMIntegrationScript, SharedL2ContractDeployer) {}
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
-    }
 
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition

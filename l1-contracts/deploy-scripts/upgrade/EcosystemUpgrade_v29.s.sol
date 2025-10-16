@@ -200,7 +200,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
                 return ContractsBytecodesLib.getCreationCode("L1V29Upgrade", true);
             }
         }
-        revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
+        return super.getCreationCode(contractName, isZKBytecode);
     }
 
     function getCreationCalldata(
@@ -457,7 +457,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
                     );
             }
         } else {
-            revert(string(abi.encodePacked("Unknown contract name: ", contractName)));
+            return super.getInitializeCalldata(contractName, isZKBytecode);
         }
     }
 }

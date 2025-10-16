@@ -62,18 +62,4 @@ contract L2NativeTokenVaultL1Test is Test, SharedL2ContractL1Deployer, L2NativeT
     ) internal override(DeployIntegrationUtils, SharedL2ContractL1Deployer) returns (Diamond.FacetCut[] memory) {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override(DeployCTMUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override(DeployCTMUtils, SharedL2ContractL1Deployer) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
-    }
 }

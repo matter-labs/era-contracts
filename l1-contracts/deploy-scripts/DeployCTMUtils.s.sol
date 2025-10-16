@@ -197,9 +197,6 @@ abstract contract DeployCTMUtils is DeployUtils {
         config.contracts.genesisRollupLeafIndex = toml.readUint("$.contracts.genesis_rollup_leaf_index");
         config.contracts.genesisBatchCommitment = toml.readBytes32("$.contracts.genesis_batch_commitment");
         config.contracts.latestProtocolVersion = toml.readUint("$.contracts.latest_protocol_version");
-        config.contracts.recursionNodeLevelVkHash = toml.readBytes32("$.contracts.recursion_node_level_vk_hash");
-        config.contracts.recursionLeafLevelVkHash = toml.readBytes32("$.contracts.recursion_leaf_level_vk_hash");
-        config.contracts.recursionCircuitsSetVksHash = toml.readBytes32("$.contracts.recursion_circuits_set_vks_hash");
         config.contracts.priorityTxMaxGasLimit = toml.readUint("$.contracts.priority_tx_max_gas_limit");
         config.contracts.diamondInitPubdataPricingMode = PubdataPricingMode(
             toml.readUint("$.contracts.diamond_init_pubdata_pricing_mode")
@@ -289,9 +286,9 @@ abstract contract DeployCTMUtils is DeployUtils {
     function getVerifierParams() internal returns (VerifierParams memory) {
         return
             VerifierParams({
-                recursionNodeLevelVkHash: config.contracts.recursionNodeLevelVkHash,
-                recursionLeafLevelVkHash: config.contracts.recursionLeafLevelVkHash,
-                recursionCircuitsSetVksHash: config.contracts.recursionCircuitsSetVksHash
+                recursionNodeLevelVkHash: bytes32(0),
+                recursionLeafLevelVkHash: bytes32(0),
+                recursionCircuitsSetVksHash: bytes32(0)
             });
     }
 
