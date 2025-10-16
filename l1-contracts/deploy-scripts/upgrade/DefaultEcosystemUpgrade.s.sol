@@ -284,7 +284,7 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         bytes memory proxyCreationCalldata = abi.encode(
             implementationAddress,
             gatewayConfig.gatewayStateTransition.chainTypeManagerProxyAdmin,
-            getInitializeCalldata(contractName)
+            getInitializeCalldata(contractName, true)
         );
         proxyAddress = Utils.deployThroughL1Deterministic(
             ContractsBytecodesLib.getCreationCode("TransparentUpgradeableProxy"),
@@ -479,6 +479,8 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMAdditional {
         StateTransitionDeployedAddresses memory stateTransition
     ) public virtual returns (Diamond.DiamondCutData memory upgradeCutData) {
         require(upgradeConfig.factoryDepsPublished, "Factory deps not published");
+
+        Diamond.FacetCut[] memory facetCutsForDeletion = getFacetCutsForDeletion();
 
         Diamond.FacetCut[] memory facetCuts;
         facetCuts = getUpgradeAddedFacetCuts(stateTransition);

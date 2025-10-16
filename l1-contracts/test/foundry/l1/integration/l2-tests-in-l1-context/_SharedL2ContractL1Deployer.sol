@@ -84,9 +84,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     }
 
     function getInitializeCalldata(
-        string memory contractName
+        string memory contractName,
+        bool isZKBytecode
     ) internal virtual override(DeployIntegrationUtils, DeployL1HelperScript) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName);
+        return super.getInitializeCalldata(contractName, isZKBytecode);
     }
 
     function getChainCreationFacetCuts(

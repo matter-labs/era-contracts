@@ -472,7 +472,10 @@ abstract contract DeployUtils is Create2FactoryUtils {
         return L2ContractHelper.hashL2Bytecode(getCreationCode(contractName, true));
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual returns (bytes memory);
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual returns (bytes memory);
 
     function test() internal virtual {}
 }

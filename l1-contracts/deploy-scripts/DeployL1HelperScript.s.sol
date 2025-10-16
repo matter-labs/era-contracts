@@ -5,7 +5,7 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {StateTransitionDeployedAddresses} from "./Utils.sol";
+import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 
 import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
@@ -96,7 +96,7 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
 
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName)),
+            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName, false)),
             contractName,
             string.concat(contractName, " Proxy"),
             isZKBytecode
