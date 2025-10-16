@@ -131,9 +131,6 @@ struct ContractsConfig {
     uint256 genesisRollupLeafIndex;
     bytes32 genesisBatchCommitment;
     uint256 latestProtocolVersion;
-    bytes32 recursionNodeLevelVkHash;
-    bytes32 recursionLeafLevelVkHash;
-    bytes32 recursionCircuitsSetVksHash;
     uint256 priorityTxMaxGasLimit;
     PubdataPricingMode diamondInitPubdataPricingMode;
     uint256 diamondInitBatchOverheadL1Gas;

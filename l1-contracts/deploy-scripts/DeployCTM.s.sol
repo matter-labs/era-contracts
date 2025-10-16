@@ -105,9 +105,11 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         address erc20Bridge = address(assetRouter.legacyBridge());
         address l1Nullifier = address(assetRouter.L1_NULLIFIER());
 
+        addresses.bridgehub.bridgehubProxy = bridgehub;
         // Bridges
         addresses.bridges.erc20BridgeProxy = erc20Bridge;
         addresses.bridges.l1NullifierProxy = l1Nullifier;
+        addresses.bridges.l1AssetRouterProxy = bridgehubProxy.assetRouter();
 
         if (reuseGovAndAdmin) {
             addresses.governance = IOwnable(bridgehub).owner();
@@ -308,6 +310,16 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
+        vm.serializeAddress(
+            "root",
+            "expected_no_da_validium_l2_validator_addr",
+            calculateExpectedL2Address("ValidiumL2DAValidator")
+        );
+        vm.serializeAddress(
+            "root",
+            "expected_avail_l2_da_validator_addr",
+            calculateExpectedL2Address("AvailL2DAValidator")
+        );
         string memory toml = vm.serializeAddress(
             "root",
             "expected_rollup_l2_da_validator_addr",
