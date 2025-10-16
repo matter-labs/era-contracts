@@ -898,10 +898,4 @@ abstract contract BridgehubBase is
     function sharedBridge() public view returns (address) {
         return assetRouter;
     }
-
-    function _ethTokenAssetId() internal view virtual returns (bytes32);
-
-    function _l1ChainId() internal view virtual returns (uint256);
-
-    function _maxNumberOfZKChains() internal view virtual returns (uint256);
 }

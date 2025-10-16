@@ -199,6 +199,4 @@ abstract contract MessageRootBase is IMessageRoot, Initializable {
 
         emit AddedChain(_chainId, cachedChainCount);
     }
-
-    function _bridgehub() internal view virtual returns (IBridgehub);
 }
