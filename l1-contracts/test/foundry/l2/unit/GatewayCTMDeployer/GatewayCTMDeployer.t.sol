@@ -93,7 +93,6 @@ contract GatewayCTMDeployerTest is Test {
             eraChainId: 1001,
             l1ChainId: 1,
             testnetVerifier: true,
-            isZKsyncOS: false,
             adminSelectors: new bytes4[](2),
             executorSelectors: new bytes4[](2),
             mailboxSelectors: new bytes4[](2),
