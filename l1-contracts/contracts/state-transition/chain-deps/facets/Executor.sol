@@ -150,16 +150,27 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         }
 
         // we can just ignore l1 da validator output with ZKsync OS:
-        // - used state diffs hash correctness verifier within state transition program
-        // - blobs not supported yet, and likely even once it's supported design will allow to ignore blobs related values anyway
+        // - used state diffs hash correctness verified within state transition program
+        // - blob commitments/linear hashes verification not supported, we use different way and custom DA validator for blobs with ZKsync OS
         // slither-disable-next-line unused-return
-        IL1DAValidator(s.l1DAValidator).checkDA({
+        L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
             _chainId: s.chainId,
             _batchNumber: uint256(_newBatch.batchNumber),
             _l2DAValidatorOutputHash: _newBatch.daCommitment,
             _operatorDAInput: _newBatch.operatorDAInput,
             _maxBlobsSupported: TOTAL_BLOBS_IN_COMMITMENT
         });
+        // Theoretically, we can just ignore it, all the DA validators, except `RollupL1DAValidator`, always return a 0 array,
+        // and `RollupL1DAValidator` will fail if we try to submit blobs with ZKsync OS, so it also returns zeroes here.
+        // However, we are double-checking that the L1 DA validator doesn't rely on "EraVM like" blobs verification, just in case.
+        if (daOutput.blobsLinearHashes.length != TOTAL_BLOBS_IN_COMMITMENT || daOutput.blobsOpeningCommitments.length != TOTAL_BLOBS_IN_COMMITMENT) {
+            revert InvalidNumberOfBlobs(TOTAL_BLOBS_IN_COMMITMENT, daOutput.blobsOpeningCommitments.length, daOutput.blobsLinearHashes.length);
+        }
+        for(uint256 i = 0; i < daOutput.blobsLinearHashes.length; i++) {
+            if (daOutput.blobsLinearHashes[i] != bytes32(0) || daOutput.blobsOpeningCommitments[i] != bytes32(0)) {
+                revert NonZeroBlobToVerifyZKsyncOS(i, daOutput.blobsLinearHashes[i], daOutput.blobsOpeningCommitments[i]);
+            }
+        }
 
         if (block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER > _newBatch.firstBlockTimestamp) {
             revert TimeNotReached(_newBatch.firstBlockTimestamp, block.timestamp - COMMIT_TIMESTAMP_NOT_OLDER);
@@ -170,10 +181,9 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         if (_newBatch.chainId != s.chainId) {
             revert IncorrectBatchChainId(_newBatch.chainId, s.chainId);
         }
-        // Currently ZKsync OS, always generates rollup da commitment and sets l2DaValidator to 0.
-        //        if (_newBatch.l2DaValidator != s.l2DAValidator) {
-        //             revert MismatchL2DAValidator();
-        //        }
+        if (_newBatch.daCommitmentScheme != s.l2DACommitmentScheme) {
+            revert MismatchL2DACommitmentScheme(uint256(_newBatch.daCommitmentScheme), uint256(s.l2DACommitmentScheme));
+        }
 
         // The batch proof public input can be calculated as keccak256(state_commitment_before & state_commitment_after & batch_output_hash)
         // batch output hash commits to information about batch that needs to be opened on l1.
@@ -183,7 +193,7 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
                 _newBatch.chainId,
                 _newBatch.firstBlockTimestamp,
                 _newBatch.lastBlockTimestamp,
-                uint160(_newBatch.l2DaValidator),
+                uint256(_newBatch.daCommitmentScheme),
                 _newBatch.daCommitment,
                 _newBatch.numberOfLayer1Txs,
                 _newBatch.priorityOperationsHash,

@@ -20,17 +20,16 @@ contract RollupL1DAValidator is IL1DAValidator {
     mapping(bytes32 versionedHash => uint256 blockOfPublishing) public publishedBlobs;
 
     /// @notice Publishes certain blobs, marking commitments to them as published.
-    /// @param _pubdataCommitments The commitments to the blobs to be published.
-    /// `_pubdataCommitments` is a packed list of commitments of the following format:
-    /// opening point (16 bytes) || claimed value (32 bytes) || commitment (48 bytes) || proof (48 bytes)
     function publishBlobs() external {
         uint256 versionedHashIndex = 0;
+        // iterate through all the published blobs in the tx (until versionedHash for index equals to 0)
         while(true) {
             bytes32 versionedHash = _getBlobVersionedHash(versionedHashIndex);
             if(versionedHash == bytes32(0)) {
                 break;
             }
             publishedBlobs[versionedHash] = block.number;
+            ++versionedHashIndex;
         }
     }
 
@@ -48,8 +47,10 @@ contract RollupL1DAValidator is IL1DAValidator {
         uint256, // _batchNumber
         bytes32 _l2DAValidatorOutputHash,
         bytes calldata _operatorDAInput,
-        uint256 // _maxBlobsSupported
+        uint256 _maxBlobsSupported
     ) external view returns (L1DAValidatorOutput memory output) {
+        // As DA input operator should provide concatenated blob versioned hashes of published blobs.
+        // If provided hash equals to 0, blob versioned hash will be taken from blob published with the current transaction.
         if (_operatorDAInput.length % BLOB_VERSIONED_HASH_SIZE != 0) {
             revert InvalidBlobsDAInputLength(_operatorDAInput.length);
         }
@@ -86,8 +87,8 @@ contract RollupL1DAValidator is IL1DAValidator {
 
         // we use this interface fo compatability, but in fact outputs not needed for ZKsync OS
         output.stateDiffHash = bytes32(0);
-        output.blobsLinearHashes = new bytes32[](0);
-        output.blobsOpeningCommitments = new bytes32[](0);
+        output.blobsLinearHashes = new bytes32[](_maxBlobsSupported);
+        output.blobsOpeningCommitments = new bytes32[](_maxBlobsSupported);
     }
 
     function _getBlobVersionedHash(uint256 _index) internal view virtual returns (bytes32 versionedHash) {
