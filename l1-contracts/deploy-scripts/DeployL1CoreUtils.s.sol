@@ -33,8 +33,6 @@ struct DeployedAddresses {
     address chainAdmin;
     address accessControlRestrictionAddress;
     address create2Factory;
-    // TODO IT's never deployed
-    address diamondProxy;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -73,6 +71,7 @@ struct Config {
     address ownerAddress;
     address deployerAddress;
     uint256 eraChainId;
+    address eraDiamondProxyAddress;
     bool supportL2LegacySharedBridgeTest;
     ContractsConfig contracts;
     TokensConfig tokens;
@@ -127,6 +126,9 @@ abstract contract DeployL1CoreUtils is DeployUtils {
         }
         _initCreate2FactoryParams(create2FactoryAddr, create2FactorySalt);
 
+        if (vm.keyExistsToml(toml, "$.contracts.era_diamond_proxy_addr")) {
+            config.eraDiamondProxyAddress = toml.readAddress("$.contracts.era_diamond_proxy_addr");
+        }
         config.tokens.tokenWethAddress = toml.readAddress("$.tokens.token_weth_address");
     }
 
@@ -160,7 +162,7 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                     addresses.bridgehub.messageRootProxy
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, addresses.diamondProxy);
+            return abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, config.eraDiamondProxyAddress);
         } else if (compareStrings(contractName, "L1AssetRouter")) {
             return
                 abi.encode(
@@ -168,7 +170,7 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                     addresses.bridgehub.bridgehubProxy,
                     addresses.bridges.l1NullifierProxy,
                     config.eraChainId,
-                    addresses.diamondProxy
+                    config.eraDiamondProxyAddress
                 );
         } else if (compareStrings(contractName, "L1ERC20Bridge")) {
             return
