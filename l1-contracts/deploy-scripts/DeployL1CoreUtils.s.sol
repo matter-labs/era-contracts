@@ -163,6 +163,14 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                 );
         } else if (compareStrings(contractName, "L1Nullifier")) {
             return abi.encode(addresses.bridgehub.bridgehubProxy, config.eraChainId, config.eraDiamondProxyAddress);
+        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+            return
+                abi.encode(
+                    config.ownerAddress,
+                    addresses.bridgehub.bridgehubProxy,
+                    addresses.bridges.l1AssetRouterProxy,
+                    addresses.bridgehub.messageRootProxy
+                );
         } else if (compareStrings(contractName, "L1AssetRouter")) {
             return
                 abi.encode(

@@ -348,7 +348,7 @@ abstract contract DeployCTMUtils is DeployUtils {
                 return type(RollupDAManager).creationCode;
             } else if (compareStrings(contractName, "ValidiumL1DAValidator")) {
                 return type(ValidiumL1DAValidator).creationCode;
-            } else if (compareStrings(contractName, "EraVerifier")) {
+            } else if (compareStrings(contractName, "Verifier")) {
                 if (config.testnetVerifier) {
                     return type(TestnetVerifier).creationCode;
                 } else {
