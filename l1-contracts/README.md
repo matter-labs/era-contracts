@@ -66,3 +66,59 @@ For example, for ZKsync Era testnet environment it would look the following way:
 ```
 VERIFICATION_URL=https://explorer.sepolia.era.zksync.dev/contract_verification yarn verify-on-l2-explorer
 ```
+
+### Verifying Contracts from Deployment Logs
+
+We provide a script [`verify-contracts.ts`](./scripts/verify-contracts.ts) that automates contract verification from deployment logs.
+
+#### Usage
+
+```bash
+yarn verify-contracts <log_file> --chain [stage|testnet|mainnet]
+```
+
+log_file — path to a deployment log containing forge verify-contract commands
+
+chain — one of stage, testnet, or mainnet (default: stage)
+
+#### Behavior
+
+- Parses all forge verify-contract commands in the log
+
+- Locates matching .sol sources inside l1-contracts or da-contracts
+
+- Supports fallback mappings (e.g. VerifierFflonk → L1VerifierFflonk)
+
+- Executes forge verify-contract from the correct project root
+
+- If verification fails, retries with:
+
+  - the original contract name (in case of fallback)
+
+  - TransparentUpgradeableProxy (useful for proxy deployments)
+
+- Redacts ETHERSCAN_API_KEY in printed commands to avoid leaking secrets
+
+#### ZKsync Support
+
+If a log line includes --verifier zksync, the script automatically appends the correct ZKsync verifier URL (no ETHERSCAN_API_KEY required).
+
+For non-ZKsync logs, the script uses Etherscan-style verification and requires ETHERSCAN_API_KEY.
+
+#### Examples
+
+_Etherscan-style (Ethereum):_
+
+```bash
+export ETHERSCAN_API_KEY=$API_KEY
+yarn verify-contracts ./deployment-logs.txt --chain mainnet
+```
+
+_ZKsync logs (no API key needed):_
+
+```bash
+yarn verify-contracts ./deployment-logs.txt --chain stage
+```
+
+If the file contains both Ethereum and ZKsync logs, it will process both successfully.
+At the end of execution, the script prints a summary of verified and skipped contracts.

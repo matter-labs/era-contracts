@@ -3,8 +3,6 @@
 pragma solidity ^0.8.21;
 
 import {IBridgehubBase} from "./IBridgehubBase.sol";
-import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
-import {IMessageRoot} from "./IMessageRoot.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -18,13 +16,13 @@ interface IL2Bridgehub is IBridgehubBase {
     ) external;
 
     /// @notice Set addresses
-    function setAddresses(
-        address _assetRouter,
-        ICTMDeploymentTracker _l1CtmDeployer,
-        IMessageRoot _messageRoot,
-        address _chainAssetHandler,
-        address _chainRegistrationSender
-    ) external;
+    // function setAddresses(
+    //     address _assetRouter,
+    //     ICTMDeploymentTracker _l1CtmDeployer,
+    //     IMessageRoot _messageRoot,
+    //     address _chainAssetHandler,
+    //     address _chainRegistrationSender
+    // ) external;
 
     function registerChainForInterop(uint256 _chainId, bytes32 _baseTokenAssetId) external;
 }

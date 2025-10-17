@@ -213,8 +213,13 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     }
 
     function deployVerifiers() internal {
-        (addresses.stateTransition.verifierFflonk) = deploySimpleContract("VerifierFflonk", false);
-        (addresses.stateTransition.verifierPlonk) = deploySimpleContract("VerifierPlonk", false);
+        if (config.isZKsyncOS) {
+            (addresses.stateTransition.verifierFflonk) = deploySimpleContract("ZKsyncOSVerifierFflonk", false);
+            (addresses.stateTransition.verifierPlonk) = deploySimpleContract("ZKsyncOSVerifierPlonk", false);
+        } else {
+            (addresses.stateTransition.verifierFflonk) = deploySimpleContract("EraVerifierFflonk", false);
+            (addresses.stateTransition.verifierPlonk) = deploySimpleContract("EraVerifierPlonk", false);
+        }
         (addresses.stateTransition.verifier) = deploySimpleContract("Verifier", false);
     }
 
@@ -621,8 +626,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     ) internal virtual override returns (Diamond.FacetCut[] memory facetCuts) {
-        // This function is not used in this script
-        revert("not implemented");
+        return getChainCreationFacetCuts(stateTransition);
     }
 
     // add this to be excluded from coverage report

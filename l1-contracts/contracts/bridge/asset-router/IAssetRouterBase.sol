@@ -47,15 +47,6 @@ interface IAssetRouterBase {
 
     event DepositFinalizedAssetRouter(uint256 indexed chainId, bytes32 indexed assetId, bytes assetData);
 
-    /// @notice Sets the asset handler address for a specified asset ID on the chain of the asset deployment tracker.
-    /// @dev The caller of this function is encoded within the `assetId`, therefore, it should be invoked by the asset deployment tracker contract.
-    /// @dev No access control on the caller, as msg.sender is encoded in the assetId.
-    /// @dev Typically, for most tokens, ADT is the native token vault. However, custom tokens may have their own specific asset deployment trackers.
-    /// @dev `setAssetHandlerAddressOnCounterpart` should be called on L1 to set asset handlers on L2 chains for a specific asset ID.
-    /// @param _assetRegistrationData The asset data which may include the asset address and any additional required data or encodings.
-    /// @param _assetHandlerAddress The address of the asset handler to be set for the provided asset.
-    function setAssetHandlerAddressThisChain(bytes32 _assetRegistrationData, address _assetHandlerAddress) external;
-
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
     /// @notice Finalize the withdrawal and release funds.
