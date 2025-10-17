@@ -378,9 +378,6 @@ contract RegisterZKChainScript is Script {
         IBridgehub bridgehub = IBridgehub(config.bridgehub);
         ChainAdminOwnable admin = ChainAdminOwnable(payable(bridgehub.admin()));
 
-        console.log("bridgehub admin:", address(admin));
-        console.log("bridehub addr:", config.bridgehub);
-
         IChainAdminOwnable.Call[] memory calls = new IChainAdminOwnable.Call[](1);
         calls[0] = IChainAdminOwnable.Call({
             target: config.bridgehub,
@@ -398,10 +395,6 @@ contract RegisterZKChainScript is Script {
                 )
             )
         });
-        console.log("config.chainTypeManagerProxy:", config.chainTypeManagerProxy);
-        console.log("chain type manager admin:", ChainTypeManager(config.chainTypeManagerProxy).admin());
-        console.log("admin addr:", admin.owner());
-        console.log("msg.sender:", msg.sender);
         vm.broadcast(admin.owner());
         admin.multicall(calls, true);
         console.log("ZK chain registered");
