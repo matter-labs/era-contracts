@@ -11,6 +11,8 @@ import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
+import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {Utils} from "./Utils.sol";
 
 /// @title AddressIntrospector
 /// @notice Utility contract to retrieve related addresses from Bridgehub, ChainTypeManager and ZKChain
@@ -18,18 +20,22 @@ interface IGettersExtra {
     function getDAValidatorPair() external view returns (address, address);
 }
 
-contract AddressIntrospector {
+library AddressIntrospector {
     struct BridgehubAddresses {
+        address bridgehubProxy;
         address assetRouter;
         address messageRoot;
         address l1CtmDeployer;
         address admin;
+        address governance;
+        address transparentProxyAdmin;
         address chainAssetHandler;
         address sharedBridgeLegacy; // optional legacy alias, if present on implementation
+        AssetRouterAddresses assetRouterAddresses;
     }
 
     struct CTMAddresses {
-        address bridgehub;
+        address ctmProxy;
         address l1GenesisUpgrade;
         address validatorTimelockPostV29;
         address legacyValidatorTimelock;
@@ -38,10 +44,10 @@ contract AddressIntrospector {
     }
 
     struct ZkChainAddresses {
+        address zkChainProxy;
         address verifier;
         address admin;
         address pendingAdmin;
-        address bridgehub;
         address chainTypeManager;
         address baseToken;
         address transactionFilterer;
@@ -74,18 +80,28 @@ contract AddressIntrospector {
         bytes32 l2TokenProxyBytecodeHash;
     }
 
+    struct NonDisoverable {
+        address rollupDAManager;
+        address bytecodesSupplier;
+        address l1RollupDAValidator;
+    }
+
     function getBridgehubAddresses(IBridgehub _bridgehub) public view returns (BridgehubAddresses memory info) {
+        info.bridgehubProxy = address(_bridgehub);
         info.assetRouter = _bridgehub.assetRouter();
         info.messageRoot = address(_bridgehub.messageRoot());
         info.l1CtmDeployer = address(_bridgehub.l1CtmDeployer());
         info.admin = _getBridgehubAdmin(_bridgehub);
         info.chainAssetHandler = _bridgehub.chainAssetHandler();
         info.sharedBridgeLegacy = _tryGetSharedBridgeLegacy(address(_bridgehub));
+        info.assetRouterAddresses = getAssetRouterAddresses(IL1AssetRouter(info.assetRouter));
+        info.governance = IOwnable(info.bridgehubProxy).owner();
+        info.transparentProxyAdmin = Utils.getProxyAdmin(info.bridgehubProxy);
     }
 
-    function getCTMAddresses(IChainTypeManager _ctm, uint256 _chainId) public view returns (CTMAddresses memory info) {
+    function getCTMAddresses(IChainTypeManager _ctm) public view returns (CTMAddresses memory info) {
         address ctmAddr = address(_ctm);
-        info.bridgehub = _ctm.BRIDGE_HUB();
+        info.ctmProxy = ctmAddr;
         info.l1GenesisUpgrade = _ctm.l1GenesisUpgrade();
         info.validatorTimelockPostV29 = _tryAddress(ctmAddr, "validatorTimelockPostV29()");
         info.legacyValidatorTimelock = _tryAddress(ctmAddr, "validatorTimelock()");
@@ -94,10 +110,10 @@ contract AddressIntrospector {
     }
 
     function getZkChainAddresses(IZKChain _zkChain) public view returns (ZkChainAddresses memory info) {
+        info.zkChainProxy = address(_zkChain);
         info.verifier = _zkChain.getVerifier();
         info.admin = _zkChain.getAdmin();
         info.pendingAdmin = _zkChain.getPendingAdmin();
-        info.bridgehub = _zkChain.getBridgehub();
         info.chainTypeManager = _zkChain.getChainTypeManager();
         info.baseToken = _zkChain.getBaseToken();
         info.transactionFilterer = _zkChain.getTransactionFilterer();
@@ -105,7 +121,9 @@ contract AddressIntrospector {
         (info.l1DAValidator, info.l2DAValidator) = IGettersExtra(address(_zkChain)).getDAValidatorPair();
     }
 
-    function getAssetRouterAddresses(IL1AssetRouter _assetRouter) public view returns (AssetRouterAddresses memory info) {
+    function getAssetRouterAddresses(
+        IL1AssetRouter _assetRouter
+    ) public view returns (AssetRouterAddresses memory info) {
         info.bridgehub = address(_assetRouter.BRIDGE_HUB());
         info.l1Nullifier = address(_assetRouter.L1_NULLIFIER());
         info.l1WethToken = _assetRouter.L1_WETH_TOKEN();
@@ -113,12 +131,17 @@ contract AddressIntrospector {
         info.ethTokenAssetId = _assetRouter.ETH_TOKEN_ASSET_ID();
     }
 
-    function getBaseTokenRoute(IBridgehub _bridgehub, uint256 _chainId) public view returns (BaseTokenRoute memory info) {
+    function getBaseTokenRoute(
+        IBridgehub _bridgehub,
+        uint256 _chainId
+    ) public view returns (BaseTokenRoute memory info) {
         info.baseTokenAssetId = _bridgehub.baseTokenAssetId(_chainId);
         address ar = _bridgehub.assetRouter();
         info.assetHandlerAddress = IAssetRouterBase(ar).assetHandlerAddress(info.baseTokenAssetId);
         if (info.assetHandlerAddress != address(0)) {
-            info.baseTokenAddress = IL1BaseTokenAssetHandler(info.assetHandlerAddress).tokenAddress(info.baseTokenAssetId);
+            info.baseTokenAddress = IL1BaseTokenAssetHandler(info.assetHandlerAddress).tokenAddress(
+                info.baseTokenAssetId
+            );
         }
     }
 
@@ -126,7 +149,9 @@ contract AddressIntrospector {
         return _zkChain.facetAddresses();
     }
 
-    function getL1ERC20BridgeAddresses(IL1ERC20Bridge _bridge) public view returns (L1ERC20BridgeAddresses memory info) {
+    function getL1ERC20BridgeAddresses(
+        IL1ERC20Bridge _bridge
+    ) public view returns (L1ERC20BridgeAddresses memory info) {
         info.l1Nullifier = address(_bridge.L1_NULLIFIER());
         info.l1AssetRouter = address(_bridge.L1_ASSET_ROUTER());
         info.l1NativeTokenVault = address(_bridge.L1_NATIVE_TOKEN_VAULT());
@@ -140,19 +165,23 @@ contract AddressIntrospector {
     function getAllForChain(
         IBridgehub _bridgehub,
         uint256 _chainId
-    ) external view returns (
-        BridgehubAddresses memory bh,
-        CTMAddresses memory ctm,
-        ZkChainAddresses memory zk,
-        AssetRouterAddresses memory ar,
-        BaseTokenRoute memory baseRoute,
-        address[] memory zkFacets,
-        L1ERC20BridgeAddresses memory legacyBridge
-    ) {
+    )
+        external
+        view
+        returns (
+            BridgehubAddresses memory bh,
+            CTMAddresses memory ctm,
+            ZkChainAddresses memory zk,
+            AssetRouterAddresses memory ar,
+            BaseTokenRoute memory baseRoute,
+            address[] memory zkFacets,
+            L1ERC20BridgeAddresses memory legacyBridge
+        )
+    {
         bh = getBridgehubAddresses(_bridgehub);
 
         address ctmAddr = _bridgehub.chainTypeManager(_chainId);
-        ctm = getCTMAddresses(IChainTypeManager(ctmAddr), _chainId);
+        ctm = getCTMAddresses(IChainTypeManager(ctmAddr));
 
         address zkAddr = _bridgehub.getZKChain(_chainId);
         zk = getZkChainAddresses(IZKChain(zkAddr));
@@ -205,5 +234,3 @@ contract AddressIntrospector {
         return address(0);
     }
 }
-
-

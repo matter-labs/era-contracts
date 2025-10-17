@@ -37,6 +37,7 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
 import {Config, DeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
+import {AddressIntrospector} from "./AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 
 contract DeployCTMScript is Script, DeployCTMUtils {
@@ -87,24 +88,13 @@ contract DeployCTMScript is Script, DeployCTMUtils {
 
         console.log("Initializing core contracts from BH");
         IBridgehub bridgehubProxy = IBridgehub(bridgehub);
-        L1AssetRouter assetRouter = L1AssetRouter(bridgehubProxy.assetRouter());
-        address messageRoot = address(bridgehubProxy.messageRoot());
-        address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
-        address chainAssetHandler = address(bridgehubProxy.chainAssetHandler());
-        address nativeTokenVault = address(assetRouter.nativeTokenVault());
-        address erc20Bridge = address(assetRouter.legacyBridge());
-        address l1Nullifier = address(assetRouter.L1_NULLIFIER());
-
-        addresses.bridgehub.bridgehubProxy = bridgehub;
-        // Bridges
-        addresses.bridges.erc20BridgeProxy = erc20Bridge;
-        addresses.bridges.l1NullifierProxy = l1Nullifier;
-        addresses.bridges.l1AssetRouterProxy = bridgehubProxy.assetRouter();
+        // Populate discovered addresses via inspector
+        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehubProxy);
 
         if (reuseGovAndAdmin) {
-            addresses.governance = IOwnable(bridgehub).owner();
-            addresses.chainAdmin = bridgehubProxy.admin();
-            addresses.transparentProxyAdmin = Utils.getProxyAdmin(bridgehub);
+            addresses.governance = discoveredBridgehub.governance;
+            addresses.chainAdmin = discoveredBridgehub.admin;
+            addresses.transparentProxyAdmin = discoveredBridgehub.transparentProxyAdmin;
         } else {
             (addresses.governance) = deploySimpleContract("Governance", false);
             (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
@@ -233,14 +223,16 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
             "bridgehub_proxy_addr",
-            addresses.bridgehub.bridgehubProxy
+            discoveredBridgehub.bridgehubProxy
         );
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
-        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
+        // Note: AssetRouterAddresses doesn't have legacyBridge, so we get it directly
+        L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", address(assetRouter.legacyBridge()));
+        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", discoveredBridgehub.assetRouterAddresses.l1Nullifier);
         string memory bridges = vm.serializeAddress(
             "bridges",
             "shared_bridge_proxy_addr",
-            addresses.bridges.l1AssetRouterProxy
+            discoveredBridgehub.assetRouter
         );
         // TODO(EVM-744): this has to be renamed to chain type manager
         vm.serializeAddress(
@@ -323,9 +315,10 @@ contract DeployCTMScript is Script, DeployCTMUtils {
 
         address dangerousTestOnlyForcedBeacon;
         if (config.supportL2LegacySharedBridgeTest) {
+            L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
             (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
-                addresses.bridges.erc20BridgeProxy,
-                addresses.bridges.l1NullifierProxy,
+                address(assetRouter.legacyBridge()),
+                discoveredBridgehub.assetRouterAddresses.l1Nullifier,
                 addresses.governance
             );
         }
@@ -333,7 +326,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         FixedForceDeploymentsData memory data = FixedForceDeploymentsData({
             l1ChainId: config.l1ChainId,
             eraChainId: config.eraChainId,
-            l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
+            l1AssetRouter: discoveredBridgehub.assetRouter,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,

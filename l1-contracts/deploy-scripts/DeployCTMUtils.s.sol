@@ -49,10 +49,10 @@ import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 import {UpgradeStageValidator} from "contracts/upgrades/UpgradeStageValidator.sol";
 import {DeployUtils} from "./DeployUtils.sol";
+import {AddressIntrospector} from "./AddressIntrospector.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
-    BridgehubDeployedAddresses bridgehub;
     StateTransitionDeployedAddresses stateTransition;
     BridgesDeployedAddresses bridges;
     DataAvailabilityDeployedAddresses daAddresses;
@@ -60,8 +60,6 @@ struct DeployedAddresses {
     address governance;
     address chainAdmin;
     address accessControlRestrictionAddress;
-    // TODO remove it
-    L1NativeTokenVaultAddresses vaults;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -79,17 +77,10 @@ struct DataAvailabilityDeployedAddresses {
 }
 
 // solhint-disable-next-line gas-struct-packing
-struct BridgehubDeployedAddresses {
-    address bridgehubProxy;
-    address ctmDeploymentTrackerProxy;
-}
-
-// solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {
     address erc20BridgeProxy;
     address l1AssetRouterProxy;
     address l1NullifierProxy;
-    address bridgedStandardERC20Implementation;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -140,6 +131,8 @@ abstract contract DeployCTMUtils is DeployUtils {
     Config public config;
     GeneratedData internal generatedData;
     DeployedAddresses internal addresses;
+    // Addresses discovered from already deployed core contracts (Bridgehub, AssetRouter, etc.)
+    AddressIntrospector.BridgehubAddresses internal discoveredBridgehub;
 
     function initializeConfig(string memory configPath) internal virtual {
         string memory toml = vm.readFile(configPath);
@@ -197,7 +190,6 @@ abstract contract DeployCTMUtils is DeployUtils {
             config.contracts.availL1DAValidator = toml.readAddress("$.contracts.avail_l1_da_validator");
         }
     }
-
 
     function deployStateTransitionDiamondFacets() internal {
         addresses.stateTransition.executorFacet = deploySimpleContract("ExecutorFacet", false);
@@ -407,7 +399,7 @@ abstract contract DeployCTMUtils is DeployUtils {
         } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy);
+            return abi.encode(discoveredBridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "Governance")) {
             return
                 abi.encode(
@@ -424,7 +416,7 @@ abstract contract DeployCTMUtils is DeployUtils {
             restrictions[0] = addresses.accessControlRestrictionAddress;
             return abi.encode(restrictions);
         } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return abi.encode(addresses.bridgehub.bridgehubProxy);
+            return abi.encode(discoveredBridgehub.bridgehubProxy);
         } else if (compareStrings(contractName, "BytecodesSupplier")) {
             return abi.encode();
         } else if (compareStrings(contractName, "ProxyAdmin")) {
