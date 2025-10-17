@@ -57,7 +57,7 @@ contract RollupL1DAValidator is IL1DAValidator {
 
         uint256 blobsProvided = _operatorDAInput.length / BLOB_VERSIONED_HASH_SIZE;
 
-        bytes publishedVersionedHashes = new bytes(_operatorDAInput.length);
+        bytes memory publishedVersionedHashes = new bytes(_operatorDAInput.length);
         uint256 versionedHashIndex = 0;
 
         for (uint256 index = 0; index < blobsProvided; ++index) {
@@ -74,7 +74,7 @@ contract RollupL1DAValidator is IL1DAValidator {
             assembly {
                 // offset relative to the `publishedVersionedHashes` start
                 // we add 1 to `index` to skip length slot
-                let relativeOffset := mul(add(i, 1), 32)
+                let relativeOffset := mul(add(index, 1), 32)
                 mstore(add(publishedVersionedHashes, relativeOffset), versionedHash)
             }
         }
