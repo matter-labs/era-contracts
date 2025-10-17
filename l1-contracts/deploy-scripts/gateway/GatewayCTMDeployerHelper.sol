@@ -58,6 +58,7 @@ library GatewayCTMDeployerHelper {
             eraChainId,
             l1ChainId,
             config.aliasedGovernanceAddress,
+            config.isZKsyncOS,
             contracts,
             innerConfig
         );
@@ -135,6 +136,7 @@ library GatewayCTMDeployerHelper {
         uint256 _eraChainId,
         uint256 _l1ChainId,
         address _governanceAddress,
+        bool _isZKsyncOS,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig
     ) internal returns (DeployedContracts memory) {
@@ -176,7 +178,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.diamondInit = _deployInternal(
             "DiamondInit",
             "DiamondInit.sol",
-            abi.encode(false),
+            abi.encode(_isZKsyncOS),
             innerConfig
         );
         _deployedContracts.stateTransition.genesisUpgrade = _deployInternal(
