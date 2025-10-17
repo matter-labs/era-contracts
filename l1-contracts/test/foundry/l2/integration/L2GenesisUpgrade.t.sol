@@ -62,7 +62,11 @@ contract L2GenesisUpgradeTest is Test, SharedL2ContractDeployer, SharedL2Contrac
     function setUp() public override {
         super.setUp();
 
-        vm.store(L2_INTEROP_HANDLER_ADDR, bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4), bytes32(uint256(0)));
+        vm.store(
+            L2_INTEROP_HANDLER_ADDR,
+            bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
+            bytes32(uint256(0))
+        );
 
         // Deploy and etch L2ComplexUpgrader
         bytes memory complexUpgraderCode = Utils.readZKFoundryBytecodeL1("L2ComplexUpgrader.sol", "L2ComplexUpgrader");
