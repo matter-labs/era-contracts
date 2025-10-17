@@ -27,6 +27,8 @@ import {InteroperableAddress} from "@openzeppelin/contracts-master/utils/draft-I
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
 import {InteropCall, InteropCallStarter} from "contracts/common/Messaging.sol";
 
+import {InteropLibrary} from "contracts/interop/InteropLibrary.sol";
+
 abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
     using stdStorage for StdStorage;
 
@@ -166,6 +168,32 @@ abstract contract L2Erc20TestAbstract is Test, SharedL2ContractDeployer {
             (InteroperableAddress.formatEvmV1(UNBUNDLER_ADDRESS))
         );
         l2InteropCenter.sendBundle(InteroperableAddress.formatEvmV1(271), calls, bundleAttributes);
+    }
+
+    function test_requestTokenTransferInteropViaLibrary() public {
+        address l2TokenAddress = initializeTokenByDeposit();
+        uint256 destinationChainId = 271;
+
+        vm.deal(address(this), 1000 ether);
+
+        vm.mockCall(
+            L2_TO_L1_MESSENGER_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_TO_L1_MESSENGER_SYSTEM_CONTRACT.sendToL1.selector),
+            abi.encode(bytes(""))
+        );
+        vm.mockCall(
+            L2_BRIDGEHUB_ADDR,
+            abi.encodeWithSelector(IBridgehubBase.baseTokenAssetId.selector),
+            abi.encode(baseTokenAssetId)
+        );
+
+        vm.mockCall(
+            L2_BASE_TOKEN_SYSTEM_CONTRACT_ADDR,
+            abi.encodeWithSelector(L2_BASE_TOKEN_SYSTEM_CONTRACT.burnMsgValue.selector),
+            abi.encode(bytes(""))
+        );
+
+        InteropLibrary.sendToken(destinationChainId, l2TokenAddress, 100, address(this));
     }
 
     function test_requestSendCall() public {
