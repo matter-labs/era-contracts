@@ -449,7 +449,10 @@ abstract contract NativeTokenVaultBase is
     function _unsafeRegisterNativeToken(address _nativeToken) internal returns (bytes32 newAssetId) {
         newAssetId = DataEncoding.encodeNTVAssetId(block.chainid, _nativeToken);
         _setNewTokenStorage(newAssetId, _nativeToken, block.chainid);
-        AssetRouterBase(address(_assetRouter())).setAssetHandlerAddressThisChain(bytes32(uint256(uint160(_nativeToken))), address(this));
+        AssetRouterBase(address(_assetRouter())).setAssetHandlerAddressThisChain(
+            bytes32(uint256(uint160(_nativeToken))),
+            address(this)
+        );
     }
 
     function _handleBridgeToChain(uint256 _chainId, bytes32 _assetId, uint256 _amount) internal virtual;

@@ -49,7 +49,6 @@ interface IAssetRouterBase {
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
-
     /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
     /// @param _sender The address of the deposit initiator.
     /// @param _assetId The deposited asset ID.

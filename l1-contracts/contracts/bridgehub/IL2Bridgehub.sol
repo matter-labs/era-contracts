@@ -8,7 +8,6 @@ import {IBridgehubBase} from "./IBridgehubBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Interface for L2-specific Bridgehub functionality
 interface IL2Bridgehub is IBridgehubBase {
-
     /// @notice Set addresses
     // function setAddresses(
     //     address _assetRouter,

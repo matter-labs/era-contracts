@@ -195,5 +195,4 @@ interface IBridgehubBase {
     function registerNewZKChain(uint256 _chainId, address _zkChain, bool _checkMaxNumberOfZKChains) external;
 
     function forwardedBridgeRecoverFailedTransfer(uint256 _chainId) external returns (address zkChain, address ctm);
-
 }

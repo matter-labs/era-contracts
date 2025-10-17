@@ -249,13 +249,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         uint256 _originChainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    )
-        public
-        payable
-        override
-        onlyAssetRouterCounterpartOrSelf(_originChainId)
-        nonReentrant
-    {
+    ) public payable override onlyAssetRouterCounterpartOrSelf(_originChainId) nonReentrant {
         require(_assetId != BASE_TOKEN_ASSET_ID, AssetIdNotSupported(BASE_TOKEN_ASSET_ID));
         _finalizeDeposit(_originChainId, _assetId, _transferData, L2_NATIVE_TOKEN_VAULT_ADDR);
 
