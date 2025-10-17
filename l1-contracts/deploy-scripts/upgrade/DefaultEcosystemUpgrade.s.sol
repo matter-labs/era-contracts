@@ -566,7 +566,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         bridges.l1NullifierProxy = address(L1AssetRouter(bridges.l1AssetRouterProxy).L1_NULLIFIER());
         bridges.erc20BridgeProxy = address(L1AssetRouter(bridges.l1AssetRouterProxy).legacyBridge());
 
-        bridges.erc20BridgeProxy = address(L1AssetRouter(bridges.l1AssetRouterProxy).legacyBridge());
         newConfig.oldValidatorTimelock = discoveredCTM.validatorTimelockPostV29;
         newConfig.ecosystemAdminAddress = discoveredBridgehub.admin;
 
