@@ -75,7 +75,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
 
     function runForTest(address bridgehub, bool skipL1Deployments) public {
         saveDiamondSelectors();
-        runInner(vm.envString("L1_CONFIG"), vm.envString("L1_OUTPUT"), bridgehub, false, skipL1Deployments);
+        runInner(vm.envString("CTM_CONFIG"), vm.envString("CTM_OUTPUT"), bridgehub, false);
     }
 
     function getAddresses() public view returns (DeployedAddresses memory) {
@@ -314,6 +314,8 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "state_transition", stateTransition);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
+        vm.serializeAddress("root", "create2_factory_addr", create2FactoryParams.factoryAddress);
+        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
         string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
     }

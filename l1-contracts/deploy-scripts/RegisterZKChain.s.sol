@@ -184,7 +184,7 @@ contract RegisterZKChainScript is Script {
         config.governanceMinDelay = uint256(toml.readUint("$.chain.governance_min_delay"));
         config.bridgehubCreateNewChainSalt = toml.readUint("$.chain.bridgehub_create_new_chain_salt");
         config.validiumMode = toml.readBool("$.chain.validium_mode");
-        config.validatorSenderOperatorEth = toml.readAddress("$.chain.validator_sender_operator_eth");
+        config.validatorSenderOperatorEth = toml.readAddress("$.chain.validator_sender_operator_commit_eth");
         config.validatorSenderOperatorBlobsEth = toml.readAddress("$.chain.validator_sender_operator_blobs_eth");
 
         // These were added to zkstack tool recently (9th Sept 2025).
