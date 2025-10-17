@@ -4,7 +4,7 @@ pragma solidity ^0.8.0;
 // solhint-disable no-console, gas-custom-errors, reason-string
 
 import {Script, console2 as console} from "forge-std/Script.sol";
-//
+
 // It's required to disable lints to force the compiler to compile the contracts
 // solhint-disable no-unused-import
 
