@@ -28,7 +28,6 @@ import {INativeTokenVaultBase} from "contracts/bridge/ntv/INativeTokenVaultBase.
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
-import {L2SharedBridgeLegacy} from "contracts/bridge/L2SharedBridgeLegacy.sol";
 
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IGovernance} from "contracts/governance/IGovernance.sol";
