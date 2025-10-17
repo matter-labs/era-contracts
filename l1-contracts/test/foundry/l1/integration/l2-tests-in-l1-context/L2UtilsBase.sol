@@ -101,16 +101,6 @@ library L2UtilsBase {
             baseTokenAssetId,
             _args.aliasedOwner
         );
-        // Initializing reentrancy guard
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2AssetRouter(L2_ASSET_ROUTER_ADDR).initL2(
-            _args.l1ChainId,
-            _args.eraChainId,
-            _args.l1AssetRouter,
-            _args.legacySharedBridge,
-            baseTokenAssetId,
-            _args.aliasedOwner
-        );
 
         vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
