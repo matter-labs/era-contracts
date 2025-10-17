@@ -359,7 +359,6 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
                 gatewayConfig.chainId,
                 discoveredBridgehub.bridgehubProxy,
                 discoveredBridgehub.assetRouter,
-                // TODO IS IT A CORRECT VALUE FOR the second bridge?
                 discoveredBridgehub.assetRouter,
                 0,
                 secondBridgeData,

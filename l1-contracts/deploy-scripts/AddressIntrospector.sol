@@ -86,9 +86,9 @@ library AddressIntrospector {
         info.assetRouter = _bridgehub.assetRouter();
         info.messageRoot = address(_bridgehub.messageRoot());
         info.l1CtmDeployer = address(_bridgehub.l1CtmDeployer());
-        info.admin = _getBridgehubAdmin(_bridgehub);
+        info.admin = _bridgehub.admin();
         info.chainAssetHandler = _bridgehub.chainAssetHandler();
-        info.sharedBridgeLegacy = _tryGetSharedBridgeLegacy(address(_bridgehub));
+//        info.sharedBridgeLegacy = _bridgehub.sharedBridge();
         info.assetRouterAddresses = getAssetRouterAddresses(IL1AssetRouter(info.assetRouter));
         info.governance = IOwnable(info.bridgehubProxy).owner();
         info.transparentProxyAdmin = Utils.getProxyAdmin(info.bridgehubProxy);
@@ -143,18 +143,6 @@ library AddressIntrospector {
         return _zkChain.facetAddresses();
     }
 
-    function getL1ERC20BridgeAddresses(
-        IL1ERC20Bridge _bridge
-    ) public view returns (L1ERC20BridgeAddresses memory info) {
-        info.l1Nullifier = address(_bridge.L1_NULLIFIER());
-        info.l1AssetRouter = address(_bridge.L1_ASSET_ROUTER());
-        info.l1NativeTokenVault = address(_bridge.L1_NATIVE_TOKEN_VAULT());
-        info.l2TokenBeacon = _bridge.l2TokenBeacon();
-        info.l2Bridge = _bridge.l2Bridge();
-        info.eraChainId = _tryUint256(address(_bridge), "ERA_CHAIN_ID()");
-        info.l2TokenProxyBytecodeHash = _tryBytes32(address(_bridge), "l2TokenProxyBytecodeHash()");
-    }
-
     /// @notice Convenience method to fetch everything for a specific chainId via a Bridgehub instance
     function getAllForChain(
         IL1Bridgehub _bridgehub,
@@ -187,38 +175,6 @@ library AddressIntrospector {
         // Optional: if legacy ERC20 bridge is known/set on the asset router, caller can provide it separately.
     }
 
-    function _getBridgehubAdmin(IL1Bridgehub _bridgehub) private view returns (address) {
-        // Bridgehub exposes `admin()` as public variable; access via staticcall interface-less
-        (bool ok, bytes memory data) = address(_bridgehub).staticcall(abi.encodeWithSignature("admin()"));
-        if (ok && data.length >= 32) {
-            return abi.decode(data, (address));
-        }
-        return address(0);
-    }
-
-    function _tryGetSharedBridgeLegacy(address _bridgehub) private view returns (address) {
-        (bool ok, bytes memory data) = _bridgehub.staticcall(abi.encodeWithSignature("sharedBridge()"));
-        if (ok && data.length >= 32) {
-            return abi.decode(data, (address));
-        }
-        return address(0);
-    }
-
-    function _tryUint256(address _target, string memory _sig) private view returns (uint256 value) {
-        (bool ok, bytes memory data) = _target.staticcall(abi.encodeWithSignature(_sig));
-        if (ok && data.length >= 32) {
-            return abi.decode(data, (uint256));
-        }
-        return 0;
-    }
-
-    function _tryBytes32(address _target, string memory _sig) private view returns (bytes32 value) {
-        (bool ok, bytes memory data) = _target.staticcall(abi.encodeWithSignature(_sig));
-        if (ok && data.length >= 32) {
-            return abi.decode(data, (bytes32));
-        }
-        return bytes32(0);
-    }
 
     function _tryAddress(address _target, string memory _sig) private view returns (address value) {
         (bool ok, bytes memory data) = _target.staticcall(abi.encodeWithSignature(_sig));
