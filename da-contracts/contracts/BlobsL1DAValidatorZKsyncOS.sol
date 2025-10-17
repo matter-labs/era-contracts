@@ -85,7 +85,7 @@ contract RollupL1DAValidator is IL1DAValidator {
             revert InvalidBlobsPublished(publishedVersionedHashesHash, _l2DAValidatorOutputHash);
         }
 
-        // we use this interface fo compatability, but in fact outputs not needed for ZKsync OS
+        // we use this interface for compatability, but in fact outputs not needed for ZKsync OS
         output.stateDiffHash = bytes32(0);
         output.blobsLinearHashes = new bytes32[](_maxBlobsSupported);
         output.blobsOpeningCommitments = new bytes32[](_maxBlobsSupported);
