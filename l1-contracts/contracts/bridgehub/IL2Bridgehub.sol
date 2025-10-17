@@ -8,12 +8,6 @@ import {IBridgehubBase} from "./IBridgehubBase.sol";
 /// @custom:security-contact security@matterlabs.dev
 /// @dev Interface for L2-specific Bridgehub functionality
 interface IL2Bridgehub is IBridgehubBase {
-    /// @notice Forward transaction on gateway
-    function forwardTransactionOnGateway(
-        uint256 _chainId,
-        bytes32 _canonicalTxHash,
-        uint64 _expirationTimestamp
-    ) external;
 
     /// @notice Set addresses
     // function setAddresses(

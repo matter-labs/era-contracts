@@ -45,7 +45,7 @@ contract TestAssetRouterBase is AssetRouterBase {
         uint256 _chainId,
         bytes32 _assetId,
         bytes calldata _transferData
-    ) external payable override {
+    ) public payable override {
         _finalizeDeposit(_chainId, _assetId, _transferData, nativeTokenVault);
     }
 

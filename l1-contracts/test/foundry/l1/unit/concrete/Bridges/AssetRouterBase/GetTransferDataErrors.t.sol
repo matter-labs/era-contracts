@@ -16,7 +16,7 @@ contract TestAssetRouterBase is AssetRouterBase {
 
     function bridgehubDepositBaseToken(uint256, bytes32, address, uint256) external payable override {}
 
-    function finalizeDeposit(uint256, bytes32, bytes calldata) external payable override {}
+    function finalizeDeposit(uint256, bytes32, bytes calldata) public payable override {}
 
     function _ensureTokenRegisteredWithNTV(address) internal pure override returns (bytes32) {
         return keccak256("test");

@@ -49,13 +49,6 @@ interface IAssetRouterBase {
 
     function assetHandlerAddress(bytes32 _assetId) external view returns (address);
 
-    /// @notice Finalize the withdrawal and release funds.
-    /// @param _chainId The chain ID of the transaction to check.
-    /// @param _assetId The bridged asset ID.
-    /// @param _transferData The position in the L2 logs Merkle tree of the l2Log that was sent with the message.
-    /// @dev We have both the legacy finalizeWithdrawal and the new finalizeDeposit functions,
-    /// finalizeDeposit uses the new format. On the L2 we have finalizeDeposit with new and old formats both.
-    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes memory _transferData) external payable;
 
     /// @notice Generates a calldata for calling the deposit finalization on the L2 native token contract.
     /// @param _sender The address of the deposit initiator.

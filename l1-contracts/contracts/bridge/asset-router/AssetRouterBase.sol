@@ -303,7 +303,7 @@ abstract contract AssetRouterBase is IAssetRouterBase, Ownable2StepUpgradeable, 
         bytes32 _assetId,
         bytes memory _assetData
     ) public view virtual override returns (bytes memory) {
-        return abi.encodeCall(IAssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
+        return abi.encodeCall(AssetRouterBase.finalizeDeposit, (block.chainid, _assetId, _assetData));
     }
 
     /// @notice Ensures that token is registered with native token vault.

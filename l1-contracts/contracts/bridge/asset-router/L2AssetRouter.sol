@@ -214,7 +214,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
         // bridge operations are executed. This prevents arbitrary function calls through the interop system.
         require(payload.length > 4, PayloadTooShort());
         require(
-            bytes4(payload[0:4]) == IAssetRouterBase.finalizeDeposit.selector,
+            bytes4(payload[0:4]) == AssetRouterBase.finalizeDeposit.selector,
             InvalidSelector(bytes4(payload[0:4]))
         );
 
@@ -252,7 +252,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard, IERC
     )
         public
         payable
-        override(AssetRouterBase, IAssetRouterBase)
+        override
         onlyAssetRouterCounterpartOrSelf(_originChainId)
         nonReentrant
     {

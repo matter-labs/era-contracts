@@ -142,7 +142,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         IMessageRoot _messageRoot,
         address _chainAssetHandler,
         address _chainRegistrationSender
-    ) external onlyOwnerOrUpgrader {
+    ) external override onlyOwnerOrUpgrader {
         assetRouter = _assetRouter;
         l1CtmDeployer = _l1CtmDeployer;
         messageRoot = _messageRoot;
