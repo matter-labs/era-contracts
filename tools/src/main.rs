@@ -74,6 +74,37 @@ struct Opt {
 
 }
 
+fn resolve_paths(opt: &Opt) -> (String, String, String, String) {
+    match opt.variant {
+        Variant::Era => (
+            "data/Era_plonk_scheduler_key.json".to_string(),
+            "data/Era_fflonk_scheduler_key.json".to_string(),
+            "data/EraVerifierPlonk.sol".to_string(),
+            "data/EraVerifierFflonk.sol".to_string(),
+        ),
+        Variant::ZKsyncOS => (
+            "data/ZKsyncOS_plonk_scheduler_key.json".to_string(),
+            "data/ZKsyncOS_fflonk_scheduler_key.json".to_string(),
+            "data/ZKsyncOSVerifierPlonk.sol".to_string(),
+            "data/ZKsyncOSVerifierFflonk.sol".to_string(),
+        ),
+        Variant::Custom => (
+            opt.plonk_input_path.clone(),
+            opt.fflonk_input_path.clone(),
+            opt.plonk_output_path.clone(),
+            opt.fflonk_output_path.clone(),
+        ),
+    }
+}
+
+fn resolve_contract_name(variant: &Variant) -> String {
+    match variant {
+        Variant::Era => "Era".to_string(),
+        Variant::ZKsyncOS => "ZKsyncOS".to_string(),
+        Variant::Custom => "".to_string(),
+    }
+}
+
 fn main() -> Result<(), Box<dyn Error>> {
     let opt = Opt::from_args();
 
@@ -91,11 +122,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let fflonk_verifier_contract_template =
         fs::read_to_string("data/fflonk_verifier_contract_template.txt")?;
 
-    let plonk_verification_key = fs::read_to_string(&opt.plonk_input_path)
-        .unwrap_or_else(|_| panic!("Unable to read from {}", &opt.plonk_input_path));
+    let plonk_verification_key = fs::read_to_string(&plonk_input_path)
+        .unwrap_or_else(|_| panic!("Unable to read from {}", &plonk_input_path));
 
-    let fflonk_verification_key = fs::read_to_string(&opt.fflonk_input_path)
-        .unwrap_or_else(|_| panic!("Unable to read from {}", &opt.fflonk_input_path));
+    let fflonk_verification_key = fs::read_to_string(&fflonk_input_path)
+        .unwrap_or_else(|_| panic!("Unable to read from {}", &fflonk_input_path));
 
     let plonk_verification_key: VerificationKey<Bn256, ZkSyncSnarkWrapperCircuit> =
         serde_json::from_str(&plonk_verification_key).unwrap();
