@@ -260,7 +260,7 @@ abstract contract DeployL1CoreUtils is DeployUtils {
                 return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "L1MessageRoot")) {
                 return abi.encodeCall(L1MessageRoot.initialize, ());
-            } else if (compareStrings(contractName, "L1ChainAssetHandlerw")) {
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
                 return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
             } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
                 return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
