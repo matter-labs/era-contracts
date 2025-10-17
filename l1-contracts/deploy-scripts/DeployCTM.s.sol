@@ -314,22 +314,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "state_transition", stateTransition);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
-        vm.serializeString("root", "contracts_config", contractsConfig);
-        vm.serializeAddress(
-            "root",
-            "expected_no_da_validium_l2_validator_addr",
-            calculateExpectedL2Address("ValidiumL2DAValidator")
-        );
-        vm.serializeAddress(
-            "root",
-            "expected_avail_l2_da_validator_addr",
-            calculateExpectedL2Address("AvailL2DAValidator")
-        );
-        string memory toml = vm.serializeAddress(
-            "root",
-            "expected_rollup_l2_da_validator_addr",
-            calculateExpectedL2Address("RollupL2DAValidator")
-        );
+        string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
     }
 

@@ -663,7 +663,6 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         additionalDependencies[0] = ContractsBytecodesLib.getCreationCode("L2SharedBridgeLegacy");
         additionalDependencies[1] = ContractsBytecodesLib.getCreationCode("BridgedStandardERC20");
         additionalDependencies[2] = ContractsBytecodesLib.getCreationCode("RollupL2DAValidator");
-        additionalDependencies[3] = ContractsBytecodesLib.getCreationCode("ValidiumL2DAValidator");
         // TODO(refactor): do we need this?
         additionalDependencies[4] = ContractsBytecodesLib.getCreationCode("DiamondProxy");
         additionalDependencies[5] = ContractsBytecodesLib.getCreationCode("L2V29Upgrade");
