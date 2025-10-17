@@ -17,11 +17,8 @@ import {RollupDAManager} from "contracts/state-transition/data-availability/Roll
 
 import {L2DACommitmentScheme, ROLLUP_L2_DA_COMMITMENT_SCHEME} from "contracts/common/Config.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
 import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
-
 import {L2LegacySharedBridgeTestHelper} from "./L2LegacySharedBridgeTestHelper.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
@@ -31,6 +28,9 @@ import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
 import {Governance} from "contracts/governance/Governance.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
+import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
 
 import {ChainRegistrationSender} from "contracts/bridgehub/ChainRegistrationSender.sol";
 import {InteropCenter} from "contracts/interop/InteropCenter.sol";
@@ -41,26 +41,19 @@ import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Execut
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
-
-import {ChainTypeManager, IChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
-import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
-import {PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
-
-import {L2AssetTracker} from "contracts/bridge/asset-tracker/L2AssetTracker.sol";
-
-import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
 
-import {Config, DeployedAddresses} from "./DeployUtils.s.sol";
-import {DeployL1HelperScript} from "./DeployL1HelperScript.s.sol";
+import {Config, DeployedAddresses, DeployCTMUtils} from "./DeployCTMUtils.s.sol";
+import {AddressIntrospector} from "./AddressIntrospector.sol";
 import {FixedForceDeploymentsData} from "contracts/state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
-contract DeployCTMScript is Script, DeployL1HelperScript {
+contract DeployCTMScript is Script, DeployCTMUtils {
     using stdToml for string;
 
     function run() public virtual {
@@ -72,8 +65,8 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         console.log("Deploying CTM related contracts");
 
         runInner(
-            "/script-config/config-deploy-l1.toml",
-            "/script-out/output-deploy-l1.toml",
+            "/script-config/config-deploy-ctm.toml",
+            "/script-out/output-deploy-ctm.toml",
             bridgehub,
             reuseGovAndAdmin,
             false
@@ -112,42 +105,13 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         console.log("Initializing core contracts from BH");
         IL1Bridgehub bridgehubProxy = IL1Bridgehub(bridgehub);
-        L1AssetRouter assetRouter = L1AssetRouter(bridgehubProxy.assetRouter());
-        address messageRoot = address(bridgehubProxy.messageRoot());
-        address l1CtmDeployer = address(bridgehubProxy.l1CtmDeployer());
-        address chainAssetHandler = address(bridgehubProxy.chainAssetHandler());
-        address nativeTokenVault = address(assetRouter.nativeTokenVault());
-        address erc20Bridge = address(assetRouter.legacyBridge());
-        address l1Nullifier = address(assetRouter.L1_NULLIFIER());
-
-        addresses.bridgehub.bridgehubProxy = bridgehub;
-        addresses.bridgehub.bridgehubImplementation = Utils.getImplementation(bridgehub);
-        addresses.bridgehub.ctmDeploymentTrackerProxy = l1CtmDeployer;
-        addresses.bridgehub.ctmDeploymentTrackerImplementation = Utils.getImplementation(l1CtmDeployer);
-        addresses.bridgehub.messageRootProxy = messageRoot;
-        addresses.bridgehub.messageRootImplementation = Utils.getImplementation(messageRoot);
-        addresses.bridgehub.chainAssetHandlerProxy = chainAssetHandler;
-        addresses.bridgehub.chainAssetHandlerImplementation = Utils.getImplementation(chainAssetHandler);
-        addresses.bridgehub.assetTrackerProxy = address(L1NativeTokenVault(nativeTokenVault).l1AssetTracker());
-        addresses.bridgehub.assetTrackerImplementation = Utils.getImplementation(addresses.bridgehub.assetTrackerProxy);
-        addresses.bridgehub.chainRegistrationSenderProxy = IBridgehubBase(bridgehub).chainRegistrationSender();
-        addresses.bridgehub.chainRegistrationSenderImplementation = Utils.getImplementation(
-            addresses.bridgehub.chainRegistrationSenderProxy
-        );
-
-        // Bridges
-        addresses.bridges.erc20BridgeProxy = erc20Bridge;
-        addresses.bridges.erc20BridgeImplementation = Utils.getImplementation(erc20Bridge);
-        addresses.bridges.l1NullifierProxy = l1Nullifier;
-        addresses.bridges.l1NullifierImplementation = Utils.getImplementation(l1Nullifier);
-        addresses.bridges.l1AssetRouterProxy = address(assetRouter);
-        addresses.bridges.l1AssetRouterImplementation = Utils.getImplementation(address(assetRouter));
-        addresses.vaults.l1NativeTokenVaultProxy = nativeTokenVault;
+        // Populate discovered addresses via inspector
+        discoveredBridgehub = AddressIntrospector.getBridgehubAddresses(bridgehubProxy);
 
         if (reuseGovAndAdmin) {
-            addresses.governance = IOwnable(bridgehub).owner();
-            addresses.chainAdmin = bridgehubProxy.admin();
-            addresses.transparentProxyAdmin = Utils.getProxyAdmin(bridgehub);
+            addresses.governance = discoveredBridgehub.governance;
+            addresses.chainAdmin = discoveredBridgehub.admin;
+            addresses.transparentProxyAdmin = discoveredBridgehub.transparentProxyAdmin;
         } else {
             (addresses.governance) = deploySimpleContract("Governance", false);
             (addresses.chainAdmin) = deploySimpleContract("ChainAdminOwnable", false);
@@ -259,27 +223,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         }
     }
 
-    function deployDiamondProxy() internal {
-        Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](1);
-        facetCuts[0] = Diamond.FacetCut({
-            facet: addresses.stateTransition.adminFacet,
-            action: Diamond.Action.Add,
-            isFreezable: false,
-            selectors: Utils.getAllSelectors(addresses.stateTransition.adminFacet.code)
-        });
-        Diamond.DiamondCutData memory diamondCut = Diamond.DiamondCutData({
-            facetCuts: facetCuts,
-            initAddress: address(0),
-            initCalldata: ""
-        });
-        address contractAddress = deployViaCreate2(
-            type(DiamondProxy).creationCode,
-            abi.encode(config.l1ChainId, diamondCut)
-        );
-        console.log("DiamondProxy deployed at:", contractAddress);
-        addresses.stateTransition.diamondProxy = contractAddress;
-    }
-
     function updateOwners() internal {
         vm.startBroadcast(msg.sender);
 
@@ -300,141 +243,35 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
     }
 
     function saveOutput(string memory outputPath) internal virtual {
-        vm.serializeAddress("bridgehub", "bridgehub_proxy_addr", addresses.bridgehub.bridgehubProxy);
-        vm.serializeAddress("bridgehub", "bridgehub_implementation_addr", addresses.bridgehub.bridgehubImplementation);
-        vm.serializeAddress(
-            "bridgehub",
-            "chain_asset_handler_implementation_addr",
-            addresses.bridgehub.chainAssetHandlerImplementation
-        );
-        vm.serializeAddress("bridgehub", "chain_asset_handler_proxy_addr", addresses.bridgehub.chainAssetHandlerProxy);
-        vm.serializeAddress(
-            "bridgehub",
-            "ctm_deployment_tracker_proxy_addr",
-            addresses.bridgehub.ctmDeploymentTrackerProxy
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "ctm_deployment_tracker_implementation_addr",
-            addresses.bridgehub.ctmDeploymentTrackerImplementation
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "chain_registration_sender_proxy_addr",
-            addresses.bridgehub.chainRegistrationSenderProxy
-        );
-        vm.serializeAddress(
-            "bridgehub",
-            "chain_registration_sender_implementation_addr",
-            addresses.bridgehub.chainRegistrationSenderImplementation
-        );
-        vm.serializeAddress("bridgehub", "interop_center_proxy_addr", addresses.bridgehub.interopCenterProxy);
-        vm.serializeAddress(
-            "bridgehub",
-            "interop_center_implementation_addr",
-            addresses.bridgehub.interopCenterImplementation
-        );
-        vm.serializeAddress("bridgehub", "l1_asset_tracker_proxy_addr", addresses.bridgehub.assetTrackerProxy);
-        vm.serializeAddress(
-            "bridgehub",
-            "asset_tracker_implementation_addr",
-            addresses.bridgehub.assetTrackerImplementation
-        );
-
-        vm.serializeAddress("bridgehub", "message_root_proxy_addr", addresses.bridgehub.messageRootProxy);
         string memory bridgehub = vm.serializeAddress(
             "bridgehub",
-            "message_root_implementation_addr",
-            addresses.bridgehub.messageRootImplementation
+            "bridgehub_proxy_addr",
+            discoveredBridgehub.bridgehubProxy
         );
-
+        // Note: AssetRouterAddresses doesn't have legacyBridge, so we get it directly
+        L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
+        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", address(assetRouter.legacyBridge()));
+        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", discoveredBridgehub.assetRouterAddresses.l1Nullifier);
+        string memory bridges = vm.serializeAddress(
+            "bridges",
+            "shared_bridge_proxy_addr",
+            discoveredBridgehub.assetRouter
+        );
         // TODO(EVM-744): this has to be renamed to chain type manager
         vm.serializeAddress(
             "state_transition",
             "state_transition_proxy_addr",
             addresses.stateTransition.chainTypeManagerProxy
         );
-        vm.serializeAddress(
-            "state_transition",
-            "state_transition_implementation_addr",
-            addresses.stateTransition.chainTypeManagerImplementation
-        );
         vm.serializeAddress("state_transition", "verifier_addr", addresses.stateTransition.verifier);
-        vm.serializeAddress("state_transition", "admin_facet_addr", addresses.stateTransition.adminFacet);
-        vm.serializeAddress("state_transition", "mailbox_facet_addr", addresses.stateTransition.mailboxFacet);
-        vm.serializeAddress("state_transition", "executor_facet_addr", addresses.stateTransition.executorFacet);
-        vm.serializeAddress("state_transition", "getters_facet_addr", addresses.stateTransition.gettersFacet);
-        vm.serializeAddress("state_transition", "diamond_init_addr", addresses.stateTransition.diamondInit);
         vm.serializeAddress("state_transition", "genesis_upgrade_addr", addresses.stateTransition.genesisUpgrade);
         vm.serializeAddress("state_transition", "default_upgrade_addr", addresses.stateTransition.defaultUpgrade);
-        vm.serializeAddress("state_transition", "bytecodes_supplier_addr", addresses.stateTransition.bytecodesSupplier);
         string memory stateTransition = vm.serializeAddress(
             "state_transition",
-            "diamond_proxy_addr",
-            addresses.stateTransition.diamondProxy
+            "bytecodes_supplier_addr",
+            addresses.stateTransition.bytecodesSupplier
         );
 
-        vm.serializeAddress("bridges", "erc20_bridge_implementation_addr", addresses.bridges.erc20BridgeImplementation);
-        vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", addresses.bridges.erc20BridgeProxy);
-        vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", addresses.bridges.l1NullifierImplementation);
-        vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", addresses.bridges.l1NullifierProxy);
-        vm.serializeAddress(
-            "bridges",
-            "shared_bridge_implementation_addr",
-            addresses.bridges.l1AssetRouterImplementation
-        );
-        string memory bridges = vm.serializeAddress(
-            "bridges",
-            "shared_bridge_proxy_addr",
-            addresses.bridges.l1AssetRouterProxy
-        );
-
-        vm.serializeUint(
-            "contracts_config",
-            "diamond_init_max_l2_gas_per_batch",
-            config.contracts.diamondInitMaxL2GasPerBatch
-        );
-        vm.serializeUint(
-            "contracts_config",
-            "diamond_init_batch_overhead_l1_gas",
-            config.contracts.diamondInitBatchOverheadL1Gas
-        );
-        vm.serializeUint(
-            "contracts_config",
-            "diamond_init_max_pubdata_per_batch",
-            config.contracts.diamondInitMaxPubdataPerBatch
-        );
-        vm.serializeUint(
-            "contracts_config",
-            "diamond_init_minimal_l2_gas_price",
-            config.contracts.diamondInitMinimalL2GasPrice
-        );
-        vm.serializeUint(
-            "contracts_config",
-            "diamond_init_priority_tx_max_pubdata",
-            config.contracts.diamondInitPriorityTxMaxPubdata
-        );
-        vm.serializeUint(
-            "contracts_config",
-            "diamond_init_pubdata_pricing_mode",
-            uint256(config.contracts.diamondInitPubdataPricingMode)
-        );
-        vm.serializeUint("contracts_config", "priority_tx_max_gas_limit", config.contracts.priorityTxMaxGasLimit);
-        vm.serializeBytes32(
-            "contracts_config",
-            "recursion_circuits_set_vks_hash",
-            config.contracts.recursionCircuitsSetVksHash
-        );
-        vm.serializeBytes32(
-            "contracts_config",
-            "recursion_leaf_level_vk_hash",
-            config.contracts.recursionLeafLevelVkHash
-        );
-        vm.serializeBytes32(
-            "contracts_config",
-            "recursion_node_level_vk_hash",
-            config.contracts.recursionNodeLevelVkHash
-        );
         vm.serializeBytes("contracts_config", "diamond_cut_data", config.contracts.diamondCutData);
 
         string memory contractsConfig = vm.serializeBytes(
@@ -442,19 +279,15 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             "force_deployments_data",
             generatedData.forceDeploymentsData
         );
-
         vm.serializeAddress(
             "deployed_addresses",
             "server_notifier_proxy_addr",
             addresses.stateTransition.serverNotifierProxy
         );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "server_notifier_implementation_address",
-            addresses.stateTransition.serverNotifierImplementation
-        );
+
         vm.serializeAddress("deployed_addresses", "governance_addr", addresses.governance);
         vm.serializeAddress("deployed_addresses", "chain_admin", addresses.chainAdmin);
+        vm.serializeString("deployed_addresses", "bridges", bridges);
         vm.serializeAddress("deployed_addresses", "transparent_proxy_admin_addr", addresses.transparentProxyAdmin);
 
         vm.serializeAddress(
@@ -462,15 +295,6 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             "validator_timelock_addr",
             addresses.stateTransition.validatorTimelock
         );
-        vm.serializeAddress(
-            "deployed_addresses",
-            "access_control_restriction_addr",
-            addresses.accessControlRestrictionAddress
-        );
-        vm.serializeString("deployed_addresses", "bridgehub", bridgehub);
-        vm.serializeString("deployed_addresses", "bridges", bridges);
-        vm.serializeString("deployed_addresses", "state_transition", stateTransition);
-
         vm.serializeAddress("deployed_addresses", "l1_rollup_da_manager", addresses.daAddresses.rollupDAManager);
         vm.serializeAddress(
             "deployed_addresses",
@@ -487,23 +311,25 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             "avail_l1_da_validator_addr",
             addresses.daAddresses.availL1DAValidator
         );
-
-        string memory deployedAddresses = vm.serializeAddress(
-            "deployed_addresses",
-            "native_token_vault_addr",
-            addresses.vaults.l1NativeTokenVaultProxy
-        );
-
-        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
-        vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
+        string memory deployedAddresses = vm.serializeString("deployed_addresses", "state_transition", stateTransition);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
-        vm.serializeUint("root", "l1_chain_id", config.l1ChainId);
-        vm.serializeUint("root", "era_chain_id", config.eraChainId);
-        vm.serializeAddress("root", "deployer_addr", config.deployerAddress);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
         vm.serializeString("root", "contracts_config", contractsConfig);
-        string memory toml = vm.serializeAddress("root", "owner_address", config.ownerAddress);
-
+        vm.serializeAddress(
+            "root",
+            "expected_no_da_validium_l2_validator_addr",
+            calculateExpectedL2Address("ValidiumL2DAValidator")
+        );
+        vm.serializeAddress(
+            "root",
+            "expected_avail_l2_da_validator_addr",
+            calculateExpectedL2Address("AvailL2DAValidator")
+        );
+        string memory toml = vm.serializeAddress(
+            "root",
+            "expected_rollup_l2_da_validator_addr",
+            calculateExpectedL2Address("RollupL2DAValidator")
+        );
         vm.writeToml(toml, outputPath);
     }
 
@@ -512,9 +338,10 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         address dangerousTestOnlyForcedBeacon;
         if (config.supportL2LegacySharedBridgeTest) {
-            (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
-                addresses.bridges.erc20BridgeProxy,
-                addresses.bridges.l1NullifierProxy,
+            L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
+            (dangerousTestOnlyForcedBeacon,) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
+                address(assetRouter.legacyBridge()),
+                discoveredBridgehub.assetRouterAddresses.l1Nullifier,
                 addresses.governance
             );
         }
@@ -523,7 +350,7 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
             l1ChainId: config.l1ChainId,
             gatewayChainId: config.gatewayChainId,
             eraChainId: config.eraChainId,
-            l1AssetRouter: addresses.bridges.l1AssetRouterProxy,
+            l1AssetRouter: discoveredBridgehub.assetRouter,
             l2TokenProxyBytecodeHash: getL2BytecodeHash("BeaconProxy"),
             aliasedL1Governance: AddressAliasHelper.applyL1ToL2Alias(addresses.governance),
             maxNumberOfZKChains: config.contracts.maxNumberOfChains,

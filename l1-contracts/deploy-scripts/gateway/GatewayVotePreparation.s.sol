@@ -21,6 +21,7 @@ import {Call} from "contracts/governance/Common.sol";
 import {Ownable2Step} from "@openzeppelin/contracts-v4/access/Ownable2Step.sol";
 
 import {ServerNotifier} from "contracts/governance/ServerNotifier.sol";
+import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";

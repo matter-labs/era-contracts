@@ -5,6 +5,7 @@ import {Test, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
 import {L2Utils} from "./L2Utils.sol";
@@ -45,7 +46,6 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
-        addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
         addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
         addresses.bridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
@@ -73,7 +73,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
         addresses.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager(addresses.bridgehub.bridgehubProxy, addresses.bridgehub.interopCenterProxy)
+            new ChainTypeManager(L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR)
         );
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
@@ -99,28 +99,4 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
 
     // add this to be excluded from coverage report
     function test() internal virtual override {}
-
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override returns (bytes memory) {
-        revert("Not implemented");
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (bytes memory) {
-        return ("Not implemented initialize calldata");
-    }
-
-    function deployTuppWithContract(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override returns (address implementation, address proxy) {
-        revert("Not implemented tupp");
-    }
-
-    // function getCreationCalldata(string memory contractName) internal view virtual override returns (bytes memory) {
-    // }
 }

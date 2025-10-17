@@ -4,7 +4,14 @@ pragma solidity 0.8.28;
 import {StdStorage, stdStorage, stdToml} from "forge-std/Test.sol";
 import {Script, console2 as console} from "forge-std/Script.sol";
 
-import {Config, DeployUtils, DeployedAddresses} from "../../../../../deploy-scripts/DeployUtils.s.sol";
+import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
+import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
+import {L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
+import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
+import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {Config, DeployCTMUtils, DeployedAddresses} from "deploy-scripts/DeployCTMUtils.s.sol";
 
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_INTEROP_CENTER_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_SYSTEM_CONTEXT_SYSTEM_CONTRACT_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 import {ISystemContext} from "contracts/common/interfaces/ISystemContext.sol";
@@ -19,8 +26,8 @@ import {SharedL2ContractDeployer, SystemContractsArgs} from "../l2-tests-abstrac
 import {L2UtilsBase} from "./L2UtilsBase.sol";
 
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
-
-import {DeployL1HelperScript} from "deploy-scripts/DeployL1HelperScript.s.sol";
+import {DeployCTMScript} from "deploy-scripts/DeployCTM.s.sol";
+import {L2UtilsBase} from "./L2UtilsBase.sol";
 
 contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegrationScript {
     using stdToml for string;
@@ -53,6 +60,7 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
         );
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
+        // TODO verify
         addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         addresses.bridgehub.interopCenterProxy = L2_INTEROP_CENTER_ADDR;
         addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
@@ -76,27 +84,13 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     // add this to be excluded from coverage report
     function test() internal virtual override(DeployCTMIntegrationScript, SharedL2ContractDeployer) {}
 
-    function getCreationCode(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal view virtual override(DeployUtils, DeployL1HelperScript) returns (bytes memory) {
-        return super.getCreationCode(contractName, false);
-    }
-
-    function getInitializeCalldata(
-        string memory contractName,
-        bool isZKBytecode
-    ) internal virtual override(DeployIntegrationUtils, DeployL1HelperScript) returns (bytes memory) {
-        return super.getInitializeCalldata(contractName, isZKBytecode);
-    }
-
     function getChainCreationFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
+    internal
+    virtual
+    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+    returns (Diamond.FacetCut[] memory)
     {
         return super.getChainCreationFacetCuts(stateTransition);
     }
@@ -104,10 +98,10 @@ contract SharedL2ContractL1Deployer is SharedL2ContractDeployer, DeployCTMIntegr
     function getUpgradeAddedFacetCuts(
         StateTransitionDeployedAddresses memory stateTransition
     )
-        internal
-        virtual
-        override(DeployCTMIntegrationScript, DeployIntegrationUtils)
-        returns (Diamond.FacetCut[] memory)
+    internal
+    virtual
+    override(DeployCTMIntegrationScript, DeployIntegrationUtils)
+    returns (Diamond.FacetCut[] memory)
     {
         return super.getUpgradeAddedFacetCuts(stateTransition);
     }

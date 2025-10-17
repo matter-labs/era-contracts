@@ -4,6 +4,10 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
+
+import {DeployIntegrationUtils} from "../../l1/integration/deploy-scripts/DeployIntegrationUtils.s.sol";
+
 import {SharedL2ContractDeployer} from "../../l1/integration/l2-tests-abstract/_SharedL2ContractDeployer.sol";
 import {L2WethTestAbstract} from "../../l1/integration/l2-tests-abstract/L2WethTestAbstract.t.sol";
 

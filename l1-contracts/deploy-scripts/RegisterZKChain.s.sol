@@ -18,6 +18,7 @@ import {IValidatorTimelock} from "contracts/state-transition/IValidatorTimelock.
 import {Governance} from "contracts/governance/Governance.sol";
 import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
+import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
 import {IChainAdminOwnable} from "contracts/governance/IChainAdminOwnable.sol";
 import {AccessControlRestriction} from "contracts/governance/AccessControlRestriction.sol";
 import {ADDRESS_ONE, Utils} from "./Utils.sol";

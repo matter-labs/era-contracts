@@ -16,7 +16,8 @@ import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {DataEncoding} from "contracts/common/libraries/DataEncoding.sol";
 import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
-import {Config, DeployedAddresses} from "deploy-scripts/DeployUtils.s.sol";
+import {DeployedAddresses as CoreDeployedAddresses} from "deploy-scripts/DeployL1CoreUtils.s.sol";
+import {DeployedAddresses as CTMDeployedAddresses, Config} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {UtilsTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 
 contract L1ContractDeployer is UtilsTest {
@@ -25,8 +26,10 @@ contract L1ContractDeployer is UtilsTest {
     DeployL1CoreContractsIntegrationScript l1CoreContractsScript;
     DeployCTMIntegrationScript ctmScript;
     RegisterCTM registerCTMScript;
+
     struct AllAddresses {
-        DeployedAddresses ecosystemAddresses;
+        CoreDeployedAddresses ecosystemAddresses;
+        CTMDeployedAddresses ctmAddresses;
         address bridgehubProxyAddress;
         address bridgehubOwnerAddress;
         L1Bridgehub bridgehub;
@@ -44,7 +47,7 @@ contract L1ContractDeployer is UtilsTest {
 
     AllAddresses public addresses;
 
-    function deployEcosystem() public returns (DeployedAddresses memory addresses) {
+    function deployEcosystem() public returns (CoreDeployedAddresses memory addresses) {
         l1CoreContractsScript = new DeployL1CoreContractsIntegrationScript();
         l1CoreContractsScript.runForTest();
         addresses = l1CoreContractsScript.getAddresses();
@@ -70,36 +73,25 @@ contract L1ContractDeployer is UtilsTest {
             "GATEWAY_PREPARATION_L1_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml"
         );
-
-        DeployedAddresses memory coreContractsAddresses = deployEcosystem();
+        CoreDeployedAddresses memory coreContractsAddresses = deployEcosystem();
         ctmScript = new DeployCTMIntegrationScript();
-        ctmScript.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy, false);
-        addresses.ecosystemAddresses = ctmScript.getAddresses();
+        ctmScript.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy);
+        addresses.ctmAddresses = ctmScript.getAddresses();
         registerCTM(
-            addresses.ecosystemAddresses.bridgehub.bridgehubProxy,
-            addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy
+            coreContractsAddresses.bridgehub.bridgehubProxy,
+            addresses.ctmAddresses.stateTransition.chainTypeManagerProxy
         );
 
         ecosystemConfig = ctmScript.getConfig();
 
-        addresses.bridgehub = L1Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
-        addresses.interopCenter = IInteropCenter(addresses.ecosystemAddresses.bridgehub.interopCenterProxy);
-        addresses.chainTypeManager = IChainTypeManager(
-            addresses.ecosystemAddresses.stateTransition.chainTypeManagerProxy
-        );
-        addresses.ctmDeploymentTracker = CTMDeploymentTracker(
-            addresses.ecosystemAddresses.bridgehub.ctmDeploymentTrackerProxy
-        );
+        // Get bridgehub from the CTM script's discovered addresses
+        addresses.bridgehub = L1Bridgehub(coreContractsAddresses.bridgehub.bridgehubProxy);
+        addresses.chainTypeManager = IChainTypeManager(addresses.ctmAddresses.stateTransition.chainTypeManagerProxy);
+        addresses.ctmDeploymentTracker = CTMDeploymentTracker(address(addresses.bridgehub.l1CtmDeployer()));
 
         addresses.sharedBridge = L1AssetRouter(addresses.ecosystemAddresses.bridges.l1AssetRouterProxy);
         addresses.l1Nullifier = L1Nullifier(addresses.ecosystemAddresses.bridges.l1NullifierProxy);
-        addresses.l1NativeTokenVault = L1NativeTokenVault(
-            payable(addresses.ecosystemAddresses.vaults.l1NativeTokenVaultProxy)
-        );
-        addresses.l1AssetTracker = L1AssetTracker(addresses.ecosystemAddresses.bridgehub.assetTrackerProxy);
-        addresses.chainRegistrationSender = ChainRegistrationSender(
-            addresses.ecosystemAddresses.bridgehub.chainRegistrationSenderProxy
-        );
+        addresses.l1NativeTokenVault = L1NativeTokenVault(payable(address(addresses.l1Nullifier.l1NativeTokenVault())));
 
         _acceptOwnership();
         _setEraBatch();
@@ -138,11 +130,11 @@ contract L1ContractDeployer is UtilsTest {
 
     function _setSharedBridgeChainBalance(uint256 _chainId, address _token, uint256 _value) internal {
         stdstore
-            .target(address(addresses.l1Nullifier))
-            .sig(addresses.l1Nullifier.chainBalance.selector)
-            .with_key(_chainId)
-            .with_key(_token)
-            .checked_write(_value);
+        .target(address(addresses.l1Nullifier))
+        .sig(addresses.l1Nullifier.chainBalance.selector)
+        .with_key(_chainId)
+        .with_key(_token)
+        .checked_write(_value);
     }
 
     function _setSharedBridgeIsWithdrawalFinalized(
@@ -152,12 +144,12 @@ contract L1ContractDeployer is UtilsTest {
         bool _isFinalized
     ) internal {
         stdstore
-            .target(address(addresses.l1Nullifier))
-            .sig(addresses.l1Nullifier.isWithdrawalFinalized.selector)
-            .with_key(_chainId)
-            .with_key(_l2BatchNumber)
-            .with_key(_l2ToL1MessageNumber)
-            .checked_write(_isFinalized);
+        .target(address(addresses.l1Nullifier))
+        .sig(addresses.l1Nullifier.isWithdrawalFinalized.selector)
+        .with_key(_chainId)
+        .with_key(_l2BatchNumber)
+        .with_key(_l2ToL1MessageNumber)
+        .checked_write(_isFinalized);
     }
 
     // add this to be excluded from coverage report

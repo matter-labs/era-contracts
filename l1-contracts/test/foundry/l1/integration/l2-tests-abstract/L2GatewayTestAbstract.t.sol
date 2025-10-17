@@ -17,6 +17,9 @@ import {BridgehubBase} from "contracts/bridgehub/BridgehubBase.sol";
 import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
 
+import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
+
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";

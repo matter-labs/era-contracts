@@ -11,6 +11,11 @@ import {BridgeMintNotImplemented, Unauthorized} from "contracts/common/L1Contrac
 import {L2_ASSET_ROUTER_ADDR} from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
 import {SharedL2ContractDeployer} from "./_SharedL2ContractDeployer.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {IZKChain} from "contracts/state-transition/chain-interfaces/IZKChain.sol";
+import {SystemContractsArgs} from "./Utils.sol";
+
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 
 abstract contract L2WethTestAbstract is Test, SharedL2ContractDeployer {
     function test_shouldDepositWethByCallingDeposit() public {

@@ -40,6 +40,7 @@ import {ZKChainBase} from "contracts/state-transition/chain-deps/facets/ZKChainB
 import {SystemContractsArgs} from "./Utils.sol";
 import {SharedUtils} from "../utils/SharedUtils.sol";
 
+import {DeployCTMUtils} from "deploy-scripts/DeployCTMUtils.s.sol";
 import {DeployIntegrationUtils} from "../deploy-scripts/DeployIntegrationUtils.s.sol";
 import {UtilsCallMockerTest} from "foundry-test/l1/unit/concrete/Utils/Utils.t.sol";
 import {AssetRouterBase} from "contracts/bridge/asset-router/AssetRouterBase.sol";
