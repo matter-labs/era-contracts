@@ -76,8 +76,6 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
     uint256 constant EXPECTED_MAX_L1_GAS_PRICE = 50 gwei;
 
     uint256 internal eraChainId;
-
-    uint256 internal eraChainId;
     uint256 internal gatewayChainId;
     bytes internal forceDeploymentsData;
 
