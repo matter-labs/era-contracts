@@ -41,11 +41,7 @@ contract TestAssetRouterBase is AssetRouterBase {
 
     function bridgehubDepositBaseToken(uint256, bytes32, address, uint256) external payable override {}
 
-    function finalizeDeposit(
-        uint256 _chainId,
-        bytes32 _assetId,
-        bytes calldata _transferData
-    ) external payable override {
+    function finalizeDeposit(uint256 _chainId, bytes32 _assetId, bytes calldata _transferData) public payable override {
         _finalizeDeposit(_chainId, _assetId, _transferData, nativeTokenVault);
     }
 

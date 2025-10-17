@@ -42,7 +42,7 @@ contract ZKChainBaseTest is UtilsTest {
     TestBaseFacet internal testBaseFacet;
     UtilsFacet internal utilsFacet;
     address internal testnetVerifier =
-        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
+        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0), false));
     DummyBridgehub internal dummyBridgehub;
 
     function getTestBaseFacetSelectors() public pure returns (bytes4[] memory selectors) {

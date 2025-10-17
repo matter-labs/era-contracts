@@ -8,7 +8,7 @@ import {AlreadyWhitelisted, InvalidSelector, NotWhitelisted, ZeroAddress} from "
 import {L2_ASSET_ROUTER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {ITransactionFilterer} from "../state-transition/chain-interfaces/ITransactionFilterer.sol";
 import {IBridgehubBase} from "../bridgehub/IBridgehubBase.sol";
-import {IAssetRouterBase} from "../bridge/asset-router/IAssetRouterBase.sol";
+import {AssetRouterBase} from "../bridge/asset-router/AssetRouterBase.sol";
 import {IL2AssetRouter} from "../bridge/asset-router/IL2AssetRouter.sol";
 
 /// @dev We want to ensure that only whitelisted contracts can ever be deployed,
@@ -93,7 +93,7 @@ contract GatewayTransactionFilterer is ITransactionFilterer, Ownable2StepUpgrade
                 return _checkCTMAssetId(decodedAssetId);
             }
 
-            if (IAssetRouterBase.finalizeDeposit.selector != l2TxSelector) {
+            if (AssetRouterBase.finalizeDeposit.selector != l2TxSelector) {
                 revert InvalidSelector(l2TxSelector);
             }
 
