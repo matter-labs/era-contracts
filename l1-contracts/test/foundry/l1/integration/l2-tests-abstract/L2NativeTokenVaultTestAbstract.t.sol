@@ -56,16 +56,16 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
 
         stdstore
-        .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-        .sig(INativeTokenVaultBase.tokenAddress.selector)
-        .with_key(assetId)
-        .checked_write(l2Token);
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig(INativeTokenVaultBase.tokenAddress.selector)
+            .with_key(assetId)
+            .checked_write(l2Token);
 
         stdstore
-        .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
-        .sig(INativeTokenVaultBase.assetId.selector)
-        .with_key(l2Token)
-        .checked_write(assetId);
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
+            .sig(INativeTokenVaultBase.assetId.selector)
+            .with_key(l2Token)
+            .checked_write(assetId);
 
         assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
         assertNotEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));

@@ -339,7 +339,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         address dangerousTestOnlyForcedBeacon;
         if (config.supportL2LegacySharedBridgeTest) {
             L1AssetRouter assetRouter = L1AssetRouter(discoveredBridgehub.assetRouter);
-            (dangerousTestOnlyForcedBeacon,) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
+            (dangerousTestOnlyForcedBeacon, ) = L2LegacySharedBridgeTestHelper.calculateTestL2TokenBeaconAddress(
                 address(assetRouter.legacyBridge()),
                 discoveredBridgehub.assetRouterAddresses.l1Nullifier,
                 addresses.governance

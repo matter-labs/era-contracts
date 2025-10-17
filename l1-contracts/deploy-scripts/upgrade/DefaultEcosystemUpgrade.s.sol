@@ -856,23 +856,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
         vm.serializeAddress("bridges", "erc20_bridge_proxy_addr", bridges.erc20BridgeProxy);
         vm.serializeAddress("bridges", "l1_nullifier_proxy_addr", bridges.l1NullifierProxy);
         vm.serializeAddress("bridges", "l1_nullifier_implementation_addr", bridges.l1NullifierImplementation);
-        vm.serializeAddress(
-            "bridges",
-            "l1_asset_router_implementation_addr",
-            bridges.l1AssetRouterImplementation
-        );
+        vm.serializeAddress("bridges", "l1_asset_router_implementation_addr", bridges.l1AssetRouterImplementation);
         vm.serializeAddress("bridges", "l1_asset_router_proxy_addr", bridges.l1AssetRouterProxy);
         // TODO: legacy name
-        vm.serializeAddress(
-            "bridges",
-            "shared_bridge_implementation_addr",
-            bridges.l1AssetRouterImplementation
-        );
-        vm.serializeAddress(
-            "bridges",
-            "bridged_standard_erc20_impl",
-            bridges.bridgedStandardERC20Implementation
-        );
+        vm.serializeAddress("bridges", "shared_bridge_implementation_addr", bridges.l1AssetRouterImplementation);
+        vm.serializeAddress("bridges", "bridged_standard_erc20_impl", bridges.bridgedStandardERC20Implementation);
 
         string memory bridgesSerialized = vm.serializeAddress(
             "bridges",
@@ -968,7 +956,11 @@ contract DefaultEcosystemUpgrade is Script, DeployCTMScript {
             "l1_bytecodes_supplier_addr",
             addresses.stateTransition.bytecodesSupplier
         );
-        vm.serializeAddress("deployed_addresses", "native_token_vault_addr", discoveredBridgehub.assetRouterAddresses.nativeTokenVault);
+        vm.serializeAddress(
+            "deployed_addresses",
+            "native_token_vault_addr",
+            discoveredBridgehub.assetRouterAddresses.nativeTokenVault
+        );
         vm.serializeAddress(
             "deployed_addresses",
             "native_token_vault_implementation_addr",

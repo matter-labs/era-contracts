@@ -88,7 +88,7 @@ library AddressIntrospector {
         info.l1CtmDeployer = address(_bridgehub.l1CtmDeployer());
         info.admin = _bridgehub.admin();
         info.chainAssetHandler = _bridgehub.chainAssetHandler();
-//        info.sharedBridgeLegacy = _bridgehub.sharedBridge();
+        //        info.sharedBridgeLegacy = _bridgehub.sharedBridge();
         info.assetRouterAddresses = getAssetRouterAddresses(IL1AssetRouter(info.assetRouter));
         info.governance = IOwnable(info.bridgehubProxy).owner();
         info.transparentProxyAdmin = Utils.getProxyAdmin(info.bridgehubProxy);
@@ -148,17 +148,17 @@ library AddressIntrospector {
         IL1Bridgehub _bridgehub,
         uint256 _chainId
     )
-    external
-    view
-    returns (
-        BridgehubAddresses memory bh,
-        CTMAddresses memory ctm,
-        ZkChainAddresses memory zk,
-        AssetRouterAddresses memory ar,
-        BaseTokenRoute memory baseRoute,
-        address[] memory zkFacets,
-        L1ERC20BridgeAddresses memory legacyBridge
-    )
+        external
+        view
+        returns (
+            BridgehubAddresses memory bh,
+            CTMAddresses memory ctm,
+            ZkChainAddresses memory zk,
+            AssetRouterAddresses memory ar,
+            BaseTokenRoute memory baseRoute,
+            address[] memory zkFacets,
+            L1ERC20BridgeAddresses memory legacyBridge
+        )
     {
         bh = getBridgehubAddresses(_bridgehub);
 
@@ -174,7 +174,6 @@ library AddressIntrospector {
 
         // Optional: if legacy ERC20 bridge is known/set on the asset router, caller can provide it separately.
     }
-
 
     function _tryAddress(address _target, string memory _sig) private view returns (address value) {
         (bool ok, bytes memory data) = _target.staticcall(abi.encodeWithSignature(_sig));
