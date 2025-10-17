@@ -47,13 +47,13 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
             abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
             abi.encode(l1Token)
         );
-        IL2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
+        IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(l2Token);
     }
 
     function test_registerLegacyToken_IncorrectConfiguration() external {
         address l2Token = makeAddr("l2Token");
         address l1Token = makeAddr("l1Token");
-        INativeTokenVault l2NativeTokenVault = INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
+        INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         bytes32 assetId = DataEncoding.encodeNTVAssetId(L1_CHAIN_ID, l1Token);
 
@@ -62,13 +62,13 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         assertEq(l2NativeTokenVault.assetId(l2Token), bytes32(0));
 
         stdstore
-            .target(address(addresses.vaults.l1NativeTokenVaultProxy))
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
             .sig(INativeTokenVault.tokenAddress.selector)
             .with_key(assetId)
             .checked_write(l2Token);
 
         stdstore
-            .target(address(addresses.vaults.l1NativeTokenVaultProxy))
+            .target(address(L2_NATIVE_TOKEN_VAULT_ADDR))
             .sig(INativeTokenVault.assetId.selector)
             .with_key(l2Token)
             .checked_write(assetId);
@@ -81,7 +81,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
             abi.encodeCall(IL2SharedBridgeLegacy.l1TokenAddress, (l2Token)),
             abi.encode(l1Token)
         );
-        IL2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
+        IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(l2Token);
 
         assertNotEq(l2NativeTokenVault.originChainId(assetId), 0);
         assertNotEq(l2NativeTokenVault.tokenAddress(assetId), address(0));
@@ -91,7 +91,7 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
     function test_registerLegacyTokenRevertNotLegacy() external {
         address l2Token = makeAddr("l2Token");
         vm.expectRevert(TokenNotLegacy.selector);
-        IL2NativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).setLegacyTokenAssetId(l2Token);
+        IL2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).setLegacyTokenAssetId(l2Token);
     }
 
     function test_registerTokenRevertIsLegacy() external {
@@ -104,11 +104,11 @@ abstract contract L2NativeTokenVaultTestAbstract is Test, SharedL2ContractDeploy
         );
 
         vm.expectRevert(TokenIsLegacy.selector);
-        INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy).registerToken(l2Token);
+        INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).registerToken(l2Token);
     }
 
     function test_bridgeMint_CorrectlyConfiguresL2LegacyToken() external {
-        INativeTokenVault l2NativeTokenVault = INativeTokenVault(addresses.vaults.l1NativeTokenVaultProxy);
+        INativeTokenVault l2NativeTokenVault = INativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR);
 
         uint256 originChainId = L1_CHAIN_ID;
         address originToken = makeAddr("l1Token");

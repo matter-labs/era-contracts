@@ -93,7 +93,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     function _getL2UpgradeTargetAndData(
         IL2ContractDeployer.ForceDeployment[] memory _forceDeployments
     ) internal override returns (address, bytes memory) {
-        bytes32 ethAssetId = IL1AssetRouter(addresses.bridges.l1AssetRouterProxy).ETH_TOKEN_ASSET_ID();
+        bytes32 ethAssetId = IL1AssetRouter(discoveredBridgehub.assetRouter).ETH_TOKEN_ASSET_ID();
         bytes memory v29UpgradeCalldata = abi.encodeCall(
             IL2V29Upgrade.upgrade,
             (AddressAliasHelper.applyL1ToL2Alias(config.ownerAddress), ethAssetId)
@@ -228,7 +228,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         calls = new Call[](1);
 
         calls[0] = Call({
-            target: addresses.stateTransition.chainTypeManagerProxy,
+            target: discoveredCTM.ctmProxy,
             data: abi.encodeCall(
                 IChainTypeManager.setValidatorTimelockPostV29,
                 (addresses.stateTransition.validatorTimelock)
@@ -277,7 +277,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     function prepareSetChainAssetHandlerOnBridgehubCall() public virtual returns (Call[] memory calls) {
         calls = new Call[](1);
         calls[0] = Call({
-            target: bridgehubAddresses.bridgehubProxy,
+            target: discoveredBridgehub.bridgehubProxy,
             data: abi.encodeCall(Bridgehub.setChainAssetHandler, (bridgehubAddresses.chainAssetHandlerProxy)),
             value: 0
         });
@@ -288,11 +288,8 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         calls = new Call[](1);
 
         calls[0] = Call({
-            target: bridgehubAddresses.ctmDeploymentTrackerProxy,
-            data: abi.encodeCall(
-                CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1,
-                (addresses.stateTransition.chainTypeManagerProxy)
-            ),
+            target: discoveredBridgehub.l1CtmDeployer,
+            data: abi.encodeCall(CTMDeploymentTracker.setCtmAssetHandlerAddressOnL1, (discoveredCTM.ctmProxy)),
             value: 0
         });
     }
@@ -308,7 +305,7 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
         );
 
         calls[0] = Call({
-            target: addresses.stateTransition.chainTypeManagerProxy,
+            target: discoveredCTM.ctmProxy,
             data: abi.encodeCall(ChainTypeManager.setUpgradeDiamondCut, (upgradeCut, oldProtocolVersion)),
             value: 0
         });
@@ -336,8 +333,8 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
     ) public virtual returns (Call[] memory calls) {
         bytes32 chainAssetId = DataEncoding.encodeAssetId(
             block.chainid,
-            bytes32(uint256(uint160(addresses.stateTransition.chainTypeManagerProxy))),
-            addresses.bridgehub.ctmDeploymentTrackerProxy
+            bytes32(uint256(uint160(discoveredCTM.ctmProxy))),
+            discoveredBridgehub.l1CtmDeployer
         );
 
         bytes memory secondBridgeData = abi.encodePacked(
@@ -351,9 +348,10 @@ contract EcosystemUpgrade_v29 is Script, DefaultEcosystemUpgrade {
                 l1GasPrice,
                 l2GasLimit,
                 gatewayConfig.chainId,
-                addresses.bridgehub.bridgehubProxy,
-                addresses.bridges.l1AssetRouterProxy,
-                addresses.bridges.l1AssetRouterProxy,
+                discoveredBridgehub.bridgehubProxy,
+                discoveredBridgehub.assetRouter,
+                // TODO IS IT A CORRECT VALUE FOR the second bridge?
+                discoveredBridgehub.assetRouter,
                 0,
                 secondBridgeData,
                 msg.sender

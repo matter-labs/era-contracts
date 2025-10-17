@@ -43,7 +43,6 @@ contract L1ContractDeployer is Test {
     function deployEcosystem() public returns (CoreDeployedAddresses memory addresses) {
         l1CoreContractsScript = new DeployL1CoreContractsIntegrationScript();
         l1CoreContractsScript.runForTest();
-        revert("Deployed L1 core contracts");
         addresses = l1CoreContractsScript.getAddresses();
     }
 
@@ -72,13 +71,14 @@ contract L1ContractDeployer is Test {
         ctmScript.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy);
         addresses.ctmAddresses = ctmScript.getAddresses();
         registerCTM(
-            addresses.ctmAddresses.bridgehub.bridgehubProxy,
+            coreContractsAddresses.bridgehub.bridgehubProxy,
             addresses.ctmAddresses.stateTransition.chainTypeManagerProxy
         );
 
         ecosystemConfig = ctmScript.getConfig();
 
-        addresses.bridgehub = Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
+        // Get bridgehub from the CTM script's discovered addresses
+        addresses.bridgehub = Bridgehub(coreContractsAddresses.bridgehub.bridgehubProxy);
         addresses.chainTypeManager = IChainTypeManager(addresses.ctmAddresses.stateTransition.chainTypeManagerProxy);
         addresses.ctmDeploymentTracker = CTMDeploymentTracker(address(addresses.bridgehub.l1CtmDeployer()));
 

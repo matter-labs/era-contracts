@@ -12,13 +12,8 @@ import {IAssetRouterBase} from "contracts/bridge/asset-router/IAssetRouterBase.s
 import {IL1BaseTokenAssetHandler} from "contracts/bridge/interfaces/IL1BaseTokenAssetHandler.sol";
 import {IL1ERC20Bridge} from "contracts/bridge/interfaces/IL1ERC20Bridge.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
+import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {Utils} from "./Utils.sol";
-
-/// @title AddressIntrospector
-/// @notice Utility contract to retrieve related addresses from Bridgehub, ChainTypeManager and ZKChain
-interface IGettersExtra {
-    function getDAValidatorPair() external view returns (address, address);
-}
 
 library AddressIntrospector {
     struct BridgehubAddresses {
@@ -118,7 +113,7 @@ library AddressIntrospector {
         info.baseToken = _zkChain.getBaseToken();
         info.transactionFilterer = _zkChain.getTransactionFilterer();
         info.settlementLayer = _zkChain.getSettlementLayer();
-        (info.l1DAValidator, info.l2DAValidator) = IGettersExtra(address(_zkChain)).getDAValidatorPair();
+        (info.l1DAValidator, info.l2DAValidator) = GettersFacet(address(_zkChain)).getDAValidatorPair();
     }
 
     function getAssetRouterAddresses(

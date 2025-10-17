@@ -45,9 +45,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         );
         initializeConfig(inputPath);
         addresses.transparentProxyAdmin = address(0x1);
-        addresses.bridgehub.bridgehubProxy = L2_BRIDGEHUB_ADDR;
         addresses.bridges.l1AssetRouterProxy = L2_ASSET_ROUTER_ADDR;
-        addresses.vaults.l1NativeTokenVaultProxy = L2_NATIVE_TOKEN_VAULT_ADDR;
         config.l1ChainId = _l1ChainId;
         console.log("Deploying L2 contracts");
         instantiateCreate2Factory();
@@ -71,9 +69,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit());
         // Deploy ChainTypeManager implementation
-        addresses.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager(addresses.bridgehub.bridgehubProxy)
-        );
+        addresses.stateTransition.chainTypeManagerImplementation = address(new ChainTypeManager(L2_BRIDGEHUB_ADDR));
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
         addresses.stateTransition.chainTypeManagerProxy = address(
