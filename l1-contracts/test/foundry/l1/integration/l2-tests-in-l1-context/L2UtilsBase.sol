@@ -79,21 +79,25 @@ library L2UtilsBase {
             L2MessageRoot(L2_MESSAGE_ROOT_ADDR).initL2(_args.l1ChainId, _args.gatewayChainId);
         }
 
-        uint256 prevChainId = block.chainid;
-        vm.chainId(_args.l1ChainId);
+        {
+            uint256 prevChainId = block.chainid;
+            vm.chainId(_args.l1ChainId);
 
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner, _args.maxNumberOfZKChains);
-        vm.chainId(prevChainId);
-        vm.prank(_args.aliasedOwner);
-        address aliasedL1ChainRegistrationSender = address(0x000000000000000000000000000000000002000a);
-        L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
-            L2_ASSET_ROUTER_ADDR,
-            ICTMDeploymentTracker(_args.l1CtmDeployer),
-            IMessageRoot(L2_MESSAGE_ROOT_ADDR),
-            L2_CHAIN_ASSET_HANDLER_ADDR,
-            aliasedL1ChainRegistrationSender
-        );
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).initL2(_args.l1ChainId, _args.aliasedOwner, _args.maxNumberOfZKChains);
+            vm.chainId(prevChainId);
+
+            vm.prank(_args.aliasedOwner);
+            address aliasedL1ChainRegistrationSender = address(0x000000000000000000000000000000000002000a);
+            L2Bridgehub(L2_BRIDGEHUB_ADDR).setAddresses(
+                L2_ASSET_ROUTER_ADDR,
+                ICTMDeploymentTracker(_args.l1CtmDeployer),
+                IMessageRoot(L2_MESSAGE_ROOT_ADDR),
+                L2_CHAIN_ASSET_HANDLER_ADDR,
+                aliasedL1ChainRegistrationSender
+            );
+        }
+
         {
             address l2messageVerification = address(new L2MessageVerification());
             vm.etch(address(L2_MESSAGE_VERIFICATION), l2messageVerification.code);
@@ -156,30 +160,39 @@ library L2UtilsBase {
                 _args.aliasedOwner
             );
         }
-        // Initializing reentrancy guard
-        // stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
-        vm.store(
-            L2_ASSET_ROUTER_ADDR,
-            bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
-            bytes32(uint256(1))
-        );
 
-        vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
+        {
+            // Initializing reentrancy guard
+            // stdstore.target(address(L2_ASSET_ROUTER_ADDR)).sig("l1AssetRouter()").checked_write(_args.l1AssetRouter);
+            vm.store(
+                L2_ASSET_ROUTER_ADDR,
+                bytes32(0x8e94fed44239eb2314ab7a406345e6c5a8f0ccedf3b600de3d004e672c33abf4),
+                bytes32(uint256(1))
+            );
+        }
 
-        vm.prank(L2_COMPLEX_UPGRADER_ADDR);
-        L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
-            _args.l1ChainId,
-            _args.aliasedOwner,
-            _args.l2TokenProxyBytecodeHash,
-            _args.legacySharedBridge,
-            _args.l2TokenBeacon,
-            wethToken,
-            baseTokenAssetId,
-            ETH_TOKEN_ADDRESS,
-            _args.l1ChainId
-        );
+        {
+            vm.etch(L2_NATIVE_TOKEN_VAULT_ADDR, ntv.code);
 
-        vm.store(L2_NATIVE_TOKEN_VAULT_ADDR, bytes32(uint256(251)), bytes32(uint256(_args.l2TokenProxyBytecodeHash)));
-        L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
+            vm.prank(L2_COMPLEX_UPGRADER_ADDR);
+            L2NativeTokenVault(L2_NATIVE_TOKEN_VAULT_ADDR).initL2(
+                _args.l1ChainId,
+                _args.aliasedOwner,
+                _args.l2TokenProxyBytecodeHash,
+                _args.legacySharedBridge,
+                _args.l2TokenBeacon,
+                wethToken,
+                baseTokenAssetId,
+                ETH_TOKEN_ADDRESS,
+                _args.l1ChainId
+            );
+
+            vm.store(
+                L2_NATIVE_TOKEN_VAULT_ADDR,
+                bytes32(uint256(251)),
+                bytes32(uint256(_args.l2TokenProxyBytecodeHash))
+            );
+            L2NativeTokenVaultDev(L2_NATIVE_TOKEN_VAULT_ADDR).deployBridgedStandardERC20(_args.aliasedOwner);
+        }
     }
 }
