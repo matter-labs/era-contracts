@@ -376,6 +376,14 @@ error ZeroChainId();
 error ZeroGasPriceL1TxZKSyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
+// 
+error ConstructorsNotSupported();
+
+error SystemContractProxyInitialized();
+
+error ZKSyncOSNotForceDeployForExistingContract(address);
+
+error UnsupportedUpgradeType();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
