@@ -9,8 +9,8 @@ interface IComplexUpgrader {
     /// @notice The type of contract upgrade.
     /// @param EraForceDeployment the force deployment for Era.
     /// @param ZKsyncOSSystemProxyUpgrade the upgrade of the system proxy on ZKsyncOS. It will involve force
-    /// deployment of both the implementation on a random address and upgrading the implementation. In case the proxy has not been initialized yet, 
-    /// it will also involve force deploying the proxy and initializing the admin.
+    /// deployment of both the implementation on an empty address that depends on the bytecode and upgrading the implementation. 
+    /// In case the proxy has not been initialized yet, it will also involve force deploying the proxy and initializing the admin.
     /// @param ZKsyncOSUnsafeForceDeployment the force deployment for ZKsyncOS. This should be used only 
     /// for exceptional cases, when the deployer is certain that the contract does not contain any address
     /// on top of it or overriding the existing bytecode is expected.
@@ -58,7 +58,7 @@ interface IComplexUpgrader {
     /// @param _delegateTo the address of the contract to which the calls will be delegated
     /// @param _calldata the calldata to be delegate called in the `_delegateTo` contract
     function forceDeployAndUpgradeUniversal(
-        UniversalForceDeploymentInfo[] calldata _forceDeployments,
+        UniversalContractUpgradeInfo[] calldata _forceDeployments,
         address _delegateTo,
         bytes calldata _calldata
     ) external payable;

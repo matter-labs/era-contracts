@@ -97,5 +97,4 @@ address constant L2_CHAIN_ASSET_HANDLER_ADDR = address(USER_CONTRACTS_OFFSET + 0
 /// does not have to include BridgedStandardERC20 and UpgradeableBeacon and so can fit into the code size limit.
 address constant L2_NTV_BEACON_DEPLOYER_ADDR = address(USER_CONTRACTS_OFFSET + 0x0b);
 
-// TODO: this address will collide with the other new draft-v30 addresses, need to select a different one.
 address constant L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR = address(USER_CONTRACTS_OFFSET + 0x0c);
