@@ -3,17 +3,13 @@ pragma solidity 0.8.28;
 
 import "forge-std/Test.sol";
 
-// ⬇️ Adjust these import paths to your repo layout as needed.
 import { SystemContractProxy } from "contracts/l2-upgrades/SystemContractProxy.sol";
 import { ISystemContractProxy } from "contracts/l2-upgrades/ISystemContractProxy.sol";
 import { SystemContractProxyAdmin } from "contracts/l2-upgrades/SystemContractProxyAdmin.sol";
 import { ITransparentUpgradeableProxy } from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 
-// The upgrader constant used by SystemContractProxy's special path.
-// (Re-use the same constant the proxy uses so tests align with prod logic.)
 import { L2_COMPLEX_UPGRADER_ADDR } from "contracts/common/l2-helpers/L2ContractAddresses.sol";
 
-// Custom errors (for revert expectation)
 import { SystemContractProxyInitialized } from "contracts/common/L1ContractErrors.sol";
 
 contract MockImplementation {
