@@ -7,7 +7,6 @@ import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
 import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
-import {SystemContractProxy} from "./SystemContractProxy.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
 import {IZKOSContractDeployer} from "./IZKOSContractDeployer.sol";
