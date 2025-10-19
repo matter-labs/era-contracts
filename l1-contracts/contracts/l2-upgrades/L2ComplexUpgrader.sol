@@ -3,8 +3,8 @@
 pragma solidity 0.8.28;
 
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {L2_FORCE_DEPLOYER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {Unauthorized, AddressHasNoCode} from "../common/L1ContractErrors.sol";
+import {L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_FORCE_DEPLOYER_ADDR, L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
+import {AddressHasNoCode, Unauthorized} from "../common/L1ContractErrors.sol";
 
 import {IComplexUpgrader} from "../state-transition/l2-deps/IComplexUpgrader.sol";
 
@@ -19,9 +19,8 @@ import {L2GenesisForceDeploymentsHelper} from "./L2GenesisForceDeploymentsHelper
 contract L2ComplexUpgrader is IComplexUpgrader {
     /// @notice Ensures that only the `FORCE_DEPLOYER` can call the function.
     /// @dev Note that it is vital to put this modifier at the start of *each* function,
-    /// since even temporary anauthorized access can be dangerous.
+    /// since even temporary unauthorized access can be dangerous.
     modifier onlyForceDeployer() {
-        // Note, that it is not
         if (msg.sender != L2_FORCE_DEPLOYER_ADDR) {
             revert Unauthorized(msg.sender);
         }
@@ -55,14 +54,14 @@ contract L2ComplexUpgrader is IComplexUpgrader {
     /// @param _delegateTo the address of the contract to which the calls will be delegated
     /// @param _calldata the calldata to be delegate called in the `_delegateTo` contract
     function forceDeployAndUpgradeUniversal(
-        UniversalForceDeploymentInfo[] calldata _forceDeployments,
+        UniversalContractUpgradeInfo[] calldata _forceDeployments,
         address _delegateTo,
         bytes calldata _calldata
     ) external payable onlyForceDeployer {
         // solhint-disable-next-line gas-length-in-loops
         for (uint256 i = 0; i < _forceDeployments.length; ++i) {
-            L2GenesisForceDeploymentsHelper.forceDeployOnAddress(
-                _forceDeployments[i].isZKsyncOS,
+            L2GenesisForceDeploymentsHelper.conductContractUpgrade(
+                _forceDeployments[i].upgradeType,
                 _forceDeployments[i].deployedBytecodeInfo,
                 _forceDeployments[i].newAddress
             );
