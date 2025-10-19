@@ -15,7 +15,7 @@ import {InvalidCaller} from "../common/L1ContractErrors.sol";
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev Important: L2 contracts are not allowed to have any immutable variables or constructors. This is needed for compatibility with ZKsyncOS.
 contract L2ChainAssetHandler is ChainAssetHandlerBase {
-    /// @dev The assetId of the base token.
+    /// @dev The assetId of the ETH.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
     bytes32 public override ETH_TOKEN_ASSET_ID;

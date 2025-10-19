@@ -46,7 +46,7 @@ contract L1AssetRouter is AssetRouterBase, IL1AssetRouter, ReentrancyGuard {
     /// @dev The address of the WETH token on L1.
     address public immutable L1_WETH_TOKEN;
 
-    /// @dev The assetId of the base token.
+    /// @dev The assetId of the ETH.
     bytes32 public immutable ETH_TOKEN_ASSET_ID;
 
     /// @dev The address of ZKsync Era diamond proxy contract.

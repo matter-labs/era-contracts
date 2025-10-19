@@ -13,7 +13,7 @@ import {DataEncoding} from "../common/libraries/DataEncoding.sol";
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
 contract L1ChainAssetHandler is ChainAssetHandlerBase {
-    /// @dev The assetId of the base token.
+    /// @dev The assetId of the ETH.
     bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
