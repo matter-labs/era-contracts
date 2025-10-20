@@ -30,14 +30,14 @@ contract ZKsyncOSDualVerifier is IVerifier {
     uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
 
     /// @dev Address of the CTM, owner of which can also add or remove verifiers.
-    ZKsyncOSChainTypeManager public immutable ctm;
+    ZKsyncOSChainTypeManager public immutable CHAIN_TYPE_MANAGER;
 
     /// @notice Mapping of different verifiers dependant on their version.
     mapping(uint32 => IVerifierV2) public fflonkVerifiers;
     mapping(uint32 => IVerifier) public plonkVerifiers;
 
     modifier onlyCtmOwner() {
-        if (msg.sender != ctm.owner()) {
+        if (msg.sender != CHAIN_TYPE_MANAGER.owner()) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -45,9 +45,9 @@ contract ZKsyncOSDualVerifier is IVerifier {
 
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
-    /// @param _ctm The address of the CTM, owner of which can add or remove verifiers.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _ctm) {
-        ctm = ZKsyncOSChainTypeManager(_ctm);
+    /// @param _CHAIN_TYPE_MANAGER The address of the CTM, owner of which can add or remove verifiers.
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _CHAIN_TYPE_MANAGER) {
+        CHAIN_TYPE_MANAGER = ZKsyncOSChainTypeManager(_CHAIN_TYPE_MANAGER);
         fflonkVerifiers[0] = _fflonkVerifier;
         plonkVerifiers[0] = _plonkVerifier;
     }
@@ -92,15 +92,15 @@ contract ZKsyncOSDualVerifier is IVerifier {
 
             return plonkVerifiers[verifierVersion].verify(args, _extractZKSyncOSProof(_proof));
         } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
-            // just for safety - only allowing default anvil chain and sepolia testnet
-            if (block.chainid != 31337 && block.chainid != 11155111) {
+            // just for safety - not allowing to use mock verifier on mainnet
+            if (block.chainid == 1) {
                 revert UnsupportedChainIdForMockVerifier();
             }
 
             uint256[] memory args = new uint256[](1);
             args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
 
-            return mockverify(args, _extractZKSyncOSProof(_proof));
+            return mockVerify(args, _extractZKSyncOSProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
@@ -109,7 +109,7 @@ contract ZKsyncOSDualVerifier is IVerifier {
     }
 
     /// @dev Verifies the correctness of public input, doesn't check the validity of proof itself.
-    function mockverify(uint256[] memory _publicInputs, uint256[] memory _proof) public view virtual returns (bool) {
+    function mockVerify(uint256[] memory _publicInputs, uint256[] memory _proof) public view virtual returns (bool) {
         if (_proof.length != 2) {
             revert InvalidMockProofLength();
         }
