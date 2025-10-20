@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts-v4/utils/math/Math.sol";
 import {IMailbox} from "../../chain-interfaces/IMailbox.sol";
 import {IMailboxImpl} from "../../chain-interfaces/IMailboxImpl.sol";
 import {IBridgehubBase} from "../../../bridgehub/IBridgehubBase.sol";
-import {BridgehubBase} from "../../../bridgehub/BridgehubBase.sol";
+import {L2Bridgehub} from "../../../bridgehub/L2Bridgehub.sol";
 
 import {ITransactionFilterer} from "../../chain-interfaces/ITransactionFilterer.sol";
 import {PriorityTree} from "../../libraries/PriorityTree.sol";
@@ -346,7 +346,7 @@ contract MailboxFacet is ZKChainBase, IMailboxImpl, MessageVerification {
     ) internal view returns (BridgehubL2TransactionRequest memory) {
         // solhint-disable-next-line func-named-parameters
         bytes memory data = abi.encodeCall(
-            BridgehubBase.forwardTransactionOnGateway,
+            L2Bridgehub.forwardTransactionOnGateway,
             (_chainId, _canonicalTxHash, _expirationTimestamp)
         );
         return

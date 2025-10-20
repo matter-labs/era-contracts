@@ -101,7 +101,7 @@ contract L2Bridgehub is BridgehubBase, IL2Bridgehub {
         uint256 _chainId,
         bytes32 _canonicalTxHash,
         uint64 _expirationTimestamp
-    ) external override onlySettlementLayerRelayedSender {
+    ) external onlySettlementLayerRelayedSender {
         if (L1_CHAIN_ID == block.chainid) {
             revert NotInGatewayMode();
         }

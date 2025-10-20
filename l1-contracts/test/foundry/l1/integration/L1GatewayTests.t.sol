@@ -8,6 +8,7 @@ import "forge-std/console.sol";
 import {Ownable} from "@openzeppelin/contracts-v4/access/Ownable.sol";
 
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
+import {L2Bridgehub} from "contracts/bridgehub/L2Bridgehub.sol";
 import {IBridgehubBase, BridgehubBurnCTMAssetData, BridgehubMintCTMAssetData, L2TransactionRequestDirect} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {L1ContractDeployer} from "./_SharedL1ContractDeployer.t.sol";
@@ -360,15 +361,6 @@ contract L1GatewayTests is
 
         vm.startBroadcast(migratingChain.getAdmin());
         migratingChain.upgradeChainFromVersion(currentProtocolVersion, diamondCut);
-        vm.stopBroadcast();
-    }
-
-    /// to increase coverage, properly tested in L2GatewayTests
-    function test_forwardToL2OnGateway() public {
-        _setUpGatewayWithFilterer();
-        vm.startBroadcast(SETTLEMENT_LAYER_RELAY_SENDER);
-        vm.expectRevert(NotInGatewayMode.selector);
-        addresses.bridgehub.forwardTransactionOnGateway(migratingChainId, bytes32(0), 0);
         vm.stopBroadcast();
     }
 
