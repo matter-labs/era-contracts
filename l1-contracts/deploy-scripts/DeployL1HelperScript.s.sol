@@ -302,13 +302,13 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
             } else if (compareStrings(contractName, "EraChainTypeManager")) {
                 return
                     abi.encodeCall(
-                        EraChainTypeManager.initialize,
+                        IChainTypeManager.initialize,
                         getChainTypeManagerInitializeData(addresses.stateTransition)
                     );
             } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
                 return
                     abi.encodeCall(
-                        ZKsyncOSChainTypeManager.initialize,
+                        IChainTypeManager.initialize,
                         getChainTypeManagerInitializeData(addresses.stateTransition)
                     );
             } else if (compareStrings(contractName, "ServerNotifier")) {

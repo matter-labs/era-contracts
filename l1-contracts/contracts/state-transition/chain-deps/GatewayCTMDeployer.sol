@@ -459,12 +459,7 @@ contract GatewayCTMDeployer {
             serverNotifier: _deployedContracts.stateTransition.serverNotifierProxy
         });
 
-        bytes memory initCalldata;
-        if (_config.isZKsyncOS) {
-            initCalldata = abi.encodeCall(ZKsyncOSChainTypeManager.initialize, (diamondInitData));
-        } else {
-            initCalldata = abi.encodeCall(EraChainTypeManager.initialize, (diamondInitData));
-        }
+        bytes memory initCalldata = abi.encodeCall(IChainTypeManager.initialize, (diamondInitData));
 
         _deployedContracts.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy{salt: _salt}(

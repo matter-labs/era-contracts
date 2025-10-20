@@ -18,6 +18,7 @@ import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
 import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
@@ -85,12 +86,12 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         bytes memory initCalldata;
         if (config.isZKsyncOS) {
             initCalldata = abi.encodeCall(
-                ZKsyncOSChainTypeManager.initialize,
+                IChainTypeManager.initialize,
                 getChainTypeManagerInitializeData(addresses.stateTransition)
             );
         } else {
             initCalldata = abi.encodeCall(
-                EraChainTypeManager.initialize,
+                IChainTypeManager.initialize,
                 getChainTypeManagerInitializeData(addresses.stateTransition)
             );
         }
