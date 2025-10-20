@@ -29,7 +29,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
     /// @dev Bridgehub smart contract that is used to operate with L2 via asynchronous L2 <-> L1 communication.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
     /// the old version where it was an immutable.
-    IL2Bridgehub public BRIDGE_HUB = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
+    IL2Bridgehub public BRIDGE_HUB;
 
     /// @dev Chain ID of L1 for bridging reasons.
     /// @dev Note, that while it is a simple storage variable, the name is in capslock for the backward compatibility with
@@ -121,6 +121,7 @@ contract L2AssetRouter is AssetRouterBase, IL2AssetRouter, ReentrancyGuard {
         bytes32 _baseTokenAssetId,
         address _aliasedOwner
     ) public reentrancyGuardInitializer onlyUpgrader {
+        BRIDGE_HUB = IL2Bridgehub(L2_BRIDGEHUB_ADDR);
         _disableInitializers();
         // solhint-disable-next-line func-named-parameters
         updateL2(_l1ChainId, _eraChainId, _l1AssetRouter, _legacySharedBridge, _baseTokenAssetId);
