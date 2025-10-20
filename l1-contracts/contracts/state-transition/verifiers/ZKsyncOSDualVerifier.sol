@@ -26,6 +26,9 @@ contract ZKsyncOSDualVerifier is IVerifier {
     /// @dev Type of verification for ZKsync OS PLONK verifier.
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
+    // @notice This is proof-skipping verifier (mock), it's only checking the correctness of the public inputs.
+    uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
+
     /// @dev Address of the CTM, owner of which can also add or remove verifiers.
     ZKsyncOSChainTypeManager public immutable ctm;
 
@@ -64,6 +67,7 @@ contract ZKsyncOSDualVerifier is IVerifier {
     /// @param _proof The zk-SNARK proof itself.
     /// @dev  The first element of the `_proof` determines the verifier type.
     ///     - 2 indicates the ZKsync OS Plonk verifier should be used.
+    ///     - 3 indicates the mock verifier (skipping proof verification) should be used.
     /// @return Returns `true` if the proof verification succeeds, otherwise throws an error.
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view virtual returns (bool) {
         // Ensure the proof has a valid length (at least one element
@@ -87,11 +91,35 @@ contract ZKsyncOSDualVerifier is IVerifier {
             args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
 
             return plonkVerifiers[verifierVersion].verify(args, _extractZKSyncOSProof(_proof));
+        } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
+            // just for safety - only allowing default anvil chain and sepolia testnet
+            if (block.chainid != 31337 && block.chainid != 11155111) {
+                revert UnsupportedChainIdForMockVerifier();
+            }
+
+            uint256[] memory args = new uint256[](1);
+            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
+
+            return mockverify(args, _extractZKSyncOSProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
             revert UnknownVerifierType();
         }
+    }
+
+    /// @dev Verifies the correctness of public input, doesn't check the validity of proof itself.
+    function mockverify(uint256[] memory _publicInputs, uint256[] memory _proof) public view virtual returns (bool) {
+        if (_proof.length != 2) {
+            revert InvalidMockProofLength();
+        }
+        if (_proof[0] != 13) {
+            revert InvalidProof();
+        }
+        if (_proof[1] != _publicInputs[0]) {
+            revert InvalidProof();
+        }
+        return true;
     }
 
     /// @inheritdoc IVerifier
