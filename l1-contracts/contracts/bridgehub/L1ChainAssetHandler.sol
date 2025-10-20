@@ -80,7 +80,8 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
     /// @param _depositSender the address of the entity that initiated the deposit.
     // slither-disable-next-line locked-ether
     function bridgeRecoverFailedTransfer(
-        uint256,
+        // solhint-disable-next-line no-unused-vars
+        uint256 _chainId,
         bytes32 _assetId,
         address _depositSender,
         bytes calldata _data
