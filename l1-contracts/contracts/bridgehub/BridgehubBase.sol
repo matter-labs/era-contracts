@@ -22,19 +22,13 @@ import {ICTMDeploymentTracker} from "./ICTMDeploymentTracker.sol";
 import {AlreadyCurrentSL, NotChainAssetHandler, NotCurrentSL, NotInGatewayMode, NotRelayedSender, SLNotWhitelisted} from "./L1BridgehubErrors.sol";
 import {AssetHandlerNotRegistered, AssetIdAlreadyRegistered, AssetIdNotSupported, BridgeHubAlreadyRegistered, CTMAlreadyRegistered, CTMNotRegistered, ChainIdCantBeCurrentChain, ChainIdNotRegistered, ChainIdTooBig, EmptyAssetId, MigrationPaused, NoCTMForAssetId, SettlementLayersMustSettleOnL1, SharedBridgeNotSet, Unauthorized, ZKChainLimitReached, ZeroAddress, ZeroChainId} from "../common/L1ContractErrors.sol";
 import {L2_COMPLEX_UPGRADER_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
-import {AssetHandlerModifiers} from "../bridge/interfaces/AssetHandlerModifiers.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
 /// @dev The Bridgehub contract serves as the primary entry point for L1->L2 communication,
 /// facilitating interactions between end user and bridges.
 /// It also manages state transition managers, base tokens, and chain registrations.
-abstract contract BridgehubBase is
-    IBridgehubBase,
-    ReentrancyGuard,
-    Ownable2StepUpgradeable,
-    PausableUpgradeable
-{
+abstract contract BridgehubBase is IBridgehubBase, ReentrancyGuard, Ownable2StepUpgradeable, PausableUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /*//////////////////////////////////////////////////////////////
