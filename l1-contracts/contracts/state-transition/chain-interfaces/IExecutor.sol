@@ -3,6 +3,7 @@
 pragma solidity ^0.8.21;
 
 import {IZKChainBase} from "./IZKChainBase.sol";
+import {L2DACommitmentScheme} from "../../common/Config.sol";
 
 /// @dev Enum used by L2 System Contracts to differentiate logs.
 enum SystemLogKey {
@@ -130,12 +131,12 @@ interface IExecutor is IZKChainBase {
     /// @param newStateCommitment State commitment of the new state.
     /// @dev chain state commitment, this preimage is not opened on l1,
     /// it's guaranteed that this commitment commits to any state that needed for execution
-    /// (state root, block number, bloch hahes)
+    /// (state root, block number, bloch hashes)
     /// @param numberOfLayer1Txs Number of priority operations to be processed
     /// @param priorityOperationsHash Hash of all priority operations from this batch
     /// @param l2LogsTreeRoot Root hash of tree that contains L2 -> L1 messages from this batch
-    /// @param l2DaValidator Address of the L2 DA validator
-    /// @param daCommitment Commitment to the DA input
+    /// @param daCommitmentScheme commitment scheme used to generate pubdata commitment for this batch
+    /// @param daCommitment commitment to the batch pubdata to validate DA in the l1 da validator
     // solhint-disable-next-line gas-struct-packing
     struct CommitBatchInfoZKsyncOS {
         uint64 batchNumber;
@@ -144,7 +145,7 @@ interface IExecutor is IZKChainBase {
         bytes32 priorityOperationsHash;
         bytes32 dependencyRootsRollingHash;
         bytes32 l2LogsTreeRoot;
-        address l2DaValidator;
+        L2DACommitmentScheme daCommitmentScheme;
         bytes32 daCommitment;
         uint64 firstBlockTimestamp;
         uint64 lastBlockTimestamp;

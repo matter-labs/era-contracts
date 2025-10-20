@@ -376,6 +376,8 @@ error ZeroChainId();
 error ZeroGasPriceL1TxZKSyncOS();
 // 0x601b6882
 error ZKChainLimitReached();
+// 0x0e0ff4d9
+error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
