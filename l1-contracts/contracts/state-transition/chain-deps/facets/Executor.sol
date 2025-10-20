@@ -803,7 +803,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
     }
 
     /// @inheritdoc IExecutor
-    // Warning: removed onlyValidator to make it permisionless.
     function proveBatchesSharedBridge(
         address, // _chainAddress
         uint256 _processBatchFrom,
