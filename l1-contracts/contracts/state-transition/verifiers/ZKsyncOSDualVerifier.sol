@@ -27,7 +27,7 @@ contract ZKsyncOSDualVerifier is IVerifier {
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
     /// @dev Address of the CTM, owner of which can also add or remove verifiers.
-    ZKsyncOSChainTypeManager public ctm;
+    ZKsyncOSChainTypeManager immutable public ctm;
 
     /// @notice Mapping of different verifiers dependant on their version.
     mapping(uint32 => IVerifierV2) public fflonkVerifiers;
