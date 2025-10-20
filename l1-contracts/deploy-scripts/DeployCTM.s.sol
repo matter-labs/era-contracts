@@ -314,7 +314,7 @@ contract DeployCTMScript is Script, DeployCTMUtils {
         string memory deployedAddresses = vm.serializeString("deployed_addresses", "state_transition", stateTransition);
         vm.serializeAddress("root", "multicall3_addr", config.contracts.multicall3Addr);
         vm.serializeString("root", "deployed_addresses", deployedAddresses);
-        vm.serializeAddress("root", "create2_factory_addr", create2FactoryParams.factoryAddress);
+        vm.serializeAddress("root", "create2_factory_addr", create2FactoryState.create2FactoryAddress);
         vm.serializeBytes32("root", "create2_factory_salt", create2FactoryParams.factorySalt);
         string memory toml = vm.serializeString("root", "contracts_config", contractsConfig);
         vm.writeToml(toml, outputPath);
