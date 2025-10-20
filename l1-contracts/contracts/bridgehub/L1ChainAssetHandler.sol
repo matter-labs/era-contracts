@@ -10,6 +10,10 @@ import {TxStatus} from "../common/Messaging.sol";
 import {InvalidProof} from "../common/L1ContractErrors.sol";
 import {IMessageRoot} from "./IMessageRoot.sol";
 import {MigrationNotInProgress} from "./L1BridgehubErrors.sol";
+import {IBridgehubBase, BridgehubBurnCTMAssetData} from "./IBridgehubBase.sol";
+import {IChainTypeManager} from "../state-transition/IChainTypeManager.sol";
+import {IZKChain} from "../state-transition/chain-interfaces/IZKChain.sol";
+import {IL1AssetHandler} from "../bridge/interfaces/IL1AssetHandler.sol";
 
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
@@ -17,8 +21,8 @@ import {MigrationNotInProgress} from "./L1BridgehubErrors.sol";
 /// it is the IL1AssetHandler for the chains themselves, which is used to migrate the chains
 /// between different settlement layers (for example from L1 to Gateway).
 /// @dev L1 version – keeps the cheap immutables set in the constructor.
-contract L1ChainAssetHandler is ChainAssetHandlerBase {
-    /// @dev The assetId of the base token.
+contract L1ChainAssetHandler is ChainAssetHandlerBase, IL1AssetHandler {
+    /// @dev The assetId of the ETH.
     bytes32 public immutable override ETH_TOKEN_ASSET_ID;
 
     /// @dev The chain ID of L1.
@@ -91,32 +95,38 @@ contract L1ChainAssetHandler is ChainAssetHandlerBase {
         _transferOwnership(_owner);
     }
 
-    function confirmSuccessfulMigrationToGateway(
-        uint256 _chainId,
-        address _depositSender,
+    /// @dev IL1AssetHandler interface, used to undo a failed migration of a chain.
+    // / @param _chainId the chainId of the chain
+    /// @param _assetId the assetId of the chain's CTM
+    /// @param _data the data for the recovery.
+    /// @param _depositSender the address of the entity that initiated the deposit.
+    // slither-disable-next-line locked-ether
+    function bridgeRecoverFailedTransfer(
+        uint256,
         bytes32 _assetId,
-        bytes memory _assetData,
-        bytes32 _l2TxHash,
-        uint256 _l2BatchNumber,
-        uint256 _l2MessageIndex,
-        uint16 _l2TxNumberInBatch,
-        bytes32[] calldata _merkleProof
-    ) public nonReentrant {
-        bool proofValid = IMessageRoot(MESSAGE_ROOT).proveL1ToL2TransactionStatusShared({
-            _chainId: _chainId,
-            _l2TxHash: _l2TxHash,
-            _l2BatchNumber: _l2BatchNumber,
-            _l2MessageIndex: _l2MessageIndex,
-            _l2TxNumberInBatch: _l2TxNumberInBatch,
-            _merkleProof: _merkleProof,
-            _status: TxStatus.Success
-        });
-        require(proofValid, InvalidProof());
-        require(isMigrationInProgress[_chainId], MigrationNotInProgress());
-        isMigrationInProgress[_chainId] = false;
-    }
+        address _depositSender,
+        bytes calldata _data
+    ) external payable override requireZeroValue(msg.value) onlyAssetRouter {
+        BridgehubBurnCTMAssetData memory bridgehubBurnData = abi.decode(_data, (BridgehubBurnCTMAssetData));
 
-    function _setMigrationInProgressOnL1(uint256 _chainId) internal override {
-        isMigrationInProgress[_chainId] = true;
+        (address zkChain, address ctm) = IBridgehubBase(_bridgehub()).forwardedBridgeRecoverFailedTransfer(
+            bridgehubBurnData.chainId
+        );
+
+        IChainTypeManager(ctm).forwardedBridgeRecoverFailedTransfer({
+            _chainId: bridgehubBurnData.chainId,
+            _assetInfo: _assetId,
+            _depositSender: _depositSender,
+            _ctmData: bridgehubBurnData.ctmData
+        });
+
+        --migrationNumber[bridgehubBurnData.chainId];
+
+        IZKChain(zkChain).forwardedBridgeRecoverFailedTransfer({
+            _chainId: bridgehubBurnData.chainId,
+            _assetInfo: _assetId,
+            _originalCaller: _depositSender,
+            _chainData: bridgehubBurnData.chainData
+        });
     }
 }
