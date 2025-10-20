@@ -218,6 +218,9 @@ contract RegisterZKChainScript is Script {
 
         config.bridgehub = toml.readAddress("$.deployed_addresses.bridgehub.bridgehub_proxy_addr");
         // TODO(EVM-744): name of the key is a bit inconsistent
+
+        path = string.concat(root, vm.envString("CTM_OUTPUT"));
+        toml = vm.readFile(path);
         config.chainTypeManagerProxy = toml.readAddress(
             "$.deployed_addresses.state_transition.state_transition_proxy_addr"
         );

@@ -2,7 +2,6 @@
 pragma solidity 0.8.28;
 
 import {StdStorage, Test, stdStorage} from "forge-std/Test.sol";
-
 import {DeployL1CoreContractsIntegrationScript} from "./deploy-scripts/DeployL1CoreContractsIntegration.s.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {DeployCTMIntegrationScript} from "./deploy-scripts/DeployCTMIntegration.s.sol";
@@ -61,6 +60,8 @@ contract L1ContractDeployer is UtilsTest {
     function _deployL1Contracts() internal {
         vm.setEnv("L1_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-l1.toml");
         vm.setEnv("L1_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-l1.toml");
+        vm.setEnv("CTM_CONFIG", "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-ctm.toml");
+        vm.setEnv("CTM_OUTPUT", "/test/foundry/l1/integration/deploy-scripts/script-out/output-deploy-ctm.toml");
         vm.setEnv(
             "ZK_CHAIN_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/config-deploy-zk-chain-era.toml"
@@ -73,19 +74,19 @@ contract L1ContractDeployer is UtilsTest {
             "GATEWAY_PREPARATION_L1_CONFIG",
             "/test/foundry/l1/integration/deploy-scripts/script-config/gateway-preparation-l1.toml"
         );
-        CoreDeployedAddresses memory coreContractsAddresses = deployEcosystem();
+        addresses.ecosystemAddresses = deployEcosystem();
         ctmScript = new DeployCTMIntegrationScript();
-        ctmScript.runForTest(coreContractsAddresses.bridgehub.bridgehubProxy);
+        ctmScript.runForTest(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
         addresses.ctmAddresses = ctmScript.getAddresses();
         registerCTM(
-            coreContractsAddresses.bridgehub.bridgehubProxy,
+            addresses.ecosystemAddresses.bridgehub.bridgehubProxy,
             addresses.ctmAddresses.stateTransition.chainTypeManagerProxy
         );
 
         ecosystemConfig = ctmScript.getConfig();
 
         // Get bridgehub from the CTM script's discovered addresses
-        addresses.bridgehub = L1Bridgehub(coreContractsAddresses.bridgehub.bridgehubProxy);
+        addresses.bridgehub = L1Bridgehub(addresses.ecosystemAddresses.bridgehub.bridgehubProxy);
         addresses.chainTypeManager = IChainTypeManager(addresses.ctmAddresses.stateTransition.chainTypeManagerProxy);
         addresses.ctmDeploymentTracker = CTMDeploymentTracker(address(addresses.bridgehub.l1CtmDeployer()));
 
