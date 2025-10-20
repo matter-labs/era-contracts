@@ -33,7 +33,7 @@ contract ZKsyncOSDualVerifier is IVerifier {
     mapping(uint32 => IVerifierV2) public fflonkVerifiers;
     mapping(uint32 => IVerifier) public plonkVerifiers;
 
-    modifier OnlyCtmOwner() {
+    modifier onlyCtmOwner() {
         if (msg.sender != ctm.owner()) {
             revert Unauthorized(msg.sender);
         }
@@ -49,12 +49,12 @@ contract ZKsyncOSDualVerifier is IVerifier {
         plonkVerifiers[0] = _plonkVerifier;
     }
 
-    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external OnlyCtmOwner {
+    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external onlyCtmOwner {
         fflonkVerifiers[version] = _fflonkVerifier;
         plonkVerifiers[version] = _plonkVerifier;
     }
 
-    function removeVerifier(uint32 version) external OnlyCtmOwner {
+    function removeVerifier(uint32 version) external onlyCtmOwner {
         delete fflonkVerifiers[version];
         delete plonkVerifiers[version];
     }
