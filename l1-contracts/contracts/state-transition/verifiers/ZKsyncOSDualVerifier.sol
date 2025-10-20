@@ -192,16 +192,16 @@ contract ZKsyncOSDualVerifier is IVerifier {
     ) public pure returns (uint256 result) {
         uint256 publicInputsLength = _publicInputs.length;
         result = initialHash;
-        
+
+        uint256 i = 0;
+
         if (result == 0) {
             result = _publicInputs[0];
-            for (uint256 i = 1; i < publicInputsLength; ++i) {
-                result = uint256(keccak256(abi.encodePacked(result, _publicInputs[i]))) >> 32;
-            }
-        } else {
-            for (uint256 i = 0; i < publicInputsLength; ++i) {
-                result = uint256(keccak256(abi.encodePacked(result, _publicInputs[i]))) >> 32;
-            }
+            i = 1;
+        }
+
+        for (; i < publicInputsLength; ++i) {
+            result = uint256(keccak256(abi.encodePacked(result, _publicInputs[i]))) >> 32;
         }
     }
 }
