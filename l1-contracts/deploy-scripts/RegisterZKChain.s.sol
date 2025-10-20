@@ -37,6 +37,7 @@ import {Call} from "contracts/governance/Common.sol";
 
 import {ETH_TOKEN_ADDRESS} from "contracts/common/Config.sol";
 import {Create2AndTransfer} from "./Create2AndTransfer.sol";
+import {ZkChainAddresses} from "./DeployedAddresses.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct Config {
@@ -79,15 +80,6 @@ contract RegisterZKChainScript is Script {
 
     bytes32 internal constant STATE_TRANSITION_NEW_CHAIN_HASH = keccak256("NewZKChain(uint256,address)");
 
-    struct Output {
-        address governance;
-        address diamondProxy;
-        address chainAdmin;
-        address l2LegacySharedBridge;
-        address accessControlRestrictionAddress;
-        address chainProxyAdmin;
-    }
-
     struct LegacySharedBridgeParams {
         bytes implementationConstructorParams;
         address implementationAddress;
@@ -98,7 +90,7 @@ contract RegisterZKChainScript is Script {
     LegacySharedBridgeParams internal legacySharedBridgeParams;
 
     Config internal config;
-    Output internal output;
+    ZkChainAddresses internal output;
 
     function run() public {
         console.log("Deploying ZKChain");

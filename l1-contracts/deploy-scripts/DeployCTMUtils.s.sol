@@ -5,13 +5,13 @@ pragma solidity ^0.8.24;
 
 import {console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
-import {StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {ChainCreationParams, ChainTypeManagerInitializeData} from "contracts/state-transition/IChainTypeManager.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
 import {InitializeDataNewChain as DiamondInitializeDataNewChain} from "contracts/state-transition/chain-interfaces/IDiamondInit.sol";
 import {FeeParams, PubdataPricingMode} from "contracts/state-transition/chain-deps/ZKChainStorage.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
+import {Utils} from "./Utils.sol";
 
 import {IL1Bridgehub} from "contracts/bridgehub/IL1Bridgehub.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
@@ -52,6 +52,7 @@ import {DeployUtils} from "./DeployUtils.sol";
 import {AddressIntrospector} from "./AddressIntrospector.sol";
 
 import {Create2FactoryUtils} from "./Create2FactoryUtils.s.sol";
+import {StateTransitionDeployedAddresses, DataAvailabilityDeployedAddresses} from "./DeployedAddresses.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -64,38 +65,25 @@ struct DeployedAddresses {
     address accessControlRestrictionAddress;
 }
 
-// solhint-disable-next-line gas-struct-packing
-struct L1NativeTokenVaultAddresses {
-    address l1NativeTokenVaultImplementation;
-    address l1NativeTokenVaultProxy;
-}
-
-struct DataAvailabilityDeployedAddresses {
-    address rollupDAManager;
-    address l1RollupDAValidator;
-    address noDAValidiumL1DAValidator;
-    address availBridge;
-    address availL1DAValidator;
-}
-
 // TODO potentially remove
 // solhint-disable-next-line gas-struct-packing
-struct BridgehubDeployedAddresses {
-    address bridgehubImplementation;
-    address bridgehubProxy;
-    address ctmDeploymentTrackerImplementation;
-    address ctmDeploymentTrackerProxy;
-    address messageRootImplementation;
-    address messageRootProxy;
-    address chainAssetHandlerImplementation;
-    address chainAssetHandlerProxy;
-    address interopCenterImplementation;
-    address interopCenterProxy;
-    address assetTrackerImplementation;
-    address assetTrackerProxy;
-    address chainRegistrationSenderImplementation;
-    address chainRegistrationSenderProxy;
-}
+    struct BridgehubDeployedAddresses {
+        address bridgehubImplementation;
+        address bridgehubProxy;
+        address ctmDeploymentTrackerImplementation;
+        address ctmDeploymentTrackerProxy;
+        address messageRootImplementation;
+        address messageRootProxy;
+        address chainAssetHandlerImplementation;
+        address chainAssetHandlerProxy;
+        address interopCenterImplementation;
+        address interopCenterProxy;
+        address assetTrackerImplementation;
+        address assetTrackerProxy;
+        address chainRegistrationSenderImplementation;
+        address chainRegistrationSenderProxy;
+    }
+
 
 // solhint-disable-next-line gas-struct-packing
 struct BridgesDeployedAddresses {

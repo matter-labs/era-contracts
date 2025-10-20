@@ -22,6 +22,7 @@ import {BridgedStandardERC20} from "contracts/bridge/BridgedStandardERC20.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts-v4/proxy/transparent/ProxyAdmin.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
+import {BridgehubDeployedAddresses, BridgesDeployedAddresses, L1NativeTokenVaultAddresses} from "./DeployedAddresses.sol";
 
 // solhint-disable-next-line gas-struct-packing
 struct DeployedAddresses {
@@ -33,36 +34,6 @@ struct DeployedAddresses {
     address chainAdmin;
     address accessControlRestrictionAddress;
     address create2Factory;
-}
-
-// solhint-disable-next-line gas-struct-packing
-struct L1NativeTokenVaultAddresses {
-    address l1NativeTokenVaultImplementation;
-    address l1NativeTokenVaultProxy;
-}
-
-// solhint-disable-next-line gas-struct-packing
-struct BridgehubDeployedAddresses {
-    address bridgehubImplementation;
-    address bridgehubProxy;
-    address ctmDeploymentTrackerImplementation;
-    address ctmDeploymentTrackerProxy;
-    address messageRootImplementation;
-    address messageRootProxy;
-    address chainAssetHandlerImplementation;
-    address chainAssetHandlerProxy;
-}
-
-// solhint-disable-next-line gas-struct-packing
-struct BridgesDeployedAddresses {
-    address erc20BridgeImplementation;
-    address erc20BridgeProxy;
-    address l1AssetRouterImplementation;
-    address l1AssetRouterProxy;
-    address l1NullifierImplementation;
-    address l1NullifierProxy;
-    address bridgedStandardERC20Implementation;
-    address bridgedTokenBeacon;
 }
 
 // solhint-disable-next-line gas-struct-packing
@@ -88,16 +59,10 @@ struct TokensConfig {
     address tokenWethAddress;
 }
 
-// solhint-disable-next-line gas-struct-packing
-struct GeneratedData {
-    bytes forceDeploymentsData;
-}
-
 abstract contract DeployL1CoreUtils is DeployUtils {
     using stdToml for string;
 
     Config public config;
-    GeneratedData internal generatedData;
     DeployedAddresses internal addresses;
 
     function initializeConfig(string memory configPath) internal virtual {

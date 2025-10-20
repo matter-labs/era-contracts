@@ -6,7 +6,8 @@ pragma solidity 0.8.28;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {stdToml} from "forge-std/StdToml.sol";
 
-import {StateTransitionDeployedAddresses, Utils} from "../Utils.sol";
+import {Utils} from "../Utils.sol";
+import {StateTransitionDeployedAddresses} from "../DeployedAddresses.sol";
 import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
