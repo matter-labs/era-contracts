@@ -100,6 +100,28 @@ contract ZKsyncOSDualVerifier is IVerifier {
         return plonkVerifiers[0].verificationKeyHash();
     }
 
+    /// @notice Calculates a keccak256 hash of the runtime loaded verification keys from the selected verifier.
+    /// @return The keccak256 hash of the loaded verification keys based on the verifier.
+    function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
+        uint256 verifierType = _verifierType & 255;
+        uint32 verifierVersion = uint32(verifierType >> 8);
+
+        if (
+            fflonkVerifiers[verifierVersion] == IVerifierV2(address(0)) &&
+            plonkVerifiers[verifierVersion] == IVerifier(address(0))
+        ) {
+            revert UnknownVerifierVersion();
+        }
+
+        if(verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
+            return plonkVerifiers[verifierVersion].verificationKeyHash();
+        }
+        // If the verifier type is unknown, revert with an error.
+        else {
+            revert UnknownVerifierType();
+        }
+    }
+
     function _extractZKSyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
         uint256 resultLength = _proof.length - 1 - 1;
 
