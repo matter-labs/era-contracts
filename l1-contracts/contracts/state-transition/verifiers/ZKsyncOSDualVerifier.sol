@@ -25,9 +25,6 @@ error UnsupportedChainIdForMockVerifier();
 contract ZKsyncOSDualVerifier is IVerifier {
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
-    // @notice This is test only verifier (mock), and must be removed before prod.
-    uint256 internal constant ZKSYNC_OS_MOCK_VERIFICATION_TYPE = 3;
-
     address public ctmOwner;
 
     mapping(uint32 => IVerifierV2) public fflonkVerifiers;
@@ -88,16 +85,6 @@ contract ZKsyncOSDualVerifier is IVerifier {
             args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
 
             return plonkVerifiers[verifierVersion].verify(args, _extractZKSyncOSProof(_proof));
-        } else if (verifierType == ZKSYNC_OS_MOCK_VERIFICATION_TYPE) {
-            // just for safety - only allowing default anvil chain and sepolia testnet
-            if (block.chainid != 31337 && block.chainid != 11155111) {
-                revert UnsupportedChainIdForMockVerifier();
-            }
-
-            uint256[] memory args = new uint256[](1);
-            args[0] = computeZKSyncOSHash(_proof[1], _publicInputs);
-
-            return mockverify(args, _extractZKSyncOSProof(_proof));
         }
         // If the verifier type is unknown, revert with an error.
         else {
