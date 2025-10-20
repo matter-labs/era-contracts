@@ -40,6 +40,7 @@ struct L1NativeTokenVaultAddresses {
 struct DataAvailabilityDeployedAddresses {
     address rollupDAManager;
     address l1RollupDAValidator;
+    address l1BlobsDAValidatorZKsyncOS;
     address noDAValidiumL1DAValidator;
     address availBridge;
     address availL1DAValidator;
