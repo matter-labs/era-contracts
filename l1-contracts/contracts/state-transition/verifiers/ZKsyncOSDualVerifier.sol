@@ -92,39 +92,10 @@ contract ZKsyncOSDualVerifier is IVerifier {
         }
     }
 
-    function mockverify(uint256[] memory _publicInputs, uint256[] memory _proof) public view virtual returns (bool) {
-        if (_proof.length != 2) {
-            revert InvalidMockProofLength();
-        }
-        if (_proof[0] != 13) {
-            revert InvalidProof();
-        }
-        if (_proof[1] != _publicInputs[0]) {
-            revert InvalidProof();
-        }
-        return true;
-    }
-
     /// @inheritdoc IVerifier
     /// @dev Used for backward compatibility with older Verifier implementation. Returns PLONK verification key hash.
     function verificationKeyHash() external view returns (bytes32) {
         return plonkVerifiers[0].verificationKeyHash();
-    }
-
-    /// @notice Extract the proof by removing the first element (proof type differentiator).
-    /// @param _proof The proof array array.
-    /// @return result A new array with the first element removed. The first element was used as a hack for
-    /// differentiator between FFLONK and PLONK proofs.
-    function _extractProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
-        uint256 resultLength = _proof.length - 1;
-
-        // Allocate memory for the new array (_proof.length - 1) since the first element is omitted.
-        result = new uint256[](resultLength);
-
-        // Copy elements starting from index 1 (the second element) of the original array.
-        assembly {
-            calldatacopy(add(result, 0x20), add(_proof.offset, 0x20), mul(resultLength, 0x20))
-        }
     }
 
     function _extractZKSyncOSProof(uint256[] calldata _proof) internal pure returns (uint256[] memory result) {
