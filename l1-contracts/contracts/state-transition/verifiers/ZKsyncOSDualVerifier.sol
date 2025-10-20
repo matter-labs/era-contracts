@@ -2,10 +2,11 @@
 
 pragma solidity 0.8.28;
 
-import {OnlyCtmOwner, UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
+import {UnknownVerifierVersion} from "../L1StateTransitionErrors.sol";
 import {IVerifierV2} from "../chain-interfaces/IVerifierV2.sol";
 import {IVerifier} from "../chain-interfaces/IVerifier.sol";
-import {EmptyProofLength, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
+import {EmptyProofLength, Unauthorized, UnknownVerifierType} from "../../common/L1ContractErrors.sol";
+import {ZKsyncOSChainTypeManager} from "../../state-transition/ZKsyncOSChainTypeManager.sol";
 
 // 0xd08a97e6
 error InvalidMockProofLength();
@@ -25,34 +26,35 @@ contract ZKsyncOSDualVerifier is IVerifier {
     /// @dev Type of verification for ZKsync OS PLONK verifier.
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
-    /// @dev Address of the CTM owner, who can also add or remove verifiers.
-    address public ctmOwner;
+    /// @dev Address of the CTM, owner of which can also add or remove verifiers.
+    ZKsyncOSChainTypeManager public ctm;
 
     /// @notice Mapping of different verifiers dependant on their version.
     mapping(uint32 => IVerifierV2) public fflonkVerifiers;
     mapping(uint32 => IVerifier) public plonkVerifiers;
 
+    modifier OnlyCtmOwner() {
+        if (msg.sender != ctm.owner()) {
+            revert Unauthorized(msg.sender);
+        }
+        _;
+    }
+
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
-    /// @param _ctmOwner The address of the contract owner, who can add or remove verifiers.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _ctmOwner) {
-        ctmOwner = _ctmOwner;
+    /// @param _ctm The address of the CTM, owner of which can add or remove verifiers.
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _ctm) {
+        ctm = ZKsyncOSChainTypeManager(_ctm);
         fflonkVerifiers[0] = _fflonkVerifier;
         plonkVerifiers[0] = _plonkVerifier;
     }
 
-    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external {
-        if (msg.sender != ctmOwner) {
-            revert OnlyCtmOwner();
-        }
+    function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external OnlyCtmOwner {
         fflonkVerifiers[version] = _fflonkVerifier;
         plonkVerifiers[version] = _plonkVerifier;
     }
 
-    function removeVerifier(uint32 version) external {
-        if (msg.sender != ctmOwner) {
-            revert OnlyCtmOwner();
-        }
+    function removeVerifier(uint32 version) external OnlyCtmOwner {
         delete fflonkVerifiers[version];
         delete plonkVerifiers[version];
     }
