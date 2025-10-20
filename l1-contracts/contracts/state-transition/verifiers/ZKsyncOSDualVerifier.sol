@@ -113,7 +113,7 @@ contract ZKsyncOSDualVerifier is IVerifier {
             revert UnknownVerifierVersion();
         }
 
-        if(verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
+        if (verifierType == ZKSYNC_OS_PLONK_VERIFICATION_TYPE) {
             return plonkVerifiers[verifierVersion].verificationKeyHash();
         }
         // If the verifier type is unknown, revert with an error.
