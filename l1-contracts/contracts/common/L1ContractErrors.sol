@@ -381,6 +381,11 @@ error ZKChainLimitReached();
 // 0x0e0ff4d9
 error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
 
+// 0xd08a97e6
+error InvalidMockProofLength();
+// 0x616008dd
+error UnsupportedChainIdForMockVerifier();
+
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,
     LegacyBridgeFirstBatch,
