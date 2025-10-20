@@ -72,6 +72,9 @@ library L2DAValidator {
             bytes32 fullPubdataHash = EfficientCall.keccak(pubdata);
             pubdataDACommitment = keccak256(abi.encodePacked(uncompressedStateDiffHash, fullPubdataHash));
         } else {
+            // will revert if `_l2DACommitmentScheme` is:
+            // - `NONE`(invalid option)
+            // - `BLOBS_ZKSYNC_OS`(not supported with Era VM
             revert InvalidDACommitmentScheme(uint256(_l2DACommitmentScheme));
         }
     }

@@ -223,6 +223,12 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
 
         // This contract is located in the `da-contracts` folder, we output it the same way for consistency/ease of use.
         addresses.daAddresses.l1RollupDAValidator = deploySimpleContract("RollupL1DAValidator", false);
+        if (config.isZKsyncOS) {
+            addresses.daAddresses.l1BlobsDAValidatorZKsyncOS = deploySimpleContract(
+                "BlobsL1DAValidatorZKsyncOS",
+                false
+            );
+        }
 
         addresses.daAddresses.noDAValidiumL1DAValidator = deploySimpleContract("ValidiumL1DAValidator", false);
 
@@ -235,6 +241,13 @@ contract DeployCTMScript is Script, DeployL1HelperScript {
         vm.startBroadcast(msg.sender);
         IRollupDAManager rollupDAManager = IRollupDAManager(addresses.daAddresses.rollupDAManager);
         rollupDAManager.updateDAPair(addresses.daAddresses.l1RollupDAValidator, getRollupL2DACommitmentScheme(), true);
+        if (config.isZKsyncOS) {
+            rollupDAManager.updateDAPair(
+                addresses.daAddresses.l1BlobsDAValidatorZKsyncOS,
+                L2DACommitmentScheme.BLOBS_ZKSYNC_OS,
+                true
+            );
+        }
         vm.stopBroadcast();
     }
 
