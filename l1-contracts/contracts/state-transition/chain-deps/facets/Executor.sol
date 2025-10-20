@@ -162,14 +162,24 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Theoretically, we can just ignore it, all the DA validators, except `RollupL1DAValidator`, always return a 0 array,
         // and `RollupL1DAValidator` will fail if we try to submit blobs with ZKsync OS, so it also returns zeroes here.
         // However, we are double-checking that the L1 DA validator doesn't rely on "EraVM like" blobs verification, just in case.
-        if (daOutput.blobsLinearHashes.length != daOutput.blobsOpeningCommitments.length  ||
-            (daOutput.blobsLinearHashes.length != 0 && daOutput.blobsLinearHashes.length != TOTAL_BLOBS_IN_COMMITMENT)) {
-            revert InvalidNumberOfBlobs(TOTAL_BLOBS_IN_COMMITMENT, daOutput.blobsOpeningCommitments.length, daOutput.blobsLinearHashes.length);
+        if (
+            daOutput.blobsLinearHashes.length != daOutput.blobsOpeningCommitments.length ||
+            (daOutput.blobsLinearHashes.length != 0 && daOutput.blobsLinearHashes.length != TOTAL_BLOBS_IN_COMMITMENT)
+        ) {
+            revert InvalidNumberOfBlobs(
+                TOTAL_BLOBS_IN_COMMITMENT,
+                daOutput.blobsOpeningCommitments.length,
+                daOutput.blobsLinearHashes.length
+            );
         }
         uint256 blobsNumber = daOutput.blobsLinearHashes.length;
-        for(uint256 i = 0; i < blobsNumber; ++i) {
+        for (uint256 i = 0; i < blobsNumber; ++i) {
             if (daOutput.blobsLinearHashes[i] != bytes32(0) || daOutput.blobsOpeningCommitments[i] != bytes32(0)) {
-                revert NonZeroBlobToVerifyZKsyncOS(i, daOutput.blobsLinearHashes[i], daOutput.blobsOpeningCommitments[i]);
+                revert NonZeroBlobToVerifyZKsyncOS(
+                    i,
+                    daOutput.blobsLinearHashes[i],
+                    daOutput.blobsOpeningCommitments[i]
+                );
             }
         }
 
