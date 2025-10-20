@@ -18,15 +18,17 @@ error UnsupportedChainIdForMockVerifier();
 /// @title Dual Verifier
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-/// @notice This contract wraps two different verifiers (FFLONK and PLONK) and routes zk-SNARK proof verification
-/// to the correct verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
-/// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type. The contract is
-/// needed for the smooth transition from PLONK based verifier to the FFLONK verifier.
+/// @notice This contract wraps ZKsync OS specific Plonk verifiers and routes zk-SNARK proof verification
+/// to the verifier based on the provided proof type. It reuses the same interface as on the original `Verifier`
+/// contract, while abusing on of the fields (`_recursiveAggregationInput`) for proof verification type.
 contract ZKsyncOSDualVerifier is IVerifier {
+    /// @dev Type of verification for ZKsync OS PLONK verifier.
     uint256 internal constant ZKSYNC_OS_PLONK_VERIFICATION_TYPE = 2;
 
+    /// @dev Address of the CTM owner, who can also add or remove verifiers.
     address public ctmOwner;
 
+    /// @notice Mapping of different verifiers dependant on their version.
     mapping(uint32 => IVerifierV2) public fflonkVerifiers;
     mapping(uint32 => IVerifier) public plonkVerifiers;
 
@@ -43,7 +45,6 @@ contract ZKsyncOSDualVerifier is IVerifier {
         if (msg.sender != ctmOwner) {
             revert OnlyCtmOwner();
         }
-        // Add logic to add verifiers
         fflonkVerifiers[version] = _fflonkVerifier;
         plonkVerifiers[version] = _plonkVerifier;
     }
@@ -56,12 +57,11 @@ contract ZKsyncOSDualVerifier is IVerifier {
         delete plonkVerifiers[version];
     }
 
-    /// @notice Routes zk-SNARK proof verification to the appropriate verifier (FFLONK or PLONK) based on the proof type.
+    /// @notice Routes zk-SNARK proof verification to the appropriate verifier based on the proof type.
     /// @param _publicInputs The public inputs to the proof.
     /// @param _proof The zk-SNARK proof itself.
     /// @dev  The first element of the `_proof` determines the verifier type.
-    ///     - 0 indicates the FFLONK verifier should be used.
-    ///     - 1 indicates the PLONK verifier should be used.
+    ///     - 2 indicates the ZKsync OS Plonk verifier should be used.
     /// @return Returns `true` if the proof verification succeeds, otherwise throws an error.
     function verify(uint256[] calldata _publicInputs, uint256[] calldata _proof) public view virtual returns (bool) {
         // Ensure the proof has a valid length (at least one element
@@ -70,7 +70,7 @@ contract ZKsyncOSDualVerifier is IVerifier {
             revert EmptyProofLength();
         }
 
-        // The first element of `_proof` determines the verifier type (either FFLONK or PLONK).
+        // The first element of `_proof` determines the verifier type.
         uint256 verifierType = _proof[0] & 255;
         uint32 verifierVersion = uint32(_proof[0] >> 8);
         if (
