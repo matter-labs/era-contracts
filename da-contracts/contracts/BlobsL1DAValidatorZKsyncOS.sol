@@ -4,7 +4,7 @@ pragma solidity 0.8.28;
 
 import {IL1DAValidator, L1DAValidatorOutput} from "./IL1DAValidator.sol";
 
-import { InvalidBlobsDAInputLength, BlobNotPublished, InvalidBlobsPublished } from "./DAContractsErrors.sol";
+import { NonEmptyBlobVersionHash, InvalidBlobsDAInputLength, BlobNotPublished, InvalidBlobsPublished } from "./DAContractsErrors.sol";
 
 /// @dev The number of blocks within each we allow blob to be used for DA.
 /// On Ethereum blobs expire within 4096 epochs, i.e. 4096 * 32 blocks. We reserve
@@ -80,8 +80,8 @@ contract BlobsL1DAValidatorZKsyncOS is IL1DAValidator {
 
         // This check is required because we want to ensure that there aren't any extra blobs trying to be published.
         // Calling the BLOBHASH opcode with an index > # blobs - 1 yields bytes32(0)
-        bytes32 versionedHash = _getBlobVersionedHash(versionedHashIndex);
-        if (versionedHash != bytes32(0)) {
+        bytes32 nextVersionedHash = _getBlobVersionedHash(versionedHashIndex);
+        if (nextVersionedHash != bytes32(0)) {
             revert NonEmptyBlobVersionHash(versionedHashIndex);
         }
 
