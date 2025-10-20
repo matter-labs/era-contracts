@@ -152,7 +152,6 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // we can just ignore l1 da validator output with ZKsync OS:
         // - used state diffs hash correctness verified within state transition program
         // - blob commitments/linear hashes verification not supported, we use different way and custom DA validator for blobs with ZKsync OS
-        // slither-disable-next-line unused-return
         L1DAValidatorOutput memory daOutput = IL1DAValidator(s.l1DAValidator).checkDA({
             _chainId: s.chainId,
             _batchNumber: uint256(_newBatch.batchNumber),
@@ -163,10 +162,12 @@ contract ExecutorFacet is ZKChainBase, IExecutor {
         // Theoretically, we can just ignore it, all the DA validators, except `RollupL1DAValidator`, always return a 0 array,
         // and `RollupL1DAValidator` will fail if we try to submit blobs with ZKsync OS, so it also returns zeroes here.
         // However, we are double-checking that the L1 DA validator doesn't rely on "EraVM like" blobs verification, just in case.
-        if (daOutput.blobsLinearHashes.length != TOTAL_BLOBS_IN_COMMITMENT || daOutput.blobsOpeningCommitments.length != TOTAL_BLOBS_IN_COMMITMENT) {
+        if (daOutput.blobsLinearHashes.length != daOutput.blobsOpeningCommitments.length  ||
+            (daOutput.blobsLinearHashes.length != 0 && daOutput.blobsLinearHashes.length != TOTAL_BLOBS_IN_COMMITMENT)) {
             revert InvalidNumberOfBlobs(TOTAL_BLOBS_IN_COMMITMENT, daOutput.blobsOpeningCommitments.length, daOutput.blobsLinearHashes.length);
         }
-        for(uint256 i = 0; i < daOutput.blobsLinearHashes.length; i++) {
+        uint256 blobsNumber = daOutput.blobsLinearHashes.length;
+        for(uint256 i = 0; i < blobsNumber; ++i) {
             if (daOutput.blobsLinearHashes[i] != bytes32(0) || daOutput.blobsOpeningCommitments[i] != bytes32(0)) {
                 revert NonZeroBlobToVerifyZKsyncOS(i, daOutput.blobsLinearHashes[i], daOutput.blobsOpeningCommitments[i]);
             }

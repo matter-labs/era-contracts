@@ -43,8 +43,6 @@ error BlobCommitmentNotPublished();
 // 0x5717f940
 error InvalidPubdataSource(uint8 pubdataSource);
 
-// ZKsync OS specific errors
-
 // 0x6122198f
 error InvalidBlobsDAInputLength(uint256 pubdataInputLength);
 
