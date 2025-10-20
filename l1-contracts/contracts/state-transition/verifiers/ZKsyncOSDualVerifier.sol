@@ -45,9 +45,9 @@ contract ZKsyncOSDualVerifier is IVerifier {
 
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
-    /// @param _CHAIN_TYPE_MANAGER The address of the CTM, owner of which can add or remove verifiers.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _CHAIN_TYPE_MANAGER) {
-        CHAIN_TYPE_MANAGER = ZKsyncOSChainTypeManager(_CHAIN_TYPE_MANAGER);
+    /// @param _chainTypeManager The address of the CTM, owner of which can add or remove verifiers.
+    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _chainTypeManager) {
+        CHAIN_TYPE_MANAGER = ZKsyncOSChainTypeManager(_chainTypeManager);
         fflonkVerifiers[0] = _fflonkVerifier;
         plonkVerifiers[0] = _plonkVerifier;
     }
@@ -132,7 +132,7 @@ contract ZKsyncOSDualVerifier is IVerifier {
     /// @return The keccak256 hash of the loaded verification keys based on the verifier.
     function verificationKeyHash(uint256 _verifierType) external view returns (bytes32) {
         uint256 verifierType = _verifierType & 255;
-        uint32 verifierVersion = uint32(verifierType >> 8);
+        uint32 verifierVersion = uint32(_verifierType >> 8);
 
         if (
             fflonkVerifiers[verifierVersion] == IVerifierV2(address(0)) &&
