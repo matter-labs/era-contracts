@@ -85,7 +85,6 @@ contract GatewayCTMFromL1 is Script {
         uint256 genesisRollupLeafIndex;
         bytes32 genesisBatchCommitment;
         uint256 latestProtocolVersion;
-        address expectedRollupL2DAValidator;
         bytes forceDeploymentsData;
     }
 
@@ -229,7 +228,6 @@ contract GatewayCTMFromL1 is Script {
             genesisRollupLeafIndex: toml.readUint("$.genesis_rollup_leaf_index"),
             genesisBatchCommitment: toml.readBytes32("$.genesis_batch_commitment"),
             latestProtocolVersion: toml.readUint("$.latest_protocol_version"),
-            expectedRollupL2DAValidator: toml.readAddress("$.expected_rollup_l2_da_validator"),
             forceDeploymentsData: toml.readBytes("$.force_deployments_data")
         });
 
@@ -239,7 +237,6 @@ contract GatewayCTMFromL1 is Script {
             salt: bytes32(0),
             eraChainId: config.eraChainId,
             l1ChainId: config.l1ChainId,
-            rollupL2DAValidatorAddress: config.expectedRollupL2DAValidator,
             testnetVerifier: config.testnetVerifier,
             adminSelectors: Utils.getAllSelectorsForFacet("Admin"),
             executorSelectors: Utils.getAllSelectorsForFacet("Executor"),
@@ -445,7 +442,7 @@ contract GatewayCTMFromL1 is Script {
             output.gatewayStateTransition.chainTypeManagerImplementation
         );
 
-        // TODO(EVM-745): eventually a proxy admin or something should be deplyoed here
+        // TODO(EVM-745): eventually a proxy admin or something should be deployed here
         Diamond.FacetCut[] memory facetCuts = new Diamond.FacetCut[](4);
         facetCuts[0] = Diamond.FacetCut({
             facet: output.gatewayStateTransition.adminFacet,

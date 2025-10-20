@@ -20,6 +20,8 @@ import {InteropRoot, L2CanonicalTransaction} from "contracts/common/Messaging.so
 import {DummyBridgehub} from "contracts/dev-contracts/test/DummyBridgehub.sol";
 import {PriorityOpsBatchInfo} from "contracts/state-transition/libraries/PriorityTree.sol";
 import {InvalidBlobCommitmentsLength, InvalidBlobHashesLength} from "test/foundry/L1TestsErrors.sol";
+import {Utils as DeployUtils} from "deploy-scripts/Utils.sol";
+import {L2DACommitmentScheme} from "contracts/common/Config.sol";
 import {ContractsBytecodesLib} from "deploy-scripts/ContractsBytecodesLib.sol";
 
 bytes32 constant DEFAULT_L2_LOGS_TREE_ROOT_HASH = 0x0000000000000000000000000000000000000000000000000000000000000000;
@@ -28,7 +30,7 @@ address constant L2_BOOTLOADER_ADDRESS = 0x0000000000000000000000000000000000008
 address constant L2_KNOWN_CODE_STORAGE_ADDRESS = 0x0000000000000000000000000000000000008004;
 address constant L2_TO_L1_MESSENGER = 0x0000000000000000000000000000000000008008;
 // constant in tests, but can be arbitrary address in real environments
-address constant L2_DA_VALIDATOR_ADDRESS = 0x2f3Bc0cB46C9780990afbf86A60bdf6439DE991C;
+L2DACommitmentScheme constant L2_DA_COMMITMENT_SCHEME = L2DACommitmentScheme.PUBDATA_KECCAK256;
 
 uint256 constant MAX_NUMBER_OF_BLOBS = 6;
 uint256 constant TOTAL_BLOBS_IN_COMMITMENT = 16;
@@ -103,7 +105,7 @@ library Utils {
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
-            bytes32(uint256(uint160(L2_DA_VALIDATOR_ADDRESS)))
+            bytes32(uint256(L2_DA_COMMITMENT_SCHEME))
         );
         logs[7] = constructL2Log(
             true,
@@ -121,13 +123,13 @@ library Utils {
         return logs;
     }
 
-    function createSystemLogsWithEmptyDAValidator() public returns (bytes[] memory) {
+    function createSystemLogsWithNoneDAValidator() public returns (bytes[] memory) {
         bytes[] memory systemLogs = createSystemLogs(bytes32(0));
         systemLogs[uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY)] = constructL2Log(
             true,
             L2_TO_L1_MESSENGER,
             uint256(SystemLogKey.USED_L2_DA_VALIDATOR_ADDRESS_KEY),
-            bytes32(uint256(0))
+            bytes32(uint256(L2DACommitmentScheme.NONE))
         );
 
         return systemLogs;
@@ -342,7 +344,7 @@ library Utils {
     }
 
     function getUtilsFacetSelectors() public pure returns (bytes4[] memory) {
-        bytes4[] memory selectors = new bytes4[](44);
+        bytes4[] memory selectors = new bytes4[](45);
 
         uint256 i = 0;
         selectors[i++] = UtilsFacet.util_setChainId.selector;
@@ -389,6 +391,7 @@ library Utils {
         selectors[i++] = UtilsFacet.util_setTotalBatchesCommitted.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierDenominator.selector;
         selectors[i++] = UtilsFacet.util_getBaseTokenGasPriceMultiplierNominator.selector;
+        selectors[i++] = UtilsFacet.util_getL2DACommimentScheme.selector;
 
         return selectors;
     }
