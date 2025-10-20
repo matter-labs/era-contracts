@@ -35,8 +35,7 @@ abstract contract BridgehubBase is
     IBridgehubBase,
     ReentrancyGuard,
     Ownable2StepUpgradeable,
-    PausableUpgradeable,
-    AssetHandlerModifiers
+    PausableUpgradeable
 {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
