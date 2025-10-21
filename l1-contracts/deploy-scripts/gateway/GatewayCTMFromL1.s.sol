@@ -265,7 +265,8 @@ contract GatewayCTMFromL1 is Script {
             forceDeploymentsData: config.forceDeploymentsData,
             protocolVersion: config.latestProtocolVersion,
             // TODO: for now, zksync os on gateway is not supported
-            isZKsyncOS: false
+            isZKsyncOS: false,
+            executionVersion: 0
         });
     }
 

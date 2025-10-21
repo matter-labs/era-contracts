@@ -61,7 +61,13 @@ library GatewayCTMDeployerHelper {
             contracts,
             innerConfig
         );
-        contracts = _deployVerifier(config.testnetVerifier, contracts, innerConfig, config.aliasedGovernanceAddress);
+        contracts = _deployVerifier(
+            config.testnetVerifier,
+            contracts,
+            innerConfig,
+            config.executionVersion,
+            config.aliasedGovernanceAddress
+        );
 
         contracts.stateTransition.validatorTimelockImplementation = _deployInternal(
             "ValidatorTimelock",
@@ -187,6 +193,7 @@ library GatewayCTMDeployerHelper {
         bool _testnetVerifier,
         DeployedContracts memory _deployedContracts,
         InnerDeployConfig memory innerConfig,
+        uint32 _version,
         address _verifierOwner
     ) internal returns (DeployedContracts memory) {
         address verifierFflonk = _deployInternal("L1VerifierFflonk", "L1VerifierFflonk.sol", hex"", innerConfig);
@@ -195,7 +202,7 @@ library GatewayCTMDeployerHelper {
         _deployedContracts.stateTransition.verifierFflonk = verifierFflonk;
         _deployedContracts.stateTransition.verifierPlonk = verifierPlonk;
 
-        bytes memory constructorParams = abi.encode(verifierFflonk, verifierPlonk, _verifierOwner);
+        bytes memory constructorParams = abi.encode(_version, verifierFflonk, verifierPlonk, _verifierOwner);
 
         if (_testnetVerifier) {
             _deployedContracts.stateTransition.verifier = _deployInternal(

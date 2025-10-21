@@ -48,7 +48,7 @@ contract ExecutorProofTest is Test {
     UtilsFacet internal utilsFacet;
     TestExecutorFacet internal executor;
     address internal testnetVerifier =
-        address(new TestnetVerifier(IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
+        address(new TestnetVerifier(0, IVerifierV2(address(0)), IVerifier(address(0)), address(0)));
 
     function getTestExecutorFacetSelectors() private pure returns (bytes4[] memory) {
         bytes4[] memory selectors = new bytes4[](3);

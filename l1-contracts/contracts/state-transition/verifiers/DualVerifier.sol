@@ -42,10 +42,10 @@ contract DualVerifier is IVerifier {
     /// @param _fflonkVerifier The address of the FFLONK verifier contract.
     /// @param _plonkVerifier The address of the PLONK verifier contract.
     /// @param _ctmOwner The address of the contract owner, who can add or remove verifiers.
-    constructor(IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _ctmOwner) {
+    constructor(uint32 _version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier, address _ctmOwner) {
         ctmOwner = _ctmOwner;
-        fflonkVerifiers[0] = _fflonkVerifier;
-        plonkVerifiers[0] = _plonkVerifier;
+        fflonkVerifiers[_version] = _fflonkVerifier;
+        plonkVerifiers[_version] = _plonkVerifier;
     }
 
     function addVerifier(uint32 version, IVerifierV2 _fflonkVerifier, IVerifier _plonkVerifier) external {

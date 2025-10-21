@@ -74,8 +74,8 @@ contract GatewayCTMDeployerTest is Test {
         new L1VerifierFflonk();
         new L1VerifierPlonk();
 
-        new TestnetVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
-        new DualVerifier(L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
+        new TestnetVerifier(0, L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
+        new DualVerifier(0, L1VerifierFflonk(address(0)), L1VerifierPlonk(address(0)), address(0));
 
         new ValidatorTimelock(L2_BRIDGEHUB_ADDR);
         new ServerNotifier();
@@ -119,7 +119,9 @@ contract GatewayCTMDeployerTest is Test {
             genesisBatchCommitment: bytes32(uint256(0x456)),
             forceDeploymentsData: hex"deadbeef",
             protocolVersion: 1,
-            isZKsyncOS: false
+            // TODO: we don't support zksync os on the gateway
+            isZKsyncOS: false,
+            executionVersion: 0
         });
 
         // Initialize selectors with sample function selectors

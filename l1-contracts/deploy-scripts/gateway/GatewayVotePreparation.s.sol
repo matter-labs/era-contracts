@@ -133,7 +133,8 @@ contract GatewayVotePreparation is DeployCTMScript, GatewayGovernanceUtils {
             forceDeploymentsData: forceDeploymentsData,
             protocolVersion: config.contracts.latestProtocolVersion,
             // TODO: for now, zksync os on gateway is not supported
-            isZKsyncOS: false
+            isZKsyncOS: false,
+            executionVersion: 0
         });
     }
 

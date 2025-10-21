@@ -225,6 +225,7 @@ contract ExecutorTest is Test {
             commitment: bytes32("")
         });
         TestnetVerifier testnetVerifier = new TestnetVerifier(
+            0,
             IVerifierV2(address(0)),
             IVerifier(address(0)),
             address(0)

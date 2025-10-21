@@ -80,6 +80,7 @@ struct Config {
     bool testnetVerifier;
     bool supportL2LegacySharedBridgeTest;
     bool isZKsyncOS;
+    uint32 executionVersion;
     ContractsConfig contracts;
     TokensConfig tokens;
 }
@@ -142,6 +143,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
         config.testnetVerifier = toml.readBool("$.testnet_verifier");
         config.supportL2LegacySharedBridgeTest = toml.readBool("$.support_l2_legacy_shared_bridge_test");
         config.isZKsyncOS = toml.readBool("$.is_zk_sync_os");
+        config.executionVersion = uint32(toml.readUint("$.execution_version"));
 
         config.contracts.governanceSecurityCouncilAddress = toml.readAddress(
             "$.contracts.governance_security_council_address"
@@ -424,6 +426,7 @@ abstract contract DeployUtils is Create2FactoryUtils {
             /// In practice we might want to set it to CTM owner (which in production will be less restritive).
             return
                 abi.encode(
+                    config.executionVersion,
                     addresses.stateTransition.verifierFflonk,
                     addresses.stateTransition.verifierPlonk,
                     config.ownerAddress
