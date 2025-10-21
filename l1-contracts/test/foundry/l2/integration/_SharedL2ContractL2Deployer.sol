@@ -10,16 +10,17 @@ import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/tran
 
 import {L2Utils} from "./L2Utils.sol";
 import {SystemContractsArgs} from "../../l1/integration/l2-tests-abstract/Utils.sol";
-import {ADDRESS_ONE, Action, FacetCut, StateTransitionDeployedAddresses} from "deploy-scripts/Utils.sol";
+import {ADDRESS_ONE} from "deploy-scripts/Utils.sol";
 
 import {ExecutorFacet} from "contracts/state-transition/chain-deps/facets/Executor.sol";
 import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol";
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
+import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
 import {L1GenesisUpgrade} from "contracts/upgrades/L1GenesisUpgrade.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {ValidatorTimelock} from "contracts/state-transition/ValidatorTimelock.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
@@ -53,7 +54,7 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         instantiateCreate2Factory();
         addresses.stateTransition.genesisUpgrade = address(new L1GenesisUpgrade());
         addresses.stateTransition.verifier = address(
-            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE), address(0))
+            new TestnetVerifier(IVerifierV2(ADDRESS_ONE), IVerifier(ADDRESS_ONE), address(0), false)
         );
         uint32 executionDelay = uint32(config.contracts.validatorTimelockExecutionDelay);
         addresses.stateTransition.validatorTimelock = address(
@@ -71,19 +72,35 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         addresses.stateTransition.gettersFacet = address(new GettersFacet());
         addresses.stateTransition.diamondInit = address(new DiamondInit(false));
         // Deploy ChainTypeManager implementation
-        addresses.stateTransition.chainTypeManagerImplementation = address(
-            new ChainTypeManager(addresses.bridgehub.bridgehubProxy)
-        );
+        if (config.isZKsyncOS) {
+            addresses.stateTransition.chainTypeManagerImplementation = address(
+                new ZKsyncOSChainTypeManager(addresses.bridgehub.bridgehubProxy)
+            );
+        } else {
+            addresses.stateTransition.chainTypeManagerImplementation = address(
+                new EraChainTypeManager(addresses.bridgehub.bridgehubProxy)
+            );
+        }
 
         // Deploy TransparentUpgradeableProxy for ChainTypeManager
+        bytes memory initCalldata;
+        if (config.isZKsyncOS) {
+            initCalldata = abi.encodeCall(
+                IChainTypeManager.initialize,
+                getChainTypeManagerInitializeData(addresses.stateTransition)
+            );
+        } else {
+            initCalldata = abi.encodeCall(
+                IChainTypeManager.initialize,
+                getChainTypeManagerInitializeData(addresses.stateTransition)
+            );
+        }
+
         addresses.stateTransition.chainTypeManagerProxy = address(
             new TransparentUpgradeableProxy(
                 addresses.stateTransition.chainTypeManagerImplementation,
                 addresses.transparentProxyAdmin,
-                abi.encodeCall(
-                    ChainTypeManager.initialize,
-                    getChainTypeManagerInitializeData(addresses.stateTransition)
-                )
+                initCalldata
             )
         );
     }
@@ -106,7 +123,10 @@ contract SharedL2ContractL2Deployer is SharedL2ContractDeployer {
         revert("Not implemented");
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
         return ("Not implemented initialize calldata");
     }
 

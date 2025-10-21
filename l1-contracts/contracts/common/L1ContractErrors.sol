@@ -115,6 +115,8 @@ error GasPerPubdataMismatch();
 error GenesisBatchCommitmentZero();
 // 0x7940c83f
 error GenesisBatchHashZero();
+// 0xb4fc6835
+error GenesisIndexStorageZero();
 // 0x3a1a8589
 error GenesisUpgradeZero();
 // 0xd356e6ba
@@ -144,6 +146,8 @@ error InvalidCaller(address);
 error InvalidChainId();
 // 0x92daded2
 error InvalidDAForPermanentRollup();
+// 0x3f98a77e
+error InvalidL2DACommitmentScheme(uint8);
 // 0x4fbe5dba
 error InvalidDelay();
 // 0xc1780bd6
@@ -382,6 +386,14 @@ error SystemContractProxyInitialized();
 error ZKSyncOSNotForceDeployForExistingContract(address);
 
 error UnsupportedUpgradeType();
+
+// 0x0e0ff4d9
+error NonZeroBlobToVerifyZKsyncOS(uint256 index, bytes32 blobLinearHash, bytes32 blobOpeningCommitment);
+
+// 0xd08a97e6
+error InvalidMockProofLength();
+// 0x616008dd
+error UnsupportedChainIdForMockVerifier();
 
 enum SharedBridgeKey {
     PostUpgradeFirstBatch,

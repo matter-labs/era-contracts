@@ -6,8 +6,6 @@ import {Diamond} from "./libraries/Diamond.sol";
 import {L2CanonicalTransaction} from "../common/Messaging.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 
-// import {IBridgehub} from "../bridgehub/IBridgehub.sol";
-
 /// @notice Struct that holds all data needed for initializing CTM Proxy.
 /// @dev We use struct instead of raw parameters in `initialize` function to prevent "Stack too deep" error
 /// @param owner The address who can manage non-critical updates in the contract
@@ -122,6 +120,10 @@ interface IChainTypeManager {
     function protocolVersionIsActive(uint256 _protocolVersion) external view returns (bool);
 
     function getProtocolVersion(uint256 _chainId) external view returns (uint256);
+
+    function serverNotifierAddress() external view returns (address);
+
+    function validatorTimelock() external view returns (address);
 
     function initialize(ChainTypeManagerInitializeData calldata _initializeData) external;
 

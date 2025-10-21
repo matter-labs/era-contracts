@@ -5,12 +5,10 @@ pragma solidity ^0.8.24;
 import {Script, console2 as console} from "forge-std/Script.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {FacetCut, StateTransitionDeployedAddresses} from "./Utils.sol";
+import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
 import {IChainTypeManager} from "contracts/state-transition/IChainTypeManager.sol";
 import {IL1AssetRouter} from "contracts/bridge/asset-router/IL1AssetRouter.sol";
-import {INativeTokenVault} from "contracts/bridge/ntv/INativeTokenVault.sol";
 import {L2ContractHelper} from "contracts/common/l2-helpers/L2ContractHelper.sol";
 import {IL1Nullifier, L1Nullifier} from "contracts/bridge/L1Nullifier.sol";
 import {IL1NativeTokenVault} from "contracts/bridge/ntv/IL1NativeTokenVault.sol";
@@ -20,7 +18,6 @@ import {IMessageRoot} from "contracts/bridgehub/IMessageRoot.sol";
 import {IOwnable} from "contracts/common/interfaces/IOwnable.sol";
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts-v4/proxy/beacon/UpgradeableBeacon.sol";
-import {Action, FacetCut, StateTransitionDeployedAddresses, Utils} from "./Utils.sol";
 import {Multicall3} from "contracts/dev-contracts/Multicall3.sol";
 
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
@@ -30,6 +27,7 @@ import {ChainAdmin} from "contracts/governance/ChainAdmin.sol";
 import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
 import {L1ChainAssetHandler} from "contracts/bridgehub/L1ChainAssetHandler.sol";
 import {L1MessageRoot} from "contracts/bridgehub/L1MessageRoot.sol";
+import {CTMDeploymentTracker} from "contracts/bridgehub/CTMDeploymentTracker.sol";
 import {L1NativeTokenVault} from "contracts/bridge/ntv/L1NativeTokenVault.sol";
 import {L1AssetRouter} from "contracts/bridge/asset-router/L1AssetRouter.sol";
 import {L1ERC20Bridge} from "contracts/bridge/L1ERC20Bridge.sol";
@@ -38,11 +36,13 @@ import {ChainAdminOwnable} from "contracts/governance/ChainAdminOwnable.sol";
 import {L1NullifierDev} from "contracts/dev-contracts/L1NullifierDev.sol";
 import {ContractsBytecodesLib} from "./ContractsBytecodesLib.sol";
 import {Diamond} from "contracts/state-transition/libraries/Diamond.sol";
-import {DiamondProxy} from "contracts/state-transition/chain-deps/DiamondProxy.sol";
-import {IRollupDAManager} from "./interfaces/IRollupDAManager.sol";
-import {DualVerifier} from "contracts/state-transition/verifiers/DualVerifier.sol";
-import {L1VerifierPlonk} from "contracts/state-transition/verifiers/L1VerifierPlonk.sol";
-import {L1VerifierFflonk} from "contracts/state-transition/verifiers/L1VerifierFflonk.sol";
+
+import {EraDualVerifier} from "contracts/state-transition/verifiers/EraDualVerifier.sol";
+import {ZKsyncOSDualVerifier} from "contracts/state-transition/verifiers/ZKsyncOSDualVerifier.sol";
+import {EraVerifierFflonk} from "contracts/state-transition/verifiers/EraVerifierFflonk.sol";
+import {EraVerifierPlonk} from "contracts/state-transition/verifiers/EraVerifierPlonk.sol";
+import {ZKsyncOSVerifierFflonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierFflonk.sol";
+import {ZKsyncOSVerifierPlonk} from "contracts/state-transition/verifiers/ZKsyncOSVerifierPlonk.sol";
 import {TestnetVerifier} from "contracts/state-transition/verifiers/TestnetVerifier.sol";
 import {IVerifier, VerifierParams} from "contracts/state-transition/chain-interfaces/IVerifier.sol";
 import {DefaultUpgrade} from "contracts/upgrades/DefaultUpgrade.sol";
@@ -53,7 +53,8 @@ import {AdminFacet} from "contracts/state-transition/chain-deps/facets/Admin.sol
 import {MailboxFacet} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
 import {GettersFacet} from "contracts/state-transition/chain-deps/facets/Getters.sol";
 import {DiamondInit} from "contracts/state-transition/chain-deps/DiamondInit.sol";
-import {ChainTypeManager} from "contracts/state-transition/ChainTypeManager.sol";
+import {EraChainTypeManager} from "contracts/state-transition/EraChainTypeManager.sol";
+import {ZKsyncOSChainTypeManager} from "contracts/state-transition/ZKsyncOSChainTypeManager.sol";
 import {ValidiumL1DAValidator} from "contracts/state-transition/data-availability/ValidiumL1DAValidator.sol";
 import {RollupDAManager} from "contracts/state-transition/data-availability/RollupDAManager.sol";
 import {BytecodesSupplier} from "contracts/upgrades/BytecodesSupplier.sol";
@@ -96,7 +97,7 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
 
         proxy = deployViaCreate2AndNotify(
             type(TransparentUpgradeableProxy).creationCode,
-            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName)),
+            abi.encode(implementation, proxyAdmin, getInitializeCalldata(contractName, false)),
             contractName,
             string.concat(contractName, " Proxy"),
             isZKBytecode
@@ -151,20 +152,30 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
                 if (config.testnetVerifier) {
                     return type(TestnetVerifier).creationCode;
                 } else {
-                    return type(DualVerifier).creationCode;
+                    if (config.isZKsyncOS) {
+                        return type(ZKsyncOSDualVerifier).creationCode;
+                    } else {
+                        return type(EraDualVerifier).creationCode;
+                    }
                 }
-            } else if (compareStrings(contractName, "VerifierFflonk")) {
-                return type(L1VerifierFflonk).creationCode;
-            } else if (compareStrings(contractName, "VerifierPlonk")) {
-                return type(L1VerifierPlonk).creationCode;
+            } else if (compareStrings(contractName, "EraVerifierFflonk")) {
+                return type(EraVerifierFflonk).creationCode;
+            } else if (compareStrings(contractName, "EraVerifierPlonk")) {
+                return type(EraVerifierPlonk).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSVerifierFflonk")) {
+                return type(ZKsyncOSVerifierFflonk).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSVerifierPlonk")) {
+                return type(ZKsyncOSVerifierPlonk).creationCode;
             } else if (compareStrings(contractName, "DefaultUpgrade")) {
                 return type(DefaultUpgrade).creationCode;
             } else if (compareStrings(contractName, "L1GenesisUpgrade")) {
                 return type(L1GenesisUpgrade).creationCode;
             } else if (compareStrings(contractName, "ValidatorTimelock")) {
                 return type(ValidatorTimelock).creationCode;
-            } else if (compareStrings(contractName, "ChainTypeManager")) {
-                return type(ChainTypeManager).creationCode;
+            } else if (compareStrings(contractName, "EraChainTypeManager")) {
+                return type(EraChainTypeManager).creationCode;
+            } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+                return type(ZKsyncOSChainTypeManager).creationCode;
             } else if (compareStrings(contractName, "BytecodesSupplier")) {
                 return type(BytecodesSupplier).creationCode;
             } else if (compareStrings(contractName, "ExecutorFacet")) {
@@ -263,41 +274,54 @@ abstract contract DeployL1HelperScript is Script, DeployUtils {
         return ContractsBytecodesLib.getCreationCode(contractName, isZKBytecode);
     }
 
-    function getInitializeCalldata(string memory contractName) internal virtual override returns (bytes memory) {
-        if (compareStrings(contractName, "L1Bridgehub")) {
-            return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
-        } else if (compareStrings(contractName, "L1MessageRoot")) {
-            return abi.encodeCall(L1MessageRoot.initialize, ());
-        } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
-            return abi.encode();
-        } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
-            return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
-        } else if (compareStrings(contractName, "L1Nullifier")) {
-            return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
-        } else if (compareStrings(contractName, "L1AssetRouter")) {
-            return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
-        } else if (compareStrings(contractName, "L1ERC20Bridge")) {
-            return abi.encodeCall(L1ERC20Bridge.initialize, ());
-        } else if (compareStrings(contractName, "L1NativeTokenVault")) {
-            return
-                abi.encodeCall(
-                    L1NativeTokenVault.initialize,
-                    (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
-                );
-        } else if (compareStrings(contractName, "ChainTypeManager")) {
-            return
-                abi.encodeCall(
-                    ChainTypeManager.initialize,
-                    getChainTypeManagerInitializeData(addresses.stateTransition)
-                );
-        } else if (compareStrings(contractName, "ServerNotifier")) {
-            return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
-        } else if (compareStrings(contractName, "ValidatorTimelock")) {
-            return
-                abi.encodeCall(
-                    ValidatorTimelock.initialize,
-                    (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
-                );
+    function getInitializeCalldata(
+        string memory contractName,
+        bool isZKBytecode
+    ) internal virtual override returns (bytes memory) {
+        if (!isZKBytecode) {
+            if (compareStrings(contractName, "L1Bridgehub")) {
+                return abi.encodeCall(L1Bridgehub.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1MessageRoot")) {
+                return abi.encodeCall(L1MessageRoot.initialize, ());
+            } else if (compareStrings(contractName, "L1ChainAssetHandler")) {
+                return abi.encodeCall(L1ChainAssetHandler.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "CTMDeploymentTracker")) {
+                return abi.encodeCall(CTMDeploymentTracker.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1Nullifier")) {
+                return abi.encodeCall(L1Nullifier.initialize, (config.deployerAddress, 1, 1, 1, 0));
+            } else if (compareStrings(contractName, "L1AssetRouter")) {
+                return abi.encodeCall(L1AssetRouter.initialize, (config.deployerAddress));
+            } else if (compareStrings(contractName, "L1ERC20Bridge")) {
+                return abi.encodeCall(L1ERC20Bridge.initialize, ());
+            } else if (compareStrings(contractName, "L1NativeTokenVault")) {
+                return
+                    abi.encodeCall(
+                        L1NativeTokenVault.initialize,
+                        (config.ownerAddress, addresses.bridges.bridgedTokenBeacon)
+                    );
+            } else if (compareStrings(contractName, "EraChainTypeManager")) {
+                return
+                    abi.encodeCall(
+                        IChainTypeManager.initialize,
+                        getChainTypeManagerInitializeData(addresses.stateTransition)
+                    );
+            } else if (compareStrings(contractName, "ZKsyncOSChainTypeManager")) {
+                return
+                    abi.encodeCall(
+                        IChainTypeManager.initialize,
+                        getChainTypeManagerInitializeData(addresses.stateTransition)
+                    );
+            } else if (compareStrings(contractName, "ServerNotifier")) {
+                return abi.encodeCall(ServerNotifier.initialize, (msg.sender));
+            } else if (compareStrings(contractName, "ValidatorTimelock")) {
+                return
+                    abi.encodeCall(
+                        ValidatorTimelock.initialize,
+                        (config.deployerAddress, uint32(config.contracts.validatorTimelockExecutionDelay))
+                    );
+            } else {
+                revert(string.concat("Contract ", contractName, " initialize calldata not set"));
+            }
         } else {
             revert(string.concat("Contract ", contractName, " ZK initialize calldata not set"));
         }

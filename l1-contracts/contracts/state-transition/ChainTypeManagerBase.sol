@@ -14,18 +14,19 @@ import {ChainCreationParams, ChainTypeManagerInitializeData, IChainTypeManager} 
 import {IZKChain} from "./chain-interfaces/IZKChain.sol";
 import {FeeParams} from "./chain-deps/ZKChainStorage.sol";
 import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable-v4/access/Ownable2StepUpgradeable.sol";
-import {L2_TO_L1_LOG_SERIALIZE_SIZE, DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK} from "../common/Config.sol";
-import {InitialForceDeploymentMismatch, AdminZero, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
-import {ChainAlreadyLive, Unauthorized, ZeroAddress, HashMismatch, GenesisUpgradeZero, GenesisBatchHashZero, GenesisBatchCommitmentZero, MigrationsNotPaused} from "../common/L1ContractErrors.sol";
+import {DEFAULT_L2_LOGS_TREE_ROOT_HASH, EMPTY_STRING_KECCAK, L2_TO_L1_LOG_SERIALIZE_SIZE} from "../common/Config.sol";
+import {AdminZero, InitialForceDeploymentMismatch, OutdatedProtocolVersion} from "./L1StateTransitionErrors.sol";
+import {ChainAlreadyLive, GenesisBatchCommitmentZero, GenesisBatchHashZero, GenesisUpgradeZero, HashMismatch, Unauthorized, ZeroAddress} from "../common/L1ContractErrors.sol";
 import {SemVer} from "../common/libraries/SemVer.sol";
-import {IBridgehub} from "../bridgehub/IBridgehub.sol";
+import {IL1Bridgehub} from "../bridgehub/IL1Bridgehub.sol";
 
 import {ReentrancyGuard} from "../common/ReentrancyGuard.sol";
 
-/// @title Chain Type Manager contract
+/// @title Chain Type Manager Base contract
 /// @author Matter Labs
 /// @custom:security-contact security@matterlabs.dev
-contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
+/// @notice Base contract for Chain Type Managers with common functionality
+abstract contract ChainTypeManagerBase is IChainTypeManager, ReentrancyGuard, Ownable2StepUpgradeable {
     using EnumerableMap for EnumerableMap.UintToAddressMap;
 
     /// @notice Address of the bridgehub
@@ -107,7 +108,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @notice only the chain asset handler can call
     modifier onlyChainAssetHandler() {
-        if (msg.sender != IBridgehub(BRIDGE_HUB).chainAssetHandler()) {
+        if (msg.sender != IL1Bridgehub(BRIDGE_HUB).chainAssetHandler()) {
             revert Unauthorized(msg.sender);
         }
         _;
@@ -121,7 +122,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @notice return the chain contract address for a chainId
     function getZKChain(uint256 _chainId) public view returns (address) {
-        return IBridgehub(BRIDGE_HUB).getZKChain(_chainId);
+        return IL1Bridgehub(BRIDGE_HUB).getZKChain(_chainId);
     }
 
     /// @notice return the chain contract address for a chainId
@@ -160,7 +161,18 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
     /// @notice Updates the parameters with which a new chain is created
     /// @param _chainCreationParams The new chain creation parameters
-    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
+    /// @dev To be overridden in derived contracts for custom validation
+    function _setChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal virtual;
+
+    /// @notice Updates the parameters with which a new chain is created
+    /// @param _chainCreationParams The new chain creation parameters
+    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
+        _setChainCreationParams(_chainCreationParams);
+    }
+
+    /// @notice Validates chain creation parameters common to all chain types
+    /// @param _chainCreationParams The chain creation parameters to validate
+    function _validateChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal pure {
         if (_chainCreationParams.genesisUpgrade == address(0)) {
             revert GenesisUpgradeZero();
         }
@@ -170,7 +182,11 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         if (_chainCreationParams.genesisBatchCommitment == bytes32(0)) {
             revert GenesisBatchCommitmentZero();
         }
+    }
 
+    /// @notice Sets chain creation parameters after validation
+    /// @param _chainCreationParams The chain creation parameters
+    function _processValidatedChainCreationParams(ChainCreationParams calldata _chainCreationParams) internal {
         l1GenesisUpgrade = _chainCreationParams.genesisUpgrade;
 
         // We need to initialize the state hash because it is used in the commitment of the next batch
@@ -201,12 +217,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
             forceDeploymentsData: _chainCreationParams.forceDeploymentsData,
             forceDeploymentHash: forceDeploymentHash
         });
-    }
-
-    /// @notice Updates the parameters with which a new chain is created
-    /// @param _chainCreationParams The new chain creation parameters
-    function setChainCreationParams(ChainCreationParams calldata _chainCreationParams) external onlyOwner {
-        _setChainCreationParams(_chainCreationParams);
     }
 
     /// @notice Starts the transfer of admin rights. Only the current admin can propose a new pending one.
@@ -269,16 +279,25 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     /// @param _oldProtocolVersion the old protocol version
     /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
     /// @param _newProtocolVersion the new protocol version
+    /// @dev To be overridden in derived contracts for custom behavior
     function setNewVersionUpgrade(
         Diamond.DiamondCutData calldata _cutData,
         uint256 _oldProtocolVersion,
         uint256 _oldProtocolVersionDeadline,
         uint256 _newProtocolVersion
-    ) external onlyOwner {
-        if (!IBridgehub(BRIDGE_HUB).migrationPaused()) {
-            revert MigrationsNotPaused();
-        }
+    ) external virtual;
 
+    /// @dev Common logic for setting new version upgrade
+    /// @param _cutData the new diamond cut data
+    /// @param _oldProtocolVersion the old protocol version
+    /// @param _oldProtocolVersionDeadline the deadline for the old protocol version
+    /// @param _newProtocolVersion the new protocol version
+    function _setNewVersionUpgrade(
+        Diamond.DiamondCutData calldata _cutData,
+        uint256 _oldProtocolVersion,
+        uint256 _oldProtocolVersionDeadline,
+        uint256 _newProtocolVersion
+    ) internal {
         bytes32 newCutHash = keccak256(abi.encode(_cutData));
         uint256 previousProtocolVersion = protocolVersion;
         upgradeCutHash[_oldProtocolVersion] = newCutHash;
@@ -321,7 +340,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         IZKChain(getZKChain(_chainId)).freezeDiamond();
     }
 
-    /// @dev freezes the specified chain
+    /// @dev unfreezes the specified chain
     /// @param _chainId the chainId of the chain
     function unfreezeChain(uint256 _chainId) external onlyOwner {
         IZKChain(getZKChain(_chainId)).unfreezeDiamond();
@@ -390,8 +409,6 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
     function setPorterAvailability(uint256 _chainId, bool _zkPorterIsAvailable) external onlyOwner {
         IZKChain(getZKChain(_chainId)).setPorterAvailability(_zkPorterIsAvailable);
     }
-
-    /// registration
 
     /// @notice deploys a full set of chains contracts
     /// @param _chainId the chain's id
@@ -474,7 +491,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
         // genesis upgrade, deploys some contracts, sets chainId
         IAdmin(zkChainAddress).genesisUpgrade(
             l1GenesisUpgrade,
-            address(IBridgehub(BRIDGE_HUB).l1CtmDeployer()),
+            address(IL1Bridgehub(BRIDGE_HUB).l1CtmDeployer()),
             _forceDeploymentData,
             _factoryDeps
         );
@@ -508,7 +525,7 @@ contract ChainTypeManager is IChainTypeManager, ReentrancyGuard, Ownable2StepUpg
 
         return
             abi.encode(
-                IBridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
+                IL1Bridgehub(BRIDGE_HUB).baseTokenAssetId(_chainId),
                 _newSettlementLayerAdmin,
                 protocolVersion,
                 _diamondCut

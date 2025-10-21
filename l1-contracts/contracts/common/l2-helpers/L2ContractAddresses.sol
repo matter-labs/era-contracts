@@ -75,6 +75,7 @@ address constant L2_NATIVE_TOKEN_VAULT_ADDR = address(USER_CONTRACTS_OFFSET + 0x
 /// @dev the address of the l2 asset router.
 address constant L2_MESSAGE_ROOT_ADDR = address(USER_CONTRACTS_OFFSET + 0x05);
 
+/// @dev The address of the l2 wrapped base token.
 address constant L2_WRAPPED_BASE_TOKEN_IMPL_ADDR = address(USER_CONTRACTS_OFFSET + 0x07);
 
 /// @dev The address of the SloadContract system contract, which provides a method to read values from arbitrary storage slots

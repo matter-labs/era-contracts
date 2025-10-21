@@ -27,7 +27,12 @@ library ContractsBytecodesLib {
     }
 
     function getCreationCodeEVM(string memory contractIdentifier) internal view returns (bytes memory) {
-        string[3] memory DA_CONTRACT_IDENTIFIERS = ["RollupL1DAValidator", "AvailL1DAValidator", "DummyAvailBridge"];
+        string[4] memory DA_CONTRACT_IDENTIFIERS = [
+            "RollupL1DAValidator",
+            "BlobsL1DAValidatorZKsyncOS",
+            "AvailL1DAValidator",
+            "DummyAvailBridge"
+        ];
 
         uint256 DA_CONTRACT_IDENTIFIERS_LENGTH = DA_CONTRACT_IDENTIFIERS.length;
         for (uint i = 0; i < DA_CONTRACT_IDENTIFIERS_LENGTH; i++) {
@@ -45,23 +50,27 @@ library ContractsBytecodesLib {
         // Defines the contract identifiers for L1 contracts that follow the
         // pattern: ContractIdentifier.sol and contract class ContractIdentifier.
         // These are handled by the generic L1 case in getCreationCode.
-        string[38] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
+        string[44] memory L1_GENERIC_CONTRACT_IDENTIFIERS = [
             "AccessControlRestriction", /// ??
             "BeaconProxy",
             "BridgedStandardERC20",
             "BridgedTokenBeacon",
-            "Bridgehub",
+            "L1Bridgehub",
+            "L2Bridgehub",
             "BytecodesSupplier", // ???
             "ChainAdmin",
             "ChainAdminOwnable",
-            "ChainAssetHandler",
+            "L1ChainAssetHandler",
+            "L2ChainAssetHandler",
             "ChainRegistrar",
-            "ChainTypeManager",
+            "EraChainTypeManager",
+            "ZKsyncOSChainTypeManager",
             "CTMDeploymentTracker",
             "DiamondInit",
             "DiamondProxy",
             "DefaultUpgrade",
-            "DualVerifier",
+            "EraDualVerifier",
+            "ZKsyncOSDualVerifier",
             "L1GenesisUpgrade",
             "L2AdminFactory",
             "L2AssetRouter",
@@ -72,7 +81,8 @@ library ContractsBytecodesLib {
             "L2ProxyAdminDeployer",
             "L2WrappedBaseToken",
             "Multicall3",
-            "MessageRoot",
+            "L1MessageRoot",
+            "L2MessageRoot",
             "PermanentRestriction",
             "ProxyAdmin", // ??
             "UpgradeableBeacon",
@@ -83,7 +93,8 @@ library ContractsBytecodesLib {
             "ValidatorTimelock",
             "ValidiumL1DAValidator", // ???
             "L2MessageVerification",
-            "L1V29Upgrade"
+            "L1V29Upgrade",
+            "UpgradeableBeaconDeployer"
         ];
 
         string[6] memory L2_GENERIC_CONTRACT_IDENTIFIERS = [
@@ -125,10 +136,14 @@ library ContractsBytecodesLib {
         } else if (Utils.compareStrings(contractIdentifier, "GettersFacet")) {
             // Original: Getters.sol
             return Utils.readZKFoundryBytecodeL1("Getters.sol", "GettersFacet");
-        } else if (Utils.compareStrings(contractIdentifier, "VerifierFflonk")) {
-            return Utils.readZKFoundryBytecodeL1("L1VerifierFflonk.sol", "L1VerifierFflonk");
-        } else if (Utils.compareStrings(contractIdentifier, "VerifierPlonk")) {
-            return Utils.readZKFoundryBytecodeL1("L1VerifierPlonk.sol", "L1VerifierPlonk");
+        } else if (Utils.compareStrings(contractIdentifier, "EraVerifierFflonk")) {
+            return Utils.readZKFoundryBytecodeL1("EraVerifierFflonk.sol", "EraVerifierFflonk");
+        } else if (Utils.compareStrings(contractIdentifier, "EraVerifierPlonk")) {
+            return Utils.readZKFoundryBytecodeL1("EraVerifierPlonk.sol", "EraVerifierPlonk");
+        } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierFflonk")) {
+            return Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierFflonk.sol", "ZKsyncOSVerifierFflonk");
+        } else if (Utils.compareStrings(contractIdentifier, "ZKsyncOSVerifierPlonk")) {
+            return Utils.readZKFoundryBytecodeL1("ZKsyncOSVerifierPlonk.sol", "ZKsyncOSVerifierPlonk");
         }
 
         // --- General Cases ---

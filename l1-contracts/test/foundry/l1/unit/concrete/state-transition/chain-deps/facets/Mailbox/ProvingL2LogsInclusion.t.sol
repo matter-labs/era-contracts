@@ -12,8 +12,8 @@ import {BatchNotExecuted, HashedLogIsDefault} from "contracts/common/L1ContractE
 import {MurkyBase} from "murky/common/MurkyBase.sol";
 import {MerkleTest} from "contracts/dev-contracts/test/MerkleTest.sol";
 import {TxStatus} from "contracts/state-transition/chain-deps/facets/Mailbox.sol";
-import {L1Bridgehub} from "contracts/bridgehub/L1Bridgehub.sol";
-import {IBridgehub} from "contracts/bridgehub/IBridgehub.sol";
+
+import {IBridgehubBase} from "contracts/bridgehub/IBridgehubBase.sol";
 import {MerkleTreeNoSort} from "test/foundry/l1/unit/concrete/common/libraries/Merkle/MerkleTreeNoSort.sol";
 import {MessageHashing} from "contracts/common/libraries/MessageHashing.sol";
 import {IMailbox} from "contracts/state-transition/chain-interfaces/IMailbox.sol";
@@ -319,12 +319,12 @@ contract MailboxL2LogsProve is MailboxTest {
 
         vm.mockCall(
             address(bridgehub),
-            abi.encodeCall(IBridgehub.whitelistedSettlementLayers, (proofInfo.settlementLayerChainId)),
+            abi.encodeCall(IBridgehubBase.whitelistedSettlementLayers, (proofInfo.settlementLayerChainId)),
             abi.encode(true)
         );
         vm.mockCall(
             address(bridgehub),
-            abi.encodeCall(IBridgehub.getZKChain, (proofInfo.settlementLayerChainId)),
+            abi.encodeCall(IBridgehubBase.getZKChain, (proofInfo.settlementLayerChainId)),
             abi.encode(secondDiamondProxy)
         );
 

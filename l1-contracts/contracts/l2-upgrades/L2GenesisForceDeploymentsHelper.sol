@@ -2,10 +2,9 @@
 
 pragma solidity 0.8.28;
 
-
 import {L2_ASSET_ROUTER_ADDR, L2_BRIDGEHUB_ADDR, L2_CHAIN_ASSET_HANDLER_ADDR, L2_DEPLOYER_SYSTEM_CONTRACT_ADDR, L2_MESSAGE_ROOT_ADDR, L2_NATIVE_TOKEN_VAULT_ADDR, L2_NTV_BEACON_DEPLOYER_ADDR, L2_WRAPPED_BASE_TOKEN_IMPL_ADDR, L2_SYSTEM_CONTRACT_PROXY_ADMIN_ADDR} from "../common/l2-helpers/L2ContractAddresses.sol";
 import {IL2ContractDeployer} from "../common/interfaces/IL2ContractDeployer.sol";
-import {ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
+import {FixedForceDeploymentsData, ZKChainSpecificForceDeploymentsData} from "../state-transition/l2-deps/IL2GenesisUpgrade.sol";
 import {IL2WrappedBaseToken} from "../bridge/interfaces/IL2WrappedBaseToken.sol";
 import {TransparentUpgradeableProxy} from "@openzeppelin/contracts-v4/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {SystemContractProxyAdmin} from "./SystemContractProxyAdmin.sol";
@@ -38,7 +37,6 @@ library L2GenesisForceDeploymentsHelper {
     function forceDeployEra(bytes memory _bytecodeInfo, address _newAddress) internal {
         bytes32 bytecodeHash = abi.decode(_bytecodeInfo, (bytes32));
         IL2ContractDeployer.ForceDeployment[] memory forceDeployments = new IL2ContractDeployer.ForceDeployment[](1);
-        // Configure the MessageRoot deployment.
         forceDeployments[0] = IL2ContractDeployer.ForceDeployment({
             bytecodeHash: bytecodeHash,
             newAddress: _newAddress,
@@ -222,7 +220,6 @@ library L2GenesisForceDeploymentsHelper {
             _baseTokenSymbol: additionalForceDeploymentsData.baseTokenSymbol
         });
 
-
         // Now initializing the upgradeable token beacon
         conductContractUpgrade(expectedUpgradeType, fixedForceDeploymentsData.l2NtvBytecodeInfo, L2_NATIVE_TOKEN_VAULT_ADDR);
 
@@ -277,16 +274,16 @@ library L2GenesisForceDeploymentsHelper {
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).initL2(
                 fixedForceDeploymentsData.l1ChainId,
                 fixedForceDeploymentsData.aliasedL1Governance,
-                L2Bridgehub(L2_BRIDGEHUB_ADDR),
+                L2_BRIDGEHUB_ADDR,
                 L2_ASSET_ROUTER_ADDR,
-                L2MessageRoot(L2_MESSAGE_ROOT_ADDR)
+                L2_MESSAGE_ROOT_ADDR
             );
         } else {
             L2ChainAssetHandler(L2_CHAIN_ASSET_HANDLER_ADDR).updateL2(
                 fixedForceDeploymentsData.l1ChainId,
-                L2Bridgehub(L2_BRIDGEHUB_ADDR),
+                L2_BRIDGEHUB_ADDR,
                 L2_ASSET_ROUTER_ADDR,
-                L2MessageRoot(L2_MESSAGE_ROOT_ADDR)
+                L2_MESSAGE_ROOT_ADDR
             );
         }
 
