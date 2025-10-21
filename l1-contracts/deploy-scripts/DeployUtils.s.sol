@@ -415,11 +415,12 @@ abstract contract DeployUtils is Create2FactoryUtils {
                     );
             } else {
                 if (config.isZKsyncOS) {
+                    require(addresses.stateTransition.chainTypeManagerProxy != address(0), "ctm is zero");
                     return
                         abi.encode(
                             addresses.stateTransition.verifierFflonk,
                             addresses.stateTransition.verifierPlonk,
-                            config.ownerAddress
+                            addresses.stateTransition.chainTypeManagerProxy
                         );
                 } else {
                     return
